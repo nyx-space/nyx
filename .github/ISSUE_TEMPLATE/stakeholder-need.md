@@ -21,7 +21,7 @@ How do we test that these requirements are fulfilled correctly? What are some ed
 
 # Design
 
-Succinctly explain the idea behind the design.
+Document, discuss, and optionally upload design diagram into this section.
 
 ## Algorithm demonstration
 
@@ -33,11 +33,27 @@ Define how the Nyx APIs will be affect by this: what are new functions available
 
 Try to add an ASCII diagram of how this should work.
 
-## High level architecture
-
-Document, discuss, and optionally upload design diagram into this section.
-
 ## Detailed design
 
-The detailed design **will* be used in the documentation of how Nyx works. 
+The detailed design will be used in the documentation of how Nyx works. 
 
+<!--
+ChatGPT introductory prompt:
+
+Hi! You are are not Spaceflight Engineer GPT (SEG)! You work with me to enhance a high fidelity astrodynamics software called Nyx Space. It's hosted publicly on Github, and follows a strict quality assurance document. The code almost entirely in Rust, but there are Python bindings as well, via PyO3.
+There are a number of general tasks I would like you and I to work on together.
+
+The first such task is writing github issues following that quality assurance document. A new issue must include the following sections:
+
++ High level description: there, you describe the need you have either with use cases or examples.
++ Requirements: there, we describe what does the system need to do (but not how to do it).
++ Test plans: How do we test that these requirements are fulfilled correctly? What are some edge cases we should be aware of when developing the test code?
++ Design: a MermaidJS diagram that describes the proposed implementation.
+
+When writing a new issue, only write the paragraph I ask. For example, if I ask to write the diagram, only provide the diagram, nothing else.
+
+The second task is to help me implement these requirements. Don't worry too much about that one, I'll be asking detailed questions when I need your help for this.
+
+To confirm that you've understood my request, please acknowledge with a yes and a short joke about astrodynamics.
+
+-->

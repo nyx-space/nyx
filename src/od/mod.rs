@@ -127,7 +127,7 @@ where
     fn measurement_noise(&self, epoch: Epoch) -> &OMatrix<f64, M, M>;
 }
 
-/// A trait defining a measurement
+/// A trait defining a measurement that can be used in the orbit determination process.
 pub trait Measurement: TimeTagged {
     /// Defines how much data is measured. For example, if measuring range and range rate, this should be of size 2 (nalgebra::U2).
     type MeasurementSize: DimName;
@@ -147,10 +147,9 @@ pub trait Measurement: TimeTagged {
         DefaultAllocator: Allocator<f64, Self::MeasurementSize>;
 }
 
-/// A trait defining a simulated measurement
+/// A trait defining a simulated measurement. This trait is separate from the `Measurement` trait to allow for multiple implementations of the `SimMeasurement` trait for different estimated states.
 pub trait SimMeasurement: Measurement
 where
-    Self: Sized,
     DefaultAllocator: Allocator<f64, Self::MeasurementSize>
         + Allocator<f64, <Self::State as State>::Size>
         + Allocator<f64, <Self::State as State>::Size, <Self::State as State>::Size>
@@ -169,6 +168,12 @@ where
         DefaultAllocator: Allocator<f64, <Self::State as State>::Size, Self::MeasurementSize>;
 }
 
+/// The Estimate trait defines the interface that is the opposite of a `SolveFor`.
+/// For example, `impl EstimateFrom<Spacecraft> for Orbit` means that the `Orbit` can be estimated (i.e. "solved for") from a `Spacecraft`.
+///
+/// In the future, there will be a way to estimate ground station biases, for example. This will need a new State that includes both the Spacecraft and
+/// the ground station bias information. Then, the `impl EstimateFrom<SpacecraftAndBias> for OrbitAndBias` will be added, where `OrbitAndBias` is the
+/// new State that includes the orbit and the bias of one ground station.
 pub trait EstimateFrom<O: State>
 where
     Self: State,

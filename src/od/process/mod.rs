@@ -16,8 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use rand::thread_rng;
-
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName};
 use crate::md::trajectory::{InterpState, Traj};
@@ -423,8 +421,6 @@ where
         // be wrong if the step would be larger. Moreover, we will reset the STM to ensure that the state transition matrix
         // stays linear (the error control function may verify this).
 
-        let mut rng = thread_rng();
-
         for (msr_cnt, (device_name, msr)) in measurements.iter().enumerate() {
             let next_msr_epoch = msr.epoch();
 
@@ -462,33 +458,33 @@ where
                     match devices.get_mut(device_name) {
                         Some(device) => {
                             if let Some(computed_meas) =
-                                device.measure(epoch, &traj, &mut rng, self.cosm.clone())
+                                device.measure(epoch, &traj, None, self.cosm.clone())
                             {
-                                self.kf
-                                    .update_h_tilde(computed_meas.sensitivity(nominal_state));
-
                                 // Switch back from extended if necessary
                                 if self.kf.is_extended() && self.ekf_trigger.disable_ekf(epoch) {
                                     self.kf.set_extended(false);
                                     info!("EKF disabled @ {epoch}");
                                 }
 
+                                self.kf
+                                    .update_h_tilde(computed_meas.sensitivity(nominal_state));
+
                                 match self.kf.measurement_update(
                                     nominal_state,
                                     &msr.observation(),
                                     &computed_meas.observation(),
                                 ) {
-                                    Ok((est, res)) => {
+                                    Ok((estimate, residual)) => {
                                         debug!("msr update #{msr_cnt} @ {epoch}");
                                         // Switch to EKF if necessary, and update the dynamics and such
                                         // Note: we call enable_ekf first to ensure that the trigger gets
                                         // called in case it needs to save some information (e.g. the
                                         // StdEkfTrigger needs to store the time of the previous measurement).
-                                        if self.ekf_trigger.enable_ekf(&est)
+                                        if self.ekf_trigger.enable_ekf(&estimate)
                                             && !self.kf.is_extended()
                                         {
                                             self.kf.set_extended(true);
-                                            if !est.within_3sigma() {
+                                            if !estimate.within_3sigma() {
                                                 warn!("EKF enabled @ {epoch} but filter DIVERGING");
                                             } else {
                                                 info!("EKF enabled @ {epoch}");
@@ -496,11 +492,11 @@ where
                                         }
                                         if self.kf.is_extended() {
                                             self.prop.state =
-                                                self.prop.state + est.state_deviation();
+                                                self.prop.state + estimate.state_deviation();
                                         }
                                         self.prop.state.reset_stm();
-                                        self.estimates.push(est);
-                                        self.residuals.push(res);
+                                        self.estimates.push(estimate);
+                                        self.residuals.push(residual);
                                     }
                                     Err(e) => return Err(e),
                                 }

@@ -24,12 +24,12 @@ use crate::time::Epoch;
 use crate::Spacecraft;
 use hifitime::Duration;
 use rand_distr::Normal;
+use rand_pcg::Pcg64Mcg;
 use std::fmt;
 use std::sync::Arc;
 
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
-use rand::Rng;
 
 /// GroundStation defines a two-way ranging and doppler station.
 #[derive(Debug, Clone)]
@@ -50,7 +50,7 @@ pub struct GroundStation {
     pub integration_time: Option<Duration>,
     /// Whether to correct for light travel time
     pub light_time_correction: bool,
-    pub(crate) range_noise: Normal<f64>,
+    pub(crate) range_noise: Normal<f64>, // TODO: Replace this with a Gauss Markov process -- not sure how to tie it to the measurement itself
     pub(crate) range_rate_noise: Normal<f64>,
 }
 
@@ -188,11 +188,11 @@ impl GroundStation {
 
 impl TrackingDeviceSim<Orbit, StdMeasurement> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
-    fn measure<R: Rng>(
+    fn measure(
         &mut self,
         epoch: Epoch,
         traj: &Traj<Orbit>,
-        _rng: &mut R,
+        _rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
     ) -> Option<StdMeasurement> {
         let rx = traj.at(epoch).unwrap();
@@ -219,11 +219,11 @@ impl TrackingDeviceSim<Orbit, StdMeasurement> for GroundStation {
 
 impl TrackingDeviceSim<Spacecraft, StdMeasurement> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
-    fn measure<R: Rng>(
+    fn measure(
         &mut self,
         epoch: Epoch,
         traj: &Traj<Spacecraft>,
-        _rng: &mut R,
+        _rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
     ) -> Option<StdMeasurement> {
         let sc_rx = traj.at(epoch).unwrap();

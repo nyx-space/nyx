@@ -18,9 +18,11 @@
 
 pub mod arc;
 mod range;
+mod range_doppler;
 mod rangerate;
 mod simul_rng_rate;
 
 pub use range::RangeMsr;
+pub use range_doppler::RangeDoppler;
 pub use rangerate::RangeRate;
 pub use simul_rng_rate::StdMeasurement;

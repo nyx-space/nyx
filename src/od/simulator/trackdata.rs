@@ -19,7 +19,7 @@
 use std::sync::Arc;
 
 use hifitime::Epoch;
-use rand::Rng;
+use rand_pcg::Pcg64Mcg;
 
 use crate::linalg::DefaultAllocator;
 use crate::md::trajectory::InterpState;
@@ -49,11 +49,15 @@ where
 
     /// Observes the input trajectory at the provided epoch, and returns a measurement from itself to the input state, and returns None of the object is not visible.
     /// This trait function takes in a trajectory and epoch so it can properly simulate integration times for the measurements.
-    fn measure<R: Rng>(
+    /// If the random number generator is provided, it shall be used to add noise to the measurement.
+    ///
+    /// # Choice of the random number generator
+    /// The Pcg64Mcg is chosen because it is fast, space efficient, and has a good statistical distribution.
+    fn measure(
         &mut self,
         epoch: Epoch,
         traj: &Traj<MsrIn>,
-        rng: &mut R,
+        rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
     ) -> Option<Msr>;
 }

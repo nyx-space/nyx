@@ -288,7 +288,7 @@ where
                 end_trace_msg.remove(name);
 
                 if let Some(msr) =
-                    device.measure(epoch, &self.trajectory, &mut self.rng, cosm.clone())
+                    device.measure(epoch, &self.trajectory, Some(&mut self.rng), cosm.clone())
                 {
                     measurements.push((name.clone(), msr));
                     // We have a new measurement, let's update the schedule.
