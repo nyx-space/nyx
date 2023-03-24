@@ -37,7 +37,9 @@ fn nil_measurement() {
         .for_duration_with_traj(1.seconds())
         .unwrap();
 
-    assert!(station.measure(epoch, &traj, None, cosm.clone()).is_none());
+    assert!(station
+        .measure_as_seen(epoch, &traj, None, cosm.clone())
+        .is_none());
 }
 
 /// Tests that the measurements generated from a topocentric frame are correct.
@@ -142,7 +144,7 @@ fn val_measurements_topo() {
     let mut traj1_msr_cnt = 0;
     for state in traj1.every(1 * Unit::Minute) {
         if dss65_madrid
-            .measure(state.epoch(), &traj1, Some(&mut rng), cosm.clone())
+            .measure_as_seen(state.epoch(), &traj1, Some(&mut rng), cosm.clone())
             .is_some()
         {
             traj1_msr_cnt += 1;
@@ -160,7 +162,7 @@ fn val_measurements_topo() {
         let state = traj1.at(now).unwrap();
         // Will panic if the measurement is not visible
         let (meas, _) = dss65_madrid
-            .measure(state.epoch(), &traj1, Some(&mut rng), cosm.clone())
+            .measure_as_seen(state.epoch(), &traj1, Some(&mut rng), cosm.clone())
             .unwrap();
 
         let obs = meas.observation();
@@ -209,7 +211,7 @@ fn val_measurements_topo() {
     // Now iterate the trajectory to count the measurements.
     for state in traj2.every(1 * Unit::Minute) {
         if dss65_madrid
-            .measure(state.epoch(), &traj2, Some(&mut rng), cosm.clone())
+            .measure_as_seen(state.epoch(), &traj2, Some(&mut rng), cosm.clone())
             .is_some()
         {
             traj2_msr_cnt += 1;
@@ -227,7 +229,7 @@ fn val_measurements_topo() {
         let state = traj2.at(now).unwrap();
         // Will panic if the measurement is not visible
         let (meas, _) = dss65_madrid
-            .measure(state.epoch(), &traj2, Some(&mut rng), cosm.clone())
+            .measure_as_seen(state.epoch(), &traj2, Some(&mut rng), cosm.clone())
             .unwrap();
         let obs = meas.observation();
         println!(

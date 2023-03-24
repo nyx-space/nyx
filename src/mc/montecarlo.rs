@@ -25,7 +25,7 @@ use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 use crate::mc::results::{PropResult, Results, Run};
 use crate::mc::DispersedState;
-use crate::md::trajectory::InterpState;
+use crate::md::trajectory::Interpolatable;
 use crate::md::EventEvaluator;
 use crate::propagators::{ErrorCtrl, Propagator};
 use crate::time::{Duration, Epoch, Unit};
@@ -39,7 +39,7 @@ use std::time::Instant as StdInstant;
 
 /// A Monte Carlo framework, automatically running on all threads via a thread pool. This framework is targeted toward analysis of time-continuous variables.
 /// One caveat of the design is that the trajectory is used for post processing, not each individual state. This may prevent some event switching from being shown in GNC simulations.
-pub struct MonteCarlo<S: InterpState, Distr: Distribution<f64> + Copy>
+pub struct MonteCarlo<S: Interpolatable, Distr: Distribution<f64> + Copy>
 where
     DefaultAllocator: Allocator<f64, S::Size>
         + Allocator<f64, S::Size, S::Size>
@@ -63,7 +63,7 @@ where
    <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
 */
 
-impl<S: InterpState, Distr: Distribution<f64> + Copy> MonteCarlo<S, Distr>
+impl<S: Interpolatable, Distr: Distribution<f64> + Copy> MonteCarlo<S, Distr>
 where
     DefaultAllocator: Allocator<f64, S::Size>
         + Allocator<f64, S::Size, S::Size>
@@ -279,7 +279,7 @@ where
     }
 }
 
-impl<S: InterpState, Distr: Distribution<f64> + Copy> fmt::Display for MonteCarlo<S, Distr>
+impl<S: Interpolatable, Distr: Distribution<f64> + Copy> fmt::Display for MonteCarlo<S, Distr>
 where
     DefaultAllocator: Allocator<f64, S::Size>
         + Allocator<f64, S::Size, S::Size>
@@ -295,7 +295,7 @@ where
     }
 }
 
-impl<S: InterpState, Distr: Distribution<f64> + Copy> fmt::LowerHex for MonteCarlo<S, Distr>
+impl<S: Interpolatable, Distr: Distribution<f64> + Copy> fmt::LowerHex for MonteCarlo<S, Distr>
 where
     DefaultAllocator: Allocator<f64, S::Size>
         + Allocator<f64, S::Size, S::Size>

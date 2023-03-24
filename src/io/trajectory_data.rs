@@ -18,7 +18,7 @@
 
 use crate::{
     linalg::{allocator::Allocator, DefaultAllocator},
-    md::{trajectory::InterpState, ui::Traj, StateParameter},
+    md::{trajectory::Interpolatable, ui::Traj, StateParameter},
     NyxError,
 };
 use arrow::{array::Float64Array, record_batch::RecordBatchReader};
@@ -80,7 +80,7 @@ impl DynamicTrajectory {
     /// This is required because the parquet file reader is not clonable.
     pub fn to_traj<S>(&self) -> Result<Traj<S>, Box<dyn Error>>
     where
-        S: InterpState,
+        S: Interpolatable,
         DefaultAllocator: Allocator<f64, S::VecLength>
             + Allocator<f64, S::Size>
             + Allocator<f64, S::Size, S::Size>,

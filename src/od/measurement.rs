@@ -188,7 +188,7 @@ impl GroundStation {
 
 impl TrackingDeviceSim<Orbit, StdMeasurement> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
-    fn measure(
+    fn measure_as_seen(
         &mut self,
         epoch: Epoch,
         traj: &Traj<Orbit>,
@@ -222,13 +222,13 @@ impl TrackingDeviceSim<Orbit, StdMeasurement> for GroundStation {
 
 impl TrackingDeviceSim<Spacecraft, StdMeasurement> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
-    fn measure(
+    fn measure_as_seen(
         &mut self,
         epoch: Epoch,
         traj: &Traj<Spacecraft>,
         _rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
-    ) -> Option<(StdMeasurement, Spacecraft)> {
+    ) -> Option<(StdMeasurement, Orbit)> {
         let sc_rx = traj.at(epoch).unwrap();
         let (elevation, rx_ssb, tx_ssb) = self.elevation_of(&sc_rx.orbit, &cosm);
 
@@ -242,7 +242,7 @@ impl TrackingDeviceSim<Spacecraft, StdMeasurement> for GroundStation {
                     &self.range_noise,
                     &self.range_rate_noise,
                 ),
-                sc_rx.with_orbit(tx_ssb), // XXX: This is wrong! This should return whatever is estimated. I think ... ?
+                tx_ssb,
             ))
         } else {
             None

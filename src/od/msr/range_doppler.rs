@@ -21,8 +21,8 @@ use std::collections::HashMap;
 use hifitime::{Epoch, Unit};
 
 use crate::cosmic::Orbit;
-use crate::linalg::{DimName, Matrix2x6, OVector, Vector2, U2, U6, U7};
-use crate::od::msr::{RangeMsr, RangeRate};
+use crate::linalg::{OVector, Vector2, U2};
+use crate::od::msr::RangeMsr;
 use crate::od::Measurement;
 use crate::TimeTagged;
 use arrow::datatypes::{DataType, Field};
@@ -147,11 +147,3 @@ impl Measurement for RangeDoppler {
         Self { epoch, obs }
     }
 }
-
-// impl SimMeasurement for RangeDoppler {
-//     type State = Orbit;
-
-//     fn sensitivity(&self, _nominal: Orbit) -> Matrix2x6<f64> {
-//         todo!()
-//     }
-// }

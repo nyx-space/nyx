@@ -19,7 +19,7 @@ extern crate rstats;
 
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
-use crate::md::trajectory::{InterpState, Traj};
+use crate::md::trajectory::{Interpolatable, Traj};
 use crate::md::StateParameter;
 use crate::time::{Duration, Epoch};
 use crate::NyxError;
@@ -28,7 +28,7 @@ pub use rstats::Stats;
 use super::DispersedState;
 
 /// A structure storing the result of a single Monte Carlo run
-pub struct Run<S: InterpState, R>
+pub struct Run<S: Interpolatable, R>
 where
     DefaultAllocator: Allocator<f64, S::Size>
         + Allocator<f64, S::Size, S::Size>
@@ -45,7 +45,7 @@ where
 }
 
 /// A structure of Monte Carlo results
-pub struct Results<S: InterpState, R>
+pub struct Results<S: Interpolatable, R>
 where
     DefaultAllocator: Allocator<f64, S::Size>
         + Allocator<f64, S::Size, S::Size>
@@ -60,7 +60,7 @@ where
 }
 
 /// A structure that stores the result of a propagation segment of a Monte Carlo.
-pub struct PropResult<S: InterpState>
+pub struct PropResult<S: Interpolatable>
 where
     DefaultAllocator: Allocator<f64, S::Size>
         + Allocator<f64, S::Size, S::Size>
@@ -72,7 +72,7 @@ where
     pub traj: Traj<S>,
 }
 
-impl<S: InterpState> Results<S, PropResult<S>>
+impl<S: Interpolatable> Results<S, PropResult<S>>
 where
     DefaultAllocator: Allocator<f64, S::Size>
         + Allocator<f64, S::Size, S::Size>

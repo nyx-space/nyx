@@ -24,7 +24,7 @@ use crate::dynamics::Dynamics;
 use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, OVector};
-use crate::md::trajectory::{InterpState, Traj};
+use crate::md::trajectory::{Interpolatable, Traj};
 use crate::md::EventEvaluator;
 use crate::time::{Duration, Epoch, Unit};
 use crate::State;
@@ -179,7 +179,7 @@ where
     ) -> Result<(D::StateType, Traj<D::StateType>), NyxError>
     where
         <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
-        D::StateType: InterpState,
+        D::StateType: Interpolatable,
     {
         let end_state;
         let mut traj = Traj::new();
@@ -213,7 +213,7 @@ where
     ) -> Result<(D::StateType, Traj<D::StateType>), NyxError>
     where
         <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
-        D::StateType: InterpState,
+        D::StateType: Interpolatable,
     {
         let duration: Duration = end_time - self.state.epoch();
         self.for_duration_with_traj(duration)
@@ -228,7 +228,7 @@ where
     ) -> Result<(D::StateType, Traj<D::StateType>), NyxError>
     where
         <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
-        D::StateType: InterpState,
+        D::StateType: Interpolatable,
     {
         self.until_nth_event(max_duration, event, 0)
     }
@@ -243,7 +243,7 @@ where
     ) -> Result<(D::StateType, Traj<D::StateType>), NyxError>
     where
         <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
-        D::StateType: InterpState,
+        D::StateType: Interpolatable,
     {
         info!("Searching for {}", event);
 

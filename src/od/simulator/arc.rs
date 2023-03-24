@@ -23,10 +23,10 @@ use rand_pcg::Pcg64Mcg;
 
 pub use crate::dynamics::{Dynamics, NyxError};
 use crate::io::ConfigError;
-use crate::md::trajectory::InterpState;
+use crate::md::trajectory::Interpolatable;
 use crate::od::msr::arc::TrackingArc;
 use crate::od::simulator::{Availability, Schedule};
-use crate::od::{EstimateFrom, Measurement};
+use crate::od::Measurement;
 pub use crate::{cosmic::Cosm, State, TimeTagged};
 use crate::{linalg::allocator::Allocator, od::TrackingDeviceSim};
 use crate::{linalg::DefaultAllocator, md::ui::Traj};
@@ -43,7 +43,7 @@ where
     D: TrackingDeviceSim<MsrIn, Msr>,
     MsrIn: State,
     Msr: Measurement,
-    MsrIn: InterpState,
+    MsrIn: Interpolatable,
     DefaultAllocator: Allocator<f64, <MsrIn as State>::Size>
         + Allocator<f64, <MsrIn as State>::Size, <MsrIn as State>::Size>
         + Allocator<f64, <MsrIn as State>::VecLength>
@@ -72,7 +72,7 @@ where
     D: TrackingDeviceSim<MsrIn, Msr>,
     MsrIn: State,
     Msr: Measurement,
-    MsrIn: InterpState,
+    MsrIn: Interpolatable,
     DefaultAllocator: Allocator<f64, <MsrIn as State>::Size>
         + Allocator<f64, <MsrIn as State>::Size, <MsrIn as State>::Size>
         + Allocator<f64, <MsrIn as State>::VecLength>
@@ -162,16 +162,16 @@ where
     pub fn generate_measurements(&mut self, cosm: Arc<Cosm>) -> Result<TrackingArc<Msr>, NyxError> {
         // Stores the first measurement and last measurement of a given sub-arc for each device.
         #[derive(Copy, Clone, Debug)]
-        struct SchedData {
+        struct ScheduleData {
             start: Option<Epoch>,
             prev: Option<Epoch>,
             end: Option<Epoch>,
         }
-        let mut sched: HashMap<String, SchedData> = HashMap::new();
+        let mut schedule: HashMap<String, ScheduleData> = HashMap::new();
 
         let mut start_trace_msg = HashSet::new();
         let mut end_trace_msg = HashSet::new();
-        let mut sched_trace_msg = HashSet::new();
+        let mut schedule_trace_msg = HashSet::new();
 
         let start = Epoch::now().unwrap();
         let mut measurements = Vec::new();
@@ -208,9 +208,9 @@ where
                 }
 
                 // Check the schedule
-                if let Some(device_sched) = sched.get(name) {
+                if let Some(device_schedule) = schedule.get(name) {
                     // Check that we aren't generating too many measurements
-                    if let Some(prev_epoch) = device_sched.prev {
+                    if let Some(prev_epoch) = device_schedule.prev {
                         if (epoch - prev_epoch) < cfg.sampling {
                             continue;
                         }
@@ -218,27 +218,27 @@ where
                     match cfg.schedule {
                         Schedule::Intermittent { on, off } => {
                             // Check that we haven't been on for too long
-                            if let Some(start_epoch) = device_sched.start {
+                            if let Some(start_epoch) = device_schedule.start {
                                 if (epoch - start_epoch) > on {
-                                    if !sched_trace_msg.contains(name) {
+                                    if !schedule_trace_msg.contains(name) {
                                         debug!(
                                             "{name} is now turned off after being on for {}",
                                             epoch - start_epoch
                                         );
-                                        sched_trace_msg.insert(name.clone());
+                                        schedule_trace_msg.insert(name.clone());
                                     }
                                     continue;
                                 }
                             }
                             // Check that we haven't been off for enough time
-                            if let Some(end_epoch) = device_sched.end {
+                            if let Some(end_epoch) = device_schedule.end {
                                 if (epoch - end_epoch) <= off {
-                                    if !sched_trace_msg.contains(name) {
+                                    if !schedule_trace_msg.contains(name) {
                                         debug!(
                                             "{name} will be available again in {}",
                                             epoch - end_epoch
                                         );
-                                        sched_trace_msg.insert(name.clone());
+                                        schedule_trace_msg.insert(name.clone());
                                     }
                                     continue;
                                 }
@@ -272,29 +272,32 @@ where
 
                 // Availability OK, so let's remove this device from the trace messages if needed.
                 start_trace_msg.remove(name);
-                sched_trace_msg.remove(name);
+                schedule_trace_msg.remove(name);
                 end_trace_msg.remove(name);
 
-                if let Some((msr, _)) =
-                    device.measure(epoch, &self.trajectory, Some(&mut self.rng), cosm.clone())
-                {
+                if let Some((msr, _)) = device.measure_as_seen(
+                    epoch,
+                    &self.trajectory,
+                    Some(&mut self.rng),
+                    cosm.clone(),
+                ) {
                     measurements.push((name.clone(), msr));
                     // We have a new measurement, let's update the schedule.
-                    if let Some(device_sched) = sched.get_mut(name) {
-                        if device_sched.start.is_none() {
+                    if let Some(device_schedule) = schedule.get_mut(name) {
+                        if device_schedule.start.is_none() {
                             // Set the start time of this pass
-                            device_sched.start = Some(epoch);
+                            device_schedule.start = Some(epoch);
                             debug!("{name} is now tracking {epoch}");
                         }
                         // In any case, set the end to none and set the prev to now.
-                        device_sched.prev = Some(epoch);
-                        device_sched.end = None;
+                        device_schedule.prev = Some(epoch);
+                        device_schedule.end = None;
                     } else {
                         debug!("{name} is now tracking {epoch}");
                         // Oh, great, first measurement for this device!
-                        sched.insert(
+                        schedule.insert(
                             name.to_string(),
-                            SchedData {
+                            ScheduleData {
                                 start: Some(epoch),
                                 prev: Some(epoch),
                                 end: None,
@@ -307,11 +310,11 @@ where
                         // so let's move to the next epoch in the time series.
                         continue 'ts;
                     }
-                } else if let Some(device_sched) = sched.get_mut(name) {
+                } else if let Some(device_schedule) = schedule.get_mut(name) {
                     // No measurement was generated, so let's update the schedule if there is one.
-                    if device_sched.end.is_none() {
-                        device_sched.start = None;
-                        device_sched.end = Some(epoch);
+                    if device_schedule.end.is_none() {
+                        device_schedule.start = None;
+                        device_schedule.end = Some(epoch);
                     }
                 }
             }
@@ -344,7 +347,7 @@ where
     D: TrackingDeviceSim<MsrIn, Msr>,
     MsrIn: State,
     Msr: Measurement,
-    MsrIn: InterpState,
+    MsrIn: Interpolatable,
     DefaultAllocator: Allocator<f64, <MsrIn as State>::Size>
         + Allocator<f64, <MsrIn as State>::Size, <MsrIn as State>::Size>
         + Allocator<f64, <MsrIn as State>::VecLength>

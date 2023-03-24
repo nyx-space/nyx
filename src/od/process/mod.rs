@@ -4,7 +4,7 @@
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
-    by the Free Software Foundatio either version 3 of the License, or
+    by the Free Software Foundation either version 3 of the License, or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
@@ -18,7 +18,7 @@
 
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName};
-use crate::md::trajectory::{InterpState, Traj};
+use crate::md::trajectory::{Interpolatable, Traj};
 
 pub use crate::od::estimate::*;
 pub use crate::od::kalman::*;
@@ -50,10 +50,10 @@ pub struct ODProcess<
     Msr: Measurement,
     T: KfTrigger,
     A: DimName,
-    S: EstimateFrom<D::StateType, Msr> + InterpState,
+    S: EstimateFrom<D::StateType, Msr> + Interpolatable,
     K: Filter<S, A, Msr::MeasurementSize>,
 > where
-    D::StateType: InterpState + Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
+    D::StateType: Interpolatable + Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
     <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, <S as State>::Size>
@@ -96,11 +96,11 @@ impl<
         Msr: Measurement,
         T: KfTrigger,
         A: DimName,
-        S: EstimateFrom<D::StateType, Msr> + InterpState,
+        S: EstimateFrom<D::StateType, Msr> + Interpolatable,
         K: Filter<S, A, Msr::MeasurementSize>,
     > ODProcess<'a, D, E, Msr, T, A, S, K>
 where
-    D::StateType: InterpState + Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
+    D::StateType: Interpolatable + Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
     <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, Msr::MeasurementSize>
@@ -458,7 +458,7 @@ where
                     match devices.get_mut(device_name) {
                         Some(device) => {
                             if let Some((computed_meas, device_loc)) =
-                                device.measure(epoch, &traj, None, self.cosm.clone())
+                                device.measure_as_seen(epoch, &traj, None, self.cosm.clone())
                             {
                                 // Switch back from extended if necessary
                                 if self.kf.is_extended() && self.ekf_trigger.disable_ekf(epoch) {
@@ -589,7 +589,7 @@ where
     pub fn to_traj(&self) -> Result<Traj<S>, NyxError>
     where
         DefaultAllocator: Allocator<f64, <S as State>::VecLength>,
-        S: InterpState,
+        S: Interpolatable,
     {
         if self.estimates.is_empty() {
             Err(NyxError::NoStateData(
@@ -614,11 +614,11 @@ impl<
         E: ErrorCtrl,
         Msr: Measurement,
         A: DimName,
-        S: EstimateFrom<D::StateType, Msr> + InterpState,
+        S: EstimateFrom<D::StateType, Msr> + Interpolatable,
         K: Filter<S, A, Msr::MeasurementSize>,
     > ODProcess<'a, D, E, Msr, CkfTrigger, A, S, K>
 where
-    D::StateType: InterpState + Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
+    D::StateType: Interpolatable + Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
     <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::VecLength>

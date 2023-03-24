@@ -20,6 +20,7 @@ pub use crate::dynamics::{Dynamics, NyxError};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
 use crate::time::Epoch;
+use crate::Orbit;
 pub use crate::{cosmic::Cosm, State, TimeTagged};
 use std::sync::Arc;
 
@@ -188,11 +189,15 @@ where
     fn extract(from: O) -> Self;
 
     /// Returns the measurement sensitivity (often referred to as H tilde).
-    /// self is the RECEIVER, e.g. the spacecraft -- consider making this a static function
+    ///
+    /// # Limitations
+    /// The transmitter is necessarily an Orbit. This implies that any non-orbit parameter in the estimation vector must be a zero-bias estimator, i.e. it must be assumed that the parameter should be zero.
+    /// This is a limitation of the current implementation. It could be fixed by specifying another State like trait in the EstimateFrom trait, significantly adding complexity with little practical use.
+    /// To solve for non zero bias parameters, one ought to be able to estimate the _delta_ of that parameter and want that delta to return to zero, thereby becoming a zero-bias estimator.
     fn sensitivity(
         msr: &M,
         receiver: Self,
-        transmitter: Self,
+        transmitter: Orbit,
     ) -> OMatrix<f64, M::MeasurementSize, Self::Size>
     where
         DefaultAllocator: Allocator<f64, M::MeasurementSize, Self::Size>;

@@ -18,7 +18,7 @@
 
 use super::traj_it::TrajIterator;
 use super::{ExportCfg, INTERPOLATION_SAMPLES};
-use super::{InterpState, TrajError};
+use super::{Interpolatable, TrajError};
 use crate::cosmic::{Cosm, Frame, Orbit, Spacecraft};
 use crate::errors::NyxError;
 use crate::io::watermark::pq_writer;
@@ -48,7 +48,7 @@ use std::time::Instant;
 
 /// Store a trajectory of any State.
 #[derive(Clone, PartialEq)]
-pub struct Traj<S: InterpState>
+pub struct Traj<S: Interpolatable>
 where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
@@ -59,7 +59,7 @@ where
     pub states: Vec<S>,
 }
 
-impl<S: InterpState> Traj<S>
+impl<S: Interpolatable> Traj<S>
 where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
@@ -661,7 +661,7 @@ where
     }
 }
 
-impl<S: InterpState> ops::Add for Traj<S>
+impl<S: Interpolatable> ops::Add for Traj<S>
 where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
@@ -674,7 +674,7 @@ where
     }
 }
 
-impl<S: InterpState> ops::Add<&Traj<S>> for Traj<S>
+impl<S: Interpolatable> ops::Add<&Traj<S>> for Traj<S>
 where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
@@ -708,7 +708,7 @@ where
     }
 }
 
-impl<S: InterpState> ops::AddAssign for Traj<S>
+impl<S: Interpolatable> ops::AddAssign for Traj<S>
 where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
@@ -718,7 +718,7 @@ where
     }
 }
 
-impl<S: InterpState> ops::AddAssign<&Traj<S>> for Traj<S>
+impl<S: Interpolatable> ops::AddAssign<&Traj<S>> for Traj<S>
 where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
@@ -853,7 +853,7 @@ impl Traj<Spacecraft> {
     }
 }
 
-impl<S: InterpState> fmt::Display for Traj<S>
+impl<S: Interpolatable> fmt::Display for Traj<S>
 where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
@@ -872,7 +872,7 @@ where
     }
 }
 
-impl<S: InterpState> fmt::Debug for Traj<S>
+impl<S: Interpolatable> fmt::Debug for Traj<S>
 where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
@@ -882,7 +882,7 @@ where
     }
 }
 
-impl<S: InterpState> Default for Traj<S>
+impl<S: Interpolatable> Default for Traj<S>
 where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,

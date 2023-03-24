@@ -427,7 +427,7 @@ impl EstimateFrom<Spacecraft, StdMeasurement> for Orbit {
         DefaultAllocator:
             Allocator<f64, <StdMeasurement as Measurement>::MeasurementSize, Self::Size>,
     {
-        todo!()
+        <Orbit as EstimateFrom<Orbit, StdMeasurement>>::sensitivity(msr, receiver, transmitter)
     }
 }
 
@@ -445,8 +445,8 @@ impl EstimateFrom<Orbit, StdMeasurement> for Orbit {
         DefaultAllocator:
             Allocator<f64, <StdMeasurement as Measurement>::MeasurementSize, Self::Size>,
     {
-        let delta_r = -(transmitter.radius() - receiver.radius());
-        let delta_v = -(transmitter.velocity() - receiver.velocity());
+        let delta_r = receiver.radius() - transmitter.radius();
+        let delta_v = receiver.velocity() - transmitter.velocity();
         let ρ = msr.observation()[0];
         let ρ_dot = msr.observation()[1];
         let m11 = delta_r.x / ρ;
@@ -466,9 +466,9 @@ impl EstimateFrom<Spacecraft, StdMeasurement> for Spacecraft {
     }
 
     fn sensitivity(
-        msr: &StdMeasurement,
-        receiver: Self,
-        transmitter: Self,
+        _msr: &StdMeasurement,
+        _receiver: Self,
+        _transmitter: Orbit,
     ) -> OMatrix<f64, <StdMeasurement as Measurement>::MeasurementSize, Self::Size>
     where
         DefaultAllocator:

@@ -118,20 +118,6 @@ impl StdMeasurement {
         let hyperstate = hyperspace_from_vector(&(rx - tx).to_cartesian_vec());
         let (obs, h_tilde) = Self::compute_sensitivity(&hyperstate, range_noise, range_rate_noise);
 
-        // Manual sensitivity calculation
-        let delta_r = -(tx.radius() - rx.radius());
-        let delta_v = -(tx.velocity() - rx.velocity());
-        let ρ = obs[0];
-        let ρ_dot = obs[1];
-        let m11 = delta_r.x / ρ;
-        let m12 = delta_r.y / ρ;
-        let m13 = delta_r.z / ρ;
-        let m21 = delta_v.x / ρ - ρ_dot * delta_r.x / ρ.powi(2);
-        let m22 = delta_v.y / ρ - ρ_dot * delta_r.y / ρ.powi(2);
-        let m23 = delta_v.z / ρ - ρ_dot * delta_r.z / ρ.powi(2);
-        let h = Matrix2x6::new(m11, m12, m13, 0.0, 0.0, 0.0, m21, m22, m23, m11, m12, m13);
-        println!("\n---want:\n{h_tilde}\ngot:\n{h}\nerr\n{}", h - h_tilde);
-
         StdMeasurement {
             dt,
             obs,

@@ -22,10 +22,10 @@ use hifitime::Epoch;
 use rand_pcg::Pcg64Mcg;
 
 use crate::linalg::DefaultAllocator;
-use crate::md::trajectory::InterpState;
+use crate::md::trajectory::Interpolatable;
 use crate::md::ui::Traj;
 use crate::od::Measurement;
-use crate::State;
+use crate::Orbit;
 use crate::{io::Configurable, linalg::allocator::Allocator};
 
 use super::Cosm;
@@ -33,7 +33,7 @@ use super::Cosm;
 /// Tracking device simulator.
 pub trait TrackingDeviceSim<MsrIn, Msr>: Configurable
 where
-    MsrIn: InterpState,
+    MsrIn: Interpolatable,
     Msr: Measurement,
     DefaultAllocator: Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, MsrIn::Size>
@@ -49,11 +49,11 @@ where
     ///
     /// # Choice of the random number generator
     /// The Pcg64Mcg is chosen because it is fast, space efficient, and has a good statistical distribution.
-    fn measure(
+    fn measure_as_seen(
         &mut self,
         epoch: Epoch,
         traj: &Traj<MsrIn>,
         rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
-    ) -> Option<(Msr, MsrIn)>;
+    ) -> Option<(Msr, Orbit)>;
 }
