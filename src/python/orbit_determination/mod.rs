@@ -25,7 +25,7 @@ use crate::od::msr::StdMeasurement;
 use crate::od::simulator::arc::TrackingArcSim;
 pub use crate::od::simulator::TrkConfig;
 pub use crate::{io::ConfigError, od::prelude::GroundStation};
-use crate::{NyxError, Orbit, Spacecraft};
+use crate::{NyxError, Spacecraft};
 use pyo3::{prelude::*, py_run};
 pub(crate) mod estimate;
 mod ground_station;
@@ -57,7 +57,7 @@ pub(crate) fn register_od(py: Python<'_>, parent_module: &PyModule) -> PyResult<
 #[derive(Clone)]
 #[pyclass]
 pub struct GroundTrackingArcSim {
-    inner: TrackingArcSim<Orbit, Spacecraft, StdMeasurement, GroundStation>,
+    inner: TrackingArcSim<Spacecraft, StdMeasurement, GroundStation>,
 }
 
 #[pymethods]

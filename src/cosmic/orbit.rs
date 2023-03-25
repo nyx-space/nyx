@@ -181,7 +181,7 @@ impl Orbit {
             vx_km_s: 0.0,
             vy_km_s: 0.0,
             vz_km_s: 0.0,
-            epoch: epoch,
+            epoch,
             frame,
             stm: None,
         }
@@ -199,7 +199,7 @@ impl Orbit {
             vx_km_s: state[3],
             vy_km_s: state[4],
             vz_km_s: state[5],
-            epoch: epoch,
+            epoch,
             frame,
             stm: None,
         }

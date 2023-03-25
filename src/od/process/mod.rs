@@ -466,7 +466,7 @@ where
                                     info!("EKF disabled @ {epoch}");
                                 }
 
-                                let h_tilde = S::sensitivity(&msr, nominal_state, device_loc);
+                                let h_tilde = S::sensitivity(msr, nominal_state, device_loc);
 
                                 self.kf.update_h_tilde(h_tilde);
 
