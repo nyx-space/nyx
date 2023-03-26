@@ -16,15 +16,25 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use crate::io::watermark::pq_writer;
 use crate::io::{duration_from_str, duration_to_str};
 use crate::linalg::{Matrix2, Vector2};
+use crate::NyxError;
+use arrow::array::{ArrayRef, Float64Array, UInt32Array};
+use arrow::datatypes::{DataType, Field, Schema};
+use arrow::record_batch::RecordBatch;
 use hifitime::{Duration, TimeUnits};
+use parquet::arrow::ArrowWriter;
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
-use rand::Rng;
+use rand::{Rng, SeedableRng};
 use rand_distr::{Distribution, Normal};
+use rand_pcg::Pcg64Mcg;
 use serde_derive::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fmt;
+use std::fs::File;
+use std::sync::Arc;
 
 /// A Gauss-Markov process for modeling biases.
 ///
@@ -45,6 +55,12 @@ use std::fmt;
 /// 1. There is no epoch in this Gauss Markov process. The time constant τ is only used as a time constant on the bias.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(
+    feature = "python",
+    pyo3(
+        text_signature = "(tau, bias_sigma, omega_n_hz=None, damping_ratio=None, drift_sigma=None, bias=0.0, drift=0.0)"
+    )
+)]
 pub struct GaussMarkov {
     /// Time constant of the Gauss-Markov process.
     #[serde(
@@ -258,13 +274,153 @@ impl GaussMarkov {
         }
     }
 
-    // TODO: Other models but more importantly, the structure that allows simulating and plotting the model results to make sure that it does not diverge.
+    /// Example noise on the ranging data from a high-precision ground station.
+    pub fn high_precision_range_km() -> Self {
+        Self {
+            tau: 12.hours(),
+            bias_sigma: 5.0e-4, // 0.5 m
+            omega_n_hz: None,
+            damping_ratio: None,
+            drift_sigma: Some(1e-4), // 0.1 m
+            bias: -4e-3,
+            drift: 0.0,
+        }
+    }
+
+    /// Example noise on the Doppler data from a high-precision ground station.
+    pub fn high_precision_doppler_km_s() -> Self {
+        Self {
+            tau: 12.hours(),
+            bias_sigma: 5.0e-5, // 5 cm/s
+            omega_n_hz: None,
+            damping_ratio: None,
+            drift_sigma: Some(1.5e-6), // 0.15 cm/s
+            bias: -4.0e-5,
+            drift: 0.0,
+        }
+    }
+}
+
+#[cfg_attr(feature = "python", pymethods)]
+impl GaussMarkov {
+    /// Simulate a Gauss Markov model and store the bias and drift in a parquet file.
+    ///
+    /// The unit is only used in the headers of the parquet file.
+    ///
+    /// This will simulate the model with 1000 different seeds, sampling the process 1140 times.
+    /// This corresponds to one sample per minute for 24 hours.
+    /// TODO: Add text_signature
+    pub fn simulate(&self, path: String, unit: Option<String>) -> Result<(), NyxError> {
+        struct GMState {
+            run: u32,
+            sample: u32,
+            bias: f64,
+            drift: f64,
+        }
+
+        let mut samples = vec![];
+
+        for run in 0..1000 {
+            let mut rng = Pcg64Mcg::from_entropy();
+
+            let mut gm = self.clone();
+            for sample in 0..1440 {
+                gm.next_bias(&mut rng);
+                samples.push(GMState {
+                    run,
+                    sample,
+                    bias: gm.bias,
+                    drift: gm.drift,
+                });
+            }
+        }
+
+        let unit = match unit {
+            Some(unit) => format!("{unit}"),
+            None => "(unitless)".to_string(),
+        };
+
+        // Build the parquet file
+        let hdrs = vec![
+            Field::new("Run", DataType::UInt32, false),
+            Field::new("Sample", DataType::UInt32, false),
+            Field::new(format!("Bias {unit}"), DataType::Float64, false),
+            Field::new(format!("Drift {unit}"), DataType::Float64, false),
+        ];
+
+        let schema = Arc::new(Schema::new(hdrs));
+        let mut record = Vec::new();
+
+        record.push(Arc::new(UInt32Array::from(
+            samples.iter().map(|s| s.run).collect::<Vec<u32>>(),
+        )) as ArrayRef);
+        record.push(Arc::new(UInt32Array::from(
+            samples.iter().map(|s| s.sample).collect::<Vec<u32>>(),
+        )) as ArrayRef);
+        record.push(Arc::new(Float64Array::from(
+            samples.iter().map(|s| s.drift).collect::<Vec<f64>>(),
+        )) as ArrayRef);
+        record.push(Arc::new(Float64Array::from(
+            samples.iter().map(|s| s.bias).collect::<Vec<f64>>(),
+        )) as ArrayRef);
+
+        // Serialize all of the devices and add that to the parquet file too.
+        let mut metadata = HashMap::new();
+        metadata.insert("Purpose".to_string(), "Gauss Markov simulation".to_string());
+
+        let props = pq_writer(Some(metadata));
+
+        let file = File::create(&path).map_err(|e| NyxError::CustomError(e.to_string()))?;
+        let mut writer = ArrowWriter::try_new(file, schema.clone(), props).unwrap();
+
+        let batch = RecordBatch::try_new(schema, record)
+            .map_err(|e| NyxError::CustomError(e.to_string()))?;
+        writer
+            .write(&batch)
+            .map_err(|e| NyxError::CustomError(e.to_string()))?;
+        writer
+            .close()
+            .map_err(|e| NyxError::CustomError(e.to_string()))?;
+
+        Ok(())
+    }
+
+    #[cfg(feature = "python")]
+    pub fn __repr__(&self) -> String {
+        format!("{self:?}")
+    }
+
+    #[cfg(feature = "python")]
+    pub fn __str__(&self) -> String {
+        format!("{self}")
+    }
+
+    #[cfg(feature = "python")]
+    #[new]
+    fn py_new(
+        tau: Duration,
+        bias_sigma: f64,
+        omega_n_hz: Option<f64>,
+        damping_ratio: Option<f64>,
+        drift_sigma: Option<f64>,
+        bias: Option<f64>,
+        drift: Option<f64>,
+    ) -> Self {
+        Self {
+            tau,
+            bias_sigma,
+            omega_n_hz,
+            damping_ratio,
+            drift_sigma,
+            bias: bias.unwrap_or(0.0),
+            drift: drift.unwrap_or(0.0),
+        }
+    }
 }
 
 #[test]
 fn fogm_test() {
     use hifitime::TimeUnits;
-    use rand_pcg::Pcg64Mcg;
     use rstats::{triangmat::Vecops, Stats};
 
     let mut gm = GaussMarkov::first_order(24.hours(), 0.1, 0.0);
@@ -309,7 +465,6 @@ fn coupled_gm_test() {
 
 #[test]
 fn zero_noise_test() {
-    use rand_pcg::Pcg64Mcg;
     use rstats::{triangmat::Vecops, Stats};
 
     let mut gm = GaussMarkov::first_order(Duration::MAX, 0.0, 0.0);

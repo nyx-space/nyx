@@ -17,3 +17,5 @@
 */
 
 pub mod gauss_markov;
+
+pub use gauss_markov::GaussMarkov;
