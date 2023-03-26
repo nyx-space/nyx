@@ -18,7 +18,7 @@
 
 use crate::io::{duration_from_str, duration_to_str};
 use crate::linalg::{Matrix2, Vector2};
-use hifitime::{Duration, Epoch};
+use hifitime::{Duration, TimeUnits};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 use rand::Rng;
@@ -31,6 +31,18 @@ use std::fmt;
 /// If the natural frequency of the process is zero, then the process is a first-order Gauss Markov process as described in section 5.2.4 of the NASA Best Practices for Navigation Filters (D'Souza et al.).
 /// Otherwise, it is a bias and drift couple first- and second-order Gauss Markov process as described in section 5.3.3 of the NASA Best Practices for Navigation Filters (D'Souza et al.).
 /// It is up to the caller to ensure that the units at initialization match the units used where the model is applied.
+///
+/// The model is as follows, where b and d are the bias and drift, and σ_b and σ_d are the standard deviations of the zero-mean white noise of the bias and drift, respectively.
+/// The time constant τ is only used as a time constant on the bias, and is not dependent on the absolute epoch, only on the original drift.
+/// ω_n^2 is the natural frequency of the drift Gauss-Markov process, and ζ is the damping ratio of the drift Gauss-Markov process.
+///
+/// \dot{b(t)} = -1/τ b(t) + d(t) + σ_b(t)
+///
+/// \dot{d(t)} = -ω_n^2 b(t) - 2ζω_n d(t) + σ_d(t)
+///
+/// # Implementation notes
+///
+/// 1. There is no epoch in this Gauss Markov process. The time constant τ is only used as a time constant on the bias.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass)]
 pub struct GaussMarkov {
@@ -48,9 +60,6 @@ pub struct GaussMarkov {
     pub damping_ratio: Option<f64>,
     /// Standard deviation of the zero-mean white noise of the drift.
     pub drift_sigma: Option<f64>,
-    /// Latest update epoch
-    #[serde(skip)]
-    pub epoch: Epoch,
     /// Latest bias estimate
     #[serde(skip)]
     pub bias: f64,
@@ -65,15 +74,15 @@ impl fmt::Display for GaussMarkov {
             None => {
                 write!(
                     f,
-                    "First order Gauss-Markov process with τ = {} and σ = {}: bias = {} @ {}",
-                    self.tau, self.bias_sigma, self.bias, self.epoch
+                    "First order Gauss-Markov process with τ = {} and σ = {}: bias = {}",
+                    self.tau, self.bias_sigma, self.bias
                 )
             }
             Some(omega_n_hz) => {
                 write!(
                     f,
-                    "Coupled bias and drift Gauss-Markov process with τ = {}, ω_n = {} Hz, ζ = {}, σ_bias = {} σ_drift = {}: bias = {}, drift = {} @ {}",
-                    self.tau, omega_n_hz, self.damping_ratio.unwrap(), self.bias_sigma, self.drift_sigma.unwrap(), self.bias, self.drift, self.epoch
+                    "Coupled bias and drift Gauss-Markov process with τ = {}, ω_n = {} Hz, ζ = {}, σ_bias = {} σ_drift = {}: bias = {}, drift = {}",
+                    self.tau, omega_n_hz, self.damping_ratio.unwrap(), self.bias_sigma, self.drift_sigma.unwrap(), self.bias, self.drift
                 )
             }
         }
@@ -90,7 +99,6 @@ impl GaussMarkov {
     /// * `omega_n_hz` - Natural frequency of the drift Gauss-Markov process.
     /// * `damping_ratio` - Damping ratio of the drift Gauss-Markov process.
     /// * `drift_sigma` - Standard deviation of the zero-mean white noise of the drift.
-    /// * `epoch` - Latest update epoch.
     /// * `bias` - Latest bias estimate.
     /// * `drift` - Latest drift estimate.
     ///
@@ -107,7 +115,6 @@ impl GaussMarkov {
         omega_n_hz: Option<f64>,
         damping_ratio: Option<f64>,
         drift_sigma: Option<f64>,
-        epoch: Epoch,
         init_bias: f64,
         init_drift: f64,
     ) -> Self {
@@ -128,7 +135,6 @@ impl GaussMarkov {
             omega_n_hz,
             damping_ratio,
             drift_sigma,
-            epoch,
             bias: init_bias,
             drift: init_drift,
         }
@@ -140,11 +146,10 @@ impl GaussMarkov {
     ///
     /// * `tau` - Time constant of the Gauss-Markov process.
     /// * `bias_sigma` - Standard deviation of the zero-mean white noise of the bias.
-    /// * `epoch` - Latest update epoch.
     /// * `bias` - Latest bias estimate.
     ///
-    pub fn first_order(tau: Duration, bias_sigma: f64, epoch: Epoch, bias: f64) -> Self {
-        Self::new(tau, bias_sigma, None, None, None, epoch, bias, 0.0)
+    pub fn first_order(tau: Duration, bias_sigma: f64, bias: f64) -> Self {
+        Self::new(tau, bias_sigma, None, None, None, bias, 0.0)
     }
 
     /// Create a new bias and drift coupled Gauss-Markov process. The bias is a second order order GM process and the couple drift is a first order GM process.
@@ -156,7 +161,6 @@ impl GaussMarkov {
     /// * `omega_n_hz` - Natural frequency of the drift Gauss-Markov process.
     /// * `damping_ratio` - Damping ratio of the drift Gauss-Markov process.
     /// * `drift_sigma` - Standard deviation of the zero-mean white noise of the drift.
-    /// * `epoch` - Latest update epoch.
     /// * `bias` - Latest bias estimate.
     /// * `drift` - Latest drift estimate.
     ///
@@ -173,7 +177,6 @@ impl GaussMarkov {
         omega_n_hz: f64,
         damping_ratio: f64,
         drift_sigma: f64,
-        epoch: Epoch,
         init_bias: f64,
         init_drift: f64,
     ) -> Self {
@@ -183,13 +186,12 @@ impl GaussMarkov {
             Some(omega_n_hz),
             Some(damping_ratio),
             Some(drift_sigma),
-            epoch,
             init_bias,
             init_drift,
         )
     }
 
-    pub fn next_bias<R: Rng>(&mut self, epoch: Epoch, rng: &mut R) -> f64 {
+    pub fn next_bias<R: Rng>(&mut self, rng: &mut R) -> f64 {
         let omega_fact = match self.omega_n_hz {
             None => 0.0,
             Some(omega_n_hz) => -omega_n_hz.powi(2),
@@ -214,11 +216,49 @@ impl GaussMarkov {
         // Update the bias and drift
         self.bias += rates[0];
         self.drift += rates[1];
-        self.epoch = epoch;
 
         // Return the new bias
         self.bias
     }
+
+    /// Zero noise Gauss-Markov process.
+    pub const ZERO: Self = Self {
+        tau: Duration::MAX,
+        bias_sigma: 0.0,
+        omega_n_hz: None,
+        damping_ratio: None,
+        drift_sigma: None,
+        bias: 0.0,
+        drift: 0.0,
+    };
+
+    /// Typical noise on the ranging data from a non-high-precision ground station.
+    pub fn default_range_km() -> Self {
+        Self {
+            tau: 5.minutes(),
+            bias_sigma: 50.0e-3, // 50 m
+            omega_n_hz: None,
+            damping_ratio: None,
+            drift_sigma: Some(5e-3), // 5 m
+            bias: 0.0,
+            drift: 0.0,
+        }
+    }
+
+    /// Typical noise on the Doppler data from a non-high-precision ground station.
+    pub fn default_doppler_km_s() -> Self {
+        Self {
+            tau: 20.minutes(),
+            bias_sigma: 50.0e-5, // 50 cm/s
+            omega_n_hz: None,
+            damping_ratio: None,
+            drift_sigma: Some(7.5e-5), // 7.5 cm/s
+            bias: 0.0,
+            drift: 0.0,
+        }
+    }
+
+    // TODO: Other models but more importantly, the structure that allows simulating and plotting the model results to make sure that it does not diverge.
 }
 
 #[test]
@@ -227,16 +267,13 @@ fn fogm_test() {
     use rand_pcg::Pcg64Mcg;
     use rstats::{triangmat::Vecops, Stats};
 
-    let mut epoch = Epoch::now().unwrap();
-
-    let mut gm = GaussMarkov::first_order(24.hours(), 0.1, epoch, 0.0);
+    let mut gm = GaussMarkov::first_order(24.hours(), 0.1, 0.0);
 
     let mut biases = Vec::with_capacity(1000);
 
     let mut rng = Pcg64Mcg::new(0);
     for _ in 0..1000 {
-        epoch = epoch + 1.hours();
-        biases.push(gm.next_bias(epoch, &mut rng));
+        biases.push(gm.next_bias(&mut rng));
     }
 
     // Result was inspected visually, not sure how to correctly test this.
@@ -253,16 +290,13 @@ fn coupled_gm_test() {
     use rand_pcg::Pcg64Mcg;
     use rstats::{triangmat::Vecops, Stats};
 
-    let mut epoch = Epoch::now().unwrap();
-
-    let mut gm = GaussMarkov::coupled_bias_drift(24.hours(), 0.1, 0.1, 0.1, 0.1, epoch, 0.0, 0.0);
+    let mut gm = GaussMarkov::coupled_bias_drift(24.hours(), 0.1, 0.1, 0.1, 0.1, 0.0, 0.0);
 
     let mut biases = Vec::with_capacity(1000);
 
     let mut rng = Pcg64Mcg::new(0);
     for _ in 0..1000 {
-        epoch = epoch + 1.hours();
-        biases.push(gm.next_bias(epoch, &mut rng));
+        biases.push(gm.next_bias(&mut rng));
     }
 
     // Result was inspected visually, not sure how to correctly test this.
@@ -275,20 +309,16 @@ fn coupled_gm_test() {
 
 #[test]
 fn zero_noise_test() {
-    use hifitime::TimeUnits;
     use rand_pcg::Pcg64Mcg;
     use rstats::{triangmat::Vecops, Stats};
 
-    let mut epoch = Epoch::now().unwrap();
-
-    let mut gm = GaussMarkov::first_order(Duration::MAX, 0.0, epoch, 0.0);
+    let mut gm = GaussMarkov::first_order(Duration::MAX, 0.0, 0.0);
 
     let mut biases = Vec::with_capacity(1000);
 
     let mut rng = Pcg64Mcg::new(0);
     for _ in 0..1000 {
-        epoch = epoch + 1.hours();
-        biases.push(gm.next_bias(epoch, &mut rng));
+        biases.push(gm.next_bias(&mut rng));
     }
 
     let min_max = biases.minmax();
@@ -303,14 +333,11 @@ fn serde_test() {
     use serde_yaml;
     use std::str::FromStr;
 
-    let epoch = Epoch::now().unwrap();
     // Note that we set the initial bias to zero because it is not serialized.
-    let gm = GaussMarkov::first_order(Duration::MAX, 0.1, epoch, 0.0);
+    let gm = GaussMarkov::first_order(Duration::MAX, 0.1, 0.0);
     let serialized = serde_yaml::to_string(&gm).unwrap();
     println!("{serialized}");
-    let mut gm_deser: GaussMarkov = serde_yaml::from_str(&serialized).unwrap();
-    // We need to set the epoch manually because it is not serialized.
-    gm_deser.epoch = epoch;
+    let gm_deser: GaussMarkov = serde_yaml::from_str(&serialized).unwrap();
     assert_eq!(gm_deser, gm);
 
     // Deserialize a coupled Gauss-Markov model
@@ -329,7 +356,6 @@ fn serde_test() {
         1.65,
         0.1,
         0.2,
-        Epoch::default(),
         0.0,
         0.0,
     );
