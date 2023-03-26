@@ -307,7 +307,7 @@ impl GaussMarkov {
     ///
     /// The unit is only used in the headers of the parquet file.
     ///
-    /// This will simulate the model with 1000 different seeds, sampling the process 1140 times.
+    /// This will simulate the model with 100 different seeds, sampling the process 1140 times.
     /// This corresponds to one sample per minute for 24 hours.
     /// TODO: Add text_signature
     pub fn simulate(&self, path: String, unit: Option<String>) -> Result<(), NyxError> {
@@ -318,9 +318,11 @@ impl GaussMarkov {
             drift: f64,
         }
 
-        let mut samples = vec![];
+        let num_runs: u32 = 100;
 
-        for run in 0..1000 {
+        let mut samples = Vec::with_capacity(num_runs as usize);
+
+        for run in 0..num_runs {
             let mut rng = Pcg64Mcg::from_entropy();
 
             let mut gm = self.clone();
@@ -335,17 +337,17 @@ impl GaussMarkov {
             }
         }
 
-        let unit = match unit {
-            Some(unit) => format!("{unit}"),
-            None => "(unitless)".to_string(),
+        let (bias_unit, drift_unit) = match unit {
+            Some(unit) => (format!("({unit})"), format!("({unit}/s)")),
+            None => ("(unitless)".to_string(), "(unitless)".to_string()),
         };
 
         // Build the parquet file
         let hdrs = vec![
             Field::new("Run", DataType::UInt32, false),
             Field::new("Sample", DataType::UInt32, false),
-            Field::new(format!("Bias {unit}"), DataType::Float64, false),
-            Field::new(format!("Drift {unit}"), DataType::Float64, false),
+            Field::new(format!("Bias {bias_unit}"), DataType::Float64, false),
+            Field::new(format!("Drift {drift_unit}"), DataType::Float64, false),
         ];
 
         let schema = Arc::new(Schema::new(hdrs));
@@ -358,10 +360,10 @@ impl GaussMarkov {
             samples.iter().map(|s| s.sample).collect::<Vec<u32>>(),
         )) as ArrayRef);
         record.push(Arc::new(Float64Array::from(
-            samples.iter().map(|s| s.drift).collect::<Vec<f64>>(),
+            samples.iter().map(|s| s.bias).collect::<Vec<f64>>(),
         )) as ArrayRef);
         record.push(Arc::new(Float64Array::from(
-            samples.iter().map(|s| s.bias).collect::<Vec<f64>>(),
+            samples.iter().map(|s| s.drift).collect::<Vec<f64>>(),
         )) as ArrayRef);
 
         // Serialize all of the devices and add that to the parquet file too.
@@ -414,6 +416,23 @@ impl GaussMarkov {
             drift_sigma,
             bias: bias.unwrap_or(0.0),
             drift: drift.unwrap_or(0.0),
+        }
+    }
+
+    /// Initializes a new Gauss Markov process for the provided kind of model.
+    ///
+    /// Available models are: `Range`, `Doppler`, `RangeHP`, `Doppler HP` (HP stands for high precision).
+    #[cfg(feature = "python")]
+    #[staticmethod]
+    fn from_default(kind: String) -> Result<Self, NyxError> {
+        match kind.as_str() {
+            "Range" => Ok(Self::default_range_km()),
+            "Doppler" => Ok(Self::default_doppler_km_s()),
+            "RangeHP" => Ok(Self::high_precision_range_km()),
+            "DopplerHP" => Ok(Self::high_precision_doppler_km_s()),
+            _ => Err(NyxError::CustomError(format!(
+                "No default Gauss Markov model for `{kind}`"
+            ))),
         }
     }
 }
