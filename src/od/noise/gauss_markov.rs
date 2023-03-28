@@ -23,7 +23,7 @@ use crate::NyxError;
 use arrow::array::{ArrayRef, Float64Array, UInt32Array};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
-use hifitime::{Duration, TimeUnits};
+use hifitime::{Duration, Epoch, TimeUnits, Unit};
 use parquet::arrow::ArrowWriter;
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
@@ -58,7 +58,7 @@ use std::sync::Arc;
 #[cfg_attr(
     feature = "python",
     pyo3(
-        text_signature = "(tau, bias_sigma, omega_n_hz=None, damping_ratio=None, drift_sigma=None, bias=0.0, drift=0.0)"
+        text_signature = "(tau, bias_sigma, omega_n_hz=None, zeta_damping=None, drift_sigma=None, bias=0.0, drift=0.0)"
     )
 )]
 pub struct GaussMarkov {
@@ -73,15 +73,18 @@ pub struct GaussMarkov {
     /// Natural frequency of the drift Gauss-Markov process.
     pub omega_n_hz: Option<f64>,
     /// Damping ratio of the drift Gauss-Markov process.
-    pub damping_ratio: Option<f64>,
+    pub zeta_damping: Option<f64>,
     /// Standard deviation of the zero-mean white noise of the drift.
     pub drift_sigma: Option<f64>,
-    /// Latest bias estimate
+    /// Latest bias
     #[serde(skip)]
     pub bias: f64,
-    /// Latest drift estimate
+    /// Latest drift
     #[serde(skip)]
     pub drift: f64,
+    /// Latest epoch, unset before first sample
+    #[serde(skip)]
+    pub epoch: Option<Epoch>,
 }
 
 impl fmt::Display for GaussMarkov {
@@ -98,7 +101,7 @@ impl fmt::Display for GaussMarkov {
                 write!(
                     f,
                     "Coupled bias and drift Gauss-Markov process with τ = {}, ω_n = {} Hz, ζ = {}, σ_bias = {} σ_drift = {}: bias = {}, drift = {}",
-                    self.tau, omega_n_hz, self.damping_ratio.unwrap(), self.bias_sigma, self.drift_sigma.unwrap(), self.bias, self.drift
+                    self.tau, omega_n_hz, self.zeta_damping.unwrap(), self.bias_sigma, self.drift_sigma.unwrap(), self.bias, self.drift
                 )
             }
         }
@@ -113,7 +116,7 @@ impl GaussMarkov {
     /// * `tau` - Time constant of the Gauss-Markov process.
     /// * `bias_sigma` - Standard deviation of the zero-mean white noise of the bias.
     /// * `omega_n_hz` - Natural frequency of the drift Gauss-Markov process.
-    /// * `damping_ratio` - Damping ratio of the drift Gauss-Markov process.
+    /// * `zeta_damping` - Damping ratio of the drift Gauss-Markov process.
     /// * `drift_sigma` - Standard deviation of the zero-mean white noise of the drift.
     /// * `bias` - Latest bias estimate.
     /// * `drift` - Latest drift estimate.
@@ -123,13 +126,13 @@ impl GaussMarkov {
     /// If `tau` is zero.
     /// If `bias_sigma` is negative.
     /// If `omega_n_hz` is negative.
-    /// If `damping_ratio` is negative.
+    /// If `zeta_damping` is negative.
     /// If `drift_sigma` is negative.
     pub fn new(
         tau: Duration,
         bias_sigma: f64,
         omega_n_hz: Option<f64>,
-        damping_ratio: Option<f64>,
+        zeta_damping: Option<f64>,
         drift_sigma: Option<f64>,
         init_bias: f64,
         init_drift: f64,
@@ -139,8 +142,8 @@ impl GaussMarkov {
         if let Some(omega_n_hz) = omega_n_hz {
             assert!(omega_n_hz >= 0.0);
         }
-        if let Some(damping_ratio) = damping_ratio {
-            assert!(damping_ratio >= 0.0);
+        if let Some(zeta_damping) = zeta_damping {
+            assert!(zeta_damping >= 0.0);
         }
         if let Some(drift_sigma) = drift_sigma {
             assert!(drift_sigma >= 0.0);
@@ -149,10 +152,11 @@ impl GaussMarkov {
             tau,
             bias_sigma,
             omega_n_hz,
-            damping_ratio,
+            zeta_damping,
             drift_sigma,
             bias: init_bias,
             drift: init_drift,
+            epoch: None,
         }
     }
 
@@ -175,7 +179,7 @@ impl GaussMarkov {
     /// * `tau` - Time constant of the Gauss-Markov process.
     /// * `bias_sigma` - Standard deviation of the zero-mean white noise of the bias.
     /// * `omega_n_hz` - Natural frequency of the drift Gauss-Markov process.
-    /// * `damping_ratio` - Damping ratio of the drift Gauss-Markov process.
+    /// * `zeta_damping` - Damping ratio of the drift Gauss-Markov process.
     /// * `drift_sigma` - Standard deviation of the zero-mean white noise of the drift.
     /// * `bias` - Latest bias estimate.
     /// * `drift` - Latest drift estimate.
@@ -185,13 +189,13 @@ impl GaussMarkov {
     /// If `tau` is zero.
     /// If `bias_sigma` is negative.
     /// If `omega_n_hz` is negative.
-    /// If `damping_ratio` is negative.
+    /// If `zeta_damping` is negative.
     /// If `drift_sigma` is negative.
     pub fn coupled_bias_drift(
         tau: Duration,
         bias_sigma: f64,
         omega_n_hz: f64,
-        damping_ratio: f64,
+        zeta_damping: f64,
         drift_sigma: f64,
         init_bias: f64,
         init_drift: f64,
@@ -200,22 +204,49 @@ impl GaussMarkov {
             tau,
             bias_sigma,
             Some(omega_n_hz),
-            Some(damping_ratio),
+            Some(zeta_damping),
             Some(drift_sigma),
             init_bias,
             init_drift,
         )
     }
 
-    pub fn next_bias<R: Rng>(&mut self, rng: &mut R) -> f64 {
+    pub fn next_bias<R: Rng>(&mut self, epoch: Epoch, rng: &mut R) -> f64 {
+        // Set the epoch while we compute the delta time
+        let dt = match self.epoch {
+            None => {
+                self.epoch = Some(epoch);
+                Duration::ZERO
+            }
+            Some(prev_epoch) => epoch - prev_epoch,
+        };
+
+        let dt_s = dt.to_seconds();
+
+        let zeta = self.zeta_damping.unwrap_or(0.0);
+        let omega_n = self.omega_n_hz.unwrap_or(0.0);
+        let omega_d = omega_n * (1.0 - zeta.powi(2)).sqrt();
+
+        let beta = 1.0 / self.tau.to_seconds();
+        let eta = -0.5 * (beta + 2.0 * zeta * omega_n);
+        let nu = (omega_d.powi(2) + beta * zeta * omega_n - 0.25 * beta.powi(2)).sqrt();
+
+        let stm = ((eta * dt_s).exp() / nu)
+            * Matrix2::new(
+                (nu * dt_s).cos() * nu + (eta + 2.0 * zeta * omega_n) * dt_s.sin(),
+                (nu * dt_s).sin(),
+                -omega_n.powi(2) * dt_s.sin(),
+                (nu * dt_s).cos() * nu + (eta + beta) * dt_s.sin(),
+            );
+
         let omega_fact = match self.omega_n_hz {
             None => 0.0,
             Some(omega_n_hz) => -omega_n_hz.powi(2),
         };
 
-        let zeta_fact = match self.damping_ratio {
+        let zeta_fact = match self.zeta_damping {
             None => 0.0,
-            Some(damping_ratio) => -2.0 * damping_ratio * self.omega_n_hz.unwrap(),
+            Some(zeta_damping) => -2.0 * zeta_damping * self.omega_n_hz.unwrap(),
         };
 
         let a_mat = Matrix2::new(-1.0 / self.tau.to_seconds(), 1.0, omega_fact, zeta_fact);
@@ -242,10 +273,11 @@ impl GaussMarkov {
         tau: Duration::MAX,
         bias_sigma: 0.0,
         omega_n_hz: None,
-        damping_ratio: None,
+        zeta_damping: None,
         drift_sigma: None,
         bias: 0.0,
         drift: 0.0,
+        epoch: None,
     };
 
     /// Typical noise on the ranging data from a non-high-precision ground station.
@@ -254,10 +286,11 @@ impl GaussMarkov {
             tau: 5.minutes(),
             bias_sigma: 50.0e-3, // 50 m
             omega_n_hz: None,
-            damping_ratio: None,
+            zeta_damping: None,
             drift_sigma: Some(5e-3), // 5 m
             bias: 0.0,
             drift: 0.0,
+            epoch: None,
         }
     }
 
@@ -267,10 +300,11 @@ impl GaussMarkov {
             tau: 20.minutes(),
             bias_sigma: 50.0e-5, // 50 cm/s
             omega_n_hz: None,
-            damping_ratio: None,
+            zeta_damping: None,
             drift_sigma: Some(7.5e-5), // 7.5 cm/s
             bias: 0.0,
             drift: 0.0,
+            epoch: None,
         }
     }
 
@@ -280,10 +314,11 @@ impl GaussMarkov {
             tau: 12.hours(),
             bias_sigma: 5.0e-4, // 0.5 m
             omega_n_hz: None,
-            damping_ratio: None,
+            zeta_damping: None,
             drift_sigma: Some(1e-4), // 0.1 m
             bias: -4e-3,
             drift: 0.0,
+            epoch: None,
         }
     }
 
@@ -293,10 +328,11 @@ impl GaussMarkov {
             tau: 12.hours(),
             bias_sigma: 5.0e-5, // 5 cm/s
             omega_n_hz: None,
-            damping_ratio: None,
+            zeta_damping: None,
             drift_sigma: Some(1.5e-6), // 0.15 cm/s
             bias: -4.0e-5,
             drift: 0.0,
+            epoch: None,
         }
     }
 }
@@ -313,7 +349,7 @@ impl GaussMarkov {
     pub fn simulate(&self, path: String, unit: Option<String>) -> Result<(), NyxError> {
         struct GMState {
             run: u32,
-            sample: u32,
+            hours: f64,
             bias: f64,
             drift: f64,
         }
@@ -321,16 +357,19 @@ impl GaussMarkov {
         let num_runs: u32 = 100;
 
         let mut samples = Vec::with_capacity(num_runs as usize);
+        let epoch = Epoch::now().unwrap();
 
         for run in 0..num_runs {
             let mut rng = Pcg64Mcg::from_entropy();
 
             let mut gm = self.clone();
-            for sample in 0..1440 {
-                gm.next_bias(&mut rng);
+            for minute in 0..1440 {
+                let tick = minute.minutes();
+                let next_epoch = epoch + tick;
+                gm.next_bias(next_epoch, &mut rng);
                 samples.push(GMState {
                     run,
-                    sample,
+                    hours: tick.to_unit(Unit::Hour),
                     bias: gm.bias,
                     drift: gm.drift,
                 });
@@ -345,7 +384,7 @@ impl GaussMarkov {
         // Build the parquet file
         let hdrs = vec![
             Field::new("Run", DataType::UInt32, false),
-            Field::new("Sample", DataType::UInt32, false),
+            Field::new("Hours", DataType::Float64, false),
             Field::new(format!("Bias {bias_unit}"), DataType::Float64, false),
             Field::new(format!("Drift {drift_unit}"), DataType::Float64, false),
         ];
@@ -356,8 +395,8 @@ impl GaussMarkov {
         record.push(Arc::new(UInt32Array::from(
             samples.iter().map(|s| s.run).collect::<Vec<u32>>(),
         )) as ArrayRef);
-        record.push(Arc::new(UInt32Array::from(
-            samples.iter().map(|s| s.sample).collect::<Vec<u32>>(),
+        record.push(Arc::new(Float64Array::from(
+            samples.iter().map(|s| s.hours).collect::<Vec<f64>>(),
         )) as ArrayRef);
         record.push(Arc::new(Float64Array::from(
             samples.iter().map(|s| s.bias).collect::<Vec<f64>>(),
@@ -403,7 +442,7 @@ impl GaussMarkov {
         tau: Duration,
         bias_sigma: f64,
         omega_n_hz: Option<f64>,
-        damping_ratio: Option<f64>,
+        zeta_damping: Option<f64>,
         drift_sigma: Option<f64>,
         bias: Option<f64>,
         drift: Option<f64>,
@@ -412,7 +451,7 @@ impl GaussMarkov {
             tau,
             bias_sigma,
             omega_n_hz,
-            damping_ratio,
+            zeta_damping,
             drift_sigma,
             bias: bias.unwrap_or(0.0),
             drift: drift.unwrap_or(0.0),
@@ -445,10 +484,11 @@ fn fogm_test() {
     let mut gm = GaussMarkov::first_order(24.hours(), 0.1, 0.0);
 
     let mut biases = Vec::with_capacity(1000);
+    let epoch = Epoch::now().unwrap();
 
     let mut rng = Pcg64Mcg::new(0);
-    for _ in 0..1000 {
-        biases.push(gm.next_bias(&mut rng));
+    for seconds in 0..1000 {
+        biases.push(gm.next_bias(epoch + seconds.seconds(), &mut rng));
     }
 
     // Result was inspected visually, not sure how to correctly test this.
@@ -468,10 +508,11 @@ fn coupled_gm_test() {
     let mut gm = GaussMarkov::coupled_bias_drift(24.hours(), 0.1, 0.1, 0.1, 0.1, 0.0, 0.0);
 
     let mut biases = Vec::with_capacity(1000);
+    let epoch = Epoch::now().unwrap();
 
     let mut rng = Pcg64Mcg::new(0);
-    for _ in 0..1000 {
-        biases.push(gm.next_bias(&mut rng));
+    for seconds in 0..1000 {
+        biases.push(gm.next_bias(epoch + seconds.seconds(), &mut rng));
     }
 
     // Result was inspected visually, not sure how to correctly test this.
@@ -489,10 +530,11 @@ fn zero_noise_test() {
     let mut gm = GaussMarkov::first_order(Duration::MAX, 0.0, 0.0);
 
     let mut biases = Vec::with_capacity(1000);
+    let epoch = Epoch::now().unwrap();
 
     let mut rng = Pcg64Mcg::new(0);
-    for _ in 0..1000 {
-        biases.push(gm.next_bias(&mut rng));
+    for seconds in 0..1000 {
+        biases.push(gm.next_bias(epoch + seconds.seconds(), &mut rng));
     }
 
     let min_max = biases.minmax();
@@ -519,7 +561,7 @@ fn serde_test() {
     tau: 1 hour 15 ns
     bias_sigma: 0.1
     omega_n_hz: 1.65
-    damping_ratio: 0.1
+    zeta_damping: 0.1
     drift_sigma: 0.2
     "#;
 
