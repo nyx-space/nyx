@@ -2,7 +2,7 @@ import logging
 from pathlib import Path
 
 
-from nyx_space.cosmic import Spacecraft
+from nyx_space.cosmic import Spacecraft, Orbit, SrpConfig, Cosm
 from nyx_space.mission_design import (
     propagate,
     StateParameter,
@@ -24,7 +24,7 @@ def test_propagate():
 
     config_path = root.joinpath("./data/tests/config/")
 
-    sc = Spacecraft.load_yaml(str(config_path.joinpath("spacecraft.yaml")))
+    sc = Spacecraft.load(str(config_path.joinpath("spacecraft.yaml")))
     # Check that we have loaded this correctly by checking the values from the YAML file
     assert sc.value_of(StateParameter.X) == -9042.862234
     assert sc.value_of(StateParameter.Y) == 18536.333069
@@ -39,9 +39,7 @@ def test_propagate():
     # Check other stuff that is computed on request
     assert sc.value_of(StateParameter.SMA) == 21999.99774705774
 
-    dynamics = SpacecraftDynamics.load_named_yaml(
-        str(config_path.joinpath("dynamics.yaml"))
-    )
+    dynamics = SpacecraftDynamics.load_named(str(config_path.joinpath("dynamics.yaml")))
     # So far, there are no accessors on the dynamics, so we will check what they print out =(
     assert (
         f"{dynamics['lofi']}"
@@ -96,5 +94,31 @@ def test_propagate():
         assert abs(sc_at_event.value_of(StateParameter.TrueAnomaly) - 180.0) <= 1e-6
 
 
+def test_build_spacecraft():
+    """
+    Tests that we can build a spacecraft from scratch without an input file
+    """
+
+    cosm = Cosm.de438()
+    eme2k = cosm.frame("EME2000")  # Earth Mean Equator J2000
+    orbit = Orbit.from_keplerian_altitude(
+        400.0, 0.01, 15.6, 45.0, 90.0, 75.0, Epoch.system_now(), eme2k
+    )
+    # Define the SRP
+    srp = SrpConfig(2.0)  # 2.0 will be the area
+    print(srp)
+    assert srp.cr == 1.8  # Default value
+    assert srp.area_m2 == 2.0
+    sc = Spacecraft(orbit, 150.0, 15.0, srp)
+    print(sc)
+
+    assert sc.srp().__eq__(srp)  # Not sure why the `==` operator doesn't work here
+    assert sc.drag().area_m2 == 0.0
+    assert (
+        sc.drag().cd == 2.2
+    )  # Default value, but the area is zero, so it doesn't have any effect
+
+
 if __name__ == "__main__":
     test_propagate()
+    test_build_spacecraft()

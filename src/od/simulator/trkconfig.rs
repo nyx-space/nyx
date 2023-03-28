@@ -169,6 +169,6 @@ fn deserialize_from_file() {
     .iter()
     .collect();
 
-    let configs: HashMap<String, TrkConfig> = TrkConfig::load_named_yaml(trkconfg_yaml).unwrap();
+    let configs: HashMap<String, TrkConfig> = TrkConfig::load_named(trkconfg_yaml).unwrap();
     dbg!(configs);
 }

@@ -36,10 +36,8 @@ impl Spacecraft {
         orbit: Orbit,
         dry_mass_kg: f64,
         fuel_mass_kg: f64,
-        srp_area_m2: f64,
-        drag_area_m2: f64,
-        cr: f64,
-        cd: f64,
+        srp: Option<SrpConfig>,
+        drag: Option<DragConfig>,
         thruster: Option<Thruster>,
         mode: Option<GuidanceMode>,
     ) -> Self {
@@ -50,38 +48,36 @@ impl Spacecraft {
             thruster,
             mode: mode.unwrap_or(GuidanceMode::Coast),
             stm: None,
-            srp: SrpConfig {
-                area_m2: srp_area_m2,
-                cr,
-            },
-            drag: DragConfig {
-                area_m2: drag_area_m2,
-                cd,
-            },
+            srp: srp.unwrap_or_else(|| SrpConfig::default()),
+            drag: drag.unwrap_or_else(|| DragConfig::default()),
         }
     }
 
     #[staticmethod]
-    fn load_yaml(path: &str) -> Result<Self, ConfigError> {
-        <Self as ConfigRepr>::load_yaml(path)
+    fn load(path: &str) -> Result<Self, ConfigError> {
+        <Self as ConfigRepr>::load(path)
     }
 
     #[staticmethod]
-    fn load_many_yaml(path: &str) -> Result<Vec<Self>, ConfigError> {
-        <Self as ConfigRepr>::load_many_yaml(path)
+    fn load_many(path: &str) -> Result<Vec<Self>, ConfigError> {
+        <Self as ConfigRepr>::load_many(path)
     }
 
     #[staticmethod]
-    fn load_named_yaml(path: &str) -> Result<HashMap<String, Self>, ConfigError> {
-        <Self as ConfigRepr>::load_named_yaml(path)
+    fn load_named(path: &str) -> Result<HashMap<String, Self>, ConfigError> {
+        <Self as ConfigRepr>::load_named(path)
     }
 
     fn __repr__(&self) -> String {
-        format!("{self:?}")
+        format!("{self:?} @ {self:p}")
     }
 
     fn __str__(&self) -> String {
         format!("{self}\n{self:x}")
+    }
+
+    fn __eq__(&self, other: Self) -> bool {
+        *self == other
     }
 
     /// Note: this returns a COPY of the orbit, not a mutable reference to it!
@@ -103,8 +99,97 @@ impl Spacecraft {
     }
 
     /// Returns the value of the provided state parameter if available
-    #[cfg(feature = "python")]
     fn value_of(&self, param: StateParameter) -> Result<f64, NyxError> {
         self.value(param)
+    }
+
+    fn srp(&self) -> SrpConfig {
+        self.srp
+    }
+
+    fn drag(&self) -> DragConfig {
+        self.drag
+    }
+}
+
+#[pymethods]
+impl SrpConfig {
+    #[new]
+    pub fn py_new(area_m2: f64, cr: Option<f64>) -> Self {
+        Self {
+            area_m2,
+            cr: cr.unwrap_or(1.8),
+        }
+    }
+
+    fn __str__(&self) -> String {
+        format!("{self:?}")
+    }
+
+    fn __eq__(&self, other: Self) -> bool {
+        *self == other
+    }
+
+    #[getter]
+    fn get_area_m2(&self) -> f64 {
+        self.area_m2
+    }
+
+    #[getter]
+    fn get_cr(&self) -> f64 {
+        self.cr
+    }
+
+    #[setter]
+    fn set_area_m2(&mut self, area_m2: f64) -> PyResult<()> {
+        self.area_m2 = area_m2;
+        Ok(())
+    }
+
+    #[setter]
+    fn set_cr(&mut self, cr: f64) -> PyResult<()> {
+        self.cr = cr;
+        Ok(())
+    }
+}
+
+#[pymethods]
+impl DragConfig {
+    #[new]
+    pub fn py_new(area_m2: f64, cd: Option<f64>) -> Self {
+        Self {
+            area_m2,
+            cd: cd.unwrap_or(1.8),
+        }
+    }
+
+    fn __str__(&self) -> String {
+        format!("{self:?}")
+    }
+
+    fn __eq__(&self, other: Self) -> bool {
+        *self == other
+    }
+
+    #[getter]
+    fn get_area_m2(&self) -> f64 {
+        self.area_m2
+    }
+
+    #[getter]
+    fn get_cd(&self) -> f64 {
+        self.cd
+    }
+
+    #[setter]
+    fn set_area_m2(&mut self, area_m2: f64) -> PyResult<()> {
+        self.area_m2 = area_m2;
+        Ok(())
+    }
+
+    #[setter]
+    fn set_cr(&mut self, cd: f64) -> PyResult<()> {
+        self.cd = cd;
+        Ok(())
     }
 }

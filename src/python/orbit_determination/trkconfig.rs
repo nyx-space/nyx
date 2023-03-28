@@ -26,18 +26,18 @@ use pyo3::prelude::*;
 #[pymethods]
 impl TrkConfig {
     #[staticmethod]
-    fn load_yaml(path: &str) -> Result<Self, ConfigError> {
-        <Self as ConfigRepr>::load_yaml(path)
+    fn load(path: &str) -> Result<Self, ConfigError> {
+        <Self as ConfigRepr>::load(path)
     }
 
     #[staticmethod]
-    fn load_many_yaml(path: &str) -> Result<Vec<Self>, ConfigError> {
-        <Self as ConfigRepr>::load_many_yaml(path)
+    fn load_many(path: &str) -> Result<Vec<Self>, ConfigError> {
+        <Self as ConfigRepr>::load_many(path)
     }
 
     #[staticmethod]
-    fn load_named_yaml(path: &str) -> Result<HashMap<String, Self>, ConfigError> {
-        <Self as ConfigRepr>::load_named_yaml(path)
+    fn load_named(path: &str) -> Result<HashMap<String, Self>, ConfigError> {
+        <Self as ConfigRepr>::load_named(path)
     }
 
     fn __repr__(&self) -> String {

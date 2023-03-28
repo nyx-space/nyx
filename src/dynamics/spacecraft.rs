@@ -166,8 +166,8 @@ impl SpacecraftDynamics {
 impl SpacecraftDynamics {
     #[cfg(feature = "python")]
     #[staticmethod]
-    fn load_yaml(path: &str) -> Result<Self, ConfigError> {
-        let serde = DynamicsSerde::load_yaml(path)?;
+    fn load(path: &str) -> Result<Self, ConfigError> {
+        let serde = DynamicsSerde::load(path)?;
 
         let cosm = Cosm::de438();
 
@@ -176,8 +176,8 @@ impl SpacecraftDynamics {
 
     #[cfg(feature = "python")]
     #[staticmethod]
-    fn load_many_yaml(path: &str) -> Result<Vec<Self>, ConfigError> {
-        let orbits = DynamicsSerde::load_many_yaml(path)?;
+    fn load_many(path: &str) -> Result<Vec<Self>, ConfigError> {
+        let orbits = DynamicsSerde::load_many(path)?;
 
         let cosm = Cosm::de438();
 
@@ -192,8 +192,8 @@ impl SpacecraftDynamics {
 
     #[cfg(feature = "python")]
     #[staticmethod]
-    fn load_named_yaml(path: &str) -> Result<HashMap<String, Self>, ConfigError> {
-        let orbits = DynamicsSerde::load_named_yaml(path)?;
+    fn load_named(path: &str) -> Result<HashMap<String, Self>, ConfigError> {
+        let orbits = DynamicsSerde::load_named(path)?;
 
         let cosm = Cosm::de438();
 

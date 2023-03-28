@@ -83,8 +83,8 @@ impl OrbitEstimate {
     }
 
     #[staticmethod]
-    fn load_yaml(path: &str) -> Result<Self, ConfigError> {
-        let serde = OrbitEstimateSerde::load_yaml(path)?;
+    fn load(path: &str) -> Result<Self, ConfigError> {
+        let serde = OrbitEstimateSerde::load(path)?;
 
         let cosm = Cosm::de438();
 
@@ -92,8 +92,8 @@ impl OrbitEstimate {
     }
 
     #[staticmethod]
-    fn load_many_yaml(path: &str) -> Result<Vec<Self>, ConfigError> {
-        let stations = OrbitEstimateSerde::load_many_yaml(path)?;
+    fn load_many(path: &str) -> Result<Vec<Self>, ConfigError> {
+        let stations = OrbitEstimateSerde::load_many(path)?;
 
         let cosm = Cosm::de438();
 
@@ -107,8 +107,8 @@ impl OrbitEstimate {
     }
 
     #[staticmethod]
-    fn load_named_yaml(path: &str) -> Result<HashMap<String, Self>, ConfigError> {
-        let orbits = OrbitEstimateSerde::load_named_yaml(path)?;
+    fn load_named(path: &str) -> Result<HashMap<String, Self>, ConfigError> {
+        let orbits = OrbitEstimateSerde::load_named(path)?;
 
         let cosm = Cosm::de438();
 

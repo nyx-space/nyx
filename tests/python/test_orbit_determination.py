@@ -27,10 +27,8 @@ def test_filter_arc():
     outpath = root.joinpath("output_data/")
 
     # Load the dynamics and spacecraft
-    sc = Spacecraft.load_yaml(str(config_path.joinpath("spacecraft.yaml")))
-    dynamics = SpacecraftDynamics.load_named_yaml(
-        str(config_path.joinpath("dynamics.yaml"))
-    )
+    sc = Spacecraft.load(str(config_path.joinpath("spacecraft.yaml")))
+    dynamics = SpacecraftDynamics.load_named(str(config_path.joinpath("dynamics.yaml")))
 
     # An propagate for two periods (we only care about the trajectory)
     _, traj = propagate(sc, dynamics["hifi"], sc.orbit.period() * 2)
@@ -41,7 +39,7 @@ def test_filter_arc():
     # Now starts the measurement generation
 
     # Load the devices
-    devices = GroundStation.load_many_yaml(
+    devices = GroundStation.load_many(
         str(root.joinpath("./data/tests/config/many_ground_stations.yaml"))
     )
     print(f"Loaded {devices}")
@@ -57,7 +55,7 @@ def test_filter_arc():
         assert device.elevation_mask_deg == 5.0  # Both have the same mask
 
     # Load the tracking configuration as a dictionary
-    trk_cfg = TrkConfig.load_named_yaml(str(config_path.joinpath("tracking_cfg.yaml")))
+    trk_cfg = TrkConfig.load_named(str(config_path.joinpath("tracking_cfg.yaml")))
 
     # Load the trajectory
     traj = DynamicTrajectory(traj_file)
@@ -65,7 +63,11 @@ def test_filter_arc():
     # Build the simulated tracking arc, setting the seed to zero
     arc_sim = GroundTrackingArcSim(devices, traj, trk_cfg, 0)
     # Generate the measurements
-    path = arc_sim.generate_measurements(str(outpath.joinpath("./from_python.parquet")), timestamp=True, metadata={"test key": "test value"})
+    path = arc_sim.generate_measurements(
+        str(outpath.joinpath("./from_python.parquet")),
+        timestamp=True,
+        metadata={"test key": "test value"},
+    )
     print(f"Saved {arc_sim} to {path}")
 
     # Now let's filter this same data.

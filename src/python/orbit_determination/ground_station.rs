@@ -29,8 +29,8 @@ use pyo3::prelude::*;
 #[pymethods]
 impl GroundStation {
     #[staticmethod]
-    fn load_yaml(path: &str) -> Result<Self, ConfigError> {
-        let serde = StationSerde::load_yaml(path)?;
+    fn load(path: &str) -> Result<Self, ConfigError> {
+        let serde = StationSerde::load(path)?;
 
         // Create a new Cosm until ANISE switch
         let cosm = Cosm::de438();
@@ -39,8 +39,8 @@ impl GroundStation {
     }
 
     #[staticmethod]
-    fn load_many_yaml(path: &str) -> Result<Vec<Self>, ConfigError> {
-        let stations = StationSerde::load_many_yaml(path)?;
+    fn load_many(path: &str) -> Result<Vec<Self>, ConfigError> {
+        let stations = StationSerde::load_many(path)?;
 
         // Create a new Cosm until ANISE switch
         let cosm = Cosm::de438();
@@ -55,8 +55,8 @@ impl GroundStation {
     }
 
     #[staticmethod]
-    fn load_named_yaml(path: &str) -> Result<HashMap<String, Self>, ConfigError> {
-        let orbits = StationSerde::load_named_yaml(path)?;
+    fn load_named(path: &str) -> Result<HashMap<String, Self>, ConfigError> {
+        let orbits = StationSerde::load_named(path)?;
 
         let cosm = Cosm::de438();
 

@@ -62,7 +62,7 @@ fn tracking_arc_simple() {
     .iter()
     .collect();
 
-    let stations_serde = StationSerde::load_many_yaml(ground_station_yaml).unwrap();
+    let stations_serde = StationSerde::load_many(ground_station_yaml).unwrap();
     let devices: Vec<GroundStation> = stations_serde
         .into_iter()
         .map(|station| GroundStation::from_config(station, cosm.clone()).unwrap())
@@ -81,7 +81,7 @@ fn tracking_arc_simple() {
     .iter()
     .collect();
 
-    let configs: HashMap<String, TrkConfig> = TrkConfig::load_named_yaml(trkconfg_yaml).unwrap();
+    let configs: HashMap<String, TrkConfig> = TrkConfig::load_named(trkconfg_yaml).unwrap();
 
     dbg!(&configs);
 

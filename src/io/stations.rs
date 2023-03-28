@@ -134,7 +134,7 @@ fn test_load_single() {
 
     assert!(test_data.exists(), "Could not find the test data");
 
-    let gs = StationSerde::load_yaml(test_data).unwrap();
+    let gs = StationSerde::load(test_data).unwrap();
 
     dbg!(&gs);
 
@@ -171,7 +171,7 @@ fn test_load_many() {
     .iter()
     .collect();
 
-    let stations = StationSerde::load_many_yaml(test_data).unwrap();
+    let stations = StationSerde::load_many(test_data).unwrap();
 
     dbg!(&stations);
 

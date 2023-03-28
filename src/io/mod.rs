@@ -84,7 +84,7 @@ impl PartialEq for ConfigError {
 
 pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {
     /// Builds the configuration representation from the path to a yaml
-    fn load_yaml<P>(path: P) -> Result<Self, ConfigError>
+    fn load<P>(path: P) -> Result<Self, ConfigError>
     where
         P: AsRef<Path>,
     {
@@ -95,7 +95,7 @@ pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {
     }
 
     /// Builds a sequence of "Selves" from the provided path to a yaml
-    fn load_many_yaml<P>(path: P) -> Result<Vec<Self>, ConfigError>
+    fn load_many<P>(path: P) -> Result<Vec<Self>, ConfigError>
     where
         P: AsRef<Path>,
     {
@@ -106,7 +106,7 @@ pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {
     }
 
     /// Builds a map of names to "selves" from the provided path to a yaml
-    fn load_named_yaml<P>(path: P) -> Result<HashMap<String, Self>, ConfigError>
+    fn load_named<P>(path: P) -> Result<HashMap<String, Self>, ConfigError>
     where
         P: AsRef<Path>,
     {
@@ -116,11 +116,11 @@ pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {
         serde_yaml::from_reader(reader).map_err(ConfigError::ParseError)
     }
 
-    /// Builds a sequence of "Selves" from the provided string of a yaml
-    fn load_many(data: &str) -> Result<Vec<Self>, ConfigError> {
-        debug!("Loading YAML:\n{data}");
-        serde_yaml::from_str(data).map_err(ConfigError::ParseError)
-    }
+    // Builds a sequence of "Selves" from the provided string of a yaml
+    // fn load_many(data: &str) -> Result<Vec<Self>, ConfigError> {
+    //     debug!("Loading YAML:\n{data}");
+    //     serde_yaml::from_str(data).map_err(ConfigError::ParseError)
+    // }
 }
 
 /// Trait to specify that a structure can be configured from a file, either in TOML, YAML, JSON, INI, etc.
@@ -132,7 +132,7 @@ where
     type IntermediateRepr: ConfigRepr;
 
     fn from_yaml<P: AsRef<Path>>(path: P, cosm: Arc<Cosm>) -> Result<Self, ConfigError> {
-        Self::from_config(Self::IntermediateRepr::load_yaml(path)?, cosm)
+        Self::from_config(Self::IntermediateRepr::load(path)?, cosm)
     }
 
     /// Creates a new instance of `self` from the configuration.

@@ -14,11 +14,11 @@ def test_fogm(plot=False):
     root = Path(__file__).joinpath("../../../").resolve()
     outpath = root.joinpath("output_data/")
 
-    gm = GaussMarkov(tau=Unit.Hour * 24, sigma=0.1, steady_state=0.5)
+    gm = GaussMarkov(tau=Unit.Hour * 24, sigma=5.6, steady_state=0.5)
     print(gm)
     assert (
         str(gm)
-        == "First order Gauss-Markov process with τ = 1 days, σ = 0.1, q = 0.5: bias = None"
+        == "First order Gauss-Markov process with τ = 1 days, σ_b = 5.6, σ_q = 0.5"
     )
     gm.simulate(str(outpath.joinpath("fogm.parquet")))
 
@@ -29,7 +29,7 @@ def test_fogm(plot=False):
     assert df["Bias (unitless)"].mean() != 0.0
     assert df["Bias (unitless)"].max() != 0.0
     assert df["Bias (unitless)"].min() != 0.0
-    # assert df["Bias (unitless)"].count() == 300100
+    assert df["Bias (unitless)"].count() == 12525
 
     if plot:
         fig = px.scatter(
@@ -38,8 +38,18 @@ def test_fogm(plot=False):
             y="Bias (unitless)",
             color="Run",
             opacity=0.4,
+            marginal_y="rug",
+            title=f"{gm}",
         )
-        fig.update_layout(title=f"{gm}")
+        fig.add_vline(
+            x=gm.tau.to_seconds(),
+            line_width=2,
+            line_dash="dash",
+            line_color="red",
+            row=1,
+            col=1,
+        )
+        fig.show()
 
 
 def test_defaults(kinds=["Range", "RangeHP", "Doppler", "DopplerHP"], plot=False):
@@ -52,23 +62,73 @@ def test_defaults(kinds=["Range", "RangeHP", "Doppler", "DopplerHP"], plot=False
     outpath = root.joinpath("output_data/")
 
     for kind in kinds:
-        gm = GaussMarkov.from_default(kind)
-        gm.simulate(str(outpath.joinpath(f"{kind}.parquet")))
+        unit = "km" if "Range" in kind else "km/s"
+        gm = GaussMarkov.default(kind)
+        gm.simulate(str(outpath.joinpath(f"{kind}.parquet")), unit=unit)
 
         # Read in the file
         df = pd.read_parquet(str(outpath.joinpath(f"{kind}.parquet")))
 
         if plot:
             fig = px.scatter(
-                df, x="Delta Time (s)", y="Bias (unitless)", color="Run", opacity=0.25
+                df,
+                x="Delta Time (s)",
+                y=f"Bias ({unit})",
+                color="Run",
+                opacity=0.4,
+                marginal_y="rug",
+                title=f"{kind} - {gm}",
             )
-            fig.update_layout(title=f"{kind} bias: {gm}")
             fig.add_vline(
-                x=gm.tau.to_seconds(), line_width=2, line_dash="dash", line_color="red"
+                x=gm.tau.to_seconds(),
+                line_width=2,
+                line_dash="dash",
+                line_color="red",
+                row=1,
+                col=1,
+            )
+            fig.show()
+
+
+def test_load(plot=False):
+    """
+    Tests that we can load a Gauss Markov process from a file and simulate it.
+    """
+    # Base path
+    root = Path(__file__).joinpath("../../../").resolve()
+    config = root.joinpath("data/tests/config/high-prec-network.yaml")
+    outpath = root.joinpath("output_data/")
+
+    models = GaussMarkov.load_named(str(config))
+
+    for name, gm in models.items():
+        gm.simulate(str(outpath.joinpath(f"{name}.parquet")))
+
+        # Read in the file
+        df = pd.read_parquet(str(outpath.joinpath(f"{name}.parquet")))
+
+        if plot:
+            fig = px.scatter(
+                df,
+                x="Delta Time (s)",
+                y=f"Bias (unitless)",
+                color="Run",
+                opacity=0.4,
+                marginal_y="rug",
+                title=f"{name} - {gm}",
+            )
+            fig.add_vline(
+                x=gm.tau.to_seconds(),
+                line_width=2,
+                line_dash="dash",
+                line_color="red",
+                row=1,
+                col=1,
             )
             fig.show()
 
 
 if __name__ == "__main__":
     test_fogm(True)
-    test_defaults(["Range"], True)
+    test_defaults(plot=True)
+    test_load(True)

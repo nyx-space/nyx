@@ -7,7 +7,7 @@ use crate::cosmic::Cosm as CosmRs;
 use crate::cosmic::Frame as FrameRs;
 use crate::cosmic::GuidanceMode;
 pub use crate::cosmic::Orbit;
-pub use crate::cosmic::Spacecraft;
+pub use crate::cosmic::{DragConfig, Spacecraft, SrpConfig};
 use crate::dynamics::guidance::Thruster;
 use std::sync::Arc;
 
@@ -18,6 +18,8 @@ pub(crate) fn register_cosmic(py: Python<'_>, parent_module: &PyModule) -> PyRes
     sm.add_class::<Frame>()?;
     sm.add_class::<Orbit>()?;
     sm.add_class::<Spacecraft>()?;
+    sm.add_class::<SrpConfig>()?;
+    sm.add_class::<DragConfig>()?;
     sm.add_class::<Thruster>()?;
     sm.add_class::<GuidanceMode>()?;
 

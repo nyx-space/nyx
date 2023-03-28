@@ -1528,8 +1528,8 @@ impl Orbit {
 
     #[cfg(feature = "python")]
     #[staticmethod]
-    fn load_yaml(path: &str) -> Result<Self, ConfigError> {
-        let serde = OrbitSerde::load_yaml(path)?;
+    fn load(path: &str) -> Result<Self, ConfigError> {
+        let serde = OrbitSerde::load(path)?;
 
         let cosm = Cosm::de438();
 
@@ -1538,8 +1538,8 @@ impl Orbit {
 
     #[cfg(feature = "python")]
     #[staticmethod]
-    fn load_many_yaml(path: &str) -> Result<Vec<Self>, ConfigError> {
-        let orbits = OrbitSerde::load_many_yaml(path)?;
+    fn load_many(path: &str) -> Result<Vec<Self>, ConfigError> {
+        let orbits = OrbitSerde::load_many(path)?;
 
         let cosm = Cosm::de438();
 
@@ -1554,8 +1554,8 @@ impl Orbit {
 
     #[cfg(feature = "python")]
     #[staticmethod]
-    fn load_named_yaml(path: &str) -> Result<HashMap<String, Self>, ConfigError> {
-        let orbits = OrbitSerde::load_named_yaml(path)?;
+    fn load_named(path: &str) -> Result<HashMap<String, Self>, ConfigError> {
+        let orbits = OrbitSerde::load_named(path)?;
 
         let cosm = Cosm::de438();
 
@@ -2230,8 +2230,7 @@ epoch: 2018-09-15T00:15:53.098 UTC
     .iter()
     .collect();
 
-    let orbit =
-        Orbit::from_config(OrbitSerde::load_yaml(test_data).unwrap(), cosm.clone()).unwrap();
+    let orbit = Orbit::from_config(OrbitSerde::load(test_data).unwrap(), cosm.clone()).unwrap();
     assert_eq!(exp, orbit);
 
     let test_data: PathBuf = [
@@ -2244,7 +2243,7 @@ epoch: 2018-09-15T00:15:53.098 UTC
     .iter()
     .collect();
 
-    let serded_orbits = OrbitSerde::load_many_yaml(test_data).unwrap();
+    let serded_orbits = OrbitSerde::load_many(test_data).unwrap();
     for orbit_s in serded_orbits {
         let orbit: Orbit = orbit_s.into();
         // Check that the orbits (mostly) match -- there will be rounding errors

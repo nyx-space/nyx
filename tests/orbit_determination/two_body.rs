@@ -233,7 +233,7 @@ fn od_tb_val_with_arc() {
     .iter()
     .collect();
 
-    let configs: HashMap<String, TrkConfig> = TrkConfig::load_named_yaml(trkconfig_yaml).unwrap();
+    let configs: HashMap<String, TrkConfig> = TrkConfig::load_named(trkconfig_yaml).unwrap();
 
     // Simulate tracking data of range and range rate
     let mut arc_sim = TrackingArcSim::with_seed(all_stations.clone(), traj, configs, 1).unwrap();
