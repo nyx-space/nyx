@@ -52,7 +52,7 @@ fn tracking_arc_simple() {
     trajectory.to_parquet_simple(path).unwrap();
 
     // Load the ground stations from the test data.
-    let ground_station_yaml: PathBuf = [
+    let ground_station_file: PathBuf = [
         &env::var("CARGO_MANIFEST_DIR").unwrap(),
         "data",
         "tests",
@@ -62,7 +62,7 @@ fn tracking_arc_simple() {
     .iter()
     .collect();
 
-    let stations_serde = StationSerde::load_many(ground_station_yaml).unwrap();
+    let stations_serde = StationSerde::load_many(ground_station_file).unwrap();
     let devices: Vec<GroundStation> = stations_serde
         .into_iter()
         .map(|station| GroundStation::from_config(station, cosm.clone()).unwrap())

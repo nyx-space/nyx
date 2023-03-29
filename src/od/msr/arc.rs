@@ -231,7 +231,7 @@ where
             + Allocator<f64, <MsrIn as State>::Size, <MsrIn as State>::Size>
             + Allocator<f64, <MsrIn as State>::VecLength>,
     {
-        let devices_repr = D::IntermediateRepr::load_many(&self.device_cfg)?;
+        let devices_repr = D::IntermediateRepr::loads_many(&self.device_cfg)?;
 
         let mut devices = HashMap::new();
 

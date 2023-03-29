@@ -161,7 +161,7 @@ fn test_load_many() {
 
     // Get the path to the root directory of the current Cargo project
 
-    let test_data: PathBuf = [
+    let test_file: PathBuf = [
         env::var("CARGO_MANIFEST_DIR").unwrap(),
         "data".to_string(),
         "tests".to_string(),
@@ -171,7 +171,7 @@ fn test_load_many() {
     .iter()
     .collect();
 
-    let stations = StationSerde::load_many(test_data).unwrap();
+    let stations = StationSerde::load_many(test_file).unwrap();
 
     dbg!(&stations);
 
