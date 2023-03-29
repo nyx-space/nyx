@@ -37,7 +37,7 @@ jobs:
         run: |
           set -e
           pip install nyx_space --find-links dist --force-reinstall
-          pip install pytest numpy
+          pip install pytest numpy pandas plotly pyarrow
           pytest
       - name: pytest
         if: ${{ !startsWith(matrix.target, 'x86') && matrix.target != 'ppc64' }}
@@ -82,7 +82,7 @@ jobs:
         run: |
           set -e
           pip install nyx_space --find-links dist --force-reinstall
-          pip install pytest numpy
+          pip install pytest numpy pandas plotly pyarrow
           pytest
 
   macos:
@@ -111,7 +111,7 @@ jobs:
         run: |
           set -e
           pip install nyx_space --find-links dist --force-reinstall
-          pip install pytest numpy
+          pip install pytest numpy pandas plotly pyarrow
           pytest
 
   release:

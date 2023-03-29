@@ -37,7 +37,7 @@ use estimate::OrbitEstimate;
 use process::process_tracking_arc;
 
 pub(crate) fn register_od(py: Python<'_>, parent_module: &PyModule) -> PyResult<()> {
-    let sm = PyModule::new(py, "nyx_space.orbit_determination")?;
+    let sm = PyModule::new(py, "_nyx_space.orbit_determination")?;
 
     sm.add_class::<GroundStation>()?;
     sm.add_class::<GroundTrackingArcSim>()?;

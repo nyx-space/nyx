@@ -12,7 +12,7 @@ use crate::dynamics::guidance::Thruster;
 use std::sync::Arc;
 
 pub(crate) fn register_cosmic(py: Python<'_>, parent_module: &PyModule) -> PyResult<()> {
-    let sm = PyModule::new(py, "nyx_space.cosmic")?;
+    let sm = PyModule::new(py, "_nyx_space.cosmic")?;
     sm.add_class::<Cosm>()?;
     sm.add_class::<Bodies>()?;
     sm.add_class::<Frame>()?;

@@ -41,7 +41,7 @@ impl From<ConfigError> for PyErr {
 }
 
 #[pymodule]
-fn nyx_space(py: Python, m: &PyModule) -> PyResult<()> {
+fn _nyx_space(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
 
     register_time_module(py, m)?;
@@ -54,7 +54,7 @@ fn nyx_space(py: Python, m: &PyModule) -> PyResult<()> {
 
 /// Reexport hifitime as nyx_space.time
 fn register_time_module(py: Python<'_>, parent_module: &PyModule) -> PyResult<()> {
-    let sm = PyModule::new(py, "nyx_space.time")?;
+    let sm = PyModule::new(py, "_nyx_space.time")?;
 
     sm.add_class::<Epoch>()?;
     sm.add_class::<TimeScale>()?;

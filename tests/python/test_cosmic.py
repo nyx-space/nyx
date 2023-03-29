@@ -1,4 +1,4 @@
-from nyx_space.cosmic import Cosm, Orbit, Spacecraft
+from nyx_space.cosmic import Cosm, Orbit, Spacecraft, SrpConfig, DragConfig
 from nyx_space.time import Epoch, Unit, Duration
 
 
@@ -56,15 +56,18 @@ def test_define_spacecraft():
     print(orbit)
     print(repr(orbit))
 
+    # Define the SRP
+    srp = SrpConfig(2.0)
+    # Define the Drag
+    drag = DragConfig(2.0)
+
     # Build a spacecraft
     sc = Spacecraft(
         orbit,
         dry_mass_kg=500.0,
         fuel_mass_kg=15.0,
-        srp_area_m2=2.0,
-        drag_area_m2=2.0,
-        cr=1.8,
-        cd=2.1,
+        srp=srp,
+        drag=drag,
     )
 
     print(sc)

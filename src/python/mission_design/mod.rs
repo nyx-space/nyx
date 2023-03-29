@@ -33,7 +33,7 @@ mod trajectory;
 
 /// Mission design
 pub(crate) fn register_md(py: Python<'_>, parent_module: &PyModule) -> PyResult<()> {
-    let sm = PyModule::new(py, "nyx_space.mission_design")?;
+    let sm = PyModule::new(py, "_nyx_space.mission_design")?;
 
     sm.add_class::<DynamicTrajectory>()?;
     sm.add_class::<SpacecraftDynamics>()?;

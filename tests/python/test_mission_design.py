@@ -13,7 +13,6 @@ from nyx_space.time import Duration, Unit, Epoch
 
 
 def test_propagate():
-
     # Initialize logging
     FORMAT = "%(levelname)s %(name)s %(filename)s:%(lineno)d\t%(message)s"
     logging.basicConfig(format=FORMAT)
