@@ -27,6 +27,8 @@ use hifitime::{Duration, Epoch, TimeSeries, TimeUnits};
 use parquet::arrow::ArrowWriter;
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
+#[cfg(feature = "python")]
+use pyo3::types::PyType;
 use rand::{Rng, SeedableRng};
 use rand_distr::Normal;
 use rand_pcg::Pcg64Mcg;
@@ -323,26 +325,26 @@ impl GaussMarkov {
     ///
     /// Available models are: `Range`, `Doppler`, `RangeHP`, `Doppler HP` (HP stands for high precision).
     #[cfg(feature = "python")]
-    #[staticmethod]
-    fn default(kind: String) -> Result<Self, NyxError> {
+    #[classmethod]
+    fn default(_cls: &PyType, kind: String) -> Result<Self, NyxError> {
         Self::from_default(kind)
     }
 
     #[cfg(feature = "python")]
-    #[staticmethod]
-    fn load(path: &str) -> Result<Self, ConfigError> {
+    #[classmethod]
+    fn load(_cls: &PyType, path: &str) -> Result<Self, ConfigError> {
         <Self as ConfigRepr>::load(path)
     }
 
     #[cfg(feature = "python")]
-    #[staticmethod]
-    fn load_many(path: &str) -> Result<Vec<Self>, ConfigError> {
+    #[classmethod]
+    fn load_many(_cls: &PyType, path: &str) -> Result<Vec<Self>, ConfigError> {
         <Self as ConfigRepr>::load_many(path)
     }
 
     #[cfg(feature = "python")]
-    #[staticmethod]
-    fn load_named(path: &str) -> Result<HashMap<String, Self>, ConfigError> {
+    #[classmethod]
+    fn load_named(_cls: &PyType, path: &str) -> Result<HashMap<String, Self>, ConfigError> {
         <Self as ConfigRepr>::load_named(path)
     }
 }

@@ -25,11 +25,12 @@ pub use crate::od::simulator::TrkConfig;
 pub use crate::{io::ConfigError, od::prelude::GroundStation};
 
 use pyo3::prelude::*;
+use pyo3::types::PyType;
 
 #[pymethods]
 impl GroundStation {
-    #[staticmethod]
-    fn load(path: &str) -> Result<Self, ConfigError> {
+    #[classmethod]
+    fn load(_cls: &PyType, path: &str) -> Result<Self, ConfigError> {
         let serde = StationSerde::load(path)?;
 
         // Create a new Cosm until ANISE switch
@@ -38,8 +39,8 @@ impl GroundStation {
         GroundStation::from_config(serde, cosm)
     }
 
-    #[staticmethod]
-    fn load_many(path: &str) -> Result<Vec<Self>, ConfigError> {
+    #[classmethod]
+    fn load_many(_cls: &PyType, path: &str) -> Result<Vec<Self>, ConfigError> {
         let stations = StationSerde::load_many(path)?;
 
         // Create a new Cosm until ANISE switch
@@ -54,8 +55,8 @@ impl GroundStation {
         Ok(selves)
     }
 
-    #[staticmethod]
-    fn load_named(path: &str) -> Result<HashMap<String, Self>, ConfigError> {
+    #[classmethod]
+    fn load_named(_cls: &PyType, path: &str) -> Result<HashMap<String, Self>, ConfigError> {
         let orbits = StationSerde::load_named(path)?;
 
         let cosm = Cosm::de438();

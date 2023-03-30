@@ -50,6 +50,8 @@ use crate::python::cosmic::Frame as PyFrame;
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 #[cfg(feature = "python")]
+use pyo3::types::PyType;
+#[cfg(feature = "python")]
 use std::collections::HashMap;
 
 /// If an orbit has an eccentricity below the following value, it is considered circular (only affects warning messages)
@@ -1527,8 +1529,8 @@ impl Orbit {
     }
 
     #[cfg(feature = "python")]
-    #[staticmethod]
-    fn load(path: &str) -> Result<Self, ConfigError> {
+    #[classmethod]
+    fn load(_cls: &PyType, path: &str) -> Result<Self, ConfigError> {
         let serde = OrbitSerde::load(path)?;
 
         let cosm = Cosm::de438();
@@ -1537,8 +1539,8 @@ impl Orbit {
     }
 
     #[cfg(feature = "python")]
-    #[staticmethod]
-    fn load_many(path: &str) -> Result<Vec<Self>, ConfigError> {
+    #[classmethod]
+    fn load_many(_cls: &PyType, path: &str) -> Result<Vec<Self>, ConfigError> {
         let orbits = OrbitSerde::load_many(path)?;
 
         let cosm = Cosm::de438();
@@ -1553,8 +1555,8 @@ impl Orbit {
     }
 
     #[cfg(feature = "python")]
-    #[staticmethod]
-    fn load_named(path: &str) -> Result<HashMap<String, Self>, ConfigError> {
+    #[classmethod]
+    fn load_named(_cls: &PyType, path: &str) -> Result<HashMap<String, Self>, ConfigError> {
         let orbits = OrbitSerde::load_named(path)?;
 
         let cosm = Cosm::de438();
@@ -1577,8 +1579,9 @@ impl Orbit {
     /// errors when creating a state from its Keplerian orbital elements (cf. the state tests).
     /// One should expect these errors to be on the order of 1e-12.
     #[cfg(feature = "python")]
-    #[staticmethod]
+    #[classmethod]
     fn from_keplerian(
+        _cls: &PyType,
         sma_km: f64,
         ecc: f64,
         inc_deg: f64,
@@ -1602,8 +1605,9 @@ impl Orbit {
 
     /// Creates a new Orbit from the provided semi-major axis altitude in kilometers
     #[cfg(feature = "python")]
-    #[staticmethod]
+    #[classmethod]
     fn from_keplerian_altitude(
+        _cls: &PyType,
         sma_altitude_km: f64,
         ecc: f64,
         inc_deg: f64,
@@ -1627,8 +1631,9 @@ impl Orbit {
 
     /// Creates a new Orbit from the provided altitudes of apoapsis and periapsis, in kilometers
     #[cfg(feature = "python")]
-    #[staticmethod]
+    #[classmethod]
     fn from_keplerian_apsis_altitude(
+        _cls: &PyType,
         apo_alt_km: f64,
         peri_alt_km: f64,
         inc_deg: f64,

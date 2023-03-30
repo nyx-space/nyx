@@ -39,6 +39,8 @@ use crate::io::ConfigRepr;
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 #[cfg(feature = "python")]
+use pyo3::types::PyType;
+#[cfg(feature = "python")]
 use std::collections::HashMap;
 
 const NORM_ERR: f64 = 1e-4;
@@ -165,8 +167,8 @@ impl SpacecraftDynamics {
 #[cfg_attr(feature = "python", pymethods)]
 impl SpacecraftDynamics {
     #[cfg(feature = "python")]
-    #[staticmethod]
-    fn load(path: &str) -> Result<Self, ConfigError> {
+    #[classmethod]
+    fn load(_cls: &PyType, path: &str) -> Result<Self, ConfigError> {
         let serde = DynamicsSerde::load(path)?;
 
         let cosm = Cosm::de438();
@@ -175,8 +177,8 @@ impl SpacecraftDynamics {
     }
 
     #[cfg(feature = "python")]
-    #[staticmethod]
-    fn load_many(path: &str) -> Result<Vec<Self>, ConfigError> {
+    #[classmethod]
+    fn load_many(_cls: &PyType, path: &str) -> Result<Vec<Self>, ConfigError> {
         let orbits = DynamicsSerde::load_many(path)?;
 
         let cosm = Cosm::de438();
@@ -191,8 +193,8 @@ impl SpacecraftDynamics {
     }
 
     #[cfg(feature = "python")]
-    #[staticmethod]
-    fn load_named(path: &str) -> Result<HashMap<String, Self>, ConfigError> {
+    #[classmethod]
+    fn load_named(_cls: &PyType, path: &str) -> Result<HashMap<String, Self>, ConfigError> {
         let orbits = DynamicsSerde::load_named(path)?;
 
         let cosm = Cosm::de438();

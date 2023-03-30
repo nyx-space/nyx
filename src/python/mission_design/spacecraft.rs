@@ -27,6 +27,7 @@ use std::collections::HashMap;
 
 use hifitime::Epoch;
 use pyo3::prelude::*;
+use pyo3::types::PyType;
 
 #[pymethods]
 impl Spacecraft {
@@ -53,18 +54,18 @@ impl Spacecraft {
         }
     }
 
-    #[staticmethod]
-    fn load(path: &str) -> Result<Self, ConfigError> {
+    #[classmethod]
+    fn load(_cls: &PyType, path: &str) -> Result<Self, ConfigError> {
         <Self as ConfigRepr>::load(path)
     }
 
-    #[staticmethod]
-    fn load_many(path: &str) -> Result<Vec<Self>, ConfigError> {
+    #[classmethod]
+    fn load_many(_cls: &PyType, path: &str) -> Result<Vec<Self>, ConfigError> {
         <Self as ConfigRepr>::load_many(path)
     }
 
-    #[staticmethod]
-    fn load_named(path: &str) -> Result<HashMap<String, Self>, ConfigError> {
+    #[classmethod]
+    fn load_named(_cls: &PyType, path: &str) -> Result<HashMap<String, Self>, ConfigError> {
         <Self as ConfigRepr>::load_named(path)
     }
 
