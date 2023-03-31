@@ -70,7 +70,7 @@ def _add_watermark(who):
             name="watermark",
             text=f"{who} © {year}",
             textangle=0,
-            opacity=0.5,
+            opacity=0.1,
             font=dict(color="black", size=100),
             xref="paper",
             yref="paper",
@@ -191,9 +191,12 @@ def finalize_plot(fig, title, xtitle=None, ytitle=None, copyright=None):
             )
         ]
 
+    if xtitle:
+        fig.update_layout(xaxis_title=xtitle)
+    if ytitle:
+        fig.update_layout(yaxis_title=ytitle)
+
     fig.update_layout(
-        xaxis_title=xtitle,
-        yaxis_title=ytitle,
         title=title,
         hovermode="x",
         template=nyx_tpl,

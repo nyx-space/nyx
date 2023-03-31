@@ -24,7 +24,7 @@ if __name__ == "__main__":
         "-c",
         "--center",
         type=str,
-        default='Earth',
+        default="Earth",
         required=False,
         help="The name of the center object, e.g. `Luna` (Moon)",
     )
@@ -41,9 +41,9 @@ if __name__ == "__main__":
     fname = ""
     try:
         traces = [
-            build_sphere(radii[args.center],
-                         body_color[args.center],
-                         opacity=args.opacity)
+            build_sphere(
+                radii[args.center], body_color[args.center], opacity=args.opacity
+            )
         ]
     except KeyError:
         print("Body must be one of:" + ", ".join(radii.keys()))
@@ -55,12 +55,14 @@ if __name__ == "__main__":
         print(df.describe())
         print(df.columns)
         traces += [
-            build_3dline(df["x (km)"],
-                         df["y (km)"],
-                         df["z (km)"],
-                         df["Epoch:Gregorian UTC"],
-                         color=color_values[i % len(color_values)],
-                         name=fpath.split('/')[-1])
+            build_3dline(
+                df["x (km)"],
+                df["y (km)"],
+                df["z (km)"],
+                df["Epoch:Gregorian UTC"],
+                color=color_values[i % len(color_values)],
+                name=fpath.split("/")[-1],
+            )
         ]
 
     # Now that we have the data, let's plot it

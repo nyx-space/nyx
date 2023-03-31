@@ -1,8 +1,8 @@
 from nyx_space.orbit_determination import GaussMarkov
 from nyx_space.time import Unit
+from nyx_space.plots import plot_gauss_markov
 from pathlib import Path
 import pandas as pd
-import plotly.express as px
 
 
 def test_fogm(plot=False):
@@ -32,24 +32,7 @@ def test_fogm(plot=False):
     assert df["Bias (unitless)"].count() == 12525
 
     if plot:
-        fig = px.scatter(
-            df,
-            x="Delta Time (s)",
-            y="Bias (unitless)",
-            color="Run",
-            opacity=0.4,
-            marginal_y="rug",
-            title=f"{gm}",
-        )
-        fig.add_vline(
-            x=gm.tau.to_seconds(),
-            line_width=2,
-            line_dash="dash",
-            line_color="red",
-            row=1,
-            col=1,
-        )
-        fig.show()
+        plot_gauss_markov(df, title=f"{gm}", tau=gm.tau.to_seconds())
 
 
 def test_defaults(kinds=["Range", "RangeHP", "Doppler", "DopplerHP"], plot=False):
@@ -70,24 +53,7 @@ def test_defaults(kinds=["Range", "RangeHP", "Doppler", "DopplerHP"], plot=False
         df = pd.read_parquet(str(outpath.joinpath(f"{kind}.parquet")))
 
         if plot:
-            fig = px.scatter(
-                df,
-                x="Delta Time (s)",
-                y=f"Bias ({unit})",
-                color="Run",
-                opacity=0.4,
-                marginal_y="rug",
-                title=f"{kind} - {gm}",
-            )
-            fig.add_vline(
-                x=gm.tau.to_seconds(),
-                line_width=2,
-                line_dash="dash",
-                line_color="red",
-                row=1,
-                col=1,
-            )
-            fig.show()
+            plot_gauss_markov(df, title=f"{kind} - {gm}", tau=gm.tau.to_seconds())
 
 
 def test_load(plot=False):
@@ -108,24 +74,7 @@ def test_load(plot=False):
         df = pd.read_parquet(str(outpath.joinpath(f"{name}.parquet")))
 
         if plot:
-            fig = px.scatter(
-                df,
-                x="Delta Time (s)",
-                y=f"Bias (unitless)",
-                color="Run",
-                opacity=0.4,
-                marginal_y="rug",
-                title=f"{name} - {gm}",
-            )
-            fig.add_vline(
-                x=gm.tau.to_seconds(),
-                line_width=2,
-                line_dash="dash",
-                line_color="red",
-                row=1,
-                col=1,
-            )
-            fig.show()
+            plot_gauss_markov(df, title=f"{name} - {gm}", tau=gm.tau.to_seconds())
 
 
 if __name__ == "__main__":
