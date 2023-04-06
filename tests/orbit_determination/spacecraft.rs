@@ -35,7 +35,6 @@ fn od_val_sc_mb_srp_reals_duals_models() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
-    use std::io;
 
     let cosm = Cosm::de438();
 
@@ -164,10 +163,9 @@ fn od_val_sc_mb_srp_reals_duals_models() {
     // Initialize the formatter
     let estimate_fmtr = NavSolutionFormatter::default("sc_ckf.csv".to_owned(), cosm);
 
-    let mut wtr = csv::Writer::from_writer(io::stdout());
+    let mut wtr = csv::Writer::from_path("sc_ckf.csv").unwrap();
     wtr.serialize(&estimate_fmtr.headers)
         .expect("could not write to stdout");
-    let mut printed = false;
     for (no, est) in odp.estimates.iter().enumerate() {
         if no == 0 {
             // Skip the first estimate which is the initial estimate provided by user
@@ -187,12 +185,9 @@ fn od_val_sc_mb_srp_reals_duals_models() {
             est.state_deviation().norm()
         );
 
-        if !printed {
-            // Format the estimate
-            wtr.serialize(estimate_fmtr.fmt(est))
-                .expect("could not write to stdout");
-            printed = true;
-        }
+        // Format the estimate
+        wtr.serialize(estimate_fmtr.fmt(est))
+            .expect("could not write to CSV");
     }
 
     for res in &odp.residuals {

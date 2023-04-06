@@ -1,6 +1,8 @@
 import plotly.graph_objects as go
 
-from .utils import plot_with_error, plot_line, plot_raw_line
+from .utils import plot_with_error, plot_line
+
+import pandas as pd
 
 
 def plot_estimates(
@@ -11,9 +13,15 @@ def plot_estimates(
     """
 
     try:
-        time_col = df[time_col_name]
+        orig_tim_col = df[time_col_name]
     except KeyError:
         raise ValueError(f"Could not find time column {time_col_name}")
+    else:
+        # Build a Python datetime column
+        time_col = pd.to_datetime(orig_tim_col)
+        x_title = "Epoch {}".format(time_col_name[-3:])
+
+    covar = {}
 
     # Reference the covariance frames
     for covar_var in [
@@ -27,9 +35,9 @@ def plot_estimates(
         possible_frames = ["", ":ric", ":rcn", ":vnc"]
         for frame in possible_frames:
             if f"{covar_var}{frame}" in df:
-                locals()[covar_var] = f"{covar_var}{frame}"
+                covar[covar_var] = f"{covar_var}{frame}"
 
-        if covar_var not in locals():
+        if covar_var not in covar:
             raise KeyError(f"Cannot find {covar_var} covariance column")
 
     fig = go.Figure()
@@ -38,8 +46,9 @@ def plot_estimates(
         df,
         time_col,
         "Estimate:X (km)",
-        cx_x,
+        covar["cx_x"],
         "blue",
+        x_title,
         "Position estimate (km)",
         title,
         copyright,
@@ -49,8 +58,9 @@ def plot_estimates(
         df,
         time_col,
         "Estimate:Y (km)",
-        cy_y,
+        covar["cy_y"],
         "green",
+        x_title,
         "Position estimate (km)",
         title,
         copyright,
@@ -60,8 +70,9 @@ def plot_estimates(
         df,
         time_col,
         "Estimate:Z (km)",
-        cz_z,
+        covar["cz_z"],
         "orange",
+        x_title,
         "Position estimate (km)",
         title,
         copyright,
@@ -80,8 +91,9 @@ def plot_estimates(
         df,
         time_col,
         "Estimate:VX (km/s)",
-        cx_dot_x_dot,
+        covar["cx_dot_x_dot"],
         "blue",
+        x_title,
         "Velocity estimate (km)",
         title,
         copyright,
@@ -91,8 +103,9 @@ def plot_estimates(
         df,
         time_col,
         "Estimate:VY (km/s)",
-        cy_dot_y_dot,
+        covar["cy_dot_y_dot"],
         "green",
+        x_title,
         "Velocity estimate (km)",
         title,
         copyright,
@@ -102,8 +115,9 @@ def plot_estimates(
         df,
         time_col,
         "Estimate:VZ (km/s)",
-        cz_dot_z_dot,
+        covar["cz_dot_z_dot"],
         "orange",
+        x_title,
         "Velocity estimate (km)",
         title,
         copyright,
@@ -127,9 +141,15 @@ def plot_covar(
     """
 
     try:
-        time_col = df[time_col_name]
+        orig_tim_col = df[time_col_name]
     except KeyError:
         raise ValueError(f"Could not find time column {time_col_name}")
+    else:
+        # Build a Python datetime column
+        time_col = pd.to_datetime(orig_tim_col)
+        x_title = "Epoch {}".format(time_col_name[-3:])
+
+    covar = {}
 
     # Reference the covariance frames
     for covar_var in [
@@ -143,25 +163,53 @@ def plot_covar(
         possible_frames = ["", ":ric", ":rcn", ":vnc"]
         for frame in possible_frames:
             if f"{covar_var}{frame}" in df:
-                locals()[covar_var] = f"{covar_var}{frame}"
+                covar[covar_var] = f"{covar_var}{frame}"
 
-        if covar_var not in locals():
+        if covar_var not in covar:
             raise KeyError(f"Cannot find {covar_var} covariance column")
 
     fig = go.Figure()
     plot_line(
-        fig, df, time_col, cx_x, "blue", "Position covariance (km)", title, copyright
+        fig,
+        df,
+        time_col,
+        covar["cx_x"],
+        "blue",
+        x_title,
+        "Position covariance (km)",
+        title,
+        copyright,
     )
     plot_line(
-        fig, df, time_col, cy_y, "green", "Position covariance (km)", title, copyright
+        fig,
+        df,
+        time_col,
+        covar["cy_y"],
+        "green",
+        x_title,
+        "Position covariance (km)",
+        title,
+        copyright,
     )
     plot_line(
-        fig, df, time_col, cz_z, "orange", "Position covariance (km)", title, copyright
+        fig,
+        df,
+        time_col,
+        covar["cz_z"],
+        "orange",
+        x_title,
+        "Position covariance (km)",
+        title,
+        copyright,
     )
 
     # Autoscale
     hwpt = int(len(df) / 2)
-    max_cov_y = max(max(df[cx_x][hwpt:]), max(df[cy_y][hwpt:]), max(df[cz_z][hwpt:]))
+    max_cov_y = max(
+        max(df[covar["cx_x"]][hwpt:]),
+        max(df[covar["cy_y"]][hwpt:]),
+        max(df[covar["cz_z"]][hwpt:]),
+    )
     fig.update_layout(yaxis_range=[-0.1 * max_cov_y, 1.5 * max_cov_y])
     fig.show()
     if html_out:
@@ -176,8 +224,9 @@ def plot_covar(
         fig,
         df,
         time_col,
-        cx_dot_x_dot,
+        covar["cx_dot_x_dot"],
         "blue",
+        x_title,
         "Velocity covariance (km/s)",
         title,
         copyright,
@@ -186,8 +235,9 @@ def plot_covar(
         fig,
         df,
         time_col,
-        cy_dot_y_dot,
+        covar["cy_dot_y_dot"],
         "green",
+        x_title,
         "Velocity covariance (km/s)",
         title,
         copyright,
@@ -196,8 +246,9 @@ def plot_covar(
         fig,
         df,
         time_col,
-        cz_dot_z_dot,
+        covar["cz_dot_z_dot"],
         "orange",
+        x_title,
         "Velocity covariance (km/s)",
         title,
         copyright,
@@ -205,9 +256,9 @@ def plot_covar(
     # Autoscale
     hwpt = int(len(df) / 2)
     max_cov_y = max(
-        max(df[cx_dot_x_dot][hwpt:]),
-        max(df[cy_dot_y_dot][hwpt:]),
-        max(df[cz_dot_z_dot][hwpt:]),
+        max(df[covar["cx_dot_x_dot"]][hwpt:]),
+        max(df[covar["cy_dot_y_dot"]][hwpt:]),
+        max(df[covar["cz_dot_z_dot"]][hwpt:]),
     )
 
     fig.update_layout(yaxis_range=[-0.1 * max_cov_y, 1.5 * max_cov_y])
@@ -228,9 +279,15 @@ def plot_state_deviation(
     """
 
     try:
-        time_col = df[time_col_name]
+        orig_tim_col = df[time_col_name]
     except KeyError:
         raise ValueError(f"Could not find time column {time_col_name}")
+    else:
+        # Build a Python datetime column
+        time_col = pd.to_datetime(orig_tim_col)
+        x_title = "Epoch {}".format(time_col_name[-3:])
+
+    covar = {}
 
     # Reference the covariance frames
     for covar_var in [
@@ -244,9 +301,9 @@ def plot_state_deviation(
         possible_frames = ["", ":ric", ":rcn", ":vnc"]
         for frame in possible_frames:
             if f"{covar_var}{frame}" in df:
-                locals()[covar_var] = f"{covar_var}{frame}"
+                covar[covar_var] = f"{covar_var}{frame}"
 
-        if covar_var not in locals():
+        if covar_var not in covar:
             raise KeyError(f"Cannot find {covar_var} covariance column")
 
     fig = go.Figure()
@@ -255,8 +312,9 @@ def plot_state_deviation(
         df,
         time_col,
         "delta_x",
-        cx_x,
+        covar["cx_x"],
         "blue",
+        x_title,
         "Position deviation (km)",
         title,
         copyright,
@@ -266,8 +324,9 @@ def plot_state_deviation(
         df,
         time_col,
         "delta_y",
-        cy_y,
+        covar["cy_y"],
         "green",
+        x_title,
         "Position deviation (km)",
         title,
         copyright,
@@ -277,15 +336,20 @@ def plot_state_deviation(
         df,
         time_col,
         "delta_z",
-        cz_z,
+        covar["cz_z"],
         "orange",
+        x_title,
         "Position deviation (km)",
         title,
         copyright,
     )
     # Autoscale
     hwpt = int(len(df) / 2)
-    max_cov_y = max(max(df[cx_x][hwpt:]), max(df[cy_y][hwpt:]), max(df[cz_z][hwpt:]))
+    max_cov_y = max(
+        max(df[covar["cx_x"]][hwpt:]),
+        max(df[covar["cy_y"]][hwpt:]),
+        max(df[covar["cz_z"]][hwpt:]),
+    )
     fig.update_layout(yaxis_range=[-1.5 * max_cov_y, 1.5 * max_cov_y])
     fig.show()
     if html_out:
@@ -301,8 +365,9 @@ def plot_state_deviation(
         df,
         time_col,
         "delta_vx",
-        cx_dot_x_dot,
+        covar["cx_dot_x_dot"],
         "blue",
+        x_title,
         "Velocity deviation (km/s)",
         title,
         copyright,
@@ -312,8 +377,9 @@ def plot_state_deviation(
         df,
         time_col,
         "delta_vy",
-        cy_dot_y_dot,
+        covar["cy_dot_y_dot"],
         "green",
+        x_title,
         "Velocity deviation (km/s)",
         title,
         copyright,
@@ -323,8 +389,9 @@ def plot_state_deviation(
         df,
         time_col,
         "delta_vz",
-        cz_dot_z_dot,
+        covar["cz_dot_z_dot"],
         "orange",
+        x_title,
         "Velocity deviation (km/s)",
         title,
         copyright,
@@ -332,9 +399,9 @@ def plot_state_deviation(
     # Autoscale
     hwpt = int(len(df) / 2)
     max_cov_y = max(
-        max(df[cx_dot_x_dot][hwpt:]),
-        max(df[cy_dot_y_dot][hwpt:]),
-        max(df[cz_dot_z_dot][hwpt:]),
+        max(df[covar["cx_dot_x_dot"]][hwpt:]),
+        max(df[covar["cy_dot_y_dot"]][hwpt:]),
+        max(df[covar["cz_dot_z_dot"]][hwpt:]),
     )
 
     fig.update_layout(yaxis_range=[-1.5 * max_cov_y, 1.5 * max_cov_y])

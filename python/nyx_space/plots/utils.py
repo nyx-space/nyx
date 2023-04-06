@@ -87,7 +87,7 @@ nyx_tpl.layout.annotations = [
     dict(
         name="watermark",
         text=f"Nyx Space 🄯 AGPLv3 {year}",
-        opacity=0.5,
+        opacity=0.75,
         font=dict(color="#3d84e8", size=12),
         xref="paper",
         yref="paper",
@@ -99,7 +99,7 @@ nyx_tpl.layout.annotations = [
 
 
 def plot_with_error(
-    fig, df, x, y_name, err_name, color_name, ytitle, title, copyright=None
+    fig, df, x, y_name, err_name, color_name, xtitle, ytitle, title, copyright=None
 ):
     """
     Adds the traces for the provided X vs Y with ERR around Y.
@@ -145,18 +145,20 @@ def plot_with_error(
         )
     )
 
-    finalize_plot(fig, None, ytitle, title, copyright)
+    finalize_plot(fig, title, xtitle, ytitle, copyright)
 
 
-def plot_line(fig, df, x, y_name, color_name, ytitle, title, copyright):
+def plot_line(fig, df, x, y_name, color_name, xtitle, ytitle, title, copyright):
     """
     Adds the trace for the provided X vs Y.
     """
 
-    plot_raw_line(fig, x, df[y_name], y_name, color_name, ytitle, title, copyright)
+    plot_raw_line(
+        fig, x, df[y_name], y_name, color_name, xtitle, ytitle, title, copyright
+    )
 
 
-def plot_raw_line(fig, x, y, y_name, color_name, ytitle, title, copyright=None):
+def plot_raw_line(fig, x, y, y_name, color_name, xtitle, ytitle, title, copyright=None):
     """
     Adds the trace for the provided X vs Y.
     """
@@ -172,7 +174,7 @@ def plot_raw_line(fig, x, y, y_name, color_name, ytitle, title, copyright=None):
         )
     )
 
-    finalize_plot(fig, None, ytitle, title, copyright)
+    finalize_plot(fig, title, xtitle, ytitle, copyright)
 
 
 def finalize_plot(fig, title, xtitle=None, ytitle=None, copyright=None):

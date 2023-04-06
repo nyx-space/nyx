@@ -19,7 +19,11 @@
 use std::collections::HashMap;
 
 use hifitime::Epoch;
-use parquet::{basic::Compression, file::properties::WriterProperties, format::KeyValue};
+use parquet::{
+    basic::{BrotliLevel, Compression},
+    file::properties::WriterProperties,
+    format::KeyValue,
+};
 use shadow_rs::shadow;
 use whoami::{platform, realname, username};
 
@@ -27,7 +31,8 @@ shadow!(build);
 
 /// The parquet writer properties
 pub(crate) fn pq_writer(metadata: Option<HashMap<String, String>>) -> Option<WriterProperties> {
-    let bldr = WriterProperties::builder().set_compression(Compression::BROTLI);
+    let bldr = WriterProperties::builder()
+        .set_compression(Compression::BROTLI(BrotliLevel::try_new(10).unwrap()));
 
     let mut file_metadata = vec![
         KeyValue::new(

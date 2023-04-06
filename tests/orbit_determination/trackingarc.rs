@@ -5,7 +5,8 @@ use nyx_space::md::ui::*;
 use nyx_space::od::msr::StdMeasurement;
 use nyx_space::od::prelude::*;
 use nyx_space::od::simulator::arc::TrackingArcSim;
-use nyx_space::od::simulator::TrkConfig;
+use nyx_space::od::simulator::{EpochRanges, TrkConfig};
+use rstest::*;
 use std::collections::HashMap;
 use std::env;
 use std::path::PathBuf;
@@ -119,4 +120,78 @@ fn tracking_arc_simple() {
     assert_eq!(arc_concrete.device_names(), arc.device_names());
     // Check that we've copied over the device configurations as well
     assert_eq!(arc_concrete.device_cfg, arc.device_cfg);
+}
+
+#[fixture]
+fn traj() -> Traj<Orbit> {
+    // Load cosm
+    let cosm = Cosm::de438();
+
+    // Dummy state
+    let orbit = Orbit::keplerian_altitude(
+        500.0,
+        1e-3,
+        30.0,
+        45.0,
+        75.0,
+        23.4,
+        Epoch::from_str("2023-02-22T19:18:17.16 UTC").unwrap(),
+        cosm.frame("EME2000"),
+    );
+
+    // Generate a trajectory
+    let (_, trajectory) = Propagator::default(OrbitalDynamics::two_body())
+        .with(orbit)
+        .for_duration_with_traj(1.5.days())
+        .unwrap();
+
+    trajectory
+}
+
+#[fixture]
+fn devices() -> Vec<GroundStation> {
+    let cosm = Cosm::de438();
+    // Load the ground stations from the test data.
+    let ground_station_file: PathBuf = [
+        &env::var("CARGO_MANIFEST_DIR").unwrap(),
+        "data",
+        "tests",
+        "config",
+        "many_ground_stations.yaml",
+    ]
+    .iter()
+    .collect();
+
+    let stations_serde = StationSerde::load_many(ground_station_file).unwrap();
+    let devices: Vec<GroundStation> = stations_serde
+        .into_iter()
+        .map(|station| GroundStation::from_config(station, cosm.clone()).unwrap())
+        .collect();
+
+    devices
+}
+
+#[rstest]
+fn trkconfig_zero_vis(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
+    let cosm = Cosm::de438();
+
+    // Build a tracking config that should never see this vehicle.
+    let trkcfg = TrkConfig {
+        exclusion_epochs: Some(vec![EpochRanges {
+            start: traj.first().epoch(),
+            end: traj.last().epoch(),
+        }]),
+        ..Default::default()
+    };
+    // Build the configs map
+    let mut configs = HashMap::new();
+    for device in &devices {
+        configs.insert(device.name.clone(), trkcfg.clone());
+    }
+
+    let mut trk = TrackingArcSim::<Orbit, StdMeasurement, _>::new(devices, traj, configs).unwrap();
+
+    let arc = trk.generate_measurements(cosm).unwrap();
+
+    assert_eq!(arc.measurements.len(), 0);
 }
