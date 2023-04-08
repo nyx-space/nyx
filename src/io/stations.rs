@@ -80,22 +80,43 @@ impl Configurable for GroundStation {
                 .or_else(|| Some("IAU Earth".to_string()))
                 .unwrap();
 
-            GroundStation::from_noise_values(
-                cfg.name.clone(),
-                cfg.elevation_mask_deg,
-                cfg.latitude_deg.unwrap(),
-                cfg.longitude_deg.unwrap(),
-                cfg.height_km.unwrap(),
-                cfg.range_noise_km,
-                cfg.range_rate_noise_km_s,
-                cosm.try_frame(&frame_name).map_or_else(
+            GroundStation {
+                name: cfg.name.clone(),
+                frame: cosm.try_frame(&frame_name).map_or_else(
                     |e| {
                         error!("{e} - using {iau_earth}");
                         iau_earth
                     },
                     |f| f,
                 ),
-            )
+                elevation_mask_deg: cfg.elevation_mask_deg,
+                timestamp_noise_s: None,
+                light_time_correction: false,
+                integration_time: None,
+                range_noise_km: None,
+                doppler_noise_km_s: None,
+                latitude_deg: cfg.latitude_deg.unwrap(),
+                longitude_deg: cfg.longitude_deg.unwrap(),
+                height_km: cfg.height_km.unwrap(),
+            }
+
+            // GroundStation::from_noise_values(
+            //     cfg.name.clone(),
+            //     cfg.elevation_mask_deg,
+            //     cfg.latitude_deg.unwrap(),
+            //     cfg.longitude_deg.unwrap(),
+            //     cfg.height_km.unwrap(),
+            //     cfg.range_noise_km,
+            //     cfg.range_rate_noise_km_s,
+            //     cosm.try_frame(&frame_name).map_or_else(
+            //         |e| {
+            //             error!("{e} - using {iau_earth}");
+            //             iau_earth
+            //         },
+            //         |f| f,
+            //     ),
+            // )
+            // todo!()
         };
 
         Ok(gs)
@@ -106,8 +127,8 @@ impl Configurable for GroundStation {
             name: self.name.clone(),
             frame: Some(self.frame.to_string()),
             elevation_mask_deg: self.elevation_mask_deg,
-            range_noise_km: self.range_noise.mean(),
-            range_rate_noise_km_s: self.range_rate_noise.mean(),
+            range_noise_km: 0.0,
+            range_rate_noise_km_s: 0.0,
             latitude_deg: Some(self.latitude_deg),
             longitude_deg: Some(self.longitude_deg),
             height_km: Some(self.height_km),

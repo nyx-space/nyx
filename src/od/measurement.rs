@@ -17,14 +17,16 @@
 */
 
 use super::msr::StdMeasurement;
+use super::noise::GaussMarkov;
 use super::TrackingDeviceSim;
 use crate::cosmic::{Cosm, Frame, Orbit};
+use crate::io::{frame_from_str, frame_to_str, maybe_duration_from_str, maybe_duration_to_str};
 use crate::md::ui::Traj;
 use crate::time::Epoch;
-use crate::Spacecraft;
+use crate::{NyxError, Spacecraft};
 use hifitime::Duration;
-use rand_distr::Normal;
 use rand_pcg::Pcg64Mcg;
+use serde_derive::{Deserialize, Serialize};
 use std::fmt;
 use std::sync::Arc;
 
@@ -32,7 +34,7 @@ use std::sync::Arc;
 use pyo3::prelude::*;
 
 /// GroundStation defines a two-way ranging and doppler station.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "python", pyclass)]
 pub struct GroundStation {
     pub name: String,
@@ -45,105 +47,95 @@ pub struct GroundStation {
     /// in km
     pub height_km: f64,
     /// Frame in which this station is defined
+    #[serde(serialize_with = "frame_to_str", deserialize_with = "frame_from_str")]
     pub frame: Frame,
     /// Duration needed to generate a measurement (if unset, it is assumed to be instantaneous)
+    #[serde(
+        serialize_with = "maybe_duration_to_str",
+        deserialize_with = "maybe_duration_from_str"
+    )]
     pub integration_time: Option<Duration>,
     /// Whether to correct for light travel time
     pub light_time_correction: bool,
-    pub(crate) range_noise: Normal<f64>, // TODO: Replace this with a Gauss Markov process -- not sure how to tie it to the measurement itself
-    pub(crate) range_rate_noise: Normal<f64>,
+    /// Noise on the timestamp of the measurement
+    pub timestamp_noise_s: Option<GaussMarkov>,
+    /// Noise on the range data of the measurement
+    pub range_noise_km: Option<GaussMarkov>,
+    /// Noise on the Doppler data of the measurement
+    pub doppler_noise_km_s: Option<GaussMarkov>,
 }
 
 impl GroundStation {
-    /// Initializes a new two-way ranging and doppler station from the noise values.
-    pub fn from_noise_values(
-        name: String,
-        elevation_mask: f64,
-        latitude: f64,
-        longitude: f64,
-        height: f64,
-        range_noise: f64,
-        range_rate_noise: f64,
-        frame: Frame,
-    ) -> Self {
-        Self {
-            name,
-            elevation_mask_deg: elevation_mask,
-            latitude_deg: latitude,
-            longitude_deg: longitude,
-            height_km: height,
-            frame,
-            integration_time: None,
-            light_time_correction: false,
-            range_noise: Normal::new(0.0, range_noise).unwrap(),
-            range_rate_noise: Normal::new(0.0, range_rate_noise).unwrap(),
-        }
-    }
-
     /// Initializes a point on the surface of a celestial object.
     /// This is meant for analysis, not for spacecraft navigation.
     pub fn from_point(
         name: String,
-        latitude: f64,
-        longitude: f64,
-        height: f64,
+        latitude_deg: f64,
+        longitude_deg: f64,
+        height_km: f64,
         frame: Frame,
     ) -> Self {
-        Self::from_noise_values(name, 0.0, latitude, longitude, height, 0.0, 0.0, frame)
+        Self {
+            name,
+            elevation_mask_deg: 0.0,
+            latitude_deg,
+            longitude_deg,
+            height_km,
+            frame,
+            integration_time: None,
+            light_time_correction: false,
+            timestamp_noise_s: None,
+            range_noise_km: None,
+            doppler_noise_km_s: None,
+        }
     }
 
-    pub fn dss65_madrid(
-        elevation_mask: f64,
-        range_noise: f64,
-        range_rate_noise: f64,
-        iau_earth: Frame,
-    ) -> Self {
-        Self::from_noise_values(
-            "Madrid".to_string(),
-            elevation_mask,
-            40.427_222,
-            4.250_556,
-            0.834_939,
-            range_noise,
-            range_rate_noise,
-            iau_earth,
-        )
+    pub fn dss65_madrid(elevation_mask: f64, _a: f64, _b: f64, iau_earth: Frame) -> Self {
+        Self {
+            name: "Madrid".to_string(),
+            elevation_mask_deg: elevation_mask,
+            latitude_deg: 40.427_222,
+            longitude_deg: 4.250_556,
+            height_km: 0.834_939,
+            frame: iau_earth,
+            integration_time: None,
+            light_time_correction: false,
+            timestamp_noise_s: None,
+            range_noise_km: Some(GaussMarkov::ZERO),
+            doppler_noise_km_s: Some(GaussMarkov::ZERO),
+        }
     }
 
-    pub fn dss34_canberra(
-        elevation_mask: f64,
-        range_noise: f64,
-        range_rate_noise: f64,
-        iau_earth: Frame,
-    ) -> Self {
-        Self::from_noise_values(
-            "Canberra".to_string(),
-            elevation_mask,
-            -35.398_333,
-            148.981_944,
-            0.691_750,
-            range_noise,
-            range_rate_noise,
-            iau_earth,
-        )
+    pub fn dss34_canberra(elevation_mask: f64, _a: f64, _b: f64, iau_earth: Frame) -> Self {
+        Self {
+            name: "Canberra".to_string(),
+            elevation_mask_deg: elevation_mask,
+            latitude_deg: -35.398_333,
+            longitude_deg: 148.981_944,
+            height_km: 0.691_750,
+            frame: iau_earth,
+            integration_time: None,
+            light_time_correction: false,
+            timestamp_noise_s: None,
+            range_noise_km: Some(GaussMarkov::ZERO),
+            doppler_noise_km_s: Some(GaussMarkov::ZERO),
+        }
     }
 
-    pub fn dss13_goldstone(
-        elevation_mask: f64,
-        range_noise: f64,
-        range_rate_noise: f64,
-        iau_earth: Frame,
-    ) -> Self {
-        Self::from_noise_values(
-            "Goldstone".to_string(),
-            elevation_mask,
-            35.247_164,
-            243.205,
-            1.071_149_04,
-            range_noise,
-            range_rate_noise,
-            iau_earth,
-        )
+    pub fn dss13_goldstone(elevation_mask: f64, _a: f64, _b: f64, iau_earth: Frame) -> Self {
+        Self {
+            name: "Goldstone".to_string(),
+            elevation_mask_deg: elevation_mask,
+            latitude_deg: 35.247_164,
+            longitude_deg: 243.205,
+            height_km: 1.071_149_04,
+            frame: iau_earth,
+            integration_time: None,
+            light_time_correction: false,
+            timestamp_noise_s: None,
+            range_noise_km: Some(GaussMarkov::ZERO),
+            doppler_noise_km_s: Some(GaussMarkov::ZERO),
+        }
     }
 }
 
@@ -192,26 +184,53 @@ impl TrackingDeviceSim<Orbit, StdMeasurement> for GroundStation {
         &mut self,
         epoch: Epoch,
         traj: &Traj<Orbit>,
-        _rng: Option<&mut Pcg64Mcg>,
+        rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
-    ) -> Option<(StdMeasurement, Orbit)> {
+    ) -> Result<Option<(StdMeasurement, Orbit)>, NyxError> {
         let rx = traj.at(epoch).unwrap();
         let (elevation, rx_rxf, tx_rxf) = self.elevation_of(&rx, &cosm);
 
+        let msr_epoch;
+        let range_noise;
+        let doppler_noise;
+
+        match rng {
+            Some(rng) => {
+                // Add the range noise, or return an error if it's not configured.
+                range_noise = self
+                    .range_noise_km
+                    .ok_or_else(|| NyxError::CustomError("Range noise not configured".to_string()))?
+                    .next_bias(rx.epoch, rng);
+
+                // Add the Doppler noise, or return an error if it's not configured.
+                doppler_noise = self
+                    .doppler_noise_km_s
+                    .ok_or_else(|| {
+                        NyxError::CustomError("Doppler noise not configured".to_string())
+                    })?
+                    .next_bias(rx.epoch, rng);
+
+                // Only add the epoch noise if it's configured, it's valid to not have any noise on the clock.
+                if let Some(mut timestamp_noise) = self.timestamp_noise_s {
+                    msr_epoch = rx.epoch + timestamp_noise.next_bias(rx.epoch, rng);
+                } else {
+                    msr_epoch = rx.epoch;
+                }
+            }
+            None => {
+                msr_epoch = rx.epoch;
+                range_noise = 0.0;
+                doppler_noise = 0.0;
+            }
+        }
+
         if elevation >= self.elevation_mask_deg {
-            Some((
-                StdMeasurement::new(
-                    rx.epoch,
-                    tx_rxf,
-                    rx_rxf,
-                    true,
-                    &self.range_noise,
-                    &self.range_rate_noise,
-                ),
+            Ok(Some((
+                StdMeasurement::new(msr_epoch, tx_rxf, rx_rxf, range_noise, doppler_noise),
                 tx_rxf,
-            ))
+            )))
         } else {
-            None
+            Ok(None)
         }
     }
 
@@ -226,26 +245,55 @@ impl TrackingDeviceSim<Spacecraft, StdMeasurement> for GroundStation {
         &mut self,
         epoch: Epoch,
         traj: &Traj<Spacecraft>,
-        _rng: Option<&mut Pcg64Mcg>,
+        rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
-    ) -> Option<(StdMeasurement, Orbit)> {
+    ) -> Result<Option<(StdMeasurement, Orbit)>, NyxError> {
+        // Ugh, this is some code duplication to avoid rebuilding a trajectory that will be destroyed at the end of this function.
         let sc_rx = traj.at(epoch).unwrap();
-        let (elevation, rx_ssb, tx_ssb) = self.elevation_of(&sc_rx.orbit, &cosm);
+        let rx = sc_rx.orbit;
+        let (elevation, rx_ssb, tx_ssb) = self.elevation_of(&rx, &cosm);
+
+        let msr_epoch;
+        let range_noise;
+        let doppler_noise;
+
+        match rng {
+            Some(rng) => {
+                // Add the range noise, or return an error if it's not configured.
+                range_noise = self
+                    .range_noise_km
+                    .ok_or_else(|| NyxError::CustomError("Range noise not configured".to_string()))?
+                    .next_bias(rx.epoch, rng);
+
+                // Add the Doppler noise, or return an error if it's not configured.
+                doppler_noise = self
+                    .doppler_noise_km_s
+                    .ok_or_else(|| {
+                        NyxError::CustomError("Doppler noise not configured".to_string())
+                    })?
+                    .next_bias(rx.epoch, rng);
+
+                // Only add the epoch noise if it's configured, it's valid to not have any noise on the clock.
+                if let Some(mut timestamp_noise) = self.timestamp_noise_s {
+                    msr_epoch = rx.epoch + timestamp_noise.next_bias(rx.epoch, rng);
+                } else {
+                    msr_epoch = rx.epoch;
+                }
+            }
+            None => {
+                msr_epoch = rx.epoch;
+                range_noise = 0.0;
+                doppler_noise = 0.0;
+            }
+        }
 
         if elevation >= self.elevation_mask_deg {
-            Some((
-                StdMeasurement::new(
-                    rx_ssb.epoch,
-                    tx_ssb,
-                    rx_ssb,
-                    true,
-                    &self.range_noise,
-                    &self.range_rate_noise,
-                ),
+            Ok(Some((
+                StdMeasurement::new(msr_epoch, tx_ssb, rx_ssb, range_noise, doppler_noise),
                 tx_ssb,
-            ))
+            )))
         } else {
-            None
+            Ok(None)
         }
     }
 

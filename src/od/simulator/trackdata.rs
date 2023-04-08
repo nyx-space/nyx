@@ -25,8 +25,8 @@ use crate::linalg::DefaultAllocator;
 use crate::md::trajectory::Interpolatable;
 use crate::md::ui::Traj;
 use crate::od::Measurement;
-use crate::Orbit;
 use crate::{io::Configurable, linalg::allocator::Allocator};
+use crate::{NyxError, Orbit};
 
 use super::Cosm;
 
@@ -49,11 +49,14 @@ where
     ///
     /// # Choice of the random number generator
     /// The Pcg64Mcg is chosen because it is fast, space efficient, and has a good statistical distribution.
+    ///
+    /// # Errors
+    ///     + A specific measurement is requested but the noise on that measurement type is not configured.
     fn measure_as_seen(
         &mut self,
         epoch: Epoch,
         traj: &Traj<MsrIn>,
         rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
-    ) -> Option<(Msr, Orbit)>;
+    ) -> Result<Option<(Msr, Orbit)>, NyxError>;
 }

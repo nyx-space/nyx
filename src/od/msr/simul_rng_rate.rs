@@ -24,8 +24,6 @@ use crate::TimeTagged;
 use arrow::datatypes::Field;
 use hyperdual::linalg::norm;
 use hyperdual::{hyperspace_from_vector, OHyperdual};
-use rand::thread_rng;
-use rand_distr::Distribution;
 use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 
@@ -34,17 +32,15 @@ use super::{RangeMsr, RangeRate};
 /// Stores a standard measurement of range (km) and range rate (km/s)
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StdMeasurement {
-    pub dt: Epoch,
+    pub epoch: Epoch,
     pub obs: Vector2<f64>,
-    visible: bool,
-    h_tilde: Matrix2x6<f64>,
 }
 
 impl StdMeasurement {
-    pub fn range(&self) -> f64 {
+    pub fn range_km(&self) -> f64 {
         self.obs[(0, 0)]
     }
-    pub fn range_rate(&self) -> f64 {
+    pub fn doppler_km_s(&self) -> f64 {
         self.obs[(1, 0)]
     }
 
@@ -80,59 +76,42 @@ impl StdMeasurement {
     }
 
     /// Generate noiseless measurement
-    pub fn noiseless(dt: Epoch, tx: Orbit, rx: Orbit, visible: bool) -> StdMeasurement {
-        Self::raw(dt, tx, rx, visible, 0.0, 0.0)
+    pub fn noiseless(dt: Epoch, tx: Orbit, rx: Orbit) -> StdMeasurement {
+        Self::raw(dt, tx, rx, 0.0, 0.0)
     }
 
     /// Generate a new measurement with the provided noise distribution.
-    pub fn new<D: Distribution<f64>>(
-        dt: Epoch,
+    pub fn new(
+        epoch: Epoch,
         tx: Orbit,
         rx: Orbit,
-        visible: bool,
-        range_dist: &D,
-        range_rate_dist: &D,
+        range_noise: f64,
+        doppler_noise: f64,
     ) -> StdMeasurement {
-        Self::raw(
-            dt,
-            tx,
-            rx,
-            visible,
-            range_dist.sample(&mut thread_rng()),
-            range_rate_dist.sample(&mut thread_rng()),
-        )
+        Self::raw(epoch, tx, rx, range_noise, doppler_noise)
     }
 
     /// Generate a new measurement with the provided noise values.
     pub fn raw(
-        dt: Epoch,
+        epoch: Epoch,
         tx: Orbit,
         rx: Orbit,
-        visible: bool,
         range_noise: f64,
-        range_rate_noise: f64,
+        doppler_noise: f64,
     ) -> StdMeasurement {
         assert_eq!(tx.frame, rx.frame, "tx & rx in different frames");
         assert_eq!(tx.epoch, rx.epoch, "tx & rx states have different times");
 
         let hyperstate = hyperspace_from_vector(&(rx - tx).to_cartesian_vec());
-        let (obs, h_tilde) = Self::compute_sensitivity(&hyperstate, range_noise, range_rate_noise);
+        let (obs, _h_tilde) = Self::compute_sensitivity(&hyperstate, range_noise, doppler_noise);
 
-        StdMeasurement {
-            dt,
-            obs,
-            visible,
-            h_tilde,
-        }
+        StdMeasurement { epoch, obs }
     }
 
-    /// Initializes a StdMeasurement from real tracking data (sensitivity is zero)
-    pub fn real(dt: Epoch, range: f64, range_rate: f64) -> Self {
+    pub fn real(dt: Epoch, range_km: f64, doppler_km_s: f64) -> Self {
         Self {
-            dt,
-            obs: Vector2::new(range, range_rate),
-            visible: true,
-            h_tilde: Matrix2x6::zeros(),
+            epoch: dt,
+            obs: Vector2::new(range_km, doppler_km_s),
         }
     }
 }
@@ -155,22 +134,17 @@ impl Measurement for StdMeasurement {
     }
 
     fn from_observation(epoch: Epoch, obs: OVector<f64, Self::MeasurementSize>) -> Self {
-        Self {
-            dt: epoch,
-            obs,
-            visible: true,
-            h_tilde: Matrix2x6::zeros(),
-        }
+        Self { epoch, obs }
     }
 }
 
 impl TimeTagged for StdMeasurement {
     fn epoch(&self) -> Epoch {
-        self.dt
+        self.epoch
     }
 
     fn set_epoch(&mut self, dt: Epoch) {
-        self.dt = dt
+        self.epoch = dt
     }
 }
 
@@ -181,7 +155,7 @@ impl Serialize for StdMeasurement {
         S: Serializer,
     {
         let mut seq = serializer.serialize_seq(Some(3))?;
-        seq.serialize_element(&self.dt.to_mjd_tai_days())?;
+        seq.serialize_element(&self.epoch.to_mjd_tai_days())?;
         let obs = self.observation();
         seq.serialize_element(&obs[(0, 0)])?;
         seq.serialize_element(&obs[(1, 0)])?;

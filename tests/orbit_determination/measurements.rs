@@ -1,6 +1,7 @@
 extern crate nyx_space as nyx;
 
 use nyx::cosmic::{Cosm, Orbit};
+use nyx::od::noise::GaussMarkov;
 use nyx::od::prelude::*;
 use nyx::time::Epoch;
 use nyx::{dynamics::OrbitalDynamics, propagators::Propagator};
@@ -19,16 +20,19 @@ fn nil_measurement() {
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
-    let mut station = GroundStation::from_noise_values(
-        "nil".to_string(),
-        0.0,
-        lat,
-        long,
-        height,
-        0.0,
-        0.0,
-        eme2k,
-    );
+    let mut station = GroundStation {
+        name: "nil".to_string(),
+        latitude_deg: lat,
+        longitude_deg: long,
+        height_km: height,
+        frame: eme2k,
+        elevation_mask_deg: 0.0,
+        timestamp_noise_s: None,
+        range_noise_km: Some(GaussMarkov::ZERO),
+        doppler_noise_km_s: Some(GaussMarkov::ZERO),
+        integration_time: None,
+        light_time_correction: false,
+    };
 
     let at_station = Orbit::from_geodesic(lat, long, height, epoch, eme2k);
 
@@ -39,6 +43,7 @@ fn nil_measurement() {
 
     assert!(station
         .measure_as_seen(epoch, &traj, None, cosm.clone())
+        .unwrap()
         .is_none());
 }
 
@@ -145,6 +150,7 @@ fn val_measurements_topo() {
     for state in traj1.every(1 * Unit::Minute) {
         if dss65_madrid
             .measure_as_seen(state.epoch(), &traj1, Some(&mut rng), cosm.clone())
+            .unwrap()
             .is_some()
         {
             traj1_msr_cnt += 1;
@@ -163,6 +169,7 @@ fn val_measurements_topo() {
         // Will panic if the measurement is not visible
         let (meas, _) = dss65_madrid
             .measure_as_seen(state.epoch(), &traj1, Some(&mut rng), cosm.clone())
+            .unwrap()
             .unwrap();
 
         let obs = meas.observation();
@@ -211,6 +218,7 @@ fn val_measurements_topo() {
     for state in traj2.every(1 * Unit::Minute) {
         if dss65_madrid
             .measure_as_seen(state.epoch(), &traj2, Some(&mut rng), cosm.clone())
+            .unwrap()
             .is_some()
         {
             traj2_msr_cnt += 1;
@@ -229,6 +237,7 @@ fn val_measurements_topo() {
         // Will panic if the measurement is not visible
         let (meas, _) = dss65_madrid
             .measure_as_seen(state.epoch(), &traj2, Some(&mut rng), cosm.clone())
+            .unwrap()
             .unwrap();
         let obs = meas.observation();
         println!(

@@ -284,7 +284,7 @@ where
                     &self.trajectory,
                     Some(&mut self.rng),
                     cosm.clone(),
-                ) {
+                )? {
                     measurements.push((name.clone(), msr));
                     // We have a new measurement, let's update the schedule.
                     if let Some(device_schedule) = schedule.get_mut(name) {

@@ -458,7 +458,7 @@ where
                     match devices.get_mut(device_name) {
                         Some(device) => {
                             if let Some((computed_meas, device_loc)) =
-                                device.measure_as_seen(epoch, &traj, None, self.cosm.clone())
+                                device.measure_as_seen(epoch, &traj, None, self.cosm.clone())?
                             {
                                 // Switch back from extended if necessary
                                 if self.kf.is_extended() && self.ekf_trigger.disable_ekf(epoch) {
