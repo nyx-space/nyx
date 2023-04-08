@@ -91,6 +91,7 @@ where
         let mut sampling_rates_ns = Vec::with_capacity(devices.len());
         for device in devices {
             if let Some(cfg) = configs.get(&device.name()) {
+                cfg.sanity_check()?;
                 sampling_rates_ns.push(cfg.sampling.truncated_nanoseconds());
             } else {
                 return Err(ConfigError::InvalidConfig(format!(
@@ -184,7 +185,7 @@ where
                 if let Availability::Epoch(start_epoch) = cfg.start {
                     if start_epoch > epoch {
                         if !start_trace_msg.contains(name) {
-                            debug!(
+                            info!(
                                 "{name} tracking starts in {} (start = {start_epoch})",
                                 start_epoch - epoch
                             );
@@ -193,11 +194,12 @@ where
                         continue;
                     }
                 }
+
                 // Check the end condition
                 if let Availability::Epoch(end_epoch) = cfg.end {
                     if end_epoch < epoch {
                         if !end_trace_msg.contains(name) {
-                            debug!(
+                            info!(
                                 "{name} tracking ended {} ago (end = {end_epoch})",
                                 epoch - end_epoch
                             );
@@ -221,7 +223,7 @@ where
                             if let Some(start_epoch) = device_schedule.start {
                                 if (epoch - start_epoch) > on {
                                     if !schedule_trace_msg.contains(name) {
-                                        debug!(
+                                        info!(
                                             "{name} is now turned off after being on for {}",
                                             epoch - start_epoch
                                         );
@@ -234,7 +236,7 @@ where
                             if let Some(end_epoch) = device_schedule.end {
                                 if (epoch - end_epoch) <= off {
                                     if !schedule_trace_msg.contains(name) {
-                                        debug!(
+                                        info!(
                                             "{name} will be available again in {}",
                                             epoch - end_epoch
                                         );
@@ -255,6 +257,7 @@ where
                     for excl in excl_list {
                         if excl.contains(epoch) {
                             // We are in an exclusion epoch, move to next device.
+                            debug!("Exclusion guard for {name} at {epoch}");
                             continue 'devices;
                         }
                     }
@@ -265,6 +268,7 @@ where
                     for incl in incl_list {
                         if !incl.contains(epoch) {
                             // Current epoch is not included in the inclusion epochs list, move to next device.
+                            debug!("Inclusion guard for {name} at {epoch}");
                             continue 'devices;
                         }
                     }
@@ -287,13 +291,13 @@ where
                         if device_schedule.start.is_none() {
                             // Set the start time of this pass
                             device_schedule.start = Some(epoch);
-                            debug!("{name} is now tracking {epoch}");
+                            info!("{name} is now tracking {epoch}");
                         }
                         // In any case, set the end to none and set the prev to now.
                         device_schedule.prev = Some(epoch);
                         device_schedule.end = None;
                     } else {
-                        debug!("{name} is now tracking {epoch}");
+                        info!("{name} is now tracking {epoch}");
                         // Oh, great, first measurement for this device!
                         schedule.insert(
                             name.to_string(),

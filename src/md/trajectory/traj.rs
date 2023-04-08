@@ -657,6 +657,7 @@ where
         writer.close()?;
 
         // Return the path this was written to
+        info!("Trajectory written to {}", path_buf.display());
         Ok(path_buf)
     }
 }

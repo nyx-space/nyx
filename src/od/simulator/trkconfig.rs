@@ -17,7 +17,7 @@
 */
 
 pub use crate::dynamics::{Dynamics, NyxError};
-use crate::io::{duration_from_str, duration_to_str, epoch_from_str, epoch_to_str};
+use crate::io::{duration_from_str, duration_to_str, epoch_from_str, epoch_to_str, ConfigError};
 use crate::io::{ConfigRepr, Configurable};
 pub use crate::{cosmic::Cosm, State, TimeTagged};
 use hifitime::TimeUnits;
@@ -84,6 +84,48 @@ impl TrkConfig {
             sampling,
             ..Default::default()
         }
+    }
+
+    /// Check that the configuration is valid
+    pub(crate) fn sanity_check(&self) -> Result<(), ConfigError> {
+        if let Some(excl_list) = &self.exclusion_epochs {
+            for excl in excl_list {
+                if excl.end - excl.start < self.sampling {
+                    return Err(ConfigError::InvalidConfig(format!(
+                        "Exclusion epoch range {:?} is shorter than the sampling period of {} and therefore ineffective",
+                        excl, self.sampling
+                    )));
+                }
+            }
+        }
+
+        if let Some(incl_list) = &self.inclusion_epochs {
+            for incl in incl_list {
+                if incl.end - incl.start < self.sampling {
+                    return Err(ConfigError::InvalidConfig(format!(
+                        "Inclusion epoch range {:?} is shorter than the sampling period of {} and therefore ineffective",
+                        incl, self.sampling
+                    )));
+                }
+            }
+        }
+
+        match self.start {
+            Availability::Epoch(epoch) => match self.end {
+                Availability::Epoch(epoch2) => {
+                    if epoch2 < epoch {
+                        return Err(ConfigError::InvalidConfig(format!(
+                            "End epoch {} is before start epoch {}",
+                            epoch2, epoch
+                        )));
+                    }
+                }
+                _ => (),
+            },
+            _ => (),
+        }
+
+        Ok(())
     }
 }
 

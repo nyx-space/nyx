@@ -187,7 +187,7 @@ where
         Ok(path_buf)
     }
 
-    /// Returns the unique list of tracking devices in this tracking arc
+    /// Returns the set of devices from which measurements were taken. This accounts for the availability of measurements, so if a device was not available, it will not appear in this set.
     pub fn device_names(&self) -> HashSet<&String> {
         let mut set = HashSet::new();
         self.measurements.iter().for_each(|(name, _msr)| {
@@ -211,13 +211,7 @@ where
 
         Some(min_interval)
     }
-}
 
-impl<Msr> TrackingArc<Msr>
-where
-    Msr: Measurement,
-    DefaultAllocator: Allocator<f64, Msr::MeasurementSize> + Allocator<f64, Msr::MeasurementSize>,
-{
     /// If this tracking arc has devices that can be used to generate simulated measurements,
     /// then this function can be used to rebuild said measurement devices
     pub fn rebuild_devices<MsrIn, D>(
