@@ -171,7 +171,6 @@ fn val_measurements_topo() {
             (obs[0] - truth.range).abs(),
             (obs[1] - truth.range_rate).abs()
         );
-        // println!("sensitivity: {}", meas.sensitivity(state));
     }
 
     // Second cislunar test

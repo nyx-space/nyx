@@ -49,7 +49,7 @@ pyo3 = {version = "0.17.3", optional = true, features = ["extension-module"]}
 pyo3-log = {version = "0.8.1", optional = true}
 numpy = {version = "0.17", optional = true}
 indicatif = {version = "0.17", features = ["rayon"]}
-rstats = "1.2.44"
+rstats = "1.2.49"
 thiserror = "1.0"
 parquet = "36.0.0"
 arrow = "36.0.0"

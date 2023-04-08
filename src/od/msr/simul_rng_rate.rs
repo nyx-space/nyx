@@ -164,14 +164,6 @@ impl Measurement for StdMeasurement {
     }
 }
 
-// impl SimMeasurement for StdMeasurement {
-//     type State = Orbit;
-
-//     fn sensitivity(&self, _nominal: Orbit) -> Matrix2x6<f64> {
-//         self.h_tilde
-//     }
-// }
-
 impl TimeTagged for StdMeasurement {
     fn epoch(&self) -> Epoch {
         self.dt

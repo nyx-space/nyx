@@ -470,9 +470,6 @@ where
 
                                 self.kf.update_h_tilde(h_tilde);
 
-                                // self.kf
-                                //     .update_h_tilde(computed_meas.sensitivity(nominal_state));
-
                                 match self.kf.measurement_update(
                                     nominal_state,
                                     &msr.observation(),

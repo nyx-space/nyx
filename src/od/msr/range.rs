@@ -105,14 +105,6 @@ impl Measurement for RangeMsr {
     }
 }
 
-// impl SimMeasurement for RangeMsr {
-//     type State = Orbit;
-
-//     fn sensitivity(&self, _nominal: Orbit) -> Matrix1x6<f64> {
-//         self.h_tilde
-//     }
-// }
-
 impl TimeTagged for RangeMsr {
     fn epoch(&self) -> Epoch {
         self.dt

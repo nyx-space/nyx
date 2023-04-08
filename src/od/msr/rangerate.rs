@@ -106,14 +106,6 @@ impl Measurement for RangeRate {
     }
 }
 
-// impl SimMeasurement for RangeRate {
-//     type State = Orbit;
-
-//     fn sensitivity(&self, _nominal: Orbit) -> Matrix1x6<f64> {
-//         self.h_tilde
-//     }
-// }
-
 impl TimeTagged for RangeRate {
     fn epoch(&self) -> Epoch {
         self.dt
