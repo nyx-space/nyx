@@ -72,13 +72,16 @@ fn trk_simple(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
     // Load cosm
     let cosm = Cosm::de438();
 
-    // Path to output data (last empty thing is needed to get a trailing slash)
-    let path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "output_data", ""]
-        .iter()
-        .collect();
+    // Path to output data
+    let path: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "output_data",
+        "tracking_truth_ephem.parquet",
+    ]
+    .iter()
+    .collect();
 
-    traj.to_parquet_simple(path.with_file_name("tracking_truth_ephem.parquet"))
-        .unwrap();
+    traj.to_parquet_simple(path.clone()).unwrap();
 
     traj.to_groundtrack_parquet(
         path.with_file_name("tracking_truth_ephem_groundtrack.parquet"),

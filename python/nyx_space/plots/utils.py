@@ -5,7 +5,6 @@ import numpy as np
 # Color blindness friendly colors, from https://jfly.uni-koeln.de/color/#pallet
 # And from https://davidmathlogic.com/colorblind/#%23E1BE6A-%2340B0A6-%237bcb12-%233d9087
 colors = {
-    "black": (0, 0, 0),
     "orange": (230, 159, 0),  # #e69f00
     "sky_blue": (86, 180, 233),  # #56b4e9
     "green": (0, 158, 115),  # #009e73
@@ -21,6 +20,7 @@ colors = {
     "blue3": (0, 108, 209),  # #006cd1
     "light_yellow": (254, 254, 98),  # #fefe62
     "pink": (211, 95, 183),  # #d35fb7
+    "black": (0, 0, 0),
     "gray": (231, 231, 231),  # #e7e7e7
     "extra-1": (216, 27, 96),  # #D81B60
     "extra-2": (30, 136, 229),  # #1E88E5
