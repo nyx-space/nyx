@@ -58,8 +58,8 @@ jobs:
           githubToken: ${{ github.token }}
           install: |
             apt-get update
-            apt-get install -y --no-install-recommends python3 python3-pip python3-numpy python3-dev
-            pip3 install -U pip pytest numpy pandas plotly pyarrow
+            apt-get install -y --no-install-recommends python3 python3-pip python3-numpy python3-dev python3-pandas
+            pip3 install -U pip pytest plotly pyarrow
           run: |
             set -e
             pip3 install nyx_space --find-links dist --force-reinstall
