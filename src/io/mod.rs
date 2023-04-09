@@ -56,7 +56,6 @@ pub mod quantity;
 /// Handles reading random variables
 pub mod rv;
 pub mod scenario;
-pub mod stations;
 pub mod tracking_data;
 pub mod trajectory_data;
 

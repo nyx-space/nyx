@@ -20,7 +20,6 @@ use super::formatter::OutputSerde;
 use super::gravity::HarmonicsMem;
 use super::quantity::*;
 use super::rv::Distribution;
-use super::stations::StationSerde;
 use super::ParsingError;
 use crate::cosmic::{Frame, Orbit};
 use crate::md::{Event, StateParameter};
@@ -434,7 +433,6 @@ pub struct ScenarioSerde {
     pub odp: Option<HashMap<String, OdpSerde>>,
     pub estimate: Option<HashMap<String, EstimateSerde>>,
     pub measurements: Option<HashMap<String, MeasurementSerde>>,
-    pub stations: Option<HashMap<String, StationSerde>>,
     pub conditions: Option<HashMap<String, ConditionSerde>>,
 }
 
@@ -692,6 +690,5 @@ fn test_od_scenario() {
     assert_eq!(scen.sequence.len(), 1);
     assert_eq!(scen.odp.unwrap().len(), 1);
     assert_eq!(scen.measurements.unwrap().len(), 1);
-    assert_eq!(scen.stations.unwrap().len(), 2);
     assert_eq!(scen.estimate.unwrap().len(), 1);
 }

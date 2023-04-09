@@ -392,71 +392,59 @@ fn test_load_single() {
     assert_eq!(expected_gs, gs);
 }
 
-// #[test]
-// fn test_load_many() {
-//     use crate::cosmic::Cosm;
-//     use std::env;
-//     use std::path::PathBuf;
+#[test]
+fn test_load_many() {
+    use crate::cosmic::Cosm;
+    use hifitime::TimeUnits;
+    use std::env;
+    use std::path::PathBuf;
 
-//     // Get the path to the root directory of the current Cargo project
+    // Get the path to the root directory of the current Cargo project
 
-//     let test_file: PathBuf = [
-//         env::var("CARGO_MANIFEST_DIR").unwrap(),
-//         "data".to_string(),
-//         "tests".to_string(),
-//         "config".to_string(),
-//         "many_ground_stations.yaml".to_string(),
-//     ]
-//     .iter()
-//     .collect();
+    let test_file: PathBuf = [
+        env::var("CARGO_MANIFEST_DIR").unwrap(),
+        "data".to_string(),
+        "tests".to_string(),
+        "config".to_string(),
+        "many_ground_stations.yaml".to_string(),
+    ]
+    .iter()
+    .collect();
 
-//     let stations = GroundStation::load_many(test_file).unwrap();
+    let stations = GroundStation::load_many(test_file).unwrap();
 
-//     dbg!(&stations);
+    dbg!(&stations);
 
-//     let expected = vec![
-//         GroundStation {
-//             name: "Demo ground station".to_string(),
-//             frame: Some("IAU Earth".to_string()),
-//             elevation_mask_deg: 5.0,
-//             range_noise_km: 1e-3,
-//             range_rate_noise_km_s: 1e-5,
-//             latitude_deg: Some(2.3522),
-//             longitude_deg: Some(48.8566),
-//             height_km: Some(0.4),
-//             inherit: None,
-//         },
-//         GroundStation {
-//             name: "Inherited".to_string(),
-//             frame: None,
-//             elevation_mask_deg: 5.0,
-//             range_noise_km: 1e-3,
-//             range_rate_noise_km_s: 1e-5,
-//             inherit: Some("DSS34".to_string()),
-//             latitude_deg: None,
-//             longitude_deg: None,
-//             height_km: None,
-//         },
-//     ];
+    let cosm = Cosm::de438();
 
-//     assert_eq!(expected, stations);
+    let expected = vec![
+        GroundStation {
+            name: "Demo ground station".to_string(),
+            frame: cosm.frame("IAU Earth"),
+            elevation_mask_deg: 5.0,
+            range_noise_km: Some(GaussMarkov::new(1.days(), 5e-3, 1e-4).unwrap()),
+            doppler_noise_km_s: Some(GaussMarkov::new(1.days(), 5e-5, 1.5e-6).unwrap()),
+            latitude_deg: 2.3522,
+            longitude_deg: 48.8566,
+            height_km: 0.4,
+            light_time_correction: false,
+            timestamp_noise_s: None,
+            integration_time: None,
+        },
+        GroundStation {
+            name: "Canberra".to_string(),
+            frame: cosm.frame("IAU Earth"),
+            elevation_mask_deg: 5.0,
+            range_noise_km: Some(GaussMarkov::new(1.days(), 5e-3, 1e-4).unwrap()),
+            doppler_noise_km_s: Some(GaussMarkov::new(1.days(), 5e-5, 1.5e-6).unwrap()),
+            latitude_deg: -35.398333,
+            longitude_deg: 148.981944,
+            height_km: 0.691750,
+            light_time_correction: false,
+            timestamp_noise_s: None,
+            integration_time: None,
+        },
+    ];
 
-//     let cosm = Cosm::de438();
-
-//     // Convert into a ground station
-//     let expected_name = "Demo ground station".to_string();
-//     let expected_el_mask = 5.0;
-//     let expected_lat = 2.3522;
-//     let expected_long = 48.8566;
-//     let expected_height = 0.4;
-//     let expected_frame = cosm.frame("IAU Earth");
-
-//     let gs = GroundStation::from_config(stations[0].clone(), cosm.clone()).unwrap();
-//     dbg!(&gs);
-//     assert_eq!(expected_name, gs.name);
-//     assert_eq!(expected_el_mask, gs.elevation_mask_deg);
-//     assert_eq!(expected_lat, gs.latitude_deg);
-//     assert_eq!(expected_long, gs.longitude_deg);
-//     assert_eq!(expected_frame, gs.frame);
-//     assert_eq!(expected_height, gs.height_km);
-// }
+    assert_eq!(expected, stations);
+}

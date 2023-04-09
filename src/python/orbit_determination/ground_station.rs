@@ -19,7 +19,6 @@
 use std::collections::HashMap;
 
 use crate::cosmic::Cosm;
-use crate::io::stations::StationSerde;
 use crate::io::{ConfigRepr, Configurable};
 pub use crate::od::simulator::TrkConfig;
 pub use crate::{io::ConfigError, od::prelude::GroundStation};
@@ -29,45 +28,22 @@ use pyo3::types::PyType;
 
 #[pymethods]
 impl GroundStation {
+    #[cfg(feature = "python")]
     #[classmethod]
     fn load(_cls: &PyType, path: &str) -> Result<Self, ConfigError> {
-        let serde = StationSerde::load(path)?;
-
-        // Create a new Cosm until ANISE switch
-        let cosm = Cosm::de438();
-
-        GroundStation::from_config(serde, cosm)
+        <Self as ConfigRepr>::load(path)
     }
 
+    #[cfg(feature = "python")]
     #[classmethod]
     fn load_many(_cls: &PyType, path: &str) -> Result<Vec<Self>, ConfigError> {
-        let stations = StationSerde::load_many(path)?;
-
-        // Create a new Cosm until ANISE switch
-        let cosm = Cosm::de438();
-
-        let mut selves = Vec::with_capacity(stations.len());
-
-        for serde in stations {
-            selves.push(GroundStation::from_config(serde, cosm.clone())?);
-        }
-
-        Ok(selves)
+        <Self as ConfigRepr>::load_many(path)
     }
 
+    #[cfg(feature = "python")]
     #[classmethod]
     fn load_named(_cls: &PyType, path: &str) -> Result<HashMap<String, Self>, ConfigError> {
-        let orbits = StationSerde::load_named(path)?;
-
-        let cosm = Cosm::de438();
-
-        let mut selves = HashMap::with_capacity(orbits.len());
-
-        for (k, v) in orbits {
-            selves.insert(k, Self::from_config(v, cosm.clone())?);
-        }
-
-        Ok(selves)
+        <Self as ConfigRepr>::load_named(path)
     }
 
     // Manual getter/setters -- waiting on https://github.com/PyO3/pyo3/pull/2786
