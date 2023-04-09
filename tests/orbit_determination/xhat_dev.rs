@@ -7,6 +7,7 @@ use nyx::dynamics::orbital::{OrbitalDynamics, PointMasses};
 use nyx::dynamics::sph_harmonics::Harmonics;
 use nyx::io::gravity::*;
 use nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
+use nyx::od::noise::GaussMarkov;
 use nyx::od::prelude::*;
 use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use nyx::utils::rss_orbit_errors;
@@ -34,12 +35,18 @@ fn xhat_dev_test_ekf_two_body() {
     // Set the disable time to be very low to test enable/disable sequence
     let ekf_disable_time = 1 * Unit::Hour;
     let elevation_mask = 0.0;
-    let range_noise = 0.0;
-    let range_rate_noise = 0.0;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
@@ -223,12 +230,18 @@ fn xhat_dev_test_ekf_multi_body() {
     // Set the disable time to be very low to test enable/disable sequence
     let ekf_disable_time = 10.0 * Unit::Second;
     let elevation_mask = 0.0;
-    let range_noise = 1e-5;
-    let range_rate_noise = 1e-7;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::high_precision_range_km(),
+        GaussMarkov::high_precision_doppler_km_s(),
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::high_precision_range_km(),
+        GaussMarkov::high_precision_doppler_km_s(),
+        iau_earth,
+    );
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
@@ -388,12 +401,18 @@ fn xhat_dev_test_ekf_harmonics() {
     // Set the disable time to be very low to test enable/disable sequence
     let ekf_disable_time = 1 * Unit::Minute;
     let elevation_mask = 0.0;
-    let range_noise = 1e-6;
-    let range_rate_noise = 1e-7;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::high_precision_range_km(),
+        GaussMarkov::high_precision_doppler_km_s(),
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::high_precision_range_km(),
+        GaussMarkov::high_precision_doppler_km_s(),
+        iau_earth,
+    );
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
@@ -544,12 +563,18 @@ fn xhat_dev_test_ekf_realistic() {
     // Set the disable time to be very low to test enable/disable sequence
     let ekf_disable_time = 10.0 * Unit::Second;
     let elevation_mask = 0.0;
-    let range_noise = 1e-5;
-    let range_rate_noise = 1e-7;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::high_precision_range_km(),
+        GaussMarkov::high_precision_doppler_km_s(),
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::high_precision_range_km(),
+        GaussMarkov::high_precision_doppler_km_s(),
+        iau_earth,
+    );
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
@@ -694,12 +719,18 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
     let iau_earth = cosm.frame("IAU Earth");
 
     let elevation_mask = 0.0;
-    let range_noise = 1e-5;
-    let range_rate_noise = 1e-7;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::high_precision_range_km(),
+        GaussMarkov::high_precision_doppler_km_s(),
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::high_precision_range_km(),
+        GaussMarkov::high_precision_doppler_km_s(),
+        iau_earth,
+    );
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
@@ -961,12 +992,18 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
     let iau_earth = cosm.frame("IAU Earth");
 
     let elevation_mask = 10.0;
-    let range_noise = 1e-5;
-    let range_rate_noise = 1e-7;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::high_precision_range_km(),
+        GaussMarkov::high_precision_doppler_km_s(),
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::high_precision_range_km(),
+        GaussMarkov::high_precision_doppler_km_s(),
+        iau_earth,
+    );
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
@@ -1225,12 +1262,18 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
     let iau_earth = cosm.frame("IAU Earth");
 
     let elevation_mask = 0.0;
-    let range_noise = 1e-5;
-    let range_rate_noise = 1e-7;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::high_precision_range_km(),
+        GaussMarkov::high_precision_doppler_km_s(),
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::high_precision_range_km(),
+        GaussMarkov::high_precision_doppler_km_s(),
+        iau_earth,
+    );
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations

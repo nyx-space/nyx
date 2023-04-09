@@ -20,7 +20,7 @@ use super::msr::StdMeasurement;
 use super::noise::GaussMarkov;
 use super::TrackingDeviceSim;
 use crate::cosmic::{Cosm, Frame, Orbit};
-use crate::io::{frame_from_str, frame_to_str, maybe_duration_from_str, maybe_duration_to_str};
+use crate::io::{frame_from_str, frame_to_str, ConfigRepr, Configurable};
 use crate::md::ui::Traj;
 use crate::time::Epoch;
 use crate::{NyxError, Spacecraft};
@@ -34,7 +34,7 @@ use std::sync::Arc;
 use pyo3::prelude::*;
 
 /// GroundStation defines a two-way ranging and doppler station.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass)]
 pub struct GroundStation {
     pub name: String,
@@ -50,10 +50,7 @@ pub struct GroundStation {
     #[serde(serialize_with = "frame_to_str", deserialize_with = "frame_from_str")]
     pub frame: Frame,
     /// Duration needed to generate a measurement (if unset, it is assumed to be instantaneous)
-    #[serde(
-        serialize_with = "maybe_duration_to_str",
-        deserialize_with = "maybe_duration_from_str"
-    )]
+    #[serde(skip)]
     pub integration_time: Option<Duration>,
     /// Whether to correct for light travel time
     pub light_time_correction: bool,
@@ -90,7 +87,12 @@ impl GroundStation {
         }
     }
 
-    pub fn dss65_madrid(elevation_mask: f64, _a: f64, _b: f64, iau_earth: Frame) -> Self {
+    pub fn dss65_madrid(
+        elevation_mask: f64,
+        range_noise_km: GaussMarkov,
+        doppler_noise_km_s: GaussMarkov,
+        iau_earth: Frame,
+    ) -> Self {
         Self {
             name: "Madrid".to_string(),
             elevation_mask_deg: elevation_mask,
@@ -101,12 +103,17 @@ impl GroundStation {
             integration_time: None,
             light_time_correction: false,
             timestamp_noise_s: None,
-            range_noise_km: Some(GaussMarkov::ZERO),
-            doppler_noise_km_s: Some(GaussMarkov::ZERO),
+            range_noise_km: Some(range_noise_km),
+            doppler_noise_km_s: Some(doppler_noise_km_s),
         }
     }
 
-    pub fn dss34_canberra(elevation_mask: f64, _a: f64, _b: f64, iau_earth: Frame) -> Self {
+    pub fn dss34_canberra(
+        elevation_mask: f64,
+        range_noise_km: GaussMarkov,
+        doppler_noise_km_s: GaussMarkov,
+        iau_earth: Frame,
+    ) -> Self {
         Self {
             name: "Canberra".to_string(),
             elevation_mask_deg: elevation_mask,
@@ -117,12 +124,17 @@ impl GroundStation {
             integration_time: None,
             light_time_correction: false,
             timestamp_noise_s: None,
-            range_noise_km: Some(GaussMarkov::ZERO),
-            doppler_noise_km_s: Some(GaussMarkov::ZERO),
+            range_noise_km: Some(range_noise_km),
+            doppler_noise_km_s: Some(doppler_noise_km_s),
         }
     }
 
-    pub fn dss13_goldstone(elevation_mask: f64, _a: f64, _b: f64, iau_earth: Frame) -> Self {
+    pub fn dss13_goldstone(
+        elevation_mask: f64,
+        range_noise_km: GaussMarkov,
+        doppler_noise_km_s: GaussMarkov,
+        iau_earth: Frame,
+    ) -> Self {
         Self {
             name: "Goldstone".to_string(),
             elevation_mask_deg: elevation_mask,
@@ -133,8 +145,8 @@ impl GroundStation {
             integration_time: None,
             light_time_correction: false,
             timestamp_noise_s: None,
-            range_noise_km: Some(GaussMarkov::ZERO),
-            doppler_noise_km_s: Some(GaussMarkov::ZERO),
+            range_noise_km: Some(range_noise_km),
+            doppler_noise_km_s: Some(doppler_noise_km_s),
         }
     }
 }
@@ -175,6 +187,26 @@ impl GroundStation {
             epoch,
             self.frame,
         )
+    }
+}
+
+impl ConfigRepr for GroundStation {}
+
+impl Configurable for GroundStation {
+    type IntermediateRepr = GroundStation;
+
+    fn from_config(
+        cfg: Self::IntermediateRepr,
+        _cosm: Arc<Cosm>,
+    ) -> Result<Self, crate::io::ConfigError>
+    where
+        Self: Sized,
+    {
+        Ok(cfg)
+    }
+
+    fn to_config(&self) -> Result<Self::IntermediateRepr, crate::io::ConfigError> {
+        Ok(self.clone())
     }
 }
 
@@ -316,3 +348,115 @@ impl fmt::Display for GroundStation {
         )
     }
 }
+
+#[test]
+fn test_load_single() {
+    use std::env;
+    use std::path::PathBuf;
+
+    use hifitime::TimeUnits;
+
+    let cosm = Cosm::de438();
+
+    // Get the path to the root directory of the current Cargo project
+    let test_data: PathBuf = [
+        env::var("CARGO_MANIFEST_DIR").unwrap(),
+        "data".to_string(),
+        "tests".to_string(),
+        "config".to_string(),
+        "one_ground_station.yaml".to_string(),
+    ]
+    .iter()
+    .collect();
+
+    assert!(test_data.exists(), "Could not find the test data");
+
+    let gs = GroundStation::load(test_data).unwrap();
+
+    dbg!(&gs);
+
+    let expected_gs = GroundStation {
+        name: "Demo ground station".to_string(),
+        frame: cosm.frame("IAU Earth"),
+        elevation_mask_deg: 5.0,
+        range_noise_km: Some(GaussMarkov::new(1.days(), 5e-3, 1e-4).unwrap()),
+        doppler_noise_km_s: Some(GaussMarkov::new(1.days(), 5e-5, 1.5e-6).unwrap()),
+        latitude_deg: 2.3522,
+        longitude_deg: 48.8566,
+        height_km: 0.4,
+        light_time_correction: false,
+        timestamp_noise_s: None,
+        integration_time: None,
+    };
+
+    assert_eq!(expected_gs, gs);
+}
+
+// #[test]
+// fn test_load_many() {
+//     use crate::cosmic::Cosm;
+//     use std::env;
+//     use std::path::PathBuf;
+
+//     // Get the path to the root directory of the current Cargo project
+
+//     let test_file: PathBuf = [
+//         env::var("CARGO_MANIFEST_DIR").unwrap(),
+//         "data".to_string(),
+//         "tests".to_string(),
+//         "config".to_string(),
+//         "many_ground_stations.yaml".to_string(),
+//     ]
+//     .iter()
+//     .collect();
+
+//     let stations = GroundStation::load_many(test_file).unwrap();
+
+//     dbg!(&stations);
+
+//     let expected = vec![
+//         GroundStation {
+//             name: "Demo ground station".to_string(),
+//             frame: Some("IAU Earth".to_string()),
+//             elevation_mask_deg: 5.0,
+//             range_noise_km: 1e-3,
+//             range_rate_noise_km_s: 1e-5,
+//             latitude_deg: Some(2.3522),
+//             longitude_deg: Some(48.8566),
+//             height_km: Some(0.4),
+//             inherit: None,
+//         },
+//         GroundStation {
+//             name: "Inherited".to_string(),
+//             frame: None,
+//             elevation_mask_deg: 5.0,
+//             range_noise_km: 1e-3,
+//             range_rate_noise_km_s: 1e-5,
+//             inherit: Some("DSS34".to_string()),
+//             latitude_deg: None,
+//             longitude_deg: None,
+//             height_km: None,
+//         },
+//     ];
+
+//     assert_eq!(expected, stations);
+
+//     let cosm = Cosm::de438();
+
+//     // Convert into a ground station
+//     let expected_name = "Demo ground station".to_string();
+//     let expected_el_mask = 5.0;
+//     let expected_lat = 2.3522;
+//     let expected_long = 48.8566;
+//     let expected_height = 0.4;
+//     let expected_frame = cosm.frame("IAU Earth");
+
+//     let gs = GroundStation::from_config(stations[0].clone(), cosm.clone()).unwrap();
+//     dbg!(&gs);
+//     assert_eq!(expected_name, gs.name);
+//     assert_eq!(expected_el_mask, gs.elevation_mask_deg);
+//     assert_eq!(expected_lat, gs.latitude_deg);
+//     assert_eq!(expected_long, gs.longitude_deg);
+//     assert_eq!(expected_frame, gs.frame);
+//     assert_eq!(expected_height, gs.height_km);
+// }

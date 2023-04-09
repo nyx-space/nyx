@@ -1,5 +1,6 @@
 extern crate nyx_space as nyx;
 
+use nyx::od::noise::GaussMarkov;
 use nyx::od::simulator::arc::TrackingArcSim;
 use nyx::od::simulator::TrkConfig;
 
@@ -25,14 +26,24 @@ fn od_val_multi_body_ckf_perfect_stations() {
 
     // Define the ground stations.
     let elevation_mask = 0.0;
-    let range_noise = 0.0;
-    let range_rate_noise = 0.0;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss13_goldstone = GroundStation::dss13_goldstone(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
 
     // Define the tracking configurations
     let mut configs = HashMap::new();
@@ -171,10 +182,12 @@ fn multi_body_ckf_covar_map() {
     let iau_earth = cosm.frame("IAU Earth");
     // Define the ground stations.
     let elevation_mask = 0.0;
-    let range_noise = 0.0;
-    let range_rate_noise = 0.0;
-    let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss13_goldstone = GroundStation::dss13_goldstone(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
     // Define the tracking configurations
     let mut configs = HashMap::new();
     configs.insert(

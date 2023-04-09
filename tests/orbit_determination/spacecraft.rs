@@ -9,6 +9,7 @@ use nyx::io::formatter::NavSolutionFormatter;
 use nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
 use nyx::md::trajectory::ExportCfg;
 use nyx::md::{Event, StateParameter};
+use nyx::od::noise::GaussMarkov;
 use nyx::od::prelude::*;
 use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use nyx::time::{Epoch, TimeUnits, Unit};
@@ -41,14 +42,24 @@ fn od_val_sc_mb_srp_reals_duals_models() {
     let iau_earth = cosm.frame("IAU Earth");
     // Define the ground stations.
     let elevation_mask = 0.0;
-    let range_noise = 0.0;
-    let range_rate_noise = 0.0;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss13_goldstone = GroundStation::dss13_goldstone(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
 
     // Define the tracking configurations
     let mut configs = HashMap::new();

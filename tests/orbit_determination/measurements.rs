@@ -88,10 +88,12 @@ fn val_measurements_topo() {
     let iau_earth = cosm.frame("IAU Earth");
 
     let elevation_mask = 7.0; // in degrees
-    let range_noise = 0.0;
-    let range_rate_noise = 0.0;
-    let mut dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let mut dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
 
     // Generate the measurements
 

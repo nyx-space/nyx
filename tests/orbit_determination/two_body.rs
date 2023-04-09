@@ -9,6 +9,7 @@ use nyx::io::formatter::NavSolutionFormatter;
 use nyx::io::gravity::*;
 use nyx::io::ConfigRepr;
 use nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
+use nyx::od::noise::GaussMarkov;
 use nyx::od::prelude::*;
 use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use std::collections::HashMap;
@@ -30,14 +31,24 @@ fn od_tb_val_ekf_fixed_step_perfect_stations() {
     // Set the disable time to be very low to test enable/disable sequence
     let ekf_disable_time = 5.0 * Unit::Second;
     let elevation_mask = 0.0;
-    let range_noise = 0.0;
-    let range_rate_noise = 0.0;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss13_goldstone = GroundStation::dss13_goldstone(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
 
     // Define the tracking configurations
     let mut configs = HashMap::new();
@@ -182,14 +193,24 @@ fn od_tb_val_with_arc() {
     // Set the disable time to be very low to test enable/disable sequence
     let ekf_disable_time = 5.0 * Unit::Second;
     let elevation_mask = 0.0;
-    let range_noise = 0.0;
-    let range_rate_noise = 0.0;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss13_goldstone = GroundStation::dss13_goldstone(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     let ekf_num_meas = 100;
@@ -353,14 +374,24 @@ fn od_tb_val_ckf_fixed_step_perfect_stations() {
 
     // Define the ground stations.
     let elevation_mask = 0.0;
-    let range_noise = 0.0;
-    let range_rate_noise = 0.0;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss13_goldstone = GroundStation::dss13_goldstone(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
 
     // Define the tracking configurations
     let mut configs = HashMap::new();
@@ -589,12 +620,24 @@ fn od_tb_ckf_fixed_step_iteration_test() {
     let elevation_mask = 0.0;
     let range_noise = 0.1; // in km (so 100 meters of error)
     let range_rate_noise = 0.001; // in km/s (or 1 meter per second of error)
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss13_goldstone = GroundStation::dss13_goldstone(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
 
     // Define the tracking configurations
     let mut configs = HashMap::new();
@@ -747,14 +790,24 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
 
     // Define the ground stations.
     let elevation_mask = 0.0;
-    let range_noise = 0.0;
-    let range_rate_noise = 0.0;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss13_goldstone = GroundStation::dss13_goldstone(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
 
     // Define the tracking configurations
     let mut configs = HashMap::new();
@@ -971,14 +1024,24 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect() {
 
     // Define the ground stations.
     let elevation_mask = 0.0;
-    let range_noise = 0.0;
-    let range_rate_noise = 0.0;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss13_goldstone = GroundStation::dss13_goldstone(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
 
     // Define the tracking configurations
     let mut configs = HashMap::new();
@@ -1102,14 +1165,24 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
 
     // Define the ground stations.
     let elevation_mask = 0.0;
-    let range_noise = 0.0;
-    let range_rate_noise = 0.0;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss13_goldstone = GroundStation::dss13_goldstone(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
 
     // Define the tracking configurations
     let mut configs = HashMap::new();

@@ -1,6 +1,5 @@
-use nyx_space::io::stations::StationSerde;
 use nyx_space::io::tracking_data::DynamicTrackingArc;
-use nyx_space::io::{ConfigRepr, Configurable};
+use nyx_space::io::ConfigRepr;
 use nyx_space::md::trajectory::ExportCfg;
 use nyx_space::md::ui::*;
 use nyx_space::od::msr::StdMeasurement;
@@ -72,11 +71,7 @@ fn continuous_tracking() {
     .iter()
     .collect();
 
-    let stations_serde = StationSerde::load_many(ground_station_file).unwrap();
-    let devices: Vec<GroundStation> = stations_serde
-        .into_iter()
-        .map(|station| GroundStation::from_config(station, cosm.clone()).unwrap())
-        .collect();
+    let devices = GroundStation::load_many(ground_station_file).unwrap();
 
     dbg!(&devices);
 

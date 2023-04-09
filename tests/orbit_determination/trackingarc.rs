@@ -1,6 +1,5 @@
-use nyx_space::io::stations::StationSerde;
 use nyx_space::io::tracking_data::DynamicTrackingArc;
-use nyx_space::io::{ConfigRepr, Configurable};
+use nyx_space::io::ConfigRepr;
 use nyx_space::md::ui::*;
 use nyx_space::od::msr::StdMeasurement;
 use nyx_space::od::prelude::*;
@@ -46,7 +45,6 @@ fn traj() -> Traj<Orbit> {
 
 #[fixture]
 fn devices() -> Vec<GroundStation> {
-    let cosm = Cosm::de438();
     // Load the ground stations from the test data.
     let ground_station_file: PathBuf = [
         &env::var("CARGO_MANIFEST_DIR").unwrap(),
@@ -58,11 +56,7 @@ fn devices() -> Vec<GroundStation> {
     .iter()
     .collect();
 
-    let stations_serde = StationSerde::load_many(ground_station_file).unwrap();
-    let devices: Vec<GroundStation> = stations_serde
-        .into_iter()
-        .map(|station| GroundStation::from_config(station, cosm.clone()).unwrap())
-        .collect();
+    let devices = GroundStation::load_many(ground_station_file).unwrap();
 
     devices
 }

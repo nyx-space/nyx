@@ -178,37 +178,6 @@ where
     Duration::from_str(&s).map_err(serde::de::Error::custom)
 }
 
-pub(crate) fn maybe_duration_to_str<S>(
-    duration: &Option<Duration>,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    match duration {
-        Some(duration) => serializer.serialize_str(&format!("{duration}")),
-        None => serializer.serialize_none(),
-    }
-}
-
-/// A deserializer from Duration string
-pub(crate) fn maybe_duration_from_str<'de, D>(deserializer: D) -> Result<Option<Duration>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    // Only deserialize if there is something there
-
-    let s = String::deserialize(deserializer)?;
-    if s.is_empty() {
-        Ok(None)
-    } else {
-        match Duration::from_str(&s) {
-            Ok(duration) => Ok(Some(duration)),
-            Err(e) => Err(serde::de::Error::custom(e.to_string())),
-        }
-    }
-}
-
 pub(crate) fn frame_to_str<S>(frame: &Frame, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
