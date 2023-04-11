@@ -171,27 +171,6 @@ impl fmt::Display for Frame {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Frame::Celestial { .. } | Frame::Geoid { .. } => {
-                write!(
-                    f,
-                    "{} {}",
-                    Bodies::try_from(self.ephem_path()).unwrap().name(),
-                    match self.frame_path().len() {
-                        0 | 1 => "J2000".to_string(),
-                        2 => "IAU Fixed".to_string(),
-                        3 => "IAU Poles Fixed".to_string(),
-                        _ => "Custom".to_string(),
-                    }
-                )
-            }
-            othframe => write!(f, "{othframe:?}"),
-        }
-    }
-}
-
-impl fmt::LowerHex for Frame {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            Frame::Celestial { .. } | Frame::Geoid { .. } => {
                 if self.frame_path().len() == 2 {
                     write!(
                         f,
@@ -202,12 +181,13 @@ impl fmt::LowerHex for Frame {
                     write!(
                         f,
                         "{} {}",
+                        Bodies::try_from(self.ephem_path()).unwrap().name(),
                         match self.frame_path().len() {
                             0 | 1 => "J2000".to_string(),
+                            2 => "IAU Fixed".to_string(),
                             3 => "IAU Poles Fixed".to_string(),
                             _ => "Custom".to_string(),
-                        },
-                        Bodies::try_from(self.ephem_path()).unwrap().name(),
+                        }
                     )
                 }
             }

@@ -542,9 +542,7 @@ impl Cosm {
             let splt: Vec<_> = name.split(' ').collect();
             if splt[0] == "iau" {
                 // This is an IAU frame, so the orientation is specified first, and we don't capitalize the ephemeris name
-                let rslt = vec![splt[0].to_string(), splt[1..splt.len()].join(" ")].join(" ");
-                dbg!(&rslt);
-                rslt
+                vec![splt[0].to_string(), splt[1..splt.len()].join(" ")].join(" ")
             } else {
                 // Likely a default center and frame, so let's do some clever guessing and capitalize the words
                 let frame_name = capitalize(splt[splt.len() - 1]);

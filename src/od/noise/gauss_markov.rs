@@ -237,7 +237,7 @@ impl GaussMarkov {
         for run in 0..num_runs {
             let mut rng = Pcg64Mcg::from_entropy();
 
-            let mut gm = self.clone();
+            let mut gm = *self;
             for epoch in TimeSeries::inclusive(start, end, step) {
                 let bias = gm.next_bias(epoch, &mut rng);
                 samples.push(GMState {
@@ -261,24 +261,24 @@ impl GaussMarkov {
         ];
 
         let schema = Arc::new(Schema::new(hdrs));
-        let mut record = Vec::new();
-
-        record.push(Arc::new(UInt32Array::from(
-            samples.iter().map(|s| s.run).collect::<Vec<u32>>(),
-        )) as ArrayRef);
-        record.push(Arc::new(Float64Array::from(
-            samples.iter().map(|s| s.dt_s).collect::<Vec<f64>>(),
-        )) as ArrayRef);
-        record.push(Arc::new(Float64Array::from(
-            samples.iter().map(|s| s.bias).collect::<Vec<f64>>(),
-        )) as ArrayRef);
+        let record = vec![
+            Arc::new(UInt32Array::from(
+                samples.iter().map(|s| s.run).collect::<Vec<u32>>(),
+            )) as ArrayRef,
+            Arc::new(Float64Array::from(
+                samples.iter().map(|s| s.dt_s).collect::<Vec<f64>>(),
+            )) as ArrayRef,
+            Arc::new(Float64Array::from(
+                samples.iter().map(|s| s.bias).collect::<Vec<f64>>(),
+            )) as ArrayRef,
+        ];
 
         let mut metadata = HashMap::new();
         metadata.insert("Purpose".to_string(), "Gauss Markov simulation".to_string());
 
         let props = pq_writer(Some(metadata));
 
-        let file = File::create(&path).map_err(|e| NyxError::CustomError(e.to_string()))?;
+        let file = File::create(path).map_err(|e| NyxError::CustomError(e.to_string()))?;
         let mut writer = ArrowWriter::try_new(file, schema.clone(), props).unwrap();
 
         let batch = RecordBatch::try_new(schema, record)
@@ -365,7 +365,7 @@ impl Configurable for GaussMarkov {
     }
 
     fn to_config(&self) -> Result<Self::IntermediateRepr, crate::io::ConfigError> {
-        let serded: Self::IntermediateRepr = (*self).into();
+        let serded: Self::IntermediateRepr = *self;
         Ok(serded)
     }
 }
