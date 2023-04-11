@@ -213,7 +213,7 @@ impl Cosm {
         self.frame_mut_gm("IAU Neptune", 6_836_534.063_879_3);
     }
 
-    /// Load the IAU Frames as defined in Celest Mech Dyn Astr (2018) 130:22 (https://doi.org/10.1007/s10569-017-9805-5)
+    /// Load the IAU Frames as defined in Celestial Mech Dyn Astr (2018) 130:22 (https://doi.org/10.1007/s10569-017-9805-5)
     pub fn load_iau_frames(&mut self) -> Result<(), NyxError> {
         // Load the IAU frames from the embedded TOML
         let iau_toml_str =
@@ -542,7 +542,9 @@ impl Cosm {
             let splt: Vec<_> = name.split(' ').collect();
             if splt[0] == "iau" {
                 // This is an IAU frame, so the orientation is specified first, and we don't capitalize the ephemeris name
-                vec![splt[0].to_string(), splt[1..splt.len()].join(" ")].join(" ")
+                let rslt = vec![splt[0].to_string(), splt[1..splt.len()].join(" ")].join(" ");
+                dbg!(&rslt);
+                rslt
             } else {
                 // Likely a default center and frame, so let's do some clever guessing and capitalize the words
                 let frame_name = capitalize(splt[splt.len() - 1]);

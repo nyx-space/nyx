@@ -181,7 +181,7 @@ pub(crate) fn frame_to_str<S>(frame: &Frame, serializer: S) -> Result<S::Ok, S::
 where
     S: Serializer,
 {
-    serializer.serialize_str(&format!("{frame}"))
+    serializer.serialize_str(&format!("{frame:x}"))
 }
 
 pub(crate) fn frame_from_str<'de, D>(deserializer: D) -> Result<Frame, D::Error>

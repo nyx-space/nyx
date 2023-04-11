@@ -188,6 +188,34 @@ impl fmt::Display for Frame {
     }
 }
 
+impl fmt::LowerHex for Frame {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Frame::Celestial { .. } | Frame::Geoid { .. } => {
+                if self.frame_path().len() == 2 {
+                    write!(
+                        f,
+                        "IAU {}",
+                        Bodies::try_from(self.ephem_path()).unwrap().name()
+                    )
+                } else {
+                    write!(
+                        f,
+                        "{} {}",
+                        match self.frame_path().len() {
+                            0 | 1 => "J2000".to_string(),
+                            3 => "IAU Poles Fixed".to_string(),
+                            _ => "Custom".to_string(),
+                        },
+                        Bodies::try_from(self.ephem_path()).unwrap().name(),
+                    )
+                }
+            }
+            othframe => write!(f, "{othframe:?}"),
+        }
+    }
+}
+
 #[allow(non_snake_case, clippy::upper_case_acronyms)]
 impl fmt::Debug for Frame {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
