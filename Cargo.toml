@@ -51,10 +51,10 @@ numpy = {version = "0.17", optional = true}
 indicatif = {version = "0.17", features = ["rayon"]}
 rstats = "1.2.49"
 thiserror = "1.0"
-parquet = "36.0.0"
-arrow = "36.0.0"
+parquet = "37.0.0"
+arrow = "37.0.0"
 shadow-rs = "0.21.0"
-serde_yaml = "0.9.17"
+serde_yaml = "0.9.21"
 whoami = "1.3.0"
 either = {version = "1.8.1", features = ["serde"]}
 num = "0.4.0"

@@ -339,7 +339,7 @@ impl fmt::Display for GroundStation {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "[{}] {} (lat.: {:.2} deg    long.: {:.2} deg    alt.: {:.2} m)",
+            "[{}] {} (lat.: {:.4} deg    long.: {:.4} deg    alt.: {:.3} m)",
             self.frame,
             self.name,
             self.latitude_deg,

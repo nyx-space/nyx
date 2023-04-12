@@ -1,3 +1,21 @@
+"""
+Nyx, blazing fast astrodynamics
+Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
+
 import plotly.graph_objects as go
 
 from .utils import (
@@ -29,7 +47,7 @@ def plot_traj(
         copyright (str, optional): The copyright to display on the plot. Defaults to None.
         fig (plotly.graph_objects.Figure, optional): The figure to add the trajectory to. Defaults to None.
         center (str, optional): The name of the center object, e.g. `Luna` (Moon). Defaults to "Earth".
-        show (bool, optional): Whether to show the plot. Defaults to True.
+        show (bool, optional): Whether to show the plot. Defaults to True. If set to false, the figure will be returned.
     """
 
     if fig is None:
@@ -67,15 +85,16 @@ def plot_traj(
     fig.add_traces(traces)
     finalize_plot(fig, title, copyright=copyright)
     fig.update_layout(scene_aspectmode="data")
-    if show:
-        fig.show()
 
     if html_out:
         with open(html_out, "w") as f:
             f.write(fig.to_html())
         print(f"Saved HTML to {html_out}")
 
-    return fig
+    if show:
+        fig.show()
+    else:
+        return fig
 
 
 def plot_ground_track(
@@ -103,7 +122,7 @@ def plot_ground_track(
         html_out (str, optional): The path to save the HTML to. Defaults to None.
         copyright (str, optional): The copyright to display on the plot. Defaults to None.
         fig (plotly.graph_objects.Figure, optional): The figure to add the trajectory to. Defaults to None.
-        show (bool, optional): Whether to show the plot. Defaults to True.
+        show (bool, optional): Whether to show the plot. Defaults to True. If set to false, the figure will be returned.
     """
     if fig is None:
         fig = go.Figure()
@@ -156,14 +175,14 @@ def plot_ground_track(
     )
     fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
 
-    finalize_plot(fig, title, copyright=copyright)
-
-    if show:
-        fig.show()
+    finalize_plot(fig, f"Ground track: {title}", copyright=copyright)
 
     if html_out:
         with open(html_out, "w") as f:
             f.write(fig.to_html())
         print(f"Saved HTML to {html_out}")
-    
-    return fig
+
+    if show:
+        fig.show()
+    else:
+        return fig

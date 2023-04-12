@@ -46,7 +46,7 @@ def test_propagate():
     )
     assert (
         f"{dynamics['hifi']}"
-        == "Spacecraft dynamics (with guidance = false): SRP with φ = 1367 W/m^2 and eclipse light-source: Sun J2000, shadows casted by: Sun J2000, Moon J2000;  Orbital dynamics: Point masses of Sun J2000, Earth J2000, Moon J2000; Earth IAU Fixed gravity field 10x10 (order x degree)"
+        == "Spacecraft dynamics (with guidance = false): SRP with φ = 1367 W/m^2 and eclipse light-source: Sun J2000, shadows casted by: Sun J2000, Moon J2000;  Orbital dynamics: Point masses of Sun J2000, Earth J2000, Moon J2000; IAU Earth gravity field 10x10 (order x degree)"
     )
 
     rslt, traj = propagate(sc, dynamics["lofi"], Unit.Day * 5.159)

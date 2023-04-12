@@ -18,8 +18,7 @@
 
 use std::collections::HashMap;
 
-use crate::cosmic::Cosm;
-use crate::io::{ConfigRepr, Configurable};
+use crate::io::ConfigRepr;
 pub use crate::od::simulator::TrkConfig;
 pub use crate::{io::ConfigError, od::prelude::GroundStation};
 

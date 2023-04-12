@@ -1,3 +1,21 @@
+"""
+Nyx, blazing fast astrodynamics
+Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
+
 import plotly.graph_objects as go
 
 from .utils import plot_with_error, plot_line
@@ -26,7 +44,7 @@ def plot_estimates(
         copyright (str): The copyright to display on the plot
         pos_fig (plotly.graph_objects.Figure): The figure to plot the position estimates on
         vel_fig (plotly.graph_objects.Figure): The figure to plot the velocity estimates on
-        show (bool): Whether to show the plot
+        show (bool): Whether to show the plot. If set to false, the figure will be returned.
     """
 
     if not isinstance(dfs, list):
@@ -76,7 +94,7 @@ def plot_estimates(
             "blue",
             x_title,
             "Position estimate (km)",
-            title,
+            f"Position estimates: {title}",
             copyright,
         )
         plot_with_error(
@@ -88,7 +106,7 @@ def plot_estimates(
             "green",
             x_title,
             "Position estimate (km)",
-            title,
+            f"Position estimates: {title}",
             copyright,
         )
         plot_with_error(
@@ -100,7 +118,7 @@ def plot_estimates(
             "orange",
             x_title,
             "Position estimate (km)",
-            title,
+            f"Position estimates: {title}",
             copyright,
         )
 
@@ -113,7 +131,7 @@ def plot_estimates(
             "blue",
             x_title,
             "Velocity estimate (km)",
-            title,
+            f"Velocity estimates: {title}",
             copyright,
         )
         plot_with_error(
@@ -125,7 +143,7 @@ def plot_estimates(
             "green",
             x_title,
             "Velocity estimate (km)",
-            title,
+            f"Velocity estimates: {title}",
             copyright,
         )
         plot_with_error(
@@ -137,13 +155,9 @@ def plot_estimates(
             "orange",
             x_title,
             "Velocity estimate (km)",
-            title,
+            f"Velocity estimates: {title}",
             copyright,
         )
-
-    if show:
-        pos_fig.show()
-        vel_fig.show()
 
     if html_out:
 
@@ -158,7 +172,11 @@ def plot_estimates(
             f.write(vel_fig.to_html())
         print(f"Saved HTML to {this_output}")
 
-    return pos_fig, vel_fig
+    if show:
+        pos_fig.show()
+        vel_fig.show()
+    else:
+        return pos_fig, vel_fig
 
 
 def plot_covar(
@@ -182,7 +200,7 @@ def plot_covar(
         copyright (str): The copyright to display on the plot
         pos_fig (plotly.graph_objects.Figure): The figure to plot the position estimates on
         vel_fig (plotly.graph_objects.Figure): The figure to plot the velocity estimates on
-        show (bool): Whether to show the plot
+        show (bool): Whether to show the plot. If set to false, the figure will be returned.
     """
 
     if not isinstance(dfs, list):
@@ -310,10 +328,6 @@ def plot_covar(
 
         vel_fig.update_layout(yaxis_range=[-0.1 * max_cov_y, 1.5 * max_cov_y])
 
-    if show:
-        pos_fig.show()
-        vel_fig.show()
-
     if html_out:
 
         html_out = html_out.replace(".html", "_{}.html")
@@ -327,7 +341,11 @@ def plot_covar(
             f.write(vel_fig.to_html())
         print(f"Saved HTML to {this_output}")
 
-    return pos_fig, vel_fig
+    if show:
+        pos_fig.show()
+        vel_fig.show()
+    else:
+        return pos_fig, vel_fig
 
 
 def plot_state_deviation(
@@ -351,7 +369,7 @@ def plot_state_deviation(
         copyright (str): The copyright to display on the plot
         pos_fig (plotly.graph_objects.Figure): The figure to plot the position estimates on
         vel_fig (plotly.graph_objects.Figure): The figure to plot the velocity estimates on
-        show (bool): Whether to show the plot
+        show (bool): Whether to show the plot. If set to false, the figure will be returned.
     """
 
     if not isinstance(dfs, list):
@@ -484,10 +502,6 @@ def plot_state_deviation(
 
         vel_fig.update_layout(yaxis_range=[-1.5 * max_cov_y, 1.5 * max_cov_y])
 
-    if show:
-        pos_fig.show()
-        vel_fig.show()
-
     if html_out:
         html_out = html_out.replace(".html", "_{}.html")
 
@@ -501,4 +515,26 @@ def plot_state_deviation(
             f.write(vel_fig.to_html())
         print(f"Saved HTML to {this_output}")
 
-    return pos_fig, vel_fig
+    if show:
+        pos_fig.show()
+        vel_fig.show()
+    else:
+        return pos_fig, vel_fig
+
+
+# TODO:
+# - Add a function to plot the residuals
+# - Add a function to plot the measurements on top of any other plotted data
+
+
+def plot_measurements(
+    dfs,
+    title,
+    time_col_name="Epoch:GregorianUtc",
+    html_out=None,
+    copyright=None,
+    fig=None,
+    show=True,
+):
+    if not isinstance(dfs, list):
+        dfs = [dfs]

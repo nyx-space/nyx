@@ -13,6 +13,8 @@ use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use nyx::time::{Epoch, TimeUnits, Unit};
 use nyx::utils::rss_orbit_errors;
 use std::collections::HashMap;
+use std::env;
+use std::path::PathBuf;
 
 /*
  * These tests check that if we start with a state deviation in the estimate, the filter will eventually converge back.
@@ -99,6 +101,17 @@ fn od_robust_test_ekf_realistic() {
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
+    // And serialize to disk
+    let path: PathBuf = [
+        &env::var("CARGO_MANIFEST_DIR").unwrap(),
+        "output_data",
+        "ekf_robust_msr.parquet",
+    ]
+    .iter()
+    .collect();
+
+    arc.to_parquet_simple(path).unwrap();
+
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be _nearly_ perfect because we've removed Saturn from the estimated trajectory
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
@@ -131,8 +144,22 @@ fn od_robust_test_ekf_realistic() {
     let mut odp = ODProcess::ekf(prop_est, kf, trig, cosm.clone());
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
-    odp.iterate_arc::<GroundStation>(&arc, IterationConf::default())
-        .unwrap();
+    // odp.iterate_arc::<GroundStation>(&arc, IterationConf::default())
+    //     .unwrap();
+
+    let estimate_fmtr =
+        NavSolutionFormatter::default("robuestness_test_no_it.csv".to_owned(), cosm);
+
+    let mut wtr = csv::Writer::from_path("robustness_test_no_it.csv").unwrap();
+    wtr.serialize(&estimate_fmtr.headers)
+        .expect("could not write to output file");
+
+    for est in &odp.estimates {
+        // Format the estimate
+        wtr.serialize(estimate_fmtr.fmt(est))
+            .expect("could not write to CSV");
+    }
+
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];
     let final_truth_state = traj.at(est.epoch()).unwrap();

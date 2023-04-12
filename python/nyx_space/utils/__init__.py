@@ -15,9 +15,3 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-
-from . import _nyx_space, plots, utils
-
-from nyx_space import time, cosmic, mission_design, orbit_determination
-
-__all__ = ["time", "cosmic", "mission_design", "orbit_determination", "plots"]
