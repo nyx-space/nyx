@@ -118,19 +118,15 @@ impl TrkConfig {
             }
         }
 
-        match self.start {
-            Availability::Epoch(epoch) => match self.end {
-                Availability::Epoch(epoch2) => {
-                    if epoch2 < epoch {
-                        return Err(ConfigError::InvalidConfig(format!(
-                            "End epoch {} is before start epoch {}",
-                            epoch2, epoch
-                        )));
-                    }
+        if let Availability::Epoch(epoch) = self.start {
+            if let Availability::Epoch(epoch2) = self.end {
+                if epoch2 < epoch {
+                    return Err(ConfigError::InvalidConfig(format!(
+                        "End epoch {} is before start epoch {}",
+                        epoch2, epoch
+                    )));
                 }
-                _ => (),
-            },
-            _ => (),
+            }
         }
 
         Ok(())
