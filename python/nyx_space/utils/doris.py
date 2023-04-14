@@ -179,8 +179,9 @@ def basic_rinex(rnx_path, stations):
                             epoch=epoch,
                             l1_phase_cycles=float(splt[1]),
                             l2_phase_cycles=float(splt[2]),
-                            c1_pseudo_range_km=float(splt[3]),
-                            c2_pseudo_range_km=float(splt[4]),
+                            # Documentation says the data is in units of 0.01 km
+                            c1_pseudo_range_km=float(splt[3]) / 100.0,
+                            c2_pseudo_range_km=float(splt[4]) / 100.0,
                             rel_freq_offset=0.0,
                         )
                     except ValueError:
@@ -221,10 +222,10 @@ def basic_rinex(rnx_path, stations):
     return data
 
 
-def prototype(gs_yaml, rnx_path):
-    from nyx_space.orbit_determination import GroundStation
+def prototype(gs_yaml, rnx_path, plot=True):
     import numpy as np
     import plotly.graph_objects as go
+    from nyx_space.orbit_determination import GroundStation
 
     stations = GroundStation.load_many(gs_yaml)
     ground_stations = {}
@@ -250,7 +251,7 @@ def prototype(gs_yaml, rnx_path):
                 continue
             time_offsets += [msr.epoch.timedelta(ref_epoch).to_seconds()]
             c1_data += [msr.c1_pseudo_range_km]
-        
+
         # Some preprocessing to try to make this zero meaned
         c1_data = (np.array(c1_data) - np.mean(c1_data)) / np.std(c1_data)
 
@@ -260,18 +261,16 @@ def prototype(gs_yaml, rnx_path):
             print(f"Skipping {gs_name} due to a ValueError")
             continue
 
-        tau_val = np.max(c1_corr)/np.exp(1)
+        tau_val = np.max(c1_corr) / np.exp(1)
         tau = time_offsets[np.argmin(np.abs(c1_corr - tau_val))]
         # Compute the stddev of the data after 2*tau
-        c1_stddev = np.std([x for t, x in zip(time_offsets, c1_data) if t > 2*tau])
+        c1_stddev = np.std([x for t, x in zip(time_offsets, c1_data) if t > 2 * tau])
 
         dt = msrs[-1].epoch.timedelta(ref_epoch)
-        title = (
-            f"For {ground_stations[gs_name]}: τ = {tau} s, σ = {c1_stddev} km (with {len(msrs)} measurements over {dt})"
-        )
+        title = f"For {ground_stations[gs_name]}: τ = {tau} s, σ = {c1_stddev * np.std(c1_data)} km (with {len(msrs)} measurements over {dt})"
         print(title)
         print(f"\tC1: {c1_corr}")
-        if len(msrs) > 100:
+        if len(msrs) > 100 and plot:
             fig = go.Figure()
             fig.add_trace(
                 go.Scatter(
@@ -299,4 +298,91 @@ def prototype(gs_yaml, rnx_path):
             fig.update_layout(title=title)
             fig.show()
 
-    return gs_to_msrs
+    """
+    Iterate through different true anomaly values and check which lead to the least errors
+    """
+    import logging
+
+    import numpy as np
+    import pandas as pd
+    from nyx_space.cosmic import Cosm, Orbit, Spacecraft
+    from nyx_space.mission_design import (
+        DynamicTrajectory,
+        SpacecraftDynamics,
+        propagate,
+    )
+    from nyx_space.orbit_determination import GroundTrackingArcSim, TrkConfig
+
+    FORMAT = "%(levelname)s %(name)s %(asctime)-15s %(filename)s:%(lineno)d %(message)s"
+    logging.basicConfig(format=FORMAT)
+    logging.getLogger().setLevel(logging.INFO)
+
+    cosm = Cosm.de438()
+    eme2k = cosm.frame("EME2000")
+
+    # Base path
+    root = Path(__file__).joinpath("../../../../").resolve()
+    config_path = root.joinpath("./data/tests/config/")
+    outpath = root.joinpath("output_data/")
+
+    # Load the dynamics
+    dynamics = SpacecraftDynamics.load_named(str(config_path.joinpath("dynamics.yaml")))
+
+    for gs_name, msrs in gs_to_msrs.items():
+        if len(msrs) < 100:
+            continue
+        # Build the approximate orbit
+        # We'll use the first measurement as the reference epoch
+        ref_epoch = msrs[0].epoch
+
+        # We'll use the first measurement as the reference station
+        ref_station = stations[gs_name]
+        # Setup a continuous tracking for this station
+        trk_cfg = {ref_station.name: TrkConfig()}
+
+        for ta_deg in np.linspace(0, 360, 10):
+
+            orbit = Orbit.from_keplerian(
+                sma_km=7349136.3e-3,
+                ecc=0.00117,
+                inc_deg=99.35,
+                raan_deg=108.48,
+                aop_deg=110.9766,
+                ta_deg=ta_deg,
+                epoch=ref_epoch,
+                frame=eme2k,
+            )
+
+            # Build a spacecraft
+            sc = Spacecraft(
+                orbit,
+                dry_mass_kg=1500.0,
+                fuel_mass_kg=0.0,
+            )
+
+            # Propagate this trajectory for one day
+            # An propagate for two periods (we only care about the trajectory)
+            _, traj = propagate(sc, dynamics["hifi"], Unit.Day * 1)
+            print(traj)
+
+            # This is a bit of a pain but at the moment, we must serialize the trajectory to a file
+            # and reload it into a Dynamic trajectory before passing it to the Python object.
+
+            traj_file = str(outpath.joinpath("./od_val_with_arc_truth_ephem.parquet"))
+            traj.to_parquet(traj_file)
+            traj = DynamicTrajectory(traj_file)
+
+            # Build a tracking arc
+            arc_sim = GroundTrackingArcSim([ref_station], traj, trk_cfg, 0)
+            # Generate the measurements
+            path = arc_sim.generate_measurements(
+                str(outpath.joinpath(f"./from_{ref_station.name}-ta_{ta_deg}.parquet")),
+                timestamp=False,
+                metadata={},
+            )
+            # Load this parquet and print the head
+            df = pd.read_parquet(path)
+            print(df.head())
+
+            break
+        break

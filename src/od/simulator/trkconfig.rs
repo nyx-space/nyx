@@ -32,9 +32,17 @@ use std::sync::Arc;
 use super::schedule::Schedule;
 use super::Availability;
 
-/// Stores a tracking configuration, there is one per tracking data simulator (e.g. one for ground station #1 and another for #2)
+/// Stores a tracking configuration, there is one per tracking data simulator (e.g. one for ground station #1 and another for #2).
+/// By default, the tracking configuration is continuous and the tracking arc is from the beginning of the simulation to the end.
+/// In Python, any value that is set to None at initialization will use the default values.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(
+    feature = "python",
+    pyo3(
+        text_signature = "(start=None, end=None, schedule_on=None, schedule_off=None, sampling=None)"
+    )
+)]
 pub struct TrkConfig {
     /// Availability configuration to start the tracking arc
     #[serde(default)]

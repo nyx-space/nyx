@@ -23,7 +23,7 @@ use rand_pcg::Pcg64Mcg;
 
 use crate::linalg::DefaultAllocator;
 use crate::md::trajectory::Interpolatable;
-use crate::md::ui::Traj;
+use crate::md::ui::{Frame, Traj};
 use crate::od::Measurement;
 use crate::{io::Configurable, linalg::allocator::Allocator};
 use crate::{NyxError, Orbit};
@@ -43,7 +43,7 @@ where
     /// Returns the name of this tracking data simulator
     fn name(&self) -> String;
 
-    /// Observes the input trajectory at the provided epoch, and returns a measurement from itself to the input state, and returns None of the object is not visible.
+    /// Performs a measurement of the input trajectory at the provided epoch (with integration times if relevant), and returns a measurement from itself to the input state. Returns None of the object is not visible.
     /// This trait function takes in a trajectory and epoch so it can properly simulate integration times for the measurements.
     /// If the random number generator is provided, it shall be used to add noise to the measurement.
     ///
@@ -52,11 +52,22 @@ where
     ///
     /// # Errors
     ///     + A specific measurement is requested but the noise on that measurement type is not configured.
-    fn measure_as_seen(
+    fn measure(
         &mut self,
         epoch: Epoch,
         traj: &Traj<MsrIn>,
         rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
-    ) -> Result<Option<(Msr, Orbit)>, NyxError>;
+    ) -> Result<Option<Msr>, NyxError>;
+
+    /// Returns the device location at the given epoch and in the given frame.
+    fn location(&self, epoch: Epoch, frame: Frame, cosm: &Cosm) -> Orbit;
+
+    // Perform an instantaneous measurement (without integration times, i.e. one-way). Returns None if the object is not visible, else returns the measurement.
+    fn measure_instantaneous(
+        &mut self,
+        rx: MsrIn,
+        rng: Option<&mut Pcg64Mcg>,
+        cosm: Arc<Cosm>,
+    ) -> Result<Option<Msr>, NyxError>;
 }

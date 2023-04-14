@@ -149,14 +149,12 @@ impl GroundStation {
             doppler_noise_km_s: Some(doppler_noise_km_s),
         }
     }
-}
 
-impl GroundStation {
     /// Computes the elevation of the provided object seen from this ground station.
     /// Also returns the ground station's orbit in the frame of the receiver
-    pub fn elevation_of(&self, rx: &Orbit, cosm: &Cosm) -> (f64, Orbit, Orbit) {
+    pub fn elevation_of(&self, rx: Orbit, cosm: &Cosm) -> (f64, Orbit, Orbit) {
         // Start by converting the receiver spacecraft into the ground station frame.
-        let rx_gs_frame = cosm.frame_chg(rx, self.frame);
+        let rx_gs_frame = cosm.frame_chg(&rx, self.frame);
 
         let dt = rx.epoch;
         // Then, compute the rotation matrix from the body fixed frame of the ground station to its topocentric frame SEZ.
@@ -175,7 +173,7 @@ impl GroundStation {
         let elevation = rho_sez.declination_deg();
 
         // Return elevation in degrees and rx/tx in the inertial frame of the spacecraft
-        (elevation, *rx, cosm.frame_chg(&tx_gs_frame, rx.frame))
+        (elevation, rx, cosm.frame_chg(&tx_gs_frame, rx.frame))
     }
 
     /// Return this ground station as an orbit in its current frame
@@ -212,15 +210,33 @@ impl Configurable for GroundStation {
 
 impl TrackingDeviceSim<Orbit, StdMeasurement> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
-    fn measure_as_seen(
+    ///
+    /// WARNING: For StdMeasurement, we just call the instantaneous measurement function.
+    fn measure(
         &mut self,
         epoch: Epoch,
         traj: &Traj<Orbit>,
         rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
-    ) -> Result<Option<(StdMeasurement, Orbit)>, NyxError> {
-        let rx = traj.at(epoch).unwrap();
-        let (elevation, rx_rxf, tx_rxf) = self.elevation_of(&rx, &cosm);
+    ) -> Result<Option<StdMeasurement>, NyxError> {
+        self.measure_instantaneous(traj.at(epoch)?, rng, cosm)
+    }
+
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    fn location(&self, epoch: Epoch, frame: Frame, cosm: &Cosm) -> Orbit {
+        cosm.frame_chg(&self.to_orbit(epoch), frame)
+    }
+
+    fn measure_instantaneous(
+        &mut self,
+        rx: Orbit,
+        rng: Option<&mut Pcg64Mcg>,
+        cosm: Arc<Cosm>,
+    ) -> Result<Option<StdMeasurement>, NyxError> {
+        let (elevation, rx, tx) = self.elevation_of(rx, &cosm);
 
         let msr_epoch;
         let range_noise;
@@ -257,33 +273,47 @@ impl TrackingDeviceSim<Orbit, StdMeasurement> for GroundStation {
         }
 
         if elevation >= self.elevation_mask_deg {
-            Ok(Some((
-                StdMeasurement::new(msr_epoch, tx_rxf, rx_rxf, range_noise, doppler_noise),
-                tx_rxf,
+            Ok(Some(StdMeasurement::new(
+                msr_epoch,
+                tx,
+                rx,
+                range_noise,
+                doppler_noise,
             )))
         } else {
             Ok(None)
         }
-    }
-
-    fn name(&self) -> String {
-        self.name.clone()
     }
 }
 
 impl TrackingDeviceSim<Spacecraft, StdMeasurement> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
-    fn measure_as_seen(
+    fn measure(
         &mut self,
         epoch: Epoch,
         traj: &Traj<Spacecraft>,
         rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
-    ) -> Result<Option<(StdMeasurement, Orbit)>, NyxError> {
-        // Ugh, this is some code duplication to avoid rebuilding a trajectory that will be destroyed at the end of this function.
-        let sc_rx = traj.at(epoch).unwrap();
-        let rx = sc_rx.orbit;
-        let (elevation, rx_ssb, tx_ssb) = self.elevation_of(&rx, &cosm);
+    ) -> Result<Option<StdMeasurement>, NyxError> {
+        let rx = traj.at(epoch)?;
+        self.measure_instantaneous(rx, rng, cosm)
+    }
+
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    fn location(&self, epoch: Epoch, frame: Frame, cosm: &Cosm) -> Orbit {
+        cosm.frame_chg(&self.to_orbit(epoch), frame)
+    }
+
+    fn measure_instantaneous(
+        &mut self,
+        rx: Spacecraft,
+        rng: Option<&mut Pcg64Mcg>,
+        cosm: Arc<Cosm>,
+    ) -> Result<Option<StdMeasurement>, NyxError> {
+        let (elevation, rx, tx) = self.elevation_of(rx.orbit, &cosm);
 
         let msr_epoch;
         let range_noise;
@@ -320,17 +350,16 @@ impl TrackingDeviceSim<Spacecraft, StdMeasurement> for GroundStation {
         }
 
         if elevation >= self.elevation_mask_deg {
-            Ok(Some((
-                StdMeasurement::new(msr_epoch, tx_ssb, rx_ssb, range_noise, doppler_noise),
-                tx_ssb,
+            Ok(Some(StdMeasurement::new(
+                msr_epoch,
+                tx,
+                rx,
+                range_noise,
+                doppler_noise,
             )))
         } else {
             Ok(None)
         }
-    }
-
-    fn name(&self) -> String {
-        self.name.clone()
     }
 }
 

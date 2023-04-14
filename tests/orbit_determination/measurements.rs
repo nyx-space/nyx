@@ -42,7 +42,7 @@ fn nil_measurement() {
         .unwrap();
 
     assert!(station
-        .measure_as_seen(epoch, &traj, None, cosm.clone())
+        .measure(epoch, &traj, None, cosm.clone())
         .unwrap()
         .is_none());
 }
@@ -151,7 +151,7 @@ fn val_measurements_topo() {
     let mut traj1_msr_cnt = 0;
     for state in traj1.every(1 * Unit::Minute) {
         if dss65_madrid
-            .measure_as_seen(state.epoch(), &traj1, Some(&mut rng), cosm.clone())
+            .measure(state.epoch(), &traj1, Some(&mut rng), cosm.clone())
             .unwrap()
             .is_some()
         {
@@ -169,8 +169,8 @@ fn val_measurements_topo() {
         let now = cislunar1.epoch() + truth.offset;
         let state = traj1.at(now).unwrap();
         // Will panic if the measurement is not visible
-        let (meas, _) = dss65_madrid
-            .measure_as_seen(state.epoch(), &traj1, Some(&mut rng), cosm.clone())
+        let meas = dss65_madrid
+            .measure(state.epoch(), &traj1, Some(&mut rng), cosm.clone())
             .unwrap()
             .unwrap();
 
@@ -219,7 +219,7 @@ fn val_measurements_topo() {
     // Now iterate the trajectory to count the measurements.
     for state in traj2.every(1 * Unit::Minute) {
         if dss65_madrid
-            .measure_as_seen(state.epoch(), &traj2, Some(&mut rng), cosm.clone())
+            .measure(state.epoch(), &traj2, Some(&mut rng), cosm.clone())
             .unwrap()
             .is_some()
         {
@@ -237,8 +237,8 @@ fn val_measurements_topo() {
         let now = cislunar2.epoch() + truth.offset;
         let state = traj2.at(now).unwrap();
         // Will panic if the measurement is not visible
-        let (meas, _) = dss65_madrid
-            .measure_as_seen(state.epoch(), &traj2, Some(&mut rng), cosm.clone())
+        let meas = dss65_madrid
+            .measure(state.epoch(), &traj2, Some(&mut rng), cosm.clone())
             .unwrap()
             .unwrap();
         let obs = meas.observation();

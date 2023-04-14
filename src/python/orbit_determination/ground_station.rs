@@ -33,17 +33,21 @@ impl GroundStation {
         <Self as ConfigRepr>::load(path)
     }
 
-    #[cfg(feature = "python")]
     #[classmethod]
     fn load_many(_cls: &PyType, path: &str) -> Result<Vec<Self>, ConfigError> {
         <Self as ConfigRepr>::load_many(path)
     }
 
-    #[cfg(feature = "python")]
     #[classmethod]
     fn load_named(_cls: &PyType, path: &str) -> Result<HashMap<String, Self>, ConfigError> {
         <Self as ConfigRepr>::load_named(path)
     }
+
+    // TODO: Once the switch to RangeDoppler is done, add this method. This requires making the other structure available to Python too
+    // and that isn't worth doing for StdMeasurement.
+    // fn measure(&mut self, epoch: Epoch, state: &State) -> Result<Measurement, NyxError> {
+    //     self.measure(epoch, state)
+    // }
 
     // Manual getter/setters -- waiting on https://github.com/PyO3/pyo3/pull/2786
 

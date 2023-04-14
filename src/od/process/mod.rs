@@ -435,6 +435,7 @@ where
                 } else {
                     self.prop.details.step
                 });
+
                 debug!("advancing propagator by {next_step_size} (Δt to next msr: {delta_t})");
                 let (_, traj_covar) = self.prop.for_duration_with_traj(next_step_size)?;
 
@@ -457,9 +458,13 @@ where
                     // Get the computed observations
                     match devices.get_mut(device_name) {
                         Some(device) => {
-                            if let Some((computed_meas, device_loc)) =
-                                device.measure_as_seen(epoch, &traj, None, self.cosm.clone())?
+                            if let Some(computed_meas) =
+                                device.measure(epoch, &traj, None, self.cosm.clone())?
                             {
+                                // Grab the device location
+                                let device_loc =
+                                    device.location(epoch, nominal_state.frame(), &self.cosm);
+
                                 // Switch back from extended if necessary
                                 if self.kf.is_extended() && self.ekf_trigger.disable_ekf(epoch) {
                                     self.kf.set_extended(false);
