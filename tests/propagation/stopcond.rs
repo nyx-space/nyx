@@ -378,9 +378,9 @@ fn event_and_combination() {
             Unit::Minute,
         )) {
             for sc_decl_zero in tighter_states {
-                let decl_deg = sc_decl_zero.value(StateParameter::Declination).unwrap();
-                println!("{sc_decl_zero:x} => decl = {} deg", decl_deg);
-                assert!((decl_deg - 3.0).abs() < 1.0);
+                let found_decl_deg = sc_decl_zero.value(StateParameter::Declination).unwrap();
+                println!("{sc_decl_zero:x} => decl = {} deg", found_decl_deg);
+                assert!((decl_deg - found_decl_deg).abs() < 1.0);
             }
         }
     }

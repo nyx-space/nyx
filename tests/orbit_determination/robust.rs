@@ -34,9 +34,9 @@ fn od_robust_test_ekf_realistic() {
 
     let iau_earth = cosm.frame("IAU Earth");
     // Define the ground stations.
-    let ekf_num_meas = 500;
+    let ekf_num_meas = 1000;
     // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 10.0 * Unit::Second;
+    let ekf_disable_time = 3 * Unit::Minute;
     let elevation_mask = 0.0;
 
     let dss65_madrid = GroundStation::dss65_madrid(
@@ -136,7 +136,11 @@ fn od_robust_test_ekf_realistic() {
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
 
-    let kf = KF::no_snc(initial_estimate, measurement_noise);
+    // Define the process noise to assume an unmodeled acceleration of 1e-3 km^2/s^2 on X, Y and Z in the ECI frame
+    let sigma_q = 1e-8_f64.powi(2);
+    let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
+
+    let kf = KF::new(initial_estimate, process_noise, measurement_noise);
 
     let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
@@ -147,16 +151,51 @@ fn od_robust_test_ekf_realistic() {
     // odp.iterate_arc::<GroundStation>(&arc, IterationConf::default())
     //     .unwrap();
 
-    let estimate_fmtr =
-        NavSolutionFormatter::default("robuestness_test_no_it.csv".to_owned(), cosm);
+    let estimate_fmtr = NavSolutionFormatter::default("robustness_test_no_it.csv".to_owned(), cosm);
 
     let mut wtr = csv::Writer::from_path("robustness_test_no_it.csv").unwrap();
     wtr.serialize(&estimate_fmtr.headers)
         .expect("could not write to output file");
 
+    let mut err_wtr = csv::Writer::from_path("robustness_test_traj_err.csv").unwrap();
+    err_wtr
+        .serialize(vec![
+            "epoch", "x_err", "y_err", "z_err", "vx_err", "vy_err", "vz_err",
+        ])
+        .expect("could not write to output file");
+
     for est in &odp.estimates {
         // Format the estimate
         wtr.serialize(estimate_fmtr.fmt(est))
+            .expect("could not write to CSV");
+        // Add the error data
+        let truth_state = traj.at(est.epoch()).unwrap();
+        let err = truth_state - est.state();
+        err_wtr
+            .serialize(vec![
+                est.epoch().to_string(),
+                format!("{}", err.x_km),
+                format!("{}", err.y_km),
+                format!("{}", err.z_km),
+                format!("{}", err.vx_km_s),
+                format!("{}", err.vy_km_s),
+                format!("{}", err.vz_km_s),
+            ])
+            .expect("could not write to CSV");
+    }
+
+    let mut resid_wtr = csv::Writer::from_path("robustness_test_residuals.csv").unwrap();
+    resid_wtr
+        .serialize(vec!["epoch", "range_postfit", "doppler_postfit"])
+        .expect("could not write to output file");
+
+    for res in &odp.residuals {
+        resid_wtr
+            .serialize(vec![
+                res.dt.to_string(),
+                format!("{}", res.postfit[0]),
+                format!("{}", res.postfit[1]),
+            ])
             .expect("could not write to CSV");
     }
 

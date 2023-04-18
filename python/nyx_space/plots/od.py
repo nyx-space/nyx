@@ -22,6 +22,10 @@ from .utils import plot_with_error, plot_line, finalize_plot, colors
 
 import pandas as pd
 
+import numpy as np
+from scipy.special import erfcinv
+from scipy.stats import norm
+
 
 def plot_estimates(
     dfs,
@@ -575,8 +579,6 @@ def plot_state_deviation(
         return pos_fig, vel_fig
 
 
-
-
 def plot_measurements(
     dfs,
     title,
@@ -673,3 +675,92 @@ def plot_measurements(
         fig.show()
     else:
         return fig
+
+
+def plot_residual_qq(df, time_col, title, copyright=None, show=True):
+    """
+    Quantile-quantile plot of residuals
+    """
+    quantiles = np.arange(0, 1.01, 0.01)
+    for col in df.columns:
+        if col.endswith("postfit"):
+            residuals = df[col]
+            residual_quantiles = np.quantile(residuals, quantiles)
+            normal_quantiles = np.sqrt(2) * erfcinv(2 * quantiles)
+            normal_quantiles = normal_quantiles[1:-1]  # Remove infinities
+
+            fig = go.Figure()
+
+            # Add scatter trace of residual vs normal quantiles
+            fig.add_trace(
+                go.Scatter(
+                    x=normal_quantiles,
+                    y=residual_quantiles,
+                    mode="markers",
+                    name=f"Quantiles {col}",
+                )
+            )
+
+            # Add line representing normal distribution
+            breakpoint()
+            fig.add_trace(
+                go.Scatter(
+                    x=[min(normal_quantiles), max(normal_quantiles)],
+                    y=[min(normal_quantiles), max(normal_quantiles)],
+                    mode="lines",
+                    name="Normal",
+                    line=dict(color="red"),
+                )
+            )
+            fig.update_layout(
+                title=f"Normal Q-Q Plot for {col}",
+                xaxis_title="Theoretical Quantiles",
+                yaxis_title="Residual Quantiles",
+            )
+            fig.show()
+
+
+def plot_residual_histogram(df, time_col, title, copyright=None, show=True):
+    """
+    Histogram of residuals
+    """
+    for col in df.columns:
+        if col.endswith("postfit"):
+            residuals = df[col]
+            fig = go.Figure()
+            fig.add_trace(go.Histogram(x=residuals))
+            fig.update_layout(
+                title=f"Histogram of Residuals for {col}",
+                xaxis_title="Residuals",
+                yaxis_title="Count",
+            )
+
+            # # Add shape layer for normal distribution
+            # fig.add_shape(
+            #     type="line",
+            #     x0=-3,
+            #     y0=0,
+            #     x1=3,
+            #     y1=0,
+            #     name="Mean",
+            #     line=dict(dash="dash", color="green"),
+            # )
+            # fig.add_shape(
+            #     type="line",
+            #     x0=-3,
+            #     y0=5,
+            #     x1=3,
+            #     y1=5,
+            #     name="Std",
+            #     line=dict(dash="dash", color="red"),
+            # )
+            # Add normal distribution with same mean and std
+            mean = np.mean(residuals)
+            std = np.std(residuals)
+            x = np.linspace(mean - 3*std, mean + 3*std, 100)
+            pdf = norm.pdf(x, mean, std) 
+            fig.add_trace(go.Scatter(x=x, y=pdf, 
+                                    name='Normal Distribution', 
+                                    line=dict(color='red')))
+
+            fig.show()

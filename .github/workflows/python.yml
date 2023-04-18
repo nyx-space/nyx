@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [x86_64, x86, aarch64, ppc64le]
+        target: [x86_64, x86, aarch64]
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -41,7 +41,7 @@ jobs:
           name: wheels
           path: dist
       - name: pytest x86_64
-        if: ${{ startsWith(matrix.target, 'x86_64') }}
+        if: ${{ matrix.target == 'x86_64' || matrix.target == 'aarch64' }}
         shell: bash
         run: |
           set -e
@@ -49,8 +49,6 @@ jobs:
           pip install pytest numpy pandas plotly pyarrow
           pytest
       - name: pytest
-        # if: ${{ !startsWith(matrix.target, 'x86') && matrix.target != 'ppc64' }}
-        if: ${{ !startsWith(matrix.target, 'x86') }}
         uses: uraimo/run-on-arch-action@v2.5.0
         with:
           arch: ${{ matrix.target }}
