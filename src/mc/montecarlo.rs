@@ -54,15 +54,6 @@ where
     pub scenario: String,
 }
 
-/*
-   D::StateType: InterpState,
-   DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
-       + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
-       + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
-       + Allocator<f64, <D::StateType as State>::VecLength>,
-   <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
-*/
-
 impl<S: Interpolatable, Distr: Distribution<f64> + Copy> MonteCarlo<S, Distr>
 where
     DefaultAllocator: Allocator<f64, S::Size>

@@ -53,7 +53,7 @@ where
     /// Map of devices from their names.
     pub devices: HashMap<String, D>,
     /// Receiver trajectory
-    pub trajectory: Traj<MsrIn>,
+    pub trajectory: Traj<MsrIn>, // TODO: Convert this to a reference
     /// Configuration of each device
     pub configs: HashMap<String, TrkConfig>,
     /// Set to true to allow for overlapping measurements (enabled by default),

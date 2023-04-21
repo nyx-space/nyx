@@ -154,14 +154,15 @@ where
         smoothed.push(self.estimates.last().unwrap().clone());
 
         loop {
+            let k = l - smoothed.len();
             // Borrow the previously smoothed estimate of the k+1 estimate
-            let sm_est_kp1 = &self.estimates[l - smoothed.len() + 1];
+            let sm_est_kp1 = &self.estimates[k + 1];
             let x_kp1_l = sm_est_kp1.state_deviation();
             let p_kp1_l = sm_est_kp1.covar();
             // Borrow the k-th estimate, which we're smoothing with the next estimate
-            let est_k = &self.estimates[l - smoothed.len()];
+            let est_k = &self.estimates[k];
             // Borrow the k+1-th estimate, which we're smoothing with the next estimate
-            let est_kp1 = &self.estimates[l - smoothed.len() + 1];
+            let est_kp1 = &self.estimates[k + 1];
 
             // Check the smoother stopping condition
             match condition {
@@ -181,11 +182,7 @@ where
                         break;
                     }
                 }
-                SmoothingArc::All => {
-                    // if est_k.epoch() == est_kp1.epoch() {
-                    //     break;
-                    // }
-                }
+                SmoothingArc::All => {}
             }
 
             // Compute the STM between both steps taken by the filter
@@ -327,7 +324,7 @@ where
                 info!("*** CONVERGED ***");
                 info!("*****************");
                 info!(
-                    "New RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
+                    "New residual RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
                     new_rms, previous_rms, best_rms
                 );
                 info!(
@@ -339,7 +336,7 @@ where
 
             if new_rms > previous_rms {
                 warn!(
-                    "New RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
+                    "New residual RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
                     new_rms, previous_rms, best_rms
                 );
                 divergence_cnt += 1;
@@ -360,7 +357,7 @@ where
                 }
             } else {
                 info!(
-                    "New RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
+                    "New residual RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
                     new_rms, previous_rms, best_rms
                 );
                 // Reset the counter

@@ -66,6 +66,16 @@ pub struct IterationConf {
     pub use_prefit: bool,
 }
 
+impl IterationConf {
+    /// Iterate and smooth only once
+    pub fn once() -> Self {
+        Self {
+            max_iterations: 1,
+            ..Default::default()
+        }
+    }
+}
+
 impl Default for IterationConf {
     /// The default absolute tolerance is 1e-2 (calibrated on an EKF with error).
     fn default() -> Self {
@@ -76,7 +86,7 @@ impl Default for IterationConf {
             max_iterations: 15,
             max_divergences: 3,
             force_failure: false,
-            use_prefit: false,
+            use_prefit: false, // TODO: Replace by residual RATIO to accommodate for unit differences.
         }
     }
 }

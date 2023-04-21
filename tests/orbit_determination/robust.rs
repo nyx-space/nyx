@@ -5,7 +5,8 @@ extern crate pretty_env_logger;
 use nyx::cosmic::{Bodies, Cosm, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::io::formatter::{NavSolutionFormatter, StateFormatter};
-use nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
+use nyx::linalg::{Matrix2, Vector2, Vector6};
+use nyx::mc::GaussianGenerator;
 use nyx::md::StateParameter;
 use nyx::od::noise::GaussMarkov;
 use nyx::od::prelude::*;
@@ -25,7 +26,6 @@ use std::path::PathBuf;
 #[allow(clippy::identity_op)]
 #[test]
 fn od_robust_test_ekf_realistic() {
-    // TODO: Add gravity field differences.
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
@@ -56,11 +56,11 @@ fn od_robust_test_ekf_realistic() {
     let mut configs = HashMap::new();
     configs.insert(
         dss65_madrid.name.clone(),
-        TrkConfig::from_sample_rate(10.seconds()),
+        TrkConfig::from_sample_rate(60.seconds()),
     );
     configs.insert(
         dss34_canberra.name.clone(),
-        TrkConfig::from_sample_rate(10.seconds()),
+        TrkConfig::from_sample_rate(60.seconds()),
     );
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
@@ -75,12 +75,28 @@ fn od_robust_test_ekf_realistic() {
     let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
-    let mut initial_state_dev = initial_state;
-    initial_state_dev.x_km += 9.5;
-    initial_state_dev.y_km -= 9.5;
-    initial_state_dev.z_km += 9.5;
 
-    println!("Initial state dev:\n{}", initial_state - initial_state_dev);
+    // Disperse the initial state based on some orbital elements errors given from ULA Atlas 5 user guide, table 2.3.3-1 <https://www.ulalaunch.com/docs/default-source/rockets/atlasvusersguide2010a.pdf>
+    // This assumes that the errors are ONE TENTH of the values given in the table. It assumes that the launch provider has provided an initial state vector, whose error is lower than the injection errors.
+    let generator = GaussianGenerator::from_std_devs(
+        initial_state,
+        &[
+            (StateParameter::Inclination, 0.0025),
+            (StateParameter::RAAN, 0.022),
+            (StateParameter::AoP, 0.02),
+        ],
+    )
+    .unwrap();
+
+    let initial_state_dev = generator.sample_with_seed(0).state;
+    let (init_rss_pos_km, init_rss_vel_km_s) = rss_orbit_errors(&initial_state, &initial_state_dev);
+
+    println!("Truth initial state:\n{initial_state}\n{initial_state:x}");
+    println!("Filter initial state:\n{initial_state_dev}\n{initial_state_dev:x}");
+    println!(
+        "Initial state dev:\t{init_rss_pos_km:.3} km\t{init_rss_vel_km_s:.3} km/s\n{}",
+        initial_state - initial_state_dev
+    );
 
     let bodies = vec![
         Bodies::Luna,
@@ -117,20 +133,20 @@ fn od_robust_test_ekf_realistic() {
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let estimator = OrbitalDynamics::point_masses(&bodies, cosm.clone());
     let setup = Propagator::new::<RK4Fixed>(estimator, opts);
-    let prop_est = setup.with(initial_state.with_stm());
+    let prop_est = setup.with(initial_state_dev.with_stm());
     let covar_radius_km = 1.0e2;
     let covar_velocity_km_s = 1.0e1;
-    let init_covar = Matrix6::from_diagonal(&Vector6::new(
+    let init_covar = Vector6::new(
         covar_radius_km,
         covar_radius_km,
         covar_radius_km,
         covar_velocity_km_s,
         covar_velocity_km_s,
         covar_velocity_km_s,
-    ));
+    );
 
     // Define the initial estimate
-    let initial_estimate = KfEstimate::from_covar(initial_state_dev, init_covar);
+    let initial_estimate = KfEstimate::from_diag(initial_state_dev, init_covar);
     println!("Initial estimate:\n{}", initial_estimate);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
@@ -147,9 +163,23 @@ fn od_robust_test_ekf_realistic() {
 
     let mut odp = ODProcess::ekf(prop_est, kf, trig, cosm.clone());
 
-    odp.process_arc::<GroundStation>(&arc).unwrap();
-    // odp.iterate_arc::<GroundStation>(&arc, IterationConf::default())
-    //     .unwrap();
+    // Let's filter and iterate on the first four hours of data
+    let subset = arc.filter_by_offset(..3.hours());
+    let remaining = arc.filter_by_offset(3.hours()..);
+
+    odp.process_arc::<GroundStation>(&subset).unwrap();
+    odp.iterate_arc::<GroundStation>(&subset, IterationConf::once())
+        .unwrap();
+
+    let (sm_rss_pos_km, sm_rss_vel_km_s) =
+        rss_orbit_errors(&initial_state, &odp.estimates[0].state());
+
+    println!(
+        "Initial state error after smoothing:\t{sm_rss_pos_km:.3} km\t{sm_rss_vel_km_s:.3} km/s\n{}",
+        initial_state - odp.estimates[0].state()
+    );
+
+    odp.process_arc::<GroundStation>(&remaining).unwrap();
 
     let estimate_fmtr = NavSolutionFormatter::default("robustness_test_no_it.csv".to_owned(), cosm);
 
@@ -248,12 +278,12 @@ fn od_robust_test_ekf_realistic() {
     );
 
     assert!(
-        delta.rmag_km() < 1e-2,
-        "Position error should be on meter level"
+        delta.rmag_km() < 0.1,
+        "Position error should be less than 100 meters"
     );
     assert!(
-        delta.vmag_km_s() < 1e-5,
-        "Velocity error should be on millimeter level"
+        delta.vmag_km_s() < 1e-4,
+        "Velocity error should be on centimeter level"
     );
 }
 

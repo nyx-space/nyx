@@ -368,12 +368,12 @@ where
         }
 
         let h_tilde_t = &self.h_tilde.transpose();
-        let mut invertible_part = &self.h_tilde * &covar_bar * h_tilde_t + &self.measurement_noise;
-        if !invertible_part.try_inverse_mut() {
+        let mut h_p_ht = &self.h_tilde * &covar_bar * h_tilde_t + &self.measurement_noise;
+        if !h_p_ht.try_inverse_mut() {
             return Err(NyxError::SingularKalmanGain);
         }
 
-        let gain = &covar_bar * h_tilde_t * &invertible_part;
+        let gain = &covar_bar * h_tilde_t * &h_p_ht;
 
         // Compute observation deviation (usually marked as y_i)
         let prefit = real_obs - computed_obs;

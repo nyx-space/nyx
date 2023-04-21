@@ -20,6 +20,7 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt::{Debug, Display};
 use std::fs::File;
+use std::ops::RangeBounds;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -242,5 +243,36 @@ where
         }
 
         Ok(devices)
+    }
+
+    /// Returns a new tracking arc that only contains measurements that fall within the given epoch range.
+    pub fn filter_by_epoch<R: RangeBounds<Epoch>>(&self, bound: R) -> Self {
+        let mut measurements = Vec::new();
+        for (name, msr) in &self.measurements {
+            if bound.contains(&msr.epoch()) {
+                measurements.push((name.clone(), *msr));
+            }
+        }
+
+        Self {
+            measurements,
+            device_cfg: self.device_cfg.clone(),
+        }
+    }
+
+    /// Returns a new tracking arc that only contains measurements that fall within the given offset from the first epoch
+    pub fn filter_by_offset<R: RangeBounds<Duration>>(&self, bound: R) -> Self {
+        let ref_epoch = self.measurements[0].1.epoch();
+        let mut measurements = Vec::new();
+        for (name, msr) in &self.measurements {
+            if bound.contains(&(msr.epoch() - ref_epoch)) {
+                measurements.push((name.clone(), *msr));
+            }
+        }
+
+        Self {
+            measurements,
+            device_cfg: self.device_cfg.clone(),
+        }
     }
 }

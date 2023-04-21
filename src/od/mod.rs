@@ -129,7 +129,7 @@ where
 }
 
 /// A trait defining a measurement that can be used in the orbit determination process.
-pub trait Measurement: TimeTagged {
+pub trait Measurement: Copy + TimeTagged {
     /// Defines how much data is measured. For example, if measuring range and range rate, this should be of size 2 (nalgebra::U2).
     type MeasurementSize: DimName;
 

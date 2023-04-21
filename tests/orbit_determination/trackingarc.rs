@@ -102,11 +102,56 @@ fn trk_simple(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
     dbg!(&configs);
 
     // Build the tracking arc simulation to generate a "standard measurement".
-    let mut trk =
-        TrackingArcSim::<Orbit, StdMeasurement, _>::with_seed(devices, traj, configs, 12345)
-            .unwrap();
+    let mut trk = TrackingArcSim::<Orbit, StdMeasurement, _>::with_seed(
+        devices,
+        traj.clone(),
+        configs,
+        12345,
+    )
+    .unwrap();
 
     let arc = trk.generate_measurements(cosm).unwrap();
+
+    // Test filtering by epoch
+    let start_epoch = arc.measurements[0].1.epoch() + 1.minutes();
+    for (_, msr) in arc.filter_by_epoch(start_epoch..).measurements {
+        assert!(msr.epoch() >= start_epoch);
+    }
+
+    for (_, msr) in arc.filter_by_epoch(..=start_epoch).measurements {
+        assert!(msr.epoch() <= start_epoch);
+    }
+
+    for (_, msr) in arc.filter_by_epoch(..start_epoch).measurements {
+        assert!(msr.epoch() < start_epoch);
+    }
+
+    assert_eq!(
+        arc.filter_by_epoch(start_epoch..start_epoch)
+            .measurements
+            .len(),
+        0
+    );
+
+    // Test filtering by duration offset
+    for (_, msr) in arc.filter_by_offset(1.minutes()..).measurements {
+        assert!(msr.epoch() >= start_epoch);
+    }
+
+    for (_, msr) in arc.filter_by_offset(..=1.minutes()).measurements {
+        assert!(msr.epoch() <= start_epoch);
+    }
+
+    for (_, msr) in arc.filter_by_offset(..1.minutes()).measurements {
+        assert!(msr.epoch() < start_epoch);
+    }
+
+    assert_eq!(
+        arc.filter_by_offset(1.minutes()..1.minutes())
+            .measurements
+            .len(),
+        0
+    );
 
     // Regression
     assert_eq!(arc.measurements.len(), 146);

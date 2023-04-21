@@ -25,6 +25,7 @@ import pandas as pd
 import numpy as np
 from scipy.special import erfcinv
 from scipy.stats import norm
+import scipy.stats as stats
 
 
 def plot_estimates(
@@ -677,90 +678,98 @@ def plot_measurements(
         return fig
 
 
-def plot_residual_qq(df, time_col, title, copyright=None, show=True):
+def plot_residuals(
+    df,
+    title,
+    time_col_name="Epoch:GregorianUtc",
+    msr_df=None,
+    copyright=None,
+):
     """
-    Quantile-quantile plot of residuals
+    Plot of residuals, with 3-σ lines
     """
-    quantiles = np.arange(0, 1.01, 0.01)
+
+    color_values = list(colors.values())
+
+    try:
+        orig_tim_col = df[time_col_name]
+    except KeyError:
+        # Find the time column
+        try:
+            col_name = [x for x in df.columns if x.startswith("Epoch")][0]
+        except IndexError:
+            raise KeyError("Could not find any time column")
+        print(f"Could not find time column {time_col_name}, using `{col_name}`")
+        orig_tim_col = df[col_name]
+
+    # Build a Python datetime column
+    time_col = pd.to_datetime(orig_tim_col)
+    x_title = "Epoch {}".format(time_col_name[-3:])
+
     for col in df.columns:
         if col.endswith("postfit"):
-            residuals = df[col]
-            residual_quantiles = np.quantile(residuals, quantiles)
-            normal_quantiles = np.sqrt(2) * erfcinv(2 * quantiles)
-            normal_quantiles = normal_quantiles[1:-1]  # Remove infinities
-
             fig = go.Figure()
+            residuals = df[col]
 
             # Add scatter trace of residual vs normal quantiles
             fig.add_trace(
                 go.Scatter(
-                    x=normal_quantiles,
-                    y=residual_quantiles,
+                    x=time_col,
+                    y=residuals,
                     mode="markers",
-                    name=f"Quantiles {col}",
+                    name=f"Residuals {col}",
                 )
             )
 
-            # Add line representing normal distribution
-            breakpoint()
-            fig.add_trace(
-                go.Scatter(
-                    x=[min(normal_quantiles), max(normal_quantiles)],
-                    y=[min(normal_quantiles), max(normal_quantiles)],
-                    mode="lines",
-                    name="Normal",
-                    line=dict(color="red"),
+            mean = np.mean(residuals)
+            std = np.std(residuals)
+            # Add the 3-σ lines
+            fig.add_hline(y=mean + 3 * std, line_dash="dash", line_color="red")
+            fig.add_hline(y=mean - 3 * std, line_dash="dash", line_color="red")
+
+            if msr_df is not None:
+                # Plot the measurements on both plots
+                fig = plot_measurements(
+                    msr_df, title, time_col_name, fig=fig, show=False
                 )
-            )
-            fig.update_layout(
-                title=f"Normal Q-Q Plot for {col}",
-                xaxis_title="Theoretical Quantiles",
-                yaxis_title="Residual Quantiles",
+
+            finalize_plot(
+                fig, title=f"{title} {col}", xtitle=x_title, copyright=copyright
             )
             fig.show()
 
 
-def plot_residual_histogram(df, time_col, title, copyright=None, show=True):
+def plot_residual_histogram(df, title, copyright=None):
     """
     Histogram of residuals
     """
+
     for col in df.columns:
         if col.endswith("postfit"):
             residuals = df[col]
             fig = go.Figure()
-            fig.add_trace(go.Histogram(x=residuals))
-            fig.update_layout(
-                title=f"Histogram of Residuals for {col}",
-                xaxis_title="Residuals",
-                yaxis_title="Count",
+            fig.add_trace(
+                go.Histogram(
+                    x=residuals,
+                    name=f"Histogram of Residuals for {col}",
+                )
             )
 
-            # # Add shape layer for normal distribution
-            # fig.add_shape(
-            #     type="line",
-            #     x0=-3,
-            #     y0=0,
-            #     x1=3,
-            #     y1=0,
-            #     name="Mean",
-            #     line=dict(dash="dash", color="green"),
-            # )
-            # fig.add_shape(
-            #     type="line",
-            #     x0=-3,
-            #     y0=5,
-            #     x1=3,
-            #     y1=5,
-            #     name="Std",
-            #     line=dict(dash="dash", color="red"),
-            # )
             # Add normal distribution with same mean and std
             mean = np.mean(residuals)
             std = np.std(residuals)
-            x = np.linspace(mean - 3*std, mean + 3*std, 100)
-            pdf = norm.pdf(x, mean, std) 
-            fig.add_trace(go.Scatter(x=x, y=pdf, 
-                                    name='Normal Distribution', 
-                                    line=dict(color='red')))
+            x = np.linspace(mean - 3 * std, mean + 3 * std, 100)
+            pdf = norm.pdf(x, mean, std)
+            fig.add_trace(
+                go.Scatter(
+                    x=x,
+                    y=pdf,
+                    name=f"Normal Distribution for {col}",
+                    line_dash="dash",
+                    line_color="red",
+                )
+            )
+
+            finalize_plot(fig, title, xtitle=None, copyright=copyright)
 
             fig.show()
