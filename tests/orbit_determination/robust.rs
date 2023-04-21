@@ -34,7 +34,7 @@ fn od_robust_test_ekf_realistic() {
 
     let iau_earth = cosm.frame("IAU Earth");
     // Define the ground stations.
-    let ekf_num_meas = 1000;
+    let ekf_num_meas = 300;
     // Set the disable time to be very low to test enable/disable sequence
     let ekf_disable_time = 3 * Unit::Minute;
     let elevation_mask = 0.0;
@@ -158,8 +158,7 @@ fn od_robust_test_ekf_realistic() {
 
     let kf = KF::new(initial_estimate, process_noise, measurement_noise);
 
-    let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
-    trig.within_sigma = 3.0;
+    let trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
 
     let mut odp = ODProcess::ekf(prop_est, kf, trig, cosm.clone());
 
@@ -181,9 +180,9 @@ fn od_robust_test_ekf_realistic() {
 
     odp.process_arc::<GroundStation>(&remaining).unwrap();
 
-    let estimate_fmtr = NavSolutionFormatter::default("robustness_test_no_it.csv".to_owned(), cosm);
+    let estimate_fmtr = NavSolutionFormatter::default("robustness_test.csv".to_owned(), cosm);
 
-    let mut wtr = csv::Writer::from_path("robustness_test_no_it.csv").unwrap();
+    let mut wtr = csv::Writer::from_path("robustness_test.csv").unwrap();
     wtr.serialize(&estimate_fmtr.headers)
         .expect("could not write to output file");
 
@@ -278,11 +277,11 @@ fn od_robust_test_ekf_realistic() {
     );
 
     assert!(
-        delta.rmag_km() < 0.1,
-        "Position error should be less than 100 meters"
+        delta.rmag_km() < 0.05,
+        "Position error should be less than 50 meters"
     );
     assert!(
-        delta.vmag_km_s() < 1e-4,
+        delta.vmag_km_s() < 1e-5,
         "Velocity error should be on centimeter level"
     );
 }

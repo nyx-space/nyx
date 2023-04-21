@@ -205,7 +205,8 @@ where
         + Allocator<f64, <T as State>::Size, A>
         + Allocator<f64, A, <T as State>::Size>
         + Allocator<usize, <T as State>::Size>
-        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
+        + Allocator<usize, <T as State>::Size, <T as State>::Size>
+        + Allocator<f64, na::Const<1>, M>,
 {
     type Estimate = KfEstimate<T>;
 
@@ -368,15 +369,21 @@ where
         }
 
         let h_tilde_t = &self.h_tilde.transpose();
-        let mut h_p_ht = &self.h_tilde * &covar_bar * h_tilde_t + &self.measurement_noise;
-        if !h_p_ht.try_inverse_mut() {
-            return Err(NyxError::SingularKalmanGain);
-        }
-
-        let gain = &covar_bar * h_tilde_t * &h_p_ht;
+        let h_p_ht = &self.h_tilde * &covar_bar * h_tilde_t;
 
         // Compute observation deviation (usually marked as y_i)
         let prefit = real_obs - computed_obs;
+
+        // Compute the prefit ratio
+        let ratio = prefit.transpose() * &h_p_ht * &prefit;
+
+        // Compute the Kalman gain but first adding the measurement noise to H⋅P⋅H^T
+        let mut invertible_part = h_p_ht + &self.measurement_noise;
+        if !invertible_part.try_inverse_mut() {
+            return Err(NyxError::SingularKalmanGain);
+        }
+
+        let gain = &covar_bar * h_tilde_t * &invertible_part;
 
         // Compute the state estimate
         let (state_hat, res) = if self.ekf {
@@ -384,7 +391,7 @@ where
             let postfit = &prefit - (&self.h_tilde * &state_hat);
             (
                 state_hat,
-                Residual::new(nominal_state.epoch(), prefit, postfit),
+                Residual::new(nominal_state.epoch(), prefit, postfit, ratio[0]),
             )
         } else {
             // Must do a time update first
@@ -392,7 +399,7 @@ where
             let postfit = &prefit - (&self.h_tilde * &state_bar);
             (
                 state_bar + &gain * &postfit,
-                Residual::new(nominal_state.epoch(), prefit, postfit),
+                Residual::new(nominal_state.epoch(), prefit, postfit, ratio[0]),
             )
         };
 

@@ -33,10 +33,12 @@ where
 {
     /// Date time of this Residual
     pub dt: Epoch,
-    /// The prefit residual (set to zero for EKF filters)
+    /// The prefit residual in the units of the measurement type
     pub prefit: OVector<f64, M>,
-    /// The postfit residual (set to zero for EKF filters)
+    /// The postfit residual in the units of the measurement type
     pub postfit: OVector<f64, M>,
+    /// The prefit residual ratio, i.e. `r' * (H*P*H')^-1 * r`, where `r` is the prefit residual, `H` is the sensitivity matrix, and `P` is the covariance matrix.
+    pub ratio: f64,
     /// The Epoch format upon serialization
     pub epoch_fmt: EpochFormat,
 }
@@ -52,6 +54,7 @@ where
             dt: Epoch::from_tai_seconds(0.0),
             prefit: OVector::<f64, M>::zeros(),
             postfit: OVector::<f64, M>::zeros(),
+            ratio: 0.0,
             epoch_fmt: EpochFormat::GregorianUtc,
         }
     }
@@ -74,11 +77,12 @@ where
         Self::header(EpochFormat::GregorianUtc)
     }
 
-    pub fn new(dt: Epoch, prefit: OVector<f64, M>, postfit: OVector<f64, M>) -> Self {
+    pub fn new(dt: Epoch, prefit: OVector<f64, M>, postfit: OVector<f64, M>, ratio: f64) -> Self {
         Self {
             dt,
             prefit,
             postfit,
+            ratio,
             epoch_fmt: EpochFormat::GregorianUtc,
         }
     }
@@ -139,6 +143,8 @@ where
         for i in 0..M::dim() {
             seq.serialize_element(&self.postfit[(i, 0)])?;
         }
+        // Serialize the ratio
+        seq.serialize_element(&self.ratio)?;
         seq.end()
     }
 }

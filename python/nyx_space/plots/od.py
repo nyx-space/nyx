@@ -23,9 +23,7 @@ from .utils import plot_with_error, plot_line, finalize_plot, colors
 import pandas as pd
 
 import numpy as np
-from scipy.special import erfcinv
 from scipy.stats import norm
-import scipy.stats as stats
 
 
 def plot_estimates(
