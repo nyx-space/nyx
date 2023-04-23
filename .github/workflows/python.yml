@@ -41,7 +41,7 @@ jobs:
           name: wheels
           path: dist
       - name: pytest x86_64
-        if: ${{ matrix.target == 'x86_64' || matrix.target == 'aarch64' }}
+        if: ${{ matrix.target == 'x86_64' }}
         shell: bash
         run: |
           set -e
@@ -49,6 +49,7 @@ jobs:
           pip install pytest numpy pandas plotly pyarrow scipy
           pytest
       - name: pytest
+        if: ${{ !startsWith(matrix.target, 'x86') && matrix.target != 'ppc64' }}
         uses: uraimo/run-on-arch-action@v2.5.0
         with:
           arch: ${{ matrix.target }}
