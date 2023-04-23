@@ -24,6 +24,7 @@ import pandas as pd
 
 import numpy as np
 from scipy.stats import norm
+from scipy.special import erfcinv
 
 
 def plot_estimates(
@@ -679,6 +680,7 @@ def plot_measurements(
 def plot_residuals(
     df,
     title,
+    kind="prefit",
     time_col_name="Epoch:GregorianUtc",
     msr_df=None,
     copyright=None,
@@ -686,8 +688,6 @@ def plot_residuals(
     """
     Plot of residuals, with 3-σ lines
     """
-
-    color_values = list(colors.values())
 
     try:
         orig_tim_col = df[time_col_name]
@@ -704,8 +704,10 @@ def plot_residuals(
     time_col = pd.to_datetime(orig_tim_col)
     x_title = "Epoch {}".format(time_col_name[-3:])
 
+    plt_any = False
+
     for col in df.columns:
-        if col.endswith("postfit"):
+        if col.endswith(kind):
             fig = go.Figure()
             residuals = df[col]
 
@@ -722,8 +724,19 @@ def plot_residuals(
             mean = np.mean(residuals)
             std = np.std(residuals)
             # Add the 3-σ lines
-            fig.add_hline(y=mean + 3 * std, line_dash="dash", line_color="red")
-            fig.add_hline(y=mean - 3 * std, line_dash="dash", line_color="red")
+            three_sig_color = colors["red_ish"]
+            three_sig_color = f"rgb({int(three_sig_color[0])}, {int(three_sig_color[1])}, {int(three_sig_color[2])})"
+            fig.add_hline(
+                y=mean + 3 * std, line_dash="dash", line_color=three_sig_color
+            )
+            fig.add_hline(
+                y=mean - 3 * std, line_dash="dash", line_color=three_sig_color
+            )
+            # Add the 1-σ lines
+            one_sig_color = colors["bright_green"]
+            one_sig_color = f"rgb({int(one_sig_color[0])}, {int(one_sig_color[1])}, {int(one_sig_color[2])})"
+            fig.add_hline(y=mean + std, line_dash="dot", line_color=one_sig_color)
+            fig.add_hline(y=mean - std, line_dash="dot", line_color=one_sig_color)
 
             if msr_df is not None:
                 # Plot the measurements on both plots
@@ -735,15 +748,19 @@ def plot_residuals(
                 fig, title=f"{title} {col}", xtitle=x_title, copyright=copyright
             )
             fig.show()
+            plt_any = True
+
+    if not plt_any:
+        raise ValueError(f"No columns ending with {kind} found -- nothing plotted")
 
 
-def plot_residual_histogram(df, title, copyright=None):
+def plot_residual_histogram(df, title, kind="prefit", copyright=None):
     """
     Histogram of residuals
     """
 
     for col in df.columns:
-        if col.endswith("postfit"):
+        if col.endswith(kind):
             residuals = df[col]
             fig = go.Figure()
             fig.add_trace(
@@ -771,3 +788,110 @@ def plot_residual_histogram(df, title, copyright=None):
             finalize_plot(fig, title, xtitle=None, copyright=copyright)
 
             fig.show()
+
+
+def plot_residual_qq(
+    df,
+    title,
+    col="residual_ratio",
+    copyright=None,
+):
+    """
+    Plot of residuals, with 3-σ lines
+    """
+
+    residuals = df[col]
+
+    # Determine the number of residuals
+    # n = len(residuals)
+    quantiles = np.arange(0, 1.01, 0.01)
+
+    # Calculate the residuals quantiles using np.quantile:
+
+    residual_quantiles = np.quantile(residuals, quantiles)
+
+    # Calculate the theoretical quantiles for a normal distribution with mean=0 and std=1:
+
+    normal_quantiles = np.sqrt(2) * erfcinv(2 * quantiles)
+
+    # Create figure
+    fig = go.Figure()
+
+    # Add scatter trace of residual vs normal quantiles
+    fig.add_trace(
+        go.Scatter(
+            x=normal_quantiles, y=residual_quantiles, mode="markers", name="Quantiles"
+        )
+    )
+
+    # Add line representing normal distribution
+    fig.add_trace(
+        go.Scatter(
+            x=[min(normal_quantiles), max(normal_quantiles)],
+            y=[min(normal_quantiles), max(normal_quantiles)],
+            mode="lines",
+            name="Normal",
+            line=dict(color="red"),
+        )
+    )
+
+    # Update layout
+    fig.update_layout(
+        title="Normal Q-Q Plot",
+        xaxis_title="Theoretical Quantiles",
+        yaxis_title="Residual Quantiles",
+    )
+
+    # Display interactive plot
+    finalize_plot(fig, title, copyright=copyright)
+    fig.show()
+
+
+def plot_qq(df, title, col="residual_ratio", copyright=None):
+
+    # Your list of residuals
+    residuals = df[col]
+
+    # Standardize the residuals
+    standardized_residuals = (residuals - np.mean(residuals)) / np.std(residuals)
+
+    # Compute the theoretical normal quantiles (percentiles)
+    residuals_sorted = np.sort(standardized_residuals)
+    theoretical_quantiles = norm.ppf(
+        np.linspace(0.5 / len(residuals), 1 - 0.5 / len(residuals), len(residuals))
+    )
+
+    # Create the Q-Q plot using Plotly
+    fig = go.Figure()
+
+    # Add the scatter plot of standardized residuals
+    fig.add_trace(
+        go.Scatter(
+            x=theoretical_quantiles,
+            y=residuals_sorted,
+            mode="markers",
+            name="Residuals",
+        )
+    )
+
+    # Add the 45-degree line representing the normal distribution
+    min_value = np.min([theoretical_quantiles.min(), residuals_sorted.min()])
+    max_value = np.max([theoretical_quantiles.max(), residuals_sorted.max()])
+    fig.add_shape(
+        type="line",
+        x0=min_value,
+        x1=max_value,
+        y0=min_value,
+        y1=max_value,
+        yref="y",
+        xref="x",
+        line=dict(color="red"),
+        name="Normal Distribution",
+    )
+
+    fig.update_layout(
+        title="Q-Q Plot",
+        xaxis_title="Theoretical Normal Quantiles",
+        yaxis_title="Sorted Standardized Residuals",
+    )
+    fig.show()

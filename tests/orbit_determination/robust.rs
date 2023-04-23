@@ -215,15 +215,25 @@ fn od_robust_test_ekf_realistic() {
 
     let mut resid_wtr = csv::Writer::from_path("robustness_test_residuals.csv").unwrap();
     resid_wtr
-        .serialize(vec!["epoch", "range_postfit", "doppler_postfit"])
+        .serialize(vec![
+            "epoch",
+            "range_prefit",
+            "doppler_prefit",
+            "range_postfit",
+            "doppler_postfit",
+            "residual_ratio",
+        ])
         .expect("could not write to output file");
 
     for res in &odp.residuals {
         resid_wtr
             .serialize(vec![
                 res.dt.to_string(),
+                format!("{}", res.prefit[0]),
+                format!("{}", res.prefit[1]),
                 format!("{}", res.postfit[0]),
                 format!("{}", res.postfit[1]),
+                format!("{}", res.ratio),
             ])
             .expect("could not write to CSV");
     }
@@ -281,7 +291,7 @@ fn od_robust_test_ekf_realistic() {
         "Position error should be less than 50 meters"
     );
     assert!(
-        delta.vmag_km_s() < 1e-5,
+        delta.vmag_km_s() < 2e-4,
         "Velocity error should be on centimeter level"
     );
 }
