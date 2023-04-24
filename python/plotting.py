@@ -24,7 +24,7 @@ def plot_measurements(path):
 
         # See if there is any metadata
         try:
-            axis_title = '{} ({})'.format(col, ", ".join([f"{k.decode('utf8')}={v.decode('utf8')}" for k, v in arc_pq.field(col).metadata.items()]))
+            axis_title = f"""{col} ({", ".join([f"{k.decode('utf8')}={v.decode('utf8')}" for k, v in arc_pq.field(col).metadata.items()])})"""
         except AttributeError:
             axis_title = col
 
