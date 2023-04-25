@@ -148,27 +148,6 @@ pub trait Measurement: Copy + TimeTagged {
         DefaultAllocator: Allocator<f64, Self::MeasurementSize>;
 }
 
-// A trait defining a simulated measurement. This trait is separate from the `Measurement` trait to allow for multiple implementations of the `SimMeasurement` trait for different estimated states.
-// pub trait SimMeasurement: Measurement
-// where
-//     DefaultAllocator: Allocator<f64, Self::MeasurementSize>
-//         + Allocator<f64, <Self::State as State>::Size>
-//         + Allocator<f64, <Self::State as State>::Size, <Self::State as State>::Size>
-//         + Allocator<f64, <Self::State as State>::VecLength>
-//         + Allocator<f64, Self::MeasurementSize, <Self::State as State>::Size>,
-// {
-//     /// Defines the estimated state
-//     type State: State;
-
-//     /// Returns the measurement sensitivity (often referred to as H tilde).
-//     fn sensitivity(
-//         &self,
-//         nominal: Self::State,
-//     ) -> OMatrix<f64, Self::MeasurementSize, <Self::State as State>::Size>
-//     where
-//         DefaultAllocator: Allocator<f64, <Self::State as State>::Size, Self::MeasurementSize>;
-// }
-
 /// The Estimate trait defines the interface that is the opposite of a `SolveFor`.
 /// For example, `impl EstimateFrom<Spacecraft> for Orbit` means that the `Orbit` can be estimated (i.e. "solved for") from a `Spacecraft`.
 ///
@@ -201,4 +180,33 @@ where
     ) -> OMatrix<f64, M::MeasurementSize, Self::Size>
     where
         DefaultAllocator: Allocator<f64, M::MeasurementSize, Self::Size>;
+}
+
+/// A generic implementation of EstimateFrom for any State that is also a Measurement, e.g. if there is a direct observation of the full state.
+/// WARNING: The frame of the full state measurement is _not_ checked to match that of `Self` or of the filtering frame.
+impl<O> EstimateFrom<O, O> for O
+where
+    O: State + Measurement,
+    Self: State,
+    DefaultAllocator: Allocator<f64, <O as State>::Size>
+        + Allocator<f64, <O as State>::VecLength>
+        + Allocator<f64, <O as State>::Size, <O as State>::Size>
+        + Allocator<f64, Self::Size>
+        + Allocator<f64, Self::VecLength>
+        + Allocator<f64, Self::Size, Self::Size>,
+{
+    fn extract(from: O) -> Self {
+        from
+    }
+
+    fn sensitivity(
+        _full_state_msr: &O,
+        _receiver: Self,
+        _transmitter: Orbit,
+    ) -> OMatrix<f64, <O as Measurement>::MeasurementSize, Self::Size>
+    where
+        DefaultAllocator: Allocator<f64, <O as Measurement>::MeasurementSize, Self::Size>,
+    {
+        OMatrix::<f64, O::MeasurementSize, Self::Size>::identity()
+    }
 }
