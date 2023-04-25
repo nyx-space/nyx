@@ -438,7 +438,7 @@ fn serde_test() {
     .iter()
     .collect();
 
-    let models = GaussMarkov::load_named(test_data).unwrap();
+    let models = <GaussMarkov as ConfigRepr>::load_named(test_data).unwrap();
     assert_eq!(models.len(), 2);
     assert_eq!(
         models["range_noise_model"].tau,

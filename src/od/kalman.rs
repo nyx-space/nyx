@@ -49,6 +49,8 @@ where
         + Allocator<f64, A, <T as State>::Size>
         + Allocator<usize, <T as State>::Size>
         + Allocator<usize, <T as State>::Size, <T as State>::Size>,
+    <DefaultAllocator as Allocator<f64, <T as State>::Size>>::Buffer: Copy,
+    <DefaultAllocator as Allocator<f64, <T as State>::Size, <T as State>::Size>>::Buffer: Copy,
 {
     /// The previous estimate used in the KF computations.
     pub prev_estimate: KfEstimate<T>,
@@ -84,6 +86,8 @@ where
         + Allocator<f64, A, <T as State>::Size>
         + Allocator<usize, <T as State>::Size>
         + Allocator<usize, <T as State>::Size, <T as State>::Size>,
+    <DefaultAllocator as Allocator<f64, <T as State>::Size>>::Buffer: Copy,
+    <DefaultAllocator as Allocator<f64, <T as State>::Size, <T as State>::Size>>::Buffer: Copy,
 {
     /// Initializes this KF with an initial estimate, measurement noise, and one process noise
     pub fn new(
@@ -169,6 +173,8 @@ where
         + Allocator<f64, U3, <T as State>::Size>
         + Allocator<usize, <T as State>::Size>
         + Allocator<usize, <T as State>::Size, <T as State>::Size>,
+    <DefaultAllocator as Allocator<f64, <T as State>::Size>>::Buffer: Copy,
+    <DefaultAllocator as Allocator<f64, <T as State>::Size, <T as State>::Size>>::Buffer: Copy,
 {
     /// Initializes this KF without SNC
     pub fn no_snc(initial_estimate: KfEstimate<T>, measurement_noise: OMatrix<f64, M, M>) -> Self {
@@ -207,6 +213,8 @@ where
         + Allocator<usize, <T as State>::Size>
         + Allocator<usize, <T as State>::Size, <T as State>::Size>
         + Allocator<f64, na::Const<1>, M>,
+    <DefaultAllocator as Allocator<f64, <T as State>::Size>>::Buffer: Copy,
+    <DefaultAllocator as Allocator<f64, <T as State>::Size, <T as State>::Size>>::Buffer: Copy,
 {
     type Estimate = KfEstimate<T>;
 

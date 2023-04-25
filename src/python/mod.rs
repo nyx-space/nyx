@@ -26,6 +26,7 @@ use pyo3::{exceptions::PyException, prelude::*};
 
 pub(crate) mod cosmic;
 mod mission_design;
+mod monte_carlo;
 mod orbit_determination;
 
 impl From<NyxError> for PyErr {
@@ -48,6 +49,7 @@ fn _nyx_space(py: Python, m: &PyModule) -> PyResult<()> {
     orbit_determination::register_od(py, m)?;
     mission_design::register_md(py, m)?;
     cosmic::register_cosmic(py, m)?;
+    monte_carlo::register_mc(py, m)?;
 
     Ok(())
 }

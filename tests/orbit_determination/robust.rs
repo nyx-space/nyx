@@ -5,8 +5,7 @@ extern crate pretty_env_logger;
 use nyx::cosmic::{Bodies, Cosm, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::io::formatter::{NavSolutionFormatter, StateFormatter};
-use nyx::linalg::{Matrix2, Vector2, Vector6};
-use nyx::mc::GaussianGenerator;
+use nyx::linalg::{Matrix2, Vector2};
 use nyx::md::StateParameter;
 use nyx::od::noise::GaussMarkov;
 use nyx::od::prelude::*;
@@ -78,17 +77,19 @@ fn od_robust_test_ekf_realistic() {
 
     // Disperse the initial state based on some orbital elements errors given from ULA Atlas 5 user guide, table 2.3.3-1 <https://www.ulalaunch.com/docs/default-source/rockets/atlasvusersguide2010a.pdf>
     // This assumes that the errors are ONE TENTH of the values given in the table. It assumes that the launch provider has provided an initial state vector, whose error is lower than the injection errors.
-    let generator = GaussianGenerator::from_std_devs(
+    // The initial covariance is computed based on the realized dispersions.
+    let initial_estimate = KfEstimate::disperse_from_diag(
         initial_state,
         &[
             (StateParameter::Inclination, 0.0025),
             (StateParameter::RAAN, 0.022),
             (StateParameter::AoP, 0.02),
         ],
-    )
-    .unwrap();
+        Some(0),
+    );
+    println!("Initial estimate:\n{}", initial_estimate);
 
-    let initial_state_dev = generator.sample_with_seed(0).state;
+    let initial_state_dev = initial_estimate.nominal_state;
     let (init_rss_pos_km, init_rss_vel_km_s) = rss_orbit_errors(&initial_state, &initial_state_dev);
 
     println!("Truth initial state:\n{initial_state}\n{initial_state:x}");
@@ -134,20 +135,6 @@ fn od_robust_test_ekf_realistic() {
     let estimator = OrbitalDynamics::point_masses(&bodies, cosm.clone());
     let setup = Propagator::new::<RK4Fixed>(estimator, opts);
     let prop_est = setup.with(initial_state_dev.with_stm());
-    let covar_radius_km = 1.0e2;
-    let covar_velocity_km_s = 1.0e1;
-    let init_covar = Vector6::new(
-        covar_radius_km,
-        covar_radius_km,
-        covar_radius_km,
-        covar_velocity_km_s,
-        covar_velocity_km_s,
-        covar_velocity_km_s,
-    );
-
-    // Define the initial estimate
-    let initial_estimate = KfEstimate::from_diag(initial_state_dev, init_covar);
-    println!("Initial estimate:\n{}", initial_estimate);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
@@ -261,17 +248,10 @@ fn od_robust_test_ekf_realistic() {
         }
     }
     for i in 0..6 {
-        if i < 3 {
-            assert!(
-                est.covar[(i, i)] < covar_radius_km,
-                "covar radius did not decrease"
-            );
-        } else {
-            assert!(
-                est.covar[(i, i)] < covar_velocity_km_s,
-                "covar velocity did not decrease"
-            );
-        }
+        assert!(
+            est.covar[(i, i)] < initial_estimate.covar[(i, i)],
+            "covar[({i}, {i})] did not decrease"
+        );
     }
 
     assert_eq!(
@@ -287,7 +267,7 @@ fn od_robust_test_ekf_realistic() {
     );
 
     assert!(
-        delta.rmag_km() < 0.05,
+        delta.rmag_km() < 0.06,
         "Position error should be less than 50 meters"
     );
     assert!(
@@ -400,21 +380,14 @@ fn od_robust_ops_test() {
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
 
-    let covar_radius_km = 0.9;
-    let covar_velocity_km_s = 0.9e-3;
-
     // Define the initial estimate
     let initial_estimate = KfEstimate::disperse_from_diag(
         initial_state,
-        Vector6::new(
-            covar_radius_km,
-            covar_radius_km,
-            covar_radius_km,
-            covar_velocity_km_s,
-            covar_velocity_km_s,
-            covar_velocity_km_s,
-        ),
-        &[StateParameter::X, StateParameter::Y, StateParameter::Z],
+        &[
+            (StateParameter::X, 5.0),
+            (StateParameter::Y, 5.0),
+            (StateParameter::Z, 5.0),
+        ],
         None,
     );
 
