@@ -174,7 +174,7 @@ where
         Self {
             nominal_state,
             state_deviation: OVector::<f64, <T as State>::Size>::zeros(),
-            covar: covar.clone(),
+            covar,
             covar_bar: covar,
             predicted: true,
             stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity(),
@@ -189,7 +189,7 @@ where
         Self {
             nominal_state,
             state_deviation: OVector::<f64, <T as State>::Size>::zeros(),
-            covar: covar.clone(),
+            covar,
             covar_bar: covar,
             predicted: true,
             stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity(),
@@ -238,7 +238,7 @@ impl KfEstimate<Orbit> {
         Self {
             nominal_state: dispersed_state.state,
             state_deviation: OVector::<f64, U6>::zeros(),
-            covar: covar.clone(),
+            covar,
             covar_bar: covar,
             predicted: true,
             stm: OMatrix::<f64, U6, U6>::identity(),
@@ -276,15 +276,15 @@ where
     }
 
     fn state_deviation(&self) -> OVector<f64, <T as State>::Size> {
-        self.state_deviation.clone()
+        self.state_deviation
     }
 
     fn covar(&self) -> OMatrix<f64, <T as State>::Size, <T as State>::Size> {
-        self.covar.clone()
+        self.covar
     }
 
     fn predicted_covar(&self) -> OMatrix<f64, <T as State>::Size, <T as State>::Size> {
-        self.covar_bar.clone()
+        self.covar_bar
     }
 
     fn predicted(&self) -> bool {

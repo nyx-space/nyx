@@ -2235,7 +2235,7 @@ epoch: 2018-09-15T00:15:53.098 UTC
     .iter()
     .collect();
 
-    let orbit = Orbit::from_config(OrbitSerde::load(test_data).unwrap(), cosm.clone()).unwrap();
+    let orbit = Orbit::from_config(OrbitSerde::load(test_data).unwrap(), cosm).unwrap();
     assert_eq!(exp, orbit);
 
     let test_data: PathBuf = [

@@ -1456,7 +1456,7 @@ mod tests {
         let earth_iau = cosm.frame("IAU Earth");
         println!("{:?}\n{:?}", eme2k, earth_iau);
 
-        let dt = Epoch::from_gregorian_utc(2023, 11, 16, 06, 11, 19, 146200000);
+        let dt = Epoch::from_gregorian_utc(2023, 11, 16, 6, 11, 19, 146200000);
 
         // Case 1: Initialize from EME2000
         let state_eme2k = Orbit::cartesian(
@@ -1505,7 +1505,7 @@ mod tests {
             -0.0517208410530453,
             0.9259079323890239,
             0.3741917360656812,
-            -0.9986038252635100,
+            -0.998_603_825_263_51,
             -0.0439204209304354,
             -0.0293495620815480,
             -0.0107403337867543,

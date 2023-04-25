@@ -136,7 +136,7 @@ fn od_val_sc_mb_srp_reals_duals_models() {
         .unwrap();
 
     // Simulate tracking data
-    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
     arc_sim.disallow_overlap(); // Prevent overlapping measurements
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();

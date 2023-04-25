@@ -56,9 +56,9 @@ fn devices() -> Vec<GroundStation> {
     .iter()
     .collect();
 
-    let devices = GroundStation::load_many(ground_station_file).unwrap();
+    
 
-    devices
+    GroundStation::load_many(ground_station_file).unwrap()
 }
 
 #[rstest]
@@ -104,7 +104,7 @@ fn trk_simple(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
     // Build the tracking arc simulation to generate a "standard measurement".
     let mut trk = TrackingArcSim::<Orbit, StdMeasurement, _>::with_seed(
         devices,
-        traj.clone(),
+        traj,
         configs,
         12345,
     )
@@ -296,7 +296,7 @@ fn trkconfig_delayed_start(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
     // Build the configs map with a single ground station
     let mut configs = HashMap::new();
 
-    configs.insert(devices[0].name.clone(), trkcfg.clone());
+    configs.insert(devices[0].name.clone(), trkcfg);
 
     // Check that if if a device does not have an associated trkconfig, the tracking arc cannot be created.
     assert!(TrackingArcSim::<Orbit, StdMeasurement, _>::new(

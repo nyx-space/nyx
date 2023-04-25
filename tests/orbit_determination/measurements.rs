@@ -42,7 +42,7 @@ fn nil_measurement() {
         .unwrap();
 
     assert!(station
-        .measure(epoch, &traj, None, cosm.clone())
+        .measure(epoch, &traj, None, cosm)
         .unwrap()
         .is_none());
 }

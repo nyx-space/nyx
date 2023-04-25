@@ -712,7 +712,7 @@ drag:
     cd: 2.2
     "#;
 
-    let deser_sc: Spacecraft = serde_yaml::from_str(&s).unwrap();
+    let deser_sc: Spacecraft = serde_yaml::from_str(s).unwrap();
     assert_eq!(sc, deser_sc);
 
     // Check that we can specify a thruster info entirely.
@@ -744,7 +744,7 @@ thruster:
         isp_s: 300.5,
         thrust_N: 1e-5,
     });
-    let deser_sc: Spacecraft = serde_yaml::from_str(&s).unwrap();
+    let deser_sc: Spacecraft = serde_yaml::from_str(s).unwrap();
     assert_eq!(sc_thruster, deser_sc);
 
     // Tests the minimum definition which will set all of the defaults too
@@ -762,7 +762,7 @@ dry_mass_kg: 500.0
 fuel_mass_kg: 159.0
 "#;
 
-    let deser_sc: Spacecraft = serde_yaml::from_str(&s).unwrap();
+    let deser_sc: Spacecraft = serde_yaml::from_str(s).unwrap();
 
     let sc = Spacecraft::new(orbit, 500.0, 159.0, 0.0, 0.0, 1.8, 2.2);
     assert_eq!(sc, deser_sc);

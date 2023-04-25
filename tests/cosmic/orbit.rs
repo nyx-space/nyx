@@ -311,7 +311,7 @@ fn state_def_equatorial() {
     f64_eq!(cart.inc_deg(), 0.005000000478594339, "inc");
     f64_eq!(cart.raan_deg(), 360.0, "raan");
     f64_eq!(cart.aop_deg(), 177.9999736473912, "aop");
-    f64_eq!(cart.ta_deg(), 2.650826247094554e-05, "ta");
+    f64_eq!(cart.ta_deg(), 2.650_826_247_094_554e-5, "ta");
 }
 
 #[test]

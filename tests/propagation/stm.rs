@@ -216,7 +216,7 @@ fn stm_hifi_variable_step() {
 
     let prop = Propagator::default_dp78(OrbitalDynamics::point_masses(
         &[Bodies::Luna, Bodies::Sun],
-        cosm.clone(),
+        cosm,
     ));
 
     let eccs = vec![1e-5, 0.2];
@@ -316,7 +316,7 @@ fn orbit_set_unset() {
 
     let prop = Propagator::default_dp78(OrbitalDynamics::point_masses(
         &[Bodies::Luna, Bodies::Sun],
-        cosm.clone(),
+        cosm,
     ));
 
     let orbit = prop.with(init).for_duration(2 * Unit::Hour).unwrap();
@@ -371,7 +371,7 @@ fn sc_and_orbit_stm_chk() {
 
     let prop_sc = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
         &[Bodies::Luna, Bodies::Sun],
-        cosm.clone(),
+        cosm,
     )));
 
     let final_orbit = prop_orbit

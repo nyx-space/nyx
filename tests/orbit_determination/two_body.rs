@@ -131,7 +131,7 @@ fn od_tb_val_ekf_fixed_step_perfect_stations() {
         prop_est,
         kf,
         EkfTrigger::new(ekf_num_meas, ekf_disable_time),
-        cosm.clone(),
+        cosm,
     );
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
@@ -257,7 +257,7 @@ fn od_tb_val_with_arc() {
     let configs: HashMap<String, TrkConfig> = TrkConfig::load_named(trkconfig_yaml).unwrap();
 
     // Simulate tracking data of range and range rate
-    let mut arc_sim = TrackingArcSim::with_seed(all_stations.clone(), traj, configs, 1).unwrap();
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 1).unwrap();
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
@@ -300,7 +300,7 @@ fn od_tb_val_with_arc() {
         prop_est,
         kf,
         EkfTrigger::new(ekf_num_meas, ekf_disable_time),
-        cosm.clone(),
+        cosm,
     );
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
@@ -708,7 +708,7 @@ fn od_tb_ckf_fixed_step_iteration_test() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
+    let mut odp = ODProcess::ckf(prop_est, ckf, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -877,7 +877,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
 
     let ckf = KF::new(initial_estimate, process_noise, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
+    let mut odp = ODProcess::ckf(prop_est, ckf, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -912,7 +912,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
             );
         }
 
-        wtr.serialize(est.clone())
+        wtr.serialize(*est)
             .expect("could not write to stdout");
     }
 
@@ -981,7 +981,7 @@ fn od_tb_ckf_map_covar() {
         nalgebra::Const<3>,
         Orbit,
         KF<Orbit, nalgebra::Const<3>, nalgebra::Const<2>>,
-    > = ODProcess::ckf(prop_est, ckf, cosm.clone());
+    > = ODProcess::ckf(prop_est, ckf, cosm);
 
     odp.map_covar(dt + prop_time).unwrap();
 
@@ -1110,7 +1110,7 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
+    let mut odp = ODProcess::ckf(prop_est, ckf, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
     let mut wtr = csv::Writer::from_path("./estimation.csv").unwrap();
@@ -1134,7 +1134,7 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect() {
             est.state_deviation().norm()
         );
 
-        wtr.serialize(est.clone())
+        wtr.serialize(*est)
             .expect("could not write to stdout");
     }
 
@@ -1264,7 +1264,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
         measurement_noise,
     );
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
+    let mut odp = ODProcess::ckf(prop_est, ckf, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -1290,7 +1290,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
             );
         }
 
-        wtr.serialize(est.clone())
+        wtr.serialize(*est)
             .expect("could not write to stdout");
     }
 

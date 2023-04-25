@@ -95,7 +95,9 @@ fn od_robust_test_ekf_realistic() {
     println!("Truth initial state:\n{initial_state}\n{initial_state:x}");
     println!("Filter initial state:\n{initial_state_dev}\n{initial_state_dev:x}");
     println!(
-        "Initial state dev:\t{init_rss_pos_km:.3} km\t{init_rss_vel_km_s:.3} km/s\n{}",
+        "Initial state dev:\t{:.3} km\t{:.3} km/s\n{}",
+        init_rss_pos_km * 1e3,
+        init_rss_vel_km_s * 1e3,
         initial_state - initial_state_dev
     );
 
@@ -161,7 +163,9 @@ fn od_robust_test_ekf_realistic() {
         rss_orbit_errors(&initial_state, &odp.estimates[0].state());
 
     println!(
-        "Initial state error after smoothing:\t{sm_rss_pos_km:.3} km\t{sm_rss_vel_km_s:.3} km/s\n{}",
+        "Initial state error after smoothing:\t{:.3} m\t{:.3} m/s\n{}",
+        sm_rss_pos_km * 1e3,
+        sm_rss_vel_km_s * 1e3,
         initial_state - odp.estimates[0].state()
     );
 
@@ -422,7 +426,7 @@ fn od_robust_ops_test() {
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
     // Clone the initial estimate
-    let pre_smooth_first_est = odp.estimates[0].clone();
+    let pre_smooth_first_est = odp.estimates[0];
     // Output the pre-iteration estimates
     let fmtr = NavSolutionFormatter::default(
         "data/robust_test_ckf_pre_iteration.csv".to_string(),
@@ -456,10 +460,8 @@ fn od_robust_ops_test() {
     odp.iterate_arc::<GroundStation>(&arc, IterationConf::default())
         .unwrap();
 
-    let fmtr = NavSolutionFormatter::default(
-        "data/robust_test_post_iteration.csv".to_string(),
-        cosm.clone(),
-    );
+    let fmtr =
+        NavSolutionFormatter::default("data/robust_test_post_iteration.csv".to_string(), cosm);
     let mut wtr = csv::Writer::from_path(fmtr.filename.clone()).expect("could not create file");
     wtr.serialize(&fmtr.headers)
         .expect("could not write headers");
@@ -469,7 +471,7 @@ fn od_robust_ops_test() {
             .expect("could not format state");
     }
 
-    let post_smooth_first_est = odp.estimates[0].clone();
+    let post_smooth_first_est = odp.estimates[0];
 
     let (init_pos_rss, init_vel_rss) = initial_state.rss(&initial_state_dev);
     let (zero_it_pos_rss, zero_it_vel_rss) = initial_state.rss(&pre_smooth_first_est.state());

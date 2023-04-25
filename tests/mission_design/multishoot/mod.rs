@@ -13,7 +13,7 @@ fn alt_orbit_raising() {
     let iau_earth = cosm.frame("IAU_Earth");
 
     /* Define the parking orbit */
-    let epoch = Epoch::from_gregorian_utc_at_noon(2022, 03, 04);
+    let epoch = Epoch::from_gregorian_utc_at_noon(2022, 3, 4);
     let start = Orbit::keplerian_altitude(300.0, 0.01, 30.0, 90.0, 90.0, 60.0, epoch, eme2k);
 
     /* Build the spacecraft -- really only the mass is needed here */
@@ -177,7 +177,7 @@ fn vmag_orbit_raising() {
     let iau_earth = cosm.frame("IAU_Earth");
 
     /* Define the parking orbit */
-    let epoch = Epoch::from_gregorian_utc_at_noon(2022, 03, 04);
+    let epoch = Epoch::from_gregorian_utc_at_noon(2022, 3, 4);
     let start = Orbit::keplerian_altitude(300.0, 0.01, 30.0, 90.0, 90.0, 60.0, epoch, eme2k);
 
     /* Build the spacecraft -- really only the mass is needed here */

@@ -109,7 +109,7 @@ fn od_val_multi_body_ckf_perfect_stations() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
+    let mut odp = ODProcess::ckf(prop_est, ckf, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -137,7 +137,7 @@ fn od_val_multi_body_ckf_perfect_stations() {
         );
 
         if !printed {
-            wtr.serialize(est.clone())
+            wtr.serialize(*est)
                 .expect("could not write to stdout");
             printed = true;
         }
@@ -245,7 +245,7 @@ fn multi_body_ckf_covar_map() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
+    let mut odp = ODProcess::ckf(prop_est, ckf, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -285,7 +285,7 @@ fn multi_body_ckf_covar_map() {
     let est = odp.estimates.last().unwrap();
 
     let mut wtr = csv::Writer::from_writer(io::stdout());
-    wtr.serialize(est.clone())
+    wtr.serialize(*est)
         .expect("could not write to stdout");
 
     println!("{:.2e}", est.state_deviation().norm());
