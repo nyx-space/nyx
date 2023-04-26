@@ -92,18 +92,24 @@ impl RangeDoppler {
         );
 
         // Compute the time difference.
-        let delta_t_s = (tx.1.epoch - rx.1.epoch).to_seconds();
+        let delta_t = tx.1.epoch - tx.0.epoch;
 
-        // Compute the one way range and range rate measurements without any noise.
-        let one_way_t_1 = Self::one_way(tx.0, rx.0, 0.0, 0.0, 0.0);
-        let one_way_t_2 = Self::one_way(tx.1, rx.1, 0.0, 0.0, 0.0);
+        // Compute the one way range and range rate measurements where the noise is only apply to one of the measurements.
+        let one_way_t_0 = Self::one_way(tx.0, rx.0, 0.0, 0.0, 0.0);
+        let one_way_t_1 = Self::one_way(
+            tx.1,
+            rx.1,
+            timestamp_noise_s,
+            range_noise_km,
+            doppler_noise_km_s,
+        );
 
-        let obs = (one_way_t_2.obs - one_way_t_1.obs) / delta_t_s;
+        // Compute the observation.
+        let obs = (one_way_t_1.obs - one_way_t_0.obs) / delta_t.to_seconds();
 
-        // Add the noise.
         Self {
-            epoch: tx.0.epoch + timestamp_noise_s * Unit::Second,
-            obs: Vector2::new(obs[0] + range_noise_km, obs[1] + doppler_noise_km_s),
+            epoch: one_way_t_1.epoch - delta_t * 0.5,
+            obs,
         }
     }
 }

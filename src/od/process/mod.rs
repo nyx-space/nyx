@@ -21,8 +21,8 @@ use crate::linalg::{DefaultAllocator, DimName};
 use crate::md::trajectory::{Interpolatable, Traj};
 
 pub use crate::od::estimate::*;
-pub use crate::od::kalman::*;
 pub use crate::od::ground_station::*;
+pub use crate::od::kalman::*;
 pub use crate::od::residual::*;
 pub use crate::od::snc::*;
 pub use crate::od::*;
@@ -420,6 +420,14 @@ where
 
         for (msr_cnt, (device_name, msr)) in measurements.iter().enumerate() {
             let next_msr_epoch = msr.epoch();
+
+            for val in msr.observation().iter() {
+                if !val.is_finite() {
+                    return Err(NyxError::CustomError(format!(
+                        "invalid measurement @ {next_msr_epoch} = {val}"
+                    )));
+                }
+            }
 
             // Advance the propagator
             loop {
