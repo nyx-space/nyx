@@ -59,12 +59,12 @@ Refer to the [showcase](https://nyxspace.com/showcase/).
 
 The "[maturin](https://crates.io/crates/maturin)" python package is used to build the python bindings.
 
-```
+```sh
 pip install maturin
 ```
 
 Build the python bindings using the following command.
-```
+```sh
 maturin build --cargo-extra-args="--features python"
 ```
 
@@ -72,7 +72,7 @@ This creates a wheel file in `./target/wheels/` which can be installed using `pi
 
 For development mode, the following command may be used that automatically installs the python module
 
-```
+```sh
 maturin develop --cargo-extra-args="--features python"
 ```
 
@@ -80,7 +80,7 @@ maturin develop --cargo-extra-args="--features python"
 
 This minimal example runs the scenario defined in `data/simple-scenario.toml` using the Python bindings.
 
-```
+```py
 from nyx_space import md
 from nyx_space import io
 from nyx_space import cosmic
