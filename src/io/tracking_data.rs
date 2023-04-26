@@ -102,7 +102,7 @@ impl DynamicTrackingArc {
                 "Epoch:TAI (s)" => has_epoch = true,
                 "Tracking device" => has_tracking_dev = true,
                 "Range (km)" => range_avail = true,
-                "Range rate (km/s)" => rate_avail = true,
+                "Doppler (km/s)" => rate_avail = true,
                 _ => {}
             }
         }
