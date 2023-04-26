@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::msr::StdMeasurement;
+use super::msr::RangeDoppler;
 use super::noise::GaussMarkov;
 use super::TrackingDeviceSim;
 use crate::cosmic::{Cosm, Frame, Orbit};
@@ -208,7 +208,7 @@ impl Configurable for GroundStation {
     }
 }
 
-impl TrackingDeviceSim<Orbit, StdMeasurement> for GroundStation {
+impl TrackingDeviceSim<Orbit, RangeDoppler> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
     ///
     /// WARNING: For StdMeasurement, we just call the instantaneous measurement function.
@@ -218,7 +218,7 @@ impl TrackingDeviceSim<Orbit, StdMeasurement> for GroundStation {
         traj: &Traj<Orbit>,
         rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
-    ) -> Result<Option<StdMeasurement>, NyxError> {
+    ) -> Result<Option<RangeDoppler>, NyxError> {
         self.measure_instantaneous(traj.at(epoch)?, rng, cosm)
     }
 
@@ -235,23 +235,23 @@ impl TrackingDeviceSim<Orbit, StdMeasurement> for GroundStation {
         rx: Orbit,
         rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
-    ) -> Result<Option<StdMeasurement>, NyxError> {
+    ) -> Result<Option<RangeDoppler>, NyxError> {
         let (elevation, rx, tx) = self.elevation_of(rx, &cosm);
 
-        let msr_epoch;
-        let range_noise;
-        let doppler_noise;
+        let timestamp_noise_s;
+        let range_noise_km;
+        let doppler_noise_km_s;
 
         match rng {
             Some(rng) => {
                 // Add the range noise, or return an error if it's not configured.
-                range_noise = self
+                range_noise_km = self
                     .range_noise_km
                     .ok_or_else(|| NyxError::CustomError("Range noise not configured".to_string()))?
                     .next_bias(rx.epoch, rng);
 
                 // Add the Doppler noise, or return an error if it's not configured.
-                doppler_noise = self
+                doppler_noise_km_s = self
                     .doppler_noise_km_s
                     .ok_or_else(|| {
                         NyxError::CustomError("Doppler noise not configured".to_string())
@@ -260,25 +260,25 @@ impl TrackingDeviceSim<Orbit, StdMeasurement> for GroundStation {
 
                 // Only add the epoch noise if it's configured, it's valid to not have any noise on the clock.
                 if let Some(mut timestamp_noise) = self.timestamp_noise_s {
-                    msr_epoch = rx.epoch + timestamp_noise.next_bias(rx.epoch, rng);
+                    timestamp_noise_s = timestamp_noise.next_bias(rx.epoch, rng);
                 } else {
-                    msr_epoch = rx.epoch;
+                    timestamp_noise_s = 0.0;
                 }
             }
             None => {
-                msr_epoch = rx.epoch;
-                range_noise = 0.0;
-                doppler_noise = 0.0;
+                timestamp_noise_s = 0.0;
+                range_noise_km = 0.0;
+                doppler_noise_km_s = 0.0;
             }
         }
 
         if elevation >= self.elevation_mask_deg {
-            Ok(Some(StdMeasurement::new(
-                msr_epoch,
+            Ok(Some(RangeDoppler::one_way(
                 tx,
                 rx,
-                range_noise,
-                doppler_noise,
+                timestamp_noise_s,
+                range_noise_km,
+                doppler_noise_km_s,
             )))
         } else {
             Ok(None)
@@ -286,7 +286,7 @@ impl TrackingDeviceSim<Orbit, StdMeasurement> for GroundStation {
     }
 }
 
-impl TrackingDeviceSim<Spacecraft, StdMeasurement> for GroundStation {
+impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
     fn measure(
         &mut self,
@@ -294,7 +294,7 @@ impl TrackingDeviceSim<Spacecraft, StdMeasurement> for GroundStation {
         traj: &Traj<Spacecraft>,
         rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
-    ) -> Result<Option<StdMeasurement>, NyxError> {
+    ) -> Result<Option<RangeDoppler>, NyxError> {
         let rx = traj.at(epoch)?;
         self.measure_instantaneous(rx, rng, cosm)
     }
@@ -312,23 +312,23 @@ impl TrackingDeviceSim<Spacecraft, StdMeasurement> for GroundStation {
         rx: Spacecraft,
         rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
-    ) -> Result<Option<StdMeasurement>, NyxError> {
+    ) -> Result<Option<RangeDoppler>, NyxError> {
         let (elevation, rx, tx) = self.elevation_of(rx.orbit, &cosm);
 
-        let msr_epoch;
-        let range_noise;
-        let doppler_noise;
+        let timestamp_noise_s;
+        let range_noise_km;
+        let doppler_noise_km_s;
 
         match rng {
             Some(rng) => {
                 // Add the range noise, or return an error if it's not configured.
-                range_noise = self
+                range_noise_km = self
                     .range_noise_km
                     .ok_or_else(|| NyxError::CustomError("Range noise not configured".to_string()))?
                     .next_bias(rx.epoch, rng);
 
                 // Add the Doppler noise, or return an error if it's not configured.
-                doppler_noise = self
+                doppler_noise_km_s = self
                     .doppler_noise_km_s
                     .ok_or_else(|| {
                         NyxError::CustomError("Doppler noise not configured".to_string())
@@ -337,27 +337,31 @@ impl TrackingDeviceSim<Spacecraft, StdMeasurement> for GroundStation {
 
                 // Only add the epoch noise if it's configured, it's valid to not have any noise on the clock.
                 if let Some(mut timestamp_noise) = self.timestamp_noise_s {
-                    msr_epoch = rx.epoch + timestamp_noise.next_bias(rx.epoch, rng);
+                    timestamp_noise_s = timestamp_noise.next_bias(rx.epoch, rng);
                 } else {
-                    msr_epoch = rx.epoch;
+                    timestamp_noise_s = 0.0;
                 }
             }
             None => {
-                msr_epoch = rx.epoch;
-                range_noise = 0.0;
-                doppler_noise = 0.0;
+                timestamp_noise_s = 0.0;
+                range_noise_km = 0.0;
+                doppler_noise_km_s = 0.0;
             }
         }
 
         if elevation >= self.elevation_mask_deg {
-            Ok(Some(StdMeasurement::new(
-                msr_epoch,
+            Ok(Some(RangeDoppler::one_way(
                 tx,
                 rx,
-                range_noise,
-                doppler_noise,
+                timestamp_noise_s,
+                range_noise_km,
+                doppler_noise_km_s,
             )))
         } else {
+            debug!(
+                "Elevation is {elevation:.3} but mask is {} -- no measurement",
+                self.elevation_mask_deg
+            );
             Ok(None)
         }
     }

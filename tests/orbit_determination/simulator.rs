@@ -2,7 +2,7 @@ use nyx_space::io::tracking_data::DynamicTrackingArc;
 use nyx_space::io::ConfigRepr;
 use nyx_space::md::trajectory::ExportCfg;
 use nyx_space::md::ui::*;
-use nyx_space::od::msr::StdMeasurement;
+use nyx_space::od::msr::RangeDoppler;
 use nyx_space::od::prelude::*;
 use nyx_space::od::simulator::arc::TrackingArcSim;
 use nyx_space::od::simulator::TrkConfig;
@@ -92,7 +92,7 @@ fn continuous_tracking() {
 
     // Build the tracking arc simulation to generate a "standard measurement".
     let mut trk =
-        TrackingArcSim::<Orbit, StdMeasurement, _>::with_seed(devices, trajectory, configs, 12345)
+        TrackingArcSim::<Orbit, RangeDoppler, _>::with_seed(devices, trajectory, configs, 12345)
             .unwrap();
 
     let arc = trk.generate_measurements(cosm).unwrap();
@@ -114,7 +114,7 @@ fn continuous_tracking() {
     // Now read this file back in.
     let dyn_arc = DynamicTrackingArc::from_parquet(output_fn).unwrap();
     // And convert to the same tracking arc as earlier
-    let arc_concrete = dyn_arc.to_tracking_arc::<StdMeasurement>().unwrap();
+    let arc_concrete = dyn_arc.to_tracking_arc::<RangeDoppler>().unwrap();
 
     println!("{arc_concrete}");
 

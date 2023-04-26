@@ -21,7 +21,7 @@ use std::collections::HashMap;
 use crate::cosmic::Cosm;
 use crate::io::tracking_data::DynamicTrackingArc;
 use crate::io::trajectory_data::DynamicTrajectory;
-use crate::od::msr::StdMeasurement;
+use crate::od::msr::RangeDoppler;
 use crate::od::noise::GaussMarkov;
 use crate::od::simulator::arc::TrackingArcSim;
 pub use crate::od::simulator::TrkConfig;
@@ -59,7 +59,7 @@ pub(crate) fn register_od(py: Python<'_>, parent_module: &PyModule) -> PyResult<
 #[derive(Clone)]
 #[pyclass]
 pub struct GroundTrackingArcSim {
-    inner: TrackingArcSim<Spacecraft, StdMeasurement, GroundStation>,
+    inner: TrackingArcSim<Spacecraft, RangeDoppler, GroundStation>,
 }
 
 #[pymethods]

@@ -912,8 +912,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
             );
         }
 
-        wtr.serialize(*est)
-            .expect("could not write to stdout");
+        wtr.serialize(*est).expect("could not write to stdout");
     }
 
     // Check the final estimate
@@ -976,7 +975,7 @@ fn od_tb_ckf_map_covar() {
     let mut odp: ODProcess<
         OrbitalDynamics,
         nyx::propagators::RSSCartesianStep,
-        StdMeasurement,
+        RangeDoppler,
         CkfTrigger,
         nalgebra::Const<3>,
         Orbit,
@@ -1134,8 +1133,7 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect() {
             est.state_deviation().norm()
         );
 
-        wtr.serialize(*est)
-            .expect("could not write to stdout");
+        wtr.serialize(*est).expect("could not write to stdout");
     }
 
     // Check the final estimate
@@ -1290,8 +1288,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
             );
         }
 
-        wtr.serialize(*est)
-            .expect("could not write to stdout");
+        wtr.serialize(*est).expect("could not write to stdout");
     }
 
     // Check the final estimate

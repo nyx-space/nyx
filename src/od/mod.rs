@@ -30,7 +30,8 @@ use crate::io::{CovarFormat, EpochFormat};
 pub mod kalman;
 
 /// Provides a range and range rate measuring models.
-pub mod measurement;
+mod ground_station;
+pub use ground_station::GroundStation;
 
 /// Provides Estimate handling functionalities.
 pub mod estimate;
@@ -58,8 +59,8 @@ pub mod snc;
 
 pub mod prelude {
     pub use super::estimate::*;
+    pub use super::ground_station::*;
     pub use super::kalman::*;
-    pub use super::measurement::*;
     pub use super::msr::*;
     pub use super::process::*;
     pub use super::residual::*;

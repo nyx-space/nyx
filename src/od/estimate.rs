@@ -16,17 +16,14 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::msr::StdMeasurement;
-use super::{CovarFormat, EpochFormat, Measurement};
-use super::{EstimateFrom, State};
+use super::State;
+use super::{CovarFormat, EpochFormat};
 use crate::cosmic::Orbit;
 use crate::hifitime::Epoch;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, Matrix, OMatrix, OVector, Vector6, U6};
 use crate::mc::GaussianGenerator;
 use crate::md::StateParameter;
-use crate::Spacecraft;
-use nalgebra::Matrix2x6;
 use rand::SeedableRng;
 use rand_distr::Distribution;
 use rand_pcg::Pcg64Mcg;
@@ -430,71 +427,6 @@ impl NavSolution<Orbit> for KfEstimate<Orbit> {
     }
     fn expected_state(&self) -> Orbit {
         self.nominal_state()
-    }
-}
-
-impl EstimateFrom<Spacecraft, StdMeasurement> for Orbit {
-    fn extract(from: Spacecraft) -> Self {
-        from.orbit
-    }
-
-    fn sensitivity(
-        msr: &StdMeasurement,
-        receiver: Self,
-        transmitter: Self,
-    ) -> OMatrix<f64, <StdMeasurement as Measurement>::MeasurementSize, Self::Size>
-    where
-        DefaultAllocator:
-            Allocator<f64, <StdMeasurement as Measurement>::MeasurementSize, Self::Size>,
-    {
-        <Orbit as EstimateFrom<Orbit, StdMeasurement>>::sensitivity(msr, receiver, transmitter)
-    }
-}
-
-impl EstimateFrom<Orbit, StdMeasurement> for Orbit {
-    fn extract(from: Orbit) -> Self {
-        from
-    }
-
-    fn sensitivity(
-        msr: &StdMeasurement,
-        receiver: Self,
-        transmitter: Self,
-    ) -> OMatrix<f64, <StdMeasurement as Measurement>::MeasurementSize, Self::Size>
-    where
-        DefaultAllocator:
-            Allocator<f64, <StdMeasurement as Measurement>::MeasurementSize, Self::Size>,
-    {
-        let delta_r = receiver.radius() - transmitter.radius();
-        let delta_v = receiver.velocity() - transmitter.velocity();
-        let ρ = msr.observation()[0];
-        let ρ_dot = msr.observation()[1];
-        let m11 = delta_r.x / ρ;
-        let m12 = delta_r.y / ρ;
-        let m13 = delta_r.z / ρ;
-        let m21 = delta_v.x / ρ - ρ_dot * delta_r.x / ρ.powi(2);
-        let m22 = delta_v.y / ρ - ρ_dot * delta_r.y / ρ.powi(2);
-        let m23 = delta_v.z / ρ - ρ_dot * delta_r.z / ρ.powi(2);
-
-        Matrix2x6::new(m11, m12, m13, 0.0, 0.0, 0.0, m21, m22, m23, m11, m12, m13)
-    }
-}
-
-impl EstimateFrom<Spacecraft, StdMeasurement> for Spacecraft {
-    fn extract(from: Spacecraft) -> Self {
-        from
-    }
-
-    fn sensitivity(
-        _msr: &StdMeasurement,
-        _receiver: Self,
-        _transmitter: Orbit,
-    ) -> OMatrix<f64, <StdMeasurement as Measurement>::MeasurementSize, Self::Size>
-    where
-        DefaultAllocator:
-            Allocator<f64, <StdMeasurement as Measurement>::MeasurementSize, Self::Size>,
-    {
-        todo!()
     }
 }
 

@@ -16,19 +16,18 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use crate::cosmic::Orbit;
+use crate::linalg::allocator::Allocator;
+use crate::linalg::{DefaultAllocator, OMatrix, OVector, Vector2, U2};
+use crate::od::msr::RangeMsr;
+use crate::od::{EstimateFrom, Measurement};
+use crate::{Spacecraft, TimeTagged};
+use arrow::datatypes::{DataType, Field};
+use hifitime::{Epoch, Unit};
+use nalgebra::Matrix2x6;
 use std::collections::HashMap;
 
-use hifitime::{Epoch, Unit};
-
-use crate::cosmic::Orbit;
-use crate::linalg::{OVector, Vector2, U2};
-use crate::od::msr::RangeMsr;
-use crate::od::Measurement;
-use crate::TimeTagged;
-use arrow::datatypes::{DataType, Field};
-
-/// A simultaneous range and Doppler measurement in units of km and km/s.
-/// This is a two-way measurement only.
+/// A simultaneous range and Doppler measurement in units of km and km/s, available both in one way and two way measurement.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RangeDoppler {
     /// Epoch of the observation
@@ -36,10 +35,6 @@ pub struct RangeDoppler {
     /// Observation vector in km and km/s
     pub obs: Vector2<f64>,
 }
-
-// TODO: Init using the state vectors of both the transmitter and receiver at two different epochs. If epochs are identical, treat it as an instantaneous measurement.
-// Also allow for an initialization that only has one epoch for instantaneous measurements.
-// The sensitivity should be computed on request only and using the nominal receiver state.
 
 impl RangeDoppler {
     /// Initialize a new one-way range and Doppler measurement from the provided states and the effective noises.
@@ -50,7 +45,7 @@ impl RangeDoppler {
     pub fn one_way(
         tx: Orbit,
         rx: Orbit,
-        clock_noise_s: f64,
+        timestamp_noise_s: f64,
         range_noise_km: f64,
         doppler_noise_km_s: f64,
     ) -> Self {
@@ -61,7 +56,7 @@ impl RangeDoppler {
         let doppler_km_s = range_vec_km.dot(&(tx.velocity() - rx.velocity())) / range_vec_km.norm();
 
         Self {
-            epoch: tx.epoch + clock_noise_s * Unit::Second,
+            epoch: tx.epoch + timestamp_noise_s * Unit::Second,
             obs: Vector2::new(
                 range_vec_km.norm() + range_noise_km,
                 doppler_km_s + doppler_noise_km_s,
@@ -78,7 +73,7 @@ impl RangeDoppler {
     pub fn two_way(
         tx: (Orbit, Orbit),
         rx: (Orbit, Orbit),
-        clock_noise_s: f64,
+        timestamp_noise_s: f64,
         range_noise_km: f64,
         doppler_noise_km_s: f64,
     ) -> Self {
@@ -107,7 +102,7 @@ impl RangeDoppler {
 
         // Add the noise.
         Self {
-            epoch: tx.0.epoch + clock_noise_s * Unit::Second,
+            epoch: tx.0.epoch + timestamp_noise_s * Unit::Second,
             obs: Vector2::new(obs[0] + range_noise_km, obs[1] + doppler_noise_km_s),
         }
     }
@@ -145,5 +140,70 @@ impl Measurement for RangeDoppler {
 
     fn from_observation(epoch: Epoch, obs: OVector<f64, Self::MeasurementSize>) -> Self {
         Self { epoch, obs }
+    }
+}
+
+impl EstimateFrom<Spacecraft, RangeDoppler> for Orbit {
+    fn extract(from: Spacecraft) -> Self {
+        from.orbit
+    }
+
+    fn sensitivity(
+        msr: &RangeDoppler,
+        receiver: Self,
+        transmitter: Self,
+    ) -> OMatrix<f64, <RangeDoppler as Measurement>::MeasurementSize, Self::Size>
+    where
+        DefaultAllocator:
+            Allocator<f64, <RangeDoppler as Measurement>::MeasurementSize, Self::Size>,
+    {
+        <Orbit as EstimateFrom<Orbit, RangeDoppler>>::sensitivity(msr, receiver, transmitter)
+    }
+}
+
+impl EstimateFrom<Orbit, RangeDoppler> for Orbit {
+    fn extract(from: Orbit) -> Self {
+        from
+    }
+
+    fn sensitivity(
+        msr: &RangeDoppler,
+        receiver: Self,
+        transmitter: Self,
+    ) -> OMatrix<f64, <RangeDoppler as Measurement>::MeasurementSize, Self::Size>
+    where
+        DefaultAllocator:
+            Allocator<f64, <RangeDoppler as Measurement>::MeasurementSize, Self::Size>,
+    {
+        let delta_r = receiver.radius() - transmitter.radius();
+        let delta_v = receiver.velocity() - transmitter.velocity();
+        let ρ = msr.observation()[0];
+        let ρ_dot = msr.observation()[1];
+        let m11 = delta_r.x / ρ;
+        let m12 = delta_r.y / ρ;
+        let m13 = delta_r.z / ρ;
+        let m21 = delta_v.x / ρ - ρ_dot * delta_r.x / ρ.powi(2);
+        let m22 = delta_v.y / ρ - ρ_dot * delta_r.y / ρ.powi(2);
+        let m23 = delta_v.z / ρ - ρ_dot * delta_r.z / ρ.powi(2);
+
+        Matrix2x6::new(m11, m12, m13, 0.0, 0.0, 0.0, m21, m22, m23, m11, m12, m13)
+    }
+}
+
+impl EstimateFrom<Spacecraft, RangeDoppler> for Spacecraft {
+    fn extract(from: Spacecraft) -> Self {
+        from
+    }
+
+    fn sensitivity(
+        _msr: &RangeDoppler,
+        _receiver: Self,
+        _transmitter: Orbit,
+    ) -> OMatrix<f64, <RangeDoppler as Measurement>::MeasurementSize, Self::Size>
+    where
+        DefaultAllocator:
+            Allocator<f64, <RangeDoppler as Measurement>::MeasurementSize, Self::Size>,
+    {
+        todo!("cannot yet estimate a full spacecraft state")
     }
 }

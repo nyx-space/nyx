@@ -265,9 +265,9 @@ fn od_robust_test_ekf_realistic() {
     );
     let delta = est.state() - final_truth_state;
     println!(
-        "RMAG error = {:.2e} m\tVMAG error = {:.3e} mm/s",
+        "RMAG error = {:.6} m\tVMAG error = {:.6} m/s",
         delta.rmag_km() * 1e3,
-        delta.vmag_km_s() * 1e6
+        delta.vmag_km_s() * 1e3
     );
 
     assert!(
