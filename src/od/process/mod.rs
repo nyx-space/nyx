@@ -36,6 +36,7 @@ pub use conf::{IterationConf, SmoothingArc};
 mod trigger;
 pub use trigger::{CkfTrigger, EkfTrigger, KfTrigger};
 
+use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::Add;
 
@@ -392,13 +393,33 @@ where
         let mut devices = arc.rebuild_devices::<S, Dev>(self.cosm.clone()).unwrap();
 
         let measurements = &arc.measurements;
+        let step_size = arc.min_duration_sep().unwrap();
+
+        self.process(measurements, &mut devices, step_size)
+    }
+
+    /// Process the provided measurements for this orbit determination process given the associated devices.
+    ///
+    /// # Argument details
+    /// + The measurements must be a list mapping the name of the measurement device to the measurement itself.
+    /// + The name of all measurement devices must be present in the provided devices, i.e. the key set of `devices` must be a superset of the measurement device names present in the list.
+    #[allow(clippy::erasing_op)]
+    pub fn process<Dev>(
+        &mut self,
+        measurements: &[(String, Msr)],
+        devices: &mut HashMap<String, Dev>,
+        step_size: Duration,
+    ) -> Result<(), NyxError>
+    where
+        Dev: TrackingDeviceSim<S, Msr>,
+    {
         assert!(
             measurements.len() >= 2,
             "must have at least two measurements"
         );
         // Start by propagating the estimator (on the same thread).
         let num_msrs = measurements.len();
-        let step_size = arc.min_duration_sep().unwrap();
+
         // Update the step size of the navigation propagator if it isn't already fixed step
         if !self.prop.fixed_step {
             self.prop.set_step(step_size, false);
