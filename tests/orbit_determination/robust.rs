@@ -142,7 +142,7 @@ fn od_robust_test_ekf_realistic_one_way() {
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
 
     // Define the process noise to assume an unmodeled acceleration of 1e-3 km^2/s^2 on X, Y and Z in the ECI frame
-    let sigma_q = 1e-8_f64.powi(2);
+    let sigma_q = 5e-10_f64.powi(2);
     let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
 
     let kf = KF::new(initial_estimate, process_noise, measurement_noise);
@@ -180,7 +180,13 @@ fn od_robust_test_ekf_realistic_one_way() {
     let mut err_wtr = csv::Writer::from_path("robustness_test_traj_err.csv").unwrap();
     err_wtr
         .serialize(vec![
-            "epoch", "x_err", "y_err", "z_err", "vx_err", "vy_err", "vz_err",
+            "epoch",
+            "x_err_km",
+            "y_err_km",
+            "z_err_km",
+            "vx_err_km_s",
+            "vy_err_km_s",
+            "vz_err_km_s",
         ])
         .expect("could not write to output file");
 
@@ -291,7 +297,7 @@ fn od_robust_test_ekf_realistic_two_way() {
 
     let iau_earth = cosm.frame("IAU Earth");
     // Define the ground stations.
-    let ekf_num_meas = 3000;
+    let ekf_num_meas = 300;
     // Set the disable time to be very low to test enable/disable sequence
     let ekf_disable_time = 3 * Unit::Minute;
     let elevation_mask = 0.0;
@@ -344,7 +350,7 @@ fn od_robust_test_ekf_realistic_two_way() {
     );
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
-    let all_stations = vec![dss65_madrid, dss34_canberra];
+    let devices = vec![dss65_madrid, dss34_canberra];
 
     // Disperse the initial state based on some orbital elements errors given from ULA Atlas 5 user guide, table 2.3.3-1 <https://www.ulalaunch.com/docs/default-source/rockets/atlasvusersguide2010a.pdf>
     // This assumes that the errors are ONE TENTH of the values given in the table. It assumes that the launch provider has provided an initial state vector, whose error is lower than the injection errors.
@@ -386,7 +392,7 @@ fn od_robust_test_ekf_realistic_two_way() {
         .unwrap();
 
     // Simulate tracking data
-    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
+    let mut arc_sim = TrackingArcSim::with_seed(devices.clone(), traj.clone(), configs, 0).unwrap();
     arc_sim.disallow_overlap(); // Prevent overlapping measurements
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
@@ -415,7 +421,7 @@ fn od_robust_test_ekf_realistic_two_way() {
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
 
     // Define the process noise to assume an unmodeled acceleration of 1e-3 km^2/s^2 on X, Y and Z in the ECI frame
-    let sigma_q = 1e-8_f64.powi(2);
+    let sigma_q = 5e-10_f64.powi(2);
     let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
 
     let kf = KF::new(initial_estimate, process_noise, measurement_noise);
@@ -428,7 +434,22 @@ fn od_robust_test_ekf_realistic_two_way() {
     let subset = arc.filter_by_offset(..3.hours());
     let remaining = arc.filter_by_offset(3.hours()..);
 
-    odp.process_arc::<GroundStation>(&subset).unwrap();
+    // TODO: Fix the deserialization of the measurements such that they also deserialize the integration time.
+    // Without it, we're stuck having to rebuild them from scratch.
+    // https://github.com/nyx-space/nyx/issues/140
+
+    // Build the hashmap of devices from the vector using their names
+    let mut devices_map = devices
+        .into_iter()
+        .map(|dev| (dev.name.clone(), dev))
+        .collect::<HashMap<_, _>>();
+
+    odp.process(
+        &subset.measurements,
+        &mut devices_map.clone(),
+        subset.min_duration_sep().unwrap(),
+    )
+    .unwrap();
     odp.iterate_arc::<GroundStation>(&subset, IterationConf::once())
         .unwrap();
 
@@ -442,18 +463,31 @@ fn od_robust_test_ekf_realistic_two_way() {
         initial_state - odp.estimates[0].state()
     );
 
-    odp.process_arc::<GroundStation>(&remaining).unwrap();
+    // odp.process_arc::<GroundStation>(&remaining).unwrap();
+    odp.process(
+        &remaining.measurements,
+        &mut devices_map,
+        remaining.min_duration_sep().unwrap(),
+    )
+    .unwrap();
 
-    let estimate_fmtr = NavSolutionFormatter::default("robustness_test.csv".to_owned(), cosm);
+    let estimate_fmtr =
+        NavSolutionFormatter::default("robustness_test_two_way.csv".to_owned(), cosm);
 
-    let mut wtr = csv::Writer::from_path("robustness_test.csv").unwrap();
+    let mut wtr = csv::Writer::from_path("robustness_test_two_way.csv").unwrap();
     wtr.serialize(&estimate_fmtr.headers)
         .expect("could not write to output file");
 
-    let mut err_wtr = csv::Writer::from_path("robustness_test_traj_err.csv").unwrap();
+    let mut err_wtr = csv::Writer::from_path("robustness_test_traj_err_two_way.csv").unwrap();
     err_wtr
         .serialize(vec![
-            "epoch", "x_err", "y_err", "z_err", "vx_err", "vy_err", "vz_err",
+            "epoch",
+            "x_err_km",
+            "y_err_km",
+            "z_err_km",
+            "vx_err_km_s",
+            "vy_err_km_s",
+            "vz_err_km_s",
         ])
         .expect("could not write to output file");
 
@@ -477,7 +511,7 @@ fn od_robust_test_ekf_realistic_two_way() {
             .expect("could not write to CSV");
     }
 
-    let mut resid_wtr = csv::Writer::from_path("robustness_test_residuals.csv").unwrap();
+    let mut resid_wtr = csv::Writer::from_path("robustness_test_residuals_two_way.csv").unwrap();
     resid_wtr
         .serialize(vec![
             "epoch",

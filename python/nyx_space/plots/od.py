@@ -391,6 +391,7 @@ def plot_state_deviation(
     dfs,
     title,
     msr_df=None,
+    traj_err=None,
     time_col_name="Epoch:GregorianUtc",
     html_out=None,
     copyright=None,
@@ -405,6 +406,7 @@ def plot_state_deviation(
         dfs (pandas.DataFrame): The data frame containing the orbit determination solution (or list thereof)
         title (str): The title of the plot
         msr_df (pandas.DataFrame): The data frame containing the measurements
+        traj_err (pandas.DataFrame): The data frame containing the trajectory error compared to truth (or list thereof)
         time_col_name (str): The name of the time column
         html_out (str): The name of the HTML file to save the plot to
         copyright (str): The copyright to display on the plot
@@ -422,6 +424,8 @@ def plot_state_deviation(
     if vel_fig is None:
         vel_fig = go.Figure()
 
+    x_title = "" # Forward declaration, will store the last time column name
+
     for df in dfs:
 
         try:
@@ -438,6 +442,17 @@ def plot_state_deviation(
         # Build a Python datetime column
         time_col = pd.to_datetime(orig_tim_col)
         x_title = "Epoch {}".format(time_col_name[-3:])
+
+        # If there is a trajectory error, rename the state deviations with the actual trajectory errors
+        if traj_err is not None:
+            df["delta_x"] = traj_err["x_err_km"]
+            df["delta_y"] = traj_err["y_err_km"]
+            df["delta_z"] = traj_err["z_err_km"]
+
+            df["delta_vx"] = traj_err["vx_err_km_s"]
+            df["delta_vy"] = traj_err["vy_err_km_s"]
+            df["delta_vz"] = traj_err["vz_err_km_s"]
+            print("Overwrote the state deviations with the trajectory error")
 
         covar = {}
 
@@ -501,6 +516,8 @@ def plot_state_deviation(
             max(df[covar["cy_y"]][hwpt:]),
             max(df[covar["cz_z"]][hwpt:]),
         )
+
+
         pos_fig.update_layout(yaxis_range=[-1.5 * max_cov_y, 1.5 * max_cov_y])
 
         plot_with_error(
@@ -558,6 +575,9 @@ def plot_state_deviation(
         vel_fig = plot_measurements(
             msr_df, title, time_col_name, fig=vel_fig, show=False
         )
+    
+    finalize_plot(pos_fig, title, x_title, "Position deviation (km)")
+    finalize_plot(vel_fig, title, x_title, "Velocity deviation (km/s)")
 
     if html_out:
         html_out = html_out.replace(".html", "_{}.html")

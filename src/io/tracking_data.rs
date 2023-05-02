@@ -189,7 +189,7 @@ impl DynamicTrackingArc {
                         .unwrap();
 
                     let rate_data = batch
-                        .column_by_name("Range rate (km/s)")
+                        .column_by_name("Doppler (km/s)")
                         .unwrap()
                         .as_any()
                         .downcast_ref::<Float64Array>()
@@ -232,7 +232,7 @@ impl DynamicTrackingArc {
                 }
                 "RangeRate" => {
                     let rate_data = batch
-                        .column_by_name("Range rate (km/s)")
+                        .column_by_name("Doppler (km/s)")
                         .unwrap()
                         .as_any()
                         .downcast_ref::<Float64Array>()

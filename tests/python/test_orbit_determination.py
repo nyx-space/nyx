@@ -100,10 +100,11 @@ def test_filter_arc():
 
     # TODO: Add more tests
 
+
 def test_one_way_msr():
-    '''
+    """
     Test that we can perform a one-way measurement
-    '''
+    """
 
     # Base path
     root = Path(__file__).joinpath("../../../").resolve()
@@ -120,15 +121,16 @@ def test_one_way_msr():
     print(f"Loaded {devices}")
 
     # One way measurement
-    
+
     end_sc, _ = propagate(sc, dynamics["hifi"], sc.orbit.period() * 1.1)
     print(end_sc)
 
     range_km, doppler_km_s = devices[0].measure(end_sc.orbit)
 
     print(range_km, doppler_km_s)
-    assert abs(range_km - 18097.562811514355) < 0.1 
-    assert abs(doppler_km_s - -0.2498238312640348) < 0.1 
+    assert abs(range_km - 18097.562811514355) < 0.1
+    assert abs(doppler_km_s - -0.2498238312640348) < 0.1
+
 
 if __name__ == "__main__":
     test_one_way_msr()

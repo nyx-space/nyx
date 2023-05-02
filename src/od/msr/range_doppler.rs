@@ -66,6 +66,8 @@ impl RangeDoppler {
 
     /// Initialize a new two-way range and Doppler measurement from the provided states as times t_1 and t_2 and the effective noises.
     ///
+    /// The measurement is time-tagged at realization, i.e. at the end of the integration time.
+    ///
     /// # Panics
     /// + If the epochs of the two states differ.
     /// + If the frames of the two states differ.
@@ -91,26 +93,45 @@ impl RangeDoppler {
             tx.1.epoch, rx.1.epoch
         );
 
-        // Compute the time difference.
-        let delta_t = tx.1.epoch - tx.0.epoch;
+        /*
+        Claude:
 
-        // Compute the one way range and range rate measurements where the noise is only apply to one of the measurements.
-        let one_way_t_0 = Self::one_way(tx.0, rx.0, 0.0, 0.0, 0.0);
-        let one_way_t_1 = Self::one_way(
-            tx.1,
-            rx.1,
-            timestamp_noise_s,
-            range_noise_km,
-            doppler_noise_km_s,
+        There are a few reasons this two-way method determines range and range-rate using:
+
+        Rx position at t1 (reception time) AND Tx position at t0 (original transmit time)
+
+        Rather than both positions at t1:
+
+            + To properly represent the total delay between transmit and receive
+            + Because the measurement depends on and is constrained to the actual transmit position, regardless of where the transmitter is at reception time
+            + For accurate velocity determination in the correct line-of-sight direction
+            + As an approximation for the signal path over the interval given limited position information
+
+         */
+
+        let range_1_km = (rx.0.radius() - tx.0.radius()) * 0.5;
+        let range_12_km = rx.1.radius() - tx.0.radius();
+        let range_2_km = range_12_km * 0.5;
+        let range_km = range_1_km + range_2_km;
+
+        // Compute the average velocity of the receiver over the integration time.
+        let v_rx = (rx.1.velocity() + rx.0.velocity()) * 0.5;
+        let doppler_km_s = range_km.dot(&(v_rx - tx.0.velocity())) / range_km.norm();
+
+        // Time tagged at the realization of this measurement, i.e. at the end of the integration time.
+        let epoch = rx.1.epoch + timestamp_noise_s * Unit::Second;
+
+        let obs = Vector2::new(
+            range_km.norm() + range_noise_km / 2.0,
+            doppler_km_s + doppler_noise_km_s / 2.0,
         );
 
-        // Compute the observation.
-        let obs = (one_way_t_1.obs - one_way_t_0.obs) / delta_t.to_seconds();
+        debug!(
+            "two way msr @ {epoch}:\nrx.0 = {}\nrx.1 = {}{obs}",
+            rx.0, rx.1
+        );
 
-        Self {
-            epoch: one_way_t_1.epoch - delta_t * 0.5,
-            obs,
-        }
+        Self { epoch, obs }
     }
 }
 

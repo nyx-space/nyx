@@ -262,6 +262,12 @@ where
 
     /// Returns a new tracking arc that only contains measurements that fall within the given offset from the first epoch
     pub fn filter_by_offset<R: RangeBounds<Duration>>(&self, bound: R) -> Self {
+        if self.measurements.is_empty() {
+            return Self {
+                device_cfg: self.device_cfg.clone(),
+                measurements: Vec::new(),
+            };
+        }
         let ref_epoch = self.measurements[0].1.epoch();
         let mut measurements = Vec::new();
         for (name, msr) in &self.measurements {

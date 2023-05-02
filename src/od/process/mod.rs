@@ -424,6 +424,7 @@ where
         if !self.prop.fixed_step {
             self.prop.set_step(step_size, false);
         }
+
         let prop_time = measurements[num_msrs - 1].1.epoch() - self.kf.previous_estimate().epoch();
         info!("Navigation propagating for a total of {prop_time} with step size {step_size}");
 
@@ -432,12 +433,8 @@ where
         let mut reported = [false; 11];
         info!("Processing {num_msrs} measurements with covariance mapping");
 
-        // In the following, we'll continuously tell the propagator to advance by a single step until the next measurement.
-        // This is effectively a clone of the "for_duration" function of the propagator.
-        // However, after every step of the propagator, we will perform a time update and reset the STM.
-        // This ensures that we have a time update every time the propagator error function says that the integration would
-        // be wrong if the step would be larger. Moreover, we will reset the STM to ensure that the state transition matrix
-        // stays linear (the error control function may verify this).
+        // We'll build a trajectory of the estimated states. This will be used to compute the measurements.
+        let mut traj = Traj::new();
 
         for (msr_cnt, (device_name, msr)) in measurements.iter().enumerate() {
             let next_msr_epoch = msr.epoch();
@@ -462,8 +459,15 @@ where
                     self.prop.details.step
                 });
 
+                // Remove old states from the trajectory
+                traj.states.retain(|state: &S| state.epoch() <= epoch);
+
                 debug!("advancing propagator by {next_step_size} (Δt to next msr: {delta_t})");
                 let (_, traj_covar) = self.prop.for_duration_with_traj(next_step_size)?;
+
+                for state in traj_covar.states {
+                    traj.states.push(S::extract(state));
+                }
 
                 // Now that we've advanced the propagator, let's see whether we're at the time of the next measurement.
 
@@ -472,15 +476,8 @@ where
                 // Get the datetime and info needed to compute the theoretical measurement according to the model
                 epoch = nominal_state.epoch();
 
+                // Perform a measurement update
                 if nominal_state.epoch() == next_msr_epoch {
-                    // Perform a measurement update
-
-                    // First, let's build a trajectory of the states without the covariances.
-                    let mut traj = Traj::new();
-                    for state in traj_covar.states {
-                        traj.states.push(S::extract(state));
-                    }
-
                     // Get the computed observations
                     match devices.get_mut(device_name) {
                         Some(device) => {
@@ -527,6 +524,9 @@ where
                                                 self.prop.state + estimate.state_deviation();
                                         }
                                         self.prop.state.reset_stm();
+                                        // Remove the last item from the trajectory and place the postfit estimate
+                                        // traj.states.pop();
+                                        // traj.states.push(estimate.state());
                                         self.estimates.push(estimate);
                                         self.residuals.push(residual);
                                     }

@@ -65,7 +65,7 @@ pub mod prelude {
     pub use super::process::*;
     pub use super::residual::*;
     pub use super::simulator::arc::TrackingArcSim;
-    pub use super::simulator::TrkConfig;
+    pub use super::simulator::*;
     pub use super::snc::*;
     pub use super::*;
 
