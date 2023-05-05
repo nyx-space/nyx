@@ -430,10 +430,6 @@ fn od_robust_test_ekf_realistic_two_way() {
 
     let mut odp = ODProcess::ekf(prop_est, kf, trig, cosm.clone());
 
-    // Let's filter and iterate on the first four hours of data
-    let subset = arc.filter_by_offset(..3.hours());
-    let remaining = arc.filter_by_offset(3.hours()..);
-
     // TODO: Fix the deserialization of the measurements such that they also deserialize the integration time.
     // Without it, we're stuck having to rebuild them from scratch.
     // https://github.com/nyx-space/nyx/issues/140
@@ -444,30 +440,11 @@ fn od_robust_test_ekf_realistic_two_way() {
         .map(|dev| (dev.name.clone(), dev))
         .collect::<HashMap<_, _>>();
 
-    odp.process(
-        &subset.measurements,
-        &mut devices_map.clone(),
-        subset.min_duration_sep().unwrap(),
-    )
-    .unwrap();
-    odp.iterate_arc::<GroundStation>(&subset, IterationConf::once())
-        .unwrap();
-
-    let (sm_rss_pos_km, sm_rss_vel_km_s) =
-        rss_orbit_errors(&initial_state, &odp.estimates[0].state());
-
-    println!(
-        "Initial state error after smoothing:\t{:.3} m\t{:.3} m/s\n{}",
-        sm_rss_pos_km * 1e3,
-        sm_rss_vel_km_s * 1e3,
-        initial_state - odp.estimates[0].state()
-    );
-
     // odp.process_arc::<GroundStation>(&remaining).unwrap();
     odp.process(
-        &remaining.measurements,
+        &arc.measurements,
         &mut devices_map,
-        remaining.min_duration_sep().unwrap(),
+        arc.min_duration_sep().unwrap(),
     )
     .unwrap();
 

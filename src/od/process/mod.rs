@@ -240,27 +240,36 @@ where
     }
 
     /// Returns the root mean square of the prefit residuals
+    ///
+    /// # WARNING:
+    /// The units will be garbage here if rows in the measurements have different units.
     pub fn rms_prefit_residual(&self) -> f64 {
         let mut sum = 0.0;
         for residual in &self.residuals {
-            // sum += residual.prefit.dot(&residual.prefit);
-            let mut msr_noise_item_inv: OVector<f64, Msr::MeasurementSize> =
-                self.kf.measurement_noise(residual.dt).diagonal().clone();
-            for i in 0..msr_noise_item_inv.len() {
-                msr_noise_item_inv[i] = 1.0 / msr_noise_item_inv[i];
-            }
-            sum += residual.prefit.dot(&msr_noise_item_inv).powi(2);
+            sum += residual.prefit.dot(&residual.prefit);
         }
-        (sum / (self.estimates.len() as f64)).sqrt()
+        (sum / (self.residuals.len() as f64)).sqrt()
     }
 
     /// Returns the root mean square of the postfit residuals
+    ///
+    /// # WARNING:
+    /// The units will be garbage here if rows in the measurements have different units.
     pub fn rms_postfit_residual(&self) -> f64 {
         let mut sum = 0.0;
         for residual in &self.residuals {
             sum += residual.postfit.dot(&residual.postfit);
         }
-        (sum / (self.estimates.len() as f64)).sqrt()
+        (sum / (self.residuals.len() as f64)).sqrt()
+    }
+
+    /// Returns the root mean square of the prefit residual ratios
+    pub fn rms_residual_ratios(&self) -> f64 {
+        let mut sum = 0.0;
+        for residual in &self.residuals {
+            sum += residual.ratio.powi(2);
+        }
+        (sum / (self.residuals.len() as f64)).sqrt()
     }
 
     /// Allows iterating on the filter solution. Requires specifying a smoothing condition to know where to stop the smoothing.
@@ -274,12 +283,7 @@ where
     {
         let measurements = &arc.measurements;
 
-        // Compute the initial RMS
-        let mut best_rms = if config.use_prefit {
-            self.rms_prefit_residual()
-        } else {
-            self.rms_postfit_residual()
-        };
+        let mut best_rms = self.rms_residual_ratios();
         let mut previous_rms = best_rms;
         let mut divergence_cnt = 0;
         let mut iter_cnt = 0;
@@ -314,11 +318,7 @@ where
             self.process_arc::<Dev>(arc)?;
 
             // Compute the new RMS
-            let new_rms = if config.use_prefit {
-                self.rms_prefit_residual()
-            } else {
-                self.rms_postfit_residual()
-            };
+            let new_rms = self.rms_residual_ratios();
             let cur_rel_rms = (new_rms - best_rms).abs() / best_rms;
             if cur_rel_rms < config.relative_tol {
                 info!("*****************");
