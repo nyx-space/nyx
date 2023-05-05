@@ -443,7 +443,7 @@ impl Configurable for SpacecraftDynamics {
             ));
         }
 
-        // TODO: Drag
+        // TODO: Drag -- https://github.com/nyx-space/nyx/issues/86
 
         Ok(SpacecraftDynamics::from_models(orbital_dyn, force_models))
     }

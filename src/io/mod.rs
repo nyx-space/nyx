@@ -189,7 +189,7 @@ where
     D: Deserializer<'de>,
 {
     let s = String::deserialize(deserializer)?;
-    // TODO: Figure out how to use DeserializeSeed here, but I'm not sure it would work.
+    // TODO: Figure out how to use DeserializeSeed here, but I'm not sure it would work. -- https://github.com/nyx-space/nyx/issues/86
     let cosm = Cosm::de438();
     cosm.try_frame(&s).map_err(serde::de::Error::custom)
 }

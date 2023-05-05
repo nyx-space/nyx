@@ -61,7 +61,7 @@ pub enum LightTimeCalc {
     /// Accounts for light-time correction. This is corresponds to CN in SPICE.
     LightTime,
     /// Accounts for light-time and stellar aberration where the solar system barycenter is the inertial frame. Corresponds to CN+S in SPICE.
-    Abberation,
+    Aberration,
 }
 
 #[derive(Debug)]
@@ -770,7 +770,7 @@ impl Cosm {
                 let state = Orbit::cartesian(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, datetime, target_frame);
                 Ok(-self.try_frame_chg(&state, frame)?)
             }
-            LightTimeCalc::LightTime | LightTimeCalc::Abberation => {
+            LightTimeCalc::LightTime | LightTimeCalc::Aberration => {
                 // Get the geometric states as seen from SSB
                 let ssb2k = self.frame_root.frame;
 
@@ -812,7 +812,7 @@ impl Cosm {
                 state.vy_km_s = tgt.vy_km_s * (1.0 - dltdt) - obs.vy_km_s;
                 state.vz_km_s = tgt.vz_km_s * (1.0 - dltdt) - obs.vz_km_s;
 
-                if correction == LightTimeCalc::Abberation {
+                if correction == LightTimeCalc::Aberration {
                     // Get a unit vector that points in the direction of the object
                     let r_hat = state.r_hat();
                     // Get the velocity vector (of the observer) scaled with respect to the speed of light
@@ -1413,7 +1413,7 @@ mod tests {
             Bodies::EarthBarycenter.ephem_path(),
             jde,
             mars2k,
-            LightTimeCalc::Abberation,
+            LightTimeCalc::Aberration,
         );
 
         assert!(dbg!(out_state.x_km - -2.577_231_712_700_484_4e8).abs() < 1e-3);

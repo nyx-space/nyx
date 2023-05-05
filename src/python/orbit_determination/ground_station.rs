@@ -46,9 +46,7 @@ impl GroundStation {
         <Self as ConfigRepr>::load_named(path)
     }
 
-    // TODO: Once the switch to RangeDoppler is done, add this method. This requires making the other structure available to Python too
-    // and that isn't worth doing for StdMeasurement.
-    /// Perform a one-way measurement of the given orbit and the epoch stored in that orbit.
+    /// Perform a one-way measurement of the given orbit at the epoch stored in that orbit instance.
     /// Returns the range in kilometers and the Doppler measurement in kilometers per second.
     fn measure(&mut self, orbit: Orbit) -> Result<(f64, f64), NyxError> {
         match self.measure_instantaneous(orbit, None, Cosm::de438())? {

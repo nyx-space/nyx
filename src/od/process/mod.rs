@@ -524,9 +524,7 @@ where
                                                 self.prop.state + estimate.state_deviation();
                                         }
                                         self.prop.state.reset_stm();
-                                        // Remove the last item from the trajectory and place the postfit estimate
-                                        // traj.states.pop();
-                                        // traj.states.push(estimate.state());
+
                                         self.estimates.push(estimate);
                                         self.residuals.push(residual);
                                     }
