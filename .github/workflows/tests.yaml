@@ -133,7 +133,7 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         # grcov . -s . --binary-path ./target/debug/ -t html --branch --ignore-not-existing -o ./target/debug/coverage/ # Export as HTML
         run: |
-          cargo test
+          cargo test --lib
           grcov . --binary-path ./target/debug/ -t lcov -s . > lcov.txt
 
       - name: Upload coverage report
