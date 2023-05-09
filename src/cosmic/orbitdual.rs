@@ -16,7 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-
 use super::{Frame, Orbit, ECC_EPSILON};
 use crate::linalg::{Vector3, U7};
 use crate::md::StateParameter;

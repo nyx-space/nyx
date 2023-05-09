@@ -91,7 +91,6 @@ hifi:
 
     // Access the "lofi" dynamics
     let lofi_dynamics =
-        SpacecraftDynamics::from_config(dynamics_serde.remove("lofi").unwrap(), cosm)
-            .unwrap();
+        SpacecraftDynamics::from_config(dynamics_serde.remove("lofi").unwrap(), cosm).unwrap();
     println!("lofi dynamics: {}", lofi_dynamics);
 }

@@ -41,10 +41,7 @@ fn nil_measurement() {
         .for_duration_with_traj(1.seconds())
         .unwrap();
 
-    assert!(station
-        .measure(epoch, &traj, None, cosm)
-        .unwrap()
-        .is_none());
+    assert!(station.measure(epoch, &traj, None, cosm).unwrap().is_none());
 }
 
 /// Tests that the measurements generated from a topocentric frame are correct.

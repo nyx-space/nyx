@@ -16,7 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-
 use crate::errors::NyxError;
 use crate::io::formatter::StateFormatter;
 use crate::{Orbit, Spacecraft};
