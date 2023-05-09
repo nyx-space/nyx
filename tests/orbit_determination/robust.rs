@@ -141,7 +141,7 @@ fn od_robust_test_ekf_realistic_one_way() {
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
 
-    // Define the process noise to assume an unmodeled acceleration of 1e-3 km^2/s^2 on X, Y and Z in the ECI frame
+    // Define the process noise to assume an unmodeled acceleration on X, Y and Z in the ECI frame
     let sigma_q = 5e-10_f64.powi(2);
     let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
 
@@ -151,7 +151,7 @@ fn od_robust_test_ekf_realistic_one_way() {
 
     let mut odp = ODProcess::ekf(prop_est, kf, trig, cosm.clone());
 
-    // Let's filter and iterate on the first four hours of data
+    // Let's filter and iterate on the initial subset of the arc to refine the initial estimate
     let subset = arc.filter_by_offset(..3.hours());
     let remaining = arc.filter_by_offset(3.hours()..);
 
@@ -420,7 +420,7 @@ fn od_robust_test_ekf_realistic_two_way() {
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
 
-    // Define the process noise to assume an unmodeled acceleration of 1e-3 km^2/s^2 on X, Y and Z in the ECI frame
+    // Define the process noise to assume an unmodeled acceleration on X, Y and Z in the ECI frame
     let sigma_q = 5e-10_f64.powi(2);
     let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
 
@@ -440,7 +440,6 @@ fn od_robust_test_ekf_realistic_two_way() {
         .map(|dev| (dev.name.clone(), dev))
         .collect::<HashMap<_, _>>();
 
-    // odp.process_arc::<GroundStation>(&remaining).unwrap();
     odp.process(
         &arc.measurements,
         &mut devices_map,
