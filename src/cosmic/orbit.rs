@@ -16,7 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::na::{Matrix3, Matrix6, Vector3, Vector6};
 use super::Cosm;
 use super::State;
 use super::{BPlane, Frame};
@@ -24,7 +23,7 @@ use crate::io::orbit::OrbitSerde;
 use crate::io::{
     epoch_from_str, epoch_to_str, frame_from_str, frame_to_str, ConfigRepr, Configurable,
 };
-use crate::linalg::{Const, OVector};
+use crate::linalg::{Const, Matrix3, Matrix6, OVector, Vector3, Vector6};
 use crate::mc::MultivariateNormal;
 use crate::md::ui::Objective;
 use crate::md::StateParameter;

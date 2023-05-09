@@ -15,7 +15,6 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-extern crate rayon;
 
 use super::{ra_dec_from_unit_vector, GuidanceLaw};
 use crate::cosmic::{Frame, GuidanceMode, Spacecraft};

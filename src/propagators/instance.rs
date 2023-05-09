@@ -17,8 +17,6 @@
 */
 
 use super::error_ctrl::ErrorCtrl;
-use super::rayon::iter::ParallelBridge;
-use super::rayon::prelude::ParallelIterator;
 use super::{IntegrationDetails, Propagator};
 use crate::dynamics::Dynamics;
 use crate::errors::NyxError;
@@ -28,6 +26,8 @@ use crate::md::trajectory::{Interpolatable, Traj};
 use crate::md::EventEvaluator;
 use crate::time::{Duration, Epoch, Unit};
 use crate::State;
+use rayon::iter::ParallelBridge;
+use rayon::prelude::ParallelIterator;
 use std::f64;
 use std::sync::mpsc::{channel, Sender};
 use std::time::Instant;

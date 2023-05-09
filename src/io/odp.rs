@@ -16,10 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-extern crate csv;
-
-use rand::thread_rng;
-
 pub use crate::cosmic::*;
 use crate::dynamics::NyxError;
 use crate::io::formatter::NavSolutionFormatter;
@@ -34,6 +30,8 @@ use crate::od::TrackingDeviceSim;
 use crate::propagators::Propagator;
 use crate::time::{Duration, Unit};
 use crate::Orbit;
+use csv;
+use rand::thread_rng;
 use std::str::FromStr;
 use std::sync::mpsc::channel;
 use std::sync::Arc;

@@ -16,8 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-extern crate levenberg_marquardt;
-
 use super::optimizer::Optimizer;
 // use super::solution::TargeterSolution;
 use crate::dynamics::guidance::Mnvr;

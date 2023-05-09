@@ -16,13 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-extern crate nalgebra as na;
-
-use self::na::Complex;
 use crate::cosmic::Orbit;
 use crate::linalg::{
     allocator::Allocator, DefaultAllocator, DimName, Matrix3, Matrix6, OVector, Vector3, Vector6,
 };
+use nalgebra::Complex;
 
 /// Returns the tilde matrix from the provided Vector3.
 pub fn tilde_matrix(v: &Vector3<f64>) -> Matrix3<f64> {

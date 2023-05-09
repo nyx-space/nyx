@@ -18,7 +18,6 @@
 
 use std::iter::zip;
 
-use super::rand_distr::{Distribution, Normal};
 use super::DispersedState;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{
@@ -26,6 +25,7 @@ use crate::linalg::{
 };
 use crate::md::StateParameter;
 use crate::{NyxError, State};
+use rand_distr::{Distribution, Normal};
 
 /// A state generator for Monte Carlo analyses.
 pub struct MultivariateNormal<S: State>

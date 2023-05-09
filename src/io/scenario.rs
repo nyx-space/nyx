@@ -470,7 +470,7 @@ impl ConditionSerde {
 
 #[test]
 fn test_md_scenario() {
-    extern crate toml;
+    use toml;
 
     let scen: ScenarioSerde = toml::from_str(
         r#"
@@ -582,7 +582,7 @@ fn test_md_scenario() {
 #[test]
 #[ignore = "OD scenario disabled during rewrite"]
 fn test_od_scenario() {
-    extern crate toml;
+    use toml;
 
     let scen: ScenarioSerde = toml::from_str(
         r#"

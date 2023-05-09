@@ -21,7 +21,6 @@ use super::solution::TargeterSolution;
 use crate::dynamics::guidance::Mnvr;
 use crate::errors::TargetingError;
 use crate::linalg::{SMatrix, SVector, Vector6};
-use crate::md::rayon::prelude::*;
 use crate::md::ui::*;
 use crate::md::StateParameter;
 pub use crate::md::{Variable, Vary};
@@ -29,6 +28,7 @@ use crate::polyfit::CommonPolynomial;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::pseudo_inverse;
 use hifitime::TimeUnits;
+use rayon::prelude::*;
 use std::time::Instant;
 
 impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {

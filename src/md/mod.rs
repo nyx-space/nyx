@@ -16,8 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-extern crate csv;
-extern crate rayon;
 
 use crate::errors::NyxError;
 use crate::io::formatter::StateFormatter;

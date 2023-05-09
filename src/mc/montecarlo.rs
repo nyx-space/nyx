@@ -15,10 +15,7 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-extern crate indicatif;
-extern crate rand;
-use super::rand_distr::Distribution;
-use super::rayon::prelude::ParallelIterator;
+
 use super::{Generator, Pcg64Mcg};
 use crate::dynamics::Dynamics;
 use crate::linalg::allocator::Allocator;
@@ -31,6 +28,8 @@ use crate::propagators::{ErrorCtrl, Propagator};
 use crate::time::{Duration, Epoch, Unit};
 use crate::State;
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
+use rand_distr::Distribution;
+use rayon::prelude::ParallelIterator;
 use rayon::prelude::*;
 use std::f64;
 use std::fmt;

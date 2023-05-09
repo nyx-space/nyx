@@ -16,12 +16,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::hyperdual::{hyperspace_from_vector, linalg::norm, Float, OHyperdual};
 use super::ForceModel;
 use crate::cosmic::eclipse::EclipseLocator;
 use crate::cosmic::{Cosm, Frame, Spacecraft, AU, SPEED_OF_LIGHT};
 use crate::errors::NyxError;
 use crate::linalg::{Const, Matrix3, Vector3};
+use hyperdual::{hyperspace_from_vector, linalg::norm, Float, OHyperdual};
 use std::fmt;
 use std::sync::Arc;
 

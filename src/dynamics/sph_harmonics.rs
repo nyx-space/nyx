@@ -16,13 +16,13 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::hyperdual::linalg::norm;
-use super::hyperdual::{hyperspace_from_vector, Float, OHyperdual};
 use crate::cosmic::{Cosm, Frame, Orbit};
 use crate::dynamics::AccelModel;
 use crate::errors::NyxError;
 use crate::io::gravity::HarmonicsMem;
 use crate::linalg::{DMatrix, Matrix3, Vector3, U7};
+use hyperdual::linalg::norm;
+use hyperdual::{hyperspace_from_vector, Float, OHyperdual};
 use std::cmp::min;
 use std::fmt;
 use std::sync::Arc;

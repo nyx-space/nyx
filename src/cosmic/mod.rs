@@ -16,10 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-extern crate hyperdual;
-extern crate nalgebra as na;
-extern crate prost;
-
 pub use self::xb::Xb;
 use self::xb::{Ephemeris, Epoch as XbEpoch};
 pub use crate::cosmic::{Frame, GuidanceMode, Orbit, Spacecraft};
@@ -173,7 +169,7 @@ impl Xb {
 
     /// Loads the provided input buffer as an XB
     pub fn from_buffer(input_xb_buf: &[u8]) -> Result<Self, NyxError> {
-        use self::prost::Message;
+        use prost::Message;
         if input_xb_buf.is_empty() {
             return Err(NyxError::LoadingError("XB buffer is empty".to_string()));
         }

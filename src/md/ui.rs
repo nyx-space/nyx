@@ -16,10 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-extern crate csv;
-extern crate rayon;
-
-use self::rayon::prelude::*;
 use super::MdHdlr;
 pub use super::{optimizer::*, trajectory::Traj, Ephemeris, Event, ScTraj, StateParameter};
 pub use crate::cosmic::{
@@ -42,6 +38,7 @@ pub use crate::propagators::{PropOpts, Propagator};
 pub use crate::time::{Duration, Epoch, TimeUnits, Unit};
 pub use crate::Spacecraft;
 pub use crate::{State, TimeTagged};
+use rayon::prelude::*;
 use std::convert::TryFrom;
 use std::str::FromStr;
 pub use std::sync::Arc;

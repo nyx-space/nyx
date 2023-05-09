@@ -16,13 +16,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use rand_pcg::Pcg64Mcg;
-
-use super::rand_distr::{Distribution, Normal};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 use crate::md::StateParameter;
 use crate::{NyxError, State};
+use rand_distr::{Distribution, Normal};
+use rand_pcg::Pcg64Mcg;
 
 /// A state generator for Monte Carlo analyses.
 pub struct Generator<S: State, Distr: Distribution<f64> + Copy>

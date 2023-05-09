@@ -16,13 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-extern crate meval;
-
-use self::meval::{Context, Expr};
 use crate::log::error;
 use crate::na::Matrix3;
 use crate::time::Epoch;
 use crate::utils::{r1, r2, r3};
+use meval::{Context, Expr};
 use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::fmt;

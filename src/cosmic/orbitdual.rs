@@ -16,17 +16,14 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-extern crate approx;
-extern crate hifitime;
-extern crate serde;
 
-use super::hyperdual::linalg::norm;
-use super::hyperdual::{Float, OHyperdual};
-use super::na::{Vector3, U7};
 use super::{Frame, Orbit, ECC_EPSILON};
+use crate::linalg::{Vector3, U7};
 use crate::md::StateParameter;
 use crate::time::Epoch;
 use crate::{NyxError, TimeTagged};
+use hyperdual::linalg::norm;
+use hyperdual::{Float, OHyperdual};
 use std::f64::consts::PI;
 use std::f64::EPSILON;
 use std::fmt;
