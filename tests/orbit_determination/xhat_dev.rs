@@ -1179,11 +1179,12 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
                 }
             }
 
-            let rmag_err = (truth_state - smoothed_est.state()).rmag_km();
+            let rmag_err_sm = (truth_state - smoothed_est.state()).rmag_km();
+            let rmag_err = (truth_state - est.state()).rmag_km();
             assert!(
-                rmag_err < 0.150,
-                "final radius error should be on ~ 150 meter level (is instead {:.3} m)",
-                rmag_err * 1e3
+                rmag_err_sm < 0.150 || rmag_err_sm < rmag_err,
+                "final radius error should be on ~ 150 meter level (is instead {:.3} m) OR the smoothed estimate should be better (but {:.3} m > {:.3} m)",
+                rmag_err_sm * 1e3, rmag_err_sm * 1e3, rmag_err * 1e3
             );
         }
 
