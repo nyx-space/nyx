@@ -21,6 +21,9 @@ use crate::io::ConfigError;
 use crate::md::ui::{PropOpts, Propagator, SpacecraftDynamics};
 use crate::md::{Event, StateParameter};
 
+use crate::propagators::{
+    CashKarp45, Dormand45, Dormand78, Fehlberg45, RK2Fixed, RK4Fixed, Verner56,
+};
 use crate::{NyxError, Spacecraft};
 use hifitime::{Duration, Epoch, Unit};
 use pyo3::{prelude::*, py_run};
@@ -51,9 +54,11 @@ pub(crate) fn register_md(py: Python<'_>, parent_module: &PyModule) -> PyResult<
 }
 
 /// Propagates the provided spacecraft with the provided dynamics until the provided stopping condition (duration, epoch, or event [and optionally the count]).
+///
+/// Available methods: rk89, dormand78, dormand45, rk45 (or fehlberg45), cashkarp45, verner56, rk4, rk2
 #[pyfunction]
 #[pyo3(
-    text_signature = "(spacecraft, dynamics, duration=None, epoch=None, event=None, event_count=None, min_step=None, max_step=None, fixed_step=None, tolerance=None)"
+    text_signature = "(spacecraft, dynamics, duration=None, epoch=None, event=None, event_count=None, min_step=None, max_step=None, fixed_step=None, tolerance=None, method='rk89')"
 )]
 fn propagate(
     spacecraft: Spacecraft,
@@ -66,6 +71,7 @@ fn propagate(
     max_step: Option<Duration>,
     fixed_step: Option<Duration>,
     tolerance: Option<f64>,
+    method: Option<String>,
 ) -> Result<(Spacecraft, Traj), NyxError> {
     let opts = match fixed_step {
         Some(step) => PropOpts::with_fixed_step(step),
@@ -85,6 +91,26 @@ fn propagate(
     };
     info!("Propagator options: {opts}");
 
+    let prop_setup = match method {
+        Some(value) => match value.to_lowercase().as_str() {
+            "rk89" => Propagator::rk89(dynamics, opts),
+            "dormand78" => Propagator::new::<Dormand78>(dynamics, opts),
+            "dormand45" => Propagator::new::<Dormand45>(dynamics, opts),
+            "rk45" | "fehlberg45" => Propagator::new::<Fehlberg45>(dynamics, opts),
+            "cashkarp45" => Propagator::new::<CashKarp45>(dynamics, opts),
+            "verner56" => Propagator::new::<Verner56>(dynamics, opts),
+            "rk4" => Propagator::new::<RK4Fixed>(dynamics, opts),
+            "rk2" => Propagator::new::<RK2Fixed>(dynamics, opts),
+            _ => {
+                return Err(NyxError::ConfigError(ConfigError::InvalidConfig(format!(
+                    "Unknown propagation method: {}",
+                    value
+                ))))
+            }
+        },
+        None => Propagator::rk89(dynamics, opts),
+    };
+
     if let Some(event) = event {
         let max_duration = match duration {
             Some(duration) => duration,
@@ -95,25 +121,25 @@ fn propagate(
         };
 
         let (sc, traj) = match event_count {
-            Some(count) => Propagator::rk89(dynamics, opts)
-                .with(spacecraft)
-                .until_nth_event(max_duration, &event, count)?,
-            None => Propagator::rk89(dynamics, opts)
+            Some(count) => {
+                prop_setup
+                    .with(spacecraft)
+                    .until_nth_event(max_duration, &event, count)?
+            }
+            None => prop_setup
                 .with(spacecraft)
                 .until_event(max_duration, &event)?,
         };
 
         Ok((sc, Traj { inner: traj }))
     } else if let Some(duration) = duration {
-        let (sc, traj) = Propagator::rk89(dynamics, opts)
+        let (sc, traj) = prop_setup
             .with(spacecraft)
             .for_duration_with_traj(duration)?;
 
         Ok((sc, Traj { inner: traj }))
     } else if let Some(epoch) = epoch {
-        let (sc, traj) = Propagator::rk89(dynamics, opts)
-            .with(spacecraft)
-            .until_epoch_with_traj(epoch)?;
+        let (sc, traj) = prop_setup.with(spacecraft).until_epoch_with_traj(epoch)?;
 
         Ok((sc, Traj { inner: traj }))
     } else {

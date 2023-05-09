@@ -61,6 +61,10 @@ def test_propagate():
     # Save the file to parquet
     traj.to_parquet("lofi.parquet")
 
+    # We can also propagate with a different method
+    rslt, traj = propagate(sc, dynamics["lofi"], Unit.Day * 5.159, method="Dormand78")
+    assert rslt.epoch.timedelta(sc.epoch) == Duration("5 days 3 h 48 min 57 s 600 ms")
+
     # Let's now propagate the original spacecraft to its apoapsis, but let's search no more than 2 orbit periods
     rslt_apo, _ = propagate(
         sc,

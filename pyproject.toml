@@ -22,3 +22,6 @@ column_limit = 100
 [tool.maturin]
 python-source = "python"
 module-name = "nyx_space._nyx_space"
+
+[tool.ruff]
+line-length = 100

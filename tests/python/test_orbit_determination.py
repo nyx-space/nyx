@@ -95,7 +95,7 @@ def test_filter_arc():
         ekf_disable_time,
     )
 
-    assert len(estimates) == 1064
+    assert len(estimates) == 1063
     assert len([est for est in estimates if not est.is_predicted]) == 762
 
     # TODO: Add more tests

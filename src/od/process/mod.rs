@@ -128,12 +128,10 @@ where
 {
     pub fn ekf(prop: PropInstance<'a, D, E>, kf: K, trigger: T, cosm: Arc<Cosm>) -> Self {
         let init_state = prop.state;
-        let mut estimates = Vec::with_capacity(10_001);
-        estimates.push(kf.previous_estimate().clone());
         Self {
             prop,
             kf,
-            estimates,
+            estimates: Vec::with_capacity(10_000),
             residuals: Vec::with_capacity(10_000),
             ekf_trigger: trigger,
             cosm,
@@ -215,9 +213,12 @@ where
             }
         }
 
+        // Note that we have yet to reverse the list, so we print them backward
         info!(
-            "Smoothing condition reached after {} estimates ",
-            smoothed.len()
+            "Smoothed {} estimates (from {} to {})",
+            smoothed.len(),
+            smoothed.last().unwrap().epoch(),
+            smoothed[0].epoch(),
         );
 
         // Now, let's add all of the other estimates so that the same indexing can be done
@@ -236,6 +237,7 @@ where
 
         // And reverse to maintain the order of estimates
         smoothed.reverse();
+
         Ok(smoothed)
     }
 
@@ -302,6 +304,8 @@ where
 
             iter_cnt += 1;
 
+            self.ekf_trigger.reset();
+
             info!("***************************");
             info!("*** Iteration number {} ***", iter_cnt);
             info!("***************************");
@@ -312,7 +316,7 @@ where
             self.prop.state = self.init_state;
             // Empty the estimates and add the first smoothed estimate as the initial estimate
             self.estimates = Vec::with_capacity(measurements.len());
-            self.estimates.push(smoothed[0].clone());
+            // self.estimates.push(smoothed[0].clone());
             self.kf.set_previous_estimate(&smoothed[0]);
             // And re-run the filter
             self.process_arc::<Dev>(arc)?;
@@ -670,12 +674,10 @@ where
 {
     pub fn ckf(prop: PropInstance<'a, D, E>, kf: K, cosm: Arc<Cosm>) -> Self {
         let init_state = prop.state;
-        let mut estimates = Vec::with_capacity(10_001);
-        estimates.push(kf.previous_estimate().clone());
         Self {
             prop,
             kf,
-            estimates,
+            estimates: Vec::with_capacity(10_000),
             residuals: Vec::with_capacity(10_000),
             cosm,
             ekf_trigger: CkfTrigger {},

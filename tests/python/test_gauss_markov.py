@@ -25,7 +25,8 @@ def test_fogm(plot=False):
     # Read in the file
     df = pd.read_parquet(str(outpath.joinpath("fogm.parquet")))
 
-    # The seeds are chosen from entry each time, so the bias should be non-zero but we can't predict what it will be.
+    # The seeds are chosen from entropy each time,
+    # so the bias should be non-zero but we can't predict what it will be.
     assert df["Bias (unitless)"].mean() != 0.0
     assert df["Bias (unitless)"].max() != 0.0
     assert df["Bias (unitless)"].min() != 0.0

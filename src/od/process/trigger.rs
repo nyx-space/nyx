@@ -43,6 +43,9 @@ pub trait KfTrigger {
     /// Set whether the EKF trigger should be inhibited. This is useful when smoothing for example.
     fn set_inhibit(&mut self, inhibit: bool);
 
+    /// Reset the trigger
+    fn reset(&mut self);
+
     /// Return true if the filter should not longer be as extended.
     /// By default, this returns false, i.e. when a filter has been switched to an EKF, it will
     /// remain as such.
@@ -51,7 +54,7 @@ pub trait KfTrigger {
     }
 
     /// If some iteration configuration is returned, the filter will iterate with it before enabling the EKF.
-    fn interation_config(&self) -> Option<IterationConf> {
+    fn iteration_config(&self) -> Option<IterationConf> {
         None
     }
 }
@@ -71,6 +74,8 @@ impl KfTrigger for CkfTrigger {
     }
 
     fn set_inhibit(&mut self, _inhibit: bool) {}
+
+    fn reset(&mut self) {}
 }
 
 /// An EkfTrigger on the number of measurements processed and a time between measurements.
@@ -140,5 +145,10 @@ impl KfTrigger for EkfTrigger {
 
     fn set_inhibit(&mut self, inhibit: bool) {
         self.inhibit = inhibit;
+    }
+
+    fn reset(&mut self) {
+        self.cur_msrs = 0;
+        self.prev_msr_dt = None;
     }
 }
