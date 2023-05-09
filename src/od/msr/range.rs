@@ -56,7 +56,7 @@ impl RangeMsr {
         let mut pmat = Matrix1x6::zeros();
 
         for j in 1..U7::dim() {
-            pmat[(j - 1)] = range[j];
+            pmat[j - 1] = range[j];
         }
 
         (fx, pmat)

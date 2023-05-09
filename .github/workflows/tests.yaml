@@ -130,15 +130,15 @@ jobs:
         env:
           RUSTFLAGS: "-Cinstrument-coverage"
           LLVM_PROFILE_FILE: "nyx_space-%p-%m.profraw"
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         # grcov . -s . --binary-path ./target/debug/ -t html --branch --ignore-not-existing -o ./target/debug/coverage/ # Export as HTML
         run: |
-          cargo test --lib
+          cargo test --lib && cargo test od_
           grcov . --binary-path ./target/debug/ -t lcov -s . > lcov.txt
 
       - name: Upload coverage report
         uses: codecov/codecov-action@v3
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           files: ./lcov.txt
 
   release:

@@ -58,7 +58,7 @@ impl RangeRate {
         let mut pmat = Matrix1x6::zeros();
 
         for j in 1..U7::dim() {
-            pmat[(0, j - 1)] = range_rate[j];
+            pmat[j - 1] = range_rate[j];
         }
         (fx, pmat)
     }
