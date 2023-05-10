@@ -124,7 +124,9 @@ jobs:
           components: rustfmt, clippy
 
       - name: Install cargo-grcov
-        run: cargo install grcov
+        run: |
+          rustup component add llvm-tools-preview
+          cargo install grcov
 
       - name: Generate coverage report
         env:
@@ -132,7 +134,9 @@ jobs:
           LLVM_PROFILE_FILE: "nyx_space-%p-%m.profraw"
         # grcov . -s . --binary-path ./target/debug/ -t html --branch --ignore-not-existing -o ./target/debug/coverage/ # Export as HTML
         run: |
-          cargo test --lib && cargo test od_
+          cargo test --lib
+          cargo test stop_cond_
+          cargo test od_
           grcov . --binary-path ./target/debug/ -t lcov -s . > lcov.txt
 
       - name: Upload coverage report
