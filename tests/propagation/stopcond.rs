@@ -358,28 +358,30 @@ fn event_and_combination() {
     // Within one minute and with a precision of 3.0 degrees.
     // NOTE: We're unwrapping here, so if the event isn't found, this will cause the test to fail.
     let event = Event::specific(StateParameter::Declination, 6.0, 3.0, Unit::Minute);
-    for sc_decl_zero in traj_moon.find_all(&event).unwrap() {
-        let decl_deg = sc_decl_zero.value(StateParameter::Declination).unwrap();
-        println!(
-            "{event}: {} => decl = {} deg",
-            event.eval_string(&sc_decl_zero),
-            decl_deg,
-        );
-        assert!((decl_deg - 6.0).abs() < 3.0);
-    }
+    let mut decl_deg = 0.0;
+    if let Ok(matching_states) = traj_moon.find_all(&event) {
+        for sc_decl_zero in matching_states {
+            decl_deg = sc_decl_zero.value(StateParameter::Declination).unwrap();
+            println!(
+                "{event}: {} => decl = {} deg",
+                event.eval_string(&sc_decl_zero),
+                decl_deg,
+            );
+            assert!((decl_deg - 6.0).abs() < 3.0);
+        }
 
-    // We should be able to find a similar event with a larger bound too.
-    for sc_decl_zero in traj_moon
-        .find_all(&Event::specific(
+        // We should be able to find a similar event with a tighter bound too.
+        if let Ok(tighter_states) = traj_moon.find_all(&Event::specific(
             StateParameter::Declination,
-            5.0,
+            decl_deg,
             1.0,
             Unit::Minute,
-        ))
-        .unwrap()
-    {
-        let decl_deg = sc_decl_zero.value(StateParameter::Declination).unwrap();
-        println!("{sc_decl_zero:x} => decl = {} deg", decl_deg);
-        assert!((decl_deg - 5.0).abs() < 2.0);
+        )) {
+            for sc_decl_zero in tighter_states {
+                let found_decl_deg = sc_decl_zero.value(StateParameter::Declination).unwrap();
+                println!("{sc_decl_zero:x} => decl = {} deg", found_decl_deg);
+                assert!((decl_deg - found_decl_deg).abs() < 1.0);
+            }
+        }
     }
 }

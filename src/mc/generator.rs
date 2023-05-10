@@ -16,11 +16,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::rand_distr::{Distribution, Normal};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 use crate::md::StateParameter;
 use crate::{NyxError, State};
+use rand_distr::{Distribution, Normal};
+use rand_pcg::Pcg64Mcg;
 
 /// A state generator for Monte Carlo analyses.
 pub struct Generator<S: State, Distr: Distribution<f64> + Copy>
@@ -104,6 +105,12 @@ where
         me.add_dispersion(dispersion)?;
 
         Ok(me)
+    }
+
+    /// Generate a single Monte Carlo state from the provided seed, uses the Pcg64Mcg RNG.
+    pub fn sample_with_seed(&self, seed: u64) -> DispersedState<S> {
+        let mut rng = Pcg64Mcg::new(seed.into());
+        self.sample(&mut rng)
     }
 }
 

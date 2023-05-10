@@ -21,11 +21,12 @@ use std::collections::HashMap;
 use crate::cosmic::Cosm;
 use crate::io::tracking_data::DynamicTrackingArc;
 use crate::io::trajectory_data::DynamicTrajectory;
-use crate::od::msr::StdMeasurement;
+use crate::od::msr::RangeDoppler;
+use crate::od::noise::GaussMarkov;
 use crate::od::simulator::arc::TrackingArcSim;
 pub use crate::od::simulator::TrkConfig;
 pub use crate::{io::ConfigError, od::prelude::GroundStation};
-use crate::{NyxError, Orbit, Spacecraft};
+use crate::{NyxError, Spacecraft};
 use pyo3::{prelude::*, py_run};
 pub(crate) mod estimate;
 mod ground_station;
@@ -36,13 +37,14 @@ use estimate::OrbitEstimate;
 use process::process_tracking_arc;
 
 pub(crate) fn register_od(py: Python<'_>, parent_module: &PyModule) -> PyResult<()> {
-    let sm = PyModule::new(py, "nyx_space.orbit_determination")?;
+    let sm = PyModule::new(py, "_nyx_space.orbit_determination")?;
 
     sm.add_class::<GroundStation>()?;
     sm.add_class::<GroundTrackingArcSim>()?;
     sm.add_class::<DynamicTrackingArc>()?;
     sm.add_class::<TrkConfig>()?;
     sm.add_class::<OrbitEstimate>()?;
+    sm.add_class::<GaussMarkov>()?;
     sm.add_function(wrap_pyfunction!(process_tracking_arc, sm)?)?;
 
     py_run!(
@@ -57,7 +59,7 @@ pub(crate) fn register_od(py: Python<'_>, parent_module: &PyModule) -> PyResult<
 #[derive(Clone)]
 #[pyclass]
 pub struct GroundTrackingArcSim {
-    inner: TrackingArcSim<Orbit, Spacecraft, StdMeasurement, GroundStation>,
+    inner: TrackingArcSim<Spacecraft, RangeDoppler, GroundStation>,
 }
 
 #[pymethods]

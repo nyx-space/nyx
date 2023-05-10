@@ -388,7 +388,7 @@ fn hermite_sine_test() {
     }
 
     println!(
-        "Max eval error: {:.e}\tMax deriv error: {:.e}\t",
+        "Max eval error: {:e}\tMax deriv error: {:e}\t",
         max_eval_err, max_deriv_err
     );
 }
@@ -419,7 +419,7 @@ fn hermite_constant_test() {
     }
 
     println!(
-        "Max eval error: {:.e}\tMax deriv error: {:.e}\t",
+        "Max eval error: {:e}\tMax deriv error: {:e}\t",
         max_eval_err, max_deriv_err
     );
 }
@@ -478,7 +478,7 @@ fn hermite_ephem_spline_test() {
     }
 
     println!(
-        "Max eval error: {:.e}\tMax deriv error: {:.e}\t",
+        "Max eval error: {:e}\tMax deriv error: {:e}\t",
         max_eval_err, max_deriv_err
     );
 }
@@ -510,7 +510,7 @@ fn hermite_duplication_test() {
     }
 
     println!(
-        "Max eval error: {:.e}\tMax deriv error: {:.e}\t",
+        "Max eval error: {:e}\tMax deriv error: {:e}\t",
         max_eval_err, max_deriv_err
     );
 }

@@ -16,7 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::na::{Matrix3, Matrix6, Vector3, Vector6};
 use super::Cosm;
 use super::State;
 use super::{BPlane, Frame};
@@ -24,7 +23,7 @@ use crate::io::orbit::OrbitSerde;
 use crate::io::{
     epoch_from_str, epoch_to_str, frame_from_str, frame_to_str, ConfigRepr, Configurable,
 };
-use crate::linalg::{Const, OVector};
+use crate::linalg::{Const, Matrix3, Matrix6, OVector, Vector3, Vector6};
 use crate::mc::MultivariateNormal;
 use crate::md::ui::Objective;
 use crate::md::StateParameter;
@@ -49,6 +48,8 @@ use crate::io::ConfigError;
 use crate::python::cosmic::Frame as PyFrame;
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
+#[cfg(feature = "python")]
+use pyo3::types::PyType;
 #[cfg(feature = "python")]
 use std::collections::HashMap;
 
@@ -162,10 +163,10 @@ impl Orbit {
         vx: f64,
         vy: f64,
         vz: f64,
-        dt: Epoch,
+        epoch: Epoch,
         frame: Frame,
     ) -> Self {
-        let mut me = Self::cartesian(x, y, z, vx, vy, vz, dt, frame);
+        let mut me = Self::cartesian(x, y, z, vx, vy, vz, epoch, frame);
         me.enable_stm();
         me
     }
@@ -173,7 +174,7 @@ impl Orbit {
     /// Creates a new Orbit in the provided frame at the provided Epoch in time with 0.0 velocity.
     ///
     /// **Units:** km, km, km
-    pub fn from_position(x: f64, y: f64, z: f64, dt: Epoch, frame: Frame) -> Self {
+    pub fn from_position(x: f64, y: f64, z: f64, epoch: Epoch, frame: Frame) -> Self {
         Orbit {
             x_km: x,
             y_km: y,
@@ -181,7 +182,7 @@ impl Orbit {
             vx_km_s: 0.0,
             vy_km_s: 0.0,
             vz_km_s: 0.0,
-            epoch: dt,
+            epoch,
             frame,
             stm: None,
         }
@@ -191,7 +192,7 @@ impl Orbit {
     ///
     /// The state vector **must** be x, y, z, vx, vy, vz. This function is a shortcut to `cartesian`
     /// and as such it has the same unit requirements.
-    pub fn cartesian_vec(state: &Vector6<f64>, dt: Epoch, frame: Frame) -> Self {
+    pub fn cartesian_vec(state: &Vector6<f64>, epoch: Epoch, frame: Frame) -> Self {
         Orbit {
             x_km: state[0],
             y_km: state[1],
@@ -199,7 +200,7 @@ impl Orbit {
             vx_km_s: state[3],
             vy_km_s: state[4],
             vz_km_s: state[5],
-            epoch: dt,
+            epoch,
             frame,
             stm: None,
         }
@@ -323,7 +324,7 @@ impl Orbit {
         raan: f64,
         aop: f64,
         ta: f64,
-        dt: Epoch,
+        epoch: Epoch,
         frame: Frame,
     ) -> Self {
         Self::keplerian(
@@ -333,7 +334,7 @@ impl Orbit {
             raan,
             aop,
             ta,
-            dt,
+            epoch,
             frame,
         )
     }
@@ -389,7 +390,7 @@ impl Orbit {
         latitude: f64,
         longitude: f64,
         height: f64,
-        dt: Epoch,
+        epoch: Epoch,
         frame: Frame,
     ) -> Self {
         Self::from_altlatlong(
@@ -397,7 +398,7 @@ impl Orbit {
             longitude,
             height,
             frame.angular_velocity(),
-            dt,
+            epoch,
             frame,
         )
     }
@@ -412,7 +413,7 @@ impl Orbit {
         longitude: f64,
         height: f64,
         angular_velocity: f64,
-        dt: Epoch,
+        epoch: Epoch,
         frame: Frame,
     ) -> Self {
         match frame {
@@ -440,7 +441,7 @@ impl Orbit {
                     velocity[0],
                     velocity[1],
                     velocity[2],
-                    dt,
+                    epoch,
                     frame,
                 )
             }
@@ -512,10 +513,10 @@ impl Orbit {
     ///
     /// The state vector **must** be sma, ecc, inc, raan, aop, ta. This function is a shortcut to `cartesian`
     /// and as such it has the same unit requirements.
-    pub fn keplerian_vec(state: &Vector6<f64>, dt: Epoch, frame: Frame) -> Self {
+    pub fn keplerian_vec(state: &Vector6<f64>, epoch: Epoch, frame: Frame) -> Self {
         match frame {
             Frame::Geoid { .. } | Frame::Celestial { .. } => Self::keplerian(
-                state[0], state[1], state[2], state[3], state[4], state[5], dt, frame,
+                state[0], state[1], state[2], state[3], state[4], state[5], epoch, frame,
             ),
             _ => panic!("Frame is not Celestial or Geoid in kind"),
         }
@@ -1527,9 +1528,9 @@ impl Orbit {
     }
 
     #[cfg(feature = "python")]
-    #[staticmethod]
-    fn load_yaml(path: &str) -> Result<Self, ConfigError> {
-        let serde = OrbitSerde::load_yaml(path)?;
+    #[classmethod]
+    fn load(_cls: &PyType, path: &str) -> Result<Self, ConfigError> {
+        let serde = OrbitSerde::load(path)?;
 
         let cosm = Cosm::de438();
 
@@ -1537,9 +1538,9 @@ impl Orbit {
     }
 
     #[cfg(feature = "python")]
-    #[staticmethod]
-    fn load_many_yaml(path: &str) -> Result<Vec<Self>, ConfigError> {
-        let orbits = OrbitSerde::load_many_yaml(path)?;
+    #[classmethod]
+    fn load_many(_cls: &PyType, path: &str) -> Result<Vec<Self>, ConfigError> {
+        let orbits = OrbitSerde::load_many(path)?;
 
         let cosm = Cosm::de438();
 
@@ -1553,9 +1554,9 @@ impl Orbit {
     }
 
     #[cfg(feature = "python")]
-    #[staticmethod]
-    fn load_named_yaml(path: &str) -> Result<HashMap<String, Self>, ConfigError> {
-        let orbits = OrbitSerde::load_named_yaml(path)?;
+    #[classmethod]
+    fn load_named(_cls: &PyType, path: &str) -> Result<HashMap<String, Self>, ConfigError> {
+        let orbits = OrbitSerde::load_named(path)?;
 
         let cosm = Cosm::de438();
 
@@ -1577,8 +1578,9 @@ impl Orbit {
     /// errors when creating a state from its Keplerian orbital elements (cf. the state tests).
     /// One should expect these errors to be on the order of 1e-12.
     #[cfg(feature = "python")]
-    #[staticmethod]
+    #[classmethod]
     fn from_keplerian(
+        _cls: &PyType,
         sma_km: f64,
         ecc: f64,
         inc_deg: f64,
@@ -1602,8 +1604,9 @@ impl Orbit {
 
     /// Creates a new Orbit from the provided semi-major axis altitude in kilometers
     #[cfg(feature = "python")]
-    #[staticmethod]
+    #[classmethod]
     fn from_keplerian_altitude(
+        _cls: &PyType,
         sma_altitude_km: f64,
         ecc: f64,
         inc_deg: f64,
@@ -1627,8 +1630,9 @@ impl Orbit {
 
     /// Creates a new Orbit from the provided altitudes of apoapsis and periapsis, in kilometers
     #[cfg(feature = "python")]
-    #[staticmethod]
+    #[classmethod]
     fn from_keplerian_apsis_altitude(
+        _cls: &PyType,
         apo_alt_km: f64,
         peri_alt_km: f64,
         inc_deg: f64,
@@ -2230,8 +2234,7 @@ epoch: 2018-09-15T00:15:53.098 UTC
     .iter()
     .collect();
 
-    let orbit =
-        Orbit::from_config(OrbitSerde::load_yaml(test_data).unwrap(), cosm.clone()).unwrap();
+    let orbit = Orbit::from_config(OrbitSerde::load(test_data).unwrap(), cosm).unwrap();
     assert_eq!(exp, orbit);
 
     let test_data: PathBuf = [
@@ -2244,7 +2247,7 @@ epoch: 2018-09-15T00:15:53.098 UTC
     .iter()
     .collect();
 
-    let serded_orbits = OrbitSerde::load_many_yaml(test_data).unwrap();
+    let serded_orbits = OrbitSerde::load_many(test_data).unwrap();
     for orbit_s in serded_orbits {
         let orbit: Orbit = orbit_s.into();
         // Check that the orbits (mostly) match -- there will be rounding errors

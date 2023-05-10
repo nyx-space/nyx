@@ -20,8 +20,8 @@ use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 
 pub use crate::od::estimate::*;
+pub use crate::od::ground_station::*;
 pub use crate::od::kalman::*;
-pub use crate::od::measurement::*;
 pub use crate::od::residual::*;
 pub use crate::od::snc::*;
 pub use crate::od::*;
@@ -40,6 +40,12 @@ pub trait KfTrigger {
             + Allocator<f64, <T as State>::VecLength>
             + Allocator<f64, <T as State>::Size, <T as State>::Size>;
 
+    /// Set whether the EKF trigger should be inhibited. This is useful when smoothing for example.
+    fn set_inhibit(&mut self, inhibit: bool);
+
+    /// Reset the trigger
+    fn reset(&mut self);
+
     /// Return true if the filter should not longer be as extended.
     /// By default, this returns false, i.e. when a filter has been switched to an EKF, it will
     /// remain as such.
@@ -48,7 +54,7 @@ pub trait KfTrigger {
     }
 
     /// If some iteration configuration is returned, the filter will iterate with it before enabling the EKF.
-    fn interation_config(&self) -> Option<IterationConf> {
+    fn iteration_config(&self) -> Option<IterationConf> {
         None
     }
 }
@@ -66,6 +72,10 @@ impl KfTrigger for CkfTrigger {
     {
         false
     }
+
+    fn set_inhibit(&mut self, _inhibit: bool) {}
+
+    fn reset(&mut self) {}
 }
 
 /// An EkfTrigger on the number of measurements processed and a time between measurements.
@@ -77,6 +87,7 @@ pub struct EkfTrigger {
     pub within_sigma: f64,
     prev_msr_dt: Option<Epoch>,
     cur_msrs: usize,
+    inhibit: bool,
 }
 
 impl EkfTrigger {
@@ -87,6 +98,7 @@ impl EkfTrigger {
             within_sigma: -1.0,
             prev_msr_dt: None,
             cur_msrs: 0,
+            inhibit: false,
         }
     }
 }
@@ -99,6 +111,10 @@ impl KfTrigger for EkfTrigger {
             + Allocator<f64, <T as State>::VecLength>
             + Allocator<f64, <T as State>::Size, <T as State>::Size>,
     {
+        if self.inhibit {
+            return false;
+        }
+
         if !est.predicted() {
             // If this isn't a prediction, let's update the previous measurement time
             self.prev_msr_dt = Some(est.epoch());
@@ -110,6 +126,9 @@ impl KfTrigger for EkfTrigger {
     }
 
     fn disable_ekf(&mut self, epoch: Epoch) -> bool {
+        if self.inhibit {
+            return true;
+        }
         // Return true if there is a prev msr dt, and the next measurement time is more than the disable time seconds away
         match self.prev_msr_dt {
             Some(prev_dt) => {
@@ -122,5 +141,14 @@ impl KfTrigger for EkfTrigger {
             }
             None => false,
         }
+    }
+
+    fn set_inhibit(&mut self, inhibit: bool) {
+        self.inhibit = inhibit;
+    }
+
+    fn reset(&mut self) {
+        self.cur_msrs = 0;
+        self.prev_msr_dt = None;
     }
 }

@@ -49,6 +49,8 @@ where
         + Allocator<f64, A, <T as State>::Size>
         + Allocator<usize, <T as State>::Size>
         + Allocator<usize, <T as State>::Size, <T as State>::Size>,
+    <DefaultAllocator as Allocator<f64, <T as State>::Size>>::Buffer: Copy,
+    <DefaultAllocator as Allocator<f64, <T as State>::Size, <T as State>::Size>>::Buffer: Copy,
 {
     /// The previous estimate used in the KF computations.
     pub prev_estimate: KfEstimate<T>,
@@ -84,6 +86,8 @@ where
         + Allocator<f64, A, <T as State>::Size>
         + Allocator<usize, <T as State>::Size>
         + Allocator<usize, <T as State>::Size, <T as State>::Size>,
+    <DefaultAllocator as Allocator<f64, <T as State>::Size>>::Buffer: Copy,
+    <DefaultAllocator as Allocator<f64, <T as State>::Size, <T as State>::Size>>::Buffer: Copy,
 {
     /// Initializes this KF with an initial estimate, measurement noise, and one process noise
     pub fn new(
@@ -169,6 +173,8 @@ where
         + Allocator<f64, U3, <T as State>::Size>
         + Allocator<usize, <T as State>::Size>
         + Allocator<usize, <T as State>::Size, <T as State>::Size>,
+    <DefaultAllocator as Allocator<f64, <T as State>::Size>>::Buffer: Copy,
+    <DefaultAllocator as Allocator<f64, <T as State>::Size, <T as State>::Size>>::Buffer: Copy,
 {
     /// Initializes this KF without SNC
     pub fn no_snc(initial_estimate: KfEstimate<T>, measurement_noise: OMatrix<f64, M, M>) -> Self {
@@ -205,7 +211,10 @@ where
         + Allocator<f64, <T as State>::Size, A>
         + Allocator<f64, A, <T as State>::Size>
         + Allocator<usize, <T as State>::Size>
-        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
+        + Allocator<usize, <T as State>::Size, <T as State>::Size>
+        + Allocator<f64, na::Const<1>, M>,
+    <DefaultAllocator as Allocator<f64, <T as State>::Size>>::Buffer: Copy,
+    <DefaultAllocator as Allocator<f64, <T as State>::Size, <T as State>::Size>>::Buffer: Copy,
 {
     type Estimate = KfEstimate<T>;
 
@@ -219,7 +228,7 @@ where
     }
 
     fn set_previous_estimate(&mut self, est: &Self::Estimate) {
-        self.prev_estimate = est.clone();
+        self.prev_estimate = *est;
     }
 
     /// Update the sensitivity matrix (or "H tilde"). This function **must** be called prior to each
@@ -234,7 +243,7 @@ where
     /// May return a FilterError if the STM was not updated.
     fn time_update(&mut self, nominal_state: T) -> Result<Self::Estimate, NyxError> {
         let stm = nominal_state.stm()?;
-        let mut covar_bar = &stm * &self.prev_estimate.covar * &stm.transpose();
+        let mut covar_bar = stm * self.prev_estimate.covar * stm.transpose();
 
         // Try to apply an SNC, if applicable
         for (i, snc) in self.process_noise.iter().enumerate().rev() {
@@ -282,19 +291,19 @@ where
         let state_bar = if self.ekf {
             OVector::<f64, <T as State>::Size>::zeros()
         } else {
-            &stm * &self.prev_estimate.state_deviation
+            stm * self.prev_estimate.state_deviation
         };
         let estimate = KfEstimate {
             nominal_state,
             state_deviation: state_bar,
-            covar: covar_bar.clone(),
+            covar: covar_bar,
             covar_bar,
             stm,
             predicted: true,
             epoch_fmt: self.epoch_fmt,
             covar_fmt: self.covar_fmt,
         };
-        self.prev_estimate = estimate.clone();
+        self.prev_estimate = estimate;
         // Update the prev epoch for all SNCs
         for snc in &mut self.process_noise {
             snc.prev_epoch = Some(self.prev_estimate.epoch());
@@ -317,7 +326,7 @@ where
 
         let stm = nominal_state.stm()?;
 
-        let mut covar_bar = &stm * &self.prev_estimate.covar * &stm.transpose();
+        let mut covar_bar = stm * self.prev_estimate.covar * stm.transpose();
         let mut snc_used = false;
         // Try to apply an SNC, if applicable
         for (i, snc) in self.process_noise.iter().enumerate().rev() {
@@ -368,38 +377,44 @@ where
         }
 
         let h_tilde_t = &self.h_tilde.transpose();
-        let mut invertible_part = &self.h_tilde * &covar_bar * h_tilde_t + &self.measurement_noise;
-        if !invertible_part.try_inverse_mut() {
-            return Err(NyxError::SingularKalmanGain);
-        }
-
-        let gain = &covar_bar * h_tilde_t * &invertible_part;
+        let h_p_ht = &self.h_tilde * covar_bar * h_tilde_t;
 
         // Compute observation deviation (usually marked as y_i)
         let prefit = real_obs - computed_obs;
 
+        // Compute the prefit ratio
+        let ratio = prefit.transpose() * &h_p_ht * &prefit;
+
+        // Compute the Kalman gain but first adding the measurement noise to H⋅P⋅H^T
+        let mut invertible_part = h_p_ht + &self.measurement_noise;
+        if !invertible_part.try_inverse_mut() {
+            return Err(NyxError::SingularKalmanGain);
+        }
+
+        let gain = covar_bar * h_tilde_t * &invertible_part;
+
         // Compute the state estimate
         let (state_hat, res) = if self.ekf {
             let state_hat = &gain * &prefit;
-            let postfit = &prefit - (&self.h_tilde * &state_hat);
+            let postfit = &prefit - (&self.h_tilde * state_hat);
             (
                 state_hat,
-                Residual::new(nominal_state.epoch(), prefit, postfit),
+                Residual::new(nominal_state.epoch(), prefit, postfit, ratio[0]),
             )
         } else {
             // Must do a time update first
-            let state_bar = &stm * &self.prev_estimate.state_deviation;
-            let postfit = &prefit - (&self.h_tilde * &state_bar);
+            let state_bar = stm * self.prev_estimate.state_deviation;
+            let postfit = &prefit - (&self.h_tilde * state_bar);
             (
                 state_bar + &gain * &postfit,
-                Residual::new(nominal_state.epoch(), prefit, postfit),
+                Residual::new(nominal_state.epoch(), prefit, postfit, ratio[0]),
             )
         };
 
         // Compute covariance (Joseph update)
         let first_term = OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity()
             - &gain * &self.h_tilde;
-        let covar = &first_term * &covar_bar * &first_term.transpose()
+        let covar = first_term * covar_bar * first_term.transpose()
             + &gain * &self.measurement_noise * &gain.transpose();
 
         // And wrap up
@@ -415,7 +430,7 @@ where
         };
 
         self.h_tilde_updated = false;
-        self.prev_estimate = estimate.clone();
+        self.prev_estimate = estimate;
         // Update the prev epoch for all SNCs
         for snc in &mut self.process_noise {
             snc.prev_epoch = Some(self.prev_estimate.epoch());

@@ -8,7 +8,6 @@ assignees: ''
 ---
 
 # Bug report
-_Bug reports will lead to a stakeholder need report, and will need to be linked to this issue_
 
 ## Describe the bug
 A clear and concise description of what the bug is.
@@ -16,8 +15,8 @@ A clear and concise description of what the bug is.
 ## To Reproduce
 Steps to reproduce the behavior:
 1. Set up a scenario with these parameters
-2. Attempted to retrieve the spacecraft mass in that way
-3. Kaboom crash
+2. Attempted to perform this action
+3. Kaboom, didn't work as expected
 
 ## Expected behavior
 A clear and concise description of what you expected to happen.

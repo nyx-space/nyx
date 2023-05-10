@@ -16,13 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-extern crate hyperdual;
-
-use self::hyperdual::{OHyperdual, Owned};
 use crate::cosmic::Orbit;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, Matrix3, OMatrix, OVector, Vector3};
 use crate::State;
+use hyperdual::{OHyperdual, Owned};
 
 use std::fmt;
 

@@ -1,9 +1,8 @@
-use nyx_space::io::stations::StationSerde;
 use nyx_space::io::tracking_data::DynamicTrackingArc;
-use nyx_space::io::{ConfigRepr, Configurable};
+use nyx_space::io::ConfigRepr;
 use nyx_space::md::trajectory::ExportCfg;
 use nyx_space::md::ui::*;
-use nyx_space::od::msr::StdMeasurement;
+use nyx_space::od::msr::RangeDoppler;
 use nyx_space::od::prelude::*;
 use nyx_space::od::simulator::arc::TrackingArcSim;
 use nyx_space::od::simulator::TrkConfig;
@@ -62,7 +61,7 @@ fn continuous_tracking() {
         .unwrap();
 
     // Load the ground stations from the test data.
-    let ground_station_yaml: PathBuf = [
+    let ground_station_file: PathBuf = [
         &env::var("CARGO_MANIFEST_DIR").unwrap(),
         "data",
         "tests",
@@ -72,11 +71,7 @@ fn continuous_tracking() {
     .iter()
     .collect();
 
-    let stations_serde = StationSerde::load_many_yaml(ground_station_yaml).unwrap();
-    let devices: Vec<GroundStation> = stations_serde
-        .into_iter()
-        .map(|station| GroundStation::from_config(station, cosm.clone()).unwrap())
-        .collect();
+    let devices = GroundStation::load_many(ground_station_file).unwrap();
 
     dbg!(&devices);
 
@@ -91,15 +86,14 @@ fn continuous_tracking() {
     .iter()
     .collect();
 
-    let configs: HashMap<String, TrkConfig> = TrkConfig::load_named_yaml(trkconfg_yaml).unwrap();
+    let configs: HashMap<String, TrkConfig> = TrkConfig::load_named(trkconfg_yaml).unwrap();
 
     dbg!(&configs);
 
     // Build the tracking arc simulation to generate a "standard measurement".
-    let mut trk = TrackingArcSim::<Orbit, Orbit, StdMeasurement, _>::with_seed(
-        devices, trajectory, configs, 12345,
-    )
-    .unwrap();
+    let mut trk =
+        TrackingArcSim::<Orbit, RangeDoppler, _>::with_seed(devices, trajectory, configs, 12345)
+            .unwrap();
 
     let arc = trk.generate_measurements(cosm).unwrap();
 
@@ -120,7 +114,7 @@ fn continuous_tracking() {
     // Now read this file back in.
     let dyn_arc = DynamicTrackingArc::from_parquet(output_fn).unwrap();
     // And convert to the same tracking arc as earlier
-    let arc_concrete = dyn_arc.to_tracking_arc::<StdMeasurement>().unwrap();
+    let arc_concrete = dyn_arc.to_tracking_arc::<RangeDoppler>().unwrap();
 
     println!("{arc_concrete}");
 

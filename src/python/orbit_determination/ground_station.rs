@@ -18,55 +18,44 @@
 
 use std::collections::HashMap;
 
-use crate::cosmic::Cosm;
-use crate::io::stations::StationSerde;
-use crate::io::{ConfigRepr, Configurable};
+use crate::cosmic::{Cosm, Orbit};
+use crate::io::ConfigRepr;
+use crate::od::simulator::trackdata::TrackingDeviceSim;
 pub use crate::od::simulator::TrkConfig;
+use crate::NyxError;
 pub use crate::{io::ConfigError, od::prelude::GroundStation};
 
 use pyo3::prelude::*;
+use pyo3::types::PyType;
 
 #[pymethods]
 impl GroundStation {
-    #[staticmethod]
-    fn load_yaml(path: &str) -> Result<Self, ConfigError> {
-        let serde = StationSerde::load_yaml(path)?;
-
-        // Create a new Cosm until ANISE switch
-        let cosm = Cosm::de438();
-
-        GroundStation::from_config(serde, cosm)
+    #[cfg(feature = "python")]
+    #[classmethod]
+    fn load(_cls: &PyType, path: &str) -> Result<Self, ConfigError> {
+        <Self as ConfigRepr>::load(path)
     }
 
-    #[staticmethod]
-    fn load_many_yaml(path: &str) -> Result<Vec<Self>, ConfigError> {
-        let stations = StationSerde::load_many_yaml(path)?;
-
-        // Create a new Cosm until ANISE switch
-        let cosm = Cosm::de438();
-
-        let mut selves = Vec::with_capacity(stations.len());
-
-        for serde in stations {
-            selves.push(GroundStation::from_config(serde, cosm.clone())?);
-        }
-
-        Ok(selves)
+    #[classmethod]
+    fn load_many(_cls: &PyType, path: &str) -> Result<Vec<Self>, ConfigError> {
+        <Self as ConfigRepr>::load_many(path)
     }
 
-    #[staticmethod]
-    fn load_named_yaml(path: &str) -> Result<HashMap<String, Self>, ConfigError> {
-        let orbits = StationSerde::load_named_yaml(path)?;
+    #[classmethod]
+    fn load_named(_cls: &PyType, path: &str) -> Result<HashMap<String, Self>, ConfigError> {
+        <Self as ConfigRepr>::load_named(path)
+    }
 
-        let cosm = Cosm::de438();
-
-        let mut selves = HashMap::with_capacity(orbits.len());
-
-        for (k, v) in orbits {
-            selves.insert(k, Self::from_config(v, cosm.clone())?);
+    /// Perform a one-way measurement of the given orbit at the epoch stored in that orbit instance.
+    /// Returns the range in kilometers and the Doppler measurement in kilometers per second.
+    fn measure(&mut self, orbit: Orbit) -> Result<(f64, f64), NyxError> {
+        match self.measure_instantaneous(orbit, None, Cosm::de438())? {
+            Some(msr) => Ok((msr.obs[0], msr.obs[1])),
+            None => Err(NyxError::CustomError(format!(
+                "Orbit not visible at {}.",
+                orbit.epoch
+            ))),
         }
-
-        Ok(selves)
     }
 
     // Manual getter/setters -- waiting on https://github.com/PyO3/pyo3/pull/2786

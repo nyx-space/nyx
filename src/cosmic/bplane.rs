@@ -16,8 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::hyperdual::linalg::norm;
-use super::hyperdual::{Float, OHyperdual};
 use super::{Frame, Orbit, OrbitDual, OrbitPartial};
 use crate::linalg::{Matrix2, Matrix3, Vector2, Vector3};
 use crate::md::objective::Objective;
@@ -25,6 +23,8 @@ use crate::md::StateParameter;
 use crate::time::{Duration, Epoch, Unit};
 use crate::utils::between_pm_180;
 use crate::NyxError;
+use hyperdual::linalg::norm;
+use hyperdual::{Float, OHyperdual};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 use std::convert::From;

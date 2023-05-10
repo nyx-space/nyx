@@ -29,7 +29,7 @@ use crate::{NyxError, Orbit, Spacecraft, State};
 use enum_iterator::all;
 
 /// States that can be interpolated should implement this trait.
-pub trait InterpState: State
+pub trait Interpolatable: State
 where
     Self: Sized,
     DefaultAllocator: Allocator<f64, Self::Size>
@@ -49,7 +49,7 @@ where
     fn export_params() -> Vec<StateParameter>;
 }
 
-impl InterpState for Orbit {
+impl Interpolatable for Orbit {
     fn interpolate(self, epoch: Epoch, states: &[Self]) -> Result<Self, NyxError> {
         // This is copied from ANISE
 
@@ -72,7 +72,7 @@ impl InterpState for Orbit {
             epochs_tdb[cno] = state.epoch().to_tdb_seconds();
         }
 
-        // TODO: Once I switch to using ANISE, this should use the same function as ANISE and not a clone.
+        // TODO: Once I switch to using ANISE, this should use the same function as ANISE and not a clone. -- https://github.com/nyx-space/nyx/issues/86
         let (x_km, vx_km_s) = hermite_eval(
             &epochs_tdb[..states.len()],
             &xs[..states.len()],
@@ -152,7 +152,7 @@ impl InterpState for Orbit {
     }
 }
 
-impl InterpState for Spacecraft {
+impl Interpolatable for Spacecraft {
     fn interpolate(self, epoch: Epoch, states: &[Self]) -> Result<Self, NyxError> {
         // Use the Orbit interpolation first.
         let orbit = Orbit::interpolate(

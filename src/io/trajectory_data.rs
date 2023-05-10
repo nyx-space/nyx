@@ -18,7 +18,7 @@
 
 use crate::{
     linalg::{allocator::Allocator, DefaultAllocator},
-    md::{trajectory::InterpState, ui::Traj, StateParameter},
+    md::{trajectory::Interpolatable, ui::Traj, StateParameter},
     NyxError,
 };
 use arrow::{array::Float64Array, record_batch::RecordBatchReader};
@@ -34,7 +34,6 @@ use crate::cosmic::Cosm;
 
 /// A dynamic trajectory allows loading a trajectory Parquet file and converting it
 /// to the concrete trajectory state type when desired.
-/// TODO: Trajectory export might benefit from storing the dynamics etc. as YAML to reload that?
 #[cfg_attr(feature = "python", pyclass)]
 #[derive(Clone)]
 pub struct DynamicTrajectory {
@@ -80,7 +79,7 @@ impl DynamicTrajectory {
     /// This is required because the parquet file reader is not clonable.
     pub fn to_traj<S>(&self) -> Result<Traj<S>, Box<dyn Error>>
     where
-        S: InterpState,
+        S: Interpolatable,
         DefaultAllocator: Allocator<f64, S::VecLength>
             + Allocator<f64, S::Size>
             + Allocator<f64, S::Size, S::Size>,
@@ -203,7 +202,7 @@ impl DynamicTrajectory {
             }
 
             // Grab the frame
-            // TODO: This is ugly and wrong because we might be using another frame info!
+            // TODO: This is ugly and wrong because we might be using another frame info! -- Hopefully fix via https://github.com/nyx-space/nyx/issues/86
             // So arguably, the cosm to load should be in the metadata or passed to this function!
             let cosm = Cosm::de438();
             let frame = cosm.try_frame(frame.as_ref().unwrap().as_str())?;

@@ -16,12 +16,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-mod interp_state;
+mod interpolatable;
 mod traj;
 mod traj_it;
 
-pub use interp_state::InterpState;
-pub(crate) use interp_state::INTERPOLATION_SAMPLES;
+pub use interpolatable::Interpolatable;
+pub(crate) use interpolatable::INTERPOLATION_SAMPLES;
 use serde::{Deserialize, Serialize};
 pub use traj::Traj;
 

@@ -18,25 +18,24 @@
 
 use std::sync::Arc;
 
-use rand::Rng;
+use hifitime::Epoch;
+use rand_pcg::Pcg64Mcg;
 
 use crate::linalg::DefaultAllocator;
-use crate::od::SimMeasurement;
-use crate::State;
+use crate::md::trajectory::Interpolatable;
+use crate::md::ui::{Frame, Traj};
+use crate::od::Measurement;
 use crate::{io::Configurable, linalg::allocator::Allocator};
+use crate::{NyxError, Orbit};
 
 use super::Cosm;
 
 /// Tracking device simulator.
 pub trait TrackingDeviceSim<MsrIn, Msr>: Configurable
 where
-    MsrIn: State,
-    Msr: SimMeasurement,
-    DefaultAllocator: Allocator<f64, <Msr::State as State>::Size>
-        + Allocator<f64, <Msr::State as State>::Size, <Msr::State as State>::Size>
-        + Allocator<f64, <Msr::State as State>::VecLength>
-        + Allocator<f64, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, <Msr::State as State>::Size>
+    MsrIn: Interpolatable,
+    Msr: Measurement,
+    DefaultAllocator: Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, MsrIn::Size>
         + Allocator<f64, MsrIn::Size, MsrIn::Size>
         + Allocator<f64, MsrIn::VecLength>,
@@ -44,6 +43,31 @@ where
     /// Returns the name of this tracking data simulator
     fn name(&self) -> String;
 
-    /// Observes the input state and returns a measurement from itself to the input state, and returns None of the object is not visible.
-    fn measure<R: Rng>(&mut self, input: &MsrIn, rng: &mut R, cosm: Arc<Cosm>) -> Option<Msr>;
+    /// Performs a measurement of the input trajectory at the provided epoch (with integration times if relevant), and returns a measurement from itself to the input state. Returns None of the object is not visible.
+    /// This trait function takes in a trajectory and epoch so it can properly simulate integration times for the measurements.
+    /// If the random number generator is provided, it shall be used to add noise to the measurement.
+    ///
+    /// # Choice of the random number generator
+    /// The Pcg64Mcg is chosen because it is fast, space efficient, and has a good statistical distribution.
+    ///
+    /// # Errors
+    ///     + A specific measurement is requested but the noise on that measurement type is not configured.
+    fn measure(
+        &mut self,
+        epoch: Epoch,
+        traj: &Traj<MsrIn>,
+        rng: Option<&mut Pcg64Mcg>,
+        cosm: Arc<Cosm>,
+    ) -> Result<Option<Msr>, NyxError>;
+
+    /// Returns the device location at the given epoch and in the given frame.
+    fn location(&self, epoch: Epoch, frame: Frame, cosm: &Cosm) -> Orbit;
+
+    // Perform an instantaneous measurement (without integration times, i.e. one-way). Returns None if the object is not visible, else returns the measurement.
+    fn measure_instantaneous(
+        &mut self,
+        rx: MsrIn,
+        rng: Option<&mut Pcg64Mcg>,
+        cosm: Arc<Cosm>,
+    ) -> Result<Option<Msr>, NyxError>;
 }

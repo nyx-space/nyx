@@ -137,7 +137,7 @@ fn tgt_b_plane_lunar_transfer() {
         ],
         b_plane_tgt.to_objectives_with_tolerance(3.0),
         luna,
-        cosm.clone(),
+        cosm,
     );
 
     let tcm_epoch = periapse_spacecraft.epoch();

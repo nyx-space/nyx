@@ -9,6 +9,7 @@ use nyx::io::formatter::NavSolutionFormatter;
 use nyx::io::gravity::*;
 use nyx::io::ConfigRepr;
 use nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
+use nyx::od::noise::GaussMarkov;
 use nyx::od::prelude::*;
 use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use std::collections::HashMap;
@@ -30,14 +31,24 @@ fn od_tb_val_ekf_fixed_step_perfect_stations() {
     // Set the disable time to be very low to test enable/disable sequence
     let ekf_disable_time = 5.0 * Unit::Second;
     let elevation_mask = 0.0;
-    let range_noise = 0.0;
-    let range_rate_noise = 0.0;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss13_goldstone = GroundStation::dss13_goldstone(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
 
     // Define the tracking configurations
     let mut configs = HashMap::new();
@@ -120,7 +131,7 @@ fn od_tb_val_ekf_fixed_step_perfect_stations() {
         prop_est,
         kf,
         EkfTrigger::new(ekf_num_meas, ekf_disable_time),
-        cosm.clone(),
+        cosm,
     );
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
@@ -182,14 +193,24 @@ fn od_tb_val_with_arc() {
     // Set the disable time to be very low to test enable/disable sequence
     let ekf_disable_time = 5.0 * Unit::Second;
     let elevation_mask = 0.0;
-    let range_noise = 0.0;
-    let range_rate_noise = 0.0;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss13_goldstone = GroundStation::dss13_goldstone(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     let ekf_num_meas = 100;
@@ -233,10 +254,10 @@ fn od_tb_val_with_arc() {
     .iter()
     .collect();
 
-    let configs: HashMap<String, TrkConfig> = TrkConfig::load_named_yaml(trkconfig_yaml).unwrap();
+    let configs: HashMap<String, TrkConfig> = TrkConfig::load_named(trkconfig_yaml).unwrap();
 
     // Simulate tracking data of range and range rate
-    let mut arc_sim = TrackingArcSim::with_seed(all_stations.clone(), traj, configs, 1).unwrap();
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 1).unwrap();
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
@@ -279,7 +300,7 @@ fn od_tb_val_with_arc() {
         prop_est,
         kf,
         EkfTrigger::new(ekf_num_meas, ekf_disable_time),
-        cosm.clone(),
+        cosm,
     );
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
@@ -353,14 +374,24 @@ fn od_tb_val_ckf_fixed_step_perfect_stations() {
 
     // Define the ground stations.
     let elevation_mask = 0.0;
-    let range_noise = 0.0;
-    let range_rate_noise = 0.0;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss13_goldstone = GroundStation::dss13_goldstone(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
 
     // Define the tracking configurations
     let mut configs = HashMap::new();
@@ -441,8 +472,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations() {
     // Check that we have as many estimates as steps taken by the propagator.
     // Note that this test cannot work when using a variable step propagator in that same setup.
     // We're adding +1 because the propagation time is inclusive on both ends.
-    // We add another +1 because we have a measurement on the initial estimate of the propagator, so we propagate by zero seconds but still process that measurement.
-    let expected_num_estimates = (prop_time.to_seconds() / step_size.to_seconds()) as usize + 2;
+    let expected_num_estimates = (prop_time.to_seconds() / step_size.to_seconds()) as usize + 1;
 
     // Check that there are no duplicates of epochs.
     let mut prev_epoch = odp.estimates[0].epoch();
@@ -589,12 +619,24 @@ fn od_tb_ckf_fixed_step_iteration_test() {
     let elevation_mask = 0.0;
     let range_noise = 0.1; // in km (so 100 meters of error)
     let range_rate_noise = 0.001; // in km/s (or 1 meter per second of error)
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss13_goldstone = GroundStation::dss13_goldstone(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
 
     // Define the tracking configurations
     let mut configs = HashMap::new();
@@ -665,7 +707,7 @@ fn od_tb_ckf_fixed_step_iteration_test() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
+    let mut odp = ODProcess::ckf(prop_est, ckf, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -747,14 +789,24 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
 
     // Define the ground stations.
     let elevation_mask = 0.0;
-    let range_noise = 0.0;
-    let range_rate_noise = 0.0;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss13_goldstone = GroundStation::dss13_goldstone(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
 
     // Define the tracking configurations
     let mut configs = HashMap::new();
@@ -818,13 +870,13 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
 
-    // Define the process noise to assume an unmodel acceleration of 1e-3 km^2/s^2 on X, Y and Z in the ECI frame
+    // Define the process noise to assume an unmodeled acceleration of 1e-3 km^2/s^2 on X, Y and Z in the ECI frame
     let sigma_q = 1e-8_f64.powi(2);
     let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
 
     let ckf = KF::new(initial_estimate, process_noise, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
+    let mut odp = ODProcess::ckf(prop_est, ckf, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -859,8 +911,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
             );
         }
 
-        wtr.serialize(est.clone())
-            .expect("could not write to stdout");
+        wtr.serialize(*est).expect("could not write to stdout");
     }
 
     // Check the final estimate
@@ -923,12 +974,12 @@ fn od_tb_ckf_map_covar() {
     let mut odp: ODProcess<
         OrbitalDynamics,
         nyx::propagators::RSSCartesianStep,
-        StdMeasurement,
+        RangeDoppler,
         CkfTrigger,
         nalgebra::Const<3>,
         Orbit,
         KF<Orbit, nalgebra::Const<3>, nalgebra::Const<2>>,
-    > = ODProcess::ckf(prop_est, ckf, cosm.clone());
+    > = ODProcess::ckf(prop_est, ckf, cosm);
 
     odp.map_covar(dt + prop_time).unwrap();
 
@@ -971,14 +1022,24 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect() {
 
     // Define the ground stations.
     let elevation_mask = 0.0;
-    let range_noise = 0.0;
-    let range_rate_noise = 0.0;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss13_goldstone = GroundStation::dss13_goldstone(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
 
     // Define the tracking configurations
     let mut configs = HashMap::new();
@@ -1047,7 +1108,7 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
+    let mut odp = ODProcess::ckf(prop_est, ckf, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
     let mut wtr = csv::Writer::from_path("./estimation.csv").unwrap();
@@ -1071,8 +1132,7 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect() {
             est.state_deviation().norm()
         );
 
-        wtr.serialize(est.clone())
-            .expect("could not write to stdout");
+        wtr.serialize(*est).expect("could not write to stdout");
     }
 
     // Check the final estimate
@@ -1102,14 +1162,24 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
 
     // Define the ground stations.
     let elevation_mask = 0.0;
-    let range_noise = 0.0;
-    let range_rate_noise = 0.0;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss13_goldstone = GroundStation::dss13_goldstone(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
 
     // Define the tracking configurations
     let mut configs = HashMap::new();
@@ -1172,7 +1242,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
 
-    // Define the process noise to assume an unmodel acceleration of 1e-3 km^2/s^2 on X, Y and Z in the ECI frame
+    // Define the process noise to assume an unmodeled acceleration of 1e-3 km^2/s^2 on X, Y and Z in the ECI frame
     let sigma_q1 = 1e-7_f64.powi(2);
     let process_noise1 = SNC3::from_diagonal(2 * Unit::Day, &[sigma_q1, sigma_q1, sigma_q1]);
 
@@ -1191,7 +1261,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
         measurement_noise,
     );
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
+    let mut odp = ODProcess::ckf(prop_est, ckf, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -1217,8 +1287,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
             );
         }
 
-        wtr.serialize(est.clone())
-            .expect("could not write to stdout");
+        wtr.serialize(*est).expect("could not write to stdout");
     }
 
     // Check the final estimate

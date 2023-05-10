@@ -16,12 +16,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::{InterpState, Traj};
+use super::{Interpolatable, Traj};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 use crate::time::TimeSeries;
 
-pub struct TrajIterator<'a, S: InterpState>
+pub struct TrajIterator<'a, S: Interpolatable>
 where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
@@ -31,7 +31,7 @@ where
     pub traj: &'a Traj<S>,
 }
 
-impl<S: InterpState> Iterator for TrajIterator<'_, S>
+impl<S: Interpolatable> Iterator for TrajIterator<'_, S>
 where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,

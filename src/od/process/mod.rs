@@ -4,7 +4,7 @@
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
-    by the Free Software Foundatio either version 3 of the License, or
+    by the Free Software Foundation either version 3 of the License, or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
@@ -16,15 +16,13 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use rand::thread_rng;
-
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName};
-use crate::md::trajectory::{InterpState, Traj};
+use crate::md::trajectory::{Interpolatable, Traj};
 
 pub use crate::od::estimate::*;
+pub use crate::od::ground_station::*;
 pub use crate::od::kalman::*;
-pub use crate::od::measurement::*;
 pub use crate::od::residual::*;
 pub use crate::od::snc::*;
 pub use crate::od::*;
@@ -38,6 +36,7 @@ pub use conf::{IterationConf, SmoothingArc};
 mod trigger;
 pub use trigger::{CkfTrigger, EkfTrigger, KfTrigger};
 
+use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::Add;
 
@@ -49,13 +48,14 @@ pub struct ODProcess<
     'a,
     D: Dynamics,
     E: ErrorCtrl,
-    Msr: SimMeasurement<State = S>,
+    Msr: Measurement,
     T: KfTrigger,
     A: DimName,
-    S: EstimateFrom<D::StateType>,
+    S: EstimateFrom<D::StateType, Msr> + Interpolatable,
     K: Filter<S, A, Msr::MeasurementSize>,
 > where
-    D::StateType: Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
+    D::StateType: Interpolatable + Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
+    <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, <S as State>::Size>
         + Allocator<f64, <S as State>::VecLength>
@@ -86,7 +86,6 @@ pub struct ODProcess<
     pub residuals: Vec<Residual<Msr::MeasurementSize>>,
     pub ekf_trigger: T,
     pub cosm: Arc<Cosm>,
-    simultaneous_msr: bool,
     init_state: D::StateType,
     _marker: PhantomData<A>,
 }
@@ -95,14 +94,15 @@ impl<
         'a,
         D: Dynamics,
         E: ErrorCtrl,
-        Msr: SimMeasurement<State = S>,
+        Msr: Measurement,
         T: KfTrigger,
         A: DimName,
-        S: EstimateFrom<D::StateType>,
+        S: EstimateFrom<D::StateType, Msr> + Interpolatable,
         K: Filter<S, A, Msr::MeasurementSize>,
     > ODProcess<'a, D, E, Msr, T, A, S, K>
 where
-    D::StateType: Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
+    D::StateType: Interpolatable + Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
+    <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, S::Size>
@@ -128,17 +128,14 @@ where
 {
     pub fn ekf(prop: PropInstance<'a, D, E>, kf: K, trigger: T, cosm: Arc<Cosm>) -> Self {
         let init_state = prop.state;
-        let mut estimates = Vec::with_capacity(10_001);
-        estimates.push(kf.previous_estimate().clone());
         Self {
             prop,
             kf,
-            estimates,
+            estimates: Vec::with_capacity(10_000),
             residuals: Vec::with_capacity(10_000),
             ekf_trigger: trigger,
             cosm,
             init_state,
-            simultaneous_msr: false,
             _marker: PhantomData::<A>,
         }
     }
@@ -156,14 +153,15 @@ where
         smoothed.push(self.estimates.last().unwrap().clone());
 
         loop {
+            let k = l - smoothed.len();
             // Borrow the previously smoothed estimate of the k+1 estimate
-            let sm_est_kp1 = &self.estimates[l - smoothed.len() + 1];
+            let sm_est_kp1 = &self.estimates[k + 1];
             let x_kp1_l = sm_est_kp1.state_deviation();
             let p_kp1_l = sm_est_kp1.covar();
             // Borrow the k-th estimate, which we're smoothing with the next estimate
-            let est_k = &self.estimates[l - smoothed.len()];
+            let est_k = &self.estimates[k];
             // Borrow the k+1-th estimate, which we're smoothing with the next estimate
-            let est_kp1 = &self.estimates[l - smoothed.len() + 1];
+            let est_kp1 = &self.estimates[k + 1];
 
             // Check the smoother stopping condition
             match condition {
@@ -183,11 +181,7 @@ where
                         break;
                     }
                 }
-                SmoothingArc::All => {
-                    // if est_k.epoch() == est_kp1.epoch() {
-                    //     break;
-                    // }
-                }
+                SmoothingArc::All => {}
             }
 
             // Compute the STM between both steps taken by the filter
@@ -219,9 +213,12 @@ where
             }
         }
 
+        // Note that we have yet to reverse the list, so we print them backward
         info!(
-            "Smoothing condition reached after {} estimates ",
-            smoothed.len()
+            "Smoothed {} estimates (from {} to {})",
+            smoothed.len(),
+            smoothed.last().unwrap().epoch(),
+            smoothed[0].epoch(),
         );
 
         // Now, let's add all of the other estimates so that the same indexing can be done
@@ -240,301 +237,41 @@ where
 
         // And reverse to maintain the order of estimates
         smoothed.reverse();
+
         Ok(smoothed)
     }
 
     /// Returns the root mean square of the prefit residuals
+    ///
+    /// # WARNING:
+    /// The units will be garbage here if rows in the measurements have different units.
     pub fn rms_prefit_residual(&self) -> f64 {
         let mut sum = 0.0;
         for residual in &self.residuals {
-            // sum += residual.prefit.dot(&residual.prefit);
-            let mut msr_noise_item_inv: OVector<f64, Msr::MeasurementSize> =
-                self.kf.measurement_noise(residual.dt).diagonal().clone();
-            for i in 0..msr_noise_item_inv.len() {
-                msr_noise_item_inv[i] = 1.0 / msr_noise_item_inv[i];
-            }
-            sum += residual.prefit.dot(&msr_noise_item_inv).powi(2);
+            sum += residual.prefit.dot(&residual.prefit);
         }
-        (sum / (self.estimates.len() as f64)).sqrt()
+        (sum / (self.residuals.len() as f64)).sqrt()
     }
 
     /// Returns the root mean square of the postfit residuals
+    ///
+    /// # WARNING:
+    /// The units will be garbage here if rows in the measurements have different units.
     pub fn rms_postfit_residual(&self) -> f64 {
         let mut sum = 0.0;
         for residual in &self.residuals {
             sum += residual.postfit.dot(&residual.postfit);
         }
-        (sum / (self.estimates.len() as f64)).sqrt()
+        (sum / (self.residuals.len() as f64)).sqrt()
     }
 
-    /// Allows iterating on the filter solution. Requires specifying a smoothing condition to know where to stop the smoothing.
-    pub fn iterate<Dev>(
-        &mut self,
-        devices: &mut [Dev],
-        measurements: &[Msr],
-        config: IterationConf,
-    ) -> Result<(), NyxError>
-    where
-        Dev: TrackingDeviceSim<S, Msr>,
-    {
-        // Compute the initial RMS
-        let mut best_rms = if config.use_prefit {
-            self.rms_prefit_residual()
-        } else {
-            self.rms_postfit_residual()
-        };
-        let mut previous_rms = best_rms;
-        let mut divergence_cnt = 0;
-        let mut iter_cnt = 0;
-        loop {
-            if best_rms <= config.absolute_tol {
-                info!("*****************");
-                info!("*** CONVERGED ***");
-                info!("*****************");
-
-                info!(
-                    "Filter converged to absolute tolerance ({:.2e} < {:.2e}) after {} iterations",
-                    best_rms, config.absolute_tol, iter_cnt
-                );
-                return Ok(());
-            }
-
-            iter_cnt += 1;
-
-            info!("***************************");
-            info!("*** Iteration number {} ***", iter_cnt);
-            info!("***************************");
-
-            // First, smooth the estimates
-            let smoothed = self.smooth(config.smoother)?;
-            // Reset the propagator
-            self.prop.state = self.init_state;
-            // Empty the estimates and add the first smoothed estimate as the initial estimate
-            self.estimates = Vec::with_capacity(measurements.len());
-            self.estimates.push(smoothed[0].clone());
-            self.kf.set_previous_estimate(&smoothed[0]);
-            // And re-run the filter
-            self.process_measurements(devices, measurements)?;
-
-            // Compute the new RMS
-            let new_rms = if config.use_prefit {
-                self.rms_prefit_residual()
-            } else {
-                self.rms_postfit_residual()
-            };
-            let cur_rel_rms = (new_rms - best_rms).abs() / best_rms;
-            if cur_rel_rms < config.relative_tol {
-                info!("*****************");
-                info!("*** CONVERGED ***");
-                info!("*****************");
-                info!(
-                    "New RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
-                    new_rms, previous_rms, best_rms
-                );
-                info!(
-                    "Filter converged to relative tolerance ({:.2e} < {:.2e}) after {} iterations",
-                    cur_rel_rms, config.relative_tol, iter_cnt
-                );
-                return Ok(());
-            }
-
-            if new_rms > previous_rms {
-                warn!(
-                    "New RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
-                    new_rms, previous_rms, best_rms
-                );
-                divergence_cnt += 1;
-                previous_rms = new_rms;
-                if divergence_cnt >= config.max_divergences {
-                    let msg = format!(
-                        "Filter iterations have continuously diverged {} times: {}",
-                        config.max_divergences, config
-                    );
-                    if config.force_failure {
-                        return Err(NyxError::MaxIterReached(msg));
-                    } else {
-                        error!("{}", msg);
-                        return Ok(());
-                    }
-                } else {
-                    warn!("Filter iteration caused divergence {} of {} acceptable subsequent divergences", divergence_cnt, config.max_divergences);
-                }
-            } else {
-                info!(
-                    "New RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
-                    new_rms, previous_rms, best_rms
-                );
-                // Reset the counter
-                divergence_cnt = 0;
-                previous_rms = new_rms;
-                if previous_rms < best_rms {
-                    best_rms = previous_rms;
-                }
-            }
-
-            if iter_cnt >= config.max_iterations {
-                let msg = format!(
-                    "Filter has iterated {} times but failed to reach filter convergence criteria: {}",
-                    config.max_iterations, config
-                );
-                if config.force_failure {
-                    return Err(NyxError::MaxIterReached(msg));
-                } else {
-                    error!("{}", msg);
-                    return Ok(());
-                }
-            }
+    /// Returns the root mean square of the prefit residual ratios
+    pub fn rms_residual_ratios(&self) -> f64 {
+        let mut sum = 0.0;
+        for residual in &self.residuals {
+            sum += residual.ratio.powi(2);
         }
-    }
-
-    /// Allows processing all measurements with covariance mapping.
-    ///
-    /// WARNING: Measurements **MUST** be ordered in positive chronological time.
-    #[allow(clippy::erasing_op)]
-    pub fn process_measurements<Dev>(
-        &mut self,
-        devices: &mut [Dev],
-        measurements: &[Msr],
-    ) -> Result<(), NyxError>
-    where
-        Dev: TrackingDeviceSim<S, Msr>,
-    {
-        assert!(
-            !measurements.is_empty(),
-            "must have at least one measurement"
-        );
-        // Start by propagating the estimator (on the same thread).
-        let num_msrs = measurements.len();
-
-        let prop_time = measurements[num_msrs - 1].epoch() - self.kf.previous_estimate().epoch();
-        info!("Navigation propagating for a total of {}", prop_time);
-
-        let mut epoch = self.prop.state.epoch();
-
-        let mut reported = [false; 11];
-        info!(
-            "Processing {} measurements with covariance mapping",
-            num_msrs
-        );
-
-        // In the following, we'll continuously tell the propagator to advance by a single step until the next measurement.
-        // This is effectively a clone of the "for_duration" function of the propagator.
-        // However, after every step of the propagator, we will perform a time update and reset the STM.
-        // This ensures that we have a time update every time the propagator error function says that the integration would
-        // be wrong if the step would be larger. Moreover, we will reset the STM to ensure that the state transition matrix
-        // stays linear (the error control function may verify this).
-
-        let mut rng = thread_rng();
-
-        for (msr_cnt, msr) in measurements.iter().enumerate() {
-            let next_msr_epoch = msr.epoch();
-
-            // Advance the propagator
-            loop {
-                let delta_t = next_msr_epoch - epoch;
-                if self.prop.details.step < delta_t {
-                    // Do a single step and (probably) a time update, but we'll see that later
-                    self.prop.single_step()?;
-                } else if delta_t.to_seconds() > 0.0 {
-                    // Take one final step of exactly the needed duration until the next measurement
-                    self.prop.for_duration(delta_t)?;
-                }
-
-                // Now that we've advanced the propagator, let's see whether we're at the time of the next measurement.
-
-                // Extract the state and update the STM in the filter.
-                let nominal_state = S::extract(self.prop.state);
-                // Get the datetime and info needed to compute the theoretical measurement according to the model
-                epoch = nominal_state.epoch();
-
-                if nominal_state.epoch() == next_msr_epoch {
-                    // Perform a measurement update
-
-                    // Get the computed observations
-                    for device in devices.iter_mut() {
-                        if let Some(computed_meas) =
-                            device.measure(&nominal_state, &mut rng, self.cosm.clone())
-                        {
-                            self.kf
-                                .update_h_tilde(computed_meas.sensitivity(nominal_state));
-
-                            // Switch back from extended if necessary
-                            if self.kf.is_extended() && self.ekf_trigger.disable_ekf(epoch) {
-                                self.kf.set_extended(false);
-                                info!("EKF disabled @ {}", epoch);
-                            }
-
-                            match self.kf.measurement_update(
-                                nominal_state,
-                                &msr.observation(),
-                                &computed_meas.observation(),
-                            ) {
-                                Ok((est, res)) => {
-                                    debug!("msr update #{} @ {}", msr_cnt, epoch);
-                                    // Switch to EKF if necessary, and update the dynamics and such
-                                    // Note: we call enable_ekf first to ensure that the trigger gets
-                                    // called in case it needs to save some information (e.g. the
-                                    // StdEkfTrigger needs to store the time of the previous measurement).
-                                    if self.ekf_trigger.enable_ekf(&est) && !self.kf.is_extended() {
-                                        self.kf.set_extended(true);
-                                        if !est.within_3sigma() {
-                                            warn!("EKF enabled @ {} but filter DIVERGING", epoch);
-                                        } else {
-                                            info!("EKF enabled @ {}", epoch);
-                                        }
-                                    }
-                                    if self.kf.is_extended() {
-                                        self.prop.state = self.prop.state + est.state_deviation();
-                                    }
-                                    self.prop.state.reset_stm();
-                                    self.estimates.push(est);
-                                    self.residuals.push(res);
-                                }
-                                Err(e) => return Err(e),
-                            }
-
-                            // If we do not have simultaneous measurements from different devices
-                            // then we don't need to check the visibility from other devices
-                            // if one is in visibility.
-                            if !self.simultaneous_msr {
-                                break;
-                            }
-                        }
-                    }
-
-                    let msr_prct = (10.0 * (msr_cnt as f64) / (num_msrs as f64)) as usize;
-                    if !reported[msr_prct] {
-                        info!(
-                            "{:>3}% done ({:.0} measurements processed)",
-                            10 * msr_prct,
-                            msr_cnt
-                        );
-                        reported[msr_prct] = true;
-                    }
-
-                    break;
-                } else {
-                    // No measurement can be used here, let's just do a time update
-                    debug!("time update {}", epoch);
-                    match self.kf.time_update(nominal_state) {
-                        Ok(est) => {
-                            // State deviation is always zero for an EKF time update
-                            // therefore we don't do anything different for an extended filter
-                            self.estimates.push(est);
-                        }
-                        Err(e) => return Err(e),
-                    }
-                    self.prop.state.reset_stm();
-                }
-            }
-        }
-
-        // Always report the 100% mark
-        if !reported[10] {
-            info!("{:>3}% done ({:.0} measurements processed)", 100, num_msrs);
-        }
-
-        Ok(())
+        (sum / (self.residuals.len() as f64)).sqrt()
     }
 
     /// Allows iterating on the filter solution. Requires specifying a smoothing condition to know where to stop the smoothing.
@@ -548,12 +285,7 @@ where
     {
         let measurements = &arc.measurements;
 
-        // Compute the initial RMS
-        let mut best_rms = if config.use_prefit {
-            self.rms_prefit_residual()
-        } else {
-            self.rms_postfit_residual()
-        };
+        let mut best_rms = self.rms_residual_ratios();
         let mut previous_rms = best_rms;
         let mut divergence_cnt = 0;
         let mut iter_cnt = 0;
@@ -572,6 +304,8 @@ where
 
             iter_cnt += 1;
 
+            self.ekf_trigger.reset();
+
             info!("***************************");
             info!("*** Iteration number {} ***", iter_cnt);
             info!("***************************");
@@ -582,24 +316,20 @@ where
             self.prop.state = self.init_state;
             // Empty the estimates and add the first smoothed estimate as the initial estimate
             self.estimates = Vec::with_capacity(measurements.len());
-            self.estimates.push(smoothed[0].clone());
+            // self.estimates.push(smoothed[0].clone());
             self.kf.set_previous_estimate(&smoothed[0]);
             // And re-run the filter
             self.process_arc::<Dev>(arc)?;
 
             // Compute the new RMS
-            let new_rms = if config.use_prefit {
-                self.rms_prefit_residual()
-            } else {
-                self.rms_postfit_residual()
-            };
+            let new_rms = self.rms_residual_ratios();
             let cur_rel_rms = (new_rms - best_rms).abs() / best_rms;
             if cur_rel_rms < config.relative_tol {
                 info!("*****************");
                 info!("*** CONVERGED ***");
                 info!("*****************");
                 info!(
-                    "New RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
+                    "New residual RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
                     new_rms, previous_rms, best_rms
                 );
                 info!(
@@ -611,7 +341,7 @@ where
 
             if new_rms > previous_rms {
                 warn!(
-                    "New RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
+                    "New residual RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
                     new_rms, previous_rms, best_rms
                 );
                 divergence_cnt += 1;
@@ -632,7 +362,7 @@ where
                 }
             } else {
                 info!(
-                    "New RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
+                    "New residual RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
                     new_rms, previous_rms, best_rms
                 );
                 // Reset the counter
@@ -667,17 +397,38 @@ where
         let mut devices = arc.rebuild_devices::<S, Dev>(self.cosm.clone()).unwrap();
 
         let measurements = &arc.measurements;
+        let step_size = arc.min_duration_sep().unwrap();
+
+        self.process(measurements, &mut devices, step_size)
+    }
+
+    /// Process the provided measurements for this orbit determination process given the associated devices.
+    ///
+    /// # Argument details
+    /// + The measurements must be a list mapping the name of the measurement device to the measurement itself.
+    /// + The name of all measurement devices must be present in the provided devices, i.e. the key set of `devices` must be a superset of the measurement device names present in the list.
+    #[allow(clippy::erasing_op)]
+    pub fn process<Dev>(
+        &mut self,
+        measurements: &[(String, Msr)],
+        devices: &mut HashMap<String, Dev>,
+        step_size: Duration,
+    ) -> Result<(), NyxError>
+    where
+        Dev: TrackingDeviceSim<S, Msr>,
+    {
         assert!(
             measurements.len() >= 2,
             "must have at least two measurements"
         );
         // Start by propagating the estimator (on the same thread).
         let num_msrs = measurements.len();
-        let step_size = arc.min_duration_sep().unwrap();
+
         // Update the step size of the navigation propagator if it isn't already fixed step
         if !self.prop.fixed_step {
             self.prop.set_step(step_size, false);
         }
+
         let prop_time = measurements[num_msrs - 1].1.epoch() - self.kf.previous_estimate().epoch();
         info!("Navigation propagating for a total of {prop_time} with step size {step_size}");
 
@@ -686,17 +437,19 @@ where
         let mut reported = [false; 11];
         info!("Processing {num_msrs} measurements with covariance mapping");
 
-        // In the following, we'll continuously tell the propagator to advance by a single step until the next measurement.
-        // This is effectively a clone of the "for_duration" function of the propagator.
-        // However, after every step of the propagator, we will perform a time update and reset the STM.
-        // This ensures that we have a time update every time the propagator error function says that the integration would
-        // be wrong if the step would be larger. Moreover, we will reset the STM to ensure that the state transition matrix
-        // stays linear (the error control function may verify this).
-
-        let mut rng = thread_rng();
+        // We'll build a trajectory of the estimated states. This will be used to compute the measurements.
+        let mut traj = Traj::new();
 
         for (msr_cnt, (device_name, msr)) in measurements.iter().enumerate() {
             let next_msr_epoch = msr.epoch();
+
+            for val in msr.observation().iter() {
+                if !val.is_finite() {
+                    return Err(NyxError::CustomError(format!(
+                        "invalid measurement @ {next_msr_epoch} = {val}"
+                    )));
+                }
+            }
 
             // Advance the propagator
             loop {
@@ -709,8 +462,16 @@ where
                 } else {
                     self.prop.details.step
                 });
+
+                // Remove old states from the trajectory
+                traj.states.retain(|state: &S| state.epoch() <= epoch);
+
                 debug!("advancing propagator by {next_step_size} (Δt to next msr: {delta_t})");
-                self.prop.for_duration(next_step_size)?;
+                let (_, traj_covar) = self.prop.for_duration_with_traj(next_step_size)?;
+
+                for state in traj_covar.states {
+                    traj.states.push(S::extract(state));
+                }
 
                 // Now that we've advanced the propagator, let's see whether we're at the time of the next measurement.
 
@@ -719,17 +480,17 @@ where
                 // Get the datetime and info needed to compute the theoretical measurement according to the model
                 epoch = nominal_state.epoch();
 
+                // Perform a measurement update
                 if nominal_state.epoch() == next_msr_epoch {
-                    // Perform a measurement update
-
                     // Get the computed observations
                     match devices.get_mut(device_name) {
                         Some(device) => {
                             if let Some(computed_meas) =
-                                device.measure(&nominal_state, &mut rng, self.cosm.clone())
+                                device.measure(epoch, &traj, None, self.cosm.clone())?
                             {
-                                self.kf
-                                    .update_h_tilde(computed_meas.sensitivity(nominal_state));
+                                // Grab the device location
+                                let device_loc =
+                                    device.location(epoch, nominal_state.frame(), &self.cosm);
 
                                 // Switch back from extended if necessary
                                 if self.kf.is_extended() && self.ekf_trigger.disable_ekf(epoch) {
@@ -737,22 +498,26 @@ where
                                     info!("EKF disabled @ {epoch}");
                                 }
 
+                                let h_tilde = S::sensitivity(msr, nominal_state, device_loc);
+
+                                self.kf.update_h_tilde(h_tilde);
+
                                 match self.kf.measurement_update(
                                     nominal_state,
                                     &msr.observation(),
                                     &computed_meas.observation(),
                                 ) {
-                                    Ok((est, res)) => {
+                                    Ok((estimate, residual)) => {
                                         debug!("msr update #{msr_cnt} @ {epoch}");
                                         // Switch to EKF if necessary, and update the dynamics and such
                                         // Note: we call enable_ekf first to ensure that the trigger gets
                                         // called in case it needs to save some information (e.g. the
                                         // StdEkfTrigger needs to store the time of the previous measurement).
-                                        if self.ekf_trigger.enable_ekf(&est)
+                                        if self.ekf_trigger.enable_ekf(&estimate)
                                             && !self.kf.is_extended()
                                         {
                                             self.kf.set_extended(true);
-                                            if !est.within_3sigma() {
+                                            if !estimate.within_3sigma() {
                                                 warn!("EKF enabled @ {epoch} but filter DIVERGING");
                                             } else {
                                                 info!("EKF enabled @ {epoch}");
@@ -760,11 +525,12 @@ where
                                         }
                                         if self.kf.is_extended() {
                                             self.prop.state =
-                                                self.prop.state + est.state_deviation();
+                                                self.prop.state + estimate.state_deviation();
                                         }
                                         self.prop.state.reset_stm();
-                                        self.estimates.push(est);
-                                        self.residuals.push(res);
+
+                                        self.estimates.push(estimate);
+                                        self.residuals.push(residual);
                                     }
                                     Err(e) => return Err(e),
                                 }
@@ -853,7 +619,7 @@ where
     pub fn to_traj(&self) -> Result<Traj<S>, NyxError>
     where
         DefaultAllocator: Allocator<f64, <S as State>::VecLength>,
-        S: InterpState,
+        S: Interpolatable,
     {
         if self.estimates.is_empty() {
             Err(NyxError::NoStateData(
@@ -876,13 +642,14 @@ impl<
         'a,
         D: Dynamics,
         E: ErrorCtrl,
-        Msr: SimMeasurement<State = S>,
+        Msr: Measurement,
         A: DimName,
-        S: EstimateFrom<D::StateType>,
+        S: EstimateFrom<D::StateType, Msr> + Interpolatable,
         K: Filter<S, A, Msr::MeasurementSize>,
     > ODProcess<'a, D, E, Msr, CkfTrigger, A, S, K>
 where
-    D::StateType: Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
+    D::StateType: Interpolatable + Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
+    <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::VecLength>
         + Allocator<f64, Msr::MeasurementSize>
@@ -907,13 +674,10 @@ where
 {
     pub fn ckf(prop: PropInstance<'a, D, E>, kf: K, cosm: Arc<Cosm>) -> Self {
         let init_state = prop.state;
-        let mut estimates = Vec::with_capacity(10_001);
-        estimates.push(kf.previous_estimate().clone());
         Self {
             prop,
             kf,
-            simultaneous_msr: false,
-            estimates,
+            estimates: Vec::with_capacity(10_000),
             residuals: Vec::with_capacity(10_000),
             cosm,
             ekf_trigger: CkfTrigger {},

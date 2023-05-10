@@ -16,11 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-extern crate rand;
-extern crate rand_distr;
-extern crate rand_pcg;
-extern crate rayon;
-
 use rand::prelude::*;
 use rand_distr::{Distribution, Normal, Uniform};
 pub use rand_pcg::Pcg64Mcg;

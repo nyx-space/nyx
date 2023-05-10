@@ -39,14 +39,14 @@ use super::{estimate::OrbitEstimate, GroundStation};
 )]
 pub(crate) fn process_tracking_arc(
     dynamics: SpacecraftDynamics,
-    spacecraft: Spacecraft, // TODO: Consolidate spacecraft and estimate better
+    spacecraft: Spacecraft,
     initial_estimate: OrbitEstimate,
-    measurement_noise: Vec<f64>, // TODO: Switch to a serializable matrix with Numpy?
+    measurement_noise: Vec<f64>,
     arc: &DynamicTrackingArc,
     ekf_num_meas: usize,
     ekf_disable_time: Duration,
 ) -> Result<Vec<OrbitEstimate>, NyxError> {
-    // TODO: Return a navigation trajectory or use a class that mimics the better ODProcess
+    // TODO: Return a navigation trajectory or use a class that mimics the better ODProcess -- https://github.com/nyx-space/nyx/issues/134
     let msr_noise = Matrix2::from_iterator(measurement_noise);
 
     let init_sc = spacecraft.with_orbit(initial_estimate.0.nominal_state.with_stm());

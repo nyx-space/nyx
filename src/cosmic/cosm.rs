@@ -61,7 +61,7 @@ pub enum LightTimeCalc {
     /// Accounts for light-time correction. This is corresponds to CN in SPICE.
     LightTime,
     /// Accounts for light-time and stellar aberration where the solar system barycenter is the inertial frame. Corresponds to CN+S in SPICE.
-    Abberation,
+    Aberration,
 }
 
 #[derive(Debug)]
@@ -213,7 +213,7 @@ impl Cosm {
         self.frame_mut_gm("IAU Neptune", 6_836_534.063_879_3);
     }
 
-    /// Load the IAU Frames as defined in Celest Mech Dyn Astr (2018) 130:22 (https://doi.org/10.1007/s10569-017-9805-5)
+    /// Load the IAU Frames as defined in Celestial Mech Dyn Astr (2018) 130:22 (https://doi.org/10.1007/s10569-017-9805-5)
     pub fn load_iau_frames(&mut self) -> Result<(), NyxError> {
         // Load the IAU frames from the embedded TOML
         let iau_toml_str =
@@ -770,7 +770,7 @@ impl Cosm {
                 let state = Orbit::cartesian(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, datetime, target_frame);
                 Ok(-self.try_frame_chg(&state, frame)?)
             }
-            LightTimeCalc::LightTime | LightTimeCalc::Abberation => {
+            LightTimeCalc::LightTime | LightTimeCalc::Aberration => {
                 // Get the geometric states as seen from SSB
                 let ssb2k = self.frame_root.frame;
 
@@ -803,7 +803,7 @@ impl Cosm {
                     frame,
                 );
 
-                // Incluee the range-rate term in the velocity computation as explained in
+                // Include the range-rate term in the velocity computation as explained in
                 // https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/req/abcorr.html#Reception%20case
                 let state_acc = state.velocity() / state.rmag_km();
                 let dltdt = state.radius().dot(&state_acc) / SPEED_OF_LIGHT_KMS;
@@ -812,7 +812,7 @@ impl Cosm {
                 state.vy_km_s = tgt.vy_km_s * (1.0 - dltdt) - obs.vy_km_s;
                 state.vz_km_s = tgt.vz_km_s * (1.0 - dltdt) - obs.vz_km_s;
 
-                if correction == LightTimeCalc::Abberation {
+                if correction == LightTimeCalc::Aberration {
                     // Get a unit vector that points in the direction of the object
                     let r_hat = state.r_hat();
                     // Get the velocity vector (of the observer) scaled with respect to the speed of light
@@ -1413,7 +1413,7 @@ mod tests {
             Bodies::EarthBarycenter.ephem_path(),
             jde,
             mars2k,
-            LightTimeCalc::Abberation,
+            LightTimeCalc::Aberration,
         );
 
         assert!(dbg!(out_state.x_km - -2.577_231_712_700_484_4e8).abs() < 1e-3);
@@ -1456,7 +1456,7 @@ mod tests {
         let earth_iau = cosm.frame("IAU Earth");
         println!("{:?}\n{:?}", eme2k, earth_iau);
 
-        let dt = Epoch::from_gregorian_utc(2023, 11, 16, 06, 11, 19, 146200000);
+        let dt = Epoch::from_gregorian_utc(2023, 11, 16, 6, 11, 19, 146200000);
 
         // Case 1: Initialize from EME2000
         let state_eme2k = Orbit::cartesian(
@@ -1505,7 +1505,7 @@ mod tests {
             -0.0517208410530453,
             0.9259079323890239,
             0.3741917360656812,
-            -0.9986038252635100,
+            -0.998_603_825_263_51,
             -0.0439204209304354,
             -0.0293495620815480,
             -0.0107403337867543,

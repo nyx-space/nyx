@@ -16,12 +16,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::hyperdual::linalg::norm;
-use super::hyperdual::{extract_jacobian_and_result, hyperspace_from_vector, Float, OHyperdual};
 use super::{AccelModel, Dynamics, NyxError};
 use crate::cosmic::{Bodies, Cosm, Frame, LightTimeCalc, Orbit};
 use crate::linalg::{Const, Matrix3, Matrix6, OVector, Vector3, Vector6};
 use crate::State;
+use hyperdual::linalg::norm;
+use hyperdual::{extract_jacobian_and_result, hyperspace_from_vector, Float, OHyperdual};
 use std::f64;
 use std::fmt;
 use std::sync::Arc;

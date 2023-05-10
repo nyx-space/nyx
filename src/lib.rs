@@ -23,13 +23,16 @@
 Refer to [nyxspace.com](https://nyxspace.com) for a user guide, a show case, the MathSpec, and the validation data.
 */
 
+// Allow confusable identifiers, as the code tries to use the literature's notation where possible.
+#![allow(confusable_idents)]
+
 /// Provides all the propagators / integrators available in `nyx`.
 pub mod propagators;
 
 /// Provides several dynamics used for orbital mechanics and attitude dynamics, which can be elegantly combined.
 pub mod dynamics;
 
-/// Provides the solar system planets, and state and ephemeride management.
+/// Provides the solar system planets, and state and ephemerides management.
 pub mod cosmic;
 
 /// Utility functions shared by different modules, and which may be useful to engineers.

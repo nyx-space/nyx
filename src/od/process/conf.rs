@@ -47,7 +47,7 @@ impl fmt::Display for SmoothingArc {
 }
 
 /// Defines a filter iteration configuration. Allows iterating on an OD solution until convergence criteria is met.
-/// The root mean squared of the postfit residuals is used to assess convergence between iterations.
+/// The root mean squared of the prefit residuals ratios is used to assess convergence between iterations.
 #[derive(Clone, Copy, Debug)]
 pub struct IterationConf {
     /// The number of measurements to account for in the iteration
@@ -62,8 +62,16 @@ pub struct IterationConf {
     pub max_divergences: usize,
     /// Set to true to force an ODP failure when the convergence criteria is not met
     pub force_failure: bool,
-    /// Set to true to use the RMS prefit instead of postfit
-    pub use_prefit: bool,
+}
+
+impl IterationConf {
+    /// Iterate and smooth only once
+    pub fn once() -> Self {
+        Self {
+            max_iterations: 1,
+            ..Default::default()
+        }
+    }
 }
 
 impl Default for IterationConf {
@@ -76,16 +84,13 @@ impl Default for IterationConf {
             max_iterations: 15,
             max_divergences: 3,
             force_failure: false,
-            use_prefit: false,
         }
     }
 }
 
 impl fmt::Display for IterationConf {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let kind = if self.use_prefit { "prefit" } else { "postfit" };
-        write!(f, "Iterate {} residuals until abs = {:.2e}, or rel = {:.2e}, or {} iterations, or {} subsequent divergences with smoothing condition of {}",
-            kind,
+        write!(f, "Iterate until abs = {:.2e}, or rel = {:.2e}, or {} iterations, or {} subsequent divergences with smoothing condition of {}",
             self.absolute_tol,
             self.relative_tol,
             self.max_iterations,

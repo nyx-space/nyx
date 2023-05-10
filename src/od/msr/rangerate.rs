@@ -18,7 +18,7 @@
 
 use crate::cosmic::Orbit;
 use crate::linalg::{DimName, Matrix1x6, OVector, Vector1, U1, U6, U7};
-use crate::od::{Measurement, SimMeasurement};
+use crate::od::Measurement;
 use crate::time::Epoch;
 use crate::TimeTagged;
 use arrow::datatypes::{DataType, Field};
@@ -58,7 +58,7 @@ impl RangeRate {
         let mut pmat = Matrix1x6::zeros();
 
         for j in 1..U7::dim() {
-            pmat[(0, j - 1)] = range_rate[j];
+            pmat[j - 1] = range_rate[j];
         }
         (fx, pmat)
     }
@@ -93,7 +93,7 @@ impl Measurement for RangeRate {
     fn fields() -> Vec<Field> {
         let mut meta = HashMap::new();
         meta.insert("unit".to_string(), "km/s".to_string());
-        vec![Field::new("Range rate (km/s)", DataType::Float64, false).with_metadata(meta)]
+        vec![Field::new("Doppler (km/s)", DataType::Float64, false).with_metadata(meta)]
     }
 
     fn from_observation(epoch: Epoch, obs: OVector<f64, Self::MeasurementSize>) -> Self {
@@ -103,14 +103,6 @@ impl Measurement for RangeRate {
             visible: true,
             h_tilde: Matrix1x6::zeros(),
         }
-    }
-}
-
-impl SimMeasurement for RangeRate {
-    type State = Orbit;
-
-    fn sensitivity(&self, _nominal: Orbit) -> Matrix1x6<f64> {
-        self.h_tilde
     }
 }
 

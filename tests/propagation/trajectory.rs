@@ -6,7 +6,7 @@ use nyx::cosmic::{Cosm, GuidanceMode, Orbit, Spacecraft};
 use nyx::dynamics::guidance::{GuidanceLaw, Ruggiero, Thruster};
 use nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
 use nyx::io::trajectory_data::DynamicTrajectory;
-use nyx::md::trajectory::InterpState;
+use nyx::md::trajectory::Interpolatable;
 use nyx::md::ui::Objective;
 use nyx::md::StateParameter;
 use nyx::propagators::*;

@@ -18,26 +18,81 @@ use std::{collections::HashMap, str::FromStr};
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 pub use crate::io::ConfigError;
-pub use crate::od::simulator::TrkConfig;
+pub use crate::od::simulator::{Schedule, TrkConfig};
 use crate::{io::ConfigRepr, od::simulator::Availability, NyxError};
 use hifitime::{Duration, Epoch};
 use pyo3::prelude::*;
+use pyo3::types::PyType;
 
 #[pymethods]
 impl TrkConfig {
-    #[staticmethod]
-    fn load_yaml(path: &str) -> Result<Self, ConfigError> {
-        <Self as ConfigRepr>::load_yaml(path)
+    #[classmethod]
+    fn load(_cls: &PyType, path: &str) -> Result<Self, ConfigError> {
+        <Self as ConfigRepr>::load(path)
     }
 
-    #[staticmethod]
-    fn load_many_yaml(path: &str) -> Result<Vec<Self>, ConfigError> {
-        <Self as ConfigRepr>::load_many_yaml(path)
+    #[classmethod]
+    fn load_many(_cls: &PyType, path: &str) -> Result<Vec<Self>, ConfigError> {
+        <Self as ConfigRepr>::load_many(path)
     }
 
-    #[staticmethod]
-    fn load_named_yaml(path: &str) -> Result<HashMap<String, Self>, ConfigError> {
-        <Self as ConfigRepr>::load_named_yaml(path)
+    #[classmethod]
+    fn load_named(_cls: &PyType, path: &str) -> Result<HashMap<String, Self>, ConfigError> {
+        <Self as ConfigRepr>::load_named(path)
+    }
+
+    #[new]
+    fn py_new(
+        start: Option<String>,
+        end: Option<String>,
+        schedule_on: Option<String>,
+        schedule_off: Option<String>,
+        sampling: Option<String>,
+    ) -> Result<Self, ConfigError> {
+        let mut me = Self::default();
+
+        if schedule_on.is_some() || schedule_off.is_some() {
+            me.schedule = Schedule::Intermittent {
+                on: Duration::from_str(schedule_on.unwrap().as_str()).map_err(|e| {
+                    ConfigError::InvalidConfig(format!(
+                        "{e} invalid format for schedule on (must be specified if schedule off is)"
+                    ))
+                })?,
+                off: Duration::from_str(schedule_off.unwrap().as_str()).map_err(|e| {
+                    ConfigError::InvalidConfig(format!(
+                        "{e} invalid format for schedule off (must be specified if schedule on is)"
+                    ))
+                })?,
+            };
+        }
+
+        if let Some(start) = start {
+            if start.to_ascii_lowercase() == "visible" {
+                me.start = Availability::Visible
+            } else {
+                me.start = Availability::Epoch(Epoch::from_str(&start).map_err(|e| {
+                    ConfigError::InvalidConfig(format!("{e} invalid format for start availability"))
+                })?)
+            }
+        }
+
+        if let Some(end) = end {
+            if end.to_ascii_lowercase() == "visible" {
+                me.end = Availability::Visible
+            } else {
+                me.end = Availability::Epoch(Epoch::from_str(&end).map_err(|e| {
+                    ConfigError::InvalidConfig(format!("{e} invalid format for end availability"))
+                })?)
+            }
+        }
+
+        if let Some(sampling) = sampling {
+            me.sampling = Duration::from_str(&sampling).map_err(|e| {
+                ConfigError::InvalidConfig(format!("{e} invalid format for sampling"))
+            })?;
+        }
+
+        Ok(me)
     }
 
     fn __repr__(&self) -> String {

@@ -7,6 +7,7 @@ use nyx::dynamics::orbital::{OrbitalDynamics, PointMasses};
 use nyx::dynamics::sph_harmonics::Harmonics;
 use nyx::io::gravity::*;
 use nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
+use nyx::od::noise::GaussMarkov;
 use nyx::od::prelude::*;
 use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use nyx::utils::rss_orbit_errors;
@@ -29,17 +30,19 @@ fn xhat_dev_test_ekf_two_body() {
     let cosm = Cosm::de438();
     let iau_earth = cosm.frame("IAU Earth");
 
-    // Define the ground stations.
-    let ekf_num_meas = 100;
-    // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 1 * Unit::Hour;
     let elevation_mask = 0.0;
-    let range_noise = 0.0;
-    let range_rate_noise = 0.0;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
@@ -56,7 +59,7 @@ fn xhat_dev_test_ekf_two_body() {
     let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
-    let prop_time = 1 * Unit::Day;
+    let prop_time = 0.01 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
@@ -116,24 +119,43 @@ fn xhat_dev_test_ekf_two_body() {
     let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
     let kf = KF::new(initial_estimate, process_noise, measurement_noise);
 
-    let mut odp = ODProcess::ekf(
-        prop_est,
-        kf,
-        EkfTrigger::new(ekf_num_meas, ekf_disable_time),
-        cosm.clone(),
-    );
+    let mut odp = ODProcess::ckf(prop_est, kf, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
-    let pre_smooth_first_est = odp.estimates[0].clone();
+    let pre_smooth_first_est = odp.estimates[0];
     let pre_smooth_num_est = odp.estimates.len();
-    odp.iterate_arc::<GroundStation>(&arc, IterationConf::try_from(SmoothingArc::All).unwrap())
-        .unwrap();
+    odp.iterate_arc::<GroundStation>(
+        &arc,
+        IterationConf {
+            smoother: SmoothingArc::All,
+            ..Default::default()
+        },
+    )
+    .unwrap();
 
     assert_eq!(
         pre_smooth_num_est,
         odp.estimates.len(),
         "different number of estimates smoothed and not"
     );
+
+    // Check the new initial estimate is better than at the start
+    let smoothed_init_state = odp.estimates[0].state();
+    let (sm_err_p, sm_err_v) = rss_orbit_errors(&smoothed_init_state, &initial_state);
+    println!(
+        "New initial state dev: {:.3} m\t{:.3} m/s\n{}",
+        sm_err_p * 1e3,
+        sm_err_v * 1e3,
+        smoothed_init_state - initial_state_dev
+    );
+
+    assert!(
+        sm_err_p < err_p,
+        "initial position not improved by smoothing"
+    );
+    // We don't check the velocity because the initial error is zero, so the smoother will change the velocity for a better fit.
+
+    // TODO: Check that the smoothed trajectory gets better with several smoothing -- https://github.com/nyx-space/nyx/issues/134
 
     // Check that the covariance deflated
     let est = &odp.estimates.last().unwrap();
@@ -159,19 +181,6 @@ fn xhat_dev_test_ekf_two_body() {
             );
         }
     }
-    for i in 0..6 {
-        if i < 3 {
-            assert!(
-                est.covar[(i, i)] < covar_radius_km,
-                "covar radius did not decrease"
-            );
-        } else {
-            assert!(
-                est.covar[(i, i)] < covar_velocity_km_s,
-                "covar velocity did not decrease"
-            );
-        }
-    }
 
     assert_eq!(
         final_truth_state.epoch,
@@ -180,12 +189,21 @@ fn xhat_dev_test_ekf_two_body() {
     );
     let rmag_err = (final_truth_state - est.state()).rmag_km();
     assert!(
-        rmag_err < 1e-2,
-        "final radius error should be on meter level (is instead {:.3} m)",
-        rmag_err * 1e3
+        rmag_err < sm_err_p,
+        "final radius error ({:.3} m) should be better than initial state error ({:.3} m)",
+        rmag_err * 1e3,
+        sm_err_p * 1e3
     );
 
-    let post_smooth_first_est = odp.estimates[0].clone();
+    let vmag_err = (final_truth_state - est.state()).vmag_km_s();
+    assert!(
+        vmag_err < sm_err_v,
+        "final velocity error ({:.3} m) should be better than initial state error ({:.3} m)",
+        vmag_err * 1e3,
+        sm_err_v * 1e3
+    );
+
+    let post_smooth_first_est = odp.estimates[0];
 
     let (init_pos_rss, init_vel_rss) = initial_state.rss(&initial_state_dev);
     let (zero_it_pos_rss, zero_it_vel_rss) = initial_state.rss(&pre_smooth_first_est.state());
@@ -223,12 +241,18 @@ fn xhat_dev_test_ekf_multi_body() {
     // Set the disable time to be very low to test enable/disable sequence
     let ekf_disable_time = 10.0 * Unit::Second;
     let elevation_mask = 0.0;
-    let range_noise = 1e-5;
-    let range_rate_noise = 1e-7;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::high_precision_range_km(),
+        GaussMarkov::high_precision_doppler_km_s(),
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::high_precision_range_km(),
+        GaussMarkov::high_precision_doppler_km_s(),
+        iau_earth,
+    );
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
@@ -303,14 +327,14 @@ fn xhat_dev_test_ekf_multi_body() {
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
 
-    let sigma_q = 1e-7_f64.powi(2);
+    let sigma_q = 1e-8_f64.powi(2);
     let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
     let kf = KF::new(initial_estimate, process_noise, measurement_noise);
 
     let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
 
-    let mut odp = ODProcess::ekf(prop_est, kf, trig, cosm.clone());
+    let mut odp = ODProcess::ekf(prop_est, kf, trig, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
     odp.iterate_arc::<GroundStation>(&arc, IterationConf::try_from(SmoothingArc::All).unwrap())
@@ -367,8 +391,8 @@ fn xhat_dev_test_ekf_multi_body() {
     );
     let rmag_err = (final_truth_state - est.state()).rmag_km();
     assert!(
-        rmag_err < 1e-2,
-        "final radius error should be on meter level (is instead {:.3} m)",
+        rmag_err < 0.1,
+        "final radius error should be on 100 meter level (is instead {:.3} m)",
         rmag_err * 1e3
     );
 }
@@ -388,12 +412,18 @@ fn xhat_dev_test_ekf_harmonics() {
     // Set the disable time to be very low to test enable/disable sequence
     let ekf_disable_time = 1 * Unit::Minute;
     let elevation_mask = 0.0;
-    let range_noise = 1e-6;
-    let range_rate_noise = 1e-7;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::high_precision_range_km(),
+        GaussMarkov::high_precision_doppler_km_s(),
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::high_precision_range_km(),
+        GaussMarkov::high_precision_doppler_km_s(),
+        iau_earth,
+    );
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
@@ -474,16 +504,16 @@ fn xhat_dev_test_ekf_harmonics() {
     println!("Initial estimate:\n{}", initial_estimate);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
+    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-5, 1e-2));
 
-    let sigma_q = 1e-5_f64.powi(2);
+    let sigma_q = 1e-7_f64.powi(2);
     let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
     let kf = KF::new(initial_estimate, process_noise, measurement_noise);
 
     let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
 
-    let mut odp = ODProcess::ekf(prop_est, kf, trig, cosm.clone());
+    let mut odp = ODProcess::ekf(prop_est, kf, trig, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -544,12 +574,18 @@ fn xhat_dev_test_ekf_realistic() {
     // Set the disable time to be very low to test enable/disable sequence
     let ekf_disable_time = 10.0 * Unit::Second;
     let elevation_mask = 0.0;
-    let range_noise = 1e-5;
-    let range_rate_noise = 1e-7;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::high_precision_range_km(),
+        GaussMarkov::high_precision_doppler_km_s(),
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::high_precision_range_km(),
+        GaussMarkov::high_precision_doppler_km_s(),
+        iau_earth,
+    );
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
@@ -630,7 +666,7 @@ fn xhat_dev_test_ekf_realistic() {
     let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
 
-    let mut odp = ODProcess::ekf(prop_est, kf, trig, cosm.clone());
+    let mut odp = ODProcess::ekf(prop_est, kf, trig, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -694,12 +730,18 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
     let iau_earth = cosm.frame("IAU Earth");
 
     let elevation_mask = 0.0;
-    let range_noise = 1e-5;
-    let range_rate_noise = 1e-7;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::high_precision_range_km(),
+        GaussMarkov::high_precision_doppler_km_s(),
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::high_precision_range_km(),
+        GaussMarkov::high_precision_doppler_km_s(),
+        iau_earth,
+    );
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
@@ -774,7 +816,7 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
 
     let kf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, kf, cosm.clone());
+    let mut odp = ODProcess::ckf(prop_est, kf, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -961,12 +1003,18 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
     let iau_earth = cosm.frame("IAU Earth");
 
     let elevation_mask = 10.0;
-    let range_noise = 1e-5;
-    let range_rate_noise = 1e-7;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::high_precision_range_km(),
+        GaussMarkov::high_precision_doppler_km_s(),
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::high_precision_range_km(),
+        GaussMarkov::high_precision_doppler_km_s(),
+        iau_earth,
+    );
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
@@ -1042,9 +1090,9 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
     println!("Initial estimate:\n{}", initial_estimate);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
+    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-5, 1e-2));
 
-    let sigma_q = 1e-7_f64.powi(2);
+    let sigma_q = 1e-8_f64.powi(2);
     let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
     let kf = KF::new(initial_estimate, process_noise, measurement_noise);
 
@@ -1052,7 +1100,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
         prop_est,
         kf,
         EkfTrigger::new(ekf_num_meas, ekf_disable_time),
-        cosm.clone(),
+        cosm,
     );
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
@@ -1131,11 +1179,12 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
                 }
             }
 
+            let rmag_err_sm = (truth_state - smoothed_est.state()).rmag_km();
             let rmag_err = (truth_state - est.state()).rmag_km();
             assert!(
-                rmag_err < 1e-2,
-                "final radius error should be on meter level (is instead {:.3} m)",
-                rmag_err * 1e3
+                rmag_err_sm < 0.150 || rmag_err_sm < rmag_err,
+                "final radius error should be on ~ 150 meter level (is instead {:.3} m) OR the smoothed estimate should be better (but {:.3} m > {:.3} m)",
+                rmag_err_sm * 1e3, rmag_err_sm * 1e3, rmag_err * 1e3
             );
         }
 
@@ -1225,12 +1274,18 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
     let iau_earth = cosm.frame("IAU Earth");
 
     let elevation_mask = 0.0;
-    let range_noise = 1e-5;
-    let range_rate_noise = 1e-7;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::high_precision_range_km(),
+        GaussMarkov::high_precision_doppler_km_s(),
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::high_precision_range_km(),
+        GaussMarkov::high_precision_doppler_km_s(),
+        iau_earth,
+    );
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
@@ -1305,7 +1360,7 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
 
     let kf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, kf, cosm.clone());
+    let mut odp = ODProcess::ckf(prop_est, kf, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 

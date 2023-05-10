@@ -27,10 +27,8 @@ def test_filter_arc():
     outpath = root.joinpath("output_data/")
 
     # Load the dynamics and spacecraft
-    sc = Spacecraft.load_yaml(str(config_path.joinpath("spacecraft.yaml")))
-    dynamics = SpacecraftDynamics.load_named_yaml(
-        str(config_path.joinpath("dynamics.yaml"))
-    )
+    sc = Spacecraft.load(str(config_path.joinpath("spacecraft.yaml")))
+    dynamics = SpacecraftDynamics.load_named(str(config_path.joinpath("dynamics.yaml")))
 
     # An propagate for two periods (we only care about the trajectory)
     _, traj = propagate(sc, dynamics["hifi"], sc.orbit.period() * 2)
@@ -41,7 +39,7 @@ def test_filter_arc():
     # Now starts the measurement generation
 
     # Load the devices
-    devices = GroundStation.load_many_yaml(
+    devices = GroundStation.load_many(
         str(root.joinpath("./data/tests/config/many_ground_stations.yaml"))
     )
     print(f"Loaded {devices}")
@@ -57,7 +55,7 @@ def test_filter_arc():
         assert device.elevation_mask_deg == 5.0  # Both have the same mask
 
     # Load the tracking configuration as a dictionary
-    trk_cfg = TrkConfig.load_named_yaml(str(config_path.joinpath("tracking_cfg.yaml")))
+    trk_cfg = TrkConfig.load_named(str(config_path.joinpath("tracking_cfg.yaml")))
 
     # Load the trajectory
     traj = DynamicTrajectory(traj_file)
@@ -65,7 +63,11 @@ def test_filter_arc():
     # Build the simulated tracking arc, setting the seed to zero
     arc_sim = GroundTrackingArcSim(devices, traj, trk_cfg, 0)
     # Generate the measurements
-    path = arc_sim.generate_measurements(str(outpath.joinpath("./from_python.parquet")), timestamp=True, metadata={"test key": "test value"})
+    path = arc_sim.generate_measurements(
+        str(outpath.joinpath("./from_python.parquet")),
+        timestamp=True,
+        metadata={"test key": "test value"},
+    )
     print(f"Saved {arc_sim} to {path}")
 
     # Now let's filter this same data.
@@ -93,11 +95,42 @@ def test_filter_arc():
         ekf_disable_time,
     )
 
-    assert len(estimates) == 1064
+    assert len(estimates) == 1063
     assert len([est for est in estimates if not est.is_predicted]) == 762
 
     # TODO: Add more tests
 
 
+def test_one_way_msr():
+    """
+    Test that we can perform a one-way measurement
+    """
+
+    # Base path
+    root = Path(__file__).joinpath("../../../").resolve()
+    config_path = root.joinpath("./data/tests/config/")
+
+    # Load the dynamics and spacecraft
+    sc = Spacecraft.load(str(config_path.joinpath("spacecraft.yaml")))
+    dynamics = SpacecraftDynamics.load_named(str(config_path.joinpath("dynamics.yaml")))
+
+    # Load the devices
+    devices = GroundStation.load_many(
+        str(config_path.joinpath("./many_ground_stations.yaml"))
+    )
+    print(f"Loaded {devices}")
+
+    # One way measurement
+
+    end_sc, _ = propagate(sc, dynamics["hifi"], sc.orbit.period() * 1.1)
+    print(end_sc)
+
+    range_km, doppler_km_s = devices[0].measure(end_sc.orbit)
+
+    print(range_km, doppler_km_s)
+    assert abs(range_km - 18097.562811514355) < 0.1
+    assert abs(doppler_km_s - -0.2498238312640348) < 0.1
+
+
 if __name__ == "__main__":
-    test_filter_arc()
+    test_one_way_msr()

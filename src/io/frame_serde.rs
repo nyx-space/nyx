@@ -16,8 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-extern crate toml;
-
 use crate::cosmic::Frame;
 use serde_derive::Deserialize;
 use std::collections::HashMap;
@@ -78,6 +76,8 @@ pub struct RotationToml {
 
 #[test]
 fn test_deser_frame_toml() {
+    use toml;
+
     let frames: FramesSerde = toml::from_str(
         r#"
         [frames.iau_sun]

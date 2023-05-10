@@ -17,7 +17,7 @@
 */
 
 pub use crate::dynamics::{Dynamics, NyxError};
-use crate::io::{duration_from_str, duration_to_str, epoch_from_str, epoch_to_str};
+use crate::io::{duration_from_str, duration_to_str, epoch_from_str, epoch_to_str, ConfigError};
 use crate::io::{ConfigRepr, Configurable};
 pub use crate::{cosmic::Cosm, State, TimeTagged};
 use hifitime::TimeUnits;
@@ -32,12 +32,22 @@ use std::sync::Arc;
 use super::schedule::Schedule;
 use super::Availability;
 
-/// Stores a tracking configuration, there is one per tracking data simulator (e.g. one for ground station #1 and another for #2)
+/// Stores a tracking configuration, there is one per tracking data simulator (e.g. one for ground station #1 and another for #2).
+/// By default, the tracking configuration is continuous and the tracking arc is from the beginning of the simulation to the end.
+/// In Python, any value that is set to None at initialization will use the default values.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(
+    feature = "python",
+    pyo3(
+        text_signature = "(start=None, end=None, schedule_on=None, schedule_off=None, sampling=None)"
+    )
+)]
 pub struct TrkConfig {
+    /// Availability configuration to start the tracking arc
     #[serde(default)]
     pub start: Availability,
+    /// Availability configuration to end the tracking arc
     #[serde(default)]
     pub end: Availability,
     #[serde(default)]
@@ -82,6 +92,44 @@ impl TrkConfig {
             sampling,
             ..Default::default()
         }
+    }
+
+    /// Check that the configuration is valid
+    pub(crate) fn sanity_check(&self) -> Result<(), ConfigError> {
+        if let Some(excl_list) = &self.exclusion_epochs {
+            for excl in excl_list {
+                if excl.end - excl.start < self.sampling {
+                    return Err(ConfigError::InvalidConfig(format!(
+                        "Exclusion epoch range {:?} is shorter than the sampling period of {} and therefore ineffective",
+                        excl, self.sampling
+                    )));
+                }
+            }
+        }
+
+        if let Some(incl_list) = &self.inclusion_epochs {
+            for incl in incl_list {
+                if incl.end - incl.start < self.sampling {
+                    return Err(ConfigError::InvalidConfig(format!(
+                        "Inclusion epoch range {:?} is shorter than the sampling period of {} and therefore ineffective",
+                        incl, self.sampling
+                    )));
+                }
+            }
+        }
+
+        if let Availability::Epoch(epoch) = self.start {
+            if let Availability::Epoch(epoch2) = self.end {
+                if epoch2 < epoch {
+                    return Err(ConfigError::InvalidConfig(format!(
+                        "End epoch {} is before start epoch {}",
+                        epoch2, epoch
+                    )));
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -167,6 +215,6 @@ fn deserialize_from_file() {
     .iter()
     .collect();
 
-    let configs: HashMap<String, TrkConfig> = TrkConfig::load_named_yaml(trkconfg_yaml).unwrap();
+    let configs: HashMap<String, TrkConfig> = TrkConfig::load_named(trkconfg_yaml).unwrap();
     dbg!(configs);
 }

@@ -16,10 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-extern crate csv;
-
-use self::csv::{QuoteStyle, Writer, WriterBuilder};
 use crate::cosmic::Orbit;
+use csv::{QuoteStyle, Writer, WriterBuilder};
 use std::fs::File;
 
 /// Exports to the XYZV data type used in Cosmographia

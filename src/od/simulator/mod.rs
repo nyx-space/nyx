@@ -23,6 +23,6 @@ mod schedule;
 pub use schedule::Schedule;
 pub mod trackdata;
 mod trkconfig;
-pub use trkconfig::TrkConfig;
+pub use trkconfig::{EpochRanges, TrkConfig};
 mod start_mode;
 pub use start_mode::Availability;

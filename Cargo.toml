@@ -1,7 +1,7 @@
 [package]
 name = "nyx-space"
 build = "build.rs"
-version = "2.0.0-alpha.1"
+version = "2.0.0-alpha.2"
 edition = "2021"
 authors = ["Christopher Rabotin <christopher.rabotin@gmail.com>"]
 description = "A high-fidelity space mission toolkit, with orbit propagation, estimation and some systems engineering"
@@ -9,7 +9,7 @@ homepage = "https://nyxspace.com"
 documentation = "https://docs.rs/nyx-space/"
 repository = "https://gitlab.com/nyx-space/nyx"
 keywords = ["space", "mission", "design", "orbit", "estimation"]
-categories = ["science", "simulation"]
+categories = ["science", "simulation", "aerospace", "science::robotics"]
 readme = "README.md"
 license = "AGPL-3.0-or-later"
 exclude = ["tests/GMAT_scripts/*", "examples", "data/*.gz", "data/*.png", "data/od_plots/", "rustfmt.toml", "de438s.xb", "Pipfile*", ".vscode/launch.json", "*.kst", "docs/*", "*.bsp", "data/tests/*"]
@@ -35,7 +35,6 @@ rand_distr = "0.4"
 meval = "0.2"
 rust-embed = "6"
 toml = "0.7"
-clap = "2"
 config = {version = "0.13.3", features = ["yaml"]}
 regex = "1.5"
 pretty_env_logger = "0.4"
@@ -49,16 +48,17 @@ pyo3 = {version = "0.17.3", optional = true, features = ["extension-module"]}
 pyo3-log = {version = "0.8.1", optional = true}
 numpy = {version = "0.17", optional = true}
 indicatif = {version = "0.17", features = ["rayon"]}
-rstats = "1.2.39"
+rstats = "1.2.49"
 thiserror = "1.0"
-parquet = "35.0.0"
-arrow = "35.0.0"
+parquet = "38.0.0"
+arrow = "38.0.0"
 shadow-rs = "0.21.0"
-serde_yaml = "0.9.17"
+serde_yaml = "0.9.21"
 whoami = "1.3.0"
 either = {version = "1.8.1", features = ["serde"]}
 num = "0.4.0"
 enum-iterator = "1.4.0"
+rstest = "0.17.0"
 
 [build-dependencies]
 shadow-rs = "0.21.0"

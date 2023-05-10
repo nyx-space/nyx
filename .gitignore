@@ -13,3 +13,5 @@ node_modules/
 *.venv
 dist/
 *.parquet
+*.profraw
+lcov.txt

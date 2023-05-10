@@ -29,7 +29,7 @@ pub enum Distribution {
 
 #[test]
 fn test_deser_distr() {
-    extern crate toml;
+    use toml;
 
     let _std_norm: Distribution = toml::from_str(
         r#"[normal]
@@ -62,7 +62,7 @@ fn test_deser_distr() {
 #[test]
 fn test_deser_distr_multi() {
     use std::collections::HashMap;
-    extern crate toml;
+    use toml;
 
     #[derive(Deserialize)]
     struct MapRv {

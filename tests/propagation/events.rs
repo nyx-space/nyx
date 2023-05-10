@@ -5,7 +5,7 @@ fn event_tracker_true_anomaly() {
     use nyx::cosmic::eclipse::{EclipseLocator, EclipseState};
     use nyx::md::ui::*;
     use nyx::md::EventEvaluator; // Only needed because we're manually calling e.eval
-    use nyx::od::measurement::GroundStation;
+    use nyx::od::GroundStation;
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -69,7 +69,7 @@ fn event_tracker_true_anomaly() {
         }
 
         // Compute the elevation
-        let (elevation, _, _) = gc.elevation_of(&state, &cosm);
+        let (elevation, _, _) = gc.elevation_of(state, &cosm);
         if elevation > max_el {
             max_el = elevation;
             max_dt = state.epoch();

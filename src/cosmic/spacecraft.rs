@@ -77,9 +77,17 @@ impl From<GuidanceMode> for f64 {
     }
 }
 
-/// A spacecraft state
+/// A spacecraft state, composed of its orbit, its dry and fuel (wet) masses (in kg), its SRP configuration, its drag configuration, its thruster configuration, and its guidance mode.
+///
+/// Optionally, the spacecraft state can also store the state transition matrix from the start of the propagation until the current time (i.e. trajectory STM, not step-size STM).
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(
+    feature = "python",
+    pyo3(
+        text_signature = "(orbit, dry_mass_kg, fuel_mass_kg, srp_area_m2, drag_area_m2, cr, cd, thruster, mode)"
+    )
+)]
 pub struct Spacecraft {
     /// Initial orbit the vehicle is in
     #[serde(deserialize_with = "orbit_from_str")]
@@ -117,7 +125,10 @@ impl Default for Spacecraft {
     }
 }
 
+#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyo3(text_signature = "(area_m2, cr=1.8)"))]
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
+/// The Solar Radiation Pressure configuration for a spacecraft
 pub struct SrpConfig {
     /// solar radiation pressure area
     pub area_m2: f64,
@@ -144,7 +155,10 @@ impl Default for SrpConfig {
     }
 }
 
+#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyo3(text_signature = "(area_m2, cd=2.2)"))]
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
+/// The drag configuration for a spacecraft
 pub struct DragConfig {
     /// drag area
     pub area_m2: f64,
@@ -698,7 +712,7 @@ drag:
     cd: 2.2
     "#;
 
-    let deser_sc: Spacecraft = serde_yaml::from_str(&s).unwrap();
+    let deser_sc: Spacecraft = serde_yaml::from_str(s).unwrap();
     assert_eq!(sc, deser_sc);
 
     // Check that we can specify a thruster info entirely.
@@ -730,7 +744,7 @@ thruster:
         isp_s: 300.5,
         thrust_N: 1e-5,
     });
-    let deser_sc: Spacecraft = serde_yaml::from_str(&s).unwrap();
+    let deser_sc: Spacecraft = serde_yaml::from_str(s).unwrap();
     assert_eq!(sc_thruster, deser_sc);
 
     // Tests the minimum definition which will set all of the defaults too
@@ -748,7 +762,7 @@ dry_mass_kg: 500.0
 fuel_mass_kg: 159.0
 "#;
 
-    let deser_sc: Spacecraft = serde_yaml::from_str(&s).unwrap();
+    let deser_sc: Spacecraft = serde_yaml::from_str(s).unwrap();
 
     let sc = Spacecraft::new(orbit, 500.0, 159.0, 0.0, 0.0, 1.8, 2.2);
     assert_eq!(sc, deser_sc);

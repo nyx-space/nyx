@@ -1,5 +1,6 @@
 extern crate nyx_space as nyx;
 
+use nyx::od::noise::GaussMarkov;
 use nyx::od::simulator::arc::TrackingArcSim;
 use nyx::od::simulator::TrkConfig;
 
@@ -25,14 +26,24 @@ fn od_val_multi_body_ckf_perfect_stations() {
 
     // Define the ground stations.
     let elevation_mask = 0.0;
-    let range_noise = 0.0;
-    let range_rate_noise = 0.0;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss13_goldstone = GroundStation::dss13_goldstone(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
 
     // Define the tracking configurations
     let mut configs = HashMap::new();
@@ -98,7 +109,7 @@ fn od_val_multi_body_ckf_perfect_stations() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
+    let mut odp = ODProcess::<_, _, RangeDoppler, _, _, _, _>::ckf(prop_est, ckf, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -126,8 +137,7 @@ fn od_val_multi_body_ckf_perfect_stations() {
         );
 
         if !printed {
-            wtr.serialize(est.clone())
-                .expect("could not write to stdout");
+            wtr.serialize(*est).expect("could not write to stdout");
             printed = true;
         }
 
@@ -171,10 +181,12 @@ fn multi_body_ckf_covar_map() {
     let iau_earth = cosm.frame("IAU Earth");
     // Define the ground stations.
     let elevation_mask = 0.0;
-    let range_noise = 0.0;
-    let range_rate_noise = 0.0;
-    let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss13_goldstone = GroundStation::dss13_goldstone(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
     // Define the tracking configurations
     let mut configs = HashMap::new();
     configs.insert(
@@ -232,7 +244,7 @@ fn multi_body_ckf_covar_map() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
+    let mut odp = ODProcess::ckf(prop_est, ckf, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -272,8 +284,7 @@ fn multi_body_ckf_covar_map() {
     let est = odp.estimates.last().unwrap();
 
     let mut wtr = csv::Writer::from_writer(io::stdout());
-    wtr.serialize(est.clone())
-        .expect("could not write to stdout");
+    wtr.serialize(*est).expect("could not write to stdout");
 
     println!("{:.2e}", est.state_deviation().norm());
     println!("{:.2e}", est.covar.norm());

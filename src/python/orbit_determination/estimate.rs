@@ -27,6 +27,7 @@ use crate::{
 use nalgebra::Matrix6;
 use numpy::PyReadonlyArrayDyn;
 use pyo3::prelude::*;
+use pyo3::types::PyType;
 
 use super::ConfigError;
 
@@ -82,18 +83,18 @@ impl OrbitEstimate {
         Ok(Self(KfEstimate::from_covar(nominal, mat6)))
     }
 
-    #[staticmethod]
-    fn load_yaml(path: &str) -> Result<Self, ConfigError> {
-        let serde = OrbitEstimateSerde::load_yaml(path)?;
+    #[classmethod]
+    fn load(_cls: &PyType, path: &str) -> Result<Self, ConfigError> {
+        let serde = OrbitEstimateSerde::load(path)?;
 
         let cosm = Cosm::de438();
 
         Self::from_config(serde, cosm)
     }
 
-    #[staticmethod]
-    fn load_many_yaml(path: &str) -> Result<Vec<Self>, ConfigError> {
-        let stations = OrbitEstimateSerde::load_many_yaml(path)?;
+    #[classmethod]
+    fn load_many(_cls: &PyType, path: &str) -> Result<Vec<Self>, ConfigError> {
+        let stations = OrbitEstimateSerde::load_many(path)?;
 
         let cosm = Cosm::de438();
 
@@ -106,9 +107,9 @@ impl OrbitEstimate {
         Ok(selves)
     }
 
-    #[staticmethod]
-    fn load_named_yaml(path: &str) -> Result<HashMap<String, Self>, ConfigError> {
-        let orbits = OrbitEstimateSerde::load_named_yaml(path)?;
+    #[classmethod]
+    fn load_named(_cls: &PyType, path: &str) -> Result<HashMap<String, Self>, ConfigError> {
+        let orbits = OrbitEstimateSerde::load_named(path)?;
 
         let cosm = Cosm::de438();
 

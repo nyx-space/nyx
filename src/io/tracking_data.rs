@@ -102,7 +102,7 @@ impl DynamicTrackingArc {
                 "Epoch:TAI (s)" => has_epoch = true,
                 "Tracking device" => has_tracking_dev = true,
                 "Range (km)" => range_avail = true,
-                "Range rate (km/s)" => rate_avail = true,
+                "Doppler (km/s)" => rate_avail = true,
                 _ => {}
             }
         }
@@ -125,7 +125,7 @@ impl DynamicTrackingArc {
 
         // Only check that the file contains the data we need
         match expected_type {
-            "StdMeasurement" => {
+            "RangeDoppler" => {
                 if !range_avail || !rate_avail {
                     return Err(NyxError::FileUnreadable(
                         "Cannot convert to simultaneous range and range rate, missing one of them"
@@ -180,7 +180,7 @@ impl DynamicTrackingArc {
 
             // Now read the data depending on what we're deserializing as
             match expected_type {
-                "StdMeasurement" => {
+                "RangeDoppler" => {
                     let range_data = batch
                         .column_by_name("Range (km)")
                         .unwrap()
@@ -189,7 +189,7 @@ impl DynamicTrackingArc {
                         .unwrap();
 
                     let rate_data = batch
-                        .column_by_name("Range rate (km/s)")
+                        .column_by_name("Doppler (km/s)")
                         .unwrap()
                         .as_any()
                         .downcast_ref::<Float64Array>()
@@ -232,7 +232,7 @@ impl DynamicTrackingArc {
                 }
                 "RangeRate" => {
                     let rate_data = batch
-                        .column_by_name("Range rate (km/s)")
+                        .column_by_name("Doppler (km/s)")
                         .unwrap()
                         .as_any()
                         .downcast_ref::<Float64Array>()

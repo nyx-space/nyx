@@ -9,6 +9,7 @@ use nyx::io::formatter::NavSolutionFormatter;
 use nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
 use nyx::md::trajectory::ExportCfg;
 use nyx::md::{Event, StateParameter};
+use nyx::od::noise::GaussMarkov;
 use nyx::od::prelude::*;
 use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use nyx::time::{Epoch, TimeUnits, Unit};
@@ -35,21 +36,30 @@ fn od_val_sc_mb_srp_reals_duals_models() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
-    use std::io;
 
     let cosm = Cosm::de438();
 
     let iau_earth = cosm.frame("IAU Earth");
     // Define the ground stations.
     let elevation_mask = 0.0;
-    let range_noise = 0.0;
-    let range_rate_noise = 0.0;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
+    let dss13_goldstone = GroundStation::dss13_goldstone(
+        elevation_mask,
+        GaussMarkov::ZERO,
+        GaussMarkov::ZERO,
+        iau_earth,
+    );
 
     // Define the tracking configurations
     let mut configs = HashMap::new();
@@ -122,13 +132,17 @@ fn od_val_sc_mb_srp_reals_duals_models() {
         ),
     ]);
 
-    traj.to_parquet(path, Some(vec![&event]), cfg).unwrap();
+    traj.to_parquet(path.clone(), Some(vec![&event]), cfg)
+        .unwrap();
 
     // Simulate tracking data
-    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
     arc_sim.disallow_overlap(); // Prevent overlapping measurements
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
+
+    arc.to_parquet(path.with_file_name("sc_msr_arc.parquet"), None, false)
+        .unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -164,10 +178,9 @@ fn od_val_sc_mb_srp_reals_duals_models() {
     // Initialize the formatter
     let estimate_fmtr = NavSolutionFormatter::default("sc_ckf.csv".to_owned(), cosm);
 
-    let mut wtr = csv::Writer::from_writer(io::stdout());
+    let mut wtr = csv::Writer::from_path("sc_ckf.csv").unwrap();
     wtr.serialize(&estimate_fmtr.headers)
         .expect("could not write to stdout");
-    let mut printed = false;
     for (no, est) in odp.estimates.iter().enumerate() {
         if no == 0 {
             // Skip the first estimate which is the initial estimate provided by user
@@ -187,12 +200,9 @@ fn od_val_sc_mb_srp_reals_duals_models() {
             est.state_deviation().norm()
         );
 
-        if !printed {
-            // Format the estimate
-            wtr.serialize(estimate_fmtr.fmt(est))
-                .expect("could not write to stdout");
-            printed = true;
-        }
+        // Format the estimate
+        wtr.serialize(estimate_fmtr.fmt(est))
+            .expect("could not write to CSV");
     }
 
     for res in &odp.residuals {

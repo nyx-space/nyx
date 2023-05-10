@@ -16,15 +16,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-extern crate serde;
-extern crate serde_derive;
-
-use self::serde_derive::{Deserialize, Serialize};
 use crate::cosmic::{Cosm, Frame};
 use crate::md::objective::Objective;
 use crate::md::ui::StateParameter;
 use crate::time::Epoch;
 use crate::NyxError;
+use serde_derive::{Deserialize, Serialize};
 use std::convert::Into;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -173,7 +170,7 @@ impl Into<NodeSerde> for &Node {
 
 #[test]
 fn test_nodeserde() {
-    extern crate toml;
+    use toml;
 
     let str_nodes = r#"[[nodes]]
 x = -394.37164017582654

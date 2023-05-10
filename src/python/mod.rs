@@ -26,6 +26,7 @@ use pyo3::{exceptions::PyException, prelude::*};
 
 pub(crate) mod cosmic;
 mod mission_design;
+mod monte_carlo;
 mod orbit_determination;
 
 impl From<NyxError> for PyErr {
@@ -41,20 +42,21 @@ impl From<ConfigError> for PyErr {
 }
 
 #[pymodule]
-fn nyx_space(py: Python, m: &PyModule) -> PyResult<()> {
+fn _nyx_space(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
 
     register_time_module(py, m)?;
     orbit_determination::register_od(py, m)?;
     mission_design::register_md(py, m)?;
     cosmic::register_cosmic(py, m)?;
+    monte_carlo::register_mc(py, m)?;
 
     Ok(())
 }
 
 /// Reexport hifitime as nyx_space.time
 fn register_time_module(py: Python<'_>, parent_module: &PyModule) -> PyResult<()> {
-    let sm = PyModule::new(py, "nyx_space.time")?;
+    let sm = PyModule::new(py, "_nyx_space.time")?;
 
     sm.add_class::<Epoch>()?;
     sm.add_class::<TimeScale>()?;
