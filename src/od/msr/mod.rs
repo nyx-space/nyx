@@ -21,6 +21,7 @@ mod range;
 mod range_doppler;
 mod rangerate;
 
+pub use arc::TrackingArc;
 pub use range::RangeMsr;
 pub use range_doppler::RangeDoppler;
 pub use rangerate::RangeRate;

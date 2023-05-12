@@ -120,10 +120,7 @@ fn od_tb_val_ekf_fixed_step_perfect_stations() {
         prop_est,
         kf,
         EkfTrigger::new(ekf_num_meas, ekf_disable_time),
-        RejectCriteria::ZScoreMultiplier {
-            count: 100,
-            value: 3.0,
-        },
+        None,
         cosm,
     );
 
@@ -293,10 +290,7 @@ fn od_tb_val_with_arc() {
         prop_est,
         kf,
         EkfTrigger::new(ekf_num_meas, ekf_disable_time),
-        RejectCriteria::ResidualRatio {
-            count: 100,
-            value: 3.0,
-        },
+        Some(FltResid::default()),
         cosm,
     );
 
@@ -456,7 +450,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, RejectCriteria::None, cosm.clone());
+    let mut odp = ODProcess::ckf(prop_est, ckf, None, cosm.clone());
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -704,7 +698,7 @@ fn od_tb_ckf_fixed_step_iteration_test() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, RejectCriteria::None, cosm);
+    let mut odp = ODProcess::ckf(prop_est, ckf, None, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -873,7 +867,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
 
     let ckf = KF::new(initial_estimate, process_noise, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, RejectCriteria::None, cosm);
+    let mut odp = ODProcess::ckf(prop_est, ckf, None, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -976,7 +970,7 @@ fn od_tb_ckf_map_covar() {
         nalgebra::Const<3>,
         Orbit,
         KF<Orbit, nalgebra::Const<3>, nalgebra::Const<2>>,
-    > = ODProcess::ckf(prop_est, ckf, RejectCriteria::None, cosm);
+    > = ODProcess::ckf(prop_est, ckf, None, cosm);
 
     odp.map_covar(dt + prop_time).unwrap();
 
@@ -1105,7 +1099,7 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, RejectCriteria::None, cosm);
+    let mut odp = ODProcess::ckf(prop_est, ckf, None, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
     let mut wtr = csv::Writer::from_path("./estimation.csv").unwrap();
@@ -1258,7 +1252,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
         measurement_noise,
     );
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, RejectCriteria::None, cosm);
+    let mut odp = ODProcess::ckf(prop_est, ckf, None, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 

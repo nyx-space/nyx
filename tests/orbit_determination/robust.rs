@@ -95,7 +95,7 @@ fn od_robust_test_ekf_realistic_one_way() {
     println!("Truth initial state:\n{initial_state}\n{initial_state:x}");
     println!("Filter initial state:\n{initial_state_dev}\n{initial_state_dev:x}");
     println!(
-        "Initial state dev:\t{:.3} km\t{:.3} km/s\n{}",
+        "Initial state dev:\t{:.3} m\t{:.3} m/s\n{}",
         init_rss_pos_km * 1e3,
         init_rss_vel_km_s * 1e3,
         initial_state - initial_state_dev
@@ -149,7 +149,7 @@ fn od_robust_test_ekf_realistic_one_way() {
 
     let trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
 
-    let mut odp = ODProcess::ekf(prop_est, kf, trig, RejectCriteria::None, cosm.clone());
+    let mut odp = ODProcess::ekf(prop_est, kf, trig, None, cosm.clone());
 
     // Let's filter and iterate on the initial subset of the arc to refine the initial estimate
     let subset = arc.filter_by_offset(..3.hours());
@@ -372,7 +372,7 @@ fn od_robust_test_ekf_realistic_two_way() {
     println!("Truth initial state:\n{initial_state}\n{initial_state:x}");
     println!("Filter initial state:\n{initial_state_dev}\n{initial_state_dev:x}");
     println!(
-        "Initial state dev:\t{:.3} km\t{:.3} km/s\n{}",
+        "Initial state dev:\t{:.3} m\t{:.3} m/s\n{}",
         init_rss_pos_km * 1e3,
         init_rss_vel_km_s * 1e3,
         initial_state - initial_state_dev
@@ -428,7 +428,7 @@ fn od_robust_test_ekf_realistic_two_way() {
 
     let trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
 
-    let mut odp = ODProcess::ekf(prop_est, kf, trig, RejectCriteria::None, cosm.clone());
+    let mut odp = ODProcess::ekf(prop_est, kf, trig, None, cosm.clone());
 
     // TODO: Fix the deserialization of the measurements such that they also deserialize the integration time.
     // Without it, we're stuck having to rebuild them from scratch.

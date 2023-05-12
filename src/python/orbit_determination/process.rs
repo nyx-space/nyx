@@ -25,7 +25,7 @@ use crate::{
     md::ui::{Cosm, Propagator, SpacecraftDynamics},
     od::{
         kalman::KF,
-        process::{EkfTrigger, ODProcess},
+        process::{EkfTrigger, FltResid, ODProcess},
     },
     NyxError, Spacecraft,
 };
@@ -35,7 +35,7 @@ use super::{estimate::OrbitEstimate, GroundStation};
 /// Propagates the provided spacecraft with the provided dynamics until the provided stopping condition (duration, epoch, or event [and optionally the count]).
 #[pyfunction]
 #[pyo3(
-    text_signature = "(spacecraft, dynamics, duration=None, epoch=None, event=None, event_count=None, min_step=None, max_step=None, fixed_step=None, tolerance=None)"
+    text_signature = "(dynamics, spacecraft, initial_estimate, measurement_noise, arc, ekf_num_meas, ekf_disable_time, resid_crit=None)"
 )]
 pub(crate) fn process_tracking_arc(
     dynamics: SpacecraftDynamics,
@@ -45,6 +45,7 @@ pub(crate) fn process_tracking_arc(
     arc: &DynamicTrackingArc,
     ekf_num_meas: usize,
     ekf_disable_time: Duration,
+    resid_crit: Option<FltResid>,
 ) -> Result<Vec<OrbitEstimate>, NyxError> {
     // TODO: Return a navigation trajectory or use a class that mimics the better ODProcess -- https://github.com/nyx-space/nyx/issues/134
     let msr_noise = Matrix2::from_iterator(measurement_noise);
@@ -61,7 +62,7 @@ pub(crate) fn process_tracking_arc(
         prop_est,
         kf,
         EkfTrigger::new(ekf_num_meas, ekf_disable_time),
-        RejectCriteria::None,
+        resid_crit,
         Cosm::de438(),
     );
 

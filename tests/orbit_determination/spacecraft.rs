@@ -171,7 +171,7 @@ fn od_val_sc_mb_srp_reals_duals_models() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, RejectCriteria::None, cosm.clone());
+    let mut odp = ODProcess::ckf(prop_est, ckf, None, cosm.clone());
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 

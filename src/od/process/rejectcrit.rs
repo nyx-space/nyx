@@ -18,24 +18,44 @@
 
 use crate::cosmic::Cosm;
 use crate::io::{ConfigError, ConfigRepr, Configurable};
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
 use serde_derive::{Deserialize, Serialize};
 use std::sync::Arc;
 
-/// Defines how to reject measurements based on the value of their residual ratios.
-/// The count is the minimum number of measurements to be ingested prior to applying the rejection criteria.
+/// Reject measurements with a residual ratio greater than the provided value.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
-pub enum RejectCriteria {
-    /// Reject measurements with a residual ratio greater than the provided value. This is a good default option when set to 3.0.
-    ResidualRatio { count: usize, value: f64 },
-    /// Reject measurements if their residual ratio is greater than the current z-score of the residual ratio multiplied by the provided value.
-    ZScoreMultiplier { count: usize, value: f64 },
-    /// Accept all measurements
-    None,
+#[cfg_attr(feature = "python", pyclass)]
+pub struct FltResid {
+    /// Minimum number of accepted measurements before applying the rejection criteria.
+    pub min_accepted: usize,
+    /// Number of sigmas for a measurement to be considered an outlier.
+    pub num_sigmas: f64,
 }
 
-impl ConfigRepr for RejectCriteria {}
+#[cfg(feature = "python")]
+impl FltResid {
+    fn __repr__(&self) -> String {
+        format!("{self:?}")
+    }
 
-impl Configurable for RejectCriteria {
+    fn __str__(&self) -> String {
+        format!("{self:?}")
+    }
+}
+
+impl Default for FltResid {
+    fn default() -> Self {
+        Self {
+            min_accepted: 10,
+            num_sigmas: 3.0,
+        }
+    }
+}
+
+impl ConfigRepr for FltResid {}
+
+impl Configurable for FltResid {
     type IntermediateRepr = Self;
 
     fn from_config(cfg: Self, _cosm: Arc<Cosm>) -> Result<Self, ConfigError>
