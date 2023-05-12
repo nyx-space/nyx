@@ -137,6 +137,7 @@ jobs:
           cargo test --lib
           cargo test stop_cond_nrho_apo
           cargo test od_robust
+          cargo test od_resid_reject_
           grcov . --binary-path ./target/debug/ -t lcov -s . > lcov.txt
 
       - name: Upload coverage report
