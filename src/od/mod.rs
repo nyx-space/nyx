@@ -108,12 +108,24 @@ where
 
     /// Computes the measurement update with a provided real observation and computed observation.
     ///
-    ///Returns an error if the STM or sensitivity matrices were not updated.
+    /// The nominal state is the state used for the computed observation.
+    /// The real observation is the observation that was actually measured.
+    /// The computed observation is the observation that was computed from the nominal state.
+    ///
+    /// Returns the updated estimate and the residual. The residual may be zero if the residual ratio check prevented the ingestion of this measurement.
+    ///
+    /// # Arguments
+    ///
+    /// * `nominal_state`: the nominal state at which the observation was computed.
+    /// * `real_obs`: the real observation that was measured.
+    /// * `computed_obs`: the computed observation from the nominal state.
+    /// * `resid_ratio_check`: the ratio below which the measurement is considered to be valid.
     fn measurement_update(
         &mut self,
         nominal_state: T,
         real_obs: &OVector<f64, M>,
         computed_obs: &OVector<f64, M>,
+        resid_ratio_check: Option<f64>,
     ) -> Result<(Self::Estimate, residual::Residual<M>), NyxError>;
 
     /// Returns whether the filter is an extended filter (e.g. EKF)

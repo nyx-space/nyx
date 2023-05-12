@@ -8,6 +8,7 @@ use self::nyx::State;
 
 mod measurements;
 mod multi_body;
+mod resid_reject;
 mod robust;
 mod simulator;
 mod spacecraft;
@@ -56,14 +57,14 @@ fn filter_errors() {
     let sensitivity = Matrix2x6::zeros();
 
     let mut ckf = KF::no_snc(initial_estimate, measurement_noise);
-    match ckf.measurement_update(Orbit::zeros(), real_obs, computed_obs) {
+    match ckf.measurement_update(Orbit::zeros(), real_obs, computed_obs, None) {
         Ok(_) => panic!("expected the measurement update to fail"),
         Err(e) => {
             assert_eq!(e, NyxError::SensitivityNotUpdated);
         }
     }
     ckf.update_h_tilde(sensitivity);
-    match ckf.measurement_update(Orbit::zeros(), real_obs, computed_obs) {
+    match ckf.measurement_update(Orbit::zeros(), real_obs, computed_obs, None) {
         Ok(_) => panic!("expected the measurement update to fail"),
         Err(e) => {
             assert_eq!(e, NyxError::SingularKalmanGain);

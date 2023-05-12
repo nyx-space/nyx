@@ -23,6 +23,7 @@ use crate::io::tracking_data::DynamicTrackingArc;
 use crate::io::trajectory_data::DynamicTrajectory;
 use crate::od::msr::RangeDoppler;
 use crate::od::noise::GaussMarkov;
+use crate::od::process::FltResid;
 use crate::od::simulator::arc::TrackingArcSim;
 pub use crate::od::simulator::TrkConfig;
 pub use crate::{io::ConfigError, od::prelude::GroundStation};
@@ -45,6 +46,7 @@ pub(crate) fn register_od(py: Python<'_>, parent_module: &PyModule) -> PyResult<
     sm.add_class::<TrkConfig>()?;
     sm.add_class::<OrbitEstimate>()?;
     sm.add_class::<GaussMarkov>()?;
+    sm.add_class::<FltResid>()?;
     sm.add_function(wrap_pyfunction!(process_tracking_arc, sm)?)?;
 
     py_run!(

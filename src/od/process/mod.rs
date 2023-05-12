@@ -35,12 +35,14 @@ mod conf;
 pub use conf::{IterationConf, SmoothingArc};
 mod trigger;
 pub use trigger::{CkfTrigger, EkfTrigger, KfTrigger};
+mod rejectcrit;
 
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::Add;
 
 use self::msr::arc::TrackingArc;
+pub use self::rejectcrit::FltResid;
 
 /// An orbit determination process. Note that everything passed to this structure is moved.
 #[allow(clippy::upper_case_acronyms)]
@@ -85,6 +87,8 @@ pub struct ODProcess<
     /// Vector of residuals available after a pass
     pub residuals: Vec<Residual<Msr::MeasurementSize>>,
     pub ekf_trigger: T,
+    /// Residual rejection criteria allows preventing bad measurements from affecting the estimation.
+    pub resid_crit: Option<FltResid>,
     pub cosm: Arc<Cosm>,
     init_state: D::StateType,
     _marker: PhantomData<A>,
@@ -126,7 +130,13 @@ where
         + Allocator<f64, <S as State>::Size, A>
         + Allocator<f64, A, <S as State>::Size>,
 {
-    pub fn ekf(prop: PropInstance<'a, D, E>, kf: K, trigger: T, cosm: Arc<Cosm>) -> Self {
+    pub fn ekf(
+        prop: PropInstance<'a, D, E>,
+        kf: K,
+        trigger: T,
+        resid_crit: Option<FltResid>,
+        cosm: Arc<Cosm>,
+    ) -> Self {
         let init_state = prop.state;
         Self {
             prop,
@@ -134,6 +144,7 @@ where
             estimates: Vec::with_capacity(10_000),
             residuals: Vec::with_capacity(10_000),
             ekf_trigger: trigger,
+            resid_crit,
             cosm,
             init_state,
             _marker: PhantomData::<A>,
@@ -440,6 +451,8 @@ where
         // We'll build a trajectory of the estimated states. This will be used to compute the measurements.
         let mut traj = Traj::new();
 
+        let mut msr_accepted_cnt = 0;
+
         for (msr_cnt, (device_name, msr)) in measurements.iter().enumerate() {
             let next_msr_epoch = msr.epoch();
 
@@ -502,13 +515,30 @@ where
 
                                 self.kf.update_h_tilde(h_tilde);
 
+                                let resid_ratio_check = match self.resid_crit {
+                                    None => None,
+                                    Some(flt) => {
+                                        if msr_accepted_cnt < flt.min_accepted {
+                                            None
+                                        } else {
+                                            Some(flt.num_sigmas)
+                                        }
+                                    }
+                                };
+
                                 match self.kf.measurement_update(
                                     nominal_state,
                                     &msr.observation(),
                                     &computed_meas.observation(),
+                                    resid_ratio_check,
                                 ) {
                                     Ok((estimate, residual)) => {
-                                        debug!("msr update #{msr_cnt} @ {epoch}");
+                                        debug!("processed msr #{msr_cnt} @ {epoch}");
+
+                                        if !residual.rejected {
+                                            msr_accepted_cnt += 1;
+                                        }
+
                                         // Switch to EKF if necessary, and update the dynamics and such
                                         // Note: we call enable_ekf first to ensure that the trigger gets
                                         // called in case it needs to save some information (e.g. the
@@ -546,8 +576,8 @@ where
                     let msr_prct = (10.0 * (msr_cnt as f64) / (num_msrs as f64)) as usize;
                     if !reported[msr_prct] {
                         info!(
-                            "{:>3}% done ({msr_cnt:.0} measurements processed)",
-                            10 * msr_prct,
+                            "{:>3}% done ({msr_accepted_cnt:.0} measurements accepted, {:.0} rejected)",
+                            10 * msr_prct, msr_cnt - (msr_accepted_cnt - 1)
                         );
                         reported[msr_prct] = true;
                     }
@@ -571,7 +601,10 @@ where
 
         // Always report the 100% mark
         if !reported[10] {
-            info!("100% done ({num_msrs:.0} measurements processed)");
+            info!(
+                "100% done ({msr_accepted_cnt:.0} measurements accepted, {:.0} rejected)",
+                num_msrs - msr_accepted_cnt
+            );
         }
 
         Ok(())
@@ -672,16 +705,22 @@ where
         + Allocator<f64, <S as State>::Size, A>
         + Allocator<f64, A, <S as State>::Size>,
 {
-    pub fn ckf(prop: PropInstance<'a, D, E>, kf: K, cosm: Arc<Cosm>) -> Self {
+    pub fn ckf(
+        prop: PropInstance<'a, D, E>,
+        kf: K,
+        resid_crit: Option<FltResid>,
+        cosm: Arc<Cosm>,
+    ) -> Self {
         let init_state = prop.state;
         Self {
             prop,
             kf,
             estimates: Vec::with_capacity(10_000),
             residuals: Vec::with_capacity(10_000),
-            cosm,
+            resid_crit,
             ekf_trigger: CkfTrigger {},
             init_state,
+            cosm,
             _marker: PhantomData::<A>,
         }
     }

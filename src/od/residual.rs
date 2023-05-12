@@ -32,7 +32,7 @@ where
     DefaultAllocator: Allocator<f64, M> + Allocator<f64, M, M>,
 {
     /// Date time of this Residual
-    pub dt: Epoch,
+    pub epoch: Epoch,
     /// The prefit residual in the units of the measurement type
     pub prefit: OVector<f64, M>,
     /// The postfit residual in the units of the measurement type
@@ -41,6 +41,8 @@ where
     pub ratio: f64,
     /// The Epoch format upon serialization
     pub epoch_fmt: EpochFormat,
+    /// Whether or not this was rejected
+    pub rejected: bool,
 }
 
 impl<M> Residual<M>
@@ -51,11 +53,24 @@ where
     /// An empty estimate. This is useful if wanting to store an estimate outside the scope of a filtering loop.
     pub fn zeros() -> Self {
         Self {
-            dt: Epoch::from_tai_seconds(0.0),
+            epoch: Epoch::from_tai_seconds(0.0),
             prefit: OVector::<f64, M>::zeros(),
             postfit: OVector::<f64, M>::zeros(),
             ratio: 0.0,
             epoch_fmt: EpochFormat::GregorianUtc,
+            rejected: true,
+        }
+    }
+
+    /// Flags a Residual as rejected.
+    pub fn rejected(epoch: Epoch, prefit: OVector<f64, M>, ratio: f64) -> Self {
+        Self {
+            epoch,
+            prefit,
+            postfit: OVector::<f64, M>::zeros(),
+            ratio,
+            epoch_fmt: EpochFormat::GregorianUtc,
+            rejected: true,
         }
     }
 
@@ -77,13 +92,19 @@ where
         Self::header(EpochFormat::GregorianUtc)
     }
 
-    pub fn new(dt: Epoch, prefit: OVector<f64, M>, postfit: OVector<f64, M>, ratio: f64) -> Self {
+    pub fn new(
+        epoch: Epoch,
+        prefit: OVector<f64, M>,
+        postfit: OVector<f64, M>,
+        ratio: f64,
+    ) -> Self {
         Self {
-            dt,
+            epoch,
             prefit,
             postfit,
             ratio,
             epoch_fmt: EpochFormat::GregorianUtc,
+            rejected: false,
         }
     }
 }
@@ -123,17 +144,17 @@ where
     {
         let mut seq = serializer.serialize_seq(Some(2 * M::dim() + 1))?;
         match self.epoch_fmt {
-            EpochFormat::GregorianUtc => seq.serialize_element(&format!("{}", self.dt))?,
-            EpochFormat::GregorianTai => seq.serialize_element(&format!("{:x}", self.dt))?,
-            EpochFormat::MjdTai => seq.serialize_element(&self.dt.to_mjd_tai_days())?,
-            EpochFormat::MjdTt => seq.serialize_element(&self.dt.to_mjd_tt_days())?,
-            EpochFormat::MjdUtc => seq.serialize_element(&self.dt.to_mjd_utc_days())?,
-            EpochFormat::JdeEt => seq.serialize_element(&self.dt.to_jde_et_days())?,
-            EpochFormat::JdeTai => seq.serialize_element(&self.dt.to_jde_tai_days())?,
-            EpochFormat::JdeTt => seq.serialize_element(&self.dt.to_jde_tt_days())?,
-            EpochFormat::JdeUtc => seq.serialize_element(&self.dt.to_jde_utc_days())?,
-            EpochFormat::TaiSecs(e) => seq.serialize_element(&(self.dt.to_tai_seconds() - e))?,
-            EpochFormat::TaiDays(e) => seq.serialize_element(&(self.dt.to_tai_days() - e))?,
+            EpochFormat::GregorianUtc => seq.serialize_element(&format!("{}", self.epoch))?,
+            EpochFormat::GregorianTai => seq.serialize_element(&format!("{:x}", self.epoch))?,
+            EpochFormat::MjdTai => seq.serialize_element(&self.epoch.to_mjd_tai_days())?,
+            EpochFormat::MjdTt => seq.serialize_element(&self.epoch.to_mjd_tt_days())?,
+            EpochFormat::MjdUtc => seq.serialize_element(&self.epoch.to_mjd_utc_days())?,
+            EpochFormat::JdeEt => seq.serialize_element(&self.epoch.to_jde_et_days())?,
+            EpochFormat::JdeTai => seq.serialize_element(&self.epoch.to_jde_tai_days())?,
+            EpochFormat::JdeTt => seq.serialize_element(&self.epoch.to_jde_tt_days())?,
+            EpochFormat::JdeUtc => seq.serialize_element(&self.epoch.to_jde_utc_days())?,
+            EpochFormat::TaiSecs(e) => seq.serialize_element(&(self.epoch.to_tai_seconds() - e))?,
+            EpochFormat::TaiDays(e) => seq.serialize_element(&(self.epoch.to_tai_days() - e))?,
         }
         // Serialize the prefit
         for i in 0..M::dim() {
