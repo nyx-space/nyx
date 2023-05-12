@@ -34,7 +34,30 @@ pub struct FltResid {
 }
 
 #[cfg(feature = "python")]
+#[pymethods]
 impl FltResid {
+    #[getter]
+    fn get_min_accepted(&self) -> usize {
+        self.min_accepted
+    }
+
+    #[setter(orbit)]
+    fn py_set_min_accepted(&mut self, min_accepted: usize) -> PyResult<()> {
+        self.min_accepted = min_accepted;
+        Ok(())
+    }
+
+    #[getter]
+    fn get_num_sigmas(&self) -> f64 {
+        self.num_sigmas
+    }
+
+    #[setter(orbit)]
+    fn py_set_num_sigmas(&mut self, num_sigmas: f64) -> PyResult<()> {
+        self.num_sigmas = num_sigmas;
+        Ok(())
+    }
+
     fn __repr__(&self) -> String {
         format!("{self:?}")
     }

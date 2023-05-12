@@ -535,7 +535,7 @@ where
                                     Ok((estimate, residual)) => {
                                         debug!("processed msr #{msr_cnt} @ {epoch}");
 
-                                        if !estimate.predicted() {
+                                        if !residual.rejected {
                                             msr_accepted_cnt += 1;
                                         }
 
@@ -577,7 +577,7 @@ where
                     if !reported[msr_prct] {
                         info!(
                             "{:>3}% done ({msr_accepted_cnt:.0} measurements accepted, {:.0} rejected)",
-                            10 * msr_prct, msr_cnt - msr_accepted_cnt
+                            10 * msr_prct, msr_cnt - (msr_accepted_cnt - 1)
                         );
                         reported[msr_prct] = true;
                     }
