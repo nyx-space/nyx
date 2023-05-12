@@ -8,6 +8,7 @@ use self::nyx::State;
 
 mod measurements;
 mod multi_body;
+mod resid_reject;
 mod robust;
 mod simulator;
 mod spacecraft;

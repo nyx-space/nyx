@@ -517,7 +517,8 @@ where
                                 let resid_ratio_check = match self.resid_crit {
                                     RejectCriteria::None => None,
                                     RejectCriteria::ResidualRatio { count, value } => {
-                                        if self.residuals.len() < count {
+                                        if self.residuals.is_empty() || self.residuals.len() < count
+                                        {
                                             None
                                         } else {
                                             Some(value)
@@ -525,7 +526,8 @@ where
                                     }
                                     RejectCriteria::ZScoreMultiplier { count, value } => {
                                         // Calculate the z-score of the residuals so far.
-                                        if self.residuals.len() < count {
+                                        if self.residuals.is_empty() || self.residuals.len() < count
+                                        {
                                             None
                                         } else {
                                             let ratios = self

@@ -389,15 +389,14 @@ where
         let ratio_mat = prefit.transpose() * &h_p_ht * &prefit;
         let ratio = ratio_mat[0];
 
-        if let Some(resid_ratio_threshold) = resid_ratio_check {
-            if ratio > resid_ratio_threshold {
-                warn!(
-                    "{} measurement rejected: residual ratio {} > {}",
-                    epoch, ratio, resid_ratio_threshold
-                );
+        if let Some(ratio_thresh) = resid_ratio_check {
+            if ratio > ratio_thresh {
+                warn!("{epoch} msr rejected: residual ratio {ratio} > {ratio_thresh}");
                 // Perform only a time update and return
                 let pred_est = self.time_update(nominal_state)?;
                 return Ok((pred_est, Residual::rejected(epoch, prefit, ratio)));
+            } else {
+                debug!("{epoch} msr accepted: residual ratio {ratio} < {ratio_thresh}");
             }
         }
 
