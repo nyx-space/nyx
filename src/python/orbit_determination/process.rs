@@ -61,6 +61,7 @@ pub(crate) fn process_tracking_arc(
         prop_est,
         kf,
         EkfTrigger::new(ekf_num_meas, ekf_disable_time),
+        RejectCriteria::None,
         Cosm::de438(),
     );
 

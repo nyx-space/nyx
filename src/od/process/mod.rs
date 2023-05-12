@@ -34,13 +34,16 @@ use crate::State;
 mod conf;
 pub use conf::{IterationConf, SmoothingArc};
 mod trigger;
+use rstats::Stats;
 pub use trigger::{CkfTrigger, EkfTrigger, KfTrigger};
+mod rejectcrit;
 
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::Add;
 
 use self::msr::arc::TrackingArc;
+pub use self::rejectcrit::RejectCriteria;
 
 /// An orbit determination process. Note that everything passed to this structure is moved.
 #[allow(clippy::upper_case_acronyms)]
@@ -85,6 +88,8 @@ pub struct ODProcess<
     /// Vector of residuals available after a pass
     pub residuals: Vec<Residual<Msr::MeasurementSize>>,
     pub ekf_trigger: T,
+    /// Residual rejection criteria allows preventing bad measurements from affecting the estimation.
+    pub resid_crit: RejectCriteria,
     pub cosm: Arc<Cosm>,
     init_state: D::StateType,
     _marker: PhantomData<A>,
@@ -126,7 +131,13 @@ where
         + Allocator<f64, <S as State>::Size, A>
         + Allocator<f64, A, <S as State>::Size>,
 {
-    pub fn ekf(prop: PropInstance<'a, D, E>, kf: K, trigger: T, cosm: Arc<Cosm>) -> Self {
+    pub fn ekf(
+        prop: PropInstance<'a, D, E>,
+        kf: K,
+        trigger: T,
+        resid_crit: RejectCriteria,
+        cosm: Arc<Cosm>,
+    ) -> Self {
         let init_state = prop.state;
         Self {
             prop,
@@ -134,6 +145,7 @@ where
             estimates: Vec::with_capacity(10_000),
             residuals: Vec::with_capacity(10_000),
             ekf_trigger: trigger,
+            resid_crit,
             cosm,
             init_state,
             _marker: PhantomData::<A>,
@@ -502,10 +514,42 @@ where
 
                                 self.kf.update_h_tilde(h_tilde);
 
+                                let resid_ratio_check = match self.resid_crit {
+                                    RejectCriteria::None => None,
+                                    RejectCriteria::ResidualRatio { count, value } => {
+                                        if self.residuals.len() < count {
+                                            None
+                                        } else {
+                                            Some(value)
+                                        }
+                                    }
+                                    RejectCriteria::ZScoreMultiplier { count, value } => {
+                                        // Calculate the z-score of the residuals so far.
+                                        if self.residuals.len() < count {
+                                            None
+                                        } else {
+                                            let ratios = self
+                                                .residuals
+                                                .iter()
+                                                .map(|resid| resid.ratio)
+                                                .collect::<Vec<f64>>();
+                                            let ameanstd = ratios.ameanstd().unwrap();
+                                            // Compute the multiplier for the z-score.
+                                            let mean = ameanstd.centre;
+                                            let stddev = ameanstd.dispersion;
+                                            // zscore = (x-mean)/stddev
+                                            // => zscore > T <=> x > mean + T*stddev
+                                            // ^^^ That's the check we'll do.
+                                            Some(mean + value * stddev)
+                                        }
+                                    }
+                                };
+
                                 match self.kf.measurement_update(
                                     nominal_state,
                                     &msr.observation(),
                                     &computed_meas.observation(),
+                                    resid_ratio_check,
                                 ) {
                                     Ok((estimate, residual)) => {
                                         debug!("msr update #{msr_cnt} @ {epoch}");
@@ -672,16 +716,22 @@ where
         + Allocator<f64, <S as State>::Size, A>
         + Allocator<f64, A, <S as State>::Size>,
 {
-    pub fn ckf(prop: PropInstance<'a, D, E>, kf: K, cosm: Arc<Cosm>) -> Self {
+    pub fn ckf(
+        prop: PropInstance<'a, D, E>,
+        kf: K,
+        resid_crit: RejectCriteria,
+        cosm: Arc<Cosm>,
+    ) -> Self {
         let init_state = prop.state;
         Self {
             prop,
             kf,
             estimates: Vec::with_capacity(10_000),
             residuals: Vec::with_capacity(10_000),
-            cosm,
+            resid_crit,
             ekf_trigger: CkfTrigger {},
             init_state,
+            cosm,
             _marker: PhantomData::<A>,
         }
     }

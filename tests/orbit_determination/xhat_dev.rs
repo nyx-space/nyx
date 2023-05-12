@@ -119,7 +119,7 @@ fn xhat_dev_test_ekf_two_body() {
     let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
     let kf = KF::new(initial_estimate, process_noise, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, kf, cosm);
+    let mut odp = ODProcess::ckf(prop_est, kf, RejectCriteria::None, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
     let pre_smooth_first_est = odp.estimates[0];
@@ -334,7 +334,7 @@ fn xhat_dev_test_ekf_multi_body() {
     let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
 
-    let mut odp = ODProcess::ekf(prop_est, kf, trig, cosm);
+    let mut odp = ODProcess::ekf(prop_est, kf, trig, RejectCriteria::None, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
     odp.iterate_arc::<GroundStation>(&arc, IterationConf::try_from(SmoothingArc::All).unwrap())
@@ -513,7 +513,7 @@ fn xhat_dev_test_ekf_harmonics() {
     let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
 
-    let mut odp = ODProcess::ekf(prop_est, kf, trig, cosm);
+    let mut odp = ODProcess::ekf(prop_est, kf, trig, RejectCriteria::None, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -666,7 +666,7 @@ fn xhat_dev_test_ekf_realistic() {
     let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
 
-    let mut odp = ODProcess::ekf(prop_est, kf, trig, cosm);
+    let mut odp = ODProcess::ekf(prop_est, kf, trig, RejectCriteria::None, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -816,7 +816,7 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
 
     let kf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, kf, cosm);
+    let mut odp = ODProcess::ckf(prop_est, kf, RejectCriteria::None, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -1100,6 +1100,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
         prop_est,
         kf,
         EkfTrigger::new(ekf_num_meas, ekf_disable_time),
+        RejectCriteria::None,
         cosm,
     );
 
@@ -1360,7 +1361,7 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
 
     let kf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, kf, cosm);
+    let mut odp = ODProcess::ckf(prop_est, kf, RejectCriteria::None, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 

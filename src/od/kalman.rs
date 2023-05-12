@@ -319,6 +319,7 @@ where
         nominal_state: T,
         real_obs: &OVector<f64, M>,
         computed_obs: &OVector<f64, M>,
+        resid_ratio_check: Option<f64>,
     ) -> Result<(Self::Estimate, Residual<M>), NyxError> {
         if !self.h_tilde_updated {
             return Err(NyxError::SensitivityNotUpdated);
@@ -326,11 +327,13 @@ where
 
         let stm = nominal_state.stm()?;
 
+        let epoch = nominal_state.epoch();
+
         let mut covar_bar = stm * self.prev_estimate.covar * stm.transpose();
         let mut snc_used = false;
         // Try to apply an SNC, if applicable
         for (i, snc) in self.process_noise.iter().enumerate().rev() {
-            if let Some(snc_matrix) = snc.to_matrix(nominal_state.epoch()) {
+            if let Some(snc_matrix) = snc.to_matrix(epoch) {
                 // Check if we're using another SNC than the one before
                 if self.prev_used_snc != i {
                     info!("Switched to {}-th {}", i, snc);
@@ -340,7 +343,7 @@ where
                 // Let's compute the Gamma matrix, an approximation of the time integral
                 // which assumes that the acceleration is constant between these two measurements.
                 let mut gamma = OMatrix::<f64, <T as State>::Size, A>::zeros();
-                let delta_t = (nominal_state.epoch() - self.prev_estimate.epoch()).to_seconds();
+                let delta_t = (epoch - self.prev_estimate.epoch()).to_seconds();
                 for blk in 0..A::dim() / 3 {
                     for i in 0..3 {
                         let idx_i = i + A::dim() * blk;
@@ -373,7 +376,7 @@ where
         }
 
         if !snc_used {
-            debug!("@{} No SNC", nominal_state.epoch());
+            debug!("@{} No SNC", epoch);
         }
 
         let h_tilde_t = &self.h_tilde.transpose();
@@ -383,7 +386,20 @@ where
         let prefit = real_obs - computed_obs;
 
         // Compute the prefit ratio
-        let ratio = prefit.transpose() * &h_p_ht * &prefit;
+        let ratio_mat = prefit.transpose() * &h_p_ht * &prefit;
+        let ratio = ratio_mat[0];
+
+        if let Some(resid_ratio_threshold) = resid_ratio_check {
+            if ratio > resid_ratio_threshold {
+                warn!(
+                    "{} measurement rejected: residual ratio {} > {}",
+                    epoch, ratio, resid_ratio_threshold
+                );
+                // Perform only a time update and return
+                let pred_est = self.time_update(nominal_state)?;
+                return Ok((pred_est, Residual::rejected(epoch, prefit, ratio)));
+            }
+        }
 
         // Compute the Kalman gain but first adding the measurement noise to H⋅P⋅H^T
         let mut invertible_part = h_p_ht + &self.measurement_noise;
@@ -397,17 +413,14 @@ where
         let (state_hat, res) = if self.ekf {
             let state_hat = &gain * &prefit;
             let postfit = &prefit - (&self.h_tilde * state_hat);
-            (
-                state_hat,
-                Residual::new(nominal_state.epoch(), prefit, postfit, ratio[0]),
-            )
+            (state_hat, Residual::new(epoch, prefit, postfit, ratio))
         } else {
             // Must do a time update first
             let state_bar = stm * self.prev_estimate.state_deviation;
             let postfit = &prefit - (&self.h_tilde * state_bar);
             (
                 state_bar + &gain * &postfit,
-                Residual::new(nominal_state.epoch(), prefit, postfit, ratio[0]),
+                Residual::new(epoch, prefit, postfit, ratio),
             )
         };
 
