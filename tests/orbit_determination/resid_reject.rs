@@ -7,7 +7,7 @@ use rstest::*;
 use nyx_space::cosmic::{Bodies, Cosm, Orbit};
 use nyx_space::dynamics::orbital::OrbitalDynamics;
 use nyx_space::linalg::{Matrix2, Vector2};
-use nyx_space::md::ui::*;
+use nyx_space::md::prelude::*;
 use nyx_space::md::StateParameter;
 use nyx_space::od::noise::GaussMarkov;
 use nyx_space::od::prelude::*;

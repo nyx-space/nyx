@@ -21,7 +21,7 @@ use hifitime::TimeUnits;
 use crate::dynamics::guidance::Mnvr;
 use crate::linalg::SVector;
 use crate::md::objective::Objective;
-use crate::md::ui::*;
+use crate::md::prelude::*;
 pub use crate::md::{Variable, Vary};
 use crate::polyfit::CommonPolynomial;
 use std::fmt;

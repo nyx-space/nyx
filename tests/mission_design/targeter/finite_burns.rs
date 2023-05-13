@@ -4,7 +4,7 @@ use hifitime::TimeUnits;
 use nyx::dynamics::guidance::{Mnvr, Thruster};
 use nyx::linalg::Vector3;
 use nyx::md::optimizer::*;
-use nyx::md::ui::*;
+use nyx::md::prelude::*;
 
 #[test]
 fn thrust_dir_tgt_sma_aop_raan() {

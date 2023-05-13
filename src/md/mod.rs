@@ -23,7 +23,24 @@ use std::error::Error;
 use std::fmt;
 use std::fs::File;
 
-pub mod ui;
+pub mod prelude {
+    pub use super::{optimizer::*, trajectory::Traj, Ephemeris, Event, ScTraj, StateParameter};
+    pub use crate::cosmic::{
+        try_achieve_b_plane, BPlane, BPlaneTarget, Bodies, Cosm, Frame, GuidanceMode,
+        LightTimeCalc, Orbit, OrbitDual,
+    };
+    pub use crate::dynamics::{
+        Drag, Harmonics, OrbitalDynamics, PointMasses, SolarPressure, SpacecraftDynamics,
+    };
+    pub use crate::dynamics::{Dynamics, NyxError};
+    pub use crate::io::gravity::HarmonicsMem;
+    pub use crate::md::objective::Objective;
+    pub use crate::propagators::{PropOpts, Propagator};
+    pub use crate::time::{Duration, Epoch, TimeUnits, Unit};
+    pub use crate::Spacecraft;
+    pub use crate::{State, TimeTagged};
+    pub use std::sync::Arc;
+}
 
 pub mod trajectory;
 

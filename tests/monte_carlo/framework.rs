@@ -1,7 +1,7 @@
 extern crate nyx_space as nyx;
 
 use nyx::mc::*;
-use nyx::md::ui::*;
+use nyx::md::prelude::*;
 
 #[test]
 fn test_monte_carlo_epoch() {

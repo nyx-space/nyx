@@ -21,7 +21,7 @@ use super::noise::GaussMarkov;
 use super::TrackingDeviceSim;
 use crate::cosmic::{Cosm, Frame, Orbit};
 use crate::io::{frame_from_str, frame_to_str, ConfigRepr, Configurable};
-use crate::md::ui::Traj;
+use crate::md::prelude::Traj;
 use crate::time::Epoch;
 use crate::{NyxError, Spacecraft};
 use hifitime::Duration;

@@ -25,7 +25,7 @@ use crate::io::{
 };
 use crate::linalg::{Const, Matrix3, Matrix6, OVector, Vector3, Vector6};
 use crate::mc::MultivariateNormal;
-use crate::md::ui::Objective;
+use crate::md::prelude::Objective;
 use crate::md::StateParameter;
 
 use crate::time::{Duration, Epoch, Unit};

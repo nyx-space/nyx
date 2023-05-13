@@ -20,7 +20,7 @@ use super::ctrlnodes::Node;
 use super::multishoot::MultipleShooting;
 pub use super::CostFunction;
 use crate::errors::TargetingError;
-use crate::md::ui::*;
+use crate::md::prelude::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::{Orbit, Spacecraft};
 

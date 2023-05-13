@@ -18,7 +18,7 @@
 
 use crate::{
     linalg::{allocator::Allocator, DefaultAllocator},
-    md::{trajectory::Interpolatable, ui::Traj, StateParameter},
+    md::{trajectory::Interpolatable, StateParameter, prelude::Traj},
     NyxError,
 };
 use arrow::{array::Float64Array, record_batch::RecordBatchReader};

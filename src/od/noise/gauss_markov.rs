@@ -18,7 +18,7 @@
 
 use crate::io::watermark::pq_writer;
 use crate::io::{duration_from_str, duration_to_str, ConfigError, ConfigRepr, Configurable};
-use crate::md::ui::Cosm;
+use crate::md::prelude::Cosm;
 use crate::NyxError;
 use arrow::array::{ArrayRef, Float64Array, UInt32Array};
 use arrow::datatypes::{DataType, Field, Schema};

@@ -52,7 +52,7 @@ fn nil_measurement() {
 #[test]
 fn val_measurements_topo() {
     use self::nyx::cosmic::{Cosm, Orbit};
-    use self::nyx::md::ui::*;
+    use self::nyx::md::prelude::*;
     use self::nyx::od::prelude::*;
     use self::nyx::propagators::RK4Fixed;
     use std::str::FromStr;

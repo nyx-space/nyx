@@ -4,7 +4,7 @@ use nyx::od::noise::GaussMarkov;
 use nyx::od::simulator::arc::TrackingArcSim;
 use nyx::od::simulator::TrkConfig;
 
-use self::nyx::md::ui::*;
+use self::nyx::md::prelude::*;
 use self::nyx::od::prelude::*;
 
 // Extra testing imports

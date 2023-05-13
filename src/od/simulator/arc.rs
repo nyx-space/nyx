@@ -29,7 +29,7 @@ use crate::od::simulator::{Availability, Schedule};
 use crate::od::Measurement;
 pub use crate::{cosmic::Cosm, State, TimeTagged};
 use crate::{linalg::allocator::Allocator, od::TrackingDeviceSim};
-use crate::{linalg::DefaultAllocator, md::ui::Traj};
+use crate::{linalg::DefaultAllocator, md::prelude::Traj};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::marker::PhantomData;
