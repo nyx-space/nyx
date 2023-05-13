@@ -135,9 +135,10 @@ jobs:
         # grcov . -s . --binary-path ./target/debug/ -t html --branch --ignore-not-existing -o ./target/debug/coverage/ # Export as HTML
         run: |
           cargo test --lib
-          cargo test stop_cond_nrho_apo
-          cargo test od_robust
-          cargo test od_resid_reject_
+          cargo test cosmic
+          cargo test mission_design
+          cargo test orbit_determination
+          cargo test propulsion
           grcov . --binary-path ./target/debug/ -t lcov -s . > lcov.txt
 
       - name: Upload coverage report

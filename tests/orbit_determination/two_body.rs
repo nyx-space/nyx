@@ -966,7 +966,6 @@ fn od_tb_ckf_map_covar() {
         OrbitalDynamics,
         nyx::propagators::RSSCartesianStep,
         RangeDoppler,
-        CkfTrigger,
         nalgebra::Const<3>,
         Orbit,
         KF<Orbit, nalgebra::Const<3>, nalgebra::Const<2>>,

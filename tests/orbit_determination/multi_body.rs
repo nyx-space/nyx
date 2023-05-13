@@ -109,7 +109,7 @@ fn od_val_multi_body_ckf_perfect_stations() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::<_, _, RangeDoppler, _, _, _, _>::ckf(prop_est, ckf, None, cosm);
+    let mut odp = ODProcess::<_, _, RangeDoppler, _, _, _>::ckf(prop_est, ckf, None, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
