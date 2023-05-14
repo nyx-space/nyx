@@ -21,7 +21,7 @@ use pyo3::prelude::*;
 
 use crate::md::trajectory::ExportCfg;
 use crate::{
-    md::{ui::Traj as TrajRs, Event, EventEvaluator},
+    md::{prelude::Traj as TrajRs, Event, EventEvaluator},
     NyxError, Spacecraft, State,
 };
 

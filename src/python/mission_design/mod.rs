@@ -18,7 +18,7 @@
 
 use crate::io::trajectory_data::DynamicTrajectory;
 use crate::io::ConfigError;
-use crate::md::ui::{PropOpts, Propagator, SpacecraftDynamics};
+use crate::md::prelude::{PropOpts, Propagator, SpacecraftDynamics};
 use crate::md::{Event, StateParameter};
 
 use crate::propagators::{
