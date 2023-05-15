@@ -101,10 +101,8 @@ impl EkfTrigger {
             inhibit: false,
         }
     }
-}
 
-impl KfTrigger for EkfTrigger {
-    fn enable_ekf<T: State, E>(&mut self, est: &E) -> bool
+    pub fn enable_ekf<T: State, E>(&mut self, est: &E) -> bool
     where
         E: Estimate<T>,
         DefaultAllocator: Allocator<f64, <T as State>::Size>
@@ -125,7 +123,7 @@ impl KfTrigger for EkfTrigger {
                 || self.within_sigma <= 0.0)
     }
 
-    fn disable_ekf(&mut self, epoch: Epoch) -> bool {
+    pub fn disable_ekf(&mut self, epoch: Epoch) -> bool {
         if self.inhibit {
             return true;
         }
@@ -143,11 +141,11 @@ impl KfTrigger for EkfTrigger {
         }
     }
 
-    fn set_inhibit(&mut self, inhibit: bool) {
+    pub fn set_inhibit(&mut self, inhibit: bool) {
         self.inhibit = inhibit;
     }
 
-    fn reset(&mut self) {
+    pub fn reset(&mut self) {
         self.cur_msrs = 0;
         self.prev_msr_dt = None;
     }

@@ -54,7 +54,7 @@ impl ConfigRepr for DynamicsSerde {}
 fn test_serde() {
     use crate::cosmic::Cosm;
     use crate::io::Configurable;
-    use crate::md::ui::SpacecraftDynamics;
+    use crate::md::prelude::SpacecraftDynamics;
     use std::collections::HashMap;
 
     let yaml = "

@@ -16,9 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use crate::cosmic::SPEED_OF_LIGHT_KMS;
 use crate::io::watermark::pq_writer;
 use crate::io::{duration_from_str, duration_to_str, ConfigError, ConfigRepr, Configurable};
-use crate::md::ui::Cosm;
+use crate::md::prelude::Cosm;
 use crate::NyxError;
 use arrow::array::{ArrayRef, Float64Array, UInt32Array};
 use arrow::datatypes::{DataType, Field, Schema};
@@ -36,6 +37,7 @@ use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 use std::fs::File;
+use std::ops::Mul;
 use std::sync::Arc;
 
 /// A first order Gauss-Markov process for modeling biases as described in section 5.2.4 of the NASA Best Practices for Navigation Filters (D'Souza et al.).
@@ -49,6 +51,10 @@ use std::sync::Arc;
 /// b(t + Δt) = b(t) * exp(-Δt / τ) + q * (1 - exp(-Δt / τ)) * w(t)
 ///
 /// Where w(t) ~ 𝓝(0, σ_{ss}) is a zero-mean white noise process with standard deviation σ_ss, the steady state sigma.
+///
+/// ## Important
+/// If the time constant is greater than 366 days, then the process is actually modeled as a white noise process.
+/// This allows the users to model a white noise process without having to change the process type.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass)]
 #[cfg_attr(feature = "python", pyo3(text_signature = "(tau, sigma, state_state)"))]
@@ -107,8 +113,18 @@ impl GaussMarkov {
         })
     }
 
+    /// Create a new `GaussMarkov` process as if it were purely a white noise (zero mean), i.e. without any time correlation.
+    pub fn white_noise(sigma: f64) -> Self {
+        Self::new(Duration::MAX, 0.0, sigma).unwrap()
+    }
+
     /// Return the next bias sample.
     pub fn next_bias<R: Rng>(&mut self, epoch: Epoch, rng: &mut R) -> f64 {
+        // If the time constant is set to the maximum duration, then the process is a white noise process.
+        if self.is_white() {
+            return rng.sample(Normal::new(0.0, self.steady_state_sigma).unwrap());
+        }
+
         // Compute the delta time in seconds between the previous epoch and the sample epoch.
         let dt_s = (match self.epoch {
             None => Duration::ZERO,
@@ -190,6 +206,19 @@ impl GaussMarkov {
         }
     }
 
+    /// Initializes a new Gauss Markov process as a time-uncorrelated white noise process, using only the Pr/N0 value and the bandwidth.
+    /// This returns a white noise sigma in kilometers.
+    ///
+    /// # Equation
+    /// σ = c / (2 * B * √(Pr/N0))
+    ///
+    /// Where c is the speed of light, B is the bandwidth in Hz, and the Pr/N0 is the signal-to-noise ratio.
+    pub fn from_pr_n0(pr_n0: f64, bandwidth_hz: f64) -> Self {
+        let sigma = SPEED_OF_LIGHT_KMS / (2.0 * bandwidth_hz * (pr_n0).sqrt());
+
+        Self::white_noise(sigma)
+    }
+
     /// Initializes a new Gauss Markov process for the provided kind of model.
     ///
     /// Available models are: `Range`, `Doppler`, `RangeHP`, `Doppler HP` (HP stands for high precision).
@@ -202,6 +231,21 @@ impl GaussMarkov {
             _ => Err(NyxError::CustomError(format!(
                 "No default Gauss Markov model for `{kind}`"
             ))),
+        }
+    }
+}
+
+impl Mul<f64> for GaussMarkov {
+    type Output = Self;
+
+    /// Scale the Gauss Markov process by a constant, maintaining the same time constant.
+    fn mul(self, rhs: f64) -> Self::Output {
+        Self {
+            tau: self.tau,
+            bias_sigma: self.bias_sigma * rhs,
+            steady_state_sigma: self.steady_state_sigma * rhs,
+            bias: None,
+            epoch: None,
         }
     }
 }
@@ -293,6 +337,11 @@ impl GaussMarkov {
         Ok(())
     }
 
+    /// Returns whether or not this Gauss Markov process is modeled as white noise.
+    pub fn is_white(&self) -> bool {
+        self.tau > 366.days()
+    }
+
     #[cfg(feature = "python")]
     pub fn __repr__(&self) -> String {
         format!("{self:?}")
@@ -346,6 +395,13 @@ impl GaussMarkov {
     #[classmethod]
     fn load_named(_cls: &PyType, path: &str) -> Result<HashMap<String, Self>, ConfigError> {
         <Self as ConfigRepr>::load_named(path)
+    }
+
+    /// Create a new `GaussMarkov` process as if it were purely a white noise, i.c. without any time correlation.
+    #[cfg(feature = "python")]
+    #[classmethod]
+    fn white(_cls: &PyType, sigma: f64) -> Result<Self, NyxError> {
+        Ok(Self::white_noise(sigma))
     }
 }
 
@@ -413,6 +469,43 @@ fn zero_noise_test() {
     assert_eq!(biases.amean().unwrap(), 0.0);
     assert_eq!(min_max.min, 0.0);
     assert_eq!(min_max.max, 0.0);
+}
+
+#[test]
+fn white_noise_test() {
+    let sigma = 10.0;
+    let mut gm = GaussMarkov::white_noise(sigma);
+    let mut larger_gm = gm * 10.0;
+
+    let epoch = Epoch::now().unwrap();
+
+    let mut rng = Pcg64Mcg::new(1000);
+    let mut cnt_above_3sigma = 0;
+    let mut cnt_below_3sigma = 0;
+    let mut larger_cnt_above_3sigma = 0;
+    let mut larger_cnt_below_3sigma = 0;
+    for seconds in 0..1000 {
+        let bias = gm.next_bias(epoch + seconds.seconds(), &mut rng);
+
+        if bias > 3.0 * sigma {
+            cnt_above_3sigma += 1;
+        } else if bias < -3.0 * sigma {
+            cnt_below_3sigma += 1;
+        }
+
+        let larger_bias = larger_gm.next_bias(epoch + seconds.seconds(), &mut rng);
+        if larger_bias > 30.0 * sigma {
+            larger_cnt_above_3sigma += 1;
+        } else if larger_bias < -30.0 * sigma {
+            larger_cnt_below_3sigma += 1;
+        }
+    }
+
+    assert!(dbg!(cnt_above_3sigma) <= 3);
+    assert!(dbg!(cnt_below_3sigma) <= 3);
+
+    assert!(dbg!(larger_cnt_above_3sigma) <= 3);
+    assert!(dbg!(larger_cnt_below_3sigma) <= 3);
 }
 
 #[test]

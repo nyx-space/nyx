@@ -17,8 +17,7 @@
 */
 
 use crate::cosmic::{Cosm, Frame};
-use crate::md::objective::Objective;
-use crate::md::ui::StateParameter;
+use crate::md::prelude::{Objective, StateParameter};
 use crate::time::Epoch;
 use crate::NyxError;
 use serde_derive::{Deserialize, Serialize};

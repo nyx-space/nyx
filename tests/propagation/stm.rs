@@ -5,7 +5,7 @@ use nyx::linalg::{Const, Matrix6, OVector};
 use nyx::propagators::*;
 use nyx::time::{Epoch, Unit};
 use nyx::State;
-use nyx_space::md::ui::SpacecraftDynamics;
+use nyx_space::md::prelude::SpacecraftDynamics;
 
 // These tests compare the computation of the state transition matrix between the finite differencing methoid (common) and hyperdual numbers.
 // Conclusion: hyperdual numbers lead to less error than finite differencing.

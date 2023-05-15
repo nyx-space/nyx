@@ -22,8 +22,8 @@ use hifitime::Epoch;
 use rand_pcg::Pcg64Mcg;
 
 use crate::linalg::DefaultAllocator;
+use crate::md::prelude::{Frame, Traj};
 use crate::md::trajectory::Interpolatable;
-use crate::md::ui::{Frame, Traj};
 use crate::od::Measurement;
 use crate::{io::Configurable, linalg::allocator::Allocator};
 use crate::{NyxError, Orbit};

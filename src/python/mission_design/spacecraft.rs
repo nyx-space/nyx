@@ -19,7 +19,7 @@ use crate::{
     cosmic::{DragConfig, SrpConfig},
     dynamics::guidance::Thruster,
     io::{ConfigError, ConfigRepr},
-    md::ui::GuidanceMode,
+    md::prelude::GuidanceMode,
     Orbit, Spacecraft, State,
 };
 use crate::{md::StateParameter, NyxError};

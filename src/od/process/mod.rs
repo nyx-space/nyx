@@ -51,7 +51,6 @@ pub struct ODProcess<
     D: Dynamics,
     E: ErrorCtrl,
     Msr: Measurement,
-    T: KfTrigger,
     A: DimName,
     S: EstimateFrom<D::StateType, Msr> + Interpolatable,
     K: Filter<S, A, Msr::MeasurementSize>,
@@ -86,7 +85,7 @@ pub struct ODProcess<
     pub estimates: Vec<K::Estimate>,
     /// Vector of residuals available after a pass
     pub residuals: Vec<Residual<Msr::MeasurementSize>>,
-    pub ekf_trigger: T,
+    pub ekf_trigger: Option<EkfTrigger>,
     /// Residual rejection criteria allows preventing bad measurements from affecting the estimation.
     pub resid_crit: Option<FltResid>,
     pub cosm: Arc<Cosm>,
@@ -99,11 +98,10 @@ impl<
         D: Dynamics,
         E: ErrorCtrl,
         Msr: Measurement,
-        T: KfTrigger,
         A: DimName,
         S: EstimateFrom<D::StateType, Msr> + Interpolatable,
         K: Filter<S, A, Msr::MeasurementSize>,
-    > ODProcess<'a, D, E, Msr, T, A, S, K>
+    > ODProcess<'a, D, E, Msr, A, S, K>
 where
     D::StateType: Interpolatable + Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
     <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
@@ -133,7 +131,7 @@ where
     pub fn ekf(
         prop: PropInstance<'a, D, E>,
         kf: K,
-        trigger: T,
+        trigger: EkfTrigger,
         resid_crit: Option<FltResid>,
         cosm: Arc<Cosm>,
     ) -> Self {
@@ -143,7 +141,7 @@ where
             kf,
             estimates: Vec::with_capacity(10_000),
             residuals: Vec::with_capacity(10_000),
-            ekf_trigger: trigger,
+            ekf_trigger: Some(trigger),
             resid_crit,
             cosm,
             init_state,
@@ -315,7 +313,9 @@ where
 
             iter_cnt += 1;
 
-            self.ekf_trigger.reset();
+            if let Some(trigger) = &mut self.ekf_trigger {
+                trigger.reset();
+            }
 
             info!("***************************");
             info!("*** Iteration number {} ***", iter_cnt);
@@ -506,9 +506,11 @@ where
                                     device.location(epoch, nominal_state.frame(), &self.cosm);
 
                                 // Switch back from extended if necessary
-                                if self.kf.is_extended() && self.ekf_trigger.disable_ekf(epoch) {
-                                    self.kf.set_extended(false);
-                                    info!("EKF disabled @ {epoch}");
+                                if let Some(trigger) = &mut self.ekf_trigger {
+                                    if self.kf.is_extended() && trigger.disable_ekf(epoch) {
+                                        self.kf.set_extended(false);
+                                        info!("EKF disabled @ {epoch}");
+                                    }
                                 }
 
                                 let h_tilde = S::sensitivity(msr, nominal_state, device_loc);
@@ -543,20 +545,24 @@ where
                                         // Note: we call enable_ekf first to ensure that the trigger gets
                                         // called in case it needs to save some information (e.g. the
                                         // StdEkfTrigger needs to store the time of the previous measurement).
-                                        if self.ekf_trigger.enable_ekf(&estimate)
-                                            && !self.kf.is_extended()
-                                        {
-                                            self.kf.set_extended(true);
-                                            if !estimate.within_3sigma() {
-                                                warn!("EKF enabled @ {epoch} but filter DIVERGING");
-                                            } else {
-                                                info!("EKF enabled @ {epoch}");
+
+                                        if let Some(trigger) = &mut self.ekf_trigger {
+                                            if trigger.enable_ekf(&estimate)
+                                                && !self.kf.is_extended()
+                                            {
+                                                self.kf.set_extended(true);
+                                                if !estimate.within_3sigma() {
+                                                    warn!("EKF enabled @ {epoch} but filter DIVERGING");
+                                                } else {
+                                                    info!("EKF enabled @ {epoch}");
+                                                }
+                                            }
+                                            if self.kf.is_extended() {
+                                                self.prop.state =
+                                                    self.prop.state + estimate.state_deviation();
                                             }
                                         }
-                                        if self.kf.is_extended() {
-                                            self.prop.state =
-                                                self.prop.state + estimate.state_deviation();
-                                        }
+
                                         self.prop.state.reset_stm();
 
                                         self.estimates.push(estimate);
@@ -679,7 +685,7 @@ impl<
         A: DimName,
         S: EstimateFrom<D::StateType, Msr> + Interpolatable,
         K: Filter<S, A, Msr::MeasurementSize>,
-    > ODProcess<'a, D, E, Msr, CkfTrigger, A, S, K>
+    > ODProcess<'a, D, E, Msr, A, S, K>
 where
     D::StateType: Interpolatable + Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
     <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
@@ -718,7 +724,7 @@ where
             estimates: Vec::with_capacity(10_000),
             residuals: Vec::with_capacity(10_000),
             resid_crit,
-            ekf_trigger: CkfTrigger {},
+            ekf_trigger: None,
             init_state,
             cosm,
             _marker: PhantomData::<A>,

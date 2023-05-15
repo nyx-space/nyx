@@ -135,16 +135,15 @@ jobs:
         # grcov . -s . --binary-path ./target/debug/ -t html --branch --ignore-not-existing -o ./target/debug/coverage/ # Export as HTML
         run: |
           cargo test --lib
-          cargo test stop_cond_nrho_apo
-          cargo test od_robust
-          cargo test od_resid_reject_
-          grcov . --binary-path ./target/debug/ -t lcov -s . > lcov.txt
+          grcov . --binary-path ./target/debug/ -t lcov -s . > lcov-lib.txt
+          cargo test -- cosmic mission_design orbit_determination propulsion test_monte_carlo_epoch
+          grcov . --binary-path ./target/debug/ -t lcov -s . > lcov-integ.txt
 
       - name: Upload coverage report
         uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./lcov.txt
+          files: ./lcov-lib.txt, ./lcov-integ.txt
 
   release:
     name: Release

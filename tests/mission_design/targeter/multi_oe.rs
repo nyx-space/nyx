@@ -3,7 +3,7 @@ extern crate nyx_space as nyx;
 // use nyx::dynamics::guidance::Mnvr;
 use nyx::dynamics::guidance::Thruster;
 use nyx::md::optimizer::*;
-use nyx::md::ui::*;
+use nyx::md::prelude::*;
 
 #[test]
 fn tgt_c3_decl() {

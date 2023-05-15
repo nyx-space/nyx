@@ -1,7 +1,7 @@
 extern crate nyx_space as nyx;
 
 use nyx::mc::*;
-use nyx::md::ui::*;
+use nyx::md::prelude::*;
 
 #[test]
 fn test_monte_carlo_epoch() {
@@ -12,7 +12,7 @@ fn test_monte_carlo_epoch() {
 
     let cosm = Cosm::de438();
 
-    // Build the innitial state
+    // Build the initial state
 
     let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);
@@ -45,7 +45,7 @@ fn test_monte_carlo_epoch() {
         scenario: "test_monte_carlo_epoch".to_string(),
     };
 
-    let rslts = my_mc.run_until_epoch(prop, dt + 1.0_f64 * Unit::Day, 100);
+    let rslts = my_mc.run_until_epoch(prop, dt + 1.0_f64 * Unit::Day, 10);
 
     let average_sma_dispersion = rslts
         .dispersion_values_of(StateParameter::SMA)

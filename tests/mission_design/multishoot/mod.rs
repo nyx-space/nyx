@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use nyx::dynamics::guidance::Thruster;
 use nyx::md::opti::multishoot::*;
-use nyx::md::ui::*;
+use nyx::md::prelude::*;
 
 #[test]
 fn alt_orbit_raising() {

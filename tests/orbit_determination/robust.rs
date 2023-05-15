@@ -52,15 +52,16 @@ fn od_robust_test_ekf_realistic_one_way() {
     );
 
     // Define the tracking configurations
-    let mut configs = HashMap::new();
-    configs.insert(
-        dss65_madrid.name.clone(),
-        TrkConfig::from_sample_rate(60.seconds()),
-    );
-    configs.insert(
-        dss34_canberra.name.clone(),
-        TrkConfig::from_sample_rate(60.seconds()),
-    );
+    let configs = HashMap::from([
+        (
+            dss65_madrid.name.clone(),
+            TrkConfig::from_sample_rate(60.seconds()),
+        ),
+        (
+            dss34_canberra.name.clone(),
+            TrkConfig::from_sample_rate(60.seconds()),
+        ),
+    ]);
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     let all_stations = vec![dss65_madrid, dss34_canberra];
@@ -329,25 +330,26 @@ fn od_robust_test_ekf_realistic_two_way() {
     dss34_canberra.integration_time = Some(60.seconds());
 
     // Define the tracking configurations
-    let mut configs = HashMap::new();
-    configs.insert(
-        dss65_madrid.name.clone(),
-        TrkConfig {
-            // Make sure to start the tracking one integration time after the start of the trajectory
-            start: simulator::Availability::Epoch(dt + 60.seconds()),
-            sampling: 60.seconds(),
-            ..Default::default()
-        },
-    );
-    configs.insert(
-        dss34_canberra.name.clone(),
-        TrkConfig {
-            // Make sure to start the tracking one integration time after the start of the trajectory
-            start: simulator::Availability::Epoch(dt + 60.seconds()),
-            sampling: 60.seconds(),
-            ..Default::default()
-        },
-    );
+    let configs = HashMap::from([
+        (
+            dss65_madrid.name.clone(),
+            TrkConfig {
+                // Make sure to start the tracking one integration time after the start of the trajectory
+                start: simulator::Availability::Epoch(dt + 60.seconds()),
+                sampling: 60.seconds(),
+                ..Default::default()
+            },
+        ),
+        (
+            dss34_canberra.name.clone(),
+            TrkConfig {
+                // Make sure to start the tracking one integration time after the start of the trajectory
+                start: simulator::Availability::Epoch(dt + 60.seconds()),
+                sampling: 60.seconds(),
+                ..Default::default()
+            },
+        ),
+    ]);
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     let devices = vec![dss65_madrid, dss34_canberra];

@@ -26,8 +26,8 @@ use crate::io::gravity::HarmonicsMem;
 
 use crate::io::{ConfigError, Configurable};
 use crate::linalg::{Const, DimName, OMatrix, OVector, Vector3};
-pub use crate::md::ui::SolarPressure;
-use crate::md::ui::{Harmonics, PointMasses};
+pub use crate::md::prelude::SolarPressure;
+use crate::md::prelude::{Harmonics, PointMasses};
 use crate::State;
 
 use std::fmt;

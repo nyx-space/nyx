@@ -4,7 +4,7 @@ use nyx::od::noise::GaussMarkov;
 use nyx::od::simulator::arc::TrackingArcSim;
 use nyx::od::simulator::TrkConfig;
 
-use self::nyx::md::ui::*;
+use self::nyx::md::prelude::*;
 use self::nyx::od::prelude::*;
 
 // Extra testing imports
@@ -109,7 +109,7 @@ fn od_val_multi_body_ckf_perfect_stations() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::<_, _, RangeDoppler, _, _, _, _>::ckf(prop_est, ckf, None, cosm);
+    let mut odp = ODProcess::<_, _, RangeDoppler, _, _, _>::ckf(prop_est, ckf, None, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 

@@ -1,7 +1,7 @@
 extern crate nyx_space as nyx;
 
 use nyx::md::optimizer::*;
-use nyx::md::ui::*;
+use nyx::md::prelude::*;
 
 #[test]
 fn tgt_b_plane_earth_gravity_assist_no_propagation() {

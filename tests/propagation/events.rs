@@ -3,7 +3,7 @@ extern crate nyx_space as nyx;
 #[test]
 fn event_tracker_true_anomaly() {
     use nyx::cosmic::eclipse::{EclipseLocator, EclipseState};
-    use nyx::md::ui::*;
+    use nyx::md::prelude::*;
     use nyx::md::EventEvaluator; // Only needed because we're manually calling e.eval
     use nyx::od::GroundStation;
 
