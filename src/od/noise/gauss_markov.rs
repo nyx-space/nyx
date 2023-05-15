@@ -401,7 +401,7 @@ impl GaussMarkov {
     #[cfg(feature = "python")]
     #[classmethod]
     fn white(_cls: &PyType, sigma: f64) -> Result<Self, NyxError> {
-        Self::white_noise(sigma)
+        Ok(Self::white_noise(sigma))
     }
 }
 

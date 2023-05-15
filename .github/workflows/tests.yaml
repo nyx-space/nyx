@@ -136,7 +136,7 @@ jobs:
         run: |
           cargo test --lib
           grcov . --binary-path ./target/debug/ -t lcov -s . > lcov-lib.txt
-          cargo test cosmic mission_design orbit_determination propulsion test_monte_carlo_epoch
+          cargo test -- cosmic mission_design orbit_determination propulsion test_monte_carlo_epoch
           grcov . --binary-path ./target/debug/ -t lcov -s . > lcov-integ.txt
 
       - name: Upload coverage report
