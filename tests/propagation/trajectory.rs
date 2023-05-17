@@ -120,9 +120,9 @@ fn traj_ephem_forward() {
     .iter()
     .collect();
 
-    ephem
+    let exported_path = ephem
         .to_parquet(
-            &path,
+            path,
             Some(vec![
                 &EclipseLocator::cislunar(cosm.clone()).to_penumbra_event()
             ]),
@@ -132,7 +132,7 @@ fn traj_ephem_forward() {
 
     // Reload this trajectory and make sure that it matches
 
-    let dyn_traj = DynamicTrajectory::from_parquet(path).unwrap();
+    let dyn_traj = DynamicTrajectory::from_parquet(exported_path).unwrap();
     let concrete_traj = dyn_traj.to_traj::<Orbit>().unwrap();
 
     if ephem != concrete_traj {
