@@ -24,7 +24,11 @@ use std::fmt;
 use std::fs::File;
 
 pub mod prelude {
-    pub use super::{optimizer::*, trajectory::Traj, Ephemeris, Event, ScTraj, StateParameter};
+    pub use super::{
+        optimizer::*,
+        trajectory::{ExportCfg, Interpolatable, Traj},
+        Ephemeris, Event, ScTraj, StateParameter,
+    };
     pub use crate::cosmic::{
         try_achieve_b_plane, BPlane, BPlaneTarget, Bodies, Cosm, Frame, GuidanceMode,
         LightTimeCalc, Orbit, OrbitDual,

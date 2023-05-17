@@ -27,7 +27,7 @@ use crate::linalg::DefaultAllocator;
 use crate::md::prelude::{GuidanceMode, StateParameter};
 use crate::md::EventEvaluator;
 use crate::time::{Duration, Epoch, TimeSeries, TimeUnits, Unit};
-use arrow::array::{ArrayRef, Float64Array, StringArray};
+use arrow::array::{Array, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 use hifitime::prelude::{Format, Formatter};
@@ -443,6 +443,9 @@ where
         events: Option<Vec<&dyn EventEvaluator<S>>>,
         cfg: ExportCfg,
     ) -> Result<PathBuf, Box<dyn Error>> {
+        let tick = Epoch::now().unwrap();
+        info!("Exporting trajectory to parquet file...");
+
         // Build the schema
         let mut hdrs = vec![
             Field::new("Epoch:Gregorian UTC", DataType::Utf8, false),
@@ -482,140 +485,63 @@ where
 
         // Build the schema
         let schema = Arc::new(Schema::new(hdrs));
-        let mut record = Vec::new();
+        let mut record: Vec<Arc<dyn Array>> = Vec::new();
 
-        // Build the states iterator
+        // Build the states iterator -- this does require copying the current states but I can't either get a reference or a copy of all the states.
+        let states = match cfg.start_epoch {
+            Some(start) => {
+                let end = cfg.end_epoch.unwrap_or_else(|| self.last().epoch());
+                let step = cfg.step.unwrap_or_else(|| 1.minutes());
+                self.every_between(step, start, end)
+                    .map(|s| s)
+                    .collect::<Vec<S>>()
+            }
+            None => self.states.iter().map(|s| *s).collect::<Vec<S>>(),
+        };
 
-        if cfg.start_epoch.is_some() || cfg.end_epoch.is_some() || cfg.step.is_some() {
-            let start = if let Some(start) = cfg.start_epoch {
-                start
+        // Build all of the records
+
+        // Epochs
+        let mut utc_epoch = StringBuilder::new();
+        let mut tai_epoch = StringBuilder::new();
+        let mut tai_s = Float64Builder::new();
+        for s in &states {
+            utc_epoch.append_value(format!("{}", s.epoch()));
+            tai_epoch.append_value(format!("{:x}", s.epoch()));
+            tai_s.append_value(s.epoch().to_tai_seconds());
+        }
+        record.push(Arc::new(utc_epoch.finish()));
+        record.push(Arc::new(tai_epoch.finish()));
+        record.push(Arc::new(tai_s.finish()));
+
+        // Add all of the fields
+        for field in fields {
+            if field == StateParameter::GuidanceMode {
+                let mut guid_mode = StringBuilder::new();
+                for s in &states {
+                    guid_mode
+                        .append_value(format!("{:?}", GuidanceMode::from(s.value(field).unwrap())));
+                }
+                record.push(Arc::new(guid_mode.finish()));
             } else {
-                self.first().epoch()
-            };
-
-            let end = if let Some(end) = cfg.end_epoch {
-                end
-            } else {
-                self.last().epoch()
-            };
-
-            let step = if let Some(step) = cfg.step {
-                step
-            } else {
-                1.minutes()
-            };
-
-            // Build all of the records
-            let mut data = Vec::new();
-            for s in self.every_between(step, start, end) {
-                data.push(format!("{}", s.epoch()));
-            }
-            record.push(Arc::new(StringArray::from(data)) as ArrayRef);
-
-            // TDB epoch
-            let mut data = Vec::new();
-            for s in self.every_between(step, start, end) {
-                data.push(format!("{:x}", s.epoch()));
-            }
-            record.push(Arc::new(StringArray::from(data)) as ArrayRef);
-
-            // TAI Epoch seconds
-            let mut data = Vec::new();
-            for s in self.every_between(step, start, end) {
-                data.push(s.epoch().to_tai_seconds());
-            }
-            record.push(Arc::new(Float64Array::from(data)) as ArrayRef);
-
-            // Add all of the fields
-            // This is super ugly, but I can't seem to convert the TrajIterator into an `Iter<S>`
-            for field in fields {
-                if field == StateParameter::GuidanceMode {
-                    // This is the only string field
-                    record.push(Arc::new(StringArray::from({
-                        let mut data = Vec::new();
-                        for s in self.every_between(step, start, end) {
-                            let mode = GuidanceMode::from(s.value(field).unwrap());
-
-                            data.push(format!("{mode:?}"));
-                        }
-                        data
-                    })) as ArrayRef);
-                } else {
-                    record.push(Arc::new(Float64Array::from({
-                        let mut data = Vec::new();
-                        for s in self.every_between(step, start, end) {
-                            data.push(s.value(field).unwrap());
-                        }
-                        data
-                    })) as ArrayRef);
+                let mut data = Float64Builder::new();
+                for s in &states {
+                    data.append_value(s.value(field).unwrap());
                 }
+                record.push(Arc::new(data.finish()));
             }
-            // Add all of the evaluated events
-            if let Some(events) = events {
-                for event in events {
-                    record.push(Arc::new(Float64Array::from({
-                        let mut data = Vec::new();
-                        for s in self.every_between(step, start, end) {
-                            data.push(event.eval(&s));
-                        }
-                        data
-                    })) as ArrayRef);
+        }
+        info!("Serialized {} states", states.len());
+
+        // Add all of the evaluated events
+        if let Some(events) = events {
+            info!("Evaluating {} event(s)", events.len());
+            for event in events {
+                let mut data = Float64Builder::new();
+                for s in &states {
+                    data.append_value(event.eval(s));
                 }
-            }
-        } else {
-            // Build all of the records
-            record.push(Arc::new(StringArray::from(
-                self.states
-                    .iter()
-                    .map(|s| format!("{}", s.epoch()))
-                    .collect::<Vec<String>>(),
-            )) as ArrayRef);
-
-            // TDB epoch
-            record.push(Arc::new(StringArray::from(
-                self.states
-                    .iter()
-                    .map(|s| format!("{:x}", s.epoch()))
-                    .collect::<Vec<String>>(),
-            )) as ArrayRef);
-
-            // TDB Epoch seconds
-            record.push(Arc::new(Float64Array::from(
-                self.states
-                    .iter()
-                    .map(|s| s.epoch().to_tai_seconds())
-                    .collect::<Vec<f64>>(),
-            )) as ArrayRef);
-
-            // Add all of the fields
-            for field in fields {
-                if field == StateParameter::GuidanceMode {
-                    record.push(Arc::new(StringArray::from(
-                        self.states
-                            .iter()
-                            .map(|s| format!("{:?}", GuidanceMode::from(s.value(field).unwrap())))
-                            .collect::<Vec<String>>(),
-                    )) as ArrayRef);
-                } else {
-                    record.push(Arc::new(Float64Array::from(
-                        self.states
-                            .iter()
-                            .map(|s| s.value(field).unwrap())
-                            .collect::<Vec<f64>>(),
-                    )) as ArrayRef);
-                }
-            }
-
-            // Add all of the evaluated events
-            if let Some(events) = events {
-                for event in events {
-                    record.push(Arc::new(Float64Array::from({
-                        self.states
-                            .iter()
-                            .map(|s| event.eval(s))
-                            .collect::<Vec<f64>>()
-                    })) as ArrayRef);
-                }
+                record.push(Arc::new(data.finish()));
             }
         }
 
@@ -656,7 +582,11 @@ where
         writer.close()?;
 
         // Return the path this was written to
-        info!("Trajectory written to {}", path_buf.display());
+        let tock_time = Epoch::now().unwrap() - tick;
+        info!(
+            "Trajectory written to {} in {tock_time}",
+            path_buf.display()
+        );
         Ok(path_buf)
     }
 }

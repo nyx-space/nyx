@@ -88,6 +88,8 @@ where
         extra_metadata: Option<HashMap<String, String>>,
         timestamp: bool,
     ) -> Result<PathBuf, Box<dyn Error>> {
+        // TODO(now): Switch to ExportCfg and make it available in Python?
+
         // Build the schema
         let mut hdrs = vec![
             Field::new("Epoch:Gregorian UTC", DataType::Utf8, false),

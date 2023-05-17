@@ -98,4 +98,12 @@ impl ExportCfg {
         }
         me
     }
+
+    /// Initialize a new default configuration but timestamp the filename.
+    pub fn timestamped() -> Self {
+        Self {
+            timestamp: true,
+            ..Default::default()
+        }
+    }
 }

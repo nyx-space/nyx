@@ -46,16 +46,14 @@ where
                     if next_epoch >= self.traj.first().epoch()
                         && next_epoch <= self.traj.last().epoch()
                     {
+                        let msg = format!(
+                            "!!! [BUG] TrajIterator: {e} not found but should be present in {} !",
+                            self.traj
+                        );
                         if log_enabled!(log::Level::Error) {
-                            error!("[!!!] BUG [!!!]");
-                            error!("[!!!]\t{e}\t[!!!]");
-                            error!("[!!!]\t{}\t[!!!]", self.traj);
-                            error!("[!!!]     [!!!]");
+                            error!("{msg}");
                         } else {
-                            println!("[!!!] BUG [!!!]");
-                            println!("[!!!]\t{e}\t[!!!]");
-                            println!("[!!!]\t{}\t[!!!]", self.traj);
-                            println!("[!!!]     [!!!]");
+                            println!("{msg}");
                         };
                     }
                     None

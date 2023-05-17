@@ -34,7 +34,7 @@ use crate::State;
 mod conf;
 pub use conf::{IterationConf, SmoothingArc};
 mod trigger;
-pub use trigger::{CkfTrigger, EkfTrigger, KfTrigger};
+pub use trigger::EkfTrigger;
 mod rejectcrit;
 
 use std::collections::HashMap;
@@ -250,30 +250,6 @@ where
         Ok(smoothed)
     }
 
-    /// Returns the root mean square of the prefit residuals
-    ///
-    /// # WARNING:
-    /// The units will be garbage here if rows in the measurements have different units.
-    pub fn rms_prefit_residual(&self) -> f64 {
-        let mut sum = 0.0;
-        for residual in &self.residuals {
-            sum += residual.prefit.dot(&residual.prefit);
-        }
-        (sum / (self.residuals.len() as f64)).sqrt()
-    }
-
-    /// Returns the root mean square of the postfit residuals
-    ///
-    /// # WARNING:
-    /// The units will be garbage here if rows in the measurements have different units.
-    pub fn rms_postfit_residual(&self) -> f64 {
-        let mut sum = 0.0;
-        for residual in &self.residuals {
-            sum += residual.postfit.dot(&residual.postfit);
-        }
-        (sum / (self.residuals.len() as f64)).sqrt()
-    }
-
     /// Returns the root mean square of the prefit residual ratios
     pub fn rms_residual_ratios(&self) -> f64 {
         let mut sum = 0.0;
@@ -284,15 +260,17 @@ where
     }
 
     /// Allows iterating on the filter solution. Requires specifying a smoothing condition to know where to stop the smoothing.
-    pub fn iterate_arc<Dev>(
+    pub fn iterate<Dev>(
         &mut self,
-        arc: &TrackingArc<Msr>,
+        measurements: &[(String, Msr)],
+        devices: &mut HashMap<String, Dev>,
+        step_size: Duration,
         config: IterationConf,
     ) -> Result<(), NyxError>
     where
         Dev: TrackingDeviceSim<S, Msr>,
     {
-        let measurements = &arc.measurements;
+        // TODO(now): Add ExportCfg to iterate and to process so the data can be exported as we process it. Consider a thread writing with channel for faster serialization.
 
         let mut best_rms = self.rms_residual_ratios();
         let mut previous_rms = best_rms;
@@ -308,11 +286,12 @@ where
                     "Filter converged to absolute tolerance ({:.2e} < {:.2e}) after {} iterations",
                     best_rms, config.absolute_tol, iter_cnt
                 );
-                return Ok(());
+                break;
             }
 
             iter_cnt += 1;
 
+            // Prevent infinite loop when iterating prior to turning on the EKF.
             if let Some(trigger) = &mut self.ekf_trigger {
                 trigger.reset();
             }
@@ -330,7 +309,7 @@ where
             // self.estimates.push(smoothed[0].clone());
             self.kf.set_previous_estimate(&smoothed[0]);
             // And re-run the filter
-            self.process_arc::<Dev>(arc)?;
+            self.process::<Dev>(measurements, devices, step_size)?;
 
             // Compute the new RMS
             let new_rms = self.rms_residual_ratios();
@@ -347,7 +326,8 @@ where
                     "Filter converged to relative tolerance ({:.2e} < {:.2e}) after {} iterations",
                     cur_rel_rms, config.relative_tol, iter_cnt
                 );
-                return Ok(());
+
+                break;
             }
 
             if new_rms > previous_rms {
@@ -366,7 +346,7 @@ where
                         return Err(NyxError::MaxIterReached(msg));
                     } else {
                         error!("{}", msg);
-                        return Ok(());
+                        break;
                     }
                 } else {
                     warn!("Filter iteration caused divergence {} of {} acceptable subsequent divergences", divergence_cnt, config.max_divergences);
@@ -393,10 +373,29 @@ where
                     return Err(NyxError::MaxIterReached(msg));
                 } else {
                     error!("{}", msg);
-                    return Ok(());
+                    break;
                 }
             }
         }
+
+        Ok(())
+    }
+
+    /// Allows iterating on the filter solution. Requires specifying a smoothing condition to know where to stop the smoothing.
+    pub fn iterate_arc<Dev>(
+        &mut self,
+        arc: &TrackingArc<Msr>,
+        config: IterationConf,
+    ) -> Result<(), NyxError>
+    where
+        Dev: TrackingDeviceSim<S, Msr>,
+    {
+        let mut devices = arc.rebuild_devices::<S, Dev>(self.cosm.clone()).unwrap();
+
+        let measurements = &arc.measurements;
+        let step_size = arc.min_duration_sep().unwrap();
+
+        self.iterate(measurements, &mut devices, step_size, config)
     }
 
     /// Process the provided tracking arc for this orbit determination process.
@@ -517,16 +516,10 @@ where
 
                                 self.kf.update_h_tilde(h_tilde);
 
-                                let resid_ratio_check = match self.resid_crit {
-                                    None => None,
-                                    Some(flt) => {
-                                        if msr_accepted_cnt < flt.min_accepted {
-                                            None
-                                        } else {
-                                            Some(flt.num_sigmas)
-                                        }
-                                    }
-                                };
+                                let resid_ratio_check = self
+                                    .resid_crit
+                                    .filter(|flt| msr_accepted_cnt >= flt.min_accepted)
+                                    .map(|flt| flt.num_sigmas);
 
                                 match self.kf.measurement_update(
                                     nominal_state,

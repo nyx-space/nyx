@@ -1396,7 +1396,7 @@ impl Orbit {
     /// Returns the semi minor axis in km, includes code for a hyperbolic orbit
     pub fn semi_minor_axis_km(&self) -> f64 {
         if self.ecc() <= 1.0 {
-            ((self.sma_km() * self.ecc()).powi(2) - self.sma_km().powi(2)).sqrt()
+            self.sma_km() * (1.0 - self.ecc().powi(2)).sqrt()
         } else {
             self.hmag_km2_s().powi(2) / (self.frame.gm() * (self.ecc().powi(2) - 1.0).sqrt())
         }
