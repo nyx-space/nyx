@@ -492,11 +492,9 @@ where
             Some(start) => {
                 let end = cfg.end_epoch.unwrap_or_else(|| self.last().epoch());
                 let step = cfg.step.unwrap_or_else(|| 1.minutes());
-                self.every_between(step, start, end)
-                    .map(|s| s)
-                    .collect::<Vec<S>>()
+                self.every_between(step, start, end).collect::<Vec<S>>()
             }
-            None => self.states.iter().map(|s| *s).collect::<Vec<S>>(),
+            None => self.states.to_vec(),
         };
 
         // Build all of the records
