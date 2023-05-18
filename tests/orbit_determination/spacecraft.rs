@@ -141,7 +141,7 @@ fn od_val_sc_mb_srp_reals_duals_models() {
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
-    arc.to_parquet(path.with_file_name("sc_msr_arc.parquet"), None, false)
+    arc.to_parquet_simple(path.with_file_name("sc_msr_arc.parquet"))
         .unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.

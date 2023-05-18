@@ -30,7 +30,6 @@ use crate::time::{Duration, Epoch, TimeSeries, TimeUnits, Unit};
 use arrow::array::{Array, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
-use hifitime::prelude::{Format, Formatter};
 use parquet::arrow::ArrowWriter;
 use rayon::prelude::*;
 use std::collections::HashMap;
@@ -40,7 +39,6 @@ use std::fs::File;
 use std::iter::Iterator;
 use std::ops;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use std::sync::mpsc::channel;
 use std::sync::Arc;
 use std::time::Instant;
@@ -446,6 +444,9 @@ where
         let tick = Epoch::now().unwrap();
         info!("Exporting trajectory to parquet file...");
 
+        // Grab the path here before we move stuff.
+        let path_buf = cfg.actual_path(path);
+
         // Build the schema
         let mut hdrs = vec![
             Field::new("Epoch:Gregorian UTC", DataType::Utf8, false),
@@ -488,13 +489,14 @@ where
         let mut record: Vec<Arc<dyn Array>> = Vec::new();
 
         // Build the states iterator -- this does require copying the current states but I can't either get a reference or a copy of all the states.
-        let states = match cfg.start_epoch {
-            Some(start) => {
-                let end = cfg.end_epoch.unwrap_or_else(|| self.last().epoch());
-                let step = cfg.step.unwrap_or_else(|| 1.minutes());
-                self.every_between(step, start, end).collect::<Vec<S>>()
-            }
-            None => self.states.to_vec(),
+        let states = if cfg.start_epoch.is_some() || cfg.end_epoch.is_some() || cfg.step.is_some() {
+            // Must interpolate the data!
+            let start = cfg.start_epoch.unwrap_or_else(|| self.first().epoch());
+            let end = cfg.end_epoch.unwrap_or_else(|| self.last().epoch());
+            let step = cfg.step.unwrap_or_else(|| 1.minutes());
+            self.every_between(step, start, end).collect::<Vec<S>>()
+        } else {
+            self.states.to_vec()
         };
 
         // Build all of the records
@@ -553,24 +555,6 @@ where
         }
 
         let props = pq_writer(Some(metadata));
-
-        let mut path_buf = path.as_ref().to_path_buf();
-
-        if cfg.timestamp {
-            if let Some(file_name) = path_buf.file_name() {
-                if let Some(file_name_str) = file_name.to_str() {
-                    if let Some(extension) = path_buf.extension() {
-                        let stamp = Formatter::new(
-                            Epoch::now().unwrap(),
-                            Format::from_str("%Y-%m-%dT%H-%M-%S").unwrap(),
-                        );
-                        let new_file_name =
-                            format!("{file_name_str}-{stamp}.{}", extension.to_str().unwrap());
-                        path_buf.set_file_name(new_file_name);
-                    }
-                }
-            }
-        };
 
         let file = File::create(&path_buf)?;
         let mut writer = ArrowWriter::try_new(file, schema.clone(), props).unwrap();
