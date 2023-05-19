@@ -17,6 +17,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import pandas as pd
 
 from .utils import (
     radii,
@@ -25,6 +27,7 @@ from .utils import (
     colors,
     finalize_plot,
     body_color,
+    nyx_tpl,
 )
 
 
@@ -116,7 +119,7 @@ def plot_ground_track(
         dfs (pandas.DataFrame): The data frame containing the trajectory (or a list thereof)
         title (str): The title of the plot
         names (str): The name of the trajectory (or a list thereof)
-        projection (str, optional): The projection to use. Defaults to "orthographic".
+        projection (str, optional): The projection to use. Defaults to "orthographic". Another good option is "equirectangular"
         landmarks (dict, optional): A dictionary of landmarks to plot. Defaults to {}. Example: {"Eiffel Tower": (48.8584, 2.2945)} (latitude, longitude)
         not_earth (bool, optional): Whether to plot the Earth. Defaults to False.
         html_out (str, optional): The path to save the HTML to. Defaults to None.
@@ -137,7 +140,7 @@ def plot_ground_track(
 
     assert len(names) == len(dfs), "Number of names must match number of dataframes"
 
-    for (name, df) in zip(names, dfs):
+    for name, df in zip(names, dfs):
         i = len(fig.data)
         try:
             color = color_values[i % len(color_values)]
@@ -176,6 +179,78 @@ def plot_ground_track(
     fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
 
     finalize_plot(fig, f"Ground track: {title}", copyright=copyright)
+
+    if html_out:
+        with open(html_out, "w") as f:
+            f.write(fig.to_html())
+        print(f"Saved HTML to {html_out}")
+
+    if show:
+        fig.show()
+    else:
+        return fig
+
+
+def plot_orbit_elements(
+    dfs,
+    title,
+    names,
+    html_out=None,
+    copyright=None,
+    show=True,
+):
+    """
+    Plots the orbital elements: SMA, ECC, INC, RAAN, AOP, TA, True Longitude, AOL
+
+    Args:
+        dfs (pandas.DataFrame): The data frame containing the trajectory (or a list thereof)
+        title (str): The title of the plot
+        html_out (str, optional): The path to save the HTML to. Defaults to None.
+        copyright (str, optional): The copyright to display on the plot. Defaults to None.
+        fig (plotly.graph_objects.Figure, optional): The figure to add the trajectory to. Defaults to None.
+        center (str, optional): The name of the center object, e.g. `Luna` (Moon). Defaults to "Earth".
+        show (bool, optional): Whether to show the plot. Defaults to True. If set to false, the figure will be returned.
+    """
+
+    if not isinstance(dfs, list):
+        dfs = [dfs]
+
+    for df in dfs:
+        df["Epoch"] = pd.to_datetime(df["Epoch:Gregorian UTC"])
+
+    if not isinstance(names, list):
+        names = [names]
+
+    assert len(names) == len(dfs), "Number of names must match number of dataframes"
+
+    columns = [
+        "sma (km)",
+        "ecc",
+        "inc (deg)",
+        "raan (deg)",
+        "aop (deg)",
+        "ta (deg)",
+        "aol (deg)",
+        "tlong (deg)",
+    ]
+
+    fig = make_subplots(rows=4, cols=2, subplot_titles=columns)
+
+    row_i = 0
+    col_i = 0
+
+    for col in columns:
+        for k, df in enumerate(dfs):
+            fig.add_trace(
+                go.Scatter(x=df["Epoch"], y=df[col], name=f"{names[k]} {col}"),
+                row=row_i + 1,
+                col=col_i + 1,
+            )
+        col_i = (col_i + 1) % 2
+        if col_i == 0:
+            row_i = (row_i + 1) % 4
+
+    finalize_plot(fig, title, copyright=copyright)
 
     if html_out:
         with open(html_out, "w") as f:

@@ -78,6 +78,8 @@ fn trk_simple(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
     traj.to_groundtrack_parquet(
         path.with_file_name("tracking_truth_ephem_groundtrack.parquet"),
         cosm.frame("IAU Earth"),
+        None,
+        None,
         cosm.clone(),
     )
     .unwrap();
