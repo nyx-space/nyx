@@ -761,24 +761,21 @@ impl Traj<Orbit> {
         &self,
         path: P,
         body_fixed_frame: Frame,
+        events: Option<Vec<&dyn EventEvaluator<Orbit>>>,
+        metadata: Option<HashMap<String, String>>,
         cosm: Arc<Cosm>,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<PathBuf, Box<dyn Error>> {
         let traj = self.to_frame(body_fixed_frame, cosm)?;
 
-        traj.to_parquet_with_cfg(
-            path,
-            ExportCfg {
-                fields: Some(vec![
-                    StateParameter::GeodeticLatitude,
-                    StateParameter::GeodeticLongitude,
-                    StateParameter::GeodeticHeight,
-                ]),
-                step: Some(1 * Unit::Minute),
-                ..Default::default()
-            },
-        )?;
+        let mut cfg = ExportCfg::default();
+        cfg.append_field(StateParameter::GeodeticLatitude);
+        cfg.append_field(StateParameter::GeodeticLongitude);
+        cfg.append_field(StateParameter::GeodeticHeight);
+        cfg.append_field(StateParameter::Rmag);
+        cfg.set_step(1.minutes());
+        cfg.metadata = metadata;
 
-        Ok(())
+        traj.to_parquet(path, events, cfg)
     }
 }
 
@@ -832,24 +829,21 @@ impl Traj<Spacecraft> {
         &self,
         path: P,
         body_fixed_frame: Frame,
+        events: Option<Vec<&dyn EventEvaluator<Spacecraft>>>,
+        metadata: Option<HashMap<String, String>>,
         cosm: Arc<Cosm>,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<PathBuf, Box<dyn Error>> {
         let traj = self.to_frame(body_fixed_frame, cosm)?;
 
-        traj.to_parquet_with_cfg(
-            path,
-            ExportCfg {
-                fields: Some(vec![
-                    StateParameter::GeodeticLatitude,
-                    StateParameter::GeodeticLongitude,
-                    StateParameter::GeodeticHeight,
-                ]),
-                step: Some(1 * Unit::Minute),
-                ..Default::default()
-            },
-        )?;
+        let mut cfg = ExportCfg::default();
+        cfg.append_field(StateParameter::GeodeticLatitude);
+        cfg.append_field(StateParameter::GeodeticLongitude);
+        cfg.append_field(StateParameter::GeodeticHeight);
+        cfg.append_field(StateParameter::Rmag);
+        cfg.set_step(1.minutes());
+        cfg.metadata = metadata;
 
-        Ok(())
+        traj.to_parquet(path, events, cfg)
     }
 }
 

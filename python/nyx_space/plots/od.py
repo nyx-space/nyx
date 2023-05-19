@@ -236,7 +236,6 @@ def plot_covar(
         vel_fig = go.Figure()
 
     for df in dfs:
-
         try:
             orig_tim_col = df[time_col_name]
         except KeyError:
@@ -368,7 +367,6 @@ def plot_covar(
         )
 
     if html_out:
-
         html_out = html_out.replace(".html", "_{}.html")
         this_output = html_out.format("pos_cov")
         with open(this_output, "w") as f:
@@ -424,10 +422,9 @@ def plot_state_deviation(
     if vel_fig is None:
         vel_fig = go.Figure()
 
-    x_title = "" # Forward declaration, will store the last time column name
+    x_title = ""  # Forward declaration, will store the last time column name
 
     for df in dfs:
-
         try:
             orig_tim_col = df[time_col_name]
         except KeyError:
@@ -517,7 +514,6 @@ def plot_state_deviation(
             max(df[covar["cz_z"]][hwpt:]),
         )
 
-
         pos_fig.update_layout(yaxis_range=[-1.5 * max_cov_y, 1.5 * max_cov_y])
 
         plot_with_error(
@@ -575,7 +571,7 @@ def plot_state_deviation(
         vel_fig = plot_measurements(
             msr_df, title, time_col_name, fig=vel_fig, show=False
         )
-    
+
     finalize_plot(pos_fig, title, x_title, "Position deviation (km)")
     finalize_plot(vel_fig, title, x_title, "Velocity deviation (km/s)")
 
@@ -619,7 +615,6 @@ def plot_measurements(
     station_colors = {}
 
     for df in dfs:
-
         try:
             orig_tim_col = df[time_col_name]
         except KeyError:
@@ -868,7 +863,6 @@ def plot_residual_qq(
 
 
 def plot_qq(df, title, col="residual_ratio", copyright=None):
-
     # Your list of residuals
     residuals = df[col]
 

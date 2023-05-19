@@ -20,8 +20,12 @@ use hifitime::{Epoch, Unit};
 use pyo3::prelude::*;
 
 use crate::md::trajectory::ExportCfg;
+use crate::python::cosmic::Frame;
 use crate::{
-    md::{prelude::Traj as TrajRs, Event, EventEvaluator},
+    md::{
+        prelude::{Cosm, Traj as TrajRs},
+        Event, EventEvaluator,
+    },
     NyxError, Spacecraft, State,
 };
 
@@ -88,33 +92,61 @@ impl Traj {
         self.inner.find_minmax(&event, precision)
     }
 
-    /// Saves this trajectory to a parquet file, optionally adding the event columns to append and metadata
-    #[pyo3(text_signature = "(path, events=None, metadata=None")]
+    /// Saves this trajectory to a parquet file, optionally adding the event columns to append and metadata.
+    /// Set the groundtrack parameter to a body fixed frame to export this trajectory with latitude, longitude, and height columns in that body fixed frame.
+    #[pyo3(text_signature = "(path, events=None, metadata=None, groundtrack=None")]
     fn to_parquet(
         &self,
         path: String,
         events: Option<Vec<Event>>,
         metadata: Option<HashMap<String, String>>,
+        groundtrack: Option<Frame>,
     ) -> Result<String, NyxError> {
-        let cfg = match metadata {
-            None => ExportCfg::default(),
-            Some(_) => ExportCfg {
-                metadata,
-                ..Default::default()
-            },
-        };
-
         let maybe = match events {
-            None => self.inner.to_parquet(path, None, cfg),
+            None => match groundtrack {
+                None => {
+                    let cfg = match metadata {
+                        None => ExportCfg::default(),
+                        Some(_) => ExportCfg {
+                            metadata,
+                            ..Default::default()
+                        },
+                    };
+                    self.inner.to_parquet(path, None, cfg)
+                }
+                Some(py_frame) => self.inner.to_groundtrack_parquet(
+                    path,
+                    py_frame.inner,
+                    None,
+                    metadata,
+                    Cosm::de438(),
+                ),
+            },
             Some(events) => {
-                let events = Some(
-                    events
-                        .iter()
-                        .map(|e| e as &dyn EventEvaluator<Spacecraft>)
-                        .collect::<Vec<&dyn EventEvaluator<Spacecraft>>>(),
-                );
+                let events = events
+                    .iter()
+                    .map(|e| e as &dyn EventEvaluator<Spacecraft>)
+                    .collect::<Vec<&dyn EventEvaluator<Spacecraft>>>();
 
-                self.inner.to_parquet(path, events, cfg)
+                match groundtrack {
+                    None => {
+                        let cfg = match metadata {
+                            None => ExportCfg::default(),
+                            Some(_) => ExportCfg {
+                                metadata,
+                                ..Default::default()
+                            },
+                        };
+                        self.inner.to_parquet(path, Some(events), cfg)
+                    }
+                    Some(py_frame) => self.inner.to_groundtrack_parquet(
+                        path,
+                        py_frame.inner,
+                        Some(events),
+                        metadata,
+                        Cosm::de438(),
+                    ),
+                }
             }
         };
 

@@ -1,0 +1,20 @@
+lofi:
+  point_masses:
+    - Luna
+
+hifi:
+  point_masses:
+    - Sun
+    - Earth
+    - Luna
+    - JupiterBarycenter
+  harmonics:
+    - frame: IAU Moon
+      coeffs: data/Luna_jggrx_1500e_sha.tab.gz
+      degree: 50
+      order: 50
+  srp:
+    phi: 1367.0
+    shadows:
+      - Earth J2000
+      - Moon J2000

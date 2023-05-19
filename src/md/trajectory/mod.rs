@@ -98,4 +98,16 @@ impl ExportCfg {
         }
         me
     }
+
+    pub fn append_field(&mut self, field: StateParameter) {
+        if let Some(fields) = self.fields.as_mut() {
+            fields.push(field);
+        } else {
+            self.fields = Some(vec![field]);
+        }
+    }
+
+    pub fn set_step(&mut self, step: Duration) {
+        self.step = Some(step);
+    }
 }
