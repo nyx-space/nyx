@@ -341,7 +341,6 @@ def prototype(gs_yaml, rnx_path, plot=True):
         trk_cfg = {ref_station.name: TrkConfig()}
 
         for ta_deg in np.linspace(0, 360, 10):
-
             orbit = Orbit.from_keplerian(
                 sma_km=7349136.3e-3,
                 ecc=0.00117,

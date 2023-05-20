@@ -111,6 +111,18 @@ impl ExportCfg {
         }
     }
 
+    pub fn append_field(&mut self, field: StateParameter) {
+        if let Some(fields) = self.fields.as_mut() {
+            fields.push(field);
+        } else {
+            self.fields = Some(vec![field]);
+        }
+    }
+
+    pub fn set_step(&mut self, step: Duration) {
+        self.step = Some(step);
+    }
+
     /// Modifies the provided path to include the timestamp if required.
     pub(crate) fn actual_path<P: AsRef<Path>>(&self, path: P) -> PathBuf {
         let mut path_buf = path.as_ref().to_path_buf();

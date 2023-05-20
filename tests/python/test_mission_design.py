@@ -91,6 +91,11 @@ def test_propagate():
         "lofi_with_events.parquet", metadata={"test key": "test value"}, events=[event]
     )
 
+    # Also export this ground track
+    cosm = Cosm.de438()
+    iau_earth = cosm.frame("IAU Earth")
+    traj.to_parquet("iau_earth_lofi.parquet", groundtrack=iau_earth)
+
     # Let's also search for this event in the trajectory
     for sc_at_event in traj.find(event):
         print(sc_at_event)

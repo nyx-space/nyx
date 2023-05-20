@@ -28,6 +28,7 @@ pub(crate) fn register_cosmic(py: Python<'_>, parent_module: &PyModule) -> PyRes
     Ok(())
 }
 
+#[derive(Clone)]
 #[pyclass]
 pub struct Frame {
     pub inner: FrameRs,
