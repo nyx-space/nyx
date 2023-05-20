@@ -92,6 +92,10 @@ where
             warn!("The `step` parameter in the export is not supported for tracking arcs.");
         }
 
+        if cfg.fields.is_some() {
+            warn!("The `fields` parameter in the export is not supported for tracking arcs.");
+        }
+
         // Build the schema
         let mut hdrs = vec![
             Field::new("Epoch:Gregorian UTC", DataType::Utf8, false),

@@ -425,10 +425,11 @@ impl FromStr for EpochFormat {
 }
 
 /// Specifies the format of the covariance during serialization
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum CovarFormat {
-    /// Default: allows plotting the variance of the elements instead of the covariance
-    Sqrt,
+    /// Uncertainty is the square root of the covariance, not very useful for variance terms because these could be complex.
+    #[default]
+    Uncertainty,
     /// Keeps the covariance as computed, i.e. one sigma (~68%), causes e.g. positional elements in km^2.
     Sigma1,
     /// Three sigma covers about 99.7% of the distribution
@@ -440,8 +441,8 @@ pub enum CovarFormat {
 impl fmt::Display for CovarFormat {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            CovarFormat::Sqrt => write!(f, "exptd_val_"),
-            CovarFormat::Sigma1 => write!(f, "covar_"),
+            CovarFormat::Uncertainty => write!(f, "Uncertainty"),
+            CovarFormat::Sigma1 => write!(f, "Covariance"),
             CovarFormat::Sigma3 => write!(f, "3sig_covar"),
             CovarFormat::MulSigma(x) => write!(f, "{x}sig_covar"),
         }
@@ -453,7 +454,7 @@ impl FromStr for CovarFormat {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().replace(' ', "").as_str() {
-            "sqrt" => Ok(CovarFormat::Sqrt),
+            "sqrt" => Ok(CovarFormat::Uncertainty),
             "1sigma" | "sigma1" => Ok(CovarFormat::Sigma1),
             "3sigma" | "sigma3" => Ok(CovarFormat::Sigma3),
             _ => Err(ParsingError::CovarFormat),

@@ -214,7 +214,7 @@ fn od_resid_reject_all_ckf_two_way(
     )
     .unwrap();
 
-    for residual in odp.residuals.iter() {
+    for residual in odp.residuals.iter().flatten() {
         assert!(residual.rejected, "{} was not rejected!", residual.epoch);
     }
 
@@ -280,7 +280,7 @@ fn od_resid_reject_default_ckf_two_way(
 
     // With the default configuration, the filter converges very fast since we have similar dynamics.
 
-    for residual in odp.residuals.iter() {
+    for residual in odp.residuals.iter().flatten() {
         assert!(!residual.rejected, "{} was rejected!", residual.epoch);
     }
 

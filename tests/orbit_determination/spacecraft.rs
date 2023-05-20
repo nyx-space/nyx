@@ -205,7 +205,7 @@ fn od_val_sc_mb_srp_reals_duals_models() {
             .expect("could not write to CSV");
     }
 
-    for res in &odp.residuals {
+    for res in odp.residuals.iter().flatten() {
         assert!(
             res.postfit.norm() < 1e-5,
             "postfit should be zero (perfect dynamics) ({:e})",

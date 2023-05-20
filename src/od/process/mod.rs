@@ -19,12 +19,10 @@
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName};
 use crate::md::trajectory::{Interpolatable, Traj};
-
 pub use crate::od::estimate::*;
 pub use crate::od::ground_station::*;
 pub use crate::od::snc::*;
 pub use crate::od::*;
-
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::propagators::PropInstance;
 pub use crate::time::{Duration, Unit};
@@ -34,13 +32,12 @@ pub use conf::{IterationConf, SmoothingArc};
 mod trigger;
 pub use trigger::EkfTrigger;
 mod rejectcrit;
-
+use self::msr::arc::TrackingArc;
+pub use self::rejectcrit::FltResid;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::Add;
-
-use self::msr::arc::TrackingArc;
-pub use self::rejectcrit::FltResid;
+mod export;
 
 /// An orbit determination process. Note that everything passed to this structure is moved.
 #[allow(clippy::upper_case_acronyms)]
@@ -82,7 +79,7 @@ pub struct ODProcess<
     /// Vector of estimates available after a pass
     pub estimates: Vec<K::Estimate>,
     /// Vector of residuals available after a pass
-    pub residuals: Vec<Residual<Msr::MeasurementSize>>,
+    pub residuals: Vec<Option<Residual<Msr::MeasurementSize>>>,
     pub ekf_trigger: Option<EkfTrigger>,
     /// Residual rejection criteria allows preventing bad measurements from affecting the estimation.
     pub resid_crit: Option<FltResid>,
@@ -251,8 +248,10 @@ where
     /// Returns the root mean square of the prefit residual ratios
     pub fn rms_residual_ratios(&self) -> f64 {
         let mut sum = 0.0;
-        for residual in &self.residuals {
-            sum += residual.ratio.powi(2);
+        for opt_residual in &self.residuals {
+            if let Some(residual) = opt_residual {
+                sum += residual.ratio.powi(2);
+            }
         }
         (sum / (self.residuals.len() as f64)).sqrt()
     }
@@ -303,8 +302,9 @@ where
             // Reset the propagator
             self.prop.state = self.init_state;
             // Empty the estimates and add the first smoothed estimate as the initial estimate
-            self.estimates = Vec::with_capacity(measurements.len());
-            // self.estimates.push(smoothed[0].clone());
+            self.estimates = Vec::with_capacity(measurements.len().max(self.estimates.len()));
+            self.residuals = Vec::with_capacity(measurements.len().max(self.estimates.len()));
+
             self.kf.set_previous_estimate(&smoothed[0]);
             // And re-run the filter
             self.process::<Dev>(measurements, devices, step_size)?;
@@ -557,7 +557,7 @@ where
                                         self.prop.state.reset_stm();
 
                                         self.estimates.push(estimate);
-                                        self.residuals.push(residual);
+                                        self.residuals.push(Some(residual));
                                     }
                                     Err(e) => return Err(e),
                                 }
@@ -588,6 +588,8 @@ where
                             // State deviation is always zero for an EKF time update
                             // therefore we don't do anything different for an extended filter
                             self.estimates.push(est);
+                            // We push None so that the residuals and estimates are aligned
+                            self.residuals.push(None);
                         }
                         Err(e) => return Err(e),
                     }
@@ -633,6 +635,7 @@ where
                     // State deviation is always zero for an EKF time update
                     // therefore we don't do anything different for an extended filter
                     self.estimates.push(est);
+                    self.residuals.push(None);
                 }
                 Err(e) => return Err(e),
             }
@@ -645,7 +648,7 @@ where
         Ok(())
     }
 
-    /// Builds the navigation trajectory for the estimated state only (no covariance until https://gitlab.com/nyx-space/nyx/-/issues/199!)
+    /// Builds the navigation trajectory for the estimated state only
     pub fn to_traj(&self) -> Result<Traj<S>, NyxError>
     where
         DefaultAllocator: Allocator<f64, <S as State>::VecLength>,

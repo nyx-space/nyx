@@ -84,7 +84,7 @@ where
             predicted: true,
             stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity(),
             epoch_fmt: EpochFormat::GregorianUtc,
-            covar_fmt: CovarFormat::Sqrt,
+            covar_fmt: CovarFormat::Uncertainty,
         }
     }
 
@@ -99,7 +99,7 @@ where
             predicted: true,
             stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity(),
             epoch_fmt: EpochFormat::GregorianUtc,
-            covar_fmt: CovarFormat::Sqrt,
+            covar_fmt: CovarFormat::Uncertainty,
         }
     }
 }
@@ -148,7 +148,7 @@ impl KfEstimate<Orbit> {
             predicted: true,
             stm: OMatrix::<f64, U6, U6>::identity(),
             epoch_fmt: EpochFormat::GregorianUtc,
-            covar_fmt: CovarFormat::Sqrt,
+            covar_fmt: CovarFormat::Uncertainty,
         }
     }
 }
@@ -172,7 +172,7 @@ where
             predicted: true,
             stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity(),
             epoch_fmt: EpochFormat::GregorianUtc,
-            covar_fmt: CovarFormat::Sqrt,
+            covar_fmt: CovarFormat::Uncertainty,
         }
     }
 
@@ -304,7 +304,7 @@ where
         for i in 0..dim {
             for j in 0..dim {
                 let ser_covar = match self.covar_fmt {
-                    CovarFormat::Sqrt => self.covar[(i, j)].sqrt(),
+                    CovarFormat::Uncertainty => self.covar[(i, j)].sqrt(),
                     CovarFormat::Sigma1 => self.covar[(i, j)],
                     CovarFormat::Sigma3 => self.covar[(i, j)] * 3.0,
                     CovarFormat::MulSigma(x) => self.covar[(i, j)] * x,

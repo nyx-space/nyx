@@ -223,7 +223,7 @@ fn od_robust_test_ekf_realistic_one_way() {
         ])
         .expect("could not write to output file");
 
-    for res in &odp.residuals {
+    for res in odp.residuals.iter().flatten() {
         resid_wtr
             .serialize(vec![
                 res.epoch.to_string(),
@@ -501,7 +501,7 @@ fn od_robust_test_ekf_realistic_two_way() {
         ])
         .expect("could not write to output file");
 
-    for res in &odp.residuals {
+    for res in odp.residuals.iter().flatten() {
         resid_wtr
             .serialize(vec![
                 res.epoch.to_string(),
