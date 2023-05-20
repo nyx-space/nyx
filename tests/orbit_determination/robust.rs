@@ -5,6 +5,7 @@ extern crate pretty_env_logger;
 use nyx::cosmic::{Bodies, Cosm, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::io::formatter::NavSolutionFormatter;
+use nyx::io::ExportCfg;
 use nyx::linalg::{Matrix2, Vector2};
 use nyx::md::StateParameter;
 use nyx::od::noise::GaussMarkov;
@@ -408,7 +409,7 @@ fn od_robust_test_ekf_realistic_two_way() {
     .iter()
     .collect();
 
-    arc.to_parquet_simple(path).unwrap();
+    arc.to_parquet_simple(path.clone()).unwrap();
 
     println!("{arc}");
 
@@ -446,6 +447,13 @@ fn od_robust_test_ekf_realistic_two_way() {
         &arc.measurements,
         &mut devices_map,
         arc.min_duration_sep().unwrap(),
+    )
+    .unwrap();
+
+    // Export as Parquet
+    odp.to_parquet(
+        path.with_file_name("robustness_test_two_way.parquet"),
+        ExportCfg::timestamped(),
     )
     .unwrap();
 

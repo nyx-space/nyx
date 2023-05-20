@@ -255,7 +255,7 @@ where
         }
         // Add the 1-sigma covariance in the integration frame
         for i in 0..<S as State>::Size::dim() {
-            for j in 0..<S as State>::Size::dim() {
+            for j in i..<S as State>::Size::dim() {
                 let mut data = Float64Builder::new();
                 for s in &estimates {
                     data.append_value(s.covar()[(i, j)]);
@@ -275,7 +275,7 @@ where
             // Create a full DCM and only rotate the orbit part of it.
             let mut dcm = OMatrix::<f64, S::Size, S::Size>::identity();
             for i in 0..6 {
-                for j in 0..6 {
+                for j in i..6 {
                     dcm[(i, j)] = dcm6x6[(i, j)];
                 }
             }
@@ -286,7 +286,7 @@ where
 
         // Now store the RIC covariance data.
         for i in 0..<S as State>::Size::dim() {
-            for j in 0..<S as State>::Size::dim() {
+            for j in i..<S as State>::Size::dim() {
                 let mut data = Float64Builder::new();
                 for k in 0..estimates.len() {
                     data.append_value(ric_covariances[k][(i, j)]);
@@ -306,6 +306,7 @@ where
                     data.append_null();
                 }
             }
+            record.push(Arc::new(data.finish()));
         }
         // Postfit
         for i in 0..Msr::MeasurementSize::dim() {
@@ -317,6 +318,7 @@ where
                     data.append_null();
                 }
             }
+            record.push(Arc::new(data.finish()));
         }
         // Residual ratio (unique entry regardless of the size)
         let mut data = Float64Builder::new();
@@ -327,6 +329,7 @@ where
                 data.append_null();
             }
         }
+        record.push(Arc::new(data.finish()));
 
         info!("Serialized {} estimates and residuals", estimates.len());
 
@@ -345,7 +348,7 @@ where
         let props = pq_writer(Some(metadata));
 
         let file = File::create(&path_buf)?;
-        let mut writer = ArrowWriter::try_new(file, schema.clone(), props).unwrap();
+        let mut writer = ArrowWriter::try_new(file, schema.clone(), props)?;
 
         let batch = RecordBatch::try_new(schema, record)?;
         writer.write(&batch)?;
