@@ -13,6 +13,7 @@ use nyx::od::prelude::*;
 use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use nyx::time::{Epoch, TimeUnits, Unit};
 use nyx::utils::rss_orbit_errors;
+use polars::prelude::*;
 use std::collections::HashMap;
 use std::env;
 use std::path::PathBuf;
@@ -443,6 +444,14 @@ fn od_robust_test_ekf_realistic_two_way() {
         .map(|dev| (dev.name.clone(), dev))
         .collect::<HashMap<_, _>>();
 
+    // Check that exporting an empty set returns an error.
+    assert!(odp
+        .to_parquet(
+            path.with_file_name("robustness_test_two_way.parquet"),
+            ExportCfg::timestamped(),
+        )
+        .is_err());
+
     odp.process(
         &arc.measurements,
         &mut devices_map,
@@ -450,77 +459,133 @@ fn od_robust_test_ekf_realistic_two_way() {
     )
     .unwrap();
 
+    let mut num_residual_none = 0;
+    let mut num_residual_some = 0;
+    odp.residuals.iter().for_each(|opt_v| match opt_v {
+        Some(_) => num_residual_some += 1,
+        None => {
+            num_residual_none += 1;
+        }
+    });
+
     // Export as Parquet
-    odp.to_parquet(
-        path.with_file_name("robustness_test_two_way.parquet"),
-        ExportCfg::timestamped(),
-    )
-    .unwrap();
+    let timestamped_path = odp
+        .to_parquet(
+            path.with_file_name("robustness_test_two_way.parquet"),
+            ExportCfg::timestamped(),
+        )
+        .unwrap();
 
-    let estimate_fmtr =
-        NavSolutionFormatter::default("robustness_test_two_way.csv".to_owned(), cosm);
+    // Read in the Parquet file and assert proper data was written.
 
-    let mut wtr = csv::Writer::from_path("robustness_test_two_way.csv").unwrap();
-    wtr.serialize(&estimate_fmtr.headers)
-        .expect("could not write to output file");
+    let df = LazyFrame::scan_parquet(timestamped_path, Default::default()).unwrap();
 
-    let mut err_wtr = csv::Writer::from_path("robustness_test_traj_err_two_way.csv").unwrap();
-    err_wtr
-        .serialize(vec![
-            "epoch",
-            "x_err_km",
-            "y_err_km",
-            "z_err_km",
-            "vx_err_km_s",
-            "vy_err_km_s",
-            "vz_err_km_s",
+    // Note: this also checks that the columns that match the given measurement kind exist.
+    let df_residuals = df
+        .clone()
+        .select([
+            col("Prefit residual: Range (km)"),
+            col("Prefit residual: Doppler (km/s)"),
+            col("Postfit residual: Range (km)"),
+            col("Postfit residual: Doppler (km/s)"),
+            col("Residual ratio"),
         ])
-        .expect("could not write to output file");
+        .collect()
+        .unwrap();
 
-    for est in &odp.estimates {
-        // Format the estimate
-        wtr.serialize(estimate_fmtr.fmt(est))
-            .expect("could not write to CSV");
-        // Add the error data
-        let truth_state = traj.at(est.epoch()).unwrap();
-        let err = truth_state - est.state();
-        err_wtr
-            .serialize(vec![
-                est.epoch().to_string(),
-                format!("{}", err.x_km),
-                format!("{}", err.y_km),
-                format!("{}", err.z_km),
-                format!("{}", err.vx_km_s),
-                format!("{}", err.vy_km_s),
-                format!("{}", err.vz_km_s),
-            ])
-            .expect("could not write to CSV");
+    for series in df_residuals.iter() {
+        assert_eq!(series.len(), odp.estimates.len());
+        let mut num_none = 0;
+        let mut num_some = 0;
+        series
+            .f64()
+            .unwrap()
+            .into_iter()
+            .for_each(|opt_v| match opt_v {
+                Some(_) => num_some += 1,
+                None => {
+                    num_none += 1;
+                }
+            });
+
+        assert_eq!(num_none, num_residual_none);
+        assert_eq!(num_some, num_residual_some);
     }
 
-    let mut resid_wtr = csv::Writer::from_path("robustness_test_residuals_two_way.csv").unwrap();
-    resid_wtr
-        .serialize(vec![
-            "epoch",
-            "range_prefit",
-            "doppler_prefit",
-            "range_postfit",
-            "doppler_postfit",
-            "residual_ratio",
+    // Check that the position and velocity estimates are present, along with the epochs
+    assert!(df
+        .clone()
+        .select([
+            col("Epoch:Gregorian UTC"),
+            col("Epoch:Gregorian TAI"),
+            col("Epoch:TAI (s)"),
+            col("x (km)"),
+            col("y (km)"),
+            col("z (km)"),
+            col("vx (km/s)"),
+            col("vy (km/s)"),
+            col("vz (km/s)"),
         ])
-        .expect("could not write to output file");
+        .collect()
+        .is_ok());
 
-    for res in odp.residuals.iter().flatten() {
-        resid_wtr
-            .serialize(vec![
-                res.epoch.to_string(),
-                format!("{}", res.prefit[0]),
-                format!("{}", res.prefit[1]),
-                format!("{}", res.postfit[0]),
-                format!("{}", res.postfit[1]),
-                format!("{}", res.ratio),
-            ])
-            .expect("could not write to CSV");
-    }
+    // Check that the covariance in the integration frame is present
+    assert!(df
+        .clone()
+        .select([
+            col("Covariance XX (Earth J2000)"),
+            col("Covariance YZ (Earth J2000)"),
+            col("Covariance YY (Earth J2000)"),
+            col("Covariance ZX (Earth J2000)"),
+            col("Covariance ZY (Earth J2000)"),
+            col("Covariance ZZ (Earth J2000)"),
+            col("Covariance VxX (Earth J2000)"),
+            col("Covariance VxY (Earth J2000)"),
+            col("Covariance VxZ (Earth J2000)"),
+            col("Covariance VxVx (Earth J2000)"),
+            col("Covariance VyX (Earth J2000)"),
+            col("Covariance VyY (Earth J2000)"),
+            col("Covariance VyZ (Earth J2000)"),
+            col("Covariance VyVx (Earth J2000)"),
+            col("Covariance VyVy (Earth J2000)"),
+            col("Covariance VzX (Earth J2000)"),
+            col("Covariance VzY (Earth J2000)"),
+            col("Covariance VzZ (Earth J2000)"),
+            col("Covariance VzVx (Earth J2000)"),
+            col("Covariance VzVy (Earth J2000)"),
+            col("Covariance VzVz (Earth J2000)"),
+        ])
+        .collect()
+        .is_ok());
+
+    // Check that the covariance in the RIC frame is present
+    assert!(df
+        .clone()
+        .select([
+            col("Covariance XX (RIC)"),
+            col("Covariance YZ (RIC)"),
+            col("Covariance YY (RIC)"),
+            col("Covariance ZX (RIC)"),
+            col("Covariance ZY (RIC)"),
+            col("Covariance ZZ (RIC)"),
+            col("Covariance VxX (RIC)"),
+            col("Covariance VxY (RIC)"),
+            col("Covariance VxZ (RIC)"),
+            col("Covariance VxVx (RIC)"),
+            col("Covariance VyX (RIC)"),
+            col("Covariance VyY (RIC)"),
+            col("Covariance VyZ (RIC)"),
+            col("Covariance VyVx (RIC)"),
+            col("Covariance VyVy (RIC)"),
+            col("Covariance VzX (RIC)"),
+            col("Covariance VzY (RIC)"),
+            col("Covariance VzZ (RIC)"),
+            col("Covariance VzVx (RIC)"),
+            col("Covariance VzVy (RIC)"),
+            col("Covariance VzVz (RIC)"),
+        ])
+        .collect()
+        .is_ok());
 
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];

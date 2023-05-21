@@ -60,6 +60,9 @@ num = "0.4.0"
 enum-iterator = "1.4.0"
 rstest = "0.17.0"
 
+[dev-dependencies]
+polars = {version = "0.29.0", features = ["parquet", "lazy"]}
+
 [build-dependencies]
 shadow-rs = "0.21.0"
 
