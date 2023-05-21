@@ -9,6 +9,7 @@ from nyx_space.orbit_determination import (
     OrbitEstimate,
     process_tracking_arc,
     DynamicTrackingArc,
+    ExportCfg,
 )
 from nyx_space.mission_design import DynamicTrajectory, SpacecraftDynamics, propagate
 from nyx_space.cosmic import Spacecraft
@@ -85,20 +86,25 @@ def test_filter_arc():
     # Unless there is a 2 hour gap in the measurements, and then switch back to classical
     ekf_disable_time = Unit.Hour * 2
 
-    estimates = process_tracking_arc(
+    # Set up the export
+    cfg = ExportCfg(timestamp=True)
+
+    rslt_path = process_tracking_arc(
         dynamics["hifi"],
         sc,
         orbit_est,
         msr_noise,
         arc,
+        str(outpath.joinpath("./od_result.parquet")),
+        cfg,
         ekf_num_msr_trig,
         ekf_disable_time,
     )
 
-    assert len(estimates) == 1063
-    assert len([est for est in estimates if not est.is_predicted]) == 762
+    print(f"Stored to {rslt_path}")
 
-    # TODO: Add more tests
+    # TODO: Add plotting and saving of the figures
+    # TODO: Add figures to artifacts
 
 
 def test_one_way_msr():

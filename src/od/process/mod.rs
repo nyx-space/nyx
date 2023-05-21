@@ -123,6 +123,29 @@ where
         + Allocator<f64, <S as State>::Size, A>
         + Allocator<f64, A, <S as State>::Size>,
 {
+    /// Initialize a new orbit determination process with an optional trigger to switch from a CKF to an EKF.
+    pub fn new(
+        prop: PropInstance<'a, D, E>,
+        kf: K,
+        ekf_trigger: Option<EkfTrigger>,
+        resid_crit: Option<FltResid>,
+        cosm: Arc<Cosm>,
+    ) -> Self {
+        let init_state = prop.state;
+        Self {
+            prop,
+            kf,
+            estimates: Vec::with_capacity(10_000),
+            residuals: Vec::with_capacity(10_000),
+            ekf_trigger,
+            resid_crit,
+            cosm,
+            init_state,
+            _marker: PhantomData::<A>,
+        }
+    }
+
+    /// Initialize a new orbit determination process with an Extended Kalman filter. The switch from a classical KF to an EKF is based on the provided trigger.
     pub fn ekf(
         prop: PropInstance<'a, D, E>,
         kf: K,

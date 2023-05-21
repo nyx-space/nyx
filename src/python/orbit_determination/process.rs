@@ -22,9 +22,10 @@ use pyo3::prelude::*;
 
 use crate::{
     io::tracking_data::DynamicTrackingArc,
+    io::ExportCfg,
     md::prelude::{Cosm, Propagator, SpacecraftDynamics},
     od::{
-        kalman::KF,
+        filter::kalman::KF,
         process::{EkfTrigger, FltResid, ODProcess},
     },
     NyxError, Spacecraft,
@@ -32,10 +33,11 @@ use crate::{
 
 use super::{estimate::OrbitEstimate, GroundStation};
 
-/// Propagates the provided spacecraft with the provided dynamics until the provided stopping condition (duration, epoch, or event [and optionally the count]).
+/// Runs an orbit determination process given the dynamics, the initial spacecraft object and its orbit estimate, the measurement noise for the filter, the tracking arc data.
+/// You must also provide an export path and optionally and export configuration to export the results to a Parquet file.
 #[pyfunction]
 #[pyo3(
-    text_signature = "(dynamics, spacecraft, initial_estimate, measurement_noise, arc, ekf_num_meas, ekf_disable_time, resid_crit=None)"
+    text_signature = "(dynamics, spacecraft, initial_estimate, measurement_noise, arc, export_path, export_cfg, ekf_num_meas=None, ekf_disable_time=None, resid_crit=None)"
 )]
 pub(crate) fn process_tracking_arc(
     dynamics: SpacecraftDynamics,
@@ -43,10 +45,12 @@ pub(crate) fn process_tracking_arc(
     initial_estimate: OrbitEstimate,
     measurement_noise: Vec<f64>,
     arc: &DynamicTrackingArc,
-    ekf_num_meas: usize,
-    ekf_disable_time: Duration,
+    export_path: String,
+    export_cfg: Option<ExportCfg>,
+    ekf_num_meas: Option<usize>,
+    ekf_disable_time: Option<Duration>,
     resid_crit: Option<FltResid>,
-) -> Result<Vec<OrbitEstimate>, NyxError> {
+) -> Result<String, NyxError> {
     // TODO: Return a navigation trajectory or use a class that mimics the better ODProcess -- https://github.com/nyx-space/nyx/issues/134
     let msr_noise = Matrix2::from_iterator(measurement_noise);
 
@@ -58,23 +62,32 @@ pub(crate) fn process_tracking_arc(
     let prop = Propagator::default(dynamics);
     let prop_est = prop.with(init_sc);
 
-    let mut odp = ODProcess::ekf(
-        prop_est,
-        kf,
-        EkfTrigger::new(ekf_num_meas, ekf_disable_time),
-        resid_crit,
-        Cosm::de438(),
-    );
+    if (ekf_disable_time.is_some() && ekf_num_meas.is_none())
+        || (ekf_disable_time.is_none() && ekf_num_meas.is_some())
+    {
+        return Err(NyxError::CustomError(format!(
+            "For an EKF trigger, you must provide both a disable time and a num measurements."
+        )));
+    }
+
+    let trigger = match ekf_num_meas {
+        Some(ekf_num_meas) => Some(EkfTrigger::new(ekf_num_meas, ekf_disable_time.unwrap())),
+        None => None,
+    };
+
+    let mut odp = ODProcess::new(prop_est, kf, trigger, resid_crit, Cosm::de438());
 
     let concrete_arc = arc.to_tracking_arc()?;
 
     odp.process_arc::<GroundStation>(&concrete_arc).unwrap();
 
-    // Now build a vector of orbit estimates.
-    let mut rslt = Vec::with_capacity(odp.estimates.len());
-    for est in odp.estimates {
-        rslt.push(OrbitEstimate(est));
-    }
+    let maybe = odp.to_parquet(
+        export_path,
+        export_cfg.unwrap_or_else(|| ExportCfg::default()),
+    );
 
-    Ok(rslt)
+    match maybe {
+        Ok(path) => Ok(format!("{}", path.to_str().unwrap())),
+        Err(e) => Err(NyxError::CustomError(e.to_string())),
+    }
 }

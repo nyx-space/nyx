@@ -17,7 +17,7 @@
 */
 
 use crate::io::trajectory_data::DynamicTrajectory;
-use crate::io::ConfigError;
+use crate::io::{ConfigError, ExportCfg};
 use crate::md::prelude::{PropOpts, Propagator, SpacecraftDynamics};
 use crate::md::{Event, StateParameter};
 
@@ -42,6 +42,7 @@ pub(crate) fn register_md(py: Python<'_>, parent_module: &PyModule) -> PyResult<
     sm.add_class::<SpacecraftDynamics>()?;
     sm.add_class::<StateParameter>()?;
     sm.add_class::<Event>()?;
+    sm.add_class::<ExportCfg>()?;
     sm.add_function(wrap_pyfunction!(propagate, sm)?)?;
 
     py_run!(
