@@ -288,8 +288,8 @@ where
         for i in 0..<S as State>::Size::dim() {
             for j in i..<S as State>::Size::dim() {
                 let mut data = Float64Builder::new();
-                for k in 0..estimates.len() {
-                    data.append_value(ric_covariances[k][(i, j)]);
+                for cov in ric_covariances.iter().take(estimates.len()) {
+                    data.append_value(cov[(i, j)]);
                 }
                 record.push(Arc::new(data.finish()));
             }

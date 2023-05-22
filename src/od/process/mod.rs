@@ -271,10 +271,8 @@ where
     /// Returns the root mean square of the prefit residual ratios
     pub fn rms_residual_ratios(&self) -> f64 {
         let mut sum = 0.0;
-        for opt_residual in &self.residuals {
-            if let Some(residual) = opt_residual {
-                sum += residual.ratio.powi(2);
-            }
+        for residual in self.residuals.iter().flatten() {
+            sum += residual.ratio.powi(2);
         }
         (sum / (self.residuals.len() as f64)).sqrt()
     }

@@ -14,6 +14,15 @@ from nyx_space.orbit_determination import (
 from nyx_space.mission_design import DynamicTrajectory, SpacecraftDynamics, propagate
 from nyx_space.cosmic import Spacecraft
 from nyx_space.time import Unit
+from nyx_space.plots.od import (
+    plot_covar,
+    plot_state_deviation,
+    plot_estimates,
+    plot_residuals,
+    plot_residual_histogram,
+    plot_residual_qq,
+    plot_qq,
+)
 
 
 def test_filter_arc():
@@ -61,13 +70,15 @@ def test_filter_arc():
     # Load the trajectory
     traj = DynamicTrajectory(traj_file)
     print(f"Loaded {traj}")
+
+    # Set up the export -- We'll use the same config set up for both measurements and output of OD process
+    cfg = ExportCfg(timestamp=True, metadata={"test key": "test value"})
+
     # Build the simulated tracking arc, setting the seed to zero
     arc_sim = GroundTrackingArcSim(devices, traj, trk_cfg, 0)
     # Generate the measurements
     path = arc_sim.generate_measurements(
-        str(outpath.joinpath("./from_python.parquet")),
-        timestamp=True,
-        metadata={"test key": "test value"},
+        str(outpath.joinpath("./from_python.parquet")), cfg
     )
     print(f"Saved {arc_sim} to {path}")
 
@@ -85,9 +96,6 @@ def test_filter_arc():
     ekf_num_msr_trig = 100
     # Unless there is a 2 hour gap in the measurements, and then switch back to classical
     ekf_disable_time = Unit.Hour * 2
-
-    # Set up the export
-    cfg = ExportCfg(timestamp=True)
 
     rslt_path = process_tracking_arc(
         dynamics["hifi"],
