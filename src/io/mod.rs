@@ -134,8 +134,9 @@ impl ExportCfg {
                             Epoch::now().unwrap(),
                             Format::from_str("%Y-%m-%dT%H-%M-%S").unwrap(),
                         );
-                        let new_file_name =
-                            format!("{file_name_str}-{stamp}.{}", extension.to_str().unwrap());
+                        let ext = extension.to_str().unwrap();
+                        let file_name = file_name_str.replace(&format!(".{ext}"), "");
+                        let new_file_name = format!("{file_name}-{stamp}.{}", ext);
                         path_buf.set_file_name(new_file_name);
                     }
                 }

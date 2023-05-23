@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 import numpy as np
+import pandas as pd
 
 from nyx_space.orbit_determination import (
     GroundStation,
@@ -16,12 +17,9 @@ from nyx_space.cosmic import Spacecraft
 from nyx_space.time import Unit
 from nyx_space.plots.od import (
     plot_covar,
-    plot_state_deviation,
     plot_estimates,
     plot_residuals,
     plot_residual_histogram,
-    plot_residual_qq,
-    plot_qq,
 )
 
 
@@ -77,14 +75,14 @@ def test_filter_arc():
     # Build the simulated tracking arc, setting the seed to zero
     arc_sim = GroundTrackingArcSim(devices, traj, trk_cfg, 0)
     # Generate the measurements
-    path = arc_sim.generate_measurements(
-        str(outpath.joinpath("./from_python.parquet")), cfg
+    msr_path = arc_sim.generate_measurements(
+        str(outpath.joinpath("./msr.parquet")), cfg
     )
-    print(f"Saved {arc_sim} to {path}")
+    print(f"Saved {arc_sim} to {msr_path}")
 
     # Now let's filter this same data.
     # Load the tracking arc
-    arc = DynamicTrackingArc(path)
+    arc = DynamicTrackingArc(msr_path)
 
     # Create the orbit estimate with the covariance diagonal (100 km on position and 1 km/s on velocity)
     orbit_est = OrbitEstimate(
@@ -111,8 +109,50 @@ def test_filter_arc():
 
     print(f"Stored to {rslt_path}")
 
-    # TODO: Add plotting and saving of the figures
-    # TODO: Add figures to artifacts
+    # Load the results
+    oddf = pd.read_parquet(rslt_path)
+    # Load the reference trajectory
+    ref_traj = pd.read_parquet(traj_file)
+    # Load the measurements
+    msr_df = pd.read_parquet(msr_path)
+
+    # We'll plot the difference between the reference trajectory and the OD results, with the measurement bands overlaid.
+    plot_estimates(
+        oddf,
+        "OD results from Python",
+        cov_frame="RIC",
+        ref_traj=ref_traj,
+        msr_df=msr_df,
+        html_out=str(outpath.joinpath("./od_estimate_plots.html")),
+        show=False,
+    )
+
+    # More often, the covariance is a better indicator
+    plot_covar(
+        oddf,
+        "OD 1-sigma covar from Python",
+        cov_sigma=1.0,
+        msr_df=msr_df,
+        html_out=str(outpath.joinpath("./od_estimate_plots.html")),
+        show=False,
+    )
+
+    # Now, we'll plot the prefit residuals
+    plot_residuals(
+        oddf,
+        "OD residuals",
+        msr_df=msr_df,
+        html_out=str(outpath.joinpath("./od_residual_plots.html")),
+        show=False,
+    )
+    # And the postfit histograms
+    plot_residual_histogram(
+        oddf,
+        "OD residuals",
+        kind="Postfit",
+        html_out=str(outpath.joinpath("./od_residual_histograms.html")),
+        show=False,
+    )
 
 
 def test_one_way_msr():

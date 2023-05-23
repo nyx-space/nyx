@@ -20,6 +20,9 @@ import plotly.graph_objects as go
 
 from .utils import plot_with_error, plot_line, finalize_plot, colors
 
+import re
+from slugify import slugify
+
 import pandas as pd
 
 import numpy as np
@@ -30,8 +33,12 @@ from scipy.special import erfcinv
 def plot_estimates(
     dfs,
     title,
+    cov_frame="RIC",
+    cov_fmt="sqrt",
+    cov_sigma=3.0,
     msr_df=None,
-    time_col_name="Epoch:GregorianUtc",
+    time_col_name="Epoch:Gregorian UTC",
+    ref_traj=None,
     html_out=None,
     copyright=None,
     pos_fig=None,
@@ -44,8 +51,12 @@ def plot_estimates(
     Args:
         dfs (pandas.DataFrame): The data frame containing the orbit determination solution (or a list thereof)
         title (str): The title of the plot
+        cov_frame (str): Frame in which to plot the covariance, defaults to RIC frame. File also contains the integration frame.
+        cov_fmt (str): Defines how to plot the covariance, defaults to "sqrt" (applies np.sqrt to the column), which will convert the covariance from an expectation to an uncertainty.
+        cov_sigma (float): Defines the number fo sigmas of uncertainty or covariance to plot, uses [68, 95, 99.7% rule](https://en.wikipedia.org/wiki/68%E2%80%9395%E2%80%9399.7_rule) for 1.0, 2.0, and 3.0 of sigma.
         msr_df (pandas.DataFrame): The data frame containing the measurements
         time_col_name (str): The name of the time column
+        ref_trajs (pandas.DataFrame): If provided, the difference between the reference trajectory and the estimates will be plotted instead of the estimates alone (or list thereof).
         html_out (str): The name of the HTML file to save the plot to
         copyright (str): The copyright to display on the plot
         pos_fig (plotly.graph_objects.Figure): The figure to plot the position estimates on
@@ -56,13 +67,16 @@ def plot_estimates(
     if not isinstance(dfs, list):
         dfs = [dfs]
 
+    if ref_traj is not None and not isinstance(ref_traj, list):
+        ref_traj = [ref_traj]
+
     if pos_fig is None:
         pos_fig = go.Figure()
 
     if vel_fig is None:
         vel_fig = go.Figure()
 
-    for df in dfs:
+    for num, df in enumerate(dfs):
         try:
             orig_tim_col = df[time_col_name]
         except KeyError:
@@ -70,7 +84,7 @@ def plot_estimates(
             try:
                 col_name = [x for x in df.columns if x.startswith("Epoch")][0]
             except IndexError:
-                raise KeyError("Could not find any time column")
+                raise KeyError("Could not find any Epoch column")
             print(f"Could not find time column {time_col_name}, using `{col_name}`")
             orig_tim_col = df[col_name]
 
@@ -78,95 +92,135 @@ def plot_estimates(
         time_col = pd.to_datetime(orig_tim_col)
         x_title = "Epoch {}".format(time_col_name[-3:])
 
+        # Check that the requested covariance frame exists
+        frames = set(
+            [
+                re.search(r"\((.*?)\)", c).group(1)
+                for c in df.columns
+                if c.startswith("Covariance")
+            ]
+        )
+        if cov_frame not in frames:
+            raise ValueError(
+                f"Covariance frame `{cov_frame}` not in one of the available frames from dataframe: {frames}"
+            )
         covar = {}
 
         # Reference the covariance frames
-        for covar_var in [
-            "cx_x",
-            "cy_y",
-            "cz_z",
-            "cx_dot_x_dot",
-            "cy_dot_y_dot",
-            "cz_dot_z_dot",
-        ]:
-            possible_frames = ["", ":ric", ":rcn", ":vnc"]
-            for frame in possible_frames:
-                if f"{covar_var}{frame}" in df:
-                    covar[covar_var] = f"{covar_var}{frame}"
+        for covar_var, covar_col in {
+            "cx_x": "Covariance XX",
+            "cy_y": "Covariance YY",
+            "cz_z": "Covariance ZZ",
+            "cx_dot_x_dot": "Covariance VxVx",
+            "cy_dot_y_dot": "Covariance VyVy",
+            "cz_dot_z_dot": "Covariance VzVz",
+        }.items():
+            # Create a new column with the transformed covariance. (e.g. "Covariance VzVz (RIC) 1.0-sigma sqrt")
+            cov_col_name = f"{covar_col} ({cov_frame}) {cov_sigma}-sigma {cov_fmt}"
+            # Transform the current column
+            df[cov_col_name] = eval(f"np.{cov_fmt}")(df[f"{covar_col} ({cov_frame})"])
+            covar[f"{covar_var}"] = cov_col_name
 
-            if covar_var not in covar:
-                raise KeyError(f"Cannot find {covar_var} covariance column")
+        plt_df = df
+        plt_columns = [
+            "x (km)",
+            "y (km)",
+            "z (km)",
+            "vx (km/s)",
+            "vy (km/s)",
+            "vz (km/s)",
+        ]
+        plt_modifier = ""
+
+        if ref_traj is not None:
+            # Merge both dataframes, keeping all of the values
+            merged_df = pd.merge(
+                df,
+                ref_traj[num],
+                on=time_col_name,
+                how="outer",
+                suffixes=("_od", "_ref_traj"),
+            )
+            # Add the difference to reference to the dataframe
+            for coord in plt_columns:
+                merged_df[f"delta {coord}"] = (
+                    merged_df[f"{coord}_od"] - merged_df[f"{coord}_ref_traj"]
+                )
+            # Set the plotted dataframe to this one
+            plt_df = merged_df
+            plt_columns = [f"delta {c}" for c in plt_columns]
+            plt_modifier = " error"
 
         plot_with_error(
             pos_fig,
-            df,
+            plt_df,
             time_col,
-            "x (km)",
+            plt_columns[0],
             covar["cx_x"],
             "blue",
             x_title,
-            "Position estimate (km)",
+            f"Position estimate {plt_modifier}(km)",
             f"Position estimates: {title}",
             copyright,
         )
         plot_with_error(
             pos_fig,
-            df,
+            plt_df,
             time_col,
-            "y (km)",
+            plt_columns[1],
             covar["cy_y"],
             "green",
             x_title,
-            "Position estimate (km)",
+            f"Position estimate {plt_modifier}(km)",
             f"Position estimates: {title}",
             copyright,
         )
         plot_with_error(
             pos_fig,
-            df,
+            plt_df,
             time_col,
-            "z (km)",
+            plt_columns[2],
             covar["cz_z"],
             "orange",
             x_title,
-            "Position estimate (km)",
+            f"Position estimate {plt_modifier}(km)",
             f"Position estimates: {title}",
             copyright,
         )
 
         plot_with_error(
             vel_fig,
-            df,
+            plt_df,
             time_col,
-            "vx (km/s)",
+            plt_columns[3],
             covar["cx_dot_x_dot"],
             "blue",
             x_title,
-            "Velocity estimate (km)",
+            f"Velocity estimate {plt_modifier}(km/s)",
             f"Velocity estimates: {title}",
             copyright,
         )
         plot_with_error(
             vel_fig,
-            df,
+            plt_df,
             time_col,
-            "vy (km/s)",
+            plt_columns[4],
             covar["cy_dot_y_dot"],
             "green",
             x_title,
-            "Velocity estimate (km)",
+            f"Velocity estimate {plt_modifier}(km/s)",
             f"Velocity estimates: {title}",
             copyright,
         )
         plot_with_error(
             vel_fig,
-            df,
+            plt_df,
             time_col,
-            "vz (km/s)",
+            plt_columns[5],
             covar["cz_dot_z_dot"],
             "orange",
             x_title,
-            "Velocity estimate (km)",
+            f"Velocity estimate {plt_modifier}(km/s)",
             f"Velocity estimates: {title}",
             copyright,
         )
@@ -203,8 +257,11 @@ def plot_estimates(
 def plot_covar(
     dfs,
     title,
+    cov_frame="RIC",
+    cov_fmt="sqrt",
+    cov_sigma=3.0,
     msr_df=None,
-    time_col_name="Epoch:GregorianUtc",
+    time_col_name="Epoch:Gregorian UTC",
     html_out=None,
     copyright=None,
     pos_fig=None,
@@ -217,6 +274,9 @@ def plot_covar(
     Args:
         dfs (pandas.DataFrame): The data frame containing the orbit determination solution (or a list thereof)
         title (str): The title of the plot
+        cov_frame (str): Frame in which to plot the covariance, defaults to RIC frame. File also contains the integration frame.
+        cov_fmt (str): Defines how to plot the covariance, defaults to "sqrt" (applies np.sqrt to the column), which will convert the covariance from an expectation to an uncertainty.
+        cov_sigma (float): Defines the number fo sigmas of uncertainty or covariance to plot, uses [68, 95, 99.7% rule](https://en.wikipedia.org/wiki/68%E2%80%9395%E2%80%9399.7_rule) for 1.0, 2.0, and 3.0 of sigma.
         msr_df (pandas.DataFrame): The data frame containing the measurements
         time_col_name (str): The name of the time column
         html_out (str): The name of the HTML file to save the plot to
@@ -243,7 +303,7 @@ def plot_covar(
             try:
                 col_name = [x for x in df.columns if x.startswith("Epoch")][0]
             except IndexError:
-                raise KeyError("Could not find any time column")
+                raise KeyError("Could not find any Epoch column")
             print(f"Could not find time column {time_col_name}, using `{col_name}`")
             orig_tim_col = df[col_name]
 
@@ -251,24 +311,34 @@ def plot_covar(
         time_col = pd.to_datetime(orig_tim_col)
         x_title = "Epoch {}".format(time_col_name[-3:])
 
+        # Check that the requested covariance frame exists
+        frames = set(
+            [
+                re.search(r"\((.*?)\)", c).group(1)
+                for c in df.columns
+                if c.startswith("Covariance")
+            ]
+        )
+        if cov_frame not in frames:
+            raise ValueError(
+                f"Covariance frame `{cov_frame}` not in one of the available frames from dataframe: {frames}"
+            )
         covar = {}
 
         # Reference the covariance frames
-        for covar_var in [
-            "cx_x",
-            "cy_y",
-            "cz_z",
-            "cx_dot_x_dot",
-            "cy_dot_y_dot",
-            "cz_dot_z_dot",
-        ]:
-            possible_frames = ["", ":ric", ":rcn", ":vnc"]
-            for frame in possible_frames:
-                if f"{covar_var}{frame}" in df:
-                    covar[covar_var] = f"{covar_var}{frame}"
-
-            if covar_var not in covar:
-                raise KeyError(f"Cannot find {covar_var} covariance column")
+        for covar_var, covar_col in {
+            "cx_x": "Covariance XX",
+            "cy_y": "Covariance YY",
+            "cz_z": "Covariance ZZ",
+            "cx_dot_x_dot": "Covariance VxVx",
+            "cy_dot_y_dot": "Covariance VyVy",
+            "cz_dot_z_dot": "Covariance VzVz",
+        }.items():
+            # Create a new column with the transformed covariance. (e.g. "Covariance VzVz (RIC) 1.0-sigma sqrt")
+            cov_col_name = f"{covar_col} ({cov_frame}) {cov_sigma}-sigma {cov_fmt}"
+            # Transform the current column
+            df[cov_col_name] = eval(f"np.{cov_fmt}")(df[f"{covar_col} ({cov_frame})"])
+            covar[f"{covar_var}"] = cov_col_name
 
         plot_line(
             pos_fig,
@@ -277,7 +347,7 @@ def plot_covar(
             covar["cx_x"],
             "blue",
             x_title,
-            "Position covariance (km)",
+            f"Position covariance {cov_sigma}-sigma (km)",
             title,
             copyright,
         )
@@ -288,7 +358,7 @@ def plot_covar(
             covar["cy_y"],
             "green",
             x_title,
-            "Position covariance (km)",
+            f"Position covariance {cov_sigma}-sigma (km)",
             title,
             copyright,
         )
@@ -299,7 +369,7 @@ def plot_covar(
             covar["cz_z"],
             "orange",
             x_title,
-            "Position covariance (km)",
+            f"Position covariance {cov_sigma}-sigma (km)",
             title,
             copyright,
         )
@@ -320,7 +390,7 @@ def plot_covar(
             covar["cx_dot_x_dot"],
             "blue",
             x_title,
-            "Velocity covariance (km/s)",
+            f"Velocity covariance {cov_sigma}-sigma (km/s)",
             title,
             copyright,
         )
@@ -331,7 +401,7 @@ def plot_covar(
             covar["cy_dot_y_dot"],
             "green",
             x_title,
-            "Velocity covariance (km/s)",
+            f"Velocity covariance {cov_sigma}-sigma (km/s)",
             title,
             copyright,
         )
@@ -342,7 +412,7 @@ def plot_covar(
             covar["cz_dot_z_dot"],
             "orange",
             x_title,
-            "Velocity covariance (km/s)",
+            f"Velocity covariance {cov_sigma}-sigma (km/s)",
             title,
             copyright,
         )
@@ -385,220 +455,10 @@ def plot_covar(
         return pos_fig, vel_fig
 
 
-def plot_state_deviation(
-    dfs,
-    title,
-    msr_df=None,
-    traj_err=None,
-    time_col_name="Epoch:GregorianUtc",
-    html_out=None,
-    copyright=None,
-    pos_fig=None,
-    vel_fig=None,
-    show=True,
-):
-    """
-    Plot the state deviation from an orbit determination solution
-
-    Args:
-        dfs (pandas.DataFrame): The data frame containing the orbit determination solution (or list thereof)
-        title (str): The title of the plot
-        msr_df (pandas.DataFrame): The data frame containing the measurements
-        traj_err (pandas.DataFrame): The data frame containing the trajectory error compared to truth (or list thereof)
-        time_col_name (str): The name of the time column
-        html_out (str): The name of the HTML file to save the plot to
-        copyright (str): The copyright to display on the plot
-        pos_fig (plotly.graph_objects.Figure): The figure to plot the position estimates on
-        vel_fig (plotly.graph_objects.Figure): The figure to plot the velocity estimates on
-        show (bool): Whether to show the plot. If set to false, the figure will be returned.
-    """
-
-    if not isinstance(dfs, list):
-        dfs = [dfs]
-
-    if pos_fig is None:
-        pos_fig = go.Figure()
-
-    if vel_fig is None:
-        vel_fig = go.Figure()
-
-    x_title = ""  # Forward declaration, will store the last time column name
-
-    for df in dfs:
-        try:
-            orig_tim_col = df[time_col_name]
-        except KeyError:
-            # Find the time column
-            try:
-                col_name = [x for x in df.columns if x.startswith("Epoch")][0]
-            except IndexError:
-                raise KeyError("Could not find any time column")
-            print(f"Could not find time column {time_col_name}, using `{col_name}`")
-            orig_tim_col = df[col_name]
-
-        # Build a Python datetime column
-        time_col = pd.to_datetime(orig_tim_col)
-        x_title = "Epoch {}".format(time_col_name[-3:])
-
-        # If there is a trajectory error, rename the state deviations with the actual trajectory errors
-        if traj_err is not None:
-            df["delta_x"] = traj_err["x_err_km"]
-            df["delta_y"] = traj_err["y_err_km"]
-            df["delta_z"] = traj_err["z_err_km"]
-
-            df["delta_vx"] = traj_err["vx_err_km_s"]
-            df["delta_vy"] = traj_err["vy_err_km_s"]
-            df["delta_vz"] = traj_err["vz_err_km_s"]
-            print("Overwrote the state deviations with the trajectory error")
-
-        covar = {}
-
-        # Reference the covariance frames
-        for covar_var in [
-            "cx_x",
-            "cy_y",
-            "cz_z",
-            "cx_dot_x_dot",
-            "cy_dot_y_dot",
-            "cz_dot_z_dot",
-        ]:
-            possible_frames = ["", ":ric", ":rcn", ":vnc"]
-            for frame in possible_frames:
-                if f"{covar_var}{frame}" in df:
-                    covar[covar_var] = f"{covar_var}{frame}"
-
-            if covar_var not in covar:
-                raise KeyError(f"Cannot find {covar_var} covariance column")
-
-        plot_with_error(
-            pos_fig,
-            df,
-            time_col,
-            "delta_x",
-            covar["cx_x"],
-            "blue",
-            x_title,
-            "Position deviation (km)",
-            title,
-            copyright,
-        )
-        plot_with_error(
-            pos_fig,
-            df,
-            time_col,
-            "delta_y",
-            covar["cy_y"],
-            "green",
-            x_title,
-            "Position deviation (km)",
-            title,
-            copyright,
-        )
-        plot_with_error(
-            pos_fig,
-            df,
-            time_col,
-            "delta_z",
-            covar["cz_z"],
-            "orange",
-            x_title,
-            "Position deviation (km)",
-            title,
-            copyright,
-        )
-        # Autoscale
-        hwpt = int(len(df) / 2)
-        max_cov_y = max(
-            max(df[covar["cx_x"]][hwpt:]),
-            max(df[covar["cy_y"]][hwpt:]),
-            max(df[covar["cz_z"]][hwpt:]),
-        )
-
-        pos_fig.update_layout(yaxis_range=[-1.5 * max_cov_y, 1.5 * max_cov_y])
-
-        plot_with_error(
-            vel_fig,
-            df,
-            time_col,
-            "delta_vx",
-            covar["cx_dot_x_dot"],
-            "blue",
-            x_title,
-            "Velocity deviation (km/s)",
-            title,
-            copyright,
-        )
-        plot_with_error(
-            vel_fig,
-            df,
-            time_col,
-            "delta_vy",
-            covar["cy_dot_y_dot"],
-            "green",
-            x_title,
-            "Velocity deviation (km/s)",
-            title,
-            copyright,
-        )
-        plot_with_error(
-            vel_fig,
-            df,
-            time_col,
-            "delta_vz",
-            covar["cz_dot_z_dot"],
-            "orange",
-            x_title,
-            "Velocity deviation (km/s)",
-            title,
-            copyright,
-        )
-        # Autoscale
-        hwpt = int(len(df) / 2)
-        max_cov_y = max(
-            max(df[covar["cx_dot_x_dot"]][hwpt:]),
-            max(df[covar["cy_dot_y_dot"]][hwpt:]),
-            max(df[covar["cz_dot_z_dot"]][hwpt:]),
-        )
-
-        vel_fig.update_layout(yaxis_range=[-1.5 * max_cov_y, 1.5 * max_cov_y])
-
-    if msr_df is not None:
-        # Plot the measurements on both plots
-        pos_fig = plot_measurements(
-            msr_df, title, time_col_name, fig=pos_fig, show=False
-        )
-
-        vel_fig = plot_measurements(
-            msr_df, title, time_col_name, fig=vel_fig, show=False
-        )
-
-    finalize_plot(pos_fig, title, x_title, "Position deviation (km)")
-    finalize_plot(vel_fig, title, x_title, "Velocity deviation (km/s)")
-
-    if html_out:
-        html_out = html_out.replace(".html", "_{}.html")
-
-        this_output = html_out.format("pos_dev")
-        with open(this_output, "w") as f:
-            f.write(pos_fig.to_html())
-        print(f"Saved HTML to {this_output}")
-
-        this_output = html_out.format("vel_dev")
-        with open(this_output, "w") as f:
-            f.write(vel_fig.to_html())
-        print(f"Saved HTML to {this_output}")
-
-    if show:
-        pos_fig.show()
-        vel_fig.show()
-    else:
-        return pos_fig, vel_fig
-
-
 def plot_measurements(
     dfs,
     title,
-    time_col_name="Epoch:GregorianUtc",
+    time_col_name="Epoch:Gregorian UTC",
     html_out=None,
     copyright=None,
     fig=None,
@@ -622,7 +482,7 @@ def plot_measurements(
             try:
                 col_name = [x for x in df.columns if x.startswith("Epoch")][0]
             except IndexError:
-                raise KeyError("Could not find any time column")
+                raise KeyError("Could not find any Epoch column")
             print(f"Could not find time column {time_col_name}, using `{col_name}`")
             orig_tim_col = df[col_name]
 
@@ -695,10 +555,12 @@ def plot_measurements(
 def plot_residuals(
     df,
     title,
-    kind="prefit",
-    time_col_name="Epoch:GregorianUtc",
+    kind="Prefit",
+    time_col_name="Epoch:Gregorian UTC",
     msr_df=None,
     copyright=None,
+    html_out=None,
+    show=True,
 ):
     """
     Plot of residuals, with 3-σ lines
@@ -711,7 +573,7 @@ def plot_residuals(
         try:
             col_name = [x for x in df.columns if x.startswith("Epoch")][0]
         except IndexError:
-            raise KeyError("Could not find any time column")
+            raise KeyError("Could not find any Epoch column")
         print(f"Could not find time column {time_col_name}, using `{col_name}`")
         orig_tim_col = df[col_name]
 
@@ -722,7 +584,7 @@ def plot_residuals(
     plt_any = False
 
     for col in df.columns:
-        if col.endswith(kind):
+        if col.startswith(kind):
             fig = go.Figure()
             residuals = df[col]
 
@@ -742,16 +604,32 @@ def plot_residuals(
             three_sig_color = colors["red_ish"]
             three_sig_color = f"rgb({int(three_sig_color[0])}, {int(three_sig_color[1])}, {int(three_sig_color[2])})"
             fig.add_hline(
-                y=mean + 3 * std, line_dash="dash", line_color=three_sig_color
+                y=mean + 3 * std,
+                line_dash="dash",
+                line_color=three_sig_color,
+                annotation_text="+ 3σ",
             )
             fig.add_hline(
-                y=mean - 3 * std, line_dash="dash", line_color=three_sig_color
+                y=mean - 3 * std,
+                line_dash="dash",
+                line_color=three_sig_color,
+                annotation_text="- 3σ",
             )
             # Add the 1-σ lines
             one_sig_color = colors["bright_green"]
             one_sig_color = f"rgb({int(one_sig_color[0])}, {int(one_sig_color[1])}, {int(one_sig_color[2])})"
-            fig.add_hline(y=mean + std, line_dash="dot", line_color=one_sig_color)
-            fig.add_hline(y=mean - std, line_dash="dot", line_color=one_sig_color)
+            fig.add_hline(
+                y=mean + std,
+                line_dash="dot",
+                line_color=one_sig_color,
+                annotation_text="+ 1σ",
+            )
+            fig.add_hline(
+                y=mean - std,
+                line_dash="dot",
+                line_color=one_sig_color,
+                annotation_text="- 1σ",
+            )
 
             if msr_df is not None:
                 # Plot the measurements on both plots
@@ -762,20 +640,31 @@ def plot_residuals(
             finalize_plot(
                 fig, title=f"{title} {col}", xtitle=x_title, copyright=copyright
             )
-            fig.show()
+
             plt_any = True
+
+            if html_out:
+                this_output = html_out.replace(".html", f"_{slugify(col)}.html")
+                with open(this_output, "w") as f:
+                    f.write(fig.to_html())
+                print(f"Saved HTML to {this_output}")
+
+            if show:
+                fig.show()
 
     if not plt_any:
         raise ValueError(f"No columns ending with {kind} found -- nothing plotted")
 
 
-def plot_residual_histogram(df, title, kind="prefit", copyright=None):
+def plot_residual_histogram(
+    df, title, kind="Prefit", copyright=None, html_out=None, show=True
+):
     """
     Histogram of residuals
     """
 
     for col in df.columns:
-        if col.endswith(kind):
+        if col.startswith(kind):
             residuals = df[col]
             fig = go.Figure()
             fig.add_trace(
@@ -802,110 +691,11 @@ def plot_residual_histogram(df, title, kind="prefit", copyright=None):
 
             finalize_plot(fig, title, xtitle=None, copyright=copyright)
 
-            fig.show()
+            if html_out:
+                this_output = html_out.replace(".html", f"_{slugify(col)}.html")
+                with open(this_output, "w") as f:
+                    f.write(fig.to_html())
+                print(f"Saved HTML to {this_output}")
 
-
-def plot_residual_qq(
-    df,
-    title,
-    col="residual_ratio",
-    copyright=None,
-):
-    """
-    Plot of residuals, with 3-σ lines
-    """
-
-    residuals = df[col]
-
-    # Determine the number of residuals
-    # n = len(residuals)
-    quantiles = np.arange(0, 1.01, 0.01)
-
-    # Calculate the residuals quantiles using np.quantile:
-
-    residual_quantiles = np.quantile(residuals, quantiles)
-
-    # Calculate the theoretical quantiles for a normal distribution with mean=0 and std=1:
-
-    normal_quantiles = np.sqrt(2) * erfcinv(2 * quantiles)
-
-    # Create figure
-    fig = go.Figure()
-
-    # Add scatter trace of residual vs normal quantiles
-    fig.add_trace(
-        go.Scatter(
-            x=normal_quantiles, y=residual_quantiles, mode="markers", name="Quantiles"
-        )
-    )
-
-    # Add line representing normal distribution
-    fig.add_trace(
-        go.Scatter(
-            x=[min(normal_quantiles), max(normal_quantiles)],
-            y=[min(normal_quantiles), max(normal_quantiles)],
-            mode="lines",
-            name="Normal",
-            line=dict(color="red"),
-        )
-    )
-
-    # Update layout
-    fig.update_layout(
-        title="Normal Q-Q Plot",
-        xaxis_title="Theoretical Quantiles",
-        yaxis_title="Residual Quantiles",
-    )
-
-    # Display interactive plot
-    finalize_plot(fig, title, copyright=copyright)
-    fig.show()
-
-
-def plot_qq(df, title, col="residual_ratio", copyright=None):
-    # Your list of residuals
-    residuals = df[col]
-
-    # Standardize the residuals
-    standardized_residuals = (residuals - np.mean(residuals)) / np.std(residuals)
-
-    # Compute the theoretical normal quantiles (percentiles)
-    residuals_sorted = np.sort(standardized_residuals)
-    theoretical_quantiles = norm.ppf(
-        np.linspace(0.5 / len(residuals), 1 - 0.5 / len(residuals), len(residuals))
-    )
-
-    # Create the Q-Q plot using Plotly
-    fig = go.Figure()
-
-    # Add the scatter plot of standardized residuals
-    fig.add_trace(
-        go.Scatter(
-            x=theoretical_quantiles,
-            y=residuals_sorted,
-            mode="markers",
-            name="Residuals",
-        )
-    )
-
-    # Add the 45-degree line representing the normal distribution
-    min_value = np.min([theoretical_quantiles.min(), residuals_sorted.min()])
-    max_value = np.max([theoretical_quantiles.max(), residuals_sorted.max()])
-    fig.add_shape(
-        type="line",
-        x0=min_value,
-        x1=max_value,
-        y0=min_value,
-        y1=max_value,
-        yref="y",
-        xref="x",
-        line=dict(color="red"),
-        name="Normal Distribution",
-    )
-
-    fig.update_layout(
-        title="Q-Q Plot",
-        xaxis_title="Theoretical Normal Quantiles",
-        yaxis_title="Sorted Standardized Residuals",
-    )
-    fig.show()
+            if show:
+                fig.show()

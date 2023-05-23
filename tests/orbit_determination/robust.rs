@@ -402,15 +402,14 @@ fn od_robust_test_ekf_realistic_two_way() {
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
     // And serialize to disk
-    let path: PathBuf = [
-        &env::var("CARGO_MANIFEST_DIR").unwrap(),
-        "output_data",
-        "ekf_robust_two_way_msr.parquet",
-    ]
-    .iter()
-    .collect();
+    let path: PathBuf = [&env::var("CARGO_MANIFEST_DIR").unwrap(), "output_data"]
+        .iter()
+        .collect();
 
-    arc.to_parquet_simple(path.clone()).unwrap();
+    traj.to_parquet_simple(path.with_file_name("ekf_robust_two_way_traj.parquet"))
+        .unwrap();
+    arc.to_parquet_simple(path.with_file_name("ekf_robust_two_way_msr.parquet"))
+        .unwrap();
 
     println!("{arc}");
 
@@ -534,25 +533,25 @@ fn od_robust_test_ekf_realistic_two_way() {
         .clone()
         .select([
             col("Covariance XX (Earth J2000)"),
-            col("Covariance YZ (Earth J2000)"),
+            col("Covariance XY (Earth J2000)"),
+            col("Covariance XZ (Earth J2000)"),
+            col("Covariance XVx (Earth J2000)"),
+            col("Covariance XVy (Earth J2000)"),
+            col("Covariance XVz (Earth J2000)"),
             col("Covariance YY (Earth J2000)"),
-            col("Covariance ZX (Earth J2000)"),
-            col("Covariance ZY (Earth J2000)"),
+            col("Covariance YZ (Earth J2000)"),
+            col("Covariance YVx (Earth J2000)"),
+            col("Covariance YVy (Earth J2000)"),
+            col("Covariance YVz (Earth J2000)"),
             col("Covariance ZZ (Earth J2000)"),
-            col("Covariance VxX (Earth J2000)"),
-            col("Covariance VxY (Earth J2000)"),
-            col("Covariance VxZ (Earth J2000)"),
+            col("Covariance ZVx (Earth J2000)"),
+            col("Covariance ZVy (Earth J2000)"),
+            col("Covariance ZVz (Earth J2000)"),
             col("Covariance VxVx (Earth J2000)"),
-            col("Covariance VyX (Earth J2000)"),
-            col("Covariance VyY (Earth J2000)"),
-            col("Covariance VyZ (Earth J2000)"),
-            col("Covariance VyVx (Earth J2000)"),
+            col("Covariance VxVy (Earth J2000)"),
+            col("Covariance VxVz (Earth J2000)"),
             col("Covariance VyVy (Earth J2000)"),
-            col("Covariance VzX (Earth J2000)"),
-            col("Covariance VzY (Earth J2000)"),
-            col("Covariance VzZ (Earth J2000)"),
-            col("Covariance VzVx (Earth J2000)"),
-            col("Covariance VzVy (Earth J2000)"),
+            col("Covariance VyVz (Earth J2000)"),
             col("Covariance VzVz (Earth J2000)"),
         ])
         .collect()
@@ -563,25 +562,25 @@ fn od_robust_test_ekf_realistic_two_way() {
         .clone()
         .select([
             col("Covariance XX (RIC)"),
-            col("Covariance YZ (RIC)"),
+            col("Covariance XY (RIC)"),
+            col("Covariance XZ (RIC)"),
+            col("Covariance XVx (RIC)"),
+            col("Covariance XVy (RIC)"),
+            col("Covariance XVz (RIC)"),
             col("Covariance YY (RIC)"),
-            col("Covariance ZX (RIC)"),
-            col("Covariance ZY (RIC)"),
+            col("Covariance YZ (RIC)"),
+            col("Covariance YVx (RIC)"),
+            col("Covariance YVy (RIC)"),
+            col("Covariance YVz (RIC)"),
             col("Covariance ZZ (RIC)"),
-            col("Covariance VxX (RIC)"),
-            col("Covariance VxY (RIC)"),
-            col("Covariance VxZ (RIC)"),
+            col("Covariance ZVx (RIC)"),
+            col("Covariance ZVy (RIC)"),
+            col("Covariance ZVz (RIC)"),
             col("Covariance VxVx (RIC)"),
-            col("Covariance VyX (RIC)"),
-            col("Covariance VyY (RIC)"),
-            col("Covariance VyZ (RIC)"),
-            col("Covariance VyVx (RIC)"),
+            col("Covariance VxVy (RIC)"),
+            col("Covariance VxVz (RIC)"),
             col("Covariance VyVy (RIC)"),
-            col("Covariance VzX (RIC)"),
-            col("Covariance VzY (RIC)"),
-            col("Covariance VzZ (RIC)"),
-            col("Covariance VzVx (RIC)"),
-            col("Covariance VzVy (RIC)"),
+            col("Covariance VyVz (RIC)"),
             col("Covariance VzVz (RIC)"),
         ])
         .collect()

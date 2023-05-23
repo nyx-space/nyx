@@ -12,7 +12,7 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)"
 ]
-dependencies = ["pandas~=2.0.0", "plotly~=5.13.0", "pytest~=7.2.0", "pyarrow~=11.0.0", "scipy~=1.10.1"]
+dependencies = ["pandas~=2.0.0", "plotly~=5.13.0", "pytest~=7.2.0", "pyarrow~=11.0.0", "scipy~=1.10.1", "python-slugify~=8.0.1"]
 
 [tool.yapf]
 based_on_style = "google"

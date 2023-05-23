@@ -194,7 +194,7 @@ def plot_ground_track(
 def plot_orbit_elements(
     dfs,
     title,
-    names,
+    names=[],
     html_out=None,
     copyright=None,
     show=True,
@@ -221,7 +221,8 @@ def plot_orbit_elements(
     if not isinstance(names, list):
         names = [names]
 
-    assert len(names) == len(dfs), "Number of names must match number of dataframes"
+    if len(names) > 1:
+        assert len(names) == len(dfs), "Number of names must match number of dataframes"
 
     columns = [
         "sma (km)",
