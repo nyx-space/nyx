@@ -51,9 +51,6 @@ pub mod frame_serde;
 pub mod gravity;
 pub mod matrices;
 pub mod orbit;
-pub mod quantity;
-
-// pub mod rv;
 pub mod tracking_data;
 pub mod trajectory_data;
 

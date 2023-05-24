@@ -19,7 +19,6 @@
 use super::traj_it::TrajIterator;
 use super::{ExportCfg, INTERPOLATION_SAMPLES};
 use super::{Interpolatable, TrajError};
-use crate::cosmic::{Cosm, Frame, Orbit, Spacecraft};
 use crate::errors::NyxError;
 use crate::io::watermark::pq_writer;
 use crate::linalg::allocator::Allocator;
@@ -41,7 +40,6 @@ use std::ops;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::channel;
 use std::sync::Arc;
-use std::time::Instant;
 
 /// Store a trajectory of any State.
 #[derive(Clone, PartialEq)]
@@ -656,125 +654,6 @@ where
 {
     fn add_assign(&mut self, rhs: &Self) {
         *self = self.clone() + rhs;
-    }
-}
-
-impl Traj<Orbit> {
-    /// Allows converting the source trajectory into the (almost) equivalent trajectory in another frame.
-    /// This simply converts each state into the other frame and may lead to aliasing due to the Nyquist–Shannon sampling theorem.
-    #[allow(clippy::map_clone)]
-    pub fn to_frame(&self, new_frame: Frame, cosm: Arc<Cosm>) -> Result<Self, NyxError> {
-        if self.states.is_empty() {
-            return Err(NyxError::Trajectory(TrajError::CreationError(
-                "No trajectory to convert".to_string(),
-            )));
-        }
-        let start_instant = Instant::now();
-        let mut traj = Self::new();
-        for state in &self.states {
-            traj.states.push(cosm.frame_chg(state, new_frame));
-        }
-        traj.finalize();
-
-        info!(
-            "Converted trajectory from {} to {} in {} ms: {traj}",
-            self.first().frame,
-            new_frame,
-            (Instant::now() - start_instant).as_millis()
-        );
-        Ok(traj)
-    }
-
-    /// Exports this trajectory to the provided filename in parquet format with only the epoch, the geodetic latitude, longitude, and height at one state per minute.
-    /// Must provide a body fixed frame to correctly compute the latitude and longitude.
-    #[allow(clippy::identity_op)]
-    pub fn to_groundtrack_parquet<P: AsRef<Path>>(
-        &self,
-        path: P,
-        body_fixed_frame: Frame,
-        events: Option<Vec<&dyn EventEvaluator<Orbit>>>,
-        metadata: Option<HashMap<String, String>>,
-        cosm: Arc<Cosm>,
-    ) -> Result<PathBuf, Box<dyn Error>> {
-        let traj = self.to_frame(body_fixed_frame, cosm)?;
-
-        let mut cfg = ExportCfg::default();
-        cfg.append_field(StateParameter::GeodeticLatitude);
-        cfg.append_field(StateParameter::GeodeticLongitude);
-        cfg.append_field(StateParameter::GeodeticHeight);
-        cfg.append_field(StateParameter::Rmag);
-        cfg.set_step(1.minutes());
-        cfg.metadata = metadata;
-
-        traj.to_parquet(path, events, cfg)
-    }
-}
-
-impl Traj<Spacecraft> {
-    /// Allows converting the source trajectory into the (almost) equivalent trajectory in another frame
-    #[allow(clippy::map_clone)]
-    pub fn to_frame(&self, new_frame: Frame, cosm: Arc<Cosm>) -> Result<Self, NyxError> {
-        if self.states.is_empty() {
-            return Err(NyxError::Trajectory(TrajError::CreationError(
-                "No trajectory to convert".to_string(),
-            )));
-        }
-        let start_instant = Instant::now();
-        let mut traj = Self::new();
-        for state in &self.states {
-            traj.states
-                .push(state.with_orbit(cosm.frame_chg(&state.orbit, new_frame)));
-        }
-        traj.finalize();
-
-        info!(
-            "Converted trajectory from {} to {} in {} ms: {traj}",
-            self.first().orbit.frame,
-            new_frame,
-            (Instant::now() - start_instant).as_millis()
-        );
-        Ok(traj)
-    }
-
-    /// A shortcut to `to_parquet_with_cfg`
-    pub fn to_parquet_with_step<P: AsRef<Path>>(
-        &self,
-        path: P,
-        step: Duration,
-    ) -> Result<(), Box<dyn Error>> {
-        self.to_parquet_with_cfg(
-            path,
-            ExportCfg {
-                step: Some(step),
-                ..Default::default()
-            },
-        )?;
-
-        Ok(())
-    }
-
-    /// Exports this trajectory to the provided filename in parquet format with only the epoch, the geodetic latitude, longitude, and height at one state per minute.
-    /// Must provide a body fixed frame to correctly compute the latitude and longitude.
-    #[allow(clippy::identity_op)]
-    pub fn to_groundtrack_parquet<P: AsRef<Path>>(
-        &self,
-        path: P,
-        body_fixed_frame: Frame,
-        events: Option<Vec<&dyn EventEvaluator<Spacecraft>>>,
-        metadata: Option<HashMap<String, String>>,
-        cosm: Arc<Cosm>,
-    ) -> Result<PathBuf, Box<dyn Error>> {
-        let traj = self.to_frame(body_fixed_frame, cosm)?;
-
-        let mut cfg = ExportCfg::default();
-        cfg.append_field(StateParameter::GeodeticLatitude);
-        cfg.append_field(StateParameter::GeodeticLongitude);
-        cfg.append_field(StateParameter::GeodeticHeight);
-        cfg.append_field(StateParameter::Rmag);
-        cfg.set_step(1.minutes());
-        cfg.metadata = metadata;
-
-        traj.to_parquet(path, events, cfg)
     }
 }
 

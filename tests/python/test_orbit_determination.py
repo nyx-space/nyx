@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 import numpy as np
 import pandas as pd
+import sys
 
 from nyx_space.orbit_determination import (
     GroundStation,
@@ -121,52 +122,55 @@ def test_filter_arc():
     # Load the measurements
     msr_df = pd.read_parquet(msr_path)
 
-    # We'll plot the difference between the reference trajectory and the OD results, with the measurement bands overlaid.
-    plot_estimates(
-        oddf,
-        "OD results from Python",
-        cov_frame="RIC",
-        ref_traj=ref_traj,
-        msr_df=msr_df,
-        html_out=str(outpath.joinpath("./od_estimate_plots.html")),
-        show=False,
-    )
+    # There seems to be a bug when exporting the HTML on Github action windows
+    # cf. https://github.com/nyx-space/nyx/actions/runs/5064848025/jobs/9092830624
+    if sys.platform != "win32":
+        # We'll plot the difference between the reference trajectory and the OD results, with the measurement bands overlaid.
+        plot_estimates(
+            oddf,
+            "OD results from Python",
+            cov_frame="RIC",
+            ref_traj=ref_traj,
+            msr_df=msr_df,
+            html_out=str(outpath.joinpath("./od_estimate_plots.html")),
+            show=False,
+        )
 
-    # Let's also plot the reference and the OD result's orbital elements
-    plot_orbit_elements(
-        [ref_traj, oddf],
-        "Python OD result",
-        ["Reference", "OD"],
-        html_out=str(outpath.joinpath("./od_vs_ref_elements.html")),
-        show=False,
-    )
+        # Let's also plot the reference and the OD result's orbital elements
+        plot_orbit_elements(
+            [ref_traj, oddf],
+            "Python OD result",
+            ["Reference", "OD"],
+            html_out=str(outpath.joinpath("./od_vs_ref_elements.html")),
+            show=False,
+        )
 
-    # More often, the covariance is a better indicator
-    plot_covar(
-        oddf,
-        "OD 1-sigma covar from Python",
-        cov_sigma=1.0,
-        msr_df=msr_df,
-        html_out=str(outpath.joinpath("./od_covar_plots.html")),
-        show=False,
-    )
+        # More often, the covariance is a better indicator
+        plot_covar(
+            oddf,
+            "OD 1-sigma covar from Python",
+            cov_sigma=1.0,
+            msr_df=msr_df,
+            html_out=str(outpath.joinpath("./od_covar_plots.html")),
+            show=False,
+        )
 
-    # Now, we'll plot the prefit residuals
-    plot_residuals(
-        oddf,
-        "OD residuals",
-        msr_df=msr_df,
-        html_out=str(outpath.joinpath("./od_residual_plots.html")),
-        show=False,
-    )
-    # And the postfit histograms
-    plot_residual_histogram(
-        oddf,
-        "OD residuals",
-        kind="Postfit",
-        html_out=str(outpath.joinpath("./od_residual_histograms.html")),
-        show=False,
-    )
+        # Now, we'll plot the prefit residuals
+        plot_residuals(
+            oddf,
+            "OD residuals",
+            msr_df=msr_df,
+            html_out=str(outpath.joinpath("./od_residual_plots.html")),
+            show=False,
+        )
+        # And the postfit histograms
+        plot_residual_histogram(
+            oddf,
+            "OD residuals",
+            kind="Postfit",
+            html_out=str(outpath.joinpath("./od_residual_histograms.html")),
+            show=False,
+        )
 
 
 def test_one_way_msr():
@@ -199,6 +203,7 @@ def test_one_way_msr():
     assert abs(range_km - 18097.562811514355) < 0.1
     assert abs(doppler_km_s - -0.2498238312640348) < 0.1
 
+
 def test_pure_prediction():
     # Initialize logging
     FORMAT = "%(levelname)s %(name)s %(asctime)-15s %(filename)s:%(lineno)d %(message)s"
@@ -220,7 +225,8 @@ def test_pure_prediction():
     # We'll assume that we have a good estimate of the spacecraft's orbit before we predict it forward in time
     # Hence, create the orbit estimate with the covariance diagonal (100 m on position and 50 m/s on velocity)
     orbit_est = OrbitEstimate(
-        sc.orbit, covar=np.diag([100.0e-3, 100.0e-3, 100.0e-3, 50.0e-3, 50.0e-3, 50.0e-3])
+        sc.orbit,
+        covar=np.diag([100.0e-3, 100.0e-3, 100.0e-3, 50.0e-3, 50.0e-3, 50.0e-3]),
     )
 
     rslt_path = predictor(
@@ -238,23 +244,27 @@ def test_pure_prediction():
     # Load the prediction results
     oddf = pd.read_parquet(rslt_path)
 
-    # Let's plot the OD result's orbital elements
-    plot_orbit_elements(
-        oddf,
-        "OD prediction result",
-        html_out=str(outpath.joinpath("./od_pred_elements.html")),
-        show=False,
-    )
+    # There seems to be a bug when exporting the HTML on Github action windows
+    # cf. https://github.com/nyx-space/nyx/actions/runs/5064848025/jobs/9092830624
+    if sys.platform != "win32":
+        # Let's plot the OD result's orbital elements
+        plot_orbit_elements(
+            oddf,
+            "OD prediction result",
+            html_out=str(outpath.joinpath("./od_pred_elements.html")),
+            show=False,
+        )
 
-    # More often, the covariance is a better indicator
-    plot_covar(
-        oddf,
-        "OD 1-sigma covar from Python",
-        cov_sigma=1.0,
-        cov_frame="Earth J2000",
-        html_out=str(outpath.joinpath("./od_pred_covar_plots.html")),
-        show=False,
-    )
+        # More often, the covariance is a better indicator
+        plot_covar(
+            oddf,
+            "OD 1-sigma covar from Python",
+            cov_sigma=1.0,
+            cov_frame="Earth J2000",
+            html_out=str(outpath.joinpath("./od_pred_covar_plots.html")),
+            show=False,
+        )
+
 
 if __name__ == "__main__":
     test_pure_prediction()
