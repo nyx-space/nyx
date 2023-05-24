@@ -132,6 +132,16 @@ impl fmt::Display for EclipseLocator {
 }
 
 impl EclipseLocator {
+    /// Creates a new typical eclipse locator.
+    /// The light source is the Sun, and the shadow bodies are the Earth and the Moon.
+    pub fn cislunar(cosm: Arc<Cosm>) -> Self {
+        Self {
+            light_source: cosm.frame("Sun J2000"),
+            shadow_bodies: vec![cosm.frame("EME2000"), cosm.frame("Moon J2000")],
+            cosm,
+        }
+    }
+
     /// Compute the visibility/eclipse between an observer and an observed state
     pub fn compute(&self, observer: &Orbit) -> EclipseState {
         let mut state = EclipseState::Visibilis;

@@ -16,67 +16,13 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use hifitime::Epoch;
+
+use super::estimate::Estimate;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
-
-pub use crate::od::estimate::*;
-pub use crate::od::ground_station::*;
-pub use crate::od::kalman::*;
-pub use crate::od::residual::*;
-pub use crate::od::snc::*;
-pub use crate::od::*;
-
 pub use crate::time::{Duration, Unit};
 use crate::State;
-
-use self::prelude::IterationConf;
-
-/// A trait detailing when to switch to from a CKF to an EKF
-pub trait KfTrigger {
-    fn enable_ekf<T: State, E>(&mut self, est: &E) -> bool
-    where
-        E: Estimate<T>,
-        DefaultAllocator: Allocator<f64, <T as State>::Size>
-            + Allocator<f64, <T as State>::VecLength>
-            + Allocator<f64, <T as State>::Size, <T as State>::Size>;
-
-    /// Set whether the EKF trigger should be inhibited. This is useful when smoothing for example.
-    fn set_inhibit(&mut self, inhibit: bool);
-
-    /// Reset the trigger
-    fn reset(&mut self);
-
-    /// Return true if the filter should not longer be as extended.
-    /// By default, this returns false, i.e. when a filter has been switched to an EKF, it will
-    /// remain as such.
-    fn disable_ekf(&mut self, _epoch: Epoch) -> bool {
-        false
-    }
-
-    /// If some iteration configuration is returned, the filter will iterate with it before enabling the EKF.
-    fn iteration_config(&self) -> Option<IterationConf> {
-        None
-    }
-}
-
-/// CkfTrigger will never switch a KF to an EKF
-pub struct CkfTrigger;
-
-impl KfTrigger for CkfTrigger {
-    fn enable_ekf<T: State, E>(&mut self, _est: &E) -> bool
-    where
-        E: Estimate<T>,
-        DefaultAllocator: Allocator<f64, <T as State>::Size>
-            + Allocator<f64, <T as State>::VecLength>
-            + Allocator<f64, <T as State>::Size, <T as State>::Size>,
-    {
-        false
-    }
-
-    fn set_inhibit(&mut self, _inhibit: bool) {}
-
-    fn reset(&mut self) {}
-}
 
 /// An EkfTrigger on the number of measurements processed and a time between measurements.
 pub struct EkfTrigger {

@@ -1,6 +1,8 @@
 import logging
 from pathlib import Path
 import numpy as np
+import pandas as pd
+import sys
 
 from nyx_space.orbit_determination import (
     GroundStation,
@@ -8,11 +10,20 @@ from nyx_space.orbit_determination import (
     TrkConfig,
     OrbitEstimate,
     process_tracking_arc,
+    predictor,
     DynamicTrackingArc,
+    ExportCfg,
 )
 from nyx_space.mission_design import DynamicTrajectory, SpacecraftDynamics, propagate
 from nyx_space.cosmic import Spacecraft
 from nyx_space.time import Unit
+from nyx_space.plots.od import (
+    plot_covar,
+    plot_estimates,
+    plot_residuals,
+    plot_residual_histogram,
+)
+from nyx_space.plots.traj import plot_orbit_elements
 
 
 def test_filter_arc():
@@ -32,8 +43,10 @@ def test_filter_arc():
 
     # An propagate for two periods (we only care about the trajectory)
     _, traj = propagate(sc, dynamics["hifi"], sc.orbit.period() * 2)
+    # Resample the trajectory at fixed step size
+    traj = traj.resample(Unit.Second * 10.0)
     # And save the trajectory
-    traj_file = str(outpath.joinpath("./od_val_with_arc_truth_ephem.parquet"))
+    traj_file = str(outpath.joinpath("./python_ref_traj.parquet"))
     traj.to_parquet(traj_file)
 
     # Now starts the measurement generation
@@ -60,50 +73,109 @@ def test_filter_arc():
     # Load the trajectory
     traj = DynamicTrajectory(traj_file)
     print(f"Loaded {traj}")
+
+    # Set up the export -- We'll use the same config set up for both measurements and output of OD process
+    cfg = ExportCfg(timestamp=True, metadata={"test key": "test value"})
+
     # Build the simulated tracking arc, setting the seed to zero
     arc_sim = GroundTrackingArcSim(devices, traj, trk_cfg, 0)
     # Generate the measurements
-    path = arc_sim.generate_measurements(
-        str(outpath.joinpath("./from_python.parquet")),
-        timestamp=True,
-        metadata={"test key": "test value"},
+    msr_path = arc_sim.generate_measurements(
+        str(outpath.joinpath("./msr.parquet")), cfg
     )
-    print(f"Saved {arc_sim} to {path}")
+    print(f"Saved {arc_sim} to {msr_path}")
 
     # Now let's filter this same data.
     # Load the tracking arc
-    arc = DynamicTrackingArc(path)
+    arc = DynamicTrackingArc(msr_path)
 
     # Create the orbit estimate with the covariance diagonal (100 km on position and 1 km/s on velocity)
     orbit_est = OrbitEstimate(
         sc.orbit, covar=np.diag([100.0, 100.0, 100.0, 1.0, 1.0, 1.0])
     )
 
-    msr_noise = [1e-3, 0, 0, 1e-6]  # TODO: Convert this to a numpy matrix
+    msr_noise = [1e-3, 0, 0, 1e-6]
     # Switch from sequential to EKF after 100 measurements
     ekf_num_msr_trig = 100
     # Unless there is a 2 hour gap in the measurements, and then switch back to classical
     ekf_disable_time = Unit.Hour * 2
 
-    estimates = process_tracking_arc(
+    rslt_path = process_tracking_arc(
         dynamics["hifi"],
         sc,
         orbit_est,
         msr_noise,
         arc,
+        str(outpath.joinpath("./od_result.parquet")),
+        cfg,
         ekf_num_msr_trig,
         ekf_disable_time,
+        # predict_for=Unit.Hour * 12, # You can predict from the final estimate by uncommenting this line.
     )
 
-    assert len(estimates) == 1063
-    assert len([est for est in estimates if not est.is_predicted]) == 762
+    print(f"Stored to {rslt_path}")
 
-    # TODO: Add more tests
+    # Load the results
+    oddf = pd.read_parquet(rslt_path)
+    # Load the reference trajectory
+    ref_traj = pd.read_parquet(traj_file)
+    # Load the measurements
+    msr_df = pd.read_parquet(msr_path)
+
+    # There seems to be a bug when exporting the HTML on Github action windows
+    # cf. https://github.com/nyx-space/nyx/actions/runs/5064848025/jobs/9092830624
+    if sys.platform != "win32":
+        # We'll plot the difference between the reference trajectory and the OD results, with the measurement bands overlaid.
+        plot_estimates(
+            oddf,
+            "OD results from Python",
+            cov_frame="RIC",
+            ref_traj=ref_traj,
+            msr_df=msr_df,
+            html_out=str(outpath.joinpath("./od_estimate_plots.html")),
+            show=False,
+        )
+
+        # Let's also plot the reference and the OD result's orbital elements
+        plot_orbit_elements(
+            [ref_traj, oddf],
+            "Python OD result",
+            ["Reference", "OD"],
+            html_out=str(outpath.joinpath("./od_vs_ref_elements.html")),
+            show=False,
+        )
+
+        # More often, the covariance is a better indicator
+        plot_covar(
+            oddf,
+            "OD 1-sigma covar from Python",
+            cov_sigma=1.0,
+            msr_df=msr_df,
+            html_out=str(outpath.joinpath("./od_covar_plots.html")),
+            show=False,
+        )
+
+        # Now, we'll plot the prefit residuals
+        plot_residuals(
+            oddf,
+            "OD residuals",
+            msr_df=msr_df,
+            html_out=str(outpath.joinpath("./od_residual_plots.html")),
+            show=False,
+        )
+        # And the postfit histograms
+        plot_residual_histogram(
+            oddf,
+            "OD residuals",
+            kind="Postfit",
+            html_out=str(outpath.joinpath("./od_residual_histograms.html")),
+            show=False,
+        )
 
 
 def test_one_way_msr():
     """
-    Test that we can perform a one-way measurement
+    Test that we can manually perform a one-way measurement
     """
 
     # Base path
@@ -132,5 +204,67 @@ def test_one_way_msr():
     assert abs(doppler_km_s - -0.2498238312640348) < 0.1
 
 
+def test_pure_prediction():
+    # Initialize logging
+    FORMAT = "%(levelname)s %(name)s %(asctime)-15s %(filename)s:%(lineno)d %(message)s"
+    logging.basicConfig(format=FORMAT)
+    logging.getLogger().setLevel(logging.INFO)
+
+    # Base path
+    root = Path(__file__).joinpath("../../../").resolve()
+    config_path = root.joinpath("./data/tests/config/")
+    outpath = root.joinpath("output_data/")
+
+    # Load the dynamics and spacecraft
+    sc = Spacecraft.load(str(config_path.joinpath("spacecraft.yaml")))
+    dynamics = SpacecraftDynamics.load_named(str(config_path.joinpath("dynamics.yaml")))
+
+    # Set up the export -- We'll use the same config set up for both measurements and output of OD process
+    cfg = ExportCfg(timestamp=True, metadata={"test key": "test value"})
+
+    # We'll assume that we have a good estimate of the spacecraft's orbit before we predict it forward in time
+    # Hence, create the orbit estimate with the covariance diagonal (100 m on position and 50 m/s on velocity)
+    orbit_est = OrbitEstimate(
+        sc.orbit,
+        covar=np.diag([100.0e-3, 100.0e-3, 100.0e-3, 50.0e-3, 50.0e-3, 50.0e-3]),
+    )
+
+    rslt_path = predictor(
+        dynamics["hifi"],
+        sc,
+        orbit_est,
+        Unit.Second * 15.0,
+        str(outpath.joinpath("./od_pred_result.parquet")),
+        cfg,
+        predict_for=Unit.Hour * 12,
+    )
+
+    print(f"Stored to {rslt_path}")
+
+    # Load the prediction results
+    oddf = pd.read_parquet(rslt_path)
+
+    # There seems to be a bug when exporting the HTML on Github action windows
+    # cf. https://github.com/nyx-space/nyx/actions/runs/5064848025/jobs/9092830624
+    if sys.platform != "win32":
+        # Let's plot the OD result's orbital elements
+        plot_orbit_elements(
+            oddf,
+            "OD prediction result",
+            html_out=str(outpath.joinpath("./od_pred_elements.html")),
+            show=False,
+        )
+
+        # More often, the covariance is a better indicator
+        plot_covar(
+            oddf,
+            "OD 1-sigma covar from Python",
+            cov_sigma=1.0,
+            cov_frame="Earth J2000",
+            html_out=str(outpath.joinpath("./od_pred_covar_plots.html")),
+            show=False,
+        )
+
+
 if __name__ == "__main__":
-    test_one_way_msr()
+    test_pure_prediction()

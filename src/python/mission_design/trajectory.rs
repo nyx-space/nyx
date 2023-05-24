@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use hifitime::{Epoch, Unit};
+use hifitime::{Duration, Epoch, Unit};
 use pyo3::prelude::*;
 
 use crate::md::trajectory::ExportCfg;
@@ -52,6 +52,13 @@ impl Traj {
     /// Return the last state of the trajectory
     fn last(&self) -> Spacecraft {
         *self.inner.last()
+    }
+
+    /// Copies this object and resamples it with the provided step size
+    fn resample(&self, step: Duration) -> Result<Self, NyxError> {
+        let inner = self.inner.resample(step)?;
+
+        Ok(Self { inner })
     }
 
     /// Finds a specific event in a trajectory.

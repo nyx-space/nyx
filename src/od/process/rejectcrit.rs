@@ -23,9 +23,14 @@ use pyo3::prelude::*;
 use serde_derive::{Deserialize, Serialize};
 use std::sync::Arc;
 
-/// Reject measurements with a residual ratio greater than the provided value.
+/// Reject measurements with a residual ratio greater than the provided sigmas values. Will only be turned used if at least min_accepted measurements have been processed so far.
+/// If unsure, use the default: `FltResid::default()` in Rust, and `FltResid()` in Python (i.e. construct without arguments).
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(
+    feature = "python",
+    pyo3(text_signature = "(min_accepted=None, num_sigmas=None)")
+)]
 pub struct FltResid {
     /// Minimum number of accepted measurements before applying the rejection criteria.
     pub min_accepted: usize,
@@ -36,6 +41,18 @@ pub struct FltResid {
 #[cfg(feature = "python")]
 #[pymethods]
 impl FltResid {
+    #[new]
+    fn py_new(min_accepted: Option<usize>, num_sigmas: Option<f64>) -> Self {
+        let mut me = Self::default();
+        if let Some(min_accepted) = min_accepted {
+            me.min_accepted = min_accepted;
+        }
+        if let Some(num_sigmas) = num_sigmas {
+            me.num_sigmas = num_sigmas;
+        }
+        me
+    }
+
     #[getter]
     fn get_min_accepted(&self) -> usize {
         self.min_accepted

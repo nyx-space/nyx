@@ -19,17 +19,16 @@
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector, U3};
 
-pub use super::estimate::{Estimate, KfEstimate};
-pub use super::residual::Residual;
-pub use super::snc::SNC;
-use super::{Filter, State};
 pub use crate::errors::NyxError;
+pub use crate::od::estimate::{Estimate, KfEstimate, Residual};
+pub use crate::od::snc::SNC;
+use crate::od::{Filter, State};
 pub use crate::time::{Epoch, Unit};
 
 /// Defines both a Classical and an Extended Kalman filter (CKF and EKF)
+/// T: Type of state
 /// A: Acceleration size (for SNC)
 /// M: Measurement size (used for the sensitivity matrix)
-/// T: Type of state
 #[derive(Debug, Clone)]
 #[allow(clippy::upper_case_acronyms)]
 pub struct KF<T, A, M>
@@ -93,9 +92,6 @@ where
         process_noise: SNC<A>,
         measurement_noise: OMatrix<f64, M, M>,
     ) -> Self {
-        let epoch_fmt = initial_estimate.epoch_fmt;
-        let covar_fmt = initial_estimate.covar_fmt;
-
         assert_eq!(
             A::dim() % 3,
             0,
@@ -113,8 +109,6 @@ where
             ekf: false,
             h_tilde: OMatrix::<f64, M, <T as State>::Size>::zeros(),
             h_tilde_updated: false,
-            epoch_fmt,
-            covar_fmt,
             prev_used_snc: 0,
         }
     }
@@ -127,9 +121,6 @@ where
         process_noises: Vec<SNC<A>>,
         measurement_noise: OMatrix<f64, M, M>,
     ) -> Self {
-        let epoch_fmt = initial_estimate.epoch_fmt;
-        let covar_fmt = initial_estimate.covar_fmt;
-
         assert_eq!(
             A::dim() % 3,
             0,
@@ -148,8 +139,6 @@ where
             ekf: false,
             h_tilde: OMatrix::<f64, M, <T as State>::Size>::zeros(),
             h_tilde_updated: false,
-            epoch_fmt,
-            covar_fmt,
             prev_used_snc: 0,
         }
     }
@@ -176,8 +165,6 @@ where
 {
     /// Initializes this KF without SNC
     pub fn no_snc(initial_estimate: KfEstimate<T>, measurement_noise: OMatrix<f64, M, M>) -> Self {
-        let epoch_fmt = initial_estimate.epoch_fmt;
-        let covar_fmt = initial_estimate.covar_fmt;
         Self {
             prev_estimate: initial_estimate,
             measurement_noise,
@@ -185,8 +172,6 @@ where
             ekf: false,
             h_tilde: OMatrix::<f64, M, <T as State>::Size>::zeros(),
             h_tilde_updated: false,
-            epoch_fmt,
-            covar_fmt,
             prev_used_snc: 0,
         }
     }
@@ -298,8 +283,6 @@ where
             covar_bar,
             stm,
             predicted: true,
-            epoch_fmt: self.epoch_fmt,
-            covar_fmt: self.covar_fmt,
         };
         self.prev_estimate = estimate;
         // Update the prev epoch for all SNCs
@@ -435,8 +418,6 @@ where
             covar_bar,
             stm,
             predicted: false,
-            epoch_fmt: self.epoch_fmt,
-            covar_fmt: self.covar_fmt,
         };
 
         self.h_tilde_updated = false;

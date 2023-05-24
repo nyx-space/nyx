@@ -28,6 +28,8 @@ use std::fs::File;
 use std::{collections::HashMap, error::Error, fmt::Display, path::Path};
 
 #[cfg(feature = "python")]
+use crate::Spacecraft;
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
 
 use crate::cosmic::Cosm;
@@ -255,6 +257,22 @@ impl DynamicTrajectory {
     #[new]
     fn new(path: String) -> Result<Self, NyxError> {
         Self::from_parquet(path).map_err(|e| NyxError::CustomError(e.to_string()))
+    }
+
+    /// Converts the provided CCSDS OEM file (first argument) into a Nyx trajectory Parquet file (second argument) and given a template spacecraft (third argument).
+    #[staticmethod]
+    #[pyo3(text_signature = "(oem_path, parquet_path, spacecraft_template)")]
+    fn convert_oem_to_parquet(
+        oem_path: String,
+        parquet_path: String,
+        spacecraft_template: Spacecraft,
+    ) -> Result<(), NyxError> {
+        let traj = Traj::<Spacecraft>::from_oem_file(oem_path, spacecraft_template)?;
+        // Convert to parquet
+        traj.to_parquet_simple(parquet_path)
+            .map_err(|e| NyxError::CustomError(e.to_string()))?;
+
+        Ok(())
     }
 
     fn __repr__(&self) -> String {

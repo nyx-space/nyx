@@ -21,6 +21,7 @@ use std::collections::HashMap;
 use crate::cosmic::Cosm;
 use crate::io::tracking_data::DynamicTrackingArc;
 use crate::io::trajectory_data::DynamicTrajectory;
+use crate::io::ExportCfg;
 use crate::od::msr::RangeDoppler;
 use crate::od::noise::GaussMarkov;
 use crate::od::process::FltResid;
@@ -35,7 +36,7 @@ mod process;
 mod trkconfig;
 
 use estimate::OrbitEstimate;
-use process::process_tracking_arc;
+use process::{predictor, process_tracking_arc};
 
 pub(crate) fn register_od(py: Python<'_>, parent_module: &PyModule) -> PyResult<()> {
     let sm = PyModule::new(py, "_nyx_space.orbit_determination")?;
@@ -47,7 +48,9 @@ pub(crate) fn register_od(py: Python<'_>, parent_module: &PyModule) -> PyResult<
     sm.add_class::<OrbitEstimate>()?;
     sm.add_class::<GaussMarkov>()?;
     sm.add_class::<FltResid>()?;
+    sm.add_class::<ExportCfg>()?;
     sm.add_function(wrap_pyfunction!(process_tracking_arc, sm)?)?;
+    sm.add_function(wrap_pyfunction!(predictor, sm)?)?;
 
     py_run!(
         py,
@@ -91,14 +94,13 @@ impl GroundTrackingArcSim {
     pub fn generate_measurements(
         &mut self,
         path: String,
-        metadata: Option<HashMap<String, String>>,
-        timestamp: bool,
+        export_cfg: ExportCfg,
     ) -> Result<String, NyxError> {
         let cosm = Cosm::de438();
         let arc = self.inner.generate_measurements(cosm)?;
 
         // Save the tracking arc
-        let maybe = arc.to_parquet(path, metadata, timestamp);
+        let maybe = arc.to_parquet(path, export_cfg);
 
         match maybe {
             Ok(path) => Ok(format!("{}", path.to_str().unwrap())),

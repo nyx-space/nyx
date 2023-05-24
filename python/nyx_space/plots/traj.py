@@ -194,7 +194,7 @@ def plot_ground_track(
 def plot_orbit_elements(
     dfs,
     title,
-    names,
+    names=[],
     html_out=None,
     copyright=None,
     show=True,
@@ -221,7 +221,8 @@ def plot_orbit_elements(
     if not isinstance(names, list):
         names = [names]
 
-    assert len(names) == len(dfs), "Number of names must match number of dataframes"
+    if len(names) > 1:
+        assert len(names) == len(dfs), "Number of names must match number of dataframes"
 
     columns = [
         "sma (km)",
@@ -241,8 +242,13 @@ def plot_orbit_elements(
 
     for col in columns:
         for k, df in enumerate(dfs):
+            try:
+                name = f"{names[k]} {col}"
+            except IndexError:
+                name = col
+
             fig.add_trace(
-                go.Scatter(x=df["Epoch"], y=df[col], name=f"{names[k]} {col}"),
+                go.Scatter(x=df["Epoch"], y=df[col], name=name),
                 row=row_i + 1,
                 col=col_i + 1,
             )
