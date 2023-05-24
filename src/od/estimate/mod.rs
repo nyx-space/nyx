@@ -17,11 +17,10 @@
 */
 
 use super::State;
-use super::{CovarFormat, EpochFormat};
 use crate::cosmic::Orbit;
 use crate::hifitime::Epoch;
 use crate::linalg::allocator::Allocator;
-use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
+use crate::linalg::{DefaultAllocator, OMatrix, OVector};
 use std::cmp::PartialEq;
 use std::fmt;
 
@@ -68,10 +67,6 @@ where
     fn predicted(&self) -> bool;
     /// The STM used to compute this Estimate
     fn stm(&self) -> &OMatrix<f64, <T as State>::Size, <T as State>::Size>;
-    /// The Epoch format upon serialization
-    fn epoch_fmt(&self) -> EpochFormat;
-    /// The covariance format upon serialization
-    fn covar_fmt(&self) -> CovarFormat;
     /// Returns whether this estimate is within some bound
     /// The 68-95-99.7 rule is a good way to assess whether the filter is operating normally
     fn within_sigma(&self, sigma: f64) -> bool {
@@ -88,36 +83,6 @@ where
     /// Returns whether this estimate is within 3 sigma, which represent 99.7% for a Normal distribution
     fn within_3sigma(&self) -> bool {
         self.within_sigma(3.0)
-    }
-    /// Returns the header
-    fn header(epoch_fmt: EpochFormat, covar_fmt: CovarFormat) -> Vec<String> {
-        let dim = <T as State>::Size::dim();
-        let mut hdr_v = Vec::with_capacity(3 * dim + 1);
-        hdr_v.push(format!("{epoch_fmt}"));
-        for i in 0..dim {
-            hdr_v.push(format!("state_{i}"));
-        }
-        // Serialize the covariance
-        for i in 0..dim {
-            for j in 0..dim {
-                hdr_v.push(format!("{covar_fmt}_{i}_{j}"));
-            }
-        }
-        hdr_v
-    }
-    /// Returns the default header
-    fn default_header() -> Vec<String> {
-        Self::header(EpochFormat::GregorianUtc, CovarFormat::Uncertainty)
-    }
-
-    /// Returns the covariance element at position (i, j) formatted with this estimate's covariance formatter
-    fn covar_ij(&self, i: usize, j: usize) -> f64 {
-        match self.covar_fmt() {
-            CovarFormat::Uncertainty => self.covar()[(i, j)].sqrt(),
-            CovarFormat::Sigma1 => self.covar()[(i, j)],
-            CovarFormat::Sigma3 => self.covar()[(i, j)] * 3.0,
-            CovarFormat::MulSigma(x) => self.covar()[(i, j)] * x,
-        }
     }
 }
 

@@ -16,7 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::{CovarFormat, EpochFormat};
 use super::{Estimate, State};
 use crate::cosmic::Orbit;
 use crate::linalg::allocator::Allocator;
@@ -26,8 +25,6 @@ use crate::md::StateParameter;
 use rand::SeedableRng;
 use rand_distr::Distribution;
 use rand_pcg::Pcg64Mcg;
-use serde::ser::SerializeSeq;
-use serde::{Serialize, Serializer};
 use std::cmp::PartialEq;
 use std::fmt;
 
@@ -55,10 +52,6 @@ where
     pub predicted: bool,
     /// The STM used to compute this Estimate
     pub stm: OMatrix<f64, <T as State>::Size, <T as State>::Size>,
-    /// The Epoch format upon serialization
-    pub epoch_fmt: EpochFormat,
-    /// The covariance format upon serialization
-    pub covar_fmt: CovarFormat,
 }
 
 impl<T: State> KfEstimate<T>
@@ -83,8 +76,6 @@ where
             covar_bar: covar,
             predicted: true,
             stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity(),
-            epoch_fmt: EpochFormat::GregorianUtc,
-            covar_fmt: CovarFormat::Uncertainty,
         }
     }
 
@@ -98,8 +89,6 @@ where
             covar_bar: covar,
             predicted: true,
             stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity(),
-            epoch_fmt: EpochFormat::GregorianUtc,
-            covar_fmt: CovarFormat::Uncertainty,
         }
     }
 }
@@ -147,8 +136,6 @@ impl KfEstimate<Orbit> {
             covar_bar: covar,
             predicted: true,
             stm: OMatrix::<f64, U6, U6>::identity(),
-            epoch_fmt: EpochFormat::GregorianUtc,
-            covar_fmt: CovarFormat::Uncertainty,
         }
     }
 }
@@ -171,8 +158,6 @@ where
             covar_bar: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::zeros(),
             predicted: true,
             stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity(),
-            epoch_fmt: EpochFormat::GregorianUtc,
-            covar_fmt: CovarFormat::Uncertainty,
         }
     }
 
@@ -197,12 +182,6 @@ where
     }
     fn stm(&self) -> &OMatrix<f64, <T as State>::Size, <T as State>::Size> {
         &self.stm
-    }
-    fn epoch_fmt(&self) -> EpochFormat {
-        self.epoch_fmt
-    }
-    fn covar_fmt(&self) -> CovarFormat {
-        self.covar_fmt
     }
     fn set_state_deviation(&mut self, new_state: OVector<f64, <T as State>::Size>) {
         self.state_deviation = new_state;
@@ -261,58 +240,6 @@ where
             "=== PREDICTED: {} ===\nEstState {:e} Covariance {:e}\n=====================",
             &self.predicted, &self.state_deviation, &self.covar
         )
-    }
-}
-
-impl<T: State> Serialize for KfEstimate<T>
-where
-    DefaultAllocator: Allocator<f64, <T as State>::Size>
-        + Allocator<f64, <T as State>::Size, <T as State>::Size>
-        + Allocator<usize, <T as State>::Size>
-        + Allocator<f64, <T as State>::VecLength>
-        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
-    <DefaultAllocator as Allocator<f64, <T as State>::Size>>::Buffer: Copy,
-    <DefaultAllocator as Allocator<f64, <T as State>::Size, <T as State>::Size>>::Buffer: Copy,
-{
-    /// Serializes the estimate
-    fn serialize<O>(&self, serializer: O) -> Result<O::Ok, O::Error>
-    where
-        O: Serializer,
-    {
-        let dim = <T as State>::Size::dim();
-        let mut seq = serializer.serialize_seq(Some(dim * 3 + 1))?;
-        match self.epoch_fmt {
-            EpochFormat::GregorianUtc => seq.serialize_element(&format!("{}", self.epoch()))?,
-            EpochFormat::GregorianTai => seq.serialize_element(&format!("{}", self.epoch()))?,
-            EpochFormat::MjdTai => seq.serialize_element(&self.epoch().to_mjd_tai_days())?,
-            EpochFormat::MjdTt => seq.serialize_element(&self.epoch().to_mjd_tt_days())?,
-            EpochFormat::MjdUtc => seq.serialize_element(&self.epoch().to_mjd_utc_days())?,
-            EpochFormat::JdeEt => seq.serialize_element(&self.epoch().to_jde_et_days())?,
-            EpochFormat::JdeTai => seq.serialize_element(&self.epoch().to_jde_tai_days())?,
-            EpochFormat::JdeTt => seq.serialize_element(&self.epoch().to_jde_tt_days())?,
-            EpochFormat::JdeUtc => seq.serialize_element(&self.epoch().to_jde_utc_days())?,
-            EpochFormat::TaiSecs(e) => {
-                seq.serialize_element(&(self.epoch().to_tai_seconds() - e))?
-            }
-            EpochFormat::TaiDays(e) => seq.serialize_element(&(self.epoch().to_tai_days() - e))?,
-        }
-        // Serialize the state
-        for i in 0..dim {
-            seq.serialize_element(&self.state_deviation[i])?;
-        }
-        // Serialize the covariance
-        for i in 0..dim {
-            for j in 0..dim {
-                let ser_covar = match self.covar_fmt {
-                    CovarFormat::Uncertainty => self.covar[(i, j)].sqrt(),
-                    CovarFormat::Sigma1 => self.covar[(i, j)],
-                    CovarFormat::Sigma3 => self.covar[(i, j)] * 3.0,
-                    CovarFormat::MulSigma(x) => self.covar[(i, j)] * x,
-                };
-                seq.serialize_element(&ser_covar)?;
-            }
-        }
-        seq.end()
     }
 }
 

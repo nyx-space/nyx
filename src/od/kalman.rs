@@ -22,7 +22,7 @@ use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector, U3};
 pub use super::estimate::{Estimate, KfEstimate};
 pub use super::residual::Residual;
 pub use super::snc::SNC;
-use super::{CovarFormat, EpochFormat, Filter, State};
+use super::{Filter, State};
 pub use crate::errors::NyxError;
 pub use crate::time::{Epoch, Unit};
 
@@ -63,8 +63,6 @@ where
     pub ekf: bool,
     h_tilde: OMatrix<f64, M, <T as State>::Size>,
     h_tilde_updated: bool,
-    epoch_fmt: EpochFormat, // Stored here only for simplification, kinda ugly
-    covar_fmt: CovarFormat, // Idem
     prev_used_snc: usize,
 }
 

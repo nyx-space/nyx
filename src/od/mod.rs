@@ -24,8 +24,6 @@ use crate::Orbit;
 pub use crate::{cosmic::Cosm, State, TimeTagged};
 use std::sync::Arc;
 
-use crate::io::{CovarFormat, EpochFormat};
-
 pub mod filter;
 pub use filter::Filter;
 
