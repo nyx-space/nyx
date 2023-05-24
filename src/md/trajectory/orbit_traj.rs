@@ -137,19 +137,19 @@ impl Traj<Orbit> {
             }
             if line.starts_with("OBJECT_NAME") {
                 // Extract the object ID from the line
-                let parts: Vec<&str> = line.split("=").collect();
+                let parts: Vec<&str> = line.split('=').collect();
                 let name = parts[1].trim().to_string();
                 debug!("[line: {lno}] Found object {name}");
                 traj.name = Some(name);
             } else if line.starts_with("REF_FRAME") {
-                let parts: Vec<&str> = line.split("=").collect();
+                let parts: Vec<&str> = line.split('=').collect();
                 let mut ref_frame = parts[1].trim();
                 if ref_frame == "ICRF" {
                     ref_frame = "EME2000";
                 }
                 frame = Some(cosm.try_frame(ref_frame)?);
             } else if line.starts_with("TIME_SYSTEM") {
-                let parts: Vec<&str> = line.split("=").collect();
+                let parts: Vec<&str> = line.split('=').collect();
                 time_system = parts[1].trim().to_string();
                 debug!("[line: {lno}] Found time system `{time_system}`");
             } else if line.starts_with("META_STOP") {
@@ -160,7 +160,7 @@ impl Traj<Orbit> {
                 let parts: Vec<&str> = line.split_whitespace().collect();
 
                 // Extract the values
-                let epoch_str = format!("{} {time_system}", parts[0].to_string());
+                let epoch_str = format!("{} {time_system}", parts[0]);
                 match parts[1].parse::<f64>() {
                     Ok(x_km) => {
                         // Look good!
