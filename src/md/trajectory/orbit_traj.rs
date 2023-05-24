@@ -24,6 +24,7 @@ use crate::md::prelude::StateParameter;
 use crate::md::EventEvaluator;
 use crate::time::Epoch;
 use crate::time::TimeUnits;
+use crate::Spacecraft;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
@@ -81,6 +82,15 @@ impl Traj<Orbit> {
         cfg.metadata = metadata;
 
         traj.to_parquet(path, events, cfg)
+    }
+
+    /// Convert this orbit trajectory into a spacecraft trajectory by copying the provided template and setting its orbit state to that of each state of the trajectory
+    pub fn upcast(&self, template: Spacecraft) -> Traj<Spacecraft> {
+        let mut out = Traj::new();
+        for orbit in &self.states {
+            out.states.push(template.with_orbit(*orbit));
+        }
+        out
     }
 
     /// Initialize a new orbit trajectory from the path to a CCSDS OEM file.
@@ -210,7 +220,7 @@ fn test_load_oem_leo() {
         println!("could not init env_logger");
     }
 
-    let leo_traj = Traj::from_oem_file(path).unwrap();
+    let leo_traj: Traj<Orbit> = Traj::<Orbit>::from_oem_file(path).unwrap();
 
     assert_eq!(leo_traj.states.len(), 361);
     assert_eq!(leo_traj.name.unwrap(), "TEST_OBJ".to_string());
@@ -237,7 +247,7 @@ fn test_load_oem_meo() {
         println!("could not init env_logger");
     }
 
-    let leo_traj = Traj::from_oem_file(path).unwrap();
+    let leo_traj = Traj::<Orbit>::from_oem_file(path).unwrap();
 
     assert_eq!(leo_traj.states.len(), 61);
     assert_eq!(leo_traj.name.unwrap(), "TEST_OBJ".to_string());
@@ -264,7 +274,7 @@ fn test_load_oem_geo() {
         println!("could not init env_logger");
     }
 
-    let leo_traj = Traj::from_oem_file(path).unwrap();
+    let leo_traj: Traj<Orbit> = Traj::<Orbit>::from_oem_file(path).unwrap();
 
     assert_eq!(leo_traj.states.len(), 181);
     assert_eq!(leo_traj.name.unwrap(), "TEST_OBJ".to_string());

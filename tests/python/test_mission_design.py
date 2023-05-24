@@ -8,6 +8,7 @@ from nyx_space.mission_design import (
     StateParameter,
     Event,
     SpacecraftDynamics,
+    DynamicTrajectory
 )
 from nyx_space.time import Duration, Unit, Epoch
 
@@ -109,6 +110,10 @@ def test_build_spacecraft():
     """
     Tests that we can build a spacecraft from scratch without an input file
     """
+    # Initialize logging
+    FORMAT = "%(levelname)s %(name)s %(filename)s:%(lineno)d\t%(message)s"
+    logging.basicConfig(format=FORMAT)
+    logging.getLogger().setLevel(logging.INFO)
 
     cosm = Cosm.de438()
     eme2k = cosm.frame("EME2000")  # Earth Mean Equator J2000
@@ -129,7 +134,19 @@ def test_build_spacecraft():
         sc.drag().cd == 2.2
     )  # Default value, but the area is zero, so it doesn't have any effect
 
+    # Using this spacecraft as a template, let's load an OEM file, convert it to Parquet, and ensure we can load it back in.
+    # The orbit data will be overwritten with data from the OEM file.
+    root = Path(__file__).joinpath("../../../").resolve()
+
+    config_path = root.joinpath("./data/tests/ccsds/oem/LEO_10s.oem")
+    output_path = root.joinpath("./output_data/LEO_10s.parquet")
+    # Convert
+    DynamicTrajectory.convert_oem_to_parquet(str(config_path), str(output_path), sc)
+    # Reload
+    traj = DynamicTrajectory(str(output_path))
+    print(traj)
+
 
 if __name__ == "__main__":
-    test_propagate()
+    # test_propagate()
     test_build_spacecraft()

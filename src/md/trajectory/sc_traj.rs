@@ -95,4 +95,22 @@ impl Traj<Spacecraft> {
 
         traj.to_parquet(path, events, cfg)
     }
+
+    /// Convert this spacecraft trajectory into an Orbit trajectory, loosing all references to the spacecraft
+    pub fn downcast(&self) -> Traj<Orbit> {
+        let mut out = Traj::new();
+        for sc_state in &self.states {
+            out.states.push(sc_state.orbit);
+        }
+        out
+    }
+
+    /// Initialize a new spacecraft trajectory from the path to a CCSDS OEM file.
+    ///
+    /// CCSDS OEM only contains the orbit information, so you must provide a template spacecraft since we'll upcast the orbit trajectory into a spacecraft trajectory.
+    pub fn from_oem_file<P: AsRef<Path>>(path: P, template: Spacecraft) -> Result<Self, NyxError> {
+        let traj = Traj::<Orbit>::from_oem_file(path)?;
+
+        Ok(traj.upcast(template))
+    }
 }

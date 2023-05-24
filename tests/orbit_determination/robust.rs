@@ -424,18 +424,6 @@ fn od_robust_test_ekf_realistic_two_way() {
         .unwrap();
 
     // Note: this also checks that the columns that match the given measurement kind exist.
-    // let df_residuals = df
-    //     .clone()
-    //     .select([
-    //         col("Prefit residual: Range (km)"),
-    //         col("Prefit residual: Doppler (km/s)"),
-    //         col("Postfit residual: Range (km)"),
-    //         col("Postfit residual: Doppler (km/s)"),
-    //         col("Residual ratio"),
-    //     ])
-    //     .collect()
-    //     .unwrap();
-
     let df_residuals = df
         .columns([
             "Prefit residual: Range (km)",
@@ -465,82 +453,74 @@ fn od_robust_test_ekf_realistic_two_way() {
         assert_eq!(num_some, num_residual_some);
     }
 
-    /*
     // Check that the position and velocity estimates are present, along with the epochs
     assert!(df
-        .clone()
-        .select([
-            col("Epoch:Gregorian UTC"),
-            col("Epoch:Gregorian TAI"),
-            col("Epoch:TAI (s)"),
-            col("x (km)"),
-            col("y (km)"),
-            col("z (km)"),
-            col("vx (km/s)"),
-            col("vy (km/s)"),
-            col("vz (km/s)"),
+        .columns([
+            "Epoch:Gregorian UTC",
+            "Epoch:Gregorian TAI",
+            "Epoch:TAI (s)",
+            "x (km)",
+            "y (km)",
+            "z (km)",
+            "vx (km/s)",
+            "vy (km/s)",
+            "vz (km/s)",
         ])
-        .collect()
         .is_ok());
 
     // Check that the covariance in the integration frame is present
     assert!(df
-        .clone()
-        .select([
-            col("Covariance XX (Earth J2000)"),
-            col("Covariance XY (Earth J2000)"),
-            col("Covariance XZ (Earth J2000)"),
-            col("Covariance XVx (Earth J2000)"),
-            col("Covariance XVy (Earth J2000)"),
-            col("Covariance XVz (Earth J2000)"),
-            col("Covariance YY (Earth J2000)"),
-            col("Covariance YZ (Earth J2000)"),
-            col("Covariance YVx (Earth J2000)"),
-            col("Covariance YVy (Earth J2000)"),
-            col("Covariance YVz (Earth J2000)"),
-            col("Covariance ZZ (Earth J2000)"),
-            col("Covariance ZVx (Earth J2000)"),
-            col("Covariance ZVy (Earth J2000)"),
-            col("Covariance ZVz (Earth J2000)"),
-            col("Covariance VxVx (Earth J2000)"),
-            col("Covariance VxVy (Earth J2000)"),
-            col("Covariance VxVz (Earth J2000)"),
-            col("Covariance VyVy (Earth J2000)"),
-            col("Covariance VyVz (Earth J2000)"),
-            col("Covariance VzVz (Earth J2000)"),
+        .columns([
+            "Covariance XX (Earth J2000)",
+            "Covariance XY (Earth J2000)",
+            "Covariance XZ (Earth J2000)",
+            "Covariance XVx (Earth J2000)",
+            "Covariance XVy (Earth J2000)",
+            "Covariance XVz (Earth J2000)",
+            "Covariance YY (Earth J2000)",
+            "Covariance YZ (Earth J2000)",
+            "Covariance YVx (Earth J2000)",
+            "Covariance YVy (Earth J2000)",
+            "Covariance YVz (Earth J2000)",
+            "Covariance ZZ (Earth J2000)",
+            "Covariance ZVx (Earth J2000)",
+            "Covariance ZVy (Earth J2000)",
+            "Covariance ZVz (Earth J2000)",
+            "Covariance VxVx (Earth J2000)",
+            "Covariance VxVy (Earth J2000)",
+            "Covariance VxVz (Earth J2000)",
+            "Covariance VyVy (Earth J2000)",
+            "Covariance VyVz (Earth J2000)",
+            "Covariance VzVz (Earth J2000)",
         ])
-        .collect()
         .is_ok());
 
     // Check that the covariance in the RIC frame is present
     assert!(df
-        .clone()
-        .select([
-            col("Covariance XX (RIC)"),
-            col("Covariance XY (RIC)"),
-            col("Covariance XZ (RIC)"),
-            col("Covariance XVx (RIC)"),
-            col("Covariance XVy (RIC)"),
-            col("Covariance XVz (RIC)"),
-            col("Covariance YY (RIC)"),
-            col("Covariance YZ (RIC)"),
-            col("Covariance YVx (RIC)"),
-            col("Covariance YVy (RIC)"),
-            col("Covariance YVz (RIC)"),
-            col("Covariance ZZ (RIC)"),
-            col("Covariance ZVx (RIC)"),
-            col("Covariance ZVy (RIC)"),
-            col("Covariance ZVz (RIC)"),
-            col("Covariance VxVx (RIC)"),
-            col("Covariance VxVy (RIC)"),
-            col("Covariance VxVz (RIC)"),
-            col("Covariance VyVy (RIC)"),
-            col("Covariance VyVz (RIC)"),
-            col("Covariance VzVz (RIC)"),
+        .columns([
+            "Covariance XX (RIC)",
+            "Covariance XY (RIC)",
+            "Covariance XZ (RIC)",
+            "Covariance XVx (RIC)",
+            "Covariance XVy (RIC)",
+            "Covariance XVz (RIC)",
+            "Covariance YY (RIC)",
+            "Covariance YZ (RIC)",
+            "Covariance YVx (RIC)",
+            "Covariance YVy (RIC)",
+            "Covariance YVz (RIC)",
+            "Covariance ZZ (RIC)",
+            "Covariance ZVx (RIC)",
+            "Covariance ZVy (RIC)",
+            "Covariance ZVz (RIC)",
+            "Covariance VxVx (RIC)",
+            "Covariance VxVy (RIC)",
+            "Covariance VxVz (RIC)",
+            "Covariance VyVy (RIC)",
+            "Covariance VyVz (RIC)",
+            "Covariance VzVz (RIC)",
         ])
-        .collect()
         .is_ok());
-    */
 
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];
