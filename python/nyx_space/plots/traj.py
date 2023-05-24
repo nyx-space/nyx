@@ -242,8 +242,13 @@ def plot_orbit_elements(
 
     for col in columns:
         for k, df in enumerate(dfs):
+            try:
+                name = f"{names[k]} {col}"
+            except IndexError:
+                name = col
+
             fig.add_trace(
-                go.Scatter(x=df["Epoch"], y=df[col], name=f"{names[k]} {col}"),
+                go.Scatter(x=df["Epoch"], y=df[col], name=name),
                 row=row_i + 1,
                 col=col_i + 1,
             )

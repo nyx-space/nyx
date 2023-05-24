@@ -9,6 +9,7 @@ from nyx_space.orbit_determination import (
     TrkConfig,
     OrbitEstimate,
     process_tracking_arc,
+    predictor,
     DynamicTrackingArc,
     ExportCfg,
 )
@@ -21,6 +22,7 @@ from nyx_space.plots.od import (
     plot_residuals,
     plot_residual_histogram,
 )
+from nyx_space.plots.traj import plot_orbit_elements
 
 
 def test_filter_arc():
@@ -40,8 +42,10 @@ def test_filter_arc():
 
     # An propagate for two periods (we only care about the trajectory)
     _, traj = propagate(sc, dynamics["hifi"], sc.orbit.period() * 2)
+    # Resample the trajectory at fixed step size
+    traj = traj.resample(Unit.Second * 10.0)
     # And save the trajectory
-    traj_file = str(outpath.joinpath("./od_val_with_arc_truth_ephem.parquet"))
+    traj_file = str(outpath.joinpath("./python_ref_traj.parquet"))
     traj.to_parquet(traj_file)
 
     # Now starts the measurement generation
@@ -89,7 +93,7 @@ def test_filter_arc():
         sc.orbit, covar=np.diag([100.0, 100.0, 100.0, 1.0, 1.0, 1.0])
     )
 
-    msr_noise = [1e-3, 0, 0, 1e-6]  # TODO: Convert this to a numpy matrix
+    msr_noise = [1e-3, 0, 0, 1e-6]
     # Switch from sequential to EKF after 100 measurements
     ekf_num_msr_trig = 100
     # Unless there is a 2 hour gap in the measurements, and then switch back to classical
@@ -105,6 +109,7 @@ def test_filter_arc():
         cfg,
         ekf_num_msr_trig,
         ekf_disable_time,
+        # predict_for=Unit.Hour * 12, # You can predict from the final estimate by uncommenting this line.
     )
 
     print(f"Stored to {rslt_path}")
@@ -127,13 +132,22 @@ def test_filter_arc():
         show=False,
     )
 
+    # Let's also plot the reference and the OD result's orbital elements
+    plot_orbit_elements(
+        [ref_traj, oddf],
+        "Python OD result",
+        ["Reference", "OD"],
+        html_out=str(outpath.joinpath("./od_vs_ref_elements.html")),
+        show=False,
+    )
+
     # More often, the covariance is a better indicator
     plot_covar(
         oddf,
         "OD 1-sigma covar from Python",
         cov_sigma=1.0,
         msr_df=msr_df,
-        html_out=str(outpath.joinpath("./od_estimate_plots.html")),
+        html_out=str(outpath.joinpath("./od_covar_plots.html")),
         show=False,
     )
 
@@ -157,7 +171,7 @@ def test_filter_arc():
 
 def test_one_way_msr():
     """
-    Test that we can perform a one-way measurement
+    Test that we can manually perform a one-way measurement
     """
 
     # Base path
@@ -185,6 +199,62 @@ def test_one_way_msr():
     assert abs(range_km - 18097.562811514355) < 0.1
     assert abs(doppler_km_s - -0.2498238312640348) < 0.1
 
+def test_pure_prediction():
+    # Initialize logging
+    FORMAT = "%(levelname)s %(name)s %(asctime)-15s %(filename)s:%(lineno)d %(message)s"
+    logging.basicConfig(format=FORMAT)
+    logging.getLogger().setLevel(logging.INFO)
+
+    # Base path
+    root = Path(__file__).joinpath("../../../").resolve()
+    config_path = root.joinpath("./data/tests/config/")
+    outpath = root.joinpath("output_data/")
+
+    # Load the dynamics and spacecraft
+    sc = Spacecraft.load(str(config_path.joinpath("spacecraft.yaml")))
+    dynamics = SpacecraftDynamics.load_named(str(config_path.joinpath("dynamics.yaml")))
+
+    # Set up the export -- We'll use the same config set up for both measurements and output of OD process
+    cfg = ExportCfg(timestamp=True, metadata={"test key": "test value"})
+
+    # We'll assume that we have a good estimate of the spacecraft's orbit before we predict it forward in time
+    # Hence, create the orbit estimate with the covariance diagonal (100 m on position and 50 m/s on velocity)
+    orbit_est = OrbitEstimate(
+        sc.orbit, covar=np.diag([100.0e-3, 100.0e-3, 100.0e-3, 50.0e-3, 50.0e-3, 50.0e-3])
+    )
+
+    rslt_path = predictor(
+        dynamics["hifi"],
+        sc,
+        orbit_est,
+        Unit.Second * 15.0,
+        str(outpath.joinpath("./od_pred_result.parquet")),
+        cfg,
+        predict_for=Unit.Hour * 12,
+    )
+
+    print(f"Stored to {rslt_path}")
+
+    # Load the prediction results
+    oddf = pd.read_parquet(rslt_path)
+
+    # Let's plot the OD result's orbital elements
+    plot_orbit_elements(
+        oddf,
+        "OD prediction result",
+        html_out=str(outpath.joinpath("./od_pred_elements.html")),
+        show=False,
+    )
+
+    # More often, the covariance is a better indicator
+    plot_covar(
+        oddf,
+        "OD 1-sigma covar from Python",
+        cov_sigma=1.0,
+        cov_frame="Earth J2000",
+        html_out=str(outpath.joinpath("./od_pred_covar_plots.html")),
+        show=False,
+    )
 
 if __name__ == "__main__":
-    test_one_way_msr()
+    test_pure_prediction()

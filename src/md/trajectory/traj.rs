@@ -571,6 +571,25 @@ where
         );
         Ok(path_buf)
     }
+
+    /// Allows resampling this trajectory at a fixed interval instead of using the propagator step size.
+    /// This may lead to aliasing due to the Nyquist–Shannon sampling theorem.
+    pub fn resample(&self, step: Duration) -> Result<Self, NyxError> {
+        if self.states.is_empty() {
+            return Err(NyxError::Trajectory(TrajError::CreationError(
+                "No trajectory to convert".to_string(),
+            )));
+        }
+
+        let mut traj = Self::new();
+        for state in self.every(step) {
+            traj.states.push(state);
+        }
+
+        traj.finalize();
+
+        Ok(traj)
+    }
 }
 
 impl<S: Interpolatable> ops::Add for Traj<S>

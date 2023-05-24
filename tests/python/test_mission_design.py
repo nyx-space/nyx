@@ -86,6 +86,9 @@ def test_propagate():
     )
     assert abs(rslt_apo.orbit.ta_deg() - 180.0) <= 1e-6
 
+    # Resample the trajectory at fixed step size of 25 seconds
+    traj = traj.resample(Unit.Second * 25.0)
+
     # Export this trajectory with additional metadata and the events
     traj.to_parquet(
         "lofi_with_events.parquet", metadata={"test key": "test value"}, events=[event]

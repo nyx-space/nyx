@@ -27,7 +27,6 @@ import pandas as pd
 
 import numpy as np
 from scipy.stats import norm
-from scipy.special import erfcinv
 
 
 def plot_estimates(
@@ -141,6 +140,14 @@ def plot_estimates(
                 how="outer",
                 suffixes=("_od", "_ref_traj"),
             )
+            if merged_df.shape[0] > max(df.shape[0], ref_traj[num].shape[0]):
+                print(
+                    "Reference epochs differ between dataframes, performing a merge by closest key on TAI epoch instead"
+                )
+                merged_df = pd.merge_asof(
+                    df, ref_traj[num], on="Epoch:TAI (s)", suffixes=("_od", "_ref_traj")
+                )
+
             # Add the difference to reference to the dataframe
             for coord in plt_columns:
                 merged_df[f"delta {coord}"] = (
