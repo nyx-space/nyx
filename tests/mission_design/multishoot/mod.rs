@@ -125,7 +125,10 @@ fn alt_orbit_raising() {
         .for_duration_with_traj(start.period())
         .unwrap()
         .1
-        .to_parquet_with_step(output_path.join("multishoot_start.csv"), 2 * Unit::Second)
+        .to_parquet_with_step(
+            output_path.join("multishoot_start.parquet"),
+            2 * Unit::Second,
+        )
         .unwrap();
 
     // Propagate the initial orbit too
@@ -133,7 +136,10 @@ fn alt_orbit_raising() {
         .for_duration_with_traj(target.period())
         .unwrap()
         .1
-        .to_parquet_with_step(output_path.join("multishoot_target.csv"), 2 * Unit::Second)
+        .to_parquet_with_step(
+            output_path.join("multishoot_target.parquet"),
+            2 * Unit::Second,
+        )
         .unwrap();
 
     // Just propagate this spacecraft for one orbit for plotting
@@ -143,7 +149,10 @@ fn alt_orbit_raising() {
         .unwrap();
 
     end_traj
-        .to_parquet_with_step(output_path.join("multishoot_to_end.csv"), 2 * Unit::Second)
+        .to_parquet_with_step(
+            output_path.join("multishoot_to_end.parquet"),
+            2 * Unit::Second,
+        )
         .unwrap();
 
     // Check that error is 50km or less. That isn't great, but I blame that on the scenario and the final node being optimized.
@@ -347,7 +356,10 @@ fn vmag_orbit_raising() {
         .iter()
         .enumerate()
     {
-        traj.to_parquet_with_step(&format!("multishoot_to_node_{}.csv", i), 2 * Unit::Second)
-            .unwrap();
+        traj.to_parquet_with_step(
+            &format!("multishoot_to_node_{}.parquet", i),
+            2 * Unit::Second,
+        )
+        .unwrap();
     }
 }

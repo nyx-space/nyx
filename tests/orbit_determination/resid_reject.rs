@@ -1,5 +1,3 @@
-extern crate csv;
-
 use pretty_env_logger::try_init;
 
 use rstest::*;

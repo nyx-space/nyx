@@ -736,7 +736,7 @@ impl Traj<Spacecraft> {
         Ok(traj)
     }
 
-    /// A shortcut to `to_parquet_with_csv`
+    /// A shortcut to `to_parquet_with_cfg`
     pub fn to_parquet_with_step<P: AsRef<Path>>(
         &self,
         path: P,
