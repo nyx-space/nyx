@@ -17,11 +17,9 @@
 */
 
 use crate::errors::NyxError;
-use crate::io::formatter::StateFormatter;
 use crate::{Orbit, Spacecraft};
 use std::error::Error;
 use std::fmt;
-use std::fs::File;
 
 pub mod prelude {
     pub use super::{
@@ -61,47 +59,6 @@ mod param;
 pub use param::StateParameter;
 
 pub use opti::target_variable::{Variable, Vary};
-
-/// A Mission Design handler
-pub trait MdHdlr<StateType: Copy>: Send + Sync {
-    fn handle(&mut self, state: &StateType);
-}
-
-pub struct OrbitStateOutput {
-    csv_out: csv::Writer<File>,
-    fmtr: StateFormatter,
-}
-
-impl OrbitStateOutput {
-    pub fn new(fmtr: StateFormatter) -> Result<Self, NyxError> {
-        match csv::Writer::from_path(fmtr.filename.clone()) {
-            Ok(mut wtr) => {
-                wtr.serialize(&fmtr.headers)
-                    .expect("could not write headers");
-                info!("Saving output to {}", fmtr.filename);
-
-                Ok(Self { csv_out: wtr, fmtr })
-            }
-            Err(e) => Err(NyxError::ExportError(e.to_string())),
-        }
-    }
-}
-
-impl MdHdlr<Spacecraft> for OrbitStateOutput {
-    fn handle(&mut self, state: &Spacecraft) {
-        self.csv_out
-            .serialize(self.fmtr.fmt(&state.orbit))
-            .expect("could not format state");
-    }
-}
-
-impl MdHdlr<Orbit> for OrbitStateOutput {
-    fn handle(&mut self, state: &Orbit) {
-        self.csv_out
-            .serialize(self.fmtr.fmt(state))
-            .expect("could not format state");
-    }
-}
 
 #[allow(clippy::result_large_err)]
 #[derive(Clone, PartialEq, Debug)]

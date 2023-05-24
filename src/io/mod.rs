@@ -46,7 +46,6 @@ use crate::cosmic::{Cosm, Frame};
 pub mod cosmo;
 pub mod dynamics;
 pub mod estimate;
-pub mod formatter;
 /// Handles reading from frames defined in input files
 pub mod frame_serde;
 /// Handles loading of gravity models using files of NASA PDS and GMAT COF. Several gunzipped files are provided with nyx.
@@ -56,7 +55,6 @@ pub mod orbit;
 pub mod quantity;
 /// Handles reading random variables
 pub mod rv;
-pub mod scenario;
 pub mod tracking_data;
 pub mod trajectory_data;
 

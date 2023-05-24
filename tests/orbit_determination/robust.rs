@@ -4,7 +4,7 @@ extern crate pretty_env_logger;
 
 use nyx::cosmic::{Bodies, Cosm, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
-use nyx::io::formatter::NavSolutionFormatter;
+// use nyx::io::formatter::NavSolutionFormatter;
 use nyx::io::ExportCfg;
 use nyx::linalg::{Matrix2, Vector2};
 use nyx::md::StateParameter;
@@ -132,7 +132,7 @@ fn od_robust_test_ekf_realistic_one_way() {
     .iter()
     .collect();
 
-    arc.to_parquet_simple(path).unwrap();
+    arc.to_parquet_simple(&path).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be _nearly_ perfect because we've removed Saturn from the estimated trajectory
@@ -174,69 +174,11 @@ fn od_robust_test_ekf_realistic_one_way() {
 
     odp.process_arc::<GroundStation>(&remaining).unwrap();
 
-    let estimate_fmtr = NavSolutionFormatter::default("robustness_test.csv".to_owned(), cosm);
-
-    let mut wtr = csv::Writer::from_path("robustness_test.csv").unwrap();
-    wtr.serialize(&estimate_fmtr.headers)
-        .expect("could not write to output file");
-
-    let mut err_wtr = csv::Writer::from_path("robustness_test_traj_err.csv").unwrap();
-    err_wtr
-        .serialize(vec![
-            "epoch",
-            "x_err_km",
-            "y_err_km",
-            "z_err_km",
-            "vx_err_km_s",
-            "vy_err_km_s",
-            "vz_err_km_s",
-        ])
-        .expect("could not write to output file");
-
-    for est in &odp.estimates {
-        // Format the estimate
-        wtr.serialize(estimate_fmtr.fmt(est))
-            .expect("could not write to CSV");
-        // Add the error data
-        let truth_state = traj.at(est.epoch()).unwrap();
-        let err = truth_state - est.state();
-        err_wtr
-            .serialize(vec![
-                est.epoch().to_string(),
-                format!("{}", err.x_km),
-                format!("{}", err.y_km),
-                format!("{}", err.z_km),
-                format!("{}", err.vx_km_s),
-                format!("{}", err.vy_km_s),
-                format!("{}", err.vz_km_s),
-            ])
-            .expect("could not write to CSV");
-    }
-
-    let mut resid_wtr = csv::Writer::from_path("robustness_test_residuals.csv").unwrap();
-    resid_wtr
-        .serialize(vec![
-            "epoch",
-            "range_prefit",
-            "doppler_prefit",
-            "range_postfit",
-            "doppler_postfit",
-            "residual_ratio",
-        ])
-        .expect("could not write to output file");
-
-    for res in odp.residuals.iter().flatten() {
-        resid_wtr
-            .serialize(vec![
-                res.epoch.to_string(),
-                format!("{}", res.prefit[0]),
-                format!("{}", res.prefit[1]),
-                format!("{}", res.postfit[0]),
-                format!("{}", res.postfit[1]),
-                format!("{}", res.ratio),
-            ])
-            .expect("could not write to CSV");
-    }
+    odp.to_parquet(
+        path.with_file_name("robustness_test_one_way.parquet"),
+        ExportCfg::timestamped(),
+    )
+    .unwrap();
 
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];
