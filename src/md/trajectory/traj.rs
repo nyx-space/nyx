@@ -19,7 +19,6 @@
 use super::traj_it::TrajIterator;
 use super::{ExportCfg, INTERPOLATION_SAMPLES};
 use super::{Interpolatable, TrajError};
-use crate::cosmic::{Cosm, Frame, Orbit, Spacecraft};
 use crate::errors::NyxError;
 use crate::io::watermark::pq_writer;
 use crate::linalg::allocator::Allocator;
@@ -27,10 +26,9 @@ use crate::linalg::DefaultAllocator;
 use crate::md::prelude::{GuidanceMode, StateParameter};
 use crate::md::EventEvaluator;
 use crate::time::{Duration, Epoch, TimeSeries, TimeUnits, Unit};
-use arrow::array::{ArrayRef, Float64Array, StringArray};
+use arrow::array::{Array, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
-use hifitime::prelude::{Format, Formatter};
 use parquet::arrow::ArrowWriter;
 use rayon::prelude::*;
 use std::collections::HashMap;
@@ -40,10 +38,8 @@ use std::fs::File;
 use std::iter::Iterator;
 use std::ops;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use std::sync::mpsc::channel;
 use std::sync::Arc;
-use std::time::Instant;
 
 /// Store a trajectory of any State.
 #[derive(Clone, PartialEq)]
@@ -443,6 +439,12 @@ where
         events: Option<Vec<&dyn EventEvaluator<S>>>,
         cfg: ExportCfg,
     ) -> Result<PathBuf, Box<dyn Error>> {
+        let tick = Epoch::now().unwrap();
+        info!("Exporting trajectory to parquet file...");
+
+        // Grab the path here before we move stuff.
+        let path_buf = cfg.actual_path(path);
+
         // Build the schema
         let mut hdrs = vec![
             Field::new("Epoch:Gregorian UTC", DataType::Utf8, false),
@@ -482,140 +484,62 @@ where
 
         // Build the schema
         let schema = Arc::new(Schema::new(hdrs));
-        let mut record = Vec::new();
+        let mut record: Vec<Arc<dyn Array>> = Vec::new();
 
-        // Build the states iterator
-
-        if cfg.start_epoch.is_some() || cfg.end_epoch.is_some() || cfg.step.is_some() {
-            let start = if let Some(start) = cfg.start_epoch {
-                start
-            } else {
-                self.first().epoch()
-            };
-
-            let end = if let Some(end) = cfg.end_epoch {
-                end
-            } else {
-                self.last().epoch()
-            };
-
-            let step = if let Some(step) = cfg.step {
-                step
-            } else {
-                1.minutes()
-            };
-
-            // Build all of the records
-            let mut data = Vec::new();
-            for s in self.every_between(step, start, end) {
-                data.push(format!("{}", s.epoch()));
-            }
-            record.push(Arc::new(StringArray::from(data)) as ArrayRef);
-
-            // TDB epoch
-            let mut data = Vec::new();
-            for s in self.every_between(step, start, end) {
-                data.push(format!("{:x}", s.epoch()));
-            }
-            record.push(Arc::new(StringArray::from(data)) as ArrayRef);
-
-            // TAI Epoch seconds
-            let mut data = Vec::new();
-            for s in self.every_between(step, start, end) {
-                data.push(s.epoch().to_tai_seconds());
-            }
-            record.push(Arc::new(Float64Array::from(data)) as ArrayRef);
-
-            // Add all of the fields
-            // This is super ugly, but I can't seem to convert the TrajIterator into an `Iter<S>`
-            for field in fields {
-                if field == StateParameter::GuidanceMode {
-                    // This is the only string field
-                    record.push(Arc::new(StringArray::from({
-                        let mut data = Vec::new();
-                        for s in self.every_between(step, start, end) {
-                            let mode = GuidanceMode::from(s.value(field).unwrap());
-
-                            data.push(format!("{mode:?}"));
-                        }
-                        data
-                    })) as ArrayRef);
-                } else {
-                    record.push(Arc::new(Float64Array::from({
-                        let mut data = Vec::new();
-                        for s in self.every_between(step, start, end) {
-                            data.push(s.value(field).unwrap());
-                        }
-                        data
-                    })) as ArrayRef);
-                }
-            }
-            // Add all of the evaluated events
-            if let Some(events) = events {
-                for event in events {
-                    record.push(Arc::new(Float64Array::from({
-                        let mut data = Vec::new();
-                        for s in self.every_between(step, start, end) {
-                            data.push(event.eval(&s));
-                        }
-                        data
-                    })) as ArrayRef);
-                }
-            }
+        // Build the states iterator -- this does require copying the current states but I can't either get a reference or a copy of all the states.
+        let states = if cfg.start_epoch.is_some() || cfg.end_epoch.is_some() || cfg.step.is_some() {
+            // Must interpolate the data!
+            let start = cfg.start_epoch.unwrap_or_else(|| self.first().epoch());
+            let end = cfg.end_epoch.unwrap_or_else(|| self.last().epoch());
+            let step = cfg.step.unwrap_or_else(|| 1.minutes());
+            self.every_between(step, start, end).collect::<Vec<S>>()
         } else {
-            // Build all of the records
-            record.push(Arc::new(StringArray::from(
-                self.states
-                    .iter()
-                    .map(|s| format!("{}", s.epoch()))
-                    .collect::<Vec<String>>(),
-            )) as ArrayRef);
+            self.states.to_vec()
+        };
 
-            // TDB epoch
-            record.push(Arc::new(StringArray::from(
-                self.states
-                    .iter()
-                    .map(|s| format!("{:x}", s.epoch()))
-                    .collect::<Vec<String>>(),
-            )) as ArrayRef);
+        // Build all of the records
 
-            // TDB Epoch seconds
-            record.push(Arc::new(Float64Array::from(
-                self.states
-                    .iter()
-                    .map(|s| s.epoch().to_tai_seconds())
-                    .collect::<Vec<f64>>(),
-            )) as ArrayRef);
+        // Epochs
+        let mut utc_epoch = StringBuilder::new();
+        let mut tai_epoch = StringBuilder::new();
+        let mut tai_s = Float64Builder::new();
+        for s in &states {
+            utc_epoch.append_value(format!("{}", s.epoch()));
+            tai_epoch.append_value(format!("{:x}", s.epoch()));
+            tai_s.append_value(s.epoch().to_tai_seconds());
+        }
+        record.push(Arc::new(utc_epoch.finish()));
+        record.push(Arc::new(tai_epoch.finish()));
+        record.push(Arc::new(tai_s.finish()));
 
-            // Add all of the fields
-            for field in fields {
-                if field == StateParameter::GuidanceMode {
-                    record.push(Arc::new(StringArray::from(
-                        self.states
-                            .iter()
-                            .map(|s| format!("{:?}", GuidanceMode::from(s.value(field).unwrap())))
-                            .collect::<Vec<String>>(),
-                    )) as ArrayRef);
-                } else {
-                    record.push(Arc::new(Float64Array::from(
-                        self.states
-                            .iter()
-                            .map(|s| s.value(field).unwrap())
-                            .collect::<Vec<f64>>(),
-                    )) as ArrayRef);
+        // Add all of the fields
+        for field in fields {
+            if field == StateParameter::GuidanceMode {
+                let mut guid_mode = StringBuilder::new();
+                for s in &states {
+                    guid_mode
+                        .append_value(format!("{:?}", GuidanceMode::from(s.value(field).unwrap())));
                 }
+                record.push(Arc::new(guid_mode.finish()));
+            } else {
+                let mut data = Float64Builder::new();
+                for s in &states {
+                    data.append_value(s.value(field).unwrap());
+                }
+                record.push(Arc::new(data.finish()));
             }
+        }
+        info!("Serialized {} states", states.len());
 
-            // Add all of the evaluated events
-            if let Some(events) = events {
-                for event in events {
-                    record.push(Arc::new(Float64Array::from({
-                        self.states
-                            .iter()
-                            .map(|s| event.eval(s))
-                            .collect::<Vec<f64>>()
-                    })) as ArrayRef);
+        // Add all of the evaluated events
+        if let Some(events) = events {
+            info!("Evaluating {} event(s)", events.len());
+            for event in events {
+                let mut data = Float64Builder::new();
+                for s in &states {
+                    data.append_value(event.eval(s));
                 }
+                record.push(Arc::new(data.finish()));
             }
         }
 
@@ -630,24 +554,6 @@ where
 
         let props = pq_writer(Some(metadata));
 
-        let mut path_buf = path.as_ref().to_path_buf();
-
-        if cfg.timestamp {
-            if let Some(file_name) = path_buf.file_name() {
-                if let Some(file_name_str) = file_name.to_str() {
-                    if let Some(extension) = path_buf.extension() {
-                        let stamp = Formatter::new(
-                            Epoch::now().unwrap(),
-                            Format::from_str("%Y-%m-%dT%H-%M-%S").unwrap(),
-                        );
-                        let new_file_name =
-                            format!("{file_name_str}-{stamp}.{}", extension.to_str().unwrap());
-                        path_buf.set_file_name(new_file_name);
-                    }
-                }
-            }
-        };
-
         let file = File::create(&path_buf)?;
         let mut writer = ArrowWriter::try_new(file, schema.clone(), props).unwrap();
 
@@ -656,8 +562,31 @@ where
         writer.close()?;
 
         // Return the path this was written to
-        info!("Trajectory written to {}", path_buf.display());
+        let tock_time = Epoch::now().unwrap() - tick;
+        info!(
+            "Trajectory written to {} in {tock_time}",
+            path_buf.display()
+        );
         Ok(path_buf)
+    }
+
+    /// Allows resampling this trajectory at a fixed interval instead of using the propagator step size.
+    /// This may lead to aliasing due to the Nyquist–Shannon sampling theorem.
+    pub fn resample(&self, step: Duration) -> Result<Self, NyxError> {
+        if self.states.is_empty() {
+            return Err(NyxError::Trajectory(TrajError::CreationError(
+                "No trajectory to convert".to_string(),
+            )));
+        }
+
+        let mut traj = Self::new();
+        for state in self.every(step) {
+            traj.states.push(state);
+        }
+
+        traj.finalize();
+
+        Ok(traj)
     }
 }
 
@@ -725,125 +654,6 @@ where
 {
     fn add_assign(&mut self, rhs: &Self) {
         *self = self.clone() + rhs;
-    }
-}
-
-impl Traj<Orbit> {
-    /// Allows converting the source trajectory into the (almost) equivalent trajectory in another frame.
-    /// This simply converts each state into the other frame and may lead to aliasing due to the Nyquist–Shannon sampling theorem.
-    #[allow(clippy::map_clone)]
-    pub fn to_frame(&self, new_frame: Frame, cosm: Arc<Cosm>) -> Result<Self, NyxError> {
-        if self.states.is_empty() {
-            return Err(NyxError::Trajectory(TrajError::CreationError(
-                "No trajectory to convert".to_string(),
-            )));
-        }
-        let start_instant = Instant::now();
-        let mut traj = Self::new();
-        for state in &self.states {
-            traj.states.push(cosm.frame_chg(state, new_frame));
-        }
-        traj.finalize();
-
-        info!(
-            "Converted trajectory from {} to {} in {} ms: {traj}",
-            self.first().frame,
-            new_frame,
-            (Instant::now() - start_instant).as_millis()
-        );
-        Ok(traj)
-    }
-
-    /// Exports this trajectory to the provided filename in parquet format with only the epoch, the geodetic latitude, longitude, and height at one state per minute.
-    /// Must provide a body fixed frame to correctly compute the latitude and longitude.
-    #[allow(clippy::identity_op)]
-    pub fn to_groundtrack_parquet<P: AsRef<Path>>(
-        &self,
-        path: P,
-        body_fixed_frame: Frame,
-        events: Option<Vec<&dyn EventEvaluator<Orbit>>>,
-        metadata: Option<HashMap<String, String>>,
-        cosm: Arc<Cosm>,
-    ) -> Result<PathBuf, Box<dyn Error>> {
-        let traj = self.to_frame(body_fixed_frame, cosm)?;
-
-        let mut cfg = ExportCfg::default();
-        cfg.append_field(StateParameter::GeodeticLatitude);
-        cfg.append_field(StateParameter::GeodeticLongitude);
-        cfg.append_field(StateParameter::GeodeticHeight);
-        cfg.append_field(StateParameter::Rmag);
-        cfg.set_step(1.minutes());
-        cfg.metadata = metadata;
-
-        traj.to_parquet(path, events, cfg)
-    }
-}
-
-impl Traj<Spacecraft> {
-    /// Allows converting the source trajectory into the (almost) equivalent trajectory in another frame
-    #[allow(clippy::map_clone)]
-    pub fn to_frame(&self, new_frame: Frame, cosm: Arc<Cosm>) -> Result<Self, NyxError> {
-        if self.states.is_empty() {
-            return Err(NyxError::Trajectory(TrajError::CreationError(
-                "No trajectory to convert".to_string(),
-            )));
-        }
-        let start_instant = Instant::now();
-        let mut traj = Self::new();
-        for state in &self.states {
-            traj.states
-                .push(state.with_orbit(cosm.frame_chg(&state.orbit, new_frame)));
-        }
-        traj.finalize();
-
-        info!(
-            "Converted trajectory from {} to {} in {} ms: {traj}",
-            self.first().orbit.frame,
-            new_frame,
-            (Instant::now() - start_instant).as_millis()
-        );
-        Ok(traj)
-    }
-
-    /// A shortcut to `to_parquet_with_csv`
-    pub fn to_parquet_with_step<P: AsRef<Path>>(
-        &self,
-        path: P,
-        step: Duration,
-    ) -> Result<(), Box<dyn Error>> {
-        self.to_parquet_with_cfg(
-            path,
-            ExportCfg {
-                step: Some(step),
-                ..Default::default()
-            },
-        )?;
-
-        Ok(())
-    }
-
-    /// Exports this trajectory to the provided filename in parquet format with only the epoch, the geodetic latitude, longitude, and height at one state per minute.
-    /// Must provide a body fixed frame to correctly compute the latitude and longitude.
-    #[allow(clippy::identity_op)]
-    pub fn to_groundtrack_parquet<P: AsRef<Path>>(
-        &self,
-        path: P,
-        body_fixed_frame: Frame,
-        events: Option<Vec<&dyn EventEvaluator<Spacecraft>>>,
-        metadata: Option<HashMap<String, String>>,
-        cosm: Arc<Cosm>,
-    ) -> Result<PathBuf, Box<dyn Error>> {
-        let traj = self.to_frame(body_fixed_frame, cosm)?;
-
-        let mut cfg = ExportCfg::default();
-        cfg.append_field(StateParameter::GeodeticLatitude);
-        cfg.append_field(StateParameter::GeodeticLongitude);
-        cfg.append_field(StateParameter::GeodeticHeight);
-        cfg.append_field(StateParameter::Rmag);
-        cfg.set_step(1.minutes());
-        cfg.metadata = metadata;
-
-        traj.to_parquet(path, events, cfg)
     }
 }
 

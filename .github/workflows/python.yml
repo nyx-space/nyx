@@ -63,6 +63,11 @@ jobs:
             set -e
             pip3 install nyx_space --find-links dist --force-reinstall
             pytest
+      - name: Upload python tests HTMLs
+        uses: actions/upload-artifact@v3
+        with:
+          name: od-plots
+          path: output_data/*.html
 
   windows:
     runs-on: windows-latest

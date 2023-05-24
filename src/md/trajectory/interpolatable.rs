@@ -47,6 +47,9 @@ where
 
     /// List of state parameters that will be exported to a trajectory file in addition to the epoch (provided in this different formats).
     fn export_params() -> Vec<StateParameter>;
+
+    /// Returns the orbit
+    fn orbit(&self) -> &Orbit;
 }
 
 impl Interpolatable for Orbit {
@@ -150,6 +153,10 @@ impl Interpolatable for Orbit {
         ]
         .concat()
     }
+
+    fn orbit(&self) -> &Orbit {
+        self
+    }
 }
 
 impl Interpolatable for Spacecraft {
@@ -221,5 +228,9 @@ impl Interpolatable for Spacecraft {
             sc_params,
         ]
         .concat()
+    }
+
+    fn orbit(&self) -> &Orbit {
+        &self.orbit
     }
 }

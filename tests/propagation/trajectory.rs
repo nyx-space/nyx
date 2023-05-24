@@ -2,12 +2,12 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
 use hifitime::TimeUnits;
+use nyx::cosmic::eclipse::EclipseLocator;
 use nyx::cosmic::{Cosm, GuidanceMode, Orbit, Spacecraft};
 use nyx::dynamics::guidance::{GuidanceLaw, Ruggiero, Thruster};
 use nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
 use nyx::io::trajectory_data::DynamicTrajectory;
-use nyx::md::prelude::Objective;
-use nyx::md::trajectory::Interpolatable;
+use nyx::md::prelude::{ExportCfg, Interpolatable, Objective};
 use nyx::md::StateParameter;
 use nyx::propagators::*;
 use nyx::time::{Epoch, TimeSeries, Unit};
@@ -120,11 +120,19 @@ fn traj_ephem_forward() {
     .iter()
     .collect();
 
-    ephem.to_parquet_simple(&path).unwrap();
+    let exported_path = ephem
+        .to_parquet(
+            path,
+            Some(vec![
+                &EclipseLocator::cislunar(cosm.clone()).to_penumbra_event()
+            ]),
+            ExportCfg::timestamped(),
+        )
+        .unwrap();
 
     // Reload this trajectory and make sure that it matches
 
-    let dyn_traj = DynamicTrajectory::from_parquet(path).unwrap();
+    let dyn_traj = DynamicTrajectory::from_parquet(exported_path).unwrap();
     let concrete_traj = dyn_traj.to_traj::<Orbit>().unwrap();
 
     if ephem != concrete_traj {

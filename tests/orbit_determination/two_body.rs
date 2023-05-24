@@ -1,13 +1,11 @@
-extern crate csv;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
 use nyx::cosmic::{Cosm, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::sph_harmonics::Harmonics;
-use nyx::io::formatter::NavSolutionFormatter;
-use nyx::io::gravity::*;
 use nyx::io::ConfigRepr;
+use nyx::io::{gravity::*, ExportCfg};
 use nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
 use nyx::od::noise::GaussMarkov;
 use nyx::od::prelude::*;
@@ -358,7 +356,6 @@ fn od_tb_val_ckf_fixed_step_perfect_stations() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
-    use std::io;
 
     let cosm = Cosm::de438();
     let iau_earth = cosm.frame("IAU Earth");
@@ -454,12 +451,12 @@ fn od_tb_val_ckf_fixed_step_perfect_stations() {
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
-    // Initialize the formatter
-    let estimate_fmtr = NavSolutionFormatter::default("tb_ckf.csv".to_owned(), cosm);
+    let path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "output_data", "tb_ckf.parquet"]
+        .iter()
+        .collect();
 
-    let mut wtr = csv::Writer::from_writer(io::stdout());
-    wtr.serialize(&estimate_fmtr.headers)
-        .expect("could not write to stdout");
+    odp.to_parquet(path, ExportCfg::default()).unwrap();
+
     // Check that we have as many estimates as steps taken by the propagator.
     // Note that this test cannot work when using a variable step propagator in that same setup.
     // We're adding +1 because the propagation time is inclusive on both ends.
@@ -483,7 +480,6 @@ fn od_tb_val_ckf_fixed_step_perfect_stations() {
         "Different number of estimates received"
     );
 
-    let mut printed = false;
     for (no, est) in odp.estimates.iter().enumerate() {
         if no == 0 {
             // Skip the first estimate which is the initial estimate provided by user
@@ -504,16 +500,9 @@ fn od_tb_val_ckf_fixed_step_perfect_stations() {
             "estimate error should be zero (perfect dynamics) ({:e})",
             est.state_deviation().norm()
         );
-
-        if !printed {
-            // Format the estimate
-            wtr.serialize(estimate_fmtr.fmt(est))
-                .expect("could not write to stdout");
-            printed = true;
-        }
     }
 
-    for res in &odp.residuals {
+    for res in odp.residuals.iter().flatten() {
         assert!(
             res.postfit.norm() < 1e-12,
             "postfit should be zero (perfect dynamics) ({:e})",
@@ -871,9 +860,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
-    let mut wtr = csv::Writer::from_path("./estimation.csv").unwrap();
-
-    // Let's export these to a CSV file, and also check that the covariance never falls below our sigma squared values
+    // Let's check that the covariance never falls below our sigma squared values
     for (no, est) in odp.estimates.iter().enumerate() {
         if no == 1 {
             println!("{}", est);
@@ -901,8 +888,6 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
                 est.covar[(i, i)]
             );
         }
-
-        wtr.serialize(*est).expect("could not write to stdout");
     }
 
     // Check the final estimate
@@ -929,7 +914,7 @@ fn od_tb_ckf_map_covar() {
     let cosm = Cosm::de438();
 
     // Define the propagator information.
-    let prop_time = 2 * Unit::Day;
+    let duration = 2 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
 
     // Define state information.
@@ -971,7 +956,7 @@ fn od_tb_ckf_map_covar() {
         KF<Orbit, nalgebra::Const<3>, nalgebra::Const<2>>,
     > = ODProcess::ckf(prop_est, ckf, None, cosm);
 
-    odp.map_covar(dt + prop_time).unwrap();
+    odp.predict_for(30.seconds(), duration).unwrap();
 
     // Check that the covariance inflated (we don't get the norm of the estimate because it's zero without any truth data)
     let estimates = odp.estimates;
@@ -1101,9 +1086,8 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect() {
     let mut odp = ODProcess::ckf(prop_est, ckf, None, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
-    let mut wtr = csv::Writer::from_path("./estimation.csv").unwrap();
 
-    // Let's export these to a CSV file, and also check that the covariance never falls below our sigma squared values
+    // Let's check that the covariance never falls below our sigma squared values
     for (no, est) in odp.estimates.iter().enumerate() {
         if no == 1 {
             println!("{}", est);
@@ -1121,8 +1105,6 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect() {
             "estimate error should be good (perfect dynamics) ({:e})",
             est.state_deviation().norm()
         );
-
-        wtr.serialize(*est).expect("could not write to stdout");
     }
 
     // Check the final estimate
@@ -1255,9 +1237,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
-    let mut wtr = csv::Writer::from_path("./estimation.csv").unwrap();
-
-    // Let's export these to a CSV file, and also check that the covariance never falls below our sigma squared values
+    // Let's check that the covariance never falls below our sigma squared values
     for (no, est) in odp.estimates.iter().enumerate() {
         if no == 1 {
             println!("{}", est);
@@ -1276,8 +1256,6 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
                 i
             );
         }
-
-        wtr.serialize(*est).expect("could not write to stdout");
     }
 
     // Check the final estimate

@@ -1,4 +1,3 @@
-extern crate csv;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 

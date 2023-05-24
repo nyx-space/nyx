@@ -19,14 +19,10 @@
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName};
 use crate::md::trajectory::{Interpolatable, Traj};
-
 pub use crate::od::estimate::*;
 pub use crate::od::ground_station::*;
-pub use crate::od::kalman::*;
-pub use crate::od::residual::*;
 pub use crate::od::snc::*;
 pub use crate::od::*;
-
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::propagators::PropInstance;
 pub use crate::time::{Duration, Unit};
@@ -34,15 +30,14 @@ use crate::State;
 mod conf;
 pub use conf::{IterationConf, SmoothingArc};
 mod trigger;
-pub use trigger::{CkfTrigger, EkfTrigger, KfTrigger};
+pub use trigger::EkfTrigger;
 mod rejectcrit;
-
+use self::msr::arc::TrackingArc;
+pub use self::rejectcrit::FltResid;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::Add;
-
-use self::msr::arc::TrackingArc;
-pub use self::rejectcrit::FltResid;
+mod export;
 
 /// An orbit determination process. Note that everything passed to this structure is moved.
 #[allow(clippy::upper_case_acronyms)]
@@ -84,7 +79,7 @@ pub struct ODProcess<
     /// Vector of estimates available after a pass
     pub estimates: Vec<K::Estimate>,
     /// Vector of residuals available after a pass
-    pub residuals: Vec<Residual<Msr::MeasurementSize>>,
+    pub residuals: Vec<Option<Residual<Msr::MeasurementSize>>>,
     pub ekf_trigger: Option<EkfTrigger>,
     /// Residual rejection criteria allows preventing bad measurements from affecting the estimation.
     pub resid_crit: Option<FltResid>,
@@ -128,6 +123,29 @@ where
         + Allocator<f64, <S as State>::Size, A>
         + Allocator<f64, A, <S as State>::Size>,
 {
+    /// Initialize a new orbit determination process with an optional trigger to switch from a CKF to an EKF.
+    pub fn new(
+        prop: PropInstance<'a, D, E>,
+        kf: K,
+        ekf_trigger: Option<EkfTrigger>,
+        resid_crit: Option<FltResid>,
+        cosm: Arc<Cosm>,
+    ) -> Self {
+        let init_state = prop.state;
+        Self {
+            prop,
+            kf,
+            estimates: Vec::with_capacity(10_000),
+            residuals: Vec::with_capacity(10_000),
+            ekf_trigger,
+            resid_crit,
+            cosm,
+            init_state,
+            _marker: PhantomData::<A>,
+        }
+    }
+
+    /// Initialize a new orbit determination process with an Extended Kalman filter. The switch from a classical KF to an EKF is based on the provided trigger.
     pub fn ekf(
         prop: PropInstance<'a, D, E>,
         kf: K,
@@ -250,49 +268,27 @@ where
         Ok(smoothed)
     }
 
-    /// Returns the root mean square of the prefit residuals
-    ///
-    /// # WARNING:
-    /// The units will be garbage here if rows in the measurements have different units.
-    pub fn rms_prefit_residual(&self) -> f64 {
-        let mut sum = 0.0;
-        for residual in &self.residuals {
-            sum += residual.prefit.dot(&residual.prefit);
-        }
-        (sum / (self.residuals.len() as f64)).sqrt()
-    }
-
-    /// Returns the root mean square of the postfit residuals
-    ///
-    /// # WARNING:
-    /// The units will be garbage here if rows in the measurements have different units.
-    pub fn rms_postfit_residual(&self) -> f64 {
-        let mut sum = 0.0;
-        for residual in &self.residuals {
-            sum += residual.postfit.dot(&residual.postfit);
-        }
-        (sum / (self.residuals.len() as f64)).sqrt()
-    }
-
     /// Returns the root mean square of the prefit residual ratios
     pub fn rms_residual_ratios(&self) -> f64 {
         let mut sum = 0.0;
-        for residual in &self.residuals {
+        for residual in self.residuals.iter().flatten() {
             sum += residual.ratio.powi(2);
         }
         (sum / (self.residuals.len() as f64)).sqrt()
     }
 
     /// Allows iterating on the filter solution. Requires specifying a smoothing condition to know where to stop the smoothing.
-    pub fn iterate_arc<Dev>(
+    pub fn iterate<Dev>(
         &mut self,
-        arc: &TrackingArc<Msr>,
+        measurements: &[(String, Msr)],
+        devices: &mut HashMap<String, Dev>,
+        step_size: Duration,
         config: IterationConf,
     ) -> Result<(), NyxError>
     where
         Dev: TrackingDeviceSim<S, Msr>,
     {
-        let measurements = &arc.measurements;
+        // TODO(now): Add ExportCfg to iterate and to process so the data can be exported as we process it. Consider a thread writing with channel for faster serialization.
 
         let mut best_rms = self.rms_residual_ratios();
         let mut previous_rms = best_rms;
@@ -308,11 +304,12 @@ where
                     "Filter converged to absolute tolerance ({:.2e} < {:.2e}) after {} iterations",
                     best_rms, config.absolute_tol, iter_cnt
                 );
-                return Ok(());
+                break;
             }
 
             iter_cnt += 1;
 
+            // Prevent infinite loop when iterating prior to turning on the EKF.
             if let Some(trigger) = &mut self.ekf_trigger {
                 trigger.reset();
             }
@@ -326,11 +323,12 @@ where
             // Reset the propagator
             self.prop.state = self.init_state;
             // Empty the estimates and add the first smoothed estimate as the initial estimate
-            self.estimates = Vec::with_capacity(measurements.len());
-            // self.estimates.push(smoothed[0].clone());
+            self.estimates = Vec::with_capacity(measurements.len().max(self.estimates.len()));
+            self.residuals = Vec::with_capacity(measurements.len().max(self.estimates.len()));
+
             self.kf.set_previous_estimate(&smoothed[0]);
             // And re-run the filter
-            self.process_arc::<Dev>(arc)?;
+            self.process::<Dev>(measurements, devices, step_size)?;
 
             // Compute the new RMS
             let new_rms = self.rms_residual_ratios();
@@ -347,7 +345,8 @@ where
                     "Filter converged to relative tolerance ({:.2e} < {:.2e}) after {} iterations",
                     cur_rel_rms, config.relative_tol, iter_cnt
                 );
-                return Ok(());
+
+                break;
             }
 
             if new_rms > previous_rms {
@@ -366,7 +365,7 @@ where
                         return Err(NyxError::MaxIterReached(msg));
                     } else {
                         error!("{}", msg);
-                        return Ok(());
+                        break;
                     }
                 } else {
                     warn!("Filter iteration caused divergence {} of {} acceptable subsequent divergences", divergence_cnt, config.max_divergences);
@@ -393,10 +392,29 @@ where
                     return Err(NyxError::MaxIterReached(msg));
                 } else {
                     error!("{}", msg);
-                    return Ok(());
+                    break;
                 }
             }
         }
+
+        Ok(())
+    }
+
+    /// Allows iterating on the filter solution. Requires specifying a smoothing condition to know where to stop the smoothing.
+    pub fn iterate_arc<Dev>(
+        &mut self,
+        arc: &TrackingArc<Msr>,
+        config: IterationConf,
+    ) -> Result<(), NyxError>
+    where
+        Dev: TrackingDeviceSim<S, Msr>,
+    {
+        let mut devices = arc.rebuild_devices::<S, Dev>(self.cosm.clone()).unwrap();
+
+        let measurements = &arc.measurements;
+        let step_size = arc.min_duration_sep().unwrap();
+
+        self.iterate(measurements, &mut devices, step_size, config)
     }
 
     /// Process the provided tracking arc for this orbit determination process.
@@ -517,16 +535,10 @@ where
 
                                 self.kf.update_h_tilde(h_tilde);
 
-                                let resid_ratio_check = match self.resid_crit {
-                                    None => None,
-                                    Some(flt) => {
-                                        if msr_accepted_cnt < flt.min_accepted {
-                                            None
-                                        } else {
-                                            Some(flt.num_sigmas)
-                                        }
-                                    }
-                                };
+                                let resid_ratio_check = self
+                                    .resid_crit
+                                    .filter(|flt| msr_accepted_cnt >= flt.min_accepted)
+                                    .map(|flt| flt.num_sigmas);
 
                                 match self.kf.measurement_update(
                                     nominal_state,
@@ -566,7 +578,7 @@ where
                                         self.prop.state.reset_stm();
 
                                         self.estimates.push(estimate);
-                                        self.residuals.push(residual);
+                                        self.residuals.push(Some(residual));
                                     }
                                     Err(e) => return Err(e),
                                 }
@@ -597,6 +609,8 @@ where
                             // State deviation is always zero for an EKF time update
                             // therefore we don't do anything different for an extended filter
                             self.estimates.push(est);
+                            // We push None so that the residuals and estimates are aligned
+                            self.residuals.push(None);
                         }
                         Err(e) => return Err(e),
                     }
@@ -616,10 +630,11 @@ where
         Ok(())
     }
 
-    /// Allows for covariance mapping without processing measurements
-    pub fn map_covar(&mut self, end_epoch: Epoch) -> Result<(), NyxError> {
+    /// Continuously predicts the trajectory until the provided end epoch, with covariance mapping at each step. In other words, this performs a time update.
+    pub fn predict_until(&mut self, max_step: Duration, end_epoch: Epoch) -> Result<(), NyxError> {
         let prop_time = end_epoch - self.kf.previous_estimate().epoch();
         info!("Propagating for {prop_time} seconds and mapping covariance",);
+        self.prop.set_step(max_step, false);
 
         loop {
             let mut epoch = self.prop.state.epoch();
@@ -642,6 +657,7 @@ where
                     // State deviation is always zero for an EKF time update
                     // therefore we don't do anything different for an extended filter
                     self.estimates.push(est);
+                    self.residuals.push(None);
                 }
                 Err(e) => return Err(e),
             }
@@ -654,7 +670,14 @@ where
         Ok(())
     }
 
-    /// Builds the navigation trajectory for the estimated state only (no covariance until https://gitlab.com/nyx-space/nyx/-/issues/199!)
+    /// Continuously predicts the trajectory for the provided duration, with covariance mapping at each step. In other words, this performs a time update.
+    pub fn predict_for(&mut self, max_step: Duration, duration: Duration) -> Result<(), NyxError> {
+        let end_epoch = self.kf.previous_estimate().epoch() + duration;
+
+        self.predict_until(max_step, end_epoch)
+    }
+
+    /// Builds the navigation trajectory for the estimated state only
     pub fn to_traj(&self) -> Result<Traj<S>, NyxError>
     where
         DefaultAllocator: Allocator<f64, <S as State>::VecLength>,

@@ -1,11 +1,9 @@
-extern crate csv;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
 use nyx::cosmic::{Bodies, Cosm, Orbit, Spacecraft};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::spacecraft::{SolarPressure, SpacecraftDynamics};
-use nyx::io::formatter::NavSolutionFormatter;
 use nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
 use nyx::md::trajectory::ExportCfg;
 use nyx::md::{Event, StateParameter};
@@ -141,7 +139,7 @@ fn od_val_sc_mb_srp_reals_duals_models() {
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
-    arc.to_parquet(path.with_file_name("sc_msr_arc.parquet"), None, false)
+    arc.to_parquet_simple(path.with_file_name("sc_msr_arc.parquet"))
         .unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
@@ -175,12 +173,12 @@ fn od_val_sc_mb_srp_reals_duals_models() {
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
-    // Initialize the formatter
-    let estimate_fmtr = NavSolutionFormatter::default("sc_ckf.csv".to_owned(), cosm);
+    odp.to_parquet(
+        path.with_file_name("spacecraft_od_results.parquet"),
+        ExportCfg::timestamped(),
+    )
+    .unwrap();
 
-    let mut wtr = csv::Writer::from_path("sc_ckf.csv").unwrap();
-    wtr.serialize(&estimate_fmtr.headers)
-        .expect("could not write to stdout");
     for (no, est) in odp.estimates.iter().enumerate() {
         if no == 0 {
             // Skip the first estimate which is the initial estimate provided by user
@@ -199,13 +197,9 @@ fn od_val_sc_mb_srp_reals_duals_models() {
             "estimate error should be zero (perfect dynamics) ({:e})",
             est.state_deviation().norm()
         );
-
-        // Format the estimate
-        wtr.serialize(estimate_fmtr.fmt(est))
-            .expect("could not write to CSV");
     }
 
-    for res in &odp.residuals {
+    for res in odp.residuals.iter().flatten() {
         assert!(
             res.postfit.norm() < 1e-5,
             "postfit should be zero (perfect dynamics) ({:e})",

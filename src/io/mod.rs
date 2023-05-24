@@ -17,9 +17,11 @@
 */
 
 use crate::errors::NyxError;
+use crate::md::StateParameter;
 use crate::time::Epoch;
 use crate::Orbit;
 pub(crate) mod watermark;
+use hifitime::prelude::{Format, Formatter};
 use hifitime::Duration;
 use serde::de::DeserializeOwned;
 use serde::ser::SerializeSeq;
@@ -28,12 +30,11 @@ use serde::{Serialize, Serializer};
 use serde_yaml::Error as YamlError;
 use std::collections::HashMap;
 use std::convert::From;
-use std::fmt;
 use std::fmt::Debug;
 use std::fs::File;
 use std::io::BufReader;
 use std::io::Error as IoError;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -44,22 +45,122 @@ use crate::cosmic::{Cosm, Frame};
 pub mod cosmo;
 pub mod dynamics;
 pub mod estimate;
-pub mod formatter;
 /// Handles reading from frames defined in input files
 pub mod frame_serde;
 /// Handles loading of gravity models using files of NASA PDS and GMAT COF. Several gunzipped files are provided with nyx.
 pub mod gravity;
 pub mod matrices;
 pub mod orbit;
-pub mod quantity;
-/// Handles reading random variables
-pub mod rv;
-pub mod scenario;
 pub mod tracking_data;
 pub mod trajectory_data;
 
 use std::io;
 use thiserror::Error;
+
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
+/// Configuration for exporting a trajectory to parquet.
+#[derive(Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(
+    feature = "python",
+    pyo3(
+        text_signature = "(timestamp=None, fields=None, start_epoch=None, step=None, end_epoch=None, metadata=None)"
+    )
+)]
+pub struct ExportCfg {
+    /// Fields to export, if unset, defaults to all possible fields.
+    pub fields: Option<Vec<StateParameter>>,
+    /// Start epoch to export, defaults to the start of the trajectory
+    pub start_epoch: Option<Epoch>,
+    /// End epoch to export, defaults to the end of the trajectory
+    pub end_epoch: Option<Epoch>,
+    /// An optional step, defaults to every state in the trajectory (which likely isn't equidistant)
+    pub step: Option<Duration>,
+    /// Additional metadata to store in the Parquet metadata
+    pub metadata: Option<HashMap<String, String>>,
+    /// Set to true to append the timestamp to the filename
+    pub timestamp: bool,
+}
+
+impl ExportCfg {
+    /// Initialize a new configuration with the given metadata entries.
+    pub fn from_metadata(metadata: Vec<(String, String)>) -> Self {
+        let mut me = ExportCfg {
+            metadata: Some(HashMap::new()),
+            ..Default::default()
+        };
+        for (k, v) in metadata {
+            me.metadata.as_mut().unwrap().insert(k, v);
+        }
+        me
+    }
+
+    /// Initialize a new default configuration but timestamp the filename.
+    pub fn timestamped() -> Self {
+        Self {
+            timestamp: true,
+            ..Default::default()
+        }
+    }
+
+    pub fn append_field(&mut self, field: StateParameter) {
+        if let Some(fields) = self.fields.as_mut() {
+            fields.push(field);
+        } else {
+            self.fields = Some(vec![field]);
+        }
+    }
+
+    pub fn set_step(&mut self, step: Duration) {
+        self.step = Some(step);
+    }
+
+    /// Modifies the provided path to include the timestamp if required.
+    pub(crate) fn actual_path<P: AsRef<Path>>(&self, path: P) -> PathBuf {
+        let mut path_buf = path.as_ref().to_path_buf();
+        if self.timestamp {
+            if let Some(file_name) = path_buf.file_name() {
+                if let Some(file_name_str) = file_name.to_str() {
+                    if let Some(extension) = path_buf.extension() {
+                        let stamp = Formatter::new(
+                            Epoch::now().unwrap(),
+                            Format::from_str("%Y-%m-%dT%H-%M-%S").unwrap(),
+                        );
+                        let ext = extension.to_str().unwrap();
+                        let file_name = file_name_str.replace(&format!(".{ext}"), "");
+                        let new_file_name = format!("{file_name}-{stamp}.{}", ext);
+                        path_buf.set_file_name(new_file_name);
+                    }
+                }
+            }
+        };
+        path_buf
+    }
+}
+
+#[cfg(feature = "python")]
+#[pymethods]
+impl ExportCfg {
+    #[new]
+    fn py_new(
+        timestamp: Option<bool>,
+        fields: Option<Vec<StateParameter>>,
+        start_epoch: Option<Epoch>,
+        end_epoch: Option<Epoch>,
+        metadata: Option<HashMap<String, String>>,
+    ) -> Self {
+        Self {
+            timestamp: timestamp.unwrap_or(false),
+            fields,
+            start_epoch,
+            end_epoch,
+            metadata,
+            ..Default::default()
+        }
+    }
+}
 
 #[derive(Error, Debug)]
 pub enum ConfigError {
@@ -233,8 +334,6 @@ pub enum ParsingError {
     OD(String),
     UseOdInstead,
     UseMdInstead,
-    EpochFormat,
-    CovarFormat,
     FileNotFound(String),
     FileNotUTF8(String),
     SequenceNotFound(String),
@@ -253,116 +352,5 @@ pub enum ParsingError {
 impl From<NyxError> for ParsingError {
     fn from(error: NyxError) -> Self {
         Self::ExecutionError(error)
-    }
-}
-
-/// Specifies the format of the Epoch during serialization
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum EpochFormat {
-    /// Default is GregorianUtc, as defined in [hifitime](https://docs.rs/hifitime/).
-    GregorianUtc,
-    GregorianTai,
-    MjdTai,
-    MjdTt,
-    MjdUtc,
-    JdeEt,
-    JdeTai,
-    JdeTt,
-    JdeUtc,
-    /// Seconds past a provided TAI Epoch
-    TaiSecs(f64),
-    /// Days past a provided TAI Epoch
-    TaiDays(f64),
-}
-
-impl EpochFormat {
-    pub fn format(&self, dt: Epoch) -> String {
-        match *self {
-            EpochFormat::GregorianUtc => format!("{dt}"),
-            EpochFormat::GregorianTai => format!("{dt:x}",),
-            EpochFormat::MjdTai => format!("{:.9}", dt.to_mjd_tai_days()),
-            EpochFormat::MjdTt => format!("{:.9}", dt.to_mjd_tt_days()),
-            EpochFormat::MjdUtc => format!("{:.9}", dt.to_mjd_utc_days()),
-            EpochFormat::JdeEt => format!("{:.9}", dt.to_jde_et_days()),
-            EpochFormat::JdeTai => format!("{:.9}", dt.to_jde_tai_days()),
-            EpochFormat::JdeTt => format!("{:.9}", dt.to_jde_tt_days()),
-            EpochFormat::JdeUtc => format!("{:.9}", dt.to_jde_utc_days()),
-            EpochFormat::TaiSecs(e) => format!("{:.9}", dt.to_tai_seconds() - e),
-            EpochFormat::TaiDays(e) => format!("{:.9}", dt.to_tai_days() - e),
-        }
-    }
-}
-
-impl fmt::Display for EpochFormat {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            EpochFormat::GregorianUtc => write!(f, "Gregorian UTC"),
-            EpochFormat::GregorianTai => write!(f, "Gregorian TAI"),
-            EpochFormat::MjdTai => write!(f, "MJD TAI"),
-            EpochFormat::MjdTt => write!(f, "MJD TT"),
-            EpochFormat::MjdUtc => write!(f, "MJD UTC"),
-            EpochFormat::JdeEt => write!(f, "JDE ET"),
-            EpochFormat::JdeTai => write!(f, "JDE TAI"),
-            EpochFormat::JdeTt => write!(f, "JDE TT"),
-            EpochFormat::JdeUtc => write!(f, "JDE UTC"),
-            EpochFormat::TaiSecs(_) => write!(f, "TAI+ s"),
-            EpochFormat::TaiDays(_) => write!(f, "TAI+ days"),
-        }
-    }
-}
-
-impl FromStr for EpochFormat {
-    type Err = ParsingError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().replace(' ', "").as_str() {
-            "gregorianutc" => Ok(EpochFormat::GregorianUtc),
-            "gregoriantai" => Ok(EpochFormat::GregorianTai),
-            "mjdtai" => Ok(EpochFormat::MjdTai),
-            "mjdtt" => Ok(EpochFormat::MjdTt),
-            "mjdutc" => Ok(EpochFormat::MjdUtc),
-            "jdeet" => Ok(EpochFormat::JdeEt),
-            "jdetai" => Ok(EpochFormat::JdeTai),
-            "jdett" => Ok(EpochFormat::JdeTt),
-            "jdeutc" => Ok(EpochFormat::JdeUtc),
-            _ => Err(ParsingError::EpochFormat),
-        }
-    }
-}
-
-/// Specifies the format of the covariance during serialization
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum CovarFormat {
-    /// Default: allows plotting the variance of the elements instead of the covariance
-    Sqrt,
-    /// Keeps the covariance as computed, i.e. one sigma (~68%), causes e.g. positional elements in km^2.
-    Sigma1,
-    /// Three sigma covers about 99.7% of the distribution
-    Sigma3,
-    /// Allows specifying a custom multiplication factor of each element of the covariance.
-    MulSigma(f64),
-}
-
-impl fmt::Display for CovarFormat {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            CovarFormat::Sqrt => write!(f, "exptd_val_"),
-            CovarFormat::Sigma1 => write!(f, "covar_"),
-            CovarFormat::Sigma3 => write!(f, "3sig_covar"),
-            CovarFormat::MulSigma(x) => write!(f, "{x}sig_covar"),
-        }
-    }
-}
-
-impl FromStr for CovarFormat {
-    type Err = ParsingError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().replace(' ', "").as_str() {
-            "sqrt" => Ok(CovarFormat::Sqrt),
-            "1sigma" | "sigma1" => Ok(CovarFormat::Sigma1),
-            "3sigma" | "sigma3" => Ok(CovarFormat::Sigma3),
-            _ => Err(ParsingError::CovarFormat),
-        }
     }
 }

@@ -1,4 +1,3 @@
-extern crate csv;
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
@@ -38,14 +37,6 @@ fn empty_estimate() {
         "expected STM norm to be sqrt(dim(STM))"
     );
     assert!(empty.predicted, "expected predicted to be true");
-}
-
-#[test]
-fn csv_serialize_empty_estimate() {
-    use std::io;
-    let empty = KfEstimate::zeros(Orbit::zeros());
-    let mut wtr = csv::Writer::from_writer(io::stdout());
-    wtr.serialize(empty).expect("could not write to stdout");
 }
 
 #[test]

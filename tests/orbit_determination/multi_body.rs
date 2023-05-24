@@ -18,7 +18,6 @@ fn od_val_multi_body_ckf_perfect_stations() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
-    use std::io;
 
     let cosm = Cosm::de438();
 
@@ -113,8 +112,6 @@ fn od_val_multi_body_ckf_perfect_stations() {
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
-    let mut wtr = csv::Writer::from_writer(io::stdout());
-    let mut printed = false;
     let mut last_est = None;
     for (no, est) in odp.estimates.iter().enumerate() {
         if no == 0 {
@@ -136,15 +133,10 @@ fn od_val_multi_body_ckf_perfect_stations() {
             est.state_deviation().norm()
         );
 
-        if !printed {
-            wtr.serialize(*est).expect("could not write to stdout");
-            printed = true;
-        }
-
         last_est = Some(est);
     }
 
-    for res in &odp.residuals {
+    for res in odp.residuals.iter().flatten() {
         assert!(
             res.postfit.norm() < 2e-16,
             "postfit should be zero (perfect dynamics) ({:e})",
@@ -174,7 +166,6 @@ fn multi_body_ckf_covar_map() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
-    use std::io;
 
     let cosm = Cosm::de438();
 
@@ -271,7 +262,7 @@ fn multi_body_ckf_covar_map() {
     }
 
     // Note that we check the residuals separately from the estimates because we have many predicted estimates which do not have any associated residuals.
-    for res in odp.residuals.iter() {
+    for res in odp.residuals.iter().flatten() {
         assert!(
             res.postfit.norm() < 2e-16,
             "postfit should be zero (perfect dynamics) ({:e})",
@@ -282,9 +273,6 @@ fn multi_body_ckf_covar_map() {
     assert!(num_pred > 0, "no predicted estimates");
 
     let est = odp.estimates.last().unwrap();
-
-    let mut wtr = csv::Writer::from_writer(io::stdout());
-    wtr.serialize(*est).expect("could not write to stdout");
 
     println!("{:.2e}", est.state_deviation().norm());
     println!("{:.2e}", est.covar.norm());
