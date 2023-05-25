@@ -37,7 +37,7 @@ use super::{estimate::OrbitEstimate, GroundStation};
 /// You must also provide an export path and optionally and export configuration to export the results to a Parquet file.
 #[pyfunction]
 #[pyo3(
-    text_signature = "(dynamics, spacecraft, initial_estimate, measurement_noise, arc, export_path, export_cfg, ekf_num_meas=None, ekf_disable_time=None, resid_crit=None, predict_until=None, predict_for=None, predict_step=None)"
+    text_signature = "(dynamics, spacecraft, initial_estimate, measurement_noise, arc, export_path, export_cfg, ekf_num_meas=None, ekf_disable_time=None, resid_crit=None, predict_until=None, predict_for=None, predict_step=None, fixed_step=False)"
 )]
 pub(crate) fn process_tracking_arc(
     dynamics: SpacecraftDynamics,
@@ -53,6 +53,7 @@ pub(crate) fn process_tracking_arc(
     predict_until: Option<Epoch>,
     predict_for: Option<Duration>,
     predict_step: Option<Duration>,
+    fixed_step: Option<bool>,
 ) -> Result<String, NyxError> {
     // TODO: Return a navigation trajectory or use a class that mimics the better ODProcess -- https://github.com/nyx-space/nyx/issues/134
     let msr_noise = Matrix2::from_iterator(measurement_noise);
@@ -87,11 +88,13 @@ pub(crate) fn process_tracking_arc(
     if let Some(epoch) = predict_until {
         let max_step =
             predict_step.ok_or_else(|| NyxError::CustomError("predict_step unset".to_string()))?;
-        odp.predict_until(max_step, epoch).unwrap();
+        odp.predict_until(max_step, fixed_step.unwrap_or_else(|| false), epoch)
+            .unwrap();
     } else if let Some(duration) = predict_for {
         let max_step =
             predict_step.ok_or_else(|| NyxError::CustomError("predict_step unset".to_string()))?;
-        odp.predict_for(max_step, duration).unwrap();
+        odp.predict_for(max_step, fixed_step.unwrap_or_else(|| false), duration)
+            .unwrap();
     }
 
     let maybe = odp.to_parquet(
