@@ -88,7 +88,13 @@ def plot_estimates(
             orig_tim_col = df[col_name]
 
         # Build a Python datetime column
-        time_col = pd.to_datetime(orig_tim_col)
+        pd_ok_epochs = []
+        for epoch in orig_tim_col:
+            epoch = epoch.replace("UTC", "").strip()
+            if '.' not in epoch:
+                epoch += ".0"
+            pd_ok_epochs += [epoch]
+        time_col = pd.to_datetime(pd_ok_epochs)
         x_title = "Epoch {}".format(time_col_name[-3:])
 
         # Check that the requested covariance frame exists
@@ -115,9 +121,14 @@ def plot_estimates(
             "cz_dot_z_dot": "Covariance VzVz",
         }.items():
             # Create a new column with the transformed covariance. (e.g. "Covariance VzVz (RIC) 1.0-sigma sqrt")
-            cov_col_name = f"{covar_col} ({cov_frame}) {cov_sigma}-sigma {cov_fmt}"
-            # Transform the current column
-            df[cov_col_name] = eval(f"np.{cov_fmt}")(df[f"{covar_col} ({cov_frame})"])
+            if cov_fmt is None:
+                cov_col_name = f"{covar_col} ({cov_frame}) {cov_sigma}-sigma"
+                # No transformation here
+                df[cov_col_name] = df[f"{covar_col} ({cov_frame})"]
+            else:
+                cov_col_name = f"{covar_col} ({cov_frame}) {cov_sigma}-sigma {cov_fmt}"
+                # Transform the current column
+                df[cov_col_name] = eval(f"np.{cov_fmt}")(df[f"{covar_col} ({cov_frame})"])
             covar[f"{covar_var}"] = cov_col_name
 
         plt_df = df
@@ -315,7 +326,13 @@ def plot_covar(
             orig_tim_col = df[col_name]
 
         # Build a Python datetime column
-        time_col = pd.to_datetime(orig_tim_col)
+        pd_ok_epochs = []
+        for epoch in orig_tim_col:
+            epoch = epoch.replace("UTC", "").strip()
+            if '.' not in epoch:
+                epoch += ".0"
+            pd_ok_epochs += [epoch]
+        time_col = pd.to_datetime(pd_ok_epochs)
         x_title = "Epoch {}".format(time_col_name[-3:])
 
         # Check that the requested covariance frame exists
@@ -494,7 +511,13 @@ def plot_measurements(
             orig_tim_col = df[col_name]
 
         # Build a Python datetime column
-        time_col = pd.to_datetime(orig_tim_col)
+        pd_ok_epochs = []
+        for epoch in orig_tim_col:
+            epoch = epoch.replace("UTC", "").strip()
+            if '.' not in epoch:
+                epoch += ".0"
+            pd_ok_epochs += [epoch]
+        time_col = pd.to_datetime(pd_ok_epochs)
         x_title = "Epoch {}".format(time_col_name[-3:])
 
         # Diff the epochs of the measurements to find when there is a start and end.
@@ -585,7 +608,13 @@ def plot_residuals(
         orig_tim_col = df[col_name]
 
     # Build a Python datetime column
-    time_col = pd.to_datetime(orig_tim_col)
+    pd_ok_epochs = []
+    for epoch in orig_tim_col:
+        epoch = epoch.replace("UTC", "").strip()
+        if '.' not in epoch:
+            epoch += ".0"
+        pd_ok_epochs += [epoch]
+    time_col = pd.to_datetime(pd_ok_epochs)
     x_title = "Epoch {}".format(time_col_name[-3:])
 
     plt_any = False

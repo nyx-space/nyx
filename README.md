@@ -1,5 +1,5 @@
 # nyx
-[Nyx](https://nyxspace.com) is a high fidelity, fast, reliable and **[validated]([https://nyxspace.com/MathSpec/](https://nyxspace.com/nyxspace/MathSpec/))** astrodynamics toolkit library written in Rust. It provides convenient interfaces to both Rust and Python.
+[Nyx](https://nyxspace.com) is a high fidelity, fast, reliable and **[validated]([https://nyxspace.com/MathSpec/](https://nyxspace.com/nyxspace/MathSpec/))** astrodynamics toolkit library written in Rust and available in Python.
 
 The target audience is mission designers, astrodynamics engineers/hobbyists, and GNC engineers. The rationale for using Rust is to allow for very fast computations, guaranteed thread safety,
 and portability to all platforms supported by [Rust](https://forge.rust-lang.org/platform-support.html).
@@ -50,49 +50,4 @@ The [AGPLv3 LICENSE](https://nyxspace.com/license/) is enforced.
 - [x] Frame rotations
 
 # Who am I?
-An astrodynamics engineer with a heavy background in software. I currently work for Rocket Lab USA on the GNC of the Blue Ghost lunar lander.
-
-# Examples
-Refer to the [showcase](https://nyxspace.com/showcase/).
-
-# Python todo
-
-The "[maturin](https://crates.io/crates/maturin)" python package is used to build the python bindings.
-
-```sh
-pip install maturin
-```
-
-Build the python bindings using the following command.
-```sh
-maturin build --cargo-extra-args="--features python"
-```
-
-This creates a wheel file in `./target/wheels/` which can be installed using `pip install <filename.whl>`.
-
-For development mode, the following command may be used that automatically installs the python module
-
-```sh
-maturin develop --cargo-extra-args="--features python"
-```
-
-## Python code example
-
-This minimal example runs the scenario defined in `data/simple-scenario.toml` using the Python bindings.
-
-```py
-from nyx_space import md
-from nyx_space import io
-from nyx_space import cosmic
-
-# Initialize the cosm which stores the ephemeris
-cosm = cosmic.Cosm.de438()
-
-with open('data/simple-scenario.toml', 'r') as f:
-    scen_data = f.read()
-
-scenario = io.ScenarioSerde.from_toml_str(scen_data)
-
-md.MDProcess.execute_all_in_scenario(scenario, cosm)
-
-```
+An astrodynamics engineer with a heavy background in software. I currently work for Rocket Lab USA on the GNC of the Blue Ghost lunar lander. -- Find me on [LinkedIn](https://www.linkedin.com/in/chrisrabotin/).
