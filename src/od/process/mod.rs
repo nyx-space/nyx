@@ -631,10 +631,15 @@ where
     }
 
     /// Continuously predicts the trajectory until the provided end epoch, with covariance mapping at each step. In other words, this performs a time update.
-    pub fn predict_until(&mut self, max_step: Duration, end_epoch: Epoch) -> Result<(), NyxError> {
+    pub fn predict_until(
+        &mut self,
+        step: Duration,
+        fixed_step: bool,
+        end_epoch: Epoch,
+    ) -> Result<(), NyxError> {
         let prop_time = end_epoch - self.kf.previous_estimate().epoch();
         info!("Propagating for {prop_time} seconds and mapping covariance",);
-        self.prop.set_step(max_step, false);
+        self.prop.set_step(step, fixed_step);
 
         loop {
             let mut epoch = self.prop.state.epoch();
@@ -671,10 +676,15 @@ where
     }
 
     /// Continuously predicts the trajectory for the provided duration, with covariance mapping at each step. In other words, this performs a time update.
-    pub fn predict_for(&mut self, max_step: Duration, duration: Duration) -> Result<(), NyxError> {
+    pub fn predict_for(
+        &mut self,
+        step: Duration,
+        fixed_step: bool,
+        duration: Duration,
+    ) -> Result<(), NyxError> {
         let end_epoch = self.kf.previous_estimate().epoch() + duration;
 
-        self.predict_until(max_step, end_epoch)
+        self.predict_until(step, fixed_step, end_epoch)
     }
 
     /// Builds the navigation trajectory for the estimated state only

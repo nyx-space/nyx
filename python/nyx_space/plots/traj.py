@@ -216,7 +216,13 @@ def plot_orbit_elements(
         dfs = [dfs]
 
     for df in dfs:
-        df["Epoch"] = pd.to_datetime(df["Epoch:Gregorian UTC"])
+        pd_ok_epochs = []
+        for epoch in df["Epoch:Gregorian UTC"]:
+            epoch = epoch.replace("UTC", "").strip()
+            if '.' not in epoch:
+                epoch += ".0"
+            pd_ok_epochs += [epoch]
+        df["Epoch"] = pd.to_datetime(pd_ok_epochs)
 
     if not isinstance(names, list):
         names = [names]
