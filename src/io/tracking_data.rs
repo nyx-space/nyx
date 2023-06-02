@@ -18,7 +18,7 @@
 
 use crate::{
     linalg::{allocator::Allocator, DefaultAllocator, OVector},
-    od::{msr::arc::TrackingArc, Measurement},
+    od::{msr::TrackingArc, Measurement},
     NyxError,
 };
 use arrow::{

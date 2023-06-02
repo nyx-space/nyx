@@ -20,7 +20,7 @@ use std::collections::HashMap;
 
 use crate::cosmic::{Cosm, Orbit};
 use crate::io::ConfigRepr;
-use crate::od::simulator::trackdata::TrackingDeviceSim;
+use crate::od::simulator::TrackingDeviceSim;
 pub use crate::od::simulator::TrkConfig;
 use crate::NyxError;
 pub use crate::{io::ConfigError, od::prelude::GroundStation};

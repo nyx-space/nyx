@@ -18,10 +18,12 @@
 
 pub use crate::dynamics::{Dynamics, NyxError};
 pub use crate::{cosmic::Cosm, State, TimeTagged};
-pub mod arc;
+mod arc;
+pub use arc::TrackingArcSim;
 mod schedule;
 pub use schedule::Schedule;
-pub mod trackdata;
+mod trackdata;
+pub use trackdata::TrackingDeviceSim;
 mod trkconfig;
 pub use trkconfig::{EpochRanges, TrkConfig};
 mod start_mode;
