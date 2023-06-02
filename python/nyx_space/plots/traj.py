@@ -219,7 +219,7 @@ def plot_orbit_elements(
         pd_ok_epochs = []
         for epoch in df["Epoch:Gregorian UTC"]:
             epoch = epoch.replace("UTC", "").strip()
-            if '.' not in epoch:
+            if "." not in epoch:
                 epoch += ".0"
             pd_ok_epochs += [epoch]
         df["Epoch"] = pd.to_datetime(pd_ok_epochs)

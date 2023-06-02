@@ -266,6 +266,12 @@ impl StateParameter {
     fn __str__(&self) -> String {
         format!("{self:?}")
     }
+
+    #[cfg(feature = "python")]
+    #[new]
+    fn py_new(name: String) -> Result<Self, NyxError> {
+        Self::from_str(&name)
+    }
 }
 
 impl StateParameter {
