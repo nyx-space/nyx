@@ -23,12 +23,17 @@ use crate::{
 };
 use arrow::{array::Float64Array, record_batch::RecordBatchReader};
 use hifitime::Epoch;
+
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use std::fs::File;
 use std::{collections::HashMap, error::Error, fmt::Display, path::Path};
 
 #[cfg(feature = "python")]
+use crate::python::mission_design::{OrbitTraj as OrbitTrajPy, SpacecraftTraj as ScTrajPy};
+#[cfg(feature = "python")]
 use crate::Spacecraft;
+#[cfg(feature = "python")]
+use log::warn;
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 
@@ -37,13 +42,18 @@ use crate::cosmic::Cosm;
 /// A dynamic trajectory allows loading a trajectory Parquet file and converting it
 /// to the concrete trajectory state type when desired.
 #[cfg_attr(feature = "python", pyclass)]
-#[derive(Clone)]
-pub struct DynamicTrajectory {
+#[cfg_attr(
+    feature = "python",
+    pyo3(text_signature = "(path, format='parquet', parquet_path=None, spacecraft_template=None)")
+)]
+#[cfg_attr(feature = "python", pyo3(module = "nyx_space.mission_design"))]
+#[derive(Clone, PartialEq)]
+pub struct TrajectoryLoader {
     pub path: String,
     metadata: HashMap<String, String>,
 }
 
-impl DynamicTrajectory {
+impl TrajectoryLoader {
     pub fn from_parquet<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn Error>> {
         let file = File::open(&path)?;
 
@@ -241,7 +251,7 @@ impl DynamicTrajectory {
     }
 }
 
-impl Display for DynamicTrajectory {
+impl Display for TrajectoryLoader {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for item in self.repr() {
             writeln!(f, "{item}")?;
@@ -252,30 +262,81 @@ impl Display for DynamicTrajectory {
 
 #[cfg(feature = "python")]
 #[pymethods]
-impl DynamicTrajectory {
-    /// Initializes a new dynamic trajectory from the provided parquet file
+impl TrajectoryLoader {
+    /// Initializes a new dynamic trajectory from the provided file, and the format kind
     #[new]
-    fn new(path: String) -> Result<Self, NyxError> {
-        Self::from_parquet(path).map_err(|e| NyxError::CustomError(e.to_string()))
+    fn new(
+        path: String,
+        format: Option<String>,
+        parquet_path: Option<String>,
+        spacecraft_template: Option<Spacecraft>,
+    ) -> Result<Self, NyxError> {
+        if format.is_none() {
+            Self::from_parquet(path).map_err(|e| NyxError::CustomError(e.to_string()))
+        } else {
+            let uformat = format.unwrap().to_lowercase();
+            match uformat.as_str() {
+                "parquet" => {
+                    Self::from_parquet(path).map_err(|e| NyxError::CustomError(e.to_string()))
+                }
+                "oem" => {
+                    // Now we check that everything is set correctly.
+                    if parquet_path.is_none() {
+                        return Err(NyxError::CustomError(
+                            "Loading an OEM requires `parquet_path` parameter for output file"
+                                .to_string(),
+                        ));
+                    }
+                    let sc_tpl = match spacecraft_template {
+                        Some(sc) => sc,
+                        None => {
+                            warn!("No spacecraft template specified on OEM loading, assuming zero fuel mass");
+                            Spacecraft::default()
+                        }
+                    };
+
+                    let traj = Traj::<Spacecraft>::from_oem_file(path, sc_tpl)?;
+                    let out_pq = parquet_path.unwrap();
+                    // Convert to parquet
+                    traj.to_parquet_simple(&out_pq)
+                        .map_err(|e| NyxError::CustomError(e.to_string()))?;
+                    // Return Self with this path
+                    Self::from_parquet(out_pq).map_err(|e| NyxError::CustomError(e.to_string()))
+                }
+                &_ => Err(NyxError::CustomError(format!(
+                    "Unexpected format `{uformat}`"
+                ))),
+            }
+        }
     }
 
-    /// Converts the provided CCSDS OEM file (first argument) into a Nyx trajectory Parquet file (second argument) and given a template spacecraft (third argument).
-    #[staticmethod]
-    #[pyo3(text_signature = "(oem_path, parquet_path, spacecraft_template)")]
-    fn convert_oem_to_parquet(
-        oem_path: String,
-        parquet_path: String,
-        spacecraft_template: Spacecraft,
-    ) -> Result<(), NyxError> {
-        let traj = Traj::<Spacecraft>::from_oem_file(oem_path, spacecraft_template)?;
-        // Convert to parquet
-        traj.to_parquet_simple(parquet_path)
-            .map_err(|e| NyxError::CustomError(e.to_string()))?;
+    /// Converts this loaded trajectory into an Orbit trajectory (no spacecraft data)
+    fn to_orbit_traj(&self) -> Result<OrbitTrajPy, NyxError> {
+        Ok(OrbitTrajPy {
+            inner: self
+                .to_traj()
+                .map_err(|e| NyxError::CustomError(e.to_string()))?,
+        })
+    }
 
-        Ok(())
+    /// Converts this loaded trajectory into an Orbit trajectory (no spacecraft data)
+    fn to_spacecraft_traj(&self) -> Result<ScTrajPy, NyxError> {
+        Ok(ScTrajPy {
+            inner: self
+                .to_traj()
+                .map_err(|e| NyxError::CustomError(e.to_string()))?,
+        })
     }
 
     fn __repr__(&self) -> String {
         format!("{self}")
+    }
+
+    fn __getnewargs__(&self) -> Result<(String,), NyxError> {
+        Ok((self.path.clone(),))
+    }
+
+    fn __eq__(&self, other: &Self) -> bool {
+        self == other
     }
 }

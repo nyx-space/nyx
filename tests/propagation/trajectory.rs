@@ -6,7 +6,7 @@ use nyx::cosmic::eclipse::EclipseLocator;
 use nyx::cosmic::{Cosm, GuidanceMode, Orbit, Spacecraft};
 use nyx::dynamics::guidance::{GuidanceLaw, Ruggiero, Thruster};
 use nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
-use nyx::io::trajectory_data::DynamicTrajectory;
+use nyx::io::trajectory_data::TrajectoryLoader;
 use nyx::md::prelude::{ExportCfg, Interpolatable, Objective};
 use nyx::md::StateParameter;
 use nyx::propagators::*;
@@ -132,7 +132,7 @@ fn traj_ephem_forward() {
 
     // Reload this trajectory and make sure that it matches
 
-    let dyn_traj = DynamicTrajectory::from_parquet(exported_path).unwrap();
+    let dyn_traj = TrajectoryLoader::from_parquet(exported_path).unwrap();
     let concrete_traj = dyn_traj.to_traj::<Orbit>().unwrap();
 
     if ephem != concrete_traj {

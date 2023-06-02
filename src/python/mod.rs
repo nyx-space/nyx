@@ -25,7 +25,7 @@ use pyo3::py_run;
 use pyo3::{exceptions::PyException, prelude::*};
 
 pub(crate) mod cosmic;
-mod mission_design;
+pub(crate) mod mission_design;
 mod monte_carlo;
 mod orbit_determination;
 

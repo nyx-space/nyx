@@ -113,7 +113,9 @@ def test_generate_states():
     orbits = generate_orbits(
         orbit,
         [
-            (StateParameter.SMA, 0.05),
+            # Note that we can create the state parameter from a string of its name
+            (StateParameter("SMA"), 0.05),
+            # Or directly as an enum (the preferred method)
             (StateParameter.Eccentricity, 0.1),
             (StateParameter.Inclination, 0.1),
         ],

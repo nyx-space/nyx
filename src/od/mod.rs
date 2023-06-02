@@ -47,7 +47,7 @@ pub mod simulator;
 pub mod process;
 
 use arrow::datatypes::Field;
-pub use simulator::trackdata::TrackingDeviceSim;
+pub use simulator::TrackingDeviceSim;
 
 /// Provides all state noise compensation functionality
 pub mod snc;
@@ -58,7 +58,7 @@ pub mod prelude {
     pub use super::ground_station::*;
     pub use super::msr::*;
     pub use super::process::*;
-    pub use super::simulator::arc::TrackingArcSim;
+    pub use super::simulator::TrackingArcSim;
     pub use super::simulator::*;
     pub use super::snc::*;
     pub use super::*;

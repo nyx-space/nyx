@@ -91,7 +91,7 @@ def plot_estimates(
         pd_ok_epochs = []
         for epoch in orig_tim_col:
             epoch = epoch.replace("UTC", "").strip()
-            if '.' not in epoch:
+            if "." not in epoch:
                 epoch += ".0"
             pd_ok_epochs += [epoch]
         time_col = pd.to_datetime(pd_ok_epochs)
@@ -128,7 +128,9 @@ def plot_estimates(
             else:
                 cov_col_name = f"{covar_col} ({cov_frame}) {cov_sigma}-sigma {cov_fmt}"
                 # Transform the current column
-                df[cov_col_name] = eval(f"np.{cov_fmt}")(df[f"{covar_col} ({cov_frame})"])
+                df[cov_col_name] = eval(f"np.{cov_fmt}")(
+                    df[f"{covar_col} ({cov_frame})"]
+                )
             covar[f"{covar_var}"] = cov_col_name
 
         plt_df = df
@@ -329,7 +331,7 @@ def plot_covar(
         pd_ok_epochs = []
         for epoch in orig_tim_col:
             epoch = epoch.replace("UTC", "").strip()
-            if '.' not in epoch:
+            if "." not in epoch:
                 epoch += ".0"
             pd_ok_epochs += [epoch]
         time_col = pd.to_datetime(pd_ok_epochs)
@@ -514,7 +516,7 @@ def plot_measurements(
         pd_ok_epochs = []
         for epoch in orig_tim_col:
             epoch = epoch.replace("UTC", "").strip()
-            if '.' not in epoch:
+            if "." not in epoch:
                 epoch += ".0"
             pd_ok_epochs += [epoch]
         time_col = pd.to_datetime(pd_ok_epochs)
@@ -611,7 +613,7 @@ def plot_residuals(
     pd_ok_epochs = []
     for epoch in orig_tim_col:
         epoch = epoch.replace("UTC", "").strip()
-        if '.' not in epoch:
+        if "." not in epoch:
             epoch += ".0"
         pd_ok_epochs += [epoch]
     time_col = pd.to_datetime(pd_ok_epochs)

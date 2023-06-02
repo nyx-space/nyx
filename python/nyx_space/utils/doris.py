@@ -307,7 +307,7 @@ def prototype(gs_yaml, rnx_path, plot=True):
     import pandas as pd
     from nyx_space.cosmic import Cosm, Orbit, Spacecraft
     from nyx_space.mission_design import (
-        DynamicTrajectory,
+        TrajectoryLoader,
         SpacecraftDynamics,
         propagate,
     )
@@ -369,7 +369,7 @@ def prototype(gs_yaml, rnx_path, plot=True):
 
             traj_file = str(outpath.joinpath("./od_val_with_arc_truth_ephem.parquet"))
             traj.to_parquet(traj_file)
-            traj = DynamicTrajectory(traj_file)
+            traj = TrajectoryLoader(traj_file)
 
             # Build a tracking arc
             arc_sim = GroundTrackingArcSim([ref_station], traj, trk_cfg, 0)

@@ -126,9 +126,13 @@ impl Traj<Orbit> {
 
         let mut traj = Self::default();
 
-        let mut start = false;
+        let mut parse = false;
 
         'lines: for (lno, line) in lines.iter().enumerate() {
+            if line.is_empty() {
+                continue;
+            }
+
             for tok in &ignored_tokens {
                 if line.starts_with(tok) {
                     // Ignore this token
@@ -139,7 +143,7 @@ impl Traj<Orbit> {
                 // Extract the object ID from the line
                 let parts: Vec<&str> = line.split('=').collect();
                 let name = parts[1].trim().to_string();
-                debug!("[line: {lno}] Found object {name}");
+                debug!("[line: {}] Found object {name}", lno + 1);
                 traj.name = Some(name);
             } else if line.starts_with("REF_FRAME") {
                 let parts: Vec<&str> = line.split('=').collect();
@@ -151,13 +155,17 @@ impl Traj<Orbit> {
             } else if line.starts_with("TIME_SYSTEM") {
                 let parts: Vec<&str> = line.split('=').collect();
                 time_system = parts[1].trim().to_string();
-                debug!("[line: {lno}] Found time system `{time_system}`");
+                debug!("[line: {}] Found time system `{time_system}`", lno + 1);
             } else if line.starts_with("META_STOP") {
                 // We can start parsing now
-                start = true;
-            } else if !line.is_empty() && start {
+                parse = true;
+            } else if line.starts_with("META_START") {
+                // Stop the parsing
+                parse = false;
+            } else if parse {
                 // Split the line into components
                 let parts: Vec<&str> = line.split_whitespace().collect();
+                debug!("[line: {}] Parsing `{parts:?}`", lno + 1);
 
                 // Extract the values
                 let epoch_str = format!("{} {time_system}", parts[0]);
@@ -170,7 +178,6 @@ impl Traj<Orbit> {
                         let vy_km_s = parts[5].parse::<f64>().unwrap();
                         let vz_km_s = parts[6].parse::<f64>().unwrap();
 
-                        debug!("[line: {lno}] Parsing epoch `{epoch_str}`");
                         let orbit = Orbit {
                             epoch: Epoch::from_str(epoch_str.trim()).map_err(|e| {
                                 NyxError::CCSDS(format!("Parsing epoch error: {e}"))

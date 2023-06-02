@@ -3,7 +3,7 @@ use nyx_space::io::ConfigRepr;
 use nyx_space::md::prelude::*;
 use nyx_space::od::msr::RangeDoppler;
 use nyx_space::od::prelude::*;
-use nyx_space::od::simulator::arc::TrackingArcSim;
+use nyx_space::od::simulator::TrackingArcSim;
 use nyx_space::od::simulator::{Availability, EpochRanges, Schedule, TrkConfig};
 use rstest::*;
 use std::collections::HashMap;

@@ -20,12 +20,12 @@ use std::collections::HashMap;
 
 use crate::cosmic::Cosm;
 use crate::io::tracking_data::DynamicTrackingArc;
-use crate::io::trajectory_data::DynamicTrajectory;
+use crate::io::trajectory_data::TrajectoryLoader;
 use crate::io::ExportCfg;
 use crate::od::msr::RangeDoppler;
 use crate::od::noise::GaussMarkov;
 use crate::od::process::FltResid;
-use crate::od::simulator::arc::TrackingArcSim;
+use crate::od::simulator::TrackingArcSim;
 pub use crate::od::simulator::TrkConfig;
 pub use crate::{io::ConfigError, od::prelude::GroundStation};
 use crate::{NyxError, Spacecraft};
@@ -73,7 +73,7 @@ impl GroundTrackingArcSim {
     #[new]
     pub fn with_seed(
         devices: Vec<GroundStation>,
-        trajectory: DynamicTrajectory,
+        trajectory: TrajectoryLoader,
         configs: HashMap<String, TrkConfig>,
         seed: u64,
     ) -> Result<Self, NyxError> {

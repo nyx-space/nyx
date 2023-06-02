@@ -32,7 +32,7 @@ pub use conf::{IterationConf, SmoothingArc};
 mod trigger;
 pub use trigger::EkfTrigger;
 mod rejectcrit;
-use self::msr::arc::TrackingArc;
+use self::msr::TrackingArc;
 pub use self::rejectcrit::FltResid;
 use std::collections::HashMap;
 use std::marker::PhantomData;

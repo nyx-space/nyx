@@ -24,7 +24,7 @@ use rand_pcg::Pcg64Mcg;
 pub use crate::dynamics::{Dynamics, NyxError};
 use crate::io::ConfigError;
 use crate::md::trajectory::Interpolatable;
-use crate::od::msr::arc::TrackingArc;
+use crate::od::msr::TrackingArc;
 use crate::od::simulator::{Availability, Schedule};
 use crate::od::Measurement;
 pub use crate::{cosmic::Cosm, State, TimeTagged};

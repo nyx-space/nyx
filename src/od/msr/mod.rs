@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub mod arc;
+mod arc;
 mod range;
 mod range_doppler;
 mod rangerate;
