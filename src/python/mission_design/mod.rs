@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::io::trajectory_data::DynamicTrajectory;
+use crate::io::trajectory_data::TrajectoryLoader;
 use crate::io::{ConfigError, ExportCfg};
 use crate::md::prelude::{PropOpts, Propagator, SpacecraftDynamics};
 use crate::md::{Event, StateParameter};
@@ -38,7 +38,7 @@ mod trajectory;
 pub(crate) fn register_md(py: Python<'_>, parent_module: &PyModule) -> PyResult<()> {
     let sm = PyModule::new(py, "_nyx_space.mission_design")?;
 
-    sm.add_class::<DynamicTrajectory>()?;
+    sm.add_class::<TrajectoryLoader>()?;
     sm.add_class::<SpacecraftDynamics>()?;
     sm.add_class::<StateParameter>()?;
     sm.add_class::<Event>()?;

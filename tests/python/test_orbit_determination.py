@@ -14,7 +14,7 @@ from nyx_space.orbit_determination import (
     DynamicTrackingArc,
     ExportCfg,
 )
-from nyx_space.mission_design import DynamicTrajectory, SpacecraftDynamics, propagate
+from nyx_space.mission_design import TrajectoryLoader, SpacecraftDynamics, propagate
 from nyx_space.cosmic import Spacecraft
 from nyx_space.time import Unit
 from nyx_space.plots.od import (
@@ -71,7 +71,7 @@ def test_filter_arc():
     trk_cfg = TrkConfig.load_named(str(config_path.joinpath("tracking_cfg.yaml")))
 
     # Load the trajectory
-    traj = DynamicTrajectory(traj_file)
+    traj = TrajectoryLoader(traj_file)
     print(f"Loaded {traj}")
 
     # Set up the export -- We'll use the same config set up for both measurements and output of OD process

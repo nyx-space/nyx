@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-
+import pickle
 
 from nyx_space.cosmic import Spacecraft, Orbit, SrpConfig, Cosm
 from nyx_space.mission_design import (
@@ -8,7 +8,7 @@ from nyx_space.mission_design import (
     StateParameter,
     Event,
     SpacecraftDynamics,
-    DynamicTrajectory
+    TrajectoryLoader
 )
 from nyx_space.time import Duration, Unit, Epoch
 
@@ -140,11 +140,13 @@ def test_build_spacecraft():
 
     config_path = root.joinpath("./data/tests/ccsds/oem/LEO_10s.oem")
     output_path = root.joinpath("./output_data/LEO_10s.parquet")
-    # Convert
-    DynamicTrajectory.convert_oem_to_parquet(str(config_path), str(output_path), sc)
-    # Reload
-    traj = DynamicTrajectory(str(output_path))
+    # Convert from OEM to Parquet will happen on load
+    traj = TrajectoryLoader(str(config_path), 'oem', str(output_path), sc)
     print(traj)
+    # Check that we can pickle the trajectory loader object
+    traj_pkl = pickle.dumps(traj)
+    traj_unpkl = pickle.loads(traj_pkl)
+    assert traj_unpkl.__eq__(traj)
 
 
 if __name__ == "__main__":
