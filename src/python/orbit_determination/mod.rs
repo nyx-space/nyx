@@ -25,7 +25,7 @@ use crate::io::ExportCfg;
 use crate::od::msr::RangeDoppler;
 use crate::od::noise::GaussMarkov;
 use crate::od::process::FltResid;
-use crate::od::simulator::arc::TrackingArcSim;
+use crate::od::simulator::TrackingArcSim;
 pub use crate::od::simulator::TrkConfig;
 pub use crate::{io::ConfigError, od::prelude::GroundStation};
 use crate::{NyxError, Spacecraft};
