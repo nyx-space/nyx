@@ -85,7 +85,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           args: --release --out dist --find-interpreter -F python
-          sccache: 'true'
+          # sccache: 'true' # sscache seems to have broken on Windows on Github -- https://github.com/nyx-space/nyx/actions/runs/5156694943/jobs/9288035780
       - name: Upload wheels
         uses: actions/upload-artifact@v3
         with:
