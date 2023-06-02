@@ -1,7 +1,7 @@
 extern crate nyx_space as nyx;
 
 use nyx::od::noise::GaussMarkov;
-use nyx::od::simulator::arc::TrackingArcSim;
+use nyx::od::simulator::TrackingArcSim;
 use nyx::od::simulator::TrkConfig;
 
 use self::nyx::md::prelude::*;
