@@ -28,11 +28,13 @@ use crate::{NyxError, Spacecraft};
 use hifitime::{Duration, Epoch, Unit};
 use pyo3::{prelude::*, py_run};
 
-use self::trajectory::Traj;
+pub(crate) use self::orbit_trajectory::OrbitTraj;
+pub(crate) use self::sc_trajectory::SpacecraftTraj;
 
 mod events;
+mod orbit_trajectory;
+mod sc_trajectory;
 pub mod spacecraft;
-mod trajectory;
 
 /// Mission design
 pub(crate) fn register_md(py: Python<'_>, parent_module: &PyModule) -> PyResult<()> {
@@ -43,6 +45,8 @@ pub(crate) fn register_md(py: Python<'_>, parent_module: &PyModule) -> PyResult<
     sm.add_class::<StateParameter>()?;
     sm.add_class::<Event>()?;
     sm.add_class::<ExportCfg>()?;
+    sm.add_class::<sc_trajectory::SpacecraftTraj>()?;
+    sm.add_class::<orbit_trajectory::OrbitTraj>()?;
     sm.add_function(wrap_pyfunction!(propagate, sm)?)?;
 
     py_run!(
@@ -73,7 +77,7 @@ fn propagate(
     fixed_step: Option<Duration>,
     tolerance: Option<f64>,
     method: Option<String>,
-) -> Result<(Spacecraft, Traj), NyxError> {
+) -> Result<(Spacecraft, SpacecraftTraj), NyxError> {
     let opts = match fixed_step {
         Some(step) => PropOpts::with_fixed_step(step),
         None => {
@@ -132,17 +136,17 @@ fn propagate(
                 .until_event(max_duration, &event)?,
         };
 
-        Ok((sc, Traj { inner: traj }))
+        Ok((sc, SpacecraftTraj { inner: traj }))
     } else if let Some(duration) = duration {
         let (sc, traj) = prop_setup
             .with(spacecraft)
             .for_duration_with_traj(duration)?;
 
-        Ok((sc, Traj { inner: traj }))
+        Ok((sc, SpacecraftTraj { inner: traj }))
     } else if let Some(epoch) = epoch {
         let (sc, traj) = prop_setup.with(spacecraft).until_epoch_with_traj(epoch)?;
 
-        Ok((sc, Traj { inner: traj }))
+        Ok((sc, SpacecraftTraj { inner: traj }))
     } else {
         Err(NyxError::ConfigError(ConfigError::InvalidConfig(
             "Either duration or epoch must be provided for a propagation to happen".to_string(),

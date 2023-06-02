@@ -29,16 +29,25 @@ use crate::{
     NyxError, Spacecraft, State,
 };
 
+use super::OrbitTraj;
 use std::collections::HashMap;
 
-/// A structure that stores a spacecraft structure generated from a propagation
+/// A structure that stores a spacecraft structure generated from a propagation.
+/// Cannot be pickled in Python, so you must export it to Parquet first and use the TrajectoryLoader.
 #[pyclass]
-pub(crate) struct Traj {
+pub(crate) struct SpacecraftTraj {
     pub(crate) inner: TrajRs<Spacecraft>,
 }
 
 #[pymethods]
-impl Traj {
+impl SpacecraftTraj {
+    /// Convert this spacecraft trajectory into an Orbit trajectory, loosing all references to the spacecraft
+    pub fn downcast(&self) -> OrbitTraj {
+        OrbitTraj {
+            inner: self.inner.downcast(),
+        }
+    }
+
     /// Returns the state at the provided epoch, or raises an exception if the epoch is outside of the bounds of the trajectory
     fn at(&self, epoch: Epoch) -> Result<Spacecraft, NyxError> {
         self.inner.at(epoch)

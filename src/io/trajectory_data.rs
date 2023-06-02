@@ -29,6 +29,8 @@ use std::fs::File;
 use std::{collections::HashMap, error::Error, fmt::Display, path::Path};
 
 #[cfg(feature = "python")]
+use crate::python::mission_design::{OrbitTraj as OrbitTrajPy, SpacecraftTraj as ScTrajPy};
+#[cfg(feature = "python")]
 use crate::Spacecraft;
 #[cfg(feature = "python")]
 use log::warn;
@@ -306,6 +308,24 @@ impl TrajectoryLoader {
                 ))),
             }
         }
+    }
+
+    /// Converts this loaded trajectory into an Orbit trajectory (no spacecraft data)
+    fn to_orbit_traj(&self) -> Result<OrbitTrajPy, NyxError> {
+        Ok(OrbitTrajPy {
+            inner: self
+                .to_traj()
+                .map_err(|e| NyxError::CustomError(e.to_string()))?,
+        })
+    }
+
+    /// Converts this loaded trajectory into an Orbit trajectory (no spacecraft data)
+    fn to_spacecraft_traj(&self) -> Result<ScTrajPy, NyxError> {
+        Ok(ScTrajPy {
+            inner: self
+                .to_traj()
+                .map_err(|e| NyxError::CustomError(e.to_string()))?,
+        })
     }
 
     fn __repr__(&self) -> String {
