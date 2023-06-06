@@ -18,8 +18,8 @@
 
 use super::thiserror::Error;
 use crate::io::ConfigError;
-use crate::md::StateParameter;
 use crate::md::trajectory::TrajError;
+use crate::md::StateParameter;
 pub use crate::md::TargetingError;
 pub use crate::time::Errors as TimeErrors;
 use crate::Spacecraft;

@@ -133,7 +133,10 @@ impl Ruggiero {
                 Ok(num / denom)
             }
             StateParameter::AoP => Ok(1.0),
-            _ => Err(NyxError::StateParameterUnavailable(*parameter, "not a control variable in Ruggiero".to_string())),
+            _ => Err(NyxError::StateParameterUnavailable(
+                *parameter,
+                "not a control variable in Ruggiero".to_string(),
+            )),
         }
     }
 

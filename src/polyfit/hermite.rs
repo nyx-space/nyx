@@ -330,7 +330,9 @@ pub fn hermite_eval(
             let c2 = x_eval - xs[xi - 1];
             let denom = xs[xij - 1] - xs[xi - 1];
             if denom.abs() < f64::EPSILON {
-                let msg = format!("duplicate abscissa data in interp table: denominator near zero ({denom:e})");
+                let msg = format!(
+                    "duplicate abscissa data in interp table: denominator near zero ({denom:e})"
+                );
                 return Err(NyxError::MathDomain(msg));
             }
 

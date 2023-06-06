@@ -195,7 +195,11 @@ impl Traj<Orbit> {
                         // Check that we don't have duplicate epochs
                         if let Some(prev) = traj.states.last() {
                             if prev.epoch == orbit.epoch {
-                                warn!("[line: {}] duplicate epoch {} in OEM -- overwriting", lno + 1, orbit.epoch);
+                                warn!(
+                                    "[line: {}] duplicate epoch {} in OEM -- overwriting",
+                                    lno + 1,
+                                    orbit.epoch
+                                );
                                 traj.states.pop();
                             }
                         }

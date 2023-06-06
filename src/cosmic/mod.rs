@@ -107,13 +107,19 @@ where
 
     /// Return the value of the parameter, returns an error by default
     fn value(&self, param: StateParameter) -> Result<f64, NyxError> {
-        Err(NyxError::StateParameterUnavailable(param, "unimplemented in State trait".to_string()))
+        Err(NyxError::StateParameterUnavailable(
+            param,
+            "unimplemented in State trait".to_string(),
+        ))
     }
 
     /// Allows setting the value of the given parameter.
     /// NOTE: Most parameters where the `value` is available CANNOT be also set for that parameter (it's a much harder problem!)
     fn set_value(&mut self, param: StateParameter, _val: f64) -> Result<(), NyxError> {
-        Err(NyxError::StateParameterUnavailable(param, "unimplemented in State trait".to_string()))
+        Err(NyxError::StateParameterUnavailable(
+            param,
+            "unimplemented in State trait".to_string(),
+        ))
     }
 }
 
