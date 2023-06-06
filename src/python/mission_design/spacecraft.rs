@@ -77,8 +77,8 @@ impl Spacecraft {
         format!("{self}\n{self:x}")
     }
 
-    fn __eq__(&self, other: Self) -> bool {
-        *self == other
+    fn __eq__(&self, other: &Self) -> bool {
+        self == other
     }
 
     /// Note: this returns a COPY of the orbit, not a mutable reference to it!

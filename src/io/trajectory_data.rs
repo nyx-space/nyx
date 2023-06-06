@@ -100,7 +100,7 @@ impl TrajectoryLoader {
         let mut has_epoch = false; // Required
         let mut frame = None;
 
-        let mut found_fields = [
+        let mut found_fields = vec![
             (StateParameter::X, false),
             (StateParameter::Y, false),
             (StateParameter::Z, false),
@@ -166,12 +166,21 @@ impl TrajectoryLoader {
 
         let expected_type = std::any::type_name::<S>().split("::").last().unwrap();
 
-        if expected_type == "Spacecraft" && !sc_compat {
-            // Oops, missing fuel data (using the full call in case the field name changes in the future)
-            return Err(Box::new(NyxError::FileUnreadable(format!(
-                "Missing `{}` field",
-                found_fields.last().unwrap().0.to_field(None).name()
-            ))));
+        if expected_type == "Spacecraft" {
+            if !sc_compat {
+                // Oops, missing fuel data (using the full call in case the field name changes in the future)
+                return Err(Box::new(NyxError::FileUnreadable(format!(
+                    "Missing `{}` field",
+                    found_fields.last().unwrap().0.to_field(None).name()
+                ))));
+            }
+        } else if sc_compat {
+            // Not a spacecraft, remove the fuel mass
+            if let Some(last_field) = found_fields.last_mut() {
+                if last_field.0 == StateParameter::FuelMass && last_field.1 {
+                    last_field.1 = false;
+                }
+            }
         }
 
         // At this stage, we know that the measurement is valid and the conversion is supported.
@@ -201,8 +210,8 @@ impl TrajectoryLoader {
                 );
             }
 
-            if sc_compat {
-                // Read the fuel
+            if expected_type == "Spacecraft" {
+                // Read the fuel only if this is a spacecraft we're building
                 shared_data.push(
                     batch
                         .column_by_name("fuel_mass (kg)")
