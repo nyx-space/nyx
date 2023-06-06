@@ -19,6 +19,7 @@
 use super::thiserror::Error;
 use crate::io::ConfigError;
 use crate::md::trajectory::TrajError;
+use crate::md::StateParameter;
 pub use crate::md::TargetingError;
 pub use crate::time::Errors as TimeErrors;
 use crate::Spacecraft;
@@ -75,8 +76,8 @@ pub enum NyxError {
     #[error("Partials for this model are not defined")]
     PartialsUndefined,
     /// State parameter cannot be used in this function
-    #[error("State parameter cannot be used in this function")]
-    StateParameterUnavailable,
+    #[error("Unavailable parameter {0:?}: {1}")]
+    StateParameterUnavailable(StateParameter, String),
     /// Could not load file
     #[error("Could not load file: {0}")]
     LoadingError(String),

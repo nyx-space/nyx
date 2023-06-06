@@ -235,14 +235,14 @@ pub fn hermite_eval(
     x_eval: f64,
 ) -> Result<(f64, f64), NyxError> {
     if xs.len() != ys.len() || xs.len() != ydots.len() {
-        error!("Abscissas (xs), ordinates (ys), and first derivatives (ydots) must contain the same number of items, but they are of lengths {}, {}, and {}", xs.len(), ys.len(), ydots.len());
-        return Err(NyxError::MathDomain("=(".to_string()));
+        let msg = format!("Abscissas (xs), ordinates (ys), and first derivatives (ydots) must contain the same number of items, but they are of lengths {}, {}, and {}", xs.len(), ys.len(), ydots.len());
+        return Err(NyxError::MathDomain(msg));
     } else if xs.is_empty() {
-        error!("No interpolation data provided");
-        return Err(NyxError::MathDomain("=(".to_string()));
+        let msg = "No interpolation data provided".to_string();
+        return Err(NyxError::MathDomain(msg));
     } else if xs.len() > 3 * INTERPOLATION_SAMPLES {
-        error!("More than {} samples provided, which is the maximum number of items allowed for a Hermite interpolation", 3 * INTERPOLATION_SAMPLES);
-        return Err(NyxError::MathDomain("=(".to_string()));
+        let msg = format!("More than {} samples provided, which is the maximum number of items allowed for a Hermite interpolation", 3 * INTERPOLATION_SAMPLES);
+        return Err(NyxError::MathDomain(msg));
     }
 
     // At this point, we know that the lengths of items is correct, so we can directly address them without worry for overflowing the array.
@@ -274,7 +274,8 @@ pub fn hermite_eval(
         let c2 = x_eval - xs[i - 1];
         let denom = xs[i] - xs[i - 1];
         if denom.abs() < f64::EPSILON {
-            return Err(NyxError::MathDomain("=(".to_string()));
+            let msg = format!("duplicate abscissa data: denominator near zero ({denom:e})");
+            return Err(NyxError::MathDomain(msg));
         }
 
         /*        The second column of WORK contains interpolated derivative */
@@ -329,7 +330,10 @@ pub fn hermite_eval(
             let c2 = x_eval - xs[xi - 1];
             let denom = xs[xij - 1] - xs[xi - 1];
             if denom.abs() < f64::EPSILON {
-                return Err(NyxError::MathDomain("=(".to_string()));
+                let msg = format!(
+                    "duplicate abscissa data in interp table: denominator near zero ({denom:e})"
+                );
+                return Err(NyxError::MathDomain(msg));
             }
 
             /*           Compute the interpolated derivative at X for the Ith */

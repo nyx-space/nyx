@@ -10,7 +10,7 @@ from nyx_space.mission_design import (
     SpacecraftDynamics,
     TrajectoryLoader,
 )
-from nyx_space.time import Duration, Unit, Epoch
+from nyx_space.time import Duration, Unit, Epoch, TimeSeries
 
 
 def test_propagate():
@@ -147,6 +147,25 @@ def test_build_spacecraft():
     traj_pkl = pickle.dumps(traj)
     traj_unpkl = pickle.loads(traj_pkl)
     assert traj_unpkl.__eq__(traj)
+    # Check that we can convert this to a spacecraft trajectory
+    traj_sc = traj.to_spacecraft_traj()
+    traj_orbit = traj.to_orbit_traj()
+    traj_orbit_dc = traj_sc.downcast()
+    # Check that we can query it (will raise an exception if we can't, thereby failing the test)
+    ts = TimeSeries(Epoch("2020-06-01T12:00:00.000000"), Epoch("2020-06-01T13:00:00.000000"), step=Unit.Minute*17 + Unit.Second*13.8, inclusive=True)
+    for epoch in ts:
+        orbit = traj_orbit.at(epoch)
+        dc_orbit = traj_orbit_dc.at(epoch)
+        sc_orbit = traj_sc.at(epoch).orbit
+        # Check params individually
+        assert orbit.epoch == sc_orbit.epoch
+        assert orbit.x_km == sc_orbit.x_km
+        assert orbit.vx_km_s == sc_orbit.vx_km_s
+        # Check the downcasted version
+        assert dc_orbit.x_km == sc_orbit.x_km
+        assert dc_orbit.vx_km_s == sc_orbit.vx_km_s
+        assert dc_orbit.__eq__(sc_orbit)
+
 
 
 if __name__ == "__main__":

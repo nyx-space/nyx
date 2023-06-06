@@ -861,6 +861,41 @@ impl Orbit {
 
 #[cfg_attr(feature = "python", pymethods)]
 impl Orbit {
+    #[cfg(feature = "python")]
+    #[getter]
+    fn get_epoch(&self) -> Epoch {
+        self.epoch
+    }
+    #[cfg(feature = "python")]
+    #[getter]
+    fn x_km(&self) -> f64 {
+        self.x_km
+    }
+    #[cfg(feature = "python")]
+    #[getter]
+    fn y_km(&self) -> f64 {
+        self.x_km
+    }
+    #[cfg(feature = "python")]
+    #[getter]
+    fn z_km(&self) -> f64 {
+        self.x_km
+    }
+    #[cfg(feature = "python")]
+    #[getter]
+    fn vx_km_s(&self) -> f64 {
+        self.vx_km_s
+    }
+    #[cfg(feature = "python")]
+    #[getter]
+    fn vy_km_s(&self) -> f64 {
+        self.vy_km_s
+    }
+    #[cfg(feature = "python")]
+    #[getter]
+    fn vz_km_s(&self) -> f64 {
+        self.vz_km_s
+    }
     /// Returns the magnitude of the radius vector in km
     pub fn rmag_km(&self) -> f64 {
         (self.x_km.powi(2) + self.y_km.powi(2) + self.z_km.powi(2)).sqrt()
@@ -1500,6 +1535,11 @@ impl Orbit {
         format!("{self:x}")
     }
 
+    #[cfg(feature = "python")]
+    fn __eq__(&self, other: &Self) -> bool {
+        self == other
+    }
+
     /// Creates a new Orbit in the provided frame at the provided Epoch given the position and velocity components.
     ///
     /// **Units:** km, km, km, km/s, km/s, km/s
@@ -2061,7 +2101,10 @@ impl State for Orbit {
             StateParameter::VX => Ok(self.vx_km_s),
             StateParameter::VY => Ok(self.vy_km_s),
             StateParameter::VZ => Ok(self.vz_km_s),
-            _ => Err(NyxError::StateParameterUnavailable),
+            _ => Err(NyxError::StateParameterUnavailable(
+                param,
+                "no such parameter for orbit structure".to_string(),
+            )),
         }
     }
 
@@ -2097,7 +2140,12 @@ impl State for Orbit {
                 self.vy_km_s = new_radius.y;
                 self.vz_km_s = new_radius.z;
             }
-            _ => return Err(NyxError::StateParameterUnavailable),
+            _ => {
+                return Err(NyxError::StateParameterUnavailable(
+                    param,
+                    "not settable for orbit structure with set_value".to_string(),
+                ))
+            }
         }
         Ok(())
     }
