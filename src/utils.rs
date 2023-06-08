@@ -37,15 +37,17 @@ pub fn tilde_matrix(v: &Vector3<f64>) -> Matrix3<f64> {
     )
 }
 
-/// Returns whether the provided square matrix (3x3) is diagonal
+/// Returns whether the provided square matrix (3x3) is diagonal.
+///
+/// This function checks if a given 3x3 matrix is diagonal. A matrix is diagonal if all its off-diagonal elements are zero.
+///
+/// # Arguments
+///
+/// * `m` - A 3x3 matrix.
 pub fn is_diagonal(m: &Matrix3<f64>) -> bool {
-    for i in 1..2 {
-        for j in 0..i {
-            if i == j && (m[(i, j)] - m[(0, 0)]) > f64::EPSILON
-                || i != j
-                    && (m[(i, j)].abs() > f64::EPSILON
-                        || (m[(i, j)] - m[(j, i)]).abs() > f64::EPSILON)
-            {
+    for i in 0..3 {
+        for j in 0..3 {
+            if i != j && m[(i, j)].abs() > f64::EPSILON {
                 return false;
             }
         }
@@ -90,13 +92,19 @@ where
     true
 }
 
-/// Returns the provided angle bounded between 0.0 and 360.0
+/// Returns the provided angle bounded between 0.0 and 360.0.
+///
+/// This function takes an angle (in degrees) and normalizes it to the range [0, 360).
+/// If the angle is negative, it will be converted to a positive angle in the equivalent position.
+/// For example, an angle of -90 degrees will be converted to 270 degrees.
+///
+/// # Arguments
+///
+/// * `angle` - An angle in degrees.
+///
 pub fn between_0_360(angle: f64) -> f64 {
-    let mut bounded = angle;
-    while bounded > 360.0 {
-        bounded -= 360.0;
-    }
-    while bounded < 0.0 {
+    let mut bounded = angle % 360.0;
+    if bounded < 0.0 {
         bounded += 360.0;
     }
     bounded
@@ -107,13 +115,22 @@ pub fn between_pm_180(angle: f64) -> f64 {
     between_pm_x(angle, 180.0)
 }
 
-/// Returns the provided angle bounded between -x and +x
+/// Returns the provided angle bounded between -x and +x.
+///
+/// This function takes an angle (in degrees) and normalizes it to the range [-x, x).
+/// If the angle is outside this range, it will be converted to an equivalent angle within this range.
+/// For example, if x is 180, an angle of 270 degrees will be converted to -90 degrees.
+///
+/// # Arguments
+///
+/// * `angle` - An angle in degrees.
+/// * `x` - The boundary for the angle normalization.
 pub fn between_pm_x(angle: f64, x: f64) -> f64 {
-    let mut bounded = angle;
-    while bounded > x {
+    let mut bounded = angle % (2.0 * x);
+    if bounded > x {
         bounded -= 2.0 * x;
     }
-    while bounded < -x {
+    if bounded < -x {
         bounded += 2.0 * x;
     }
     bounded
@@ -396,6 +413,36 @@ fn test_projv() {
 fn test_angle_bounds() {
     assert!((between_pm_180(181.0) - -179.0).abs() < f64::EPSILON);
     assert!((between_0_360(-179.0) - 181.0).abs() < f64::EPSILON);
+}
+
+#[test]
+fn test_positive_angle() {
+    assert_eq!(between_0_360(450.0), 90.0);
+    assert_eq!(between_pm_x(270.0, 180.0), -90.0);
+}
+
+#[test]
+fn test_negative_angle() {
+    assert_eq!(between_0_360(-90.0), 270.0);
+    assert_eq!(between_pm_x(-270.0, 180.0), 90.0);
+}
+
+#[test]
+fn test_angle_in_range() {
+    assert_eq!(between_0_360(180.0), 180.0);
+    assert_eq!(between_pm_x(90.0, 180.0), 90.0);
+}
+
+#[test]
+fn test_zero_angle() {
+    assert_eq!(between_0_360(0.0), 0.0);
+    assert_eq!(between_pm_x(0.0, 180.0), 0.0);
+}
+
+#[test]
+fn test_full_circle_angle() {
+    assert_eq!(between_0_360(360.0), 0.0);
+    assert_eq!(between_pm_x(360.0, 180.0), 0.0);
 }
 
 #[test]
