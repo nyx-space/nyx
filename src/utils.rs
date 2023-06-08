@@ -113,13 +113,22 @@ pub fn between_pm_180(angle: f64) -> f64 {
     between_pm_x(angle, 180.0)
 }
 
-/// Returns the provided angle bounded between -x and +x
+/// Returns the provided angle bounded between -x and +x.
+///
+/// This function takes an angle (in degrees) and normalizes it to the range [-x, x).
+/// If the angle is outside this range, it will be converted to an equivalent angle within this range.
+/// For example, if x is 180, an angle of 270 degrees will be converted to -90 degrees.
+///
+/// # Arguments
+///
+/// * `angle` - An angle in degrees.
+/// * `x` - The boundary for the angle normalization.
 pub fn between_pm_x(angle: f64, x: f64) -> f64 {
-    let mut bounded = angle;
-    while bounded > x {
+    let mut bounded = angle % (2.0 * x);
+    if bounded > x {
         bounded -= 2.0 * x;
     }
-    while bounded < -x {
+    if bounded < -x {
         bounded += 2.0 * x;
     }
     bounded
@@ -407,26 +416,31 @@ fn test_angle_bounds() {
 #[test]
 fn test_positive_angle() {
     assert_eq!(between_0_360(450.0), 90.0);
+    assert_eq!(between_pm_x(270.0, 180.0), -90.0);
 }
 
 #[test]
 fn test_negative_angle() {
     assert_eq!(between_0_360(-90.0), 270.0);
+    assert_eq!(between_pm_x(-270.0, 180.0), 90.0);
 }
 
 #[test]
 fn test_angle_in_range() {
     assert_eq!(between_0_360(180.0), 180.0);
+    assert_eq!(between_pm_x(90.0, 180.0), 90.0);
 }
 
 #[test]
 fn test_zero_angle() {
     assert_eq!(between_0_360(0.0), 0.0);
+    assert_eq!(between_pm_x(0.0, 180.0), 0.0);
 }
 
 #[test]
 fn test_full_circle_angle() {
     assert_eq!(between_0_360(360.0), 0.0);
+    assert_eq!(between_pm_x(360.0, 180.0), 0.0);
 }
 
 #[test]
