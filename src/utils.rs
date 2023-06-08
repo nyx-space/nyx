@@ -90,13 +90,19 @@ where
     true
 }
 
-/// Returns the provided angle bounded between 0.0 and 360.0
+/// Returns the provided angle bounded between 0.0 and 360.0.
+///
+/// This function takes an angle (in degrees) and normalizes it to the range [0, 360).
+/// If the angle is negative, it will be converted to a positive angle in the equivalent position.
+/// For example, an angle of -90 degrees will be converted to 270 degrees.
+///
+/// # Arguments
+///
+/// * `angle` - An angle in degrees.
+///
 pub fn between_0_360(angle: f64) -> f64 {
-    let mut bounded = angle;
-    while bounded > 360.0 {
-        bounded -= 360.0;
-    }
-    while bounded < 0.0 {
+    let mut bounded = angle % 360.0;
+    if bounded < 0.0 {
         bounded += 360.0;
     }
     bounded
@@ -396,6 +402,31 @@ fn test_projv() {
 fn test_angle_bounds() {
     assert!((between_pm_180(181.0) - -179.0).abs() < f64::EPSILON);
     assert!((between_0_360(-179.0) - 181.0).abs() < f64::EPSILON);
+}
+
+#[test]
+fn test_positive_angle() {
+    assert_eq!(between_0_360(450.0), 90.0);
+}
+
+#[test]
+fn test_negative_angle() {
+    assert_eq!(between_0_360(-90.0), 270.0);
+}
+
+#[test]
+fn test_angle_in_range() {
+    assert_eq!(between_0_360(180.0), 180.0);
+}
+
+#[test]
+fn test_zero_angle() {
+    assert_eq!(between_0_360(0.0), 0.0);
+}
+
+#[test]
+fn test_full_circle_angle() {
+    assert_eq!(between_0_360(360.0), 0.0);
 }
 
 #[test]
