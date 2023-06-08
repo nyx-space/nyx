@@ -37,15 +37,17 @@ pub fn tilde_matrix(v: &Vector3<f64>) -> Matrix3<f64> {
     )
 }
 
-/// Returns whether the provided square matrix (3x3) is diagonal
+/// Returns whether the provided square matrix (3x3) is diagonal.
+///
+/// This function checks if a given 3x3 matrix is diagonal. A matrix is diagonal if all its off-diagonal elements are zero.
+///
+/// # Arguments
+///
+/// * `m` - A 3x3 matrix.
 pub fn is_diagonal(m: &Matrix3<f64>) -> bool {
-    for i in 1..2 {
-        for j in 0..i {
-            if i == j && (m[(i, j)] - m[(0, 0)]) > f64::EPSILON
-                || i != j
-                    && (m[(i, j)].abs() > f64::EPSILON
-                        || (m[(i, j)] - m[(j, i)]).abs() > f64::EPSILON)
-            {
+    for i in 0..3 {
+        for j in 0..3 {
+            if i != j && m[(i, j)].abs() > f64::EPSILON {
                 return false;
             }
         }
