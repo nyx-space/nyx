@@ -40,7 +40,7 @@ rayon = "1.6"
 lazy_static = "1.4.0"
 approx = "0.5"
 rand_pcg = "0.3"
-pyo3 = {version = "0.18.0", optional = true, features = ["extension-module"]}
+pyo3 = {version = "0.19.0", optional = true, features = ["extension-module"]}
 pyo3-log = {version = "0.8.2", optional = true}
 numpy = {version = "0.18", optional = true}
 indicatif = {version = "0.17", features = ["rayon"]}
