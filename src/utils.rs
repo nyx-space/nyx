@@ -346,25 +346,32 @@ fn test_tilde_matrix() {
     assert_eq!(tilde_matrix(&vec), rslt);
 }
 
+#[rustfmt::skip]
 #[test]
 fn test_diagonality() {
-    assert!(
-        !is_diagonal(&Matrix3::new(10.0, 0.0, 0.0, 1.0, 5.0, 0.0, 0.0, 0.0, 2.0)),
+    assert!(!is_diagonal(&Matrix3::new(10.0, 0.0, 0.0,
+                                       1.0, 5.0, 0.0,
+                                       0.0, 0.0, 2.0)),
         "lower triangular"
     );
-
-    assert!(
-        !is_diagonal(&Matrix3::new(10.0, 1.0, 0.0, 1.0, 5.0, 0.0, 0.0, 0.0, 2.0)),
+    assert!(!is_diagonal(&Matrix3::new(10.0, 1.0, 0.0,
+                                       1.0, 5.0, 0.0,
+                                       0.0, 0.0, 2.0)),
         "symmetric but not diag"
     );
-
-    assert!(
-        !is_diagonal(&Matrix3::new(10.0, 1.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 2.0)),
+    assert!(!is_diagonal(&Matrix3::new(10.0, 1.0, 0.0,
+                                       0.0, 5.0, 0.0,
+                                       0.0, 0.0, 2.0)),
         "upper triangular"
     );
-
-    assert!(
-        is_diagonal(&Matrix3::new(10.0, 0.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 2.0)),
+    assert!(is_diagonal(&Matrix3::new(10.0, 0.0, 0.0,
+                                       0.0, 0.0, 0.0,
+                                       0.0, 0.0, 2.0)),
+        "diagonal with zero diagonal element"
+    );
+    assert!(is_diagonal(&Matrix3::new(10.0, 0.0, 0.0,
+                                      0.0, 5.0, 0.0,
+                                      0.0, 0.0, 2.0)),
         "diagonal"
     );
 }
