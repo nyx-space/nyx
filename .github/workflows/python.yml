@@ -74,15 +74,21 @@ jobs:
           name: od-plots
           path: output_data/*.html
 
+      - name: Get short SHA
+        id: short-sha
+        run: echo "::set-output name=sha::$(echo ${GITHUB_SHA::8})"
+        
       - name: Build and push Docker image
-        if: startsWith(matrix.target, 'x86_64') && (startsWith(github.ref, 'refs/tags/') || (startsWith(matrix.target, 'x86_64') && github.ref == 'refs/heads/master'))
+        if: startsWith(matrix.target, 'x86_64')
         uses: docker/build-push-action@v2
         with:
           context: .
-          file: ./docker/Dockerfile.pkg
+          file: ./Dockerfile
           push: true
-          tags: ghcr.io/nyx-space/nyx:${{ startsWith(github.ref, 'refs/tags/') && substr(github.ref, 10) || 'latest' }}
-  
+          tags: |
+            ghcr.io/nyx-space/nyx:${{ steps.short-sha.outputs.sha }}
+            ghcr.io/nyx-space/nyx:${{ github.ref == 'refs/heads/master' && 'latest' || steps.short-sha.outputs.sha }}
+            ghcr.io/nyx-space/nyx:${{ startsWith(github.ref, 'refs/tags/') && substr(github.ref, 10) || steps.short-sha.outputs.sha }}
 
   windows:
     runs-on: windows-latest
