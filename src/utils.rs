@@ -77,6 +77,9 @@ pub fn is_diagonal(m: &Matrix3<f64>) -> bool {
 /// let eigenvalues = OVector::from_vec(vec![Complex::new(-1.0, 0.0), Complex::new(0.0, 1.0)]);
 /// assert_eq!(are_eigenvalues_stable(eigenvalues), true);
 /// ```
+/// # Source
+///
+/// [Chemical Process Dynamics and Controls (Woolf)](https://eng.libretexts.org/Bookshelves/Industrial_and_Systems_Engineering/Book%3A_Chemical_Process_Dynamics_and_Controls_(Woolf)/10%3A_Dynamical_Systems_Analysis/10.04%3A_Using_eigenvalues_and_eigenvectors_to_find_stability_and_solve_ODEs#Summary_of_Eigenvalue_Graphs)
 pub fn are_eigenvalues_stable<N: DimName>(eigenvalues: OVector<Complex<f64>, N>) -> bool
 where
     DefaultAllocator: Allocator<Complex<f64>, N>,
