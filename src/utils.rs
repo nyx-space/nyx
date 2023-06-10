@@ -145,31 +145,133 @@ pub fn kronecker(a: f64, b: f64) -> f64 {
     }
 }
 
-/// Returns a rotation about the X axis. The angle must be provided in radians.
-/// WARNING: this is a COORDINATE SYSTEM rotation by x radians; this matrix, when applied to a vector, rotates the vector by -x  radians, not x radians.
+/// Returns a rotation matrix for a rotation about the X axis.
+///
+/// # Arguments
+///
+/// * `angle` - The angle of rotation in radians.
+///
+/// # Warning
+///
+/// This function returns a matrix for a COORDINATE SYSTEM rotation by `angle` radians.
+/// When this matrix is applied to a vector, it rotates the vector by `-angle` radians, not `angle` radians.
 /// Applying the matrix to a vector yields the vector's representation relative to the rotated coordinate system.
-/// Source: https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/cspice/eul2xf_c.html
+///
+/// # Example
+///
+/// ```
+/// let angle = std::f64::consts::PI / 2.0;
+/// let rotation_matrix = r1(angle);
+/// ```
+///
+/// # Source
+///
+/// [NAIF SPICE Toolkit](https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/cspice/eul2xf_c.html)
 pub fn r1(angle: f64) -> Matrix3<f64> {
     let (s, c) = angle.sin_cos();
     Matrix3::new(1.0, 0.0, 0.0, 0.0, c, s, 0.0, -s, c)
 }
 
-/// Returns a rotation about the Y axis. The angle must be provided in radians.
-/// WARNING: this is a COORDINATE SYSTEM rotation by x radians; this matrix, when applied to a vector, rotates the vector by -x  radians, not x radians.
+#[test]
+fn test_r1() {
+    let angle = 0.0;
+    let rotation_matrix = r1(angle);
+    assert!((rotation_matrix - Matrix3::identity()).abs().max() <= f64::EPSILON);
+
+    let angle = std::f64::consts::PI / 2.0;
+    let rotation_matrix = r1(angle);
+    let expected_matrix = Matrix3::new(1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0);
+    assert!((rotation_matrix - expected_matrix).abs().max() <= f64::EPSILON);
+
+    let v = Vector3::new(1.0, 0.0, 0.0);
+    let rotated_v = rotation_matrix * v;
+    assert!((rotated_v - v).norm() <= f64::EPSILON);
+}
+
+/// Returns a rotation matrix for a rotation about the Y axis.
+///
+/// # Arguments
+///
+/// * `angle` - The angle of rotation in radians.
+///
+/// # Warning
+///
+/// This function returns a matrix for a COORDINATE SYSTEM rotation by `angle` radians.
+/// When this matrix is applied to a vector, it rotates the vector by `-angle` radians, not `angle` radians.
 /// Applying the matrix to a vector yields the vector's representation relative to the rotated coordinate system.
-/// Source: https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/cspice/eul2xf_c.html
+///
+/// # Example
+///
+/// ```
+/// let angle = std::f64::consts::PI / 2.0;
+/// let rotation_matrix = r2(angle);
+/// ```
+///
+/// # Source
+///
+/// [NAIF SPICE Toolkit](https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/cspice/eul2xf_c.html)
 pub fn r2(angle: f64) -> Matrix3<f64> {
     let (s, c) = angle.sin_cos();
     Matrix3::new(c, 0.0, -s, 0.0, 1.0, 0.0, s, 0.0, c)
 }
 
-/// Returns a rotation about the Z axis. The angle must be provided in radians.
-/// WARNING: this is a COORDINATE SYSTEM rotation by x radians; this matrix, when applied to a vector, rotates the vector by -x  radians, not x radians.
+#[test]
+fn test_r2() {
+    let angle = 0.0;
+    let rotation_matrix = r2(angle);
+    assert!((rotation_matrix - Matrix3::identity()).abs().max() <= f64::EPSILON);
+
+    let angle = std::f64::consts::PI / 2.0;
+    let rotation_matrix = r2(angle);
+    let expected_matrix = Matrix3::new(0.0, 0.0, -1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0);
+    assert!((rotation_matrix - expected_matrix).abs().max() <= f64::EPSILON);
+
+    let v = Vector3::new(0.0, 1.0, 0.0);
+    let rotated_v = rotation_matrix * v;
+    assert!((rotated_v - v).norm() <= f64::EPSILON);
+}
+
+/// Returns a rotation matrix for a rotation about the Z axis.
+///
+/// # Arguments
+///
+/// * `angle` - The angle of rotation in radians.
+///
+/// # Warning
+///
+/// This function returns a matrix for a COORDINATE SYSTEM rotation by `angle` radians.
+/// When this matrix is applied to a vector, it rotates the vector by `-angle` radians, not `angle` radians.
 /// Applying the matrix to a vector yields the vector's representation relative to the rotated coordinate system.
-/// Source: https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/cspice/eul2xf_c.html
+///
+/// # Example
+///
+/// ```
+/// let angle = std::f64::consts::PI / 2.0;
+/// let rotation_matrix = r3(angle);
+/// ```
+///
+/// # Source
+///
+/// [NAIF SPICE Toolkit](https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/cspice/eul2xf_c.html)
 pub fn r3(angle: f64) -> Matrix3<f64> {
     let (s, c) = angle.sin_cos();
     Matrix3::new(c, s, 0.0, -s, c, 0.0, 0.0, 0.0, 1.0)
+}
+
+#[test]
+fn test_r3() {
+    let angle = 0.0;
+    let rotation_matrix = r3(angle);
+    assert!((rotation_matrix - Matrix3::identity()).abs().max() <= f64::EPSILON);
+
+    let angle = std::f64::consts::PI / 2.0;
+    let rotation_matrix = r3(angle);
+    let expected_matrix = Matrix3::new(0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0);
+    assert!((rotation_matrix - expected_matrix).abs().max() <= f64::EPSILON);
+
+    let v = Vector3::new(0.0, 0.0, 1.0);
+    let rotated_v = rotation_matrix * v;
+    assert!((rotated_v - v).norm() <= f64::EPSILON);
 }
 
 /// Rotate a vector about a given axis
