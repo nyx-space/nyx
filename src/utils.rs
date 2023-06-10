@@ -173,30 +173,96 @@ pub fn r3(angle: f64) -> Matrix3<f64> {
 }
 
 /// Rotate a vector about a given axis
+///
+/// # Arguments
+///
+/// * `v` - A vector to be rotated.
+/// * `axis` - The axis around which to rotate the vector.
+/// * `theta` - The angle by which to rotate the vector.
+///
+/// # Returns
+///
+/// A new vector that is the result of rotating `v` around `axis` by `theta` radians.
 pub fn rotv(v: &Vector3<f64>, axis: &Vector3<f64>, theta: f64) -> Vector3<f64> {
-    let k_hat = axis / axis.norm();
-    v * theta.cos() + k_hat.cross(v) * theta.sin() + k_hat.dot(v) * k_hat * (1.0 - theta.cos())
+    let k_hat = axis.normalize();
+    v.scale(theta.cos())
+        + k_hat.cross(v).scale(theta.sin())
+        + k_hat.scale(k_hat.dot(v) * (1.0 - theta.cos()))
 }
 
 /// Returns the components of vector a orthogonal to b
+///
+/// # Arguments
+///
+/// * `a` - The vector whose orthogonal components are to be calculated.
+/// * `b` - The vector to which `a` is to be made orthogonal.
+///
+/// # Returns
+///
+/// A new vector that is the orthogonal projection of `a` onto `b`.
 pub fn perpv(a: &Vector3<f64>, b: &Vector3<f64>) -> Vector3<f64> {
-    let big_a = a[0].abs().max(a[1].abs().max(a[2].abs()));
-    let big_b = b[0].abs().max(b[1].abs().max(b[2].abs()));
+    let big_a = a.amax();
+    let big_b = b.amax();
     if big_a < f64::EPSILON {
         Vector3::zeros()
     } else if big_b < f64::EPSILON {
         *a
     } else {
-        let a_scl = a / big_a;
-        let b_scl = b / big_b;
+        let a_scl = a.scale(1.0 / big_a);
+        let b_scl = b.scale(1.0 / big_b);
         let v = projv(&a_scl, &b_scl);
-        big_a * (a_scl - v)
+        (a_scl - v).scale(big_a)
     }
 }
 
 /// Returns the projection of a onto b
+///
+/// # Arguments
+///
+/// * `a` - The vector to be projected.
+/// * `b` - The vector onto which `a` is to be projected.
+///
+/// # Returns
+///
+/// * A new vector that is the projection of `a` onto `b`.
 pub fn projv(a: &Vector3<f64>, b: &Vector3<f64>) -> Vector3<f64> {
-    b * a.dot(b) / b.dot(b)
+    let b_norm_squared = b.norm_squared();
+    if b_norm_squared.abs() < f64::EPSILON {
+        Vector3::zeros()
+    } else {
+        b.scale(a.dot(b) / b_norm_squared)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use approx::assert_abs_diff_eq;
+
+    #[test]
+    fn test_rotv() {
+        let v = Vector3::new(1.0, 0.0, 0.0);
+        let axis = Vector3::new(0.0, 0.0, 1.0);
+        let theta = std::f64::consts::PI / 2.0;
+        let result = rotv(&v, &axis, theta);
+        assert_abs_diff_eq!(result, Vector3::new(0.0, 1.0, 0.0), epsilon = 1e-7);
+    }
+
+    #[test]
+    fn test_perpv() {
+        let a = Vector3::new(1.0, 1.0, 0.0);
+        let b = Vector3::new(1.0, 0.0, 0.0);
+        let result = perpv(&a, &b);
+        assert_abs_diff_eq!(result, Vector3::new(0.0, 1.0, 0.0), epsilon = 1e-7);
+    }
+
+    #[test]
+    fn test_projv() {
+        let a = Vector3::new(1.0, 1.0, 0.0);
+        let b = Vector3::new(1.0, 0.0, 0.0);
+        let result = projv(&a, &b);
+        assert_abs_diff_eq!(result, Vector3::new(1.0, 0.0, 0.0), epsilon = 1e-7);
+    }
 }
 
 /// Computes the RSS state errors in two provided vectors
