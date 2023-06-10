@@ -221,6 +221,18 @@ where
         .sqrt()
 }
 
+#[test]
+fn test_rss_errors() {
+    use nalgebra::U3;
+    let prop_err = OVector::<f64, U3>::from_iterator([1.0, 2.0, 3.0]);
+    let cur_state = OVector::<f64, U3>::from_iterator([1.0, 2.0, 3.0]);
+    assert_eq!(rss_errors(&prop_err, &cur_state), 0.0);
+
+    let prop_err = OVector::<f64, U3>::from_iterator([1.0, 2.0, 3.0]);
+    let cur_state = OVector::<f64, U3>::from_iterator([4.0, 5.0, 6.0]);
+    assert_eq!(rss_errors(&prop_err, &cur_state), 5.196152422706632);
+}
+
 /// Computes the Root Sum Squared (RSS) orbit errors in kilometers and kilometers per second.
 ///
 /// # Arguments
