@@ -55,41 +55,73 @@ pub fn is_diagonal(m: &Matrix3<f64>) -> bool {
     true
 }
 
-/// Returns whether this matrix represent a stable linear system looking at its eigen values.
-/// NOTE: This code is not super pretty on purpose to make it clear that we're covering all of the cases
-#[allow(clippy::if_same_then_else)]
-#[allow(clippy::branches_sharing_code)]
+/// Checks if the given matrix represents a stable linear system by examining its eigenvalues.
+///
+/// Stability of a linear system is determined by the properties of its eigenvalues:
+/// - If any eigenvalue has a positive real part, the system is unstable.
+/// - If the real part of an eigenvalue is zero and the imaginary part is non-zero, the system is oscillatory.
+/// - If the real part of an eigenvalue is negative, the system tends towards stability.
+/// - If both the real and imaginary parts of an eigenvalue are zero, the system is invariant.
+///
+/// # Arguments
+///
+/// `eigenvalues` - A vector of complex numbers representing the eigenvalues of the system.
+///
+/// # Returns
+///
+/// `bool` - Returns `true` if the system is stable, `false` otherwise.
+///
+/// # Example
+///
+/// ```
+/// let eigenvalues = OVector::from_vec(vec![Complex::new(-1.0, 0.0), Complex::new(0.0, 1.0)]);
+/// assert_eq!(are_eigenvalues_stable(eigenvalues), true);
+/// ```
 pub fn are_eigenvalues_stable<N: DimName>(eigenvalues: OVector<Complex<f64>, N>) -> bool
 where
     DefaultAllocator: Allocator<Complex<f64>, N>,
 {
-    // Source: https://eng.libretexts.org/Bookshelves/Industrial_and_Systems_Engineering/Book%3A_Chemical_Process_Dynamics_and_Controls_(Woolf)/10%3A_Dynamical_Systems_Analysis/10.04%3A_Using_eigenvalues_and_eigenvectors_to_find_stability_and_solve_ODEs#Summary_of_Eigenvalue_Graphs
-    for ev in &eigenvalues {
-        if ev.im.abs() > 0.0 {
-            // There is an imaginary part to this eigenvalue
-            if ev.re > 0.0 {
-                // At least one of the EVs has a positive real part and a non-zero imaginary part
-                // This is sufficient condition for unstability
-                return false;
-            } else {
-                // Option 1: The real part is zero, the system is oscilliatory
-                // Option 2: The real part is negative, so the systems tends toward stability
-                continue;
-            }
-        } else {
-            // There is no imaginary part
-            if ev.re > 0.0 {
-                // Real value is positive, so the system is unstable
-                return false;
-            } else {
-                // Option 1: The real value is negative, so the system is stable
-                // Option 2: The real value is zero, so the system is invariant
-                continue;
-            }
-        }
+    eigenvalues.iter().all(|ev| ev.re <= 0.0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use nalgebra::{Complex, OVector};
+
+    #[test]
+    fn test_stable_eigenvalues() {
+        let eigenvalues = OVector::<Complex<f64>, nalgebra::U2>::from_column_slice(&[
+            Complex::new(-1.0, 0.0),
+            Complex::new(0.0, 0.0),
+        ]);
+        assert!(are_eigenvalues_stable(eigenvalues));
     }
 
-    true
+    #[test]
+    fn test_unstable_eigenvalues() {
+        let eigenvalues = OVector::<Complex<f64>, nalgebra::U2>::from_column_slice(&[
+            Complex::new(1.0, 0.0),
+            Complex::new(0.0, 0.0),
+        ]);
+        assert!(!are_eigenvalues_stable(eigenvalues));
+    }
+
+    #[test]
+    fn test_oscillatory_eigenvalues() {
+        let eigenvalues = OVector::<Complex<f64>, nalgebra::U2>::from_column_slice(&[
+            Complex::new(0.0, 1.0),
+            Complex::new(0.0, -1.0),
+        ]);
+        assert!(are_eigenvalues_stable(eigenvalues));
+    }
+
+    #[test]
+    fn test_invariant_eigenvalues() {
+        let eigenvalues =
+            OVector::<Complex<f64>, nalgebra::U1>::from_column_slice(&[Complex::new(0.0, 0.0)]);
+        assert!(are_eigenvalues_stable(eigenvalues));
+    }
 }
 
 /// Returns the provided angle bounded between 0.0 and 360.0.
