@@ -190,6 +190,16 @@ pub fn rotv(v: &Vector3<f64>, axis: &Vector3<f64>, theta: f64) -> Vector3<f64> {
         + k_hat.scale(k_hat.dot(v) * (1.0 - theta.cos()))
 }
 
+#[test]
+fn test_rotv() {
+    use approx::assert_abs_diff_eq;
+    let v = Vector3::new(1.0, 0.0, 0.0);
+    let axis = Vector3::new(0.0, 0.0, 1.0);
+    let theta = std::f64::consts::PI / 2.0;
+    let result = rotv(&v, &axis, theta);
+    assert_abs_diff_eq!(result, Vector3::new(0.0, 1.0, 0.0), epsilon = 1e-7);
+}
+
 /// Returns the components of vector a orthogonal to b
 ///
 /// # Arguments
@@ -215,6 +225,31 @@ pub fn perpv(a: &Vector3<f64>, b: &Vector3<f64>) -> Vector3<f64> {
     }
 }
 
+#[test]
+fn test_perpv() {
+    assert_eq!(
+        perpv(&Vector3::new(6.0, 6.0, 6.0), &Vector3::new(2.0, 0.0, 0.0)),
+        Vector3::new(0.0, 6.0, 6.0)
+    );
+    assert_eq!(
+        perpv(&Vector3::new(6.0, 6.0, 6.0), &Vector3::new(-3.0, 0.0, 0.0)),
+        Vector3::new(0.0, 6.0, 6.0)
+    );
+    assert_eq!(
+        perpv(&Vector3::new(6.0, 6.0, 0.0), &Vector3::new(0.0, 7.0, 0.0)),
+        Vector3::new(6.0, 0.0, 0.0)
+    );
+    assert_eq!(
+        perpv(&Vector3::new(6.0, 0.0, 0.0), &Vector3::new(0.0, 0.0, 9.0)),
+        Vector3::new(6.0, 0.0, 0.0)
+    );
+    use approx::assert_abs_diff_eq;
+    let a = Vector3::new(1.0, 1.0, 0.0);
+    let b = Vector3::new(1.0, 0.0, 0.0);
+    let result = perpv(&a, &b);
+    assert_abs_diff_eq!(result, Vector3::new(0.0, 1.0, 0.0), epsilon = 1e-7);
+}
+
 /// Returns the projection of a onto b
 ///
 /// # Arguments
@@ -234,35 +269,30 @@ pub fn projv(a: &Vector3<f64>, b: &Vector3<f64>) -> Vector3<f64> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#[test]
+fn test_projv() {
+    assert_eq!(
+        projv(&Vector3::new(6.0, 6.0, 6.0), &Vector3::new(2.0, 0.0, 0.0)),
+        Vector3::new(6.0, 0.0, 0.0)
+    );
+    assert_eq!(
+        projv(&Vector3::new(6.0, 6.0, 6.0), &Vector3::new(-3.0, 0.0, 0.0)),
+        Vector3::new(6.0, 0.0, 0.0)
+    );
+    assert_eq!(
+        projv(&Vector3::new(6.0, 6.0, 0.0), &Vector3::new(0.0, 7.0, 0.0)),
+        Vector3::new(0.0, 6.0, 0.0)
+    );
+    assert_eq!(
+        projv(&Vector3::new(6.0, 0.0, 0.0), &Vector3::new(0.0, 0.0, 9.0)),
+        Vector3::new(0.0, 0.0, 0.0)
+    );
+
     use approx::assert_abs_diff_eq;
-
-    #[test]
-    fn test_rotv() {
-        let v = Vector3::new(1.0, 0.0, 0.0);
-        let axis = Vector3::new(0.0, 0.0, 1.0);
-        let theta = std::f64::consts::PI / 2.0;
-        let result = rotv(&v, &axis, theta);
-        assert_abs_diff_eq!(result, Vector3::new(0.0, 1.0, 0.0), epsilon = 1e-7);
-    }
-
-    #[test]
-    fn test_perpv() {
-        let a = Vector3::new(1.0, 1.0, 0.0);
-        let b = Vector3::new(1.0, 0.0, 0.0);
-        let result = perpv(&a, &b);
-        assert_abs_diff_eq!(result, Vector3::new(0.0, 1.0, 0.0), epsilon = 1e-7);
-    }
-
-    #[test]
-    fn test_projv() {
-        let a = Vector3::new(1.0, 1.0, 0.0);
-        let b = Vector3::new(1.0, 0.0, 0.0);
-        let result = projv(&a, &b);
-        assert_abs_diff_eq!(result, Vector3::new(1.0, 0.0, 0.0), epsilon = 1e-7);
-    }
+    let a = Vector3::new(1.0, 1.0, 0.0);
+    let b = Vector3::new(1.0, 0.0, 0.0);
+    let result = projv(&a, &b);
+    assert_abs_diff_eq!(result, Vector3::new(1.0, 0.0, 0.0), epsilon = 1e-7);
 }
 
 /// Computes the RSS state errors in two provided vectors
@@ -294,23 +324,80 @@ pub fn rss_orbit_vec_errors(prop_err: &Vector6<f64>, cur_state: &Vector6<f64>) -
     (err_radius, err_velocity)
 }
 
-// Normalize between -1.0 and 1.0
+/// Normalize a value between -1.0 and 1.0
+///
+/// # Arguments
+///
+/// * `x` - The value to be normalized.
+/// * `min_x` - The minimum value in the range of `x`.
+/// * `max_x` - The maximum value in the range of `x`.
+///
+/// # Returns
+///
+/// A normalized value between -1.0 and 1.0.
 pub fn normalize(x: f64, min_x: f64, max_x: f64) -> f64 {
     2.0 * (x - min_x) / (max_x - min_x) - 1.0
 }
 
-// Denormalize between -1.0 and 1.0
+#[test]
+fn test_normalize() {
+    let x = 5.0;
+    let min_x = 0.0;
+    let max_x = 10.0;
+    let result = normalize(x, min_x, max_x);
+    assert_eq!(result, 0.0);
+}
+
+/// Denormalize a value between -1.0 and 1.0
+///
+/// # Arguments
+///
+/// * `xp` - The value to be denormalized.
+/// * `min_x` - The minimum value in the original range.
+/// * `max_x` - The maximum value in the original range.
+///
+/// # Returns
+///
+/// A denormalized value between `min_x` and `max_x`.
 pub fn denormalize(xp: f64, min_x: f64, max_x: f64) -> f64 {
     (max_x - min_x) * (xp + 1.0) / 2.0 + min_x
 }
 
-// Source: https://stackoverflow.com/questions/38406793/why-is-capitalizing-the-first-letter-of-a-string-so-convoluted-in-rust
+#[test]
+fn test_denormalize() {
+    let xp = 0.0;
+    let min_x = 0.0;
+    let max_x = 10.0;
+    let result = denormalize(xp, min_x, max_x);
+    assert_eq!(result, 5.0);
+}
+
+/// Capitalize the first letter of a string
+///
+/// # Arguments
+///
+/// `s` - The string to be capitalized.
+///
+/// # Returns
+///
+/// A new string with the first letter capitalized.
+///
+/// # Source
+///
+/// https://stackoverflow.com/questions/38406793/why-is-capitalizing-the-first-letter-of-a-string-so-convoluted-in-rust
 pub fn capitalize(s: &str) -> String {
     let mut c = s.chars();
     match c.next() {
         None => String::new(),
         Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
     }
+}
+
+#[test]
+fn test_capitalize() {
+    let s = "hello";
+    let result = capitalize(s);
+    assert_eq!(result, "Hello");
 }
 
 /// Builds a 6x6 DCM from the current, previous, and post DCMs, assuming that the previous and post DCMs are exactly one second before and one second after the current DCM.
@@ -432,46 +519,6 @@ fn test_diagonality() {
     assert!(
         is_diagonal(&Matrix3::new(10.0, 0.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 2.0)),
         "diagonal"
-    );
-}
-
-#[test]
-fn test_perpv() {
-    assert_eq!(
-        perpv(&Vector3::new(6.0, 6.0, 6.0), &Vector3::new(2.0, 0.0, 0.0)),
-        Vector3::new(0.0, 6.0, 6.0)
-    );
-    assert_eq!(
-        perpv(&Vector3::new(6.0, 6.0, 6.0), &Vector3::new(-3.0, 0.0, 0.0)),
-        Vector3::new(0.0, 6.0, 6.0)
-    );
-    assert_eq!(
-        perpv(&Vector3::new(6.0, 6.0, 0.0), &Vector3::new(0.0, 7.0, 0.0)),
-        Vector3::new(6.0, 0.0, 0.0)
-    );
-    assert_eq!(
-        perpv(&Vector3::new(6.0, 0.0, 0.0), &Vector3::new(0.0, 0.0, 9.0)),
-        Vector3::new(6.0, 0.0, 0.0)
-    );
-}
-
-#[test]
-fn test_projv() {
-    assert_eq!(
-        projv(&Vector3::new(6.0, 6.0, 6.0), &Vector3::new(2.0, 0.0, 0.0)),
-        Vector3::new(6.0, 0.0, 0.0)
-    );
-    assert_eq!(
-        projv(&Vector3::new(6.0, 6.0, 6.0), &Vector3::new(-3.0, 0.0, 0.0)),
-        Vector3::new(6.0, 0.0, 0.0)
-    );
-    assert_eq!(
-        projv(&Vector3::new(6.0, 6.0, 0.0), &Vector3::new(0.0, 7.0, 0.0)),
-        Vector3::new(0.0, 6.0, 0.0)
-    );
-    assert_eq!(
-        projv(&Vector3::new(6.0, 0.0, 0.0), &Vector3::new(0.0, 0.0, 9.0)),
-        Vector3::new(0.0, 0.0, 0.0)
     );
 }
 
