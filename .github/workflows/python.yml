@@ -197,6 +197,10 @@ jobs:
         id: short-sha
         run: echo "::set-output name=sha::$(echo ${GITHUB_SHA::8})"
 
+      - name: Get the version
+        id: get_version
+        run: echo ::set-output name=VERSION::${GITHUB_REF#refs/tags/}
+
       - name: Build and push Docker image with built package
         uses: docker/build-push-action@v2
         with:
@@ -206,6 +210,6 @@ jobs:
           tags: |
             ghcr.io/nyx-space/nyx:${{ steps.short-sha.outputs.sha }}
             ghcr.io/nyx-space/nyx:${{ github.ref == 'refs/heads/master' && 'latest' || steps.short-sha.outputs.sha }}
-            ghcr.io/nyx-space/nyx:${{ startsWith(github.ref, 'refs/tags/') && substr(github.ref, 10) || steps.short-sha.outputs.sha }}
+            ghcr.io/nyx-space/nyx:${{ startsWith(github.ref, 'refs/tags/') && steps.get_version.outputs.VERSION || steps.short-sha.outputs.sha }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
