@@ -74,22 +74,6 @@ jobs:
           name: od-plots
           path: output_data/*.html
 
-      - name: Get short SHA
-        id: short-sha
-        run: echo "::set-output name=sha::$(echo ${GITHUB_SHA::8})"
-        
-      - name: Build and push Docker image
-        if: startsWith(matrix.target, 'x86_64')
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: |
-            ghcr.io/nyx-space/nyx:${{ steps.short-sha.outputs.sha }}
-            ghcr.io/nyx-space/nyx:${{ github.ref == 'refs/heads/master' && 'latest' || steps.short-sha.outputs.sha }}
-            ghcr.io/nyx-space/nyx:${{ startsWith(github.ref, 'refs/tags/') && substr(github.ref, 10) || steps.short-sha.outputs.sha }}
-
   windows:
     runs-on: windows-latest
     strategy:
@@ -182,3 +166,46 @@ jobs:
         with:
           command: upload
           args: --skip-existing *
+
+  packaging:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Cache Docker layers
+        uses: actions/cache@v2
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Build development image
+        run: docker build -f Dockerfile.dev -t nyx-build .
+
+      - name: Run development container and build the package
+        run: docker run --name nyx-builder nyx-build
+
+      - name: Copy built package from container to host
+        run: docker cp nyx-builder:/app/dist ./dist
+
+      - name: Get short SHA
+        id: short-sha
+        run: echo "::set-output name=sha::$(echo ${GITHUB_SHA::8})"
+
+      - name: Build and push Docker image with built package
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ./Dockerfile.pkg
+          push: true
+          tags: |
+            ghcr.io/nyx-space/nyx:${{ steps.short-sha.outputs.sha }}
+            ghcr.io/nyx-space/nyx:${{ github.ref == 'refs/heads/master' && 'latest' || steps.short-sha.outputs.sha }}
+            ghcr.io/nyx-space/nyx:${{ startsWith(github.ref, 'refs/tags/') && substr(github.ref, 10) || steps.short-sha.outputs.sha }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
