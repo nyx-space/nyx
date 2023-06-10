@@ -301,19 +301,50 @@ pub fn projv(a: &Vector3<f64>, b: &Vector3<f64>) -> Vector3<f64> {
     b * a.dot(b) / b.dot(b)
 }
 
-/// Computes the RSS state errors in two provided vectors
+/// Computes the Root Sum Squared (RSS) state errors between two provided vectors.
+///
+/// # Arguments
+///
+/// * `prop_err` - A vector representing the propagated error.
+/// * `cur_state` - A vector representing the current state.
+///
+/// # Returns
+///
+/// A f64 value representing the RSS state error.
 pub fn rss_errors<N: DimName>(prop_err: &OVector<f64, N>, cur_state: &OVector<f64, N>) -> f64
 where
     DefaultAllocator: Allocator<f64, N>,
 {
-    let mut v = 0.0;
-    for i in 0..N::dim() {
-        v += (prop_err[i] - cur_state[i]).powi(2);
-    }
-    v.sqrt()
+    prop_err
+        .iter()
+        .zip(cur_state.iter())
+        .map(|(&x, &y)| (x - y).powi(2))
+        .sum::<f64>()
+        .sqrt()
 }
 
-/// Returns the RSS orbit errors in kilometers and kilometers per second
+#[test]
+fn test_rss_errors() {
+    use nalgebra::U3;
+    let prop_err = OVector::<f64, U3>::from_iterator([1.0, 2.0, 3.0]);
+    let cur_state = OVector::<f64, U3>::from_iterator([1.0, 2.0, 3.0]);
+    assert_eq!(rss_errors(&prop_err, &cur_state), 0.0);
+
+    let prop_err = OVector::<f64, U3>::from_iterator([1.0, 2.0, 3.0]);
+    let cur_state = OVector::<f64, U3>::from_iterator([4.0, 5.0, 6.0]);
+    assert_eq!(rss_errors(&prop_err, &cur_state), 5.196152422706632);
+}
+
+/// Computes the Root Sum Squared (RSS) orbit errors in kilometers and kilometers per second.
+///
+/// # Arguments
+///
+/// * `prop_err` - An Orbit instance representing the propagated error.
+/// * `cur_state` - An Orbit instance representing the current state.
+///
+/// # Returns
+///
+/// A tuple of f64 values representing the RSS orbit errors in radius and velocity.
 pub fn rss_orbit_errors(prop_err: &Orbit, cur_state: &Orbit) -> (f64, f64) {
     (
         rss_errors(&prop_err.radius(), &cur_state.radius()),
@@ -321,12 +352,19 @@ pub fn rss_orbit_errors(prop_err: &Orbit, cur_state: &Orbit) -> (f64, f64) {
     )
 }
 
-/// Computes the RSS state errors in position and in velocity of two orbit vectors [P V]
+/// Computes the Root Sum Squared (RSS) state errors in position and in velocity of two orbit vectors [P V].
+///
+/// # Arguments
+///
+/// * `prop_err` - A Vector6 instance representing the propagated error.
+/// * `cur_state` - A Vector6 instance representing the current state.
+///
+/// # Returns
+///
+/// A tuple of f64 values representing the RSS orbit vector errors in radius and velocity.
 pub fn rss_orbit_vec_errors(prop_err: &Vector6<f64>, cur_state: &Vector6<f64>) -> (f64, f64) {
     let err_radius = (prop_err.fixed_rows::<3>(0) - cur_state.fixed_rows::<3>(0)).norm();
-
     let err_velocity = (prop_err.fixed_rows::<3>(3) - cur_state.fixed_rows::<3>(3)).norm();
-
     (err_radius, err_velocity)
 }
 
