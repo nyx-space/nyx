@@ -37,13 +37,34 @@ pub fn tilde_matrix(v: &Vector3<f64>) -> Matrix3<f64> {
     )
 }
 
-/// Returns whether the provided square matrix (3x3) is diagonal.
+/// Checks if the provided 3x3 matrix is diagonal.
 ///
-/// This function checks if a given 3x3 matrix is diagonal. A matrix is diagonal if all its off-diagonal elements are zero.
+/// A square matrix is considered diagonal if all its off-diagonal elements are zero.
+/// This function verifies this property for a given 3x3 matrix.
+/// It checks each off-diagonal element of the matrix and returns `false` if any of them
+/// is not approximately zero, considering a tolerance defined by `f64::EPSILON`.
 ///
 /// # Arguments
 ///
-/// * `m` - A 3x3 matrix.
+/// * `m` - A 3x3 matrix of `f64` elements to be checked.
+///
+/// # Returns
+///
+/// * `bool` - Returns `true` if the matrix is diagonal, `false` otherwise.
+///
+/// # Example
+///
+/// ```
+/// let m = Matrix3::new(1.0, 0.0, 0.0,
+///                      0.0, 2.0, 0.0,
+///                      0.0, 0.0, 3.0);
+/// assert_eq!(is_diagonal(&m), true);
+/// ```
+///
+/// # Note
+///
+/// This function uses `f64::EPSILON` as the tolerance for checking if an element is approximately zero.
+/// This means that elements with absolute value less than `f64::EPSILON` are considered zero.
 pub fn is_diagonal(m: &Matrix3<f64>) -> bool {
     for i in 0..3 {
         for j in 0..3 {
@@ -521,25 +542,32 @@ fn test_tilde_matrix() {
     assert_eq!(tilde_matrix(&vec), rslt);
 }
 
+#[rustfmt::skip]
 #[test]
 fn test_diagonality() {
-    assert!(
-        !is_diagonal(&Matrix3::new(10.0, 0.0, 0.0, 1.0, 5.0, 0.0, 0.0, 0.0, 2.0)),
+    assert!(!is_diagonal(&Matrix3::new(10.0, 0.0, 0.0,
+                                       1.0, 5.0, 0.0,
+                                       0.0, 0.0, 2.0)),
         "lower triangular"
     );
-
-    assert!(
-        !is_diagonal(&Matrix3::new(10.0, 1.0, 0.0, 1.0, 5.0, 0.0, 0.0, 0.0, 2.0)),
+    assert!(!is_diagonal(&Matrix3::new(10.0, 1.0, 0.0,
+                                       1.0, 5.0, 0.0,
+                                       0.0, 0.0, 2.0)),
         "symmetric but not diag"
     );
-
-    assert!(
-        !is_diagonal(&Matrix3::new(10.0, 1.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 2.0)),
+    assert!(!is_diagonal(&Matrix3::new(10.0, 1.0, 0.0,
+                                       0.0, 5.0, 0.0,
+                                       0.0, 0.0, 2.0)),
         "upper triangular"
     );
-
-    assert!(
-        is_diagonal(&Matrix3::new(10.0, 0.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 2.0)),
+    assert!(is_diagonal(&Matrix3::new(10.0, 0.0, 0.0,
+                                       0.0, 0.0, 0.0,
+                                       0.0, 0.0, 2.0)),
+        "diagonal with zero diagonal element"
+    );
+    assert!(is_diagonal(&Matrix3::new(10.0, 0.0, 0.0,
+                                      0.0, 5.0, 0.0,
+                                      0.0, 0.0, 2.0)),
         "diagonal"
     );
 }
