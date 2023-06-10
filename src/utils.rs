@@ -208,7 +208,7 @@ pub fn projv(a: &Vector3<f64>, b: &Vector3<f64>) -> Vector3<f64> {
 ///
 /// # Returns
 ///
-/// * A f64 value representing the RSS state error.
+/// A f64 value representing the RSS state error.
 pub fn rss_errors<N: DimName>(prop_err: &OVector<f64, N>, cur_state: &OVector<f64, N>) -> f64
 where
     DefaultAllocator: Allocator<f64, N>,
@@ -230,7 +230,7 @@ where
 ///
 /// # Returns
 ///
-/// * A tuple of f64 values representing the RSS orbit errors in radius and velocity.
+/// A tuple of f64 values representing the RSS orbit errors in radius and velocity.
 pub fn rss_orbit_errors(prop_err: &Orbit, cur_state: &Orbit) -> (f64, f64) {
     (
         rss_errors(&prop_err.radius(), &cur_state.radius()),
@@ -247,7 +247,7 @@ pub fn rss_orbit_errors(prop_err: &Orbit, cur_state: &Orbit) -> (f64, f64) {
 ///
 /// # Returns
 ///
-/// * A tuple of f64 values representing the RSS orbit vector errors in radius and velocity.
+/// A tuple of f64 values representing the RSS orbit vector errors in radius and velocity.
 pub fn rss_orbit_vec_errors(prop_err: &Vector6<f64>, cur_state: &Vector6<f64>) -> (f64, f64) {
     let err_radius = (prop_err.fixed_rows::<3>(0) - cur_state.fixed_rows::<3>(0)).norm();
     let err_velocity = (prop_err.fixed_rows::<3>(3) - cur_state.fixed_rows::<3>(3)).norm();
