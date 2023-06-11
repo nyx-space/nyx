@@ -188,10 +188,10 @@ jobs:
         run: docker build -f Dockerfile.dev -t nyx-build .
 
       - name: Run development container and build the package
-        run: docker run --name nyx-builder nyx-build
+        run: docker run --name nyx-builder nyx-build maturin build -F python --release
 
       - name: Copy built package from container to host
-        run: docker cp nyx-builder:/app/dist ./dist
+        run: docker cp nyx-builder:/app/target/wheels ./dist
 
       - name: Get short SHA
         id: short-sha
@@ -205,7 +205,7 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: .
-          file: ./Dockerfile.pkg
+          file: ./Dockerfile
           push: true
           tags: |
             ghcr.io/nyx-space/nyx:${{ steps.short-sha.outputs.sha }}

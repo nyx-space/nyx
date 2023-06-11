@@ -12,8 +12,7 @@ WORKDIR /app
 RUN useradd -ms /bin/bash nyx-user
 
 # Copy over the wheel files
-# COPY dist/*.whl /app
-COPY target/wheels/*.whl /app
+COPY dist/*.whl /app
 
 # Install the Python wheel
 RUN pip install /app/*.whl

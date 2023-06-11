@@ -1,36 +1,26 @@
-# This is a container for development of Nyx
+# This is a container to build the Nyx Python package on OpenSUSE
 # Start with OpenSUSE Tumbleweed
 FROM opensuse/tumbleweed
 
 # Install Python 3.10 and other necessary packages
 RUN zypper ref && \
-    zypper -n in gcc make python310 python310-pip zsh uuid-runtime shadow git git-lfs && \
+    zypper -n in gcc make python310 python310-pip uuid-runtime perl && \
     zypper clean
 
-# Create a non-root user
-RUN useradd -ms /bin/bash nyx-dev
+WORKDIR /app
 
-# Switch to the new user
-USER nyx-dev
-
-WORKDIR /home/nyx-dev
-
-# Install Rust for this user
+# Install Rust
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o rustup.sh && sh rustup.sh -y
 
-# Install oh-my-zsh
-RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+# Make Rust available
+ENV PATH="${PATH}:/root/.cargo/bin"
+ENV RUST_BACKTRACE=full
 
-# Set the zsh theme
-RUN sed -i 's/ZSH_THEME="robbyrussell"/ZSH_THEME="fino-time"/' ~/.zshrc
+# Install maturin to build the package
+RUN pip install maturin
 
-# Change default shell to zsh
-SHELL ["/bin/zsh", "-c"]
+# Finally copy
+COPY . /app
 
-RUN source "$HOME/.cargo/env"
-
-RUN mkdir -p $HOME/workspace
-
-WORKDIR /home/nyx-dev/workspace
-
-CMD ["zsh"]
+# And build in release only
+CMD ["maturin", "build", "-F", "python", "--release"]
