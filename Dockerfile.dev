@@ -1,0 +1,26 @@
+# This is a container to build the Nyx Python package on OpenSUSE
+# Start with OpenSUSE Tumbleweed
+FROM opensuse/tumbleweed
+
+# Install Python 3.10 and other necessary packages
+RUN zypper ref && \
+    zypper -n in gcc make python310 python310-pip uuid-runtime perl && \
+    zypper clean
+
+WORKDIR /app
+
+# Install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o rustup.sh && sh rustup.sh -y
+
+# Make Rust available
+ENV PATH="${PATH}:/root/.cargo/bin"
+ENV RUST_BACKTRACE=full
+
+# Install maturin to build the package
+RUN pip install maturin
+
+# Finally copy
+COPY . /app
+
+# And build in release only
+CMD ["maturin", "build", "-F", "python", "--release"]

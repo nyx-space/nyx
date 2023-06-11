@@ -28,6 +28,7 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: "3.10"
+
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -35,11 +36,13 @@ jobs:
           args: --release --out dist --find-interpreter -F python
           sccache: 'true'
           manylinux: auto
+
       - name: Upload wheels
         uses: actions/upload-artifact@v3
         with:
           name: wheels
           path: dist
+
       - name: pytest x86_64
         if: ${{ matrix.target == 'x86_64' }}
         shell: bash
@@ -48,6 +51,7 @@ jobs:
           pip install nyx_space --find-links dist --force-reinstall
           pip install pytest numpy pandas plotly pyarrow scipy
           pytest
+
       - name: pytest
         if: ${{ !startsWith(matrix.target, 'x86') && matrix.target != 'ppc64' && matrix.target != 'aarch64' }}
         uses: uraimo/run-on-arch-action@v2.5.0
@@ -63,6 +67,7 @@ jobs:
             set -e
             pip3 install nyx_space --find-links dist --force-reinstall
             pytest
+
       - name: Upload python tests HTMLs
         uses: actions/upload-artifact@v3
         with:
@@ -148,7 +153,7 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    if: "startsWith(github.ref, 'refs/tags/')"
+    if: ${{ startsWith(github.ref, 'refs/tags/') }}
     needs: [linux, windows, macos, sdist]
     steps:
       - uses: actions/download-artifact@v3
@@ -161,3 +166,71 @@ jobs:
         with:
           command: upload
           args: --skip-existing *
+
+  packaging:
+    permissions: write-all
+    runs-on: ubuntu-latest
+    # needs: [linux] # Don't package if the tests fail.
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        with:
+          buildkitd-flags: --debug
+
+      - name: Cache Docker layers
+        uses: actions/cache@v2
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Build development image
+        run: docker build -f Dockerfile.dev -t nyx-build .
+
+      - name: Run development container and build the package
+        run: docker run --name nyx-builder nyx-build maturin build -F python --release
+
+      - name: Copy built package from container to host
+        run: docker cp nyx-builder:/app/target/wheels ./dist
+
+      - name: Get short SHA
+        id: short-sha
+        run: echo "::set-output name=sha::$(echo ${GITHUB_SHA::8})"
+
+      - name: Get the version
+        id: get_version
+        run: echo ::set-output name=VERSION::${GITHUB_REF#refs/tags/}
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Build and push Docker image with built package
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: |
+            ghcr.io/nyx-space/nyx-fds:${{ steps.short-sha.outputs.sha }}
+            ghcr.io/nyx-space/nyx-fds:${{ github.ref == 'refs/heads/master' && 'latest' || steps.short-sha.outputs.sha }}
+            ghcr.io/nyx-space/nyx-fds:${{ startsWith(github.ref, 'refs/tags/') && steps.get_version.outputs.VERSION || steps.short-sha.outputs.sha }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
+          outputs: type=oci,dest=/tmp/image.tar
+      -
+        name: Import image in containerd
+        run: |
+          sudo ctr i import --base-name ghcr.io/nyx-space/nyx-fds:${{ steps.short-sha.outputs.sha }} --digests --all-platforms /tmp/image.tar
+      -
+        name: Push image with containerd
+        run: |
+          sudo ctr --debug i push --user "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" ghcr.io/nyx-space/nyx-fds:${{ steps.short-sha.outputs.sha }}
+
