@@ -6,6 +6,12 @@
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/",
+        "destination": "/nyx_space/"
+      }
     ]
   }
 }
