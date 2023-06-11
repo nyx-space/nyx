@@ -663,16 +663,20 @@ where
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let dur = self.last().epoch() - self.first().epoch();
-        write!(
-            f,
-            "Trajectory from {} to {} ({}, or {:.3} s) [{} states]",
-            self.first().epoch(),
-            self.last().epoch(),
-            dur,
-            dur.to_seconds(),
-            self.states.len()
-        )
+        if self.states.is_empty() {
+            write!(f, "Empty Trajectory!")
+        } else {
+            let dur = self.last().epoch() - self.first().epoch();
+            write!(
+                f,
+                "Trajectory from {} to {} ({}, or {:.3} s) [{} states]",
+                self.first().epoch(),
+                self.last().epoch(),
+                dur,
+                dur.to_seconds(),
+                self.states.len()
+            )
+        }
     }
 }
 

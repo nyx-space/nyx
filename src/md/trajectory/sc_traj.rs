@@ -85,12 +85,15 @@ impl Traj<Spacecraft> {
     ) -> Result<PathBuf, Box<dyn Error>> {
         let traj = self.to_frame(body_fixed_frame, cosm)?;
 
-        let mut cfg = ExportCfg::default();
-        cfg.append_field(StateParameter::GeodeticLatitude);
-        cfg.append_field(StateParameter::GeodeticLongitude);
-        cfg.append_field(StateParameter::GeodeticHeight);
-        cfg.append_field(StateParameter::Rmag);
-        cfg.set_step(1.minutes());
+        let mut cfg = ExportCfg::builder()
+            .step(1.minutes())
+            .fields(vec![
+                StateParameter::GeodeticLatitude,
+                StateParameter::GeodeticLongitude,
+                StateParameter::GeodeticHeight,
+                StateParameter::Rmag,
+            ])
+            .build();
         cfg.metadata = metadata;
 
         traj.to_parquet(path, events, cfg)
