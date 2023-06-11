@@ -60,6 +60,7 @@ getrandom = {version = "0.2", features = ["js"]}
 polars = {version = "0.30.0", features = ["parquet"]}
 rstest = "0.17.0"
 pretty_env_logger = "0.5"
+easybench = "1.1.1"
 
 [build-dependencies]
 shadow-rs = "0.23.0"

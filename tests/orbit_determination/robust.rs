@@ -26,9 +26,7 @@ use std::path::PathBuf;
 #[allow(clippy::identity_op)]
 #[test]
 fn od_robust_test_ekf_realistic_one_way() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
 
@@ -233,9 +231,7 @@ fn od_robust_test_ekf_realistic_one_way() {
 #[allow(clippy::identity_op)]
 #[test]
 fn od_robust_test_ekf_realistic_two_way() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
 

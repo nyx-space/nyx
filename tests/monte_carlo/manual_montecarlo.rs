@@ -23,9 +23,7 @@ fn multi_thread_monte_carlo_demo() {
     In this demo, we'll be running a 100 runs with the same dynamics and end state, but with a slightly variation in eccentricity.
     */
     extern crate pretty_env_logger;
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");

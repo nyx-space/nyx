@@ -31,9 +31,7 @@ fn od_val_sc_mb_srp_reals_duals_models() {
      *
      * Thereby, this serves as a validation of the spacecraft dynamics and SRP duals implementation.
      **/
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
 

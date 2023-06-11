@@ -121,9 +121,7 @@ fn stop_cond_3rd_peri() {
 
 #[test]
 fn stop_cond_nrho_apo() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
     use std::time::Instant;
     // The following test technically works, but the transformation of thousands of states
     // into another frame is quite slow...
@@ -273,9 +271,7 @@ fn event_and_combination() {
     use nyx::cosmic::Frame;
     use nyx::dynamics::GuidanceMode;
 
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     // Setup a scenario
     let cosm = Cosm::de438();

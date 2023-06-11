@@ -7,9 +7,7 @@ use nyx::md::prelude::*;
 fn tgt_b_plane_earth_gravity_assist_no_propagation() {
     // Rebuild the "in-place" targeting from the B-Plane test of `try_achieve`
 
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     // This is a reproduction of the B-plane computation from the `Ex_LunarTransfer.script` file from GMAT
     let cosm = Cosm::de438_gmat();
@@ -64,9 +62,7 @@ fn tgt_b_plane_earth_gravity_assist_no_propagation() {
 #[ignore = "https://gitlab.com/nyx-space/nyx/-/issues/212"]
 fn tgt_b_plane_lunar_transfer() {
     // WARNING: This test is ignored until https://gitlab.com/nyx-space/nyx/-/issues/212
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     // This is a reproduction of the B-plane computation from the `Ex_LunarTransfer.script` file from GMAT
     let cosm = Cosm::de438_gmat();
@@ -170,9 +166,7 @@ fn tgt_b_plane_lunar_transfer() {
 fn tgt_b_plane_earth_gravity_assist_with_propagation() {
     // Rebuild the "tgt_b_plane_earth_gravity_assist" scenario but with a propagation and applying the dv earlier
 
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438_gmat();
     // Define the epoch

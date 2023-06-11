@@ -25,10 +25,10 @@ use crate::md::EventEvaluator;
 use crate::time::Epoch;
 use crate::time::TimeUnits;
 use crate::Spacecraft;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs::File;
-use std::io::{BufReader, Read};
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -107,37 +107,31 @@ impl Traj<Orbit> {
         // Open the file
         let file =
             File::open(path).map_err(|e| NyxError::CCSDS(format!("File opening error: {e}")))?;
-        let mut reader = BufReader::new(file);
-
-        // Read the file contents into a buffer
-        let mut buffer = String::new();
-        reader
-            .read_to_string(&mut buffer)
-            .map_err(|e| NyxError::CCSDS(format!("File read error: {e}")))?;
-
-        // Split the file contents into lines
-        let lines: Vec<&str> = buffer.lines().collect();
+        let reader = BufReader::new(file);
 
         // Parse the Orbit Element messages
         let mut frame: Option<Frame> = None;
         let mut time_system = String::new();
 
-        let ignored_tokens = ["CCSDS_OMM_VERS", "CREATION_DATE", "ORIGINATOR"];
+        let ignored_tokens: HashSet<_> = [
+            "CCSDS_OMM_VERS".to_string(),
+            "CREATION_DATE".to_string(),
+            "ORIGINATOR".to_string(),
+        ]
+        .into();
 
         let mut traj = Self::default();
 
         let mut parse = false;
 
-        'lines: for (lno, line) in lines.iter().enumerate() {
+        'lines: for (lno, line) in reader.lines().enumerate() {
+            let line = line.map_err(|e| NyxError::CCSDS(format!("File read error: {e}")))?;
             if line.is_empty() {
                 continue;
             }
 
-            for tok in &ignored_tokens {
-                if line.starts_with(tok) {
-                    // Ignore this token
-                    continue 'lines;
-                }
+            if ignored_tokens.iter().any(|t| line.starts_with(t)) {
+                continue 'lines;
             }
             if line.starts_with("OBJECT_NAME") {
                 // Extract the object ID from the line
@@ -165,7 +159,6 @@ impl Traj<Orbit> {
             } else if parse {
                 // Split the line into components
                 let parts: Vec<&str> = line.split_whitespace().collect();
-                debug!("[line: {}] Parsing `{parts:?}`", lno + 1);
 
                 // Extract the values
                 let epoch_str = format!("{} {time_system}", parts[0]);
@@ -208,11 +201,14 @@ impl Traj<Orbit> {
                     }
                     Err(_) => {
                         // Probably a comment
+                        debug!("[line: {}] Could not parse `{parts:?}`", lno + 1);
                         continue;
                     }
                 };
             }
         }
+
+        traj.finalize();
 
         Ok(traj)
     }
@@ -220,29 +216,34 @@ impl Traj<Orbit> {
 
 #[test]
 fn test_load_oem_leo() {
+    fn the_test() {
+        // All three samples were taken from https://github.com/bradsease/oem/blob/main/tests/samples/real/
+        let path: PathBuf = [
+            env!("CARGO_MANIFEST_DIR"),
+            "data",
+            "tests",
+            "ccsds",
+            "oem",
+            "LEO_10s.oem",
+        ]
+        .iter()
+        .collect();
+
+        let _ = pretty_env_logger::try_init();
+
+        let leo_traj: Traj<Orbit> = Traj::<Orbit>::from_oem_file(path).unwrap();
+
+        assert_eq!(leo_traj.states.len(), 361);
+        assert_eq!(leo_traj.name.unwrap(), "TEST_OBJ".to_string());
+    }
+
+    use easybench::bench;
     use pretty_env_logger;
     use std::env;
 
-    // All three samples were taken from https://github.com/bradsease/oem/blob/main/tests/samples/real/
-    let path: PathBuf = [
-        env!("CARGO_MANIFEST_DIR"),
-        "data",
-        "tests",
-        "ccsds",
-        "oem",
-        "LEO_10s.oem",
-    ]
-    .iter()
-    .collect();
-
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
-
-    let leo_traj: Traj<Orbit> = Traj::<Orbit>::from_oem_file(path).unwrap();
-
-    assert_eq!(leo_traj.states.len(), 361);
-    assert_eq!(leo_traj.name.unwrap(), "TEST_OBJ".to_string());
+    the_test();
+    // If the test is successful, print the benchmark
+    println!("benchmark CCSDS OEM Loading: {}", bench(|| the_test()));
 }
 
 #[test]
@@ -262,9 +263,7 @@ fn test_load_oem_meo() {
     .iter()
     .collect();
 
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let leo_traj = Traj::<Orbit>::from_oem_file(path).unwrap();
 
@@ -289,9 +288,7 @@ fn test_load_oem_geo() {
     .iter()
     .collect();
 
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let leo_traj: Traj<Orbit> = Traj::<Orbit>::from_oem_file(path).unwrap();
 

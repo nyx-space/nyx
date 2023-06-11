@@ -8,9 +8,7 @@ use nyx::md::prelude::*;
 
 #[test]
 fn thrust_dir_tgt_sma_aop_raan() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -58,9 +56,7 @@ fn thrust_dir_tgt_sma_aop_raan() {
 
 #[test]
 fn thrust_dir_rate_tgt_sma_aop_raan() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -110,9 +106,7 @@ fn thrust_dir_rate_tgt_sma_aop_raan() {
 #[ignore]
 #[test]
 fn thrust_profile_tgt_sma_aop_raan() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -162,9 +156,7 @@ fn thrust_profile_tgt_sma_aop_raan() {
 #[test]
 fn val_tgt_finite_burn() {
     // In this test, we take a known finite burn solution and use the optimizer to solve for it.
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");

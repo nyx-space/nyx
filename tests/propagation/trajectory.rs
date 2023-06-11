@@ -18,9 +18,7 @@ use std::sync::mpsc::channel;
 #[allow(clippy::identity_op)]
 #[test]
 fn traj_ephem_forward() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
     // Test that we can correctly interpolate a spacecraft orbit
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -240,9 +238,7 @@ fn traj_ephem_forward() {
 #[allow(clippy::identity_op)]
 #[test]
 fn traj_spacecraft() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
     // Test the interpolation of a spaceraft trajectory and of its fuel. Includes a demo of checking what the guidance mode _should_ be provided the state.
     // Note that we _do not_ attempt to interpolate the Guidance Mode.
     // This is based on the Ruggiero AOP correction

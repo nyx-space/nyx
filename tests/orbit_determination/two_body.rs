@@ -17,9 +17,7 @@ use std::path::PathBuf;
 #[allow(clippy::identity_op)]
 #[test]
 fn od_tb_val_ekf_fixed_step_perfect_stations() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let iau_earth = cosm.frame("IAU Earth");
@@ -170,9 +168,7 @@ fn od_tb_val_ekf_fixed_step_perfect_stations() {
 #[allow(clippy::identity_op)]
 #[test]
 fn od_tb_val_with_arc() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let iau_earth = cosm.frame("IAU Earth");
@@ -353,9 +349,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations() {
      *
      * Thereby, this serves as a validation of the orbital dynamics implementation.
      **/
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let iau_earth = cosm.frame("IAU Earth");
@@ -588,9 +582,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations() {
 #[allow(clippy::identity_op)]
 #[test]
 fn od_tb_ckf_fixed_step_iteration_test() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let iau_earth = cosm.frame("IAU Earth");
@@ -760,9 +752,7 @@ fn od_tb_ckf_fixed_step_iteration_test() {
 #[test]
 fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
     // Tests state noise compensation with covariance mapping
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let iau_earth = cosm.frame("IAU Earth");
@@ -907,9 +897,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
 #[allow(clippy::identity_op)]
 #[test]
 fn od_tb_ckf_map_covar() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
 
@@ -988,9 +976,7 @@ fn od_tb_ckf_map_covar() {
 #[test]
 fn od_tb_val_harmonics_ckf_fixed_step_perfect() {
     // Tests state noise compensation with covariance mapping
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let iau_earth = cosm.frame("IAU Earth");
@@ -1125,9 +1111,7 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect() {
 #[test]
 fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
     // Tests state noise compensation with covariance mapping
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let iau_earth = cosm.frame("IAU Earth");

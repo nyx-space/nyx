@@ -7,9 +7,7 @@ use nyx::md::prelude::*;
 
 #[test]
 fn tgt_sma_from_apo() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -61,9 +59,7 @@ fn tgt_sma_from_apo() {
 
 #[test]
 fn tgt_sma_from_peri_fd() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -116,9 +112,7 @@ fn tgt_sma_from_peri_fd() {
 
 #[test]
 fn tgt_hd_sma_from_peri() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -172,9 +166,7 @@ fn tgt_hd_sma_from_peri() {
 
 #[test]
 fn orbit_stm_chk() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -224,9 +216,7 @@ fn orbit_stm_chk() {
 // Eccentricity
 #[test]
 fn tgt_ecc_from_apo() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -292,9 +282,7 @@ fn tgt_ecc_from_apo() {
 
 #[test]
 fn tgt_ecc_from_peri() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -364,9 +352,7 @@ fn tgt_ecc_from_peri() {
 // RAAN
 #[test]
 fn tgt_raan_from_apo() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -415,9 +401,7 @@ fn tgt_raan_from_apo() {
 
 #[test]
 fn tgt_raan_from_peri() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -487,9 +471,7 @@ fn tgt_raan_from_peri() {
 // AoP
 #[test]
 fn tgt_aop_from_apo() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -538,9 +520,7 @@ fn tgt_aop_from_apo() {
 
 #[test]
 fn tgt_aop_from_peri() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
