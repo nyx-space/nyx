@@ -7,9 +7,7 @@ use nyx::md::prelude::*;
 
 #[test]
 fn tgt_c3_decl() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -60,9 +58,7 @@ fn tgt_c3_decl() {
 
 #[test]
 fn conv_tgt_sma_ecc() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -179,9 +175,7 @@ fn conv_tgt_sma_ecc() {
 
 #[test]
 fn tgt_hd_sma_ecc() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");

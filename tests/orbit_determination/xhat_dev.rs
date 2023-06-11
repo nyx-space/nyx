@@ -22,9 +22,7 @@ use std::convert::TryFrom;
 #[allow(clippy::identity_op)]
 #[test]
 fn xhat_dev_test_ekf_two_body() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let iau_earth = cosm.frame("IAU Earth");
@@ -228,9 +226,7 @@ fn xhat_dev_test_ekf_multi_body() {
     // We seed both propagators with the same initial state, but we let a large state deviation in the filter.
     // This does _not_ impact the prefits, but it impacts the state deviation and therefore the state estimate.
     // As such, it checks that the filter can return to a nominal state.
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let iau_earth = cosm.frame("IAU Earth");
@@ -399,9 +395,7 @@ fn xhat_dev_test_ekf_multi_body() {
 #[allow(clippy::identity_op)]
 #[test]
 fn xhat_dev_test_ekf_harmonics() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let iau_earth = cosm.frame("IAU Earth");
@@ -561,9 +555,7 @@ fn xhat_dev_test_ekf_harmonics() {
 #[allow(clippy::identity_op)]
 #[test]
 fn xhat_dev_test_ekf_realistic() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let iau_earth = cosm.frame("IAU Earth");
@@ -721,9 +713,7 @@ fn xhat_dev_test_ekf_realistic() {
 #[allow(clippy::identity_op)]
 #[test]
 fn xhat_dev_test_ckf_smoother_multi_body() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let iau_earth = cosm.frame("IAU Earth");
@@ -994,9 +984,7 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
 #[allow(clippy::identity_op)]
 #[test]
 fn xhat_dev_test_ekf_snc_smoother_multi_body() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let iau_earth = cosm.frame("IAU Earth");
@@ -1266,9 +1254,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
 #[allow(clippy::identity_op)]
 #[test]
 fn xhat_dev_test_ckf_iteration_multi_body() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let iau_earth = cosm.frame("IAU Earth");

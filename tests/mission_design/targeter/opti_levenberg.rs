@@ -7,9 +7,7 @@ use nyx::md::prelude::*;
 
 #[test]
 fn tgt_levenberg_sma_from_apo() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");

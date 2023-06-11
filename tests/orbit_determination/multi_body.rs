@@ -15,9 +15,7 @@ use std::collections::HashMap;
 #[allow(clippy::identity_op)]
 #[test]
 fn od_val_multi_body_ckf_perfect_stations() {
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
 
@@ -163,9 +161,7 @@ fn od_val_multi_body_ckf_perfect_stations() {
 #[test]
 fn multi_body_ckf_covar_map() {
     // For this test, we're only enabling one station so we can check that the covariance inflates between visibility passes.
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
 

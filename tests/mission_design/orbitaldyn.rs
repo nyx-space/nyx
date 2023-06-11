@@ -882,9 +882,7 @@ fn val_earth_sph_harmonics_j2() {
 #[test]
 fn val_earth_sph_harmonics_12x12() {
     extern crate pretty_env_logger;
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
     use nyx::dynamics::sph_harmonics::Harmonics;
     use nyx::io::gravity::*;
 
@@ -958,9 +956,7 @@ fn val_earth_sph_harmonics_12x12() {
 #[test]
 fn val_earth_sph_harmonics_70x70() {
     extern crate pretty_env_logger;
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
     use nyx::dynamics::Harmonics;
     use nyx::io::gravity::*;
 
@@ -1016,9 +1012,7 @@ fn val_earth_sph_harmonics_70x70() {
 #[test]
 fn val_earth_sph_harmonics_70x70_partials() {
     extern crate pretty_env_logger;
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
     use nyx::dynamics::Harmonics;
     use nyx::io::gravity::*;
 
@@ -1075,9 +1069,7 @@ fn hf_prop() {
     // Tests a high fidelity propagation over several days for performance analysis.
 
     extern crate pretty_env_logger;
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
     use nyx::dynamics::sph_harmonics::Harmonics;
     use nyx::io::gravity::*;
 

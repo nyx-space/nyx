@@ -14,9 +14,7 @@ use std::str::FromStr;
 #[test]
 fn continuous_tracking() {
     // Test that continuous tracking
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     // Load cosm
     let cosm = Cosm::de438();

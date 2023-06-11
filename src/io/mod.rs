@@ -37,6 +37,7 @@ use std::io::Error as IoError;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
+use typed_builder::TypedBuilder;
 
 use self::orbit::OrbitSerde;
 use crate::cosmic::{Cosm, Frame};
@@ -61,7 +62,7 @@ use thiserror::Error;
 use pyo3::prelude::*;
 
 /// Configuration for exporting a trajectory to parquet.
-#[derive(Clone, Default, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize, TypedBuilder)]
 #[cfg_attr(feature = "python", pyclass)]
 #[cfg_attr(
     feature = "python",
@@ -71,16 +72,22 @@ use pyo3::prelude::*;
 )]
 pub struct ExportCfg {
     /// Fields to export, if unset, defaults to all possible fields.
+    #[builder(default, setter(strip_option))]
     pub fields: Option<Vec<StateParameter>>,
     /// Start epoch to export, defaults to the start of the trajectory
+    #[builder(default, setter(strip_option))]
     pub start_epoch: Option<Epoch>,
     /// End epoch to export, defaults to the end of the trajectory
+    #[builder(default, setter(strip_option))]
     pub end_epoch: Option<Epoch>,
     /// An optional step, defaults to every state in the trajectory (which likely isn't equidistant)
+    #[builder(default, setter(strip_option))]
     pub step: Option<Duration>,
     /// Additional metadata to store in the Parquet metadata
+    #[builder(default, setter(strip_option))]
     pub metadata: Option<HashMap<String, String>>,
     /// Set to true to append the timestamp to the filename
+    #[builder(default)]
     pub timestamp: bool,
 }
 
@@ -111,10 +118,6 @@ impl ExportCfg {
         } else {
             self.fields = Some(vec![field]);
         }
-    }
-
-    pub fn set_step(&mut self, step: Duration) {
-        self.step = Some(step);
     }
 
     /// Modifies the provided path to include the timestamp if required.

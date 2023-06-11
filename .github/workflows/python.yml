@@ -170,7 +170,7 @@ jobs:
   packaging:
     permissions: write-all
     runs-on: ubuntu-latest
-    # needs: [linux] # Don't package if the tests fail.
+    needs: [linux]
     steps:
       - name: Check out code
         uses: actions/checkout@v2
@@ -217,20 +217,10 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
-          push: false
+          push: true
           tags: |
             ghcr.io/nyx-space/nyx-fds:${{ steps.short-sha.outputs.sha }}
             ghcr.io/nyx-space/nyx-fds:${{ github.ref == 'refs/heads/master' && 'latest' || steps.short-sha.outputs.sha }}
             ghcr.io/nyx-space/nyx-fds:${{ startsWith(github.ref, 'refs/tags/') && steps.get_version.outputs.VERSION || steps.short-sha.outputs.sha }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
-          outputs: type=oci,dest=/tmp/image.tar
-      -
-        name: Import image in containerd
-        run: |
-          sudo ctr i import --base-name ghcr.io/nyx-space/nyx-fds:${{ steps.short-sha.outputs.sha }} --digests --all-platforms /tmp/image.tar
-      -
-        name: Push image with containerd
-        run: |
-          sudo ctr --debug i push --user "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" ghcr.io/nyx-space/nyx-fds:${{ steps.short-sha.outputs.sha }}
-

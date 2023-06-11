@@ -20,15 +20,15 @@ use super::TrajError;
 use super::{ExportCfg, Traj};
 use crate::cosmic::{Cosm, Frame, Orbit};
 use crate::errors::NyxError;
+use crate::io::watermark::prj_name_ver;
 use crate::md::prelude::StateParameter;
 use crate::md::EventEvaluator;
-use crate::time::Epoch;
-use crate::time::TimeUnits;
-use crate::Spacecraft;
-use std::collections::HashMap;
+use crate::time::{Epoch, Format, Formatter, TimeUnits};
+use crate::{Spacecraft, State};
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs::File;
-use std::io::{BufReader, Read};
+use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -73,12 +73,15 @@ impl Traj<Orbit> {
     ) -> Result<PathBuf, Box<dyn Error>> {
         let traj = self.to_frame(body_fixed_frame, cosm)?;
 
-        let mut cfg = ExportCfg::default();
-        cfg.append_field(StateParameter::GeodeticLatitude);
-        cfg.append_field(StateParameter::GeodeticLongitude);
-        cfg.append_field(StateParameter::GeodeticHeight);
-        cfg.append_field(StateParameter::Rmag);
-        cfg.set_step(1.minutes());
+        let mut cfg = ExportCfg::builder()
+            .step(1.minutes())
+            .fields(vec![
+                StateParameter::GeodeticLatitude,
+                StateParameter::GeodeticLongitude,
+                StateParameter::GeodeticHeight,
+                StateParameter::Rmag,
+            ])
+            .build();
         cfg.metadata = metadata;
 
         traj.to_parquet(path, events, cfg)
@@ -107,37 +110,31 @@ impl Traj<Orbit> {
         // Open the file
         let file =
             File::open(path).map_err(|e| NyxError::CCSDS(format!("File opening error: {e}")))?;
-        let mut reader = BufReader::new(file);
-
-        // Read the file contents into a buffer
-        let mut buffer = String::new();
-        reader
-            .read_to_string(&mut buffer)
-            .map_err(|e| NyxError::CCSDS(format!("File read error: {e}")))?;
-
-        // Split the file contents into lines
-        let lines: Vec<&str> = buffer.lines().collect();
+        let reader = BufReader::new(file);
 
         // Parse the Orbit Element messages
         let mut frame: Option<Frame> = None;
         let mut time_system = String::new();
 
-        let ignored_tokens = ["CCSDS_OMM_VERS", "CREATION_DATE", "ORIGINATOR"];
+        let ignored_tokens: HashSet<_> = [
+            "CCSDS_OMM_VERS".to_string(),
+            "CREATION_DATE".to_string(),
+            "ORIGINATOR".to_string(),
+        ]
+        .into();
 
         let mut traj = Self::default();
 
         let mut parse = false;
 
-        'lines: for (lno, line) in lines.iter().enumerate() {
+        'lines: for (lno, line) in reader.lines().enumerate() {
+            let line = line.map_err(|e| NyxError::CCSDS(format!("File read error: {e}")))?;
             if line.is_empty() {
                 continue;
             }
 
-            for tok in &ignored_tokens {
-                if line.starts_with(tok) {
-                    // Ignore this token
-                    continue 'lines;
-                }
+            if ignored_tokens.iter().any(|t| line.starts_with(t)) {
+                continue 'lines;
             }
             if line.starts_with("OBJECT_NAME") {
                 // Extract the object ID from the line
@@ -165,7 +162,6 @@ impl Traj<Orbit> {
             } else if parse {
                 // Split the line into components
                 let parts: Vec<&str> = line.split_whitespace().collect();
-                debug!("[line: {}] Parsing `{parts:?}`", lno + 1);
 
                 // Extract the values
                 let epoch_str = format!("{} {time_system}", parts[0]);
@@ -192,57 +188,183 @@ impl Traj<Orbit> {
                             stm: None,
                         };
 
-                        // Check that we don't have duplicate epochs
-                        if let Some(prev) = traj.states.last() {
-                            if prev.epoch == orbit.epoch {
-                                warn!(
-                                    "[line: {}] duplicate epoch {} in OEM -- overwriting",
-                                    lno + 1,
-                                    orbit.epoch
-                                );
-                                traj.states.pop();
-                            }
-                        }
-
                         traj.states.push(orbit);
                     }
                     Err(_) => {
                         // Probably a comment
+                        debug!("[line: {}] Could not parse `{parts:?}`", lno + 1);
                         continue;
                     }
                 };
             }
         }
 
+        traj.finalize();
+
         Ok(traj)
+    }
+
+    pub fn to_oem_file<P: AsRef<Path>>(
+        &self,
+        path: P,
+        cfg: ExportCfg,
+    ) -> Result<PathBuf, NyxError> {
+        if self.states.is_empty() {
+            return Err(NyxError::CCSDS(
+                "Cannot export an empty trajectory to OEM".to_string(),
+            ));
+        }
+        let tick = Epoch::now().unwrap();
+        info!("Exporting trajectory to CCSDS OEM file...");
+
+        // Grab the path here before we move stuff.
+        let path_buf = cfg.actual_path(path);
+
+        let metadata = cfg.metadata.ok_or(NyxError::CCSDS(
+            "Missing metadata in ExportCfg structure".to_string(),
+        ))?;
+
+        let file = File::create(&path_buf)
+            .map_err(|e| NyxError::CCSDS(format!("File creation error: {e}")))?;
+        let mut writer = BufWriter::new(file);
+
+        let err_hdlr = |e| NyxError::CCSDS(format!("Could not write: {e}"));
+
+        // Build the states iterator -- this does require copying the current states but I can't either get a reference or a copy of all the states.
+        let states = if cfg.start_epoch.is_some() || cfg.end_epoch.is_some() || cfg.step.is_some() {
+            // Must interpolate the data!
+            let start = cfg.start_epoch.unwrap_or_else(|| self.first().epoch());
+            let end = cfg.end_epoch.unwrap_or_else(|| self.last().epoch());
+            let step = cfg.step.unwrap_or_else(|| 1.minutes());
+            self.every_between(step, start, end).collect()
+        } else {
+            self.states.to_vec()
+        };
+
+        // Epoch formmatter.
+        let iso8601_no_ts = Format::from_str("%Y-%m-%dT%H:%M:%S.%f").unwrap();
+
+        // Write mandatory metadata
+        writeln!(writer, "CCSDS_OMM_VERS = 2.0").map_err(err_hdlr)?;
+        writeln!(
+            writer,
+            "CREATION_DATE = {}",
+            Formatter::new(Epoch::now().unwrap(), iso8601_no_ts)
+        )
+        .map_err(err_hdlr)?;
+        writeln!(
+            writer,
+            "ORIGINATOR = {}\n",
+            metadata.get("originator").ok_or(NyxError::CCSDS(
+                "Metadata is missing `originator` entry".to_string()
+            ))?
+        )
+        .map_err(err_hdlr)?;
+
+        writeln!(writer, "META_START").map_err(err_hdlr)?;
+        // Write optional metadata
+        if let Some(object_name) = metadata.get("object_name") {
+            writeln!(writer, "OBJECT_NAME = {}", object_name).map_err(err_hdlr)?;
+        } else if let Some(object_name) = &self.name {
+            writeln!(writer, "OBJECT_NAME = {}", object_name).map_err(err_hdlr)?;
+        }
+
+        writeln!(writer, "REF_FRAME = {}", states[0].frame).map_err(err_hdlr)?;
+        writeln!(writer, "TIME_SYSTEM = {}", states[0].epoch.time_scale).map_err(err_hdlr)?;
+
+        writeln!(
+            writer,
+            "START_TIME = {}",
+            Formatter::new(states[0].epoch(), iso8601_no_ts)
+        )
+        .map_err(err_hdlr)?;
+        writeln!(
+            writer,
+            "USEABLE_START_TIME = {}",
+            Formatter::new(states[0].epoch(), iso8601_no_ts)
+        )
+        .map_err(err_hdlr)?;
+        writeln!(
+            writer,
+            "USEABLE_STOP_TIME = {}",
+            Formatter::new(states[states.len() - 1].epoch(), iso8601_no_ts)
+        )
+        .map_err(err_hdlr)?;
+        writeln!(
+            writer,
+            "STOP_TIME = {}",
+            Formatter::new(states[states.len() - 1].epoch(), iso8601_no_ts)
+        )
+        .map_err(err_hdlr)?;
+
+        writeln!(writer, "META_STOP\n").map_err(err_hdlr)?;
+
+        writeln!(
+            writer,
+            "COMMENT Generated by {} (License AGPLv3)\n",
+            prj_name_ver()
+        )
+        .map_err(err_hdlr)?;
+
+        for state in &states {
+            writeln!(
+                writer,
+                "{} {:E} {:E} {:E} {:E} {:E} {:E}",
+                Formatter::new(state.epoch, iso8601_no_ts),
+                state.x_km,
+                state.y_km,
+                state.z_km,
+                state.vx_km_s,
+                state.vy_km_s,
+                state.vz_km_s
+            )
+            .map_err(err_hdlr)?;
+        }
+
+        #[allow(clippy::writeln_empty_string)]
+        writeln!(writer, "").map_err(err_hdlr)?;
+
+        // Return the path this was written to
+        let tock_time = Epoch::now().unwrap() - tick;
+        info!(
+            "Trajectory written to {} in {tock_time}",
+            path_buf.display()
+        );
+        Ok(path_buf)
     }
 }
 
 #[test]
 fn test_load_oem_leo() {
+    fn the_test() {
+        // All three samples were taken from https://github.com/bradsease/oem/blob/main/tests/samples/real/
+        let path: PathBuf = [
+            env!("CARGO_MANIFEST_DIR"),
+            "data",
+            "tests",
+            "ccsds",
+            "oem",
+            "LEO_10s.oem",
+        ]
+        .iter()
+        .collect();
+
+        let _ = pretty_env_logger::try_init();
+
+        let traj: Traj<Orbit> = Traj::<Orbit>::from_oem_file(path).unwrap();
+
+        // This trajectory has two duplicate epochs, which should be removed by the call to finalize()
+        assert_eq!(traj.states.len(), 361);
+        assert_eq!(traj.name.unwrap(), "TEST_OBJ".to_string());
+    }
+
+    use easybench::bench;
     use pretty_env_logger;
     use std::env;
 
-    // All three samples were taken from https://github.com/bradsease/oem/blob/main/tests/samples/real/
-    let path: PathBuf = [
-        env!("CARGO_MANIFEST_DIR"),
-        "data",
-        "tests",
-        "ccsds",
-        "oem",
-        "LEO_10s.oem",
-    ]
-    .iter()
-    .collect();
-
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
-
-    let leo_traj: Traj<Orbit> = Traj::<Orbit>::from_oem_file(path).unwrap();
-
-    assert_eq!(leo_traj.states.len(), 361);
-    assert_eq!(leo_traj.name.unwrap(), "TEST_OBJ".to_string());
+    the_test();
+    // If the test is successful, print the benchmark
+    println!("benchmark CCSDS OEM Loading: {}", bench(|| the_test()));
 }
 
 #[test]
@@ -262,14 +384,12 @@ fn test_load_oem_meo() {
     .iter()
     .collect();
 
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
-    let leo_traj = Traj::<Orbit>::from_oem_file(path).unwrap();
+    let traj = Traj::<Orbit>::from_oem_file(path).unwrap();
 
-    assert_eq!(leo_traj.states.len(), 61);
-    assert_eq!(leo_traj.name.unwrap(), "TEST_OBJ".to_string());
+    assert_eq!(traj.states.len(), 61);
+    assert_eq!(traj.name.unwrap(), "TEST_OBJ".to_string());
 }
 
 #[test]
@@ -289,12 +409,59 @@ fn test_load_oem_geo() {
     .iter()
     .collect();
 
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
-    let leo_traj: Traj<Orbit> = Traj::<Orbit>::from_oem_file(path).unwrap();
+    let traj: Traj<Orbit> = Traj::<Orbit>::from_oem_file(path).unwrap();
 
-    assert_eq!(leo_traj.states.len(), 181);
-    assert_eq!(leo_traj.name.unwrap(), "TEST_OBJ".to_string());
+    assert_eq!(traj.states.len(), 181);
+    assert_eq!(traj.name.as_ref().unwrap(), &"TEST_OBJ".to_string());
+
+    // Reexport this to CCSDS.
+    let cfg = ExportCfg::builder()
+        .timestamp(true)
+        .metadata(HashMap::from([
+            ("originator".to_string(), "Test suite".to_string()),
+            ("object_name".to_string(), "TEST_OBJ".to_string()),
+        ]))
+        .build();
+
+    let path: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "output_data",
+        "GEO_20s_rebuilt.oem",
+    ]
+    .iter()
+    .collect();
+
+    let out_path = traj.to_oem_file(path.clone(), cfg).unwrap();
+    // And reload, make sure we have the same data.
+    let traj_reloaded: Traj<Orbit> = Traj::<Orbit>::from_oem_file(out_path).unwrap();
+
+    assert_eq!(traj_reloaded, traj);
+
+    // Now export after trimming one state on either end
+    let cfg = ExportCfg::builder()
+        .timestamp(true)
+        .metadata(HashMap::from([
+            ("originator".to_string(), "Test suite".to_string()),
+            ("object_name".to_string(), "TEST_OBJ".to_string()),
+        ]))
+        .step(20.seconds())
+        .start_epoch(traj.first().epoch + 1.seconds())
+        .end_epoch(traj.last().epoch - 1.seconds())
+        .build();
+    let out_path = traj.to_oem_file(path, cfg).unwrap();
+    // And reload, make sure we have the same data.
+    let traj_reloaded: Traj<Orbit> = Traj::<Orbit>::from_oem_file(out_path).unwrap();
+
+    // Note that the number of states has changed because we interpolated with a step similar to the original one but
+    // we started with a different time.
+    assert_eq!(traj_reloaded.states.len(), traj.states.len() - 1);
+    assert_eq!(
+        traj_reloaded.first().epoch,
+        traj.first().epoch + 1.seconds()
+    );
+    // Note: because we used a fixed step, the last epoch is actually an offset of step size - end offset
+    // from the original trajectory
+    assert_eq!(traj_reloaded.last().epoch, traj.last().epoch - 19.seconds());
 }

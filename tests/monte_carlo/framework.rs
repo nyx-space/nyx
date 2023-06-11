@@ -6,9 +6,7 @@ use nyx::md::prelude::*;
 #[test]
 fn test_monte_carlo_epoch() {
     extern crate pretty_env_logger;
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
+    let _ = pretty_env_logger::try_init();
 
     let cosm = Cosm::de438();
 
