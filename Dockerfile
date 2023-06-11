@@ -11,15 +11,6 @@ WORKDIR /app
 # Create a non-root user
 RUN useradd -ms /bin/bash nyx-user
 
-# Copy over the wheel files
-COPY dist/*.whl /app
-
-# Install the Python wheel
-RUN pip install /app/*.whl
-
-# Install workflow and pipeline features
-RUN pip install kedro kedro-viz ruff jupyter
-
 # Switch to the new user
 USER nyx-user
 
@@ -35,5 +26,18 @@ SHELL ["/bin/zsh", "-c"]
 RUN mkdir -p $HOME/workspace
 
 WORKDIR /home/nyx-user/workspace
+
+# Install workflow and pipeline features
+RUN pip install kedro kedro-viz ruff jupyter
+
+# Make this available
+ENV PATH="${PATH}:/home/nyx-user/.local/bin"
+
+# Copy over the wheel files
+COPY dist/*.whl /app
+
+# Install the Python wheel
+RUN pip install /app/*.whl
+
 
 CMD ["zsh"]

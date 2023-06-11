@@ -169,6 +169,7 @@ jobs:
 
   packaging:
     runs-on: ubuntu-latest
+    needs: [linux] # Don't package if the tests fail.
     steps:
       - name: Check out code
         uses: actions/checkout@v2
