@@ -218,10 +218,10 @@ pub fn perpv(a: &Vector3<f64>, b: &Vector3<f64>) -> Vector3<f64> {
     } else if big_b < f64::EPSILON {
         *a
     } else {
-        let a_scl = a.scale(1.0 / big_a);
-        let b_scl = b.scale(1.0 / big_b);
+        let a_scl = a / big_a;
+        let b_scl = b / big_b;
         let v = projv(&a_scl, &b_scl);
-        (a_scl - v).scale(big_a)
+        (a_scl - v) * big_a
     }
 }
 
