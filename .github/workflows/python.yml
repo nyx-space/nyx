@@ -175,7 +175,9 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
+        with:
+          buildkitd-flags: --debug
 
       - name: Cache Docker layers
         uses: actions/cache@v2
@@ -221,3 +223,13 @@ jobs:
             ghcr.io/nyx-space/nyx-fds:${{ startsWith(github.ref, 'refs/tags/') && steps.get_version.outputs.VERSION || steps.short-sha.outputs.sha }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
+          outputs: type=oci,dest=/tmp/image.tar
+      -
+        name: Import image in containerd
+        run: |
+          sudo ctr i import --base-name ghcr.io/nyx-space/nyx-fds:${{ steps.short-sha.outputs.sha }} --digests --all-platforms /tmp/image.tar
+      -
+        name: Push image with containerd
+        run: |
+          sudo ctr --debug i push --user "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" ghcr.io/nyx-space/nyx-fds:${{ steps.short-sha.outputs.sha }}
+
