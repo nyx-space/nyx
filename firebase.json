@@ -1,0 +1,11 @@
+{
+  "hosting": {
+    "site": "nyx-rustdoc",
+    "public": "target/doc/nyx_space",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ]
+  }
+}
