@@ -97,12 +97,27 @@ impl ExportCfg {
         me
     }
 
+    pub fn from_ccsds_oem_metadata(originator: String, object_name: Option<String>) -> Self {
+        let mut metadata = Vec::new();
+        metadata.push(("originator".to_string(), originator));
+        if let Some(name) = object_name {
+            metadata.push(("object_name".to_string(), name));
+        }
+
+        Self::from_metadata(metadata)
+    }
+
     /// Initialize a new default configuration but timestamp the filename.
     pub fn timestamped() -> Self {
         Self {
             timestamp: true,
             ..Default::default()
         }
+    }
+
+    pub fn with_timestamp(mut self, enabled: bool) -> Self {
+        self.timestamp = enabled;
+        self
     }
 
     pub fn append_field(&mut self, field: StateParameter) {
