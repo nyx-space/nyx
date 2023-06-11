@@ -1,4 +1,9 @@
-/target/
+target
+output_data
+docs
+.git
+.venv
+*.parquet
 **/*.rs.bk
 Cargo.lock
 tests/Papers
@@ -11,8 +16,6 @@ node_modules/
 *.data
 *.folded
 *.venv
-dist/
 *.parquet
 *.profraw
 lcov.txt
-
