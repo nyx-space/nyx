@@ -138,6 +138,7 @@ pub fn standard(
 
     let dm = calculate_dm(&kind, &r_final, &r_init)?;
 
+    // Compute the direction of motion
     let nu_init = r_init[1].atan2(r_init[0]);
     let nu_final = r_final[1].atan2(r_final[0]);
 
@@ -147,6 +148,7 @@ pub fn standard(
         return Err(NyxError::TargetsTooClose);
     }
 
+    // Define the search space (note that we do not support multirevs in this algorithm)
     let mut phi_upper = 4.0 * PI.powi(2);
     let mut phi_lower = -4.0 * PI.powi(2);
     let mut phi = 0.0;
@@ -168,37 +170,44 @@ pub fn standard(
 
         y = r_init_norm + r_final_norm + a * (phi * c3 - 1.0) / c2.sqrt();
         if a > 0.0 && y < 0.0 {
+            // Try to increase phi
             for _ in 0..500 {
                 phi += 0.1;
+                // Recompute y
                 y = r_init_norm + r_final_norm + a * (phi * c3 - 1.0) / c2.sqrt();
                 if y >= 0.0 {
                     break;
                 }
             }
+            // If y is still negative, then our attempts have failed.
             if y < 0.0 {
                 return Err(NyxError::LambertNotReasonablePhi);
             }
         }
 
         let chi = (y / c2).sqrt();
+        // Compute the current time of flight
         cur_tof = (chi.powi(3) * c3 + a * y.sqrt()) / gm.sqrt();
-
+        // Update the next TOF we should use
         if cur_tof < tof {
             phi_lower = phi;
         } else {
             phi_upper = phi;
         }
 
+        // Compute the next phi
         phi = (phi_upper + phi_lower) / 2.0;
         let (_phi, c2_new, c3_new) = calculate_phi_and_c2_c3(phi);
         c2 = c2_new;
         c3 = c3_new;
     }
 
+    // Time of flight matches!
     let f = 1.0 - y / r_init_norm;
     let g_dot = 1.0 - y / r_final_norm;
     let g = a * (y / gm).sqrt();
 
+    // Compute velocities
     Ok(LambertSolution {
         v_init: (r_final - f * r_init) / g,
         v_final: (1.0 / g) * (g_dot * r_final - r_init),
