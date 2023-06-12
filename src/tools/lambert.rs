@@ -36,48 +36,49 @@ pub enum TransferKind {
     NRevs(u8),
 }
 
+impl TransferKind {
+    /// Calculate the direction multiplier based on the transfer kind.
+    ///
+    /// # Arguments
+    ///
+    /// * `r_final` - The final radius vector.
+    /// * `r_init` - The initial radius vector.
+    ///
+    /// # Returns
+    ///
+    /// * `Result<f64, NyxError>` - The direction multiplier or an error if the transfer kind is not supported.
+    fn direction_of_motion(
+        self,
+        r_final: &Vector3<f64>,
+        r_init: &Vector3<f64>,
+    ) -> Result<f64, NyxError> {
+        match self {
+            TransferKind::Auto => {
+                let mut dnu = r_final[1].atan2(r_final[0]) - r_init[1].atan2(r_final[1]);
+                if dnu > TAU {
+                    dnu -= TAU;
+                } else if dnu < 0.0 {
+                    dnu += TAU;
+                }
+
+                if dnu > std::f64::consts::PI {
+                    Ok(-1.0)
+                } else {
+                    Ok(1.0)
+                }
+            }
+            TransferKind::ShortWay => Ok(1.0),
+            TransferKind::LongWay => Ok(-1.0),
+            _ => Err(NyxError::LambertMultiRevNotSupported),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct LambertSolution {
     pub v_init: Vector3<f64>,
     pub v_final: Vector3<f64>,
     pub phi: f64,
-}
-
-/// Calculate the direction multiplier based on the transfer kind.
-///
-/// # Arguments
-///
-/// * `kind` - The kind of transfer (auto, short way, long way, or number of revolutions).
-/// * `r_final` - The final radius vector.
-/// * `r_init` - The initial radius vector.
-///
-/// # Returns
-///
-/// `Result<f64, NyxError>` - The direction multiplier or an error if the transfer kind is not supported.
-fn calculate_dm(
-    kind: &TransferKind,
-    r_final: &Vector3<f64>,
-    r_init: &Vector3<f64>,
-) -> Result<f64, NyxError> {
-    match kind {
-        TransferKind::Auto => {
-            let mut dnu = r_final[1].atan2(r_final[0]) - r_init[1].atan2(r_final[1]);
-            if dnu > TAU {
-                dnu -= TAU;
-            } else if dnu < 0.0 {
-                dnu += TAU;
-            }
-
-            if dnu > std::f64::consts::PI {
-                Ok(-1.0)
-            } else {
-                Ok(1.0)
-            }
-        }
-        TransferKind::ShortWay => Ok(1.0),
-        TransferKind::LongWay => Ok(-1.0),
-        _ => Err(NyxError::LambertMultiRevNotSupported),
-    }
 }
 
 /// Calculate the new values of phi, c2, and c3 based on the current value of phi.
@@ -136,9 +137,8 @@ pub fn standard(
     let r_norm_product = r_init_norm * r_final_norm;
     let cos_dnu = r_init.dot(&r_final) / r_norm_product;
 
-    let dm = calculate_dm(&kind, &r_final, &r_init)?;
+    let dm = kind.direction_of_motion(&r_final, &r_init)?;
 
-    // Compute the direction of motion
     let nu_init = r_init[1].atan2(r_init[0]);
     let nu_final = r_final[1].atan2(r_final[0]);
 
@@ -148,7 +148,6 @@ pub fn standard(
         return Err(NyxError::TargetsTooClose);
     }
 
-    // Define the search space (note that we do not support multirevs in this algorithm)
     let mut phi_upper = 4.0 * PI.powi(2);
     let mut phi_lower = -4.0 * PI.powi(2);
     let mut phi = 0.0;
@@ -170,44 +169,48 @@ pub fn standard(
 
         y = r_init_norm + r_final_norm + a * (phi * c3 - 1.0) / c2.sqrt();
         if a > 0.0 && y < 0.0 {
-            // Try to increase phi
             for _ in 0..500 {
                 phi += 0.1;
-                // Recompute y
                 y = r_init_norm + r_final_norm + a * (phi * c3 - 1.0) / c2.sqrt();
                 if y >= 0.0 {
                     break;
                 }
             }
-            // If y is still negative, then our attempts have failed.
             if y < 0.0 {
                 return Err(NyxError::LambertNotReasonablePhi);
             }
         }
 
         let chi = (y / c2).sqrt();
-        // Compute the current time of flight
         cur_tof = (chi.powi(3) * c3 + a * y.sqrt()) / gm.sqrt();
-        // Update the next TOF we should use
+
         if cur_tof < tof {
             phi_lower = phi;
         } else {
             phi_upper = phi;
         }
 
-        // Compute the next phi
         phi = (phi_upper + phi_lower) / 2.0;
-        let (_phi, c2_new, c3_new) = calculate_phi_and_c2_c3(phi);
-        c2 = c2_new;
-        c3 = c3_new;
+
+        if phi > LAMBERT_EPSILON {
+            let sqrt_phi = phi.sqrt();
+            let (s_sphi, c_sphi) = sqrt_phi.sin_cos();
+            c2 = (1.0 - c_sphi) / phi;
+            c3 = (sqrt_phi - s_sphi) / phi.powi(3).sqrt();
+        } else if phi < -LAMBERT_EPSILON {
+            let sqrt_phi = (-phi).sqrt();
+            c2 = (1.0 - sqrt_phi.cosh()) / phi;
+            c3 = (sqrt_phi.sinh() - sqrt_phi) / (-phi).powi(3).sqrt();
+        } else {
+            c2 = 0.5;
+            c3 = 1.0 / 6.0;
+        }
     }
 
-    // Time of flight matches!
     let f = 1.0 - y / r_init_norm;
     let g_dot = 1.0 - y / r_final_norm;
     let g = a * (y / gm).sqrt();
 
-    // Compute velocities
     Ok(LambertSolution {
         v_init: (r_final - f * r_init) / g,
         v_final: (1.0 / g) * (g_dot * r_final - r_init),
