@@ -7,10 +7,11 @@
       "**/.*",
       "**/node_modules/**"
     ],
-    "rewrites": [
+    "redirects": [
       {
         "source": "/",
-        "destination": "/nyx_space/"
+        "destination": "/nyx_space",
+        "type": 301
       }
     ]
   }
