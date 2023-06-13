@@ -81,33 +81,6 @@ pub struct LambertSolution {
     pub phi: f64,
 }
 
-/// Calculate the new values of phi, c2, and c3 based on the current value of phi.
-///
-/// # Arguments
-///
-/// `phi` - The current value of phi.
-///
-/// # Returns
-///
-/// `(f64, f64, f64)` - The new values of phi, c2, and c3.
-fn calculate_phi_and_c2_c3(phi: f64) -> (f64, f64, f64) {
-    let mut c2 = 0.5;
-    let mut c3 = 1.0 / 6.0;
-
-    if phi > LAMBERT_EPSILON {
-        let sqrt_phi = phi.sqrt();
-        let (s_sphi, c_sphi) = sqrt_phi.sin_cos();
-        c2 = (1.0 - c_sphi) / phi;
-        c3 = (sqrt_phi - s_sphi) / phi.powi(3).sqrt();
-    } else if phi < -LAMBERT_EPSILON {
-        let sqrt_phi = (-phi).sqrt();
-        c2 = (1.0 - sqrt_phi.cosh()) / phi;
-        c3 = (sqrt_phi.sinh() - sqrt_phi) / (-phi).powi(3).sqrt();
-    }
-
-    (phi, c2, c3)
-}
-
 /// Solve the Lambert boundary problem using a standard secant method.
 ///
 /// Given the initial and final radii, a time of flight, and a gravitational parameters, it returns the needed initial and final velocities
