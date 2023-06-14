@@ -874,12 +874,12 @@ impl Orbit {
     #[cfg(feature = "python")]
     #[getter]
     fn y_km(&self) -> f64 {
-        self.x_km
+        self.y_km
     }
     #[cfg(feature = "python")]
     #[getter]
     fn z_km(&self) -> f64 {
-        self.x_km
+        self.z_km
     }
     #[cfg(feature = "python")]
     #[getter]
