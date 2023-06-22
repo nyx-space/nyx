@@ -19,6 +19,9 @@ ENV RUST_BACKTRACE=full
 # Install maturin to build the package
 RUN pip install maturin
 
+# The lack of python seems to confuse maturin but only on github...
+RUN ln -s /usr/bin/python3 /usr/bin/python 
+
 # Finally copy
 COPY . /app
 
