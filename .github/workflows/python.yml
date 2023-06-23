@@ -192,7 +192,7 @@ jobs:
         run: docker build -f Dockerfile.dev -t nyx-build .
 
       - name: Run development container and build the package
-        run: docker run --name nyx-builder nyx-build maturin build -F python --release
+        run: docker run --name nyx-builder nyx-build
 
       - name: Copy built package from container to host
         run: docker cp nyx-builder:/app/target/wheels ./dist

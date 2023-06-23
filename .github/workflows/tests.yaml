@@ -158,6 +158,9 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v3
+      
+      - name: release-plz
+        uses: MarcoIeni/release-plz-action@v0.5.2      
 
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@master
