@@ -15,7 +15,7 @@ from nyx_space.orbit_determination import (
     ExportCfg,
 )
 from nyx_space.mission_design import TrajectoryLoader, SpacecraftDynamics, propagate
-from nyx_space.cosmic import Spacecraft
+from nyx_space.cosmic import Spacecraft, Cosm
 from nyx_space.time import Unit
 from nyx_space.plots.od import (
     plot_covar,
@@ -203,6 +203,12 @@ def test_one_way_msr():
     assert abs(range_km - 18097.562811514355) < 0.1
     assert abs(doppler_km_s - -0.2498238312640348) < 0.1
 
+    # Azimuth and elevation
+    cosm = Cosm.de438()
+    az_deg, el_deg = devices[0].compute_azimuth_elevation(end_sc.orbit, cosm)
+
+    assert abs(az_deg - 172.38393292690975) < 1e-15
+    assert abs(el_deg - 27.904687635388676) < 1e-15
 
 def test_pure_prediction():
     # Initialize logging
@@ -267,4 +273,4 @@ def test_pure_prediction():
 
 
 if __name__ == "__main__":
-    test_pure_prediction()
+    test_one_way_msr()

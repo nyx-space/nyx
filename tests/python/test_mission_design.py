@@ -217,6 +217,4 @@ def test_two_body():
     print(f"two body propagation of {len(orbits)} orbits in {timing} s")
 
 if __name__ == "__main__":
-    # test_propagate()
-    # test_build_spacecraft()
     test_two_body()

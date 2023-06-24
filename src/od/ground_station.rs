@@ -150,9 +150,9 @@ impl GroundStation {
         }
     }
 
-    /// Computes the elevation of the provided object seen from this ground station.
+    /// Computes the azimuth and elevation of the provided object seen from this ground station, both in degrees.
     /// Also returns the ground station's orbit in the frame of the receiver
-    pub fn elevation_of(&self, rx: Orbit, cosm: &Cosm) -> (f64, Orbit, Orbit) {
+    pub fn azimuth_elevation_of(&self, rx: Orbit, cosm: &Cosm) -> (f64, f64, Orbit, Orbit) {
         // Start by converting the receiver spacecraft into the ground station frame.
         let rx_gs_frame = cosm.frame_chg(&rx, self.frame);
 
@@ -170,10 +170,16 @@ impl GroundStation {
         let rho_sez = rx_sez - tx_sez;
 
         // Finally, compute the elevation (math is the same as declination)
-        let elevation = rho_sez.declination_deg();
+        let elevation_deg = rho_sez.declination_deg();
+        let azimuth_deg = (rho_sez.y_km / rho_sez.x_km).tan().to_degrees();
 
         // Return elevation in degrees and rx/tx in the inertial frame of the spacecraft
-        (elevation, rx, cosm.frame_chg(&tx_gs_frame, rx.frame))
+        (
+            azimuth_deg,
+            elevation_deg,
+            rx,
+            cosm.frame_chg(&tx_gs_frame, rx.frame),
+        )
     }
 
     /// Return this ground station as an orbit in its current frame
@@ -267,8 +273,8 @@ impl TrackingDeviceSim<Orbit, RangeDoppler> for GroundStation {
                 let rx_0 = traj.at(epoch - integration_time)?;
                 let rx_1 = traj.at(epoch)?;
 
-                let (elevation_0, rx_0, tx_0) = self.elevation_of(rx_0, &cosm);
-                let (elevation_1, rx_1, tx_1) = self.elevation_of(rx_1, &cosm);
+                let (_, elevation_0, rx_0, tx_0) = self.azimuth_elevation_of(rx_0, &cosm);
+                let (_, elevation_1, rx_1, tx_1) = self.azimuth_elevation_of(rx_1, &cosm);
 
                 if elevation_0 < self.elevation_mask_deg || elevation_1 < self.elevation_mask_deg {
                     debug!(
@@ -308,7 +314,7 @@ impl TrackingDeviceSim<Orbit, RangeDoppler> for GroundStation {
         rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
     ) -> Result<Option<RangeDoppler>, NyxError> {
-        let (elevation, rx, tx) = self.elevation_of(rx, &cosm);
+        let (_, elevation, rx, tx) = self.azimuth_elevation_of(rx, &cosm);
 
         if elevation >= self.elevation_mask_deg {
             // Only update the noises if the measurement is valid.
@@ -359,7 +365,7 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
         rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
     ) -> Result<Option<RangeDoppler>, NyxError> {
-        let (elevation, rx, tx) = self.elevation_of(rx.orbit, &cosm);
+        let (_, elevation, rx, tx) = self.azimuth_elevation_of(rx.orbit, &cosm);
 
         if elevation >= self.elevation_mask_deg {
             // Only update the noises if the measurement is valid.

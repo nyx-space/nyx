@@ -25,6 +25,8 @@ pub use crate::od::simulator::TrkConfig;
 use crate::NyxError;
 pub use crate::{io::ConfigError, od::prelude::GroundStation};
 
+use crate::python::cosmic::Cosm as CosmPy;
+
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 
@@ -56,6 +58,13 @@ impl GroundStation {
                 orbit.epoch
             ))),
         }
+    }
+
+    /// Computes the azimuth and elevation of the provided object seen from this ground station, both in degrees.
+    fn compute_azimuth_elevation(&self, receiver: Orbit, cosm: &CosmPy) -> (f64, f64) {
+        let (az_deg, el_deg, _, _) = self.azimuth_elevation_of(receiver, &cosm.inner);
+
+        (az_deg, el_deg)
     }
 
     // Manual getter/setters -- waiting on https://github.com/PyO3/pyo3/pull/2786
