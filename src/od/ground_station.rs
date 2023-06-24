@@ -23,6 +23,7 @@ use crate::cosmic::{Cosm, Frame, Orbit};
 use crate::io::{frame_from_str, frame_to_str, ConfigRepr, Configurable};
 use crate::md::prelude::Traj;
 use crate::time::Epoch;
+use crate::utils::between_0_360;
 use crate::{NyxError, Spacecraft};
 use hifitime::Duration;
 use rand_pcg::Pcg64Mcg;
@@ -170,8 +171,15 @@ impl GroundStation {
         let rho_sez = rx_sez - tx_sez;
 
         // Finally, compute the elevation (math is the same as declination)
+        // Source: Vallado, section 4.4.3
+        // Only the sine is needed as per Vallado, and the formula is the same as the declination
+        // because we're in the SEZ frame.
         let elevation_deg = rho_sez.declination_deg();
-        let azimuth_deg = (rho_sez.y_km / rho_sez.x_km).tan().to_degrees();
+        if (elevation_deg - 90.0).abs() < 1e-6 {
+            warn!("object nearly overhead (el = {elevation_deg} deg), azimuth may be incorrect");
+        }
+        // For the elevation, we need to perform a quadrant check because it's measured from 0 to 360 degrees.
+        let azimuth_deg = between_0_360((-rho_sez.y_km.atan2(rho_sez.x_km)).to_degrees());
 
         // Return elevation in degrees and rx/tx in the inertial frame of the spacecraft
         (
