@@ -5,12 +5,14 @@ import pickle
 from nyx_space.cosmic import Spacecraft, Orbit, SrpConfig, Cosm
 from nyx_space.mission_design import (
     propagate,
+    two_body,
     StateParameter,
     Event,
     SpacecraftDynamics,
     TrajectoryLoader,
 )
 from nyx_space.time import Duration, Unit, Epoch, TimeSeries
+from nyx_space.monte_carlo import generate_orbits, StateParameter
 
 
 def test_propagate():
@@ -167,7 +169,50 @@ def test_build_spacecraft():
         assert dc_orbit.__eq__(sc_orbit)
 
 
+def test_two_body():
+    # Build a demo orbit
+    cosm = Cosm.de438()
+    eme2k = cosm.frame("EME2000")
+
+    assert eme2k.gm() == 398600.435392  # SPICE data, not GMAT data (398600.4415)
+    assert eme2k.is_geoid()
+    assert eme2k.equatorial_radius() == 6378.1363
+
+    e = Epoch.system_now()
+
+    orbit = Orbit.from_keplerian_altitude(
+        400,
+        ecc=1e-4,
+        inc_deg=30.5,
+        raan_deg=35.0,
+        aop_deg=65.0,
+        ta_deg=590,
+        epoch=e,
+        frame=eme2k,
+    )
+
+    orbits = generate_orbits(
+        orbit,
+        [
+            (StateParameter("SMA"), 0.05),
+            (StateParameter.Eccentricity, 0.1),
+            (StateParameter.Inclination, 0.1),
+        ],
+        100,
+        kind="prct",
+    )
+
+    # And propagate in parallel using a single duration
+    proped_orbits = two_body(orbits, durations=[Unit.Day*531.5])
+    assert len(proped_orbits) == len(orbits)
+
+    # And propagate in parallel using many epochs
+    ts = TimeSeries(e, e + Unit.Day * 100, step=Unit.Day*1, inclusive=True)
+    epochs = [e for e in ts][:100]
+    proped_orbits = two_body(orbits, new_epochs=epochs)
+    assert len(proped_orbits) == len(orbits)
 
 if __name__ == "__main__":
     # test_propagate()
-    test_build_spacecraft()
+    # test_build_spacecraft()
+    test_two_body()

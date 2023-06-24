@@ -1556,6 +1556,28 @@ impl Orbit {
             }
     }
 
+    /// Adjusts the true anomaly of this orbit using the mean anomaly.
+    ///
+    /// # Astrodynamics note
+    /// This is akin to a two body propagation.
+    pub fn orbit_at_epoch(&self, new_epoch: Epoch) -> Result<Self, NyxError> {
+        let m0_rad = self.ma_deg().to_radians();
+        let mt_rad = m0_rad
+            + (self.frame.gm() / self.sma_km().powi(3)).sqrt()
+                * (new_epoch - self.epoch).to_seconds();
+
+        Self::keplerian_mean_anomaly(
+            self.sma_km(),
+            self.ecc(),
+            self.inc_deg(),
+            self.raan_deg(),
+            self.aop_deg(),
+            mt_rad.to_degrees(),
+            new_epoch,
+            self.frame,
+        )
+    }
+
     /// Prints this orbit in Cartesian form
     #[cfg(feature = "python")]
     fn __repr__(&self) -> String {
@@ -1670,6 +1692,31 @@ impl Orbit {
             raan_deg,
             aop_deg,
             ta_deg,
+            epoch,
+            frame.inner,
+        )
+    }
+
+    #[cfg(feature = "python")]
+    #[classmethod]
+    fn from_keplerian_mean_anomaly(
+        _cls: &PyType,
+        sma_km: f64,
+        ecc: f64,
+        inc_deg: f64,
+        raan_deg: f64,
+        aop_deg: f64,
+        ma_deg: f64,
+        epoch: Epoch,
+        frame: PyRef<PyFrame>,
+    ) -> Result<Self, NyxError> {
+        Self::keplerian_mean_anomaly(
+            sma_km,
+            ecc,
+            inc_deg,
+            raan_deg,
+            aop_deg,
+            ma_deg,
             epoch,
             frame.inner,
         )

@@ -48,6 +48,7 @@ pub(crate) fn register_md(py: Python<'_>, parent_module: &PyModule) -> PyResult<
     sm.add_class::<sc_trajectory::SpacecraftTraj>()?;
     sm.add_class::<orbit_trajectory::OrbitTraj>()?;
     sm.add_function(wrap_pyfunction!(propagate, sm)?)?;
+    sm.add_function(wrap_pyfunction!(two_body, sm)?)?;
 
     py_run!(
         py,
@@ -152,4 +153,57 @@ fn propagate(
             "Either duration or epoch must be provided for a propagation to happen".to_string(),
         )))
     }
+}
+
+#[pyfunction]
+fn two_body(
+    orbits: Vec<Orbit>,
+    new_epochs: Option<Vec<Epoch>>,
+    durations: Option<Vec<Duration>>,
+) -> Vec<Orbit> {
+    let epochs: Vec<Epoch> = if (new_orbits.is_some() && durations.is_some())
+        || (new_orbit.is_none() && durations.is_none())
+    {
+        return Err(NyxError::ConfigError(ConfigError::InvalidConfig(
+            "Either duration or epoch must be provided for a propagation to happen, but not both"
+                .to_string(),
+        )));
+    } else if let Some(new_epochs) = new_epochs {
+        if new_epochs.len() == 1 {
+            vec![new_epochs[0]; orbits.len()]
+        } else if new_epochs.len() == orbits.len() {
+            new_epochs
+        } else {
+            return Err(NyxError::ConfigError(ConfigError::InvalidConfig(
+                "New epochs must be either of the same size as the orbits vector or contain one item exactly"
+                    .to_string(),
+            )));
+        };
+    } else if let Some(durations) = durations {
+        if durations.len() == 1 {
+            orbits.iter().map(|orbit| orbit + durations[0]).collect()
+        } else if durations.len() == orbits.len() {
+            durations
+        } else {
+            return;
+            Err(NyxError::ConfigError(ConfigError::InvalidConfig(
+                "Durations must be either of the same size as the orbits vector or contain one item exactly"
+                    .to_string(),
+            )))
+        };
+    };
+
+    orbits
+        .par_iter()
+        .zip(epochsepochs.par_iter())
+        .map(|(orbit, &epoch)| orbit.orbit_at_epoch(epoch))
+        .collect::<Vec<Result<Orbit, NyxError>>>()
+        .into_iter()
+        .map(|result| match result {
+            Ok(orbit) => orbit,
+            Err(e) => {
+                eprintln!("Error: {:?}", error);
+            }
+        })
+        .collect::<Vec<Orbit>>()
 }

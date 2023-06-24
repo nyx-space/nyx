@@ -441,7 +441,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, None, cosm.clone());
+    let mut odp = ODProcess::ckf(prop_est, ckf, None, cosm);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 

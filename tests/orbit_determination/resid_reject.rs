@@ -40,7 +40,7 @@ fn traj(epoch: Epoch) -> Traj<Orbit> {
         Bodies::JupiterBarycenter,
         Bodies::SaturnBarycenter,
     ];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm.clone());
+    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm);
     let truth_setup = Propagator::dp78(orbital_dyn, PropOpts::with_max_step(step_size));
     let (_, traj) = truth_setup
         .with(initial_state)
@@ -192,7 +192,7 @@ fn od_resid_reject_all_ckf_two_way(
             min_accepted: 0, // Start the preprocessing filter at the first measurement because we try to filter everything out in this test
             num_sigmas: 3.0,
         }),
-        cosm.clone(),
+        cosm,
     );
 
     // TODO: Fix the deserialization of the measurements such that they also deserialize the integration time.
@@ -257,7 +257,7 @@ fn od_resid_reject_default_ckf_two_way(
 
     let kf = KF::new(initial_estimate, process_noise, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, kf, Some(FltResid::default()), cosm.clone());
+    let mut odp = ODProcess::ckf(prop_est, kf, Some(FltResid::default()), cosm);
 
     // TODO: Fix the deserialization of the measurements such that they also deserialize the integration time.
     // Without it, we're stuck having to rebuild them from scratch.
