@@ -155,6 +155,9 @@ fn propagate(
     }
 }
 
+/// Performs a two body propagation around the central body of each orbit in the `orbits` list either for the duration in the list or until the epochs in the list.
+/// New epoch and duration parameters may either be exactly one item or N items, where N is the number of orbits.
+/// This computation will happen in parallel on all CPUs. It uses the `at_epoch` function of `Orbit`.
 #[pyfunction]
 fn two_body(
     orbits: Vec<Orbit>,

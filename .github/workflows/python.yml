@@ -38,9 +38,14 @@ jobs:
           name: wheels
           path: dist
 
+      - name: Download wheels
+        uses: actions/download-artifact@v3
+        with:
+          name: wheels
+          path: dist
+
       - name: pytest x86_64
         if: ${{ matrix.target == 'x86_64' }}
-        shell: bash
         run: |
           set -e
           pip install nyx_space --find-links dist --force-reinstall
@@ -91,6 +96,13 @@ jobs:
         with:
           name: wheels
           path: dist
+
+      - name: Download wheels
+        uses: actions/download-artifact@v3
+        with:
+          name: wheels
+          path: dist
+
       - name: pytest
         if: ${{ !startsWith(matrix.target, 'aarch64') }}
         shell: bash
@@ -116,11 +128,19 @@ jobs:
           target: ${{ matrix.target }}
           args: --release --out dist --find-interpreter -F python
           sccache: 'true'
+      
       - name: Upload wheels
         uses: actions/upload-artifact@v3
         with:
           name: wheels
           path: dist
+      
+      - name: Download wheels
+        uses: actions/download-artifact@v3
+        with:
+          name: wheels
+          path: dist
+
       - name: pytest
         if: ${{ !startsWith(matrix.target, 'aarch64') }}
         shell: bash
