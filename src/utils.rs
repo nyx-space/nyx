@@ -22,19 +22,41 @@ use crate::linalg::{
 };
 use nalgebra::Complex;
 
-/// Returns the tilde matrix from the provided Vector3.
+/// Returns the skew-symmetric matrix (also known as the tilde matrix)
+/// corresponding to the provided 3D vector.
+///
+/// The skew-symmetric matrix of a vector `v` is defined as:
+///
+/// ```plaintext
+///  0   -v.z  v.y
+///  v.z  0   -v.x
+/// -v.y  v.x  0
+/// ```
+///
+/// This matrix has the property that for any vector `w`, the cross product `v x w`
+/// can be computed as the matrix product of the skew-symmetric matrix of `v` and `w`.
 pub fn tilde_matrix(v: &Vector3<f64>) -> Matrix3<f64> {
-    Matrix3::new(
-        0.0,
-        -v[(2, 0)],
-        v[(1, 0)],
-        v[(2, 0)],
-        0.0,
-        -v[(0, 0)],
-        -v[(1, 0)],
-        v[(0, 0)],
-        0.0,
-    )
+    Matrix3::new(0.0, -v.z, v.y, v.z, 0.0, -v.x, -v.y, v.x, 0.0)
+}
+
+#[test]
+fn test_tilde_matrix() {
+    let vec = Vector3::new(1.0, 2.0, 3.0);
+    let rslt = Matrix3::new(0.0, -3.0, 2.0, 3.0, 0.0, -1.0, -2.0, 1.0, 0.0);
+    assert_eq!(tilde_matrix(&vec), rslt);
+
+    let v = Vector3::new(1.0, 2.0, 3.0);
+    let m = tilde_matrix(&v);
+
+    assert_eq!(m[(0, 0)], 0.0);
+    assert_eq!(m[(0, 1)], -v.z);
+    assert_eq!(m[(0, 2)], v.y);
+    assert_eq!(m[(1, 0)], v.z);
+    assert_eq!(m[(1, 1)], 0.0);
+    assert_eq!(m[(1, 2)], -v.x);
+    assert_eq!(m[(2, 0)], -v.y);
+    assert_eq!(m[(2, 1)], v.x);
+    assert_eq!(m[(2, 2)], 0.0);
 }
 
 /// Checks if the provided 3x3 matrix is diagonal.
@@ -686,13 +708,6 @@ pub fn spherical_to_cartesian(range_ρ: f64, θ: f64, φ: f64) -> Vector3<f64> {
         let z = range_ρ * φ.cos();
         Vector3::new(x, y, z)
     }
-}
-
-#[test]
-fn test_tilde_matrix() {
-    let vec = Vector3::new(1.0, 2.0, 3.0);
-    let rslt = Matrix3::new(0.0, -3.0, 2.0, 3.0, 0.0, -1.0, -2.0, 1.0, 0.0);
-    assert_eq!(tilde_matrix(&vec), rslt);
 }
 
 #[rustfmt::skip]
