@@ -37,6 +37,7 @@ use crate::NyxError;
 use approx::{abs_diff_eq, relative_eq};
 use serde::{Deserialize, Serialize};
 use std::f64::consts::PI;
+use std::f64::consts::TAU;
 use std::f64::EPSILON;
 use std::fmt;
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign};
@@ -55,6 +56,7 @@ use std::collections::HashMap;
 
 /// If an orbit has an eccentricity below the following value, it is considered circular (only affects warning messages)
 pub const ECC_EPSILON: f64 = 1e-11;
+pub const MA_EPSILON: f64 = 1e-16;
 
 pub fn assert_orbit_eq_or_abs(left: &Orbit, right: &Orbit, epsilon: f64, msg: &str) {
     if !(left.to_cartesian_vec() == right.to_cartesian_vec())
@@ -378,6 +380,37 @@ impl Orbit {
             epoch,
             frame,
         )
+    }
+
+    /// Initializes a new orbit from the Keplerian orbital elements using the mean anomaly instead of the true anomaly.
+    ///
+    /// # Implementation notes
+    /// This function starts by converting the mean anomaly to true anomaly, and then it initializes the orbit
+    /// using the keplerian(..) method.
+    /// The conversion is from GMAT's MeanToTrueAnomaly function, transliterated originally by Claude and GPT4 with human adjustments.
+    pub fn keplerian_mean_anomaly(
+        sma_km: f64,
+        ecc: f64,
+        inc_deg: f64,
+        raan_deg: f64,
+        aop_deg: f64,
+        ma_deg: f64,
+        epoch: Epoch,
+        frame: Frame,
+    ) -> Result<Self, NyxError> {
+        // Start by computing the true anomaly
+        let ta_rad = compute_mean_to_true_anomaly(ma_deg.to_radians(), ecc, MA_EPSILON)?;
+
+        Ok(Self::keplerian(
+            sma_km,
+            ecc,
+            inc_deg,
+            raan_deg,
+            aop_deg,
+            ta_rad.to_degrees(),
+            epoch,
+            frame,
+        ))
     }
 
     /// Creates a new Orbit from the geodetic latitude (φ), longitude (λ) and height with respect to the ellipsoid of the frame.
@@ -2197,6 +2230,174 @@ impl Configurable for Orbit {
     fn to_config(&self) -> Result<Self::IntermediateRepr, crate::io::ConfigError> {
         let serded: Self::IntermediateRepr = (*self).into();
         Ok(serded)
+    }
+}
+
+/// Computes the true anomaly from the given mean anomaly for an orbit.
+///
+/// The computation process varies depending on whether the orbit is elliptical (eccentricity less than or equal to 1)
+/// or hyperbolic (eccentricity greater than 1). In each case, the method uses an iterative algorithm to find a
+/// sufficiently accurate approximation of the true anomaly.
+///
+/// # Arguments
+///
+/// * `ma_radians` - The mean anomaly in radians.
+/// * `ecc` - The eccentricity of the orbit.
+/// * `tol` - The tolerance for accuracy in the resulting true anomaly.
+///
+/// # Returns
+///
+/// * Ok(f64) - The calculated true anomaly in radians, if the computation was successful.
+/// * Err(NyxError) - An error that occurred during the computation. Possible errors include:
+///     - MaxIterReached: The iterative process did not converge within 1000 iterations.
+///     - MathDomain: A mathematical error occurred during computation, such as division by zero.
+///
+/// # Remarks
+///
+/// This function uses GTDS MathSpec Equations 3-180, 3-181, and 3-186 for the iterative computation process.
+///
+/// If a numerical error occurs during computation, the function may return a MathDomain error. In the case of a
+/// non-converging iterative process, the function will return a MaxIterReached error after 1000 iterations.
+///
+/// # Examples
+///
+/// ```
+/// let ma_radians = 0.5;
+/// let ecc = 0.1;
+/// let tol = 1e-6;
+/// let result = compute_mean_to_true_anomaly(ma_radians, ecc, tol);
+/// ```
+fn compute_mean_to_true_anomaly(ma_radians: f64, ecc: f64, tol: f64) -> Result<f64, NyxError> {
+    let rm = ma_radians;
+    if ecc <= 1.0 {
+        // Elliptical orbit
+        let mut e2 = rm + ecc * rm.sin(); // GTDS MathSpec Equation 3-182
+
+        let mut iter = 0;
+
+        loop {
+            iter += 1;
+            if iter > 1000 {
+                return Err(NyxError::MaxIterReached(format!("{iter}")));
+            }
+
+            // GTDS MathSpec Equation 3-180  Note: a little difference here is that it uses Cos(E) instead of Cos(E-0.5*f)
+            let normalized_anomaly = 1.0 - ecc * e2.cos();
+
+            if normalized_anomaly.abs() < MA_EPSILON {
+                return Err(NyxError::MathDomain(format!(
+                    "normalizer too small {normalized_anomaly}"
+                )));
+            }
+
+            // GTDS MathSpec Equation 3-181
+            let e1 = e2 - (e2 - ecc * e2.sin() - rm) / normalized_anomaly;
+
+            if (e2 - e1).abs() < tol {
+                break;
+            }
+
+            e2 = e1;
+        }
+
+        let mut e = e2;
+
+        if e < 0.0 {
+            e += TAU;
+        }
+
+        let c = (e - PI).abs();
+
+        let mut ta = if c >= 1.0e-08 {
+            let normalized_anomaly = 1.0 - ecc;
+
+            if (normalized_anomaly).abs() < MA_EPSILON {
+                return Err(NyxError::MathDomain(format!(
+                    "normalized anomaly too small {normalized_anomaly}"
+                )));
+            }
+
+            let eccentricity_ratio = (1.0 + ecc) / normalized_anomaly; // temp2 = (1+ecc)/(1-ecc)
+
+            if eccentricity_ratio < 0.0 {
+                return Err(NyxError::MathDomain(format!(
+                    "eccentric ratio too small {eccentricity_ratio}"
+                )));
+            }
+
+            let f = eccentricity_ratio.sqrt();
+            let g = (e / 2.0).tan();
+            // tan(TA/2) = Sqrt[(1+ecc)/(1-ecc)] * tan(E/2)
+            2.0 * (f * g).atan()
+        } else {
+            e
+        };
+
+        if ta < 0.0 {
+            ta += TAU;
+        }
+        Ok(ta)
+    } else {
+        //---------------------------------------------------------
+        // hyperbolic orbit
+        //---------------------------------------------------------
+
+        // For hyperbolic orbit, anomaly is nolonger to be an angle so we cannot use mod of 2*PI to mean anomaly.
+        // We need to keep its original value for calculation.
+        //if (rm > PI)                       // incorrect
+        //   rm = rm - TWO_PI;               // incorrect
+
+        //f2 = ecc * Sinh(rm) - rm;          // incorrect
+        //f2 = rm / 2;                       // incorrect  // GTDS MathSpec Equation 3-186
+        let mut f2: f64 = 0.0; // This is the correct initial value for hyperbolic eccentric anomaly.
+        let mut iter = 0;
+
+        loop {
+            iter += 1;
+            if iter > 1000 {
+                return Err(NyxError::MaxIterReached(format!("{iter}")));
+            }
+
+            let normalizer = ecc * f2.cosh() - 1.0;
+
+            if normalizer.abs() < MA_EPSILON {
+                return Err(NyxError::MathDomain(format!(
+                    "normalizer too small {normalizer}"
+                )));
+            }
+
+            let f1 = f2 - (ecc * f2.sinh() - f2 - rm) / normalizer; // GTDS MathSpec Equation 3-186
+            if (f2 - f1).abs() < tol {
+                break;
+            }
+            f2 = f1;
+        }
+
+        let f = f2;
+        let normalized_anomaly = ecc - 1.0;
+
+        if normalized_anomaly.abs() < MA_EPSILON {
+            return Err(NyxError::MathDomain(format!(
+                "eccentric ratio too small {normalized_anomaly}"
+            )));
+        }
+
+        let eccentricity_ratio = (ecc + 1.0) / normalized_anomaly; // temp2 = (ecc+1)/(ecc-1)
+
+        if eccentricity_ratio < 0.0 {
+            return Err(NyxError::MathDomain(format!(
+                "eccentric ratio too small {eccentricity_ratio}"
+            )));
+        }
+
+        let e = eccentricity_ratio.sqrt();
+        let g = (f / 2.0).tanh();
+        let mut ta = 2.0 * (e * g).atan(); // tan(TA/2) = Sqrt[(ecc+1)/(ecc-1)] * Tanh(F/2)    where: F is hyperbolic centric anomaly
+
+        if ta < 0.0 {
+            ta += TAU;
+        }
+        Ok(ta)
     }
 }
 
