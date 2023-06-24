@@ -1560,7 +1560,7 @@ impl Orbit {
     ///
     /// # Astrodynamics note
     /// This is akin to a two body propagation.
-    pub fn orbit_at_epoch(&self, new_epoch: Epoch) -> Result<Self, NyxError> {
+    pub fn at_epoch(&self, new_epoch: Epoch) -> Result<Self, NyxError> {
         let m0_rad = self.ma_deg().to_radians();
         let mt_rad = m0_rad
             + (self.frame.gm() / self.sma_km().powi(3)).sqrt()

@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 import pickle
+from timeit import timeit
 
 from nyx_space.cosmic import Spacecraft, Orbit, SrpConfig, Cosm
 from nyx_space.mission_design import (
@@ -198,7 +199,7 @@ def test_two_body():
             (StateParameter.Eccentricity, 0.1),
             (StateParameter.Inclination, 0.1),
         ],
-        100,
+        1000,
         kind="prct",
     )
 
@@ -207,10 +208,13 @@ def test_two_body():
     assert len(proped_orbits) == len(orbits)
 
     # And propagate in parallel using many epochs
-    ts = TimeSeries(e, e + Unit.Day * 100, step=Unit.Day*1, inclusive=True)
-    epochs = [e for e in ts][:100]
+    ts = TimeSeries(e, e + Unit.Day * 1000, step=Unit.Day*1, inclusive=False)
+    epochs = [e for e in ts]
     proped_orbits = two_body(orbits, new_epochs=epochs)
     assert len(proped_orbits) == len(orbits)
+
+    timing = timeit(lambda: two_body(orbits, new_epochs=epochs), number=1)
+    print(f"two body propagation of {len(orbits)} orbits in {timing} s")
 
 if __name__ == "__main__":
     # test_propagate()
