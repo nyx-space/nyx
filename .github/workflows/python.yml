@@ -38,17 +38,11 @@ jobs:
           name: wheels
           path: dist
 
-      - name: Download wheels
-        uses: actions/download-artifact@v3
-        with:
-          name: wheels
-          path: dist
-
       - name: pytest x86_64
         if: ${{ matrix.target == 'x86_64' }}
         run: |
           set -e
-          pip install nyx_space --find-links dist --force-reinstall
+          pip install nyx_space --use-wheel --no-index --find-links dist --force-reinstall
           pip install pytest numpy pandas plotly pyarrow scipy
           pytest
 
@@ -65,7 +59,7 @@ jobs:
             pip3 install -U pip pytest plotly
           run: |
             set -e
-            pip3 install nyx_space --find-links dist --force-reinstall
+            pip3 install nyx_space --use-wheel --no-index --find-links dist --force-reinstall
             pytest
 
       - name: Upload python tests HTMLs
@@ -97,18 +91,12 @@ jobs:
           name: wheels
           path: dist
 
-      - name: Download wheels
-        uses: actions/download-artifact@v3
-        with:
-          name: wheels
-          path: dist
-
       - name: pytest
         if: ${{ !startsWith(matrix.target, 'aarch64') }}
         shell: bash
         run: |
           set -e
-          pip install nyx_space --find-links dist --force-reinstall
+          pip install nyx_space --use-wheel --no-index --find-links dist --force-reinstall
           pip install pytest numpy pandas plotly pyarrow
           pytest
 
@@ -134,19 +122,13 @@ jobs:
         with:
           name: wheels
           path: dist
-      
-      - name: Download wheels
-        uses: actions/download-artifact@v3
-        with:
-          name: wheels
-          path: dist
 
       - name: pytest
         if: ${{ !startsWith(matrix.target, 'aarch64') }}
         shell: bash
         run: |
           set -e
-          pip install nyx_space --find-links dist --force-reinstall
+          pip install nyx_space --use-wheel --no-index --find-links dist --force-reinstall
           pip install pytest numpy pandas plotly pyarrow
           pytest
 
