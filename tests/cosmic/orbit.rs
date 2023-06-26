@@ -4,6 +4,7 @@ extern crate pretty_env_logger as pel;
 use approx::relative_eq;
 use nyx::cosmic::{Cosm, Frame, Orbit};
 use nyx::time::{Epoch, Unit};
+use nyx::utils::rss_orbit_errors;
 
 macro_rules! f64_eq {
     ($x:expr, $val:expr, $msg:expr) => {
@@ -100,7 +101,14 @@ fn state_def_circ_inc() {
         "semi parameter"
     );
 
-    let kep = Orbit::keplerian(8_191.93, 0.2, 12.85, 306.614, 314.19, -99.887_7, dt, eme2k);
+    let sma_km = 8_191.93;
+    let ecc = 0.2;
+    let inc_deg = 12.85;
+    let raan_deg = 306.614;
+    let aop_deg = 314.19;
+    let ta_deg = -99.887_7;
+
+    let kep = Orbit::keplerian(sma_km, ecc, inc_deg, raan_deg, aop_deg, ta_deg, dt, eme2k);
     f64_eq!(kep.ta_deg(), 260.1123, "ta");
 
     // Test that DCMs are valid
@@ -115,6 +123,17 @@ fn state_def_circ_inc() {
     let dcm = kep.dcm_from_traj_frame(Frame::RIC).unwrap();
     assert!(((dcm * dcm.transpose()).determinant() - 1.0).abs() < 1e-12);
     assert!(((dcm.transpose() * dcm).determinant() - 1.0).abs() < 1e-12);
+
+    // Test initialization from mean anomaly
+    let ma_deg = kep.ma_deg();
+    let kep_from_ma =
+        Orbit::keplerian_mean_anomaly(sma_km, ecc, inc_deg, raan_deg, aop_deg, ma_deg, dt, eme2k)
+            .unwrap();
+
+    let (pos_rss_km, vel_rss_km_s) = rss_orbit_errors(&kep_from_ma, &kep);
+
+    assert!(dbg!(pos_rss_km) < 1e-10);
+    assert!(dbg!(vel_rss_km_s) < 1e-14);
 }
 
 #[test]

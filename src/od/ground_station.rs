@@ -23,6 +23,7 @@ use crate::cosmic::{Cosm, Frame, Orbit};
 use crate::io::{frame_from_str, frame_to_str, ConfigRepr, Configurable};
 use crate::md::prelude::Traj;
 use crate::time::Epoch;
+use crate::utils::between_0_360;
 use crate::{NyxError, Spacecraft};
 use hifitime::Duration;
 use rand_pcg::Pcg64Mcg;
@@ -150,9 +151,9 @@ impl GroundStation {
         }
     }
 
-    /// Computes the elevation of the provided object seen from this ground station.
+    /// Computes the azimuth and elevation of the provided object seen from this ground station, both in degrees.
     /// Also returns the ground station's orbit in the frame of the receiver
-    pub fn elevation_of(&self, rx: Orbit, cosm: &Cosm) -> (f64, Orbit, Orbit) {
+    pub fn azimuth_elevation_of(&self, rx: Orbit, cosm: &Cosm) -> (f64, f64, Orbit, Orbit) {
         // Start by converting the receiver spacecraft into the ground station frame.
         let rx_gs_frame = cosm.frame_chg(&rx, self.frame);
 
@@ -170,10 +171,23 @@ impl GroundStation {
         let rho_sez = rx_sez - tx_sez;
 
         // Finally, compute the elevation (math is the same as declination)
-        let elevation = rho_sez.declination_deg();
+        // Source: Vallado, section 4.4.3
+        // Only the sine is needed as per Vallado, and the formula is the same as the declination
+        // because we're in the SEZ frame.
+        let elevation_deg = rho_sez.declination_deg();
+        if (elevation_deg - 90.0).abs() < 1e-6 {
+            warn!("object nearly overhead (el = {elevation_deg} deg), azimuth may be incorrect");
+        }
+        // For the elevation, we need to perform a quadrant check because it's measured from 0 to 360 degrees.
+        let azimuth_deg = between_0_360((-rho_sez.y_km.atan2(rho_sez.x_km)).to_degrees());
 
         // Return elevation in degrees and rx/tx in the inertial frame of the spacecraft
-        (elevation, rx, cosm.frame_chg(&tx_gs_frame, rx.frame))
+        (
+            azimuth_deg,
+            elevation_deg,
+            rx,
+            cosm.frame_chg(&tx_gs_frame, rx.frame),
+        )
     }
 
     /// Return this ground station as an orbit in its current frame
@@ -267,8 +281,8 @@ impl TrackingDeviceSim<Orbit, RangeDoppler> for GroundStation {
                 let rx_0 = traj.at(epoch - integration_time)?;
                 let rx_1 = traj.at(epoch)?;
 
-                let (elevation_0, rx_0, tx_0) = self.elevation_of(rx_0, &cosm);
-                let (elevation_1, rx_1, tx_1) = self.elevation_of(rx_1, &cosm);
+                let (_, elevation_0, rx_0, tx_0) = self.azimuth_elevation_of(rx_0, &cosm);
+                let (_, elevation_1, rx_1, tx_1) = self.azimuth_elevation_of(rx_1, &cosm);
 
                 if elevation_0 < self.elevation_mask_deg || elevation_1 < self.elevation_mask_deg {
                     debug!(
@@ -308,7 +322,7 @@ impl TrackingDeviceSim<Orbit, RangeDoppler> for GroundStation {
         rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
     ) -> Result<Option<RangeDoppler>, NyxError> {
-        let (elevation, rx, tx) = self.elevation_of(rx, &cosm);
+        let (_, elevation, rx, tx) = self.azimuth_elevation_of(rx, &cosm);
 
         if elevation >= self.elevation_mask_deg {
             // Only update the noises if the measurement is valid.
@@ -359,7 +373,7 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
         rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
     ) -> Result<Option<RangeDoppler>, NyxError> {
-        let (elevation, rx, tx) = self.elevation_of(rx.orbit, &cosm);
+        let (_, elevation, rx, tx) = self.azimuth_elevation_of(rx.orbit, &cosm);
 
         if elevation >= self.elevation_mask_deg {
             // Only update the noises if the measurement is valid.

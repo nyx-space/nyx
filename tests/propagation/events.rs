@@ -69,7 +69,7 @@ fn event_tracker_true_anomaly() {
         }
 
         // Compute the elevation
-        let (elevation, _, _) = gc.elevation_of(state, &cosm);
+        let (elevation, _, _, _) = gc.azimuth_elevation_of(state, &cosm);
         if elevation > max_el {
             max_el = elevation;
             max_dt = state.epoch();

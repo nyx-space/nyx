@@ -20,13 +20,13 @@ use crate::io::trajectory_data::TrajectoryLoader;
 use crate::io::{ConfigError, ExportCfg};
 use crate::md::prelude::{PropOpts, Propagator, SpacecraftDynamics};
 use crate::md::{Event, StateParameter};
-
 use crate::propagators::{
     CashKarp45, Dormand45, Dormand78, Fehlberg45, RK2Fixed, RK4Fixed, Verner56,
 };
-use crate::{NyxError, Spacecraft};
+use crate::{NyxError, Orbit, Spacecraft};
 use hifitime::{Duration, Epoch, Unit};
 use pyo3::{prelude::*, py_run};
+use rayon::prelude::*;
 
 pub(crate) use self::orbit_trajectory::OrbitTraj;
 pub(crate) use self::sc_trajectory::SpacecraftTraj;
@@ -48,6 +48,7 @@ pub(crate) fn register_md(py: Python<'_>, parent_module: &PyModule) -> PyResult<
     sm.add_class::<sc_trajectory::SpacecraftTraj>()?;
     sm.add_class::<orbit_trajectory::OrbitTraj>()?;
     sm.add_function(wrap_pyfunction!(propagate, sm)?)?;
+    sm.add_function(wrap_pyfunction!(two_body, sm)?)?;
 
     py_run!(
         py,
@@ -152,4 +153,73 @@ fn propagate(
             "Either duration or epoch must be provided for a propagation to happen".to_string(),
         )))
     }
+}
+
+/// Performs a two body propagation around the central body of each orbit in the `orbits` list either for the duration in the list or until the epochs in the list.
+/// New epoch and duration parameters may either be exactly one item or N items, where N is the number of orbits.
+/// This computation will happen in parallel on all CPUs. It uses the `at_epoch` function of `Orbit`.
+#[pyfunction]
+fn two_body(
+    orbits: Vec<Orbit>,
+    new_epochs: Option<Vec<Epoch>>,
+    durations: Option<Vec<Duration>>,
+) -> Result<Vec<Orbit>, NyxError> {
+    let rslt_epochs: Result<Vec<Epoch>, NyxError> = if (new_epochs.is_some() && durations.is_some())
+        || (new_epochs.is_none() && durations.is_none())
+    {
+        Err(NyxError::ConfigError(ConfigError::InvalidConfig(
+            "Either duration or epoch must be provided for a propagation to happen, but not both"
+                .to_string(),
+        )))
+    } else if let Some(new_epochs) = new_epochs {
+        if new_epochs.len() == 1 {
+            Ok(vec![new_epochs[0]; orbits.len()])
+        } else if new_epochs.len() == orbits.len() {
+            Ok(new_epochs)
+        } else {
+            Err(NyxError::ConfigError(ConfigError::InvalidConfig(format!(
+                "Expecting either one or {} items in epochs vector",
+                orbits.len()
+            ))))
+        }
+    } else if let Some(durations) = durations {
+        if durations.len() == 1 {
+            Ok(orbits
+                .iter()
+                .map(|orbit| orbit.epoch + durations[0])
+                .collect())
+        } else if durations.len() == orbits.len() {
+            Ok(durations
+                .iter()
+                .zip(&orbits)
+                .map(|(duration, orbit)| orbit.epoch + *duration)
+                .collect())
+        } else {
+            Err(NyxError::ConfigError(ConfigError::InvalidConfig(format!(
+                "Expecting either one or {} items in durations vector",
+                orbits.len()
+            ))))
+        }
+    } else {
+        Err(NyxError::CustomError(
+            "you have entered unreachable code, please report a bug".to_string(),
+        ))
+    };
+
+    let epochs = rslt_epochs?;
+
+    Ok((orbits, epochs)
+        .into_par_iter()
+        .map(|(orbit, epoch)| orbit.at_epoch(epoch))
+        .collect::<Vec<Result<Orbit, NyxError>>>()
+        .into_iter()
+        .filter(|result| match result {
+            Ok(_) => true,
+            Err(e) => {
+                println!("Error: {e:?}");
+                false
+            }
+        })
+        .map(|s| s.unwrap())
+        .collect::<Vec<Orbit>>())
 }

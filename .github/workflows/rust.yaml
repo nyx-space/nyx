@@ -37,7 +37,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         rust:
-          - { version: "1.67", name: MSRV }
+          - { version: "1.70", name: MSRV }
           - { version: stable, name: stable }
 
     runs-on: ${{ matrix.os }}
@@ -112,8 +112,8 @@ jobs:
       - name: Audit code
         run: cargo audit
 
-  coverage:
-    name: Coverage
+  ut-coverage:
+    name: Coverage (unit tests only)
     runs-on: ubuntu-latest
     needs: [tests]
 
@@ -132,22 +132,19 @@ jobs:
           rustup component add llvm-tools-preview
           cargo install grcov
 
-      - name: Generate coverage report
+      - name: Generate coverage report for unit tests
         env:
           RUSTFLAGS: "-Cinstrument-coverage"
-          LLVM_PROFILE_FILE: "nyx_space-%p-%m.profraw"
-        # grcov . -s . --binary-path ./target/debug/ -t html --branch --ignore-not-existing -o ./target/debug/coverage/ # Export as HTML
+          LLVM_PROFILE_FILE: "target/coverage/nyx_space-%p-%m.profraw"
         run: |
           cargo test --lib
-          grcov . --binary-path ./target/debug/ -t lcov -s . > lcov-lib.txt
-          cargo test -- cosmic mission_design orbit_determination propulsion test_monte_carlo_epoch
-          grcov . --binary-path ./target/debug/ -t lcov -s . > lcov-integ.txt
+          grcov . --binary-path ./target/debug/ -t lcov -s . --keep-only 'src/*' > lcov-lib.txt
 
       - name: Upload coverage report
         uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./lcov-lib.txt, ./lcov-integ.txt
+          files: ./lcov-*.txt
 
   release:
     name: Release

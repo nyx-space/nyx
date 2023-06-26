@@ -15,8 +15,8 @@ from nyx_space.orbit_determination import (
     ExportCfg,
 )
 from nyx_space.mission_design import TrajectoryLoader, SpacecraftDynamics, propagate
-from nyx_space.cosmic import Spacecraft
-from nyx_space.time import Unit
+from nyx_space.cosmic import Spacecraft, Cosm
+from nyx_space.time import Unit, TimeSeries
 from nyx_space.plots.od import (
     plot_covar,
     plot_estimates,
@@ -194,15 +194,52 @@ def test_one_way_msr():
 
     # One way measurement
 
-    end_sc, _ = propagate(sc, dynamics["hifi"], sc.orbit.period() * 1.1)
+    end_sc, traj = propagate(sc, dynamics["hifi"], sc.orbit.period() * 1.1)
     print(end_sc)
+    print(traj)
 
+    # Let's build a dataframe of the range, doppler, azimuth, and elevation as seen from a ground station that sees the spacecraft a bunch
+    gs = devices[1]
+    print(f"Using {gs}")
+    cosm = Cosm.de438()
+    data = {"epoch": [], "range (km)": [], "doppler (km/s)": [], "azimuth (deg)": [], "elevation (deg)": []}
+    # Start by building a time series
+    ts = TimeSeries(traj.first().epoch, traj.last().epoch, step=Unit.Minute*30, inclusive=True)
+    # And iterate over it
+    for epoch in ts:
+        orbit = traj.at(epoch).orbit
+        try:
+            range_km, doppler_km_s = gs.measure(orbit)
+        except:
+            # Spacecraft is not visible then, nothing to store
+            pass
+        else:
+            # Also grab the azimuth and elevation angles
+            az_deg, el_deg = gs.compute_azimuth_elevation(orbit, cosm)
+            # And push to the data dictionary
+            data["epoch"] += [str(epoch)]
+            data["azimuth (deg)"] += [az_deg]
+            data["elevation (deg)"] += [el_deg]
+            data["range (km)"] += [range_km]
+            data["doppler (km/s)"] += [doppler_km_s]
+    # And convert to a data frame
+    df = pd.DataFrame(data, columns=data.keys())
+    assert len(df) == 8
+    print(df.describe())
+
+    # Test values
     range_km, doppler_km_s = devices[0].measure(end_sc.orbit)
 
     print(range_km, doppler_km_s)
     assert abs(range_km - 18097.562811514355) < 0.1
     assert abs(doppler_km_s - -0.2498238312640348) < 0.1
 
+    # Azimuth and elevation
+    
+    az_deg, el_deg = devices[0].compute_azimuth_elevation(end_sc.orbit, cosm)
+
+    assert abs(az_deg - 128.66181520071825) < 1e-10
+    assert abs(el_deg - 27.904687635388676) < 1e-10
 
 def test_pure_prediction():
     # Initialize logging
@@ -267,4 +304,4 @@ def test_pure_prediction():
 
 
 if __name__ == "__main__":
-    test_pure_prediction()
+    test_one_way_msr()

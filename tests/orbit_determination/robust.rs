@@ -149,7 +149,7 @@ fn od_robust_test_ekf_realistic_one_way() {
 
     let trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
 
-    let mut odp = ODProcess::ekf(prop_est, kf, trig, None, cosm.clone());
+    let mut odp = ODProcess::ekf(prop_est, kf, trig, None, cosm);
 
     // Let's filter and iterate on the initial subset of the arc to refine the initial estimate
     let subset = arc.filter_by_offset(..3.hours());
@@ -368,7 +368,7 @@ fn od_robust_test_ekf_realistic_two_way() {
 
     let trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
 
-    let mut odp = ODProcess::ekf(prop_est, kf, trig, None, cosm.clone());
+    let mut odp = ODProcess::ekf(prop_est, kf, trig, None, cosm);
 
     // TODO: Fix the deserialization of the measurements such that they also deserialize the integration time.
     // Without it, we're stuck having to rebuild them from scratch.
