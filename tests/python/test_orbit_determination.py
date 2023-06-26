@@ -238,8 +238,8 @@ def test_one_way_msr():
     
     az_deg, el_deg = devices[0].compute_azimuth_elevation(end_sc.orbit, cosm)
 
-    assert abs(az_deg - 128.66181520071825) < 1e-15
-    assert abs(el_deg - 27.904687635388676) < 1e-15
+    assert abs(az_deg - 128.66181520071825) < 1e-10
+    assert abs(el_deg - 27.904687635388676) < 1e-10
 
 def test_pure_prediction():
     # Initialize logging

@@ -2305,15 +2305,6 @@ impl Configurable for Orbit {
 ///
 /// If a numerical error occurs during computation, the function may return a MathDomain error. In the case of a
 /// non-converging iterative process, the function will return a MaxIterReached error after 1000 iterations.
-///
-/// # Examples
-///
-/// ```
-/// let ma_radians = 0.5;
-/// let ecc = 0.1;
-/// let tol = 1e-6;
-/// let result = compute_mean_to_true_anomaly(ma_radians, ecc, tol);
-/// ```
 fn compute_mean_to_true_anomaly(ma_radians: f64, ecc: f64, tol: f64) -> Result<f64, NyxError> {
     let rm = ma_radians;
     if ecc <= 1.0 {

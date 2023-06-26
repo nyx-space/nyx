@@ -43,7 +43,7 @@ jobs:
         run: |
           set -e
           ls -lh dist
-          pip install --find-links dist --force-reinstall `find dist -name nyx_space* | head -n 1`
+          pip install --find-links dist --force-reinstall nyx_space
           pip install pytest numpy pandas plotly pyarrow scipy
           pytest
 
@@ -61,7 +61,7 @@ jobs:
           run: |
             ls -lh dist
             set -e
-            pip install --find-links dist --force-reinstall `find dist -name nyx_space* | head -n 1`
+            pip install --find-links dist --force-reinstall nyx_space
             pytest
 
       - name: Upload python tests HTMLs
@@ -98,7 +98,7 @@ jobs:
         run: |
           set -e
           ls -lh dist
-          pip install --find-links dist --force-reinstall `find dist -name nyx_space* | head -n 1`
+          pip install --find-links dist --force-reinstall nyx_space
           pip install pytest numpy pandas plotly pyarrow
           pytest
 
@@ -131,7 +131,7 @@ jobs:
         run: |
           set -e
           ls -lh dist
-          pip install --find-links dist --force-reinstall `find dist -name nyx_space* | head -n 1`
+          pip install --find-links dist --force-reinstall nyx_space
           pip install pytest numpy pandas plotly pyarrow
           pytest
 
