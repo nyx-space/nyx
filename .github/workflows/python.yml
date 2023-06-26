@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [x86_64, x86, aarch64]
+        target: [x86_64, aarch64]
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -43,12 +43,12 @@ jobs:
         run: |
           set -e
           ls -lh dist
-          pip install nyx_space --find-links dist --force-reinstall
+          pip install --find-links dist --force-reinstall `find dist -name nyx_space* | head -n 1`
           pip install pytest numpy pandas plotly pyarrow scipy
           pytest
 
-      - name: pytest
-        if: ${{ !startsWith(matrix.target, 'x86') && matrix.target != 'ppc64' && matrix.target != 'aarch64' }}
+      - name: pytest aarch64
+        if: ${{ matrix.target == 'aarch64' }}
         uses: uraimo/run-on-arch-action@v2.5.0
         with:
           arch: ${{ matrix.target }}
@@ -61,7 +61,7 @@ jobs:
           run: |
             ls -lh dist
             set -e
-            pip3 install nyx_space --find-links dist --force-reinstall
+            pip install --find-links dist --force-reinstall `find dist -name nyx_space* | head -n 1`
             pytest
 
       - name: Upload python tests HTMLs
@@ -94,11 +94,11 @@ jobs:
           path: dist
 
       - name: pytest
-        if: ${{ !startsWith(matrix.target, 'aarch64') }}
         shell: bash
         run: |
           set -e
-          pip install nyx_space --find-links dist --force-reinstall
+          ls -lh dist
+          pip install --find-links dist --force-reinstall `find dist -name nyx_space* | head -n 1`
           pip install pytest numpy pandas plotly pyarrow
           pytest
 
@@ -131,7 +131,7 @@ jobs:
         run: |
           set -e
           ls -lh dist
-          pip install nyx_space --find-links dist --force-reinstall
+          pip install --find-links dist --force-reinstall `find dist -name nyx_space* | head -n 1`
           pip install pytest numpy pandas plotly pyarrow
           pytest
 
