@@ -77,6 +77,9 @@ fn test_tilde_matrix() {
 /// # Example
 ///
 /// ```
+/// use nyx_space::utils::is_diagonal;
+/// use nyx_space::linalg::Matrix3;
+///
 /// let m = Matrix3::new(1.0, 0.0, 0.0,
 ///                      0.0, 2.0, 0.0,
 ///                      0.0, 0.0, 3.0);
@@ -117,7 +120,11 @@ pub fn is_diagonal(m: &Matrix3<f64>) -> bool {
 /// # Example
 ///
 /// ```
-/// let eigenvalues = OVector::from_vec(vec![Complex::new(-1.0, 0.0), Complex::new(0.0, 1.0)]);
+/// use nyx_space::utils::are_eigenvalues_stable;
+/// use nyx_space::linalg::Vector2;
+/// use nalgebra::Complex;
+///
+/// let eigenvalues = Vector2::new(Complex::new(-1.0, 0.0), Complex::new(0.0, 1.0));
 /// assert_eq!(are_eigenvalues_stable(eigenvalues), true);
 /// ```
 /// # Source
@@ -227,26 +234,28 @@ pub fn kronecker(a: f64, b: f64) -> f64 {
 ///
 /// # Arguments
 ///
-/// * `angle` - The angle of rotation in radians.
+/// * `angle_rad` - The angle of rotation in radians.
 ///
 /// # Warning
 ///
-/// This function returns a matrix for a COORDINATE SYSTEM rotation by `angle` radians.
-/// When this matrix is applied to a vector, it rotates the vector by `-angle` radians, not `angle` radians.
+/// This function returns a matrix for a COORDINATE SYSTEM rotation by `angle_rad` radians.
+/// When this matrix is applied to a vector, it rotates the vector by `-angle_rad` radians, not `angle_rad` radians.
 /// Applying the matrix to a vector yields the vector's representation relative to the rotated coordinate system.
 ///
 /// # Example
 ///
 /// ```
-/// let angle = std::f64::consts::PI / 2.0;
-/// let rotation_matrix = r1(angle);
+/// use nyx_space::utils::r1;
+///
+/// let angle_rad = std::f64::consts::PI / 2.0;
+/// let rotation_matrix = r1(angle_rad);
 /// ```
 ///
 /// # Source
 ///
 /// [NAIF SPICE Toolkit](https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/cspice/eul2xf_c.html)
-pub fn r1(angle: f64) -> Matrix3<f64> {
-    let (s, c) = angle.sin_cos();
+pub fn r1(angle_rad: f64) -> Matrix3<f64> {
+    let (s, c) = angle_rad.sin_cos();
     Matrix3::new(1.0, 0.0, 0.0, 0.0, c, s, 0.0, -s, c)
 }
 
@@ -274,22 +283,24 @@ fn test_r1() {
 ///
 /// # Warning
 ///
-/// This function returns a matrix for a COORDINATE SYSTEM rotation by `angle` radians.
-/// When this matrix is applied to a vector, it rotates the vector by `-angle` radians, not `angle` radians.
+/// This function returns a matrix for a COORDINATE SYSTEM rotation by `angle_rad` radians.
+/// When this matrix is applied to a vector, it rotates the vector by `-angle_rad` radians, not `angle_rad` radians.
 /// Applying the matrix to a vector yields the vector's representation relative to the rotated coordinate system.
 ///
 /// # Example
 ///
 /// ```
-/// let angle = std::f64::consts::PI / 2.0;
-/// let rotation_matrix = r2(angle);
+/// use nyx_space::utils::r2;
+///
+/// let angle_rad = std::f64::consts::PI / 2.0;
+/// let rotation_matrix = r2(angle_rad);
 /// ```
 ///
 /// # Source
 ///
 /// [NAIF SPICE Toolkit](https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/cspice/eul2xf_c.html)
-pub fn r2(angle: f64) -> Matrix3<f64> {
-    let (s, c) = angle.sin_cos();
+pub fn r2(angle_rad: f64) -> Matrix3<f64> {
+    let (s, c) = angle_rad.sin_cos();
     Matrix3::new(c, 0.0, -s, 0.0, 1.0, 0.0, s, 0.0, c)
 }
 
@@ -313,26 +324,28 @@ fn test_r2() {
 ///
 /// # Arguments
 ///
-/// * `angle` - The angle of rotation in radians.
+/// * `angle_rad` - The angle of rotation in radians.
 ///
 /// # Warning
 ///
-/// This function returns a matrix for a COORDINATE SYSTEM rotation by `angle` radians.
-/// When this matrix is applied to a vector, it rotates the vector by `-angle` radians, not `angle` radians.
+/// This function returns a matrix for a COORDINATE SYSTEM rotation by `angle_rad` radians.
+/// When this matrix is applied to a vector, it rotates the vector by `-angle_rad` radians, not `angle_rad` radians.
 /// Applying the matrix to a vector yields the vector's representation relative to the rotated coordinate system.
 ///
 /// # Example
 ///
 /// ```
-/// let angle = std::f64::consts::PI / 2.0;
-/// let rotation_matrix = r3(angle);
+/// use nyx_space::utils::r3;
+///
+/// let angle_rad = std::f64::consts::PI / 2.0;
+/// let rotation_matrix = r3(angle_rad);
 /// ```
 ///
 /// # Source
 ///
 /// [NAIF SPICE Toolkit](https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/cspice/eul2xf_c.html)
-pub fn r3(angle: f64) -> Matrix3<f64> {
-    let (s, c) = angle.sin_cos();
+pub fn r3(angle_rad: f64) -> Matrix3<f64> {
+    let (s, c) = angle_rad.sin_cos();
     Matrix3::new(c, s, 0.0, -s, c, 0.0, 0.0, 0.0, 1.0)
 }
 

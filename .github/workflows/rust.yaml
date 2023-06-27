@@ -70,6 +70,9 @@ jobs:
 
       - name: All integration tests (release)
         run: cargo test --release --test "*"
+      
+      - name: Doc Test
+        run: cargo test --doc
 
   lints:
     name: Lints
