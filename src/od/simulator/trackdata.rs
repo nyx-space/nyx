@@ -51,7 +51,8 @@ where
     /// The Pcg64Mcg is chosen because it is fast, space efficient, and has a good statistical distribution.
     ///
     /// # Errors
-    ///     + A specific measurement is requested but the noise on that measurement type is not configured.
+    /// + A specific measurement is requested but the noise on that measurement type is not configured.
+    ///
     fn measure(
         &mut self,
         epoch: Epoch,
