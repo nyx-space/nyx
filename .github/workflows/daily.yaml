@@ -45,7 +45,7 @@ jobs:
               RUSTFLAGS: "-Cinstrument-coverage"
               LLVM_PROFILE_FILE: "target/coverage/nyx_space-%p-%m.profraw"
             run: |
-              cargo test -- cosmic mission_design orbit_determination propulsion test_monte_carlo_epoch
+              cargo test -- cosmic
               grcov . --binary-path ./target/debug/ -t lcov -s . --keep-only 'src/*' > lcov-cosmic.txt
           
           - name: Generate coverage report for mission_design integr. tests
@@ -53,7 +53,7 @@ jobs:
               RUSTFLAGS: "-Cinstrument-coverage"
               LLVM_PROFILE_FILE: "target/coverage/nyx_space-%p-%m.profraw"
             run: |
-              cargo test -- cosmic mission_design orbit_determination propulsion test_monte_carlo_epoch
+              cargo test -- mission_design
               grcov . --binary-path ./target/debug/ -t lcov -s . --keep-only 'src/*' > lcov-mission_design.txt
           
           - name: Generate coverage report for OD integr. tests
