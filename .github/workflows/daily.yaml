@@ -38,7 +38,7 @@ jobs:
                 LLVM_PROFILE_FILE: "target/coverage/nyx_space-%p-%m.profraw"
             run: |
                 cargo test --doc
-                grcov . --binary-path ./target/debug/ -t lcov -s . --keep-only 'src/*' > lcov-lib.txt
+                grcov . --binary-path ./target/debug/ -t lcov -s . --keep-only 'src/*' > lcov-docs.txt
           
           - name: Generate coverage report for cosmic integr. tests
             env:

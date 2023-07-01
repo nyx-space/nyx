@@ -669,7 +669,12 @@ where
             let dur = self.last().epoch() - self.first().epoch();
             write!(
                 f,
-                "Trajectory from {} to {} ({}, or {:.3} s) [{} states]",
+                "Trajectory {}in {} from {} to {} ({}, or {:.3} s) [{} states]",
+                match &self.name {
+                    Some(name) => format!("of {name}"),
+                    None => String::new(),
+                },
+                self.first().frame(),
                 self.first().epoch(),
                 self.last().epoch(),
                 dur,
