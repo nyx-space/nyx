@@ -252,7 +252,9 @@ impl StateParameter {
             | Self::Z => "km",
 
             // Velocities
-            Self::C3 | Self::VX | Self::VY | Self::VZ | Self::Vmag => "km/s",
+            Self::VX | Self::VY | Self::VZ | Self::Vmag => "km/s",
+
+            Self::C3 | Self::Energy => "km^2/s^2",
 
             Self::DryMass | Self::FuelMass => "kg",
             Self::Isp => "isp",
@@ -264,7 +266,7 @@ impl StateParameter {
     /// Prints this orbit in Keplerian form
     #[cfg(feature = "python")]
     fn __str__(&self) -> String {
-        format!("{self:?}")
+        format!("{self}")
     }
 
     #[cfg(feature = "python")]
@@ -285,14 +287,8 @@ impl StateParameter {
             }
         }
 
-        let unit = if self.unit().is_empty() {
-            String::new()
-        } else {
-            format!(" ({})", self.unit())
-        };
-
         Field::new(
-            format!("{self}{unit}"),
+            format!("{self}"),
             if self == Self::GuidanceMode {
                 DataType::Utf8
             } else {
@@ -307,13 +303,22 @@ impl StateParameter {
 impl FromStr for StateParameter {
     type Err = NyxError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let keyword = s.trim().to_lowercase();
+        let keyword = s
+            .trim()
+            .split_whitespace()
+            .next()
+            .ok_or(NyxError::LoadingError(format!(
+                "Unknown state parameter: {s}"
+            )))?;
 
-        match keyword.as_str() {
+        match keyword.to_lowercase().as_str() {
             "apoapsis" => Ok(Self::Apoapsis),
             "periapsis" => Ok(Self::Periapsis),
             "aol" => Ok(Self::AoL),
             "aop" => Ok(Self::AoP),
+            "bltof" => Ok(Self::BLTOF),
+            "bdotr" => Ok(Self::BdotR),
+            "bdott" => Ok(Self::BdotT),
             "c3" => Ok(Self::C3),
             "cd" => Ok(Self::Cd),
             "cr" => Ok(Self::Cr),
@@ -365,17 +370,20 @@ impl FromStr for StateParameter {
 
 impl fmt::Display for StateParameter {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let default = format!("{self:?}");
         let repr = match *self {
             Self::Apoapsis => "apoapsis",
             Self::Periapsis => "periapsis",
             Self::AoL => "aol",
             Self::AoP => "aop",
+            Self::BLTOF => "BLToF",
+            Self::BdotR => "BdotR",
+            Self::BdotT => "BdotT",
             Self::C3 => "c3",
             Self::Cd => "cd",
             Self::Cr => "cr",
             Self::Declination => "declin",
             Self::DryMass => "dry_mass",
+            Self::Epoch => "epoch",
             Self::ApoapsisRadius => "apoapsis_radius",
             Self::EccentricAnomaly => "ea",
             Self::Eccentricity => "ecc",
@@ -413,8 +421,78 @@ impl fmt::Display for StateParameter {
             Self::VX => "vx",
             Self::VY => "vy",
             Self::VZ => "vz",
-            _ => &default,
+            // _ => &default,
         };
-        write!(f, "{repr}")
+        let unit = if self.unit().is_empty() {
+            String::new()
+        } else {
+            format!(" ({})", self.unit())
+        };
+        write!(f, "{repr}{unit}")
+    }
+}
+
+#[cfg(test)]
+mod ut_state_param {
+    use super::{FromStr, StateParameter};
+    #[test]
+    fn test_str_to_from() {
+        for s in [
+            StateParameter::Apoapsis,
+            StateParameter::Periapsis,
+            StateParameter::AoL,
+            StateParameter::AoP,
+            StateParameter::BdotR,
+            StateParameter::BdotT,
+            StateParameter::BLTOF,
+            StateParameter::C3,
+            StateParameter::Cd,
+            StateParameter::Cr,
+            StateParameter::Declination,
+            StateParameter::DryMass,
+            StateParameter::ApoapsisRadius,
+            StateParameter::EccentricAnomaly,
+            StateParameter::Eccentricity,
+            StateParameter::Energy,
+            StateParameter::FlightPathAngle,
+            StateParameter::FuelMass,
+            StateParameter::GuidanceMode,
+            StateParameter::GeodeticHeight,
+            StateParameter::GeodeticLatitude,
+            StateParameter::GeodeticLongitude,
+            StateParameter::HyperbolicAnomaly,
+            StateParameter::Hmag,
+            StateParameter::HX,
+            StateParameter::HY,
+            StateParameter::HZ,
+            StateParameter::Inclination,
+            StateParameter::Isp,
+            StateParameter::MeanAnomaly,
+            StateParameter::PeriapsisRadius,
+            StateParameter::Period,
+            StateParameter::RightAscension,
+            StateParameter::RAAN,
+            StateParameter::Rmag,
+            StateParameter::SemiParameter,
+            StateParameter::SemiMinorAxis,
+            StateParameter::SMA,
+            StateParameter::Thrust,
+            StateParameter::TrueAnomaly,
+            StateParameter::TrueLongitude,
+            StateParameter::VelocityDeclination,
+            StateParameter::Vmag,
+            StateParameter::X,
+            StateParameter::Y,
+            StateParameter::Z,
+            StateParameter::VX,
+            StateParameter::VY,
+            StateParameter::VZ,
+        ] {
+            let as_str = format!("{s}");
+            println!("{as_str}");
+            let loaded = StateParameter::from_str(&as_str).unwrap();
+
+            assert_eq!(loaded, s);
+        }
     }
 }
