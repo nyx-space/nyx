@@ -304,7 +304,6 @@ impl FromStr for StateParameter {
     type Err = NyxError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let keyword = s
-            .trim()
             .split_whitespace()
             .next()
             .ok_or(NyxError::LoadingError(format!(
