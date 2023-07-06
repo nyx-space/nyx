@@ -55,7 +55,7 @@ either = {version = "1.8.1", features = ["serde"]}
 num = "0.4.0"
 enum-iterator = "1.4.0"
 getrandom = {version = "0.2", features = ["js"]}
-typed-builder = "0.14.0"
+typed-builder = "0.15.0"
 
 [dev-dependencies]
 polars = {version = "0.30.0", features = ["parquet"]}
