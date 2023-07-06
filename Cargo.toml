@@ -56,6 +56,10 @@ num = "0.4.0"
 enum-iterator = "1.4.0"
 getrandom = {version = "0.2", features = ["js"]}
 typed-builder = "0.14.0"
+ndarray = "0.15.6"
+ndarray-linalg = "0.16.0"
+num-complex = "0.4.3"
+num-traits = "0.2.15"
 
 [dev-dependencies]
 polars = {version = "0.30.0", features = ["parquet"]}
