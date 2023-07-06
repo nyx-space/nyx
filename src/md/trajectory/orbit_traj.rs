@@ -129,6 +129,7 @@ impl Traj<Orbit> {
 
         'lines: for (lno, line) in reader.lines().enumerate() {
             let line = line.map_err(|e| NyxError::CCSDS(format!("File read error: {e}")))?;
+            let line = line.trim();
             if line.is_empty() {
                 continue;
             }
@@ -156,43 +157,51 @@ impl Traj<Orbit> {
             } else if line.starts_with("META_START") {
                 // Stop the parsing
                 parse = false;
+            } else if line.starts_with("COVARIANCE_START") {
+                // Stop the parsing
+                warn!("[line: {}] Skipping covariance in OEM parsing", lno + 1);
+                parse = false;
             } else if parse {
                 // Split the line into components
                 let parts: Vec<&str> = line.split_whitespace().collect();
 
-                // Extract the values
-                let epoch_str = format!("{} {time_system}", parts[0]);
-                match parts[1].parse::<f64>() {
-                    Ok(x_km) => {
-                        // Look good!
-                        let y_km = parts[2].parse::<f64>().unwrap();
-                        let z_km = parts[3].parse::<f64>().unwrap();
-                        let vx_km_s = parts[4].parse::<f64>().unwrap();
-                        let vy_km_s = parts[5].parse::<f64>().unwrap();
-                        let vz_km_s = parts[6].parse::<f64>().unwrap();
+                if parts.len() < 7 {
+                    debug!("[line: {}] Could not understand `{parts:?}`", lno + 1);
+                } else {
+                    // Extract the values
+                    let epoch_str = format!("{} {time_system}", parts[0]);
+                    match parts[1].parse::<f64>() {
+                        Ok(x_km) => {
+                            // Look good!
+                            let y_km = parts[2].parse::<f64>().unwrap();
+                            let z_km = parts[3].parse::<f64>().unwrap();
+                            let vx_km_s = parts[4].parse::<f64>().unwrap();
+                            let vy_km_s = parts[5].parse::<f64>().unwrap();
+                            let vz_km_s = parts[6].parse::<f64>().unwrap();
 
-                        let orbit = Orbit {
-                            epoch: Epoch::from_str(epoch_str.trim()).map_err(|e| {
-                                NyxError::CCSDS(format!("Parsing epoch error: {e}"))
-                            })?,
-                            x_km,
-                            y_km,
-                            z_km,
-                            vx_km_s,
-                            vy_km_s,
-                            vz_km_s,
-                            frame: frame.unwrap(),
-                            stm: None,
-                        };
+                            let orbit = Orbit {
+                                epoch: Epoch::from_str(epoch_str.trim()).map_err(|e| {
+                                    NyxError::CCSDS(format!("Parsing epoch error: {e}"))
+                                })?,
+                                x_km,
+                                y_km,
+                                z_km,
+                                vx_km_s,
+                                vy_km_s,
+                                vz_km_s,
+                                frame: frame.unwrap(),
+                                stm: None,
+                            };
 
-                        traj.states.push(orbit);
-                    }
-                    Err(_) => {
-                        // Probably a comment
-                        debug!("[line: {}] Could not parse `{parts:?}`", lno + 1);
-                        continue;
-                    }
-                };
+                            traj.states.push(orbit);
+                        }
+                        Err(_) => {
+                            // Probably a comment
+                            debug!("[line: {}] Could not parse `{parts:?}`", lno + 1);
+                            continue;
+                        }
+                    };
+                }
             }
         }
 
@@ -357,35 +366,25 @@ mod ut_ccsds_oem {
 
     #[test]
     fn test_load_oem_leo() {
-        fn the_test() {
-            // All three samples were taken from https://github.com/bradsease/oem/blob/main/tests/samples/real/
-            let path: PathBuf = [
-                env!("CARGO_MANIFEST_DIR"),
-                "data",
-                "tests",
-                "ccsds",
-                "oem",
-                "LEO_10s.oem",
-            ]
-            .iter()
-            .collect();
+        // All three samples were taken from https://github.com/bradsease/oem/blob/main/tests/samples/real/
+        let path: PathBuf = [
+            env!("CARGO_MANIFEST_DIR"),
+            "data",
+            "tests",
+            "ccsds",
+            "oem",
+            "LEO_10s.oem",
+        ]
+        .iter()
+        .collect();
 
-            let _ = pretty_env_logger::try_init();
+        let _ = pretty_env_logger::try_init();
 
-            let traj: Traj<Orbit> = Traj::<Orbit>::from_oem_file(path).unwrap();
+        let traj: Traj<Orbit> = Traj::<Orbit>::from_oem_file(path).unwrap();
 
-            // This trajectory has two duplicate epochs, which should be removed by the call to finalize()
-            assert_eq!(traj.states.len(), 361);
-            assert_eq!(traj.name.unwrap(), "TEST_OBJ".to_string());
-        }
-
-        use easybench::bench;
-        use pretty_env_logger;
-        use std::env;
-
-        the_test();
-        // If the test is successful, print the benchmark
-        println!("benchmark CCSDS OEM Loading: {}", bench(|| the_test()));
+        // This trajectory has two duplicate epochs, which should be removed by the call to finalize()
+        assert_eq!(traj.states.len(), 361);
+        assert_eq!(traj.name.unwrap(), "TEST_OBJ".to_string());
     }
 
     #[test]
