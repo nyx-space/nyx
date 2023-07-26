@@ -25,6 +25,7 @@ pub use crate::md::{Variable, Vary};
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::pseudo_inverse;
 use crate::utils::are_eigenvalues_stable;
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
 impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
@@ -118,6 +119,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
         let width = f64::from(max_obj_val).log10() as usize + 2 + max_obj_tol;
 
+        #[cfg(not(target_arch = "wasm32"))]
         let start_instant = Instant::now();
 
         for it in 0..=self.iterations {
@@ -216,7 +218,10 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             }
 
             if converged {
+                #[cfg(not(target_arch = "wasm32"))]
                 let conv_dur = Instant::now() - start_instant;
+                #[cfg(target_arch = "wasm32")]
+                let conv_dur = Duration::ZERO.into();
                 let mut state = xi_start;
                 // Convert the total correction from VNC back to integration frame in case that's needed.
                 for (i, var) in self.variables.iter().enumerate() {
