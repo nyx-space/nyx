@@ -32,6 +32,7 @@ use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
 impl Traj<Orbit> {
@@ -44,6 +45,8 @@ impl Traj<Orbit> {
                 "No trajectory to convert".to_string(),
             )));
         }
+
+        #[cfg(not(target_arch = "wasm32"))]
         let start_instant = Instant::now();
         let mut traj = Self::new();
         for state in &self.states {
@@ -51,12 +54,21 @@ impl Traj<Orbit> {
         }
         traj.finalize();
 
+        #[cfg(not(target_arch = "wasm32"))]
         info!(
             "Converted trajectory from {} to {} in {} ms: {traj}",
             self.first().frame,
             new_frame,
             (Instant::now() - start_instant).as_millis()
         );
+
+        #[cfg(target_arch = "wasm32")]
+        info!(
+            "Converted trajectory from {} to {}: {traj}",
+            self.first().frame,
+            new_frame,
+        );
+
         Ok(traj)
     }
 

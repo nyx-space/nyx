@@ -28,6 +28,7 @@ use hifitime::SECONDS_PER_DAY;
 use std::fmt;
 use std::fs::File;
 use std::io::Read;
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
 /// A trait allowing for something to have an epoch
@@ -180,10 +181,12 @@ impl Xb {
             return Err(NyxError::LoadingError("XB buffer is empty".to_string()));
         }
 
+        #[cfg(not(target_arch = "wasm32"))]
         let decode_start = Instant::now();
 
         match Self::decode(input_xb_buf) {
             Ok(xb) => {
+                #[cfg(not(target_arch = "wasm32"))]
                 debug!("Loaded XB in {} ms.", decode_start.elapsed().as_millis());
                 Ok(xb)
             }

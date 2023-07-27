@@ -15,4 +15,4 @@ dist/
 *.parquet
 *.profraw
 lcov.txt
-
+.DS_Store

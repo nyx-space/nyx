@@ -29,6 +29,7 @@ use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::pseudo_inverse;
 use hifitime::TimeUnits;
 use rayon::prelude::*;
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
 impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
@@ -195,6 +196,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
         let width = f64::from(max_obj_val).log10() as usize + 2 + max_obj_tol;
 
+        #[cfg(not(target_arch = "wasm32"))]
         let start_instant = Instant::now();
 
         for it in 0..=self.iterations {
@@ -457,7 +459,10 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             }
 
             if converged {
+                #[cfg(not(target_arch = "wasm32"))]
                 let conv_dur = Instant::now() - start_instant;
+                #[cfg(target_arch = "wasm32")]
+                let conv_dur = Duration::ZERO.into();
                 let mut corrected_state = xi_start;
 
                 let mut state_correction = Vector6::<f64>::zeros();

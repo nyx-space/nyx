@@ -25,7 +25,9 @@ use crate::mc::DispersedState;
 use crate::md::trajectory::Interpolatable;
 use crate::md::EventEvaluator;
 use crate::propagators::{ErrorCtrl, Propagator};
-use crate::time::{Duration, Epoch, Unit};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::time::Unit;
+use crate::time::{Duration, Epoch};
 use crate::State;
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rand_distr::Distribution;
@@ -34,6 +36,7 @@ use rayon::prelude::*;
 use std::f64;
 use std::fmt;
 use std::sync::mpsc::channel;
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant as StdInstant;
 
 /// A Monte Carlo framework, automatically running on all threads via a thread pool. This framework is targeted toward analysis of time-continuous variables.
@@ -126,6 +129,7 @@ where
         let (tx, rx) = channel();
 
         // Generate all states (must be done separately because the rng is not thread safe)
+        #[cfg(not(target_arch = "wasm32"))]
         let start = StdInstant::now();
         init_states.par_iter().progress_with(pb).for_each_with(
             (prop, tx),
@@ -147,12 +151,15 @@ where
             },
         );
 
-        let clock_time = StdInstant::now() - start;
-        println!(
-            "Propagated {} states in {}",
-            num_runs,
-            clock_time.as_secs_f64() * Unit::Second
-        );
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let clock_time = StdInstant::now() - start;
+            println!(
+                "Propagated {} states in {}",
+                num_runs,
+                clock_time.as_secs_f64() * Unit::Second
+            );
+        }
 
         // Collect all of the results and sort them by run index
         let mut runs = rx
@@ -214,6 +221,7 @@ where
         let (tx, rx) = channel();
 
         // And propagate on the thread pool
+        #[cfg(not(target_arch = "wasm32"))]
         let start = StdInstant::now();
         init_states.par_iter().progress_with(pb).for_each_with(
             (prop, tx),
@@ -236,12 +244,15 @@ where
             },
         );
 
-        let clock_time = StdInstant::now() - start;
-        println!(
-            "Propagated {} states in {}",
-            num_runs,
-            clock_time.as_secs_f64() * Unit::Second
-        );
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let clock_time = StdInstant::now() - start;
+            println!(
+                "Propagated {} states in {}",
+                num_runs,
+                clock_time.as_secs_f64() * Unit::Second
+            );
+        }
 
         // Collect all of the results and sort them by run index
         let mut runs = rx.iter().collect::<Vec<Run<S, PropResult<S>>>>();

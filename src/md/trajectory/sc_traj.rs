@@ -27,6 +27,7 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
 impl Traj<Spacecraft> {
@@ -38,6 +39,8 @@ impl Traj<Spacecraft> {
                 "No trajectory to convert".to_string(),
             )));
         }
+
+        #[cfg(not(target_arch = "wasm32"))]
         let start_instant = Instant::now();
         let mut traj = Self::new();
         for state in &self.states {
@@ -46,12 +49,21 @@ impl Traj<Spacecraft> {
         }
         traj.finalize();
 
+        #[cfg(not(target_arch = "wasm32"))]
         info!(
             "Converted trajectory from {} to {} in {} ms: {traj}",
             self.first().orbit.frame,
             new_frame,
             (Instant::now() - start_instant).as_millis()
         );
+
+        #[cfg(target_arch = "wasm32")]
+        info!(
+            "Converted trajectory from {} to {}: {traj}",
+            self.first().orbit.frame,
+            new_frame,
+        );
+
         Ok(traj)
     }
 

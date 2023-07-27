@@ -30,6 +30,7 @@ use rayon::iter::ParallelBridge;
 use rayon::prelude::ParallelIterator;
 use std::f64;
 use std::sync::mpsc::{channel, Sender};
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
 /// A Propagator allows propagating a set of dynamics forward or backward in time.
@@ -78,8 +79,11 @@ where
             return Ok(self.state);
         }
         let stop_time = self.state.epoch() + duration;
+
+        #[cfg(not(target_arch = "wasm32"))]
         let tick = Instant::now();
         let log_progress = duration.abs() >= 2 * Unit::Minute;
+
         if log_progress {
             // Prevent the print spam for orbit determination cases
             info!("Propagating for {} until {}", duration, stop_time);
@@ -98,9 +102,12 @@ where
             {
                 if stop_time == epoch {
                     // No propagation necessary
-                    if log_progress {
-                        let tock: Duration = tick.elapsed().into();
-                        info!("Done in {}", tock);
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        if log_progress {
+                            let tock: Duration = tick.elapsed().into();
+                            info!("Done in {}", tock);
+                        }
                     }
                     return Ok(self.state);
                 }
@@ -120,13 +127,19 @@ where
 
                 // Restore the step size for subsequent calls
                 self.set_step(prev_step_size, prev_step_kind);
+
                 if backprop {
                     self.step_size = -self.step_size; // Restore to a positive step size
                 }
-                if log_progress {
-                    let tock: Duration = tick.elapsed().into();
-                    info!("Done in {}", tock);
+
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    if log_progress {
+                        let tock: Duration = tick.elapsed().into();
+                        info!("Done in {}", tock);
+                    }
                 }
+
                 return Ok(self.state);
             } else {
                 self.single_step()?;
