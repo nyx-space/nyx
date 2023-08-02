@@ -172,6 +172,24 @@ impl SpacecraftTraj {
         }
     }
 
+    /// Allows converting the source trajectory into the (almost) equivalent trajectory in another frame.
+    /// This simply converts each state into the other frame and may lead to aliasing due to the Nyquist–Shannon sampling theorem.
+    fn to_frame(&self, new_frame: String) -> Result<Self, NyxError> {
+        let cosm = Cosm::de438();
+
+        let frame = cosm.try_frame(&new_frame)?;
+
+        let conv_traj = self.inner.to_frame(frame, cosm)?;
+
+        Ok(Self { inner: conv_traj })
+    }
+
+    fn __add__(&self, rhs: &Self) -> Result<Self, NyxError> {
+        let inner = (self.inner.clone() + rhs.inner.clone())?;
+
+        Ok(Self { inner })
+    }
+
     fn __str__(&self) -> String {
         format!("{}", self.inner)
     }

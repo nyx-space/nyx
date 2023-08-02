@@ -155,7 +155,12 @@ def test_build_spacecraft():
     traj_orbit = traj.to_orbit_traj()
     traj_orbit_dc = traj_sc.downcast()
     # Check that we can query it (will raise an exception if we can't, thereby failing the test)
-    ts = TimeSeries(Epoch("2020-06-01T12:00:00.000000"), Epoch("2020-06-01T13:00:00.000000"), step=Unit.Minute*17 + Unit.Second*13.8, inclusive=True)
+    ts = TimeSeries(
+        Epoch("2020-06-01T12:00:00.000000"),
+        Epoch("2020-06-01T13:00:00.000000"),
+        step=Unit.Minute * 17 + Unit.Second * 13.8,
+        inclusive=True,
+    )
     for epoch in ts:
         orbit = traj_orbit.at(epoch)
         dc_orbit = traj_orbit_dc.at(epoch)
@@ -204,11 +209,11 @@ def test_two_body():
     )
 
     # And propagate in parallel using a single duration
-    proped_orbits = two_body(orbits, durations=[Unit.Day*531.5])
+    proped_orbits = two_body(orbits, durations=[Unit.Day * 531.5])
     assert len(proped_orbits) == len(orbits)
 
     # And propagate in parallel using many epochs
-    ts = TimeSeries(e, e + Unit.Day * 1000, step=Unit.Day*1, inclusive=False)
+    ts = TimeSeries(e, e + Unit.Day * 1000, step=Unit.Day * 1, inclusive=False)
     epochs = [e for e in ts]
     proped_orbits = two_body(orbits, new_epochs=epochs)
     # Allow up to two to fail
@@ -217,5 +222,42 @@ def test_two_body():
     timing = timeit(lambda: two_body(orbits, new_epochs=epochs), number=1)
     print(f"two body propagation of {len(orbits)} orbits in {timing} s")
 
+
+def test_merge_traj():
+    # Initialize logging
+    FORMAT = "%(levelname)s %(name)s %(filename)s:%(lineno)d\t%(message)s"
+    logging.basicConfig(format=FORMAT)
+    logging.getLogger().setLevel(logging.INFO)
+
+    # Base path
+    root = Path(__file__).joinpath("../../../").resolve()
+
+    config_path = root.joinpath("./data/tests/config/")
+
+    sc1 = Spacecraft.load(str(config_path.joinpath("spacecraft.yaml")))
+
+    dynamics = SpacecraftDynamics.load_named(
+        str(config_path.joinpath("dynamics.yaml"))
+    )["lofi"]
+
+    sc2, traj1 = propagate(sc1, dynamics, Unit.Day * 5)
+    # And propagate again
+    sc3, traj2 = propagate(sc2, dynamics, Unit.Day * 5)
+    # Add the trajectories
+    traj = traj1 + traj2
+
+    assert traj.last().epoch == sc3.epoch, f"{traj.last()} != {sc3}"
+
+    # Convert into another frame and try to add them too.
+    # We only check the epoch this time.
+    traj1_moon = traj1.to_frame("Moon J2000")
+    traj2_moon = traj2.to_frame("Moon J2000")
+
+    traj_moon = traj1_moon + traj2_moon
+
+    assert traj_moon.last().epoch == sc3.epoch
+    print(traj_moon)
+
+
 if __name__ == "__main__":
-    test_two_body()
+    test_merge_traj()
