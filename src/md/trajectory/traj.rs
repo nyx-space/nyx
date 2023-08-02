@@ -595,55 +595,53 @@ where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
 {
-    type Output = Traj<S>;
+    type Output = Result<Traj<S>, NyxError>;
 
     /// Add one trajectory to another. If they do not overlap to within 10ms, a warning will be printed.
     fn add(self, other: Traj<S>) -> Self::Output {
-        self + &other
+        &self + &other
     }
 }
 
-impl<S: Interpolatable> ops::Add<&Traj<S>> for Traj<S>
+impl<S: Interpolatable> ops::Add<&Traj<S>> for &Traj<S>
 where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
 {
-    type Output = Traj<S>;
+    type Output = Result<Traj<S>, NyxError>;
 
-    /// Add one trajectory to another. If they do not overlap to within 10ms, a warning will be printed.
+    /// Add one trajectory to another, returns an error if the frames don't match
     fn add(self, other: &Traj<S>) -> Self::Output {
-        let (first, second) = if self.first().epoch() < other.first().epoch() {
-            (&self, other)
+        if self.first().frame() != other.first().frame() {
+            Err(NyxError::Trajectory(TrajError::CreationError(format!(
+                "Frame mismatch in add operation: {} != {}",
+                self.first().frame(),
+                other.first().frame()
+            ))))
         } else {
-            (other, &self)
-        };
+            if self.last().epoch() < other.first().epoch() {
+                let gap = other.first().epoch() - self.last().epoch();
+                warn!(
+                    "Resulting merged trajectory will have a time-gap of {} starting at {}",
+                    gap,
+                    self.last().epoch()
+                );
+            }
 
-        if first.last().epoch() < second.first().epoch() {
-            let gap = second.first().epoch() - first.last().epoch();
-            warn!(
-                "Resulting merged trajectory will have a time-gap of {} starting at {}",
-                gap,
-                first.last().epoch()
-            );
+            let mut me = self.clone();
+            // Now start adding the other segments while correcting the index
+            for state in &other
+                .states
+                .iter()
+                .filter(|s| s.epoch() > self.last().epoch())
+                .collect::<Vec<&S>>()
+            {
+                me.states.push(**state);
+            }
+            me.finalize();
+
+            Ok(me)
         }
-
-        let mut me = self.clone();
-        // Now start adding the other segments while correcting the index
-        for state in &second.states {
-            me.states.push(*state);
-        }
-        me.finalize();
-        me
-    }
-}
-
-impl<S: Interpolatable> ops::AddAssign for Traj<S>
-where
-    DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
-{
-    fn add_assign(&mut self, rhs: Self) {
-        *self = self.clone() + rhs;
     }
 }
 
@@ -652,8 +650,13 @@ where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
 {
+    /// Attempt to add two trajectories together and assign it to `self`
+    ///
+    /// # Warnings
+    /// 1. This will panic if the frames mismatch!
+    /// 2. This is inefficient because both `self` and `rhs` are cloned.
     fn add_assign(&mut self, rhs: &Self) {
-        *self = self.clone() + rhs;
+        *self = (self.clone() + rhs.clone()).unwrap();
     }
 }
 
