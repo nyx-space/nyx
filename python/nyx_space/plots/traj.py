@@ -27,7 +27,6 @@ from .utils import (
     colors,
     finalize_plot,
     body_color,
-    nyx_tpl,
 )
 
 
@@ -205,10 +204,9 @@ def plot_orbit_elements(
     Args:
         dfs (pandas.DataFrame): The data frame containing the trajectory (or a list thereof)
         title (str): The title of the plot
+        names (List[str]): The names of each data frame
         html_out (str, optional): The path to save the HTML to. Defaults to None.
         copyright (str, optional): The copyright to display on the plot. Defaults to None.
-        fig (plotly.graph_objects.Figure, optional): The figure to add the trajectory to. Defaults to None.
-        center (str, optional): The name of the center object, e.g. `Luna` (Moon). Defaults to "Earth".
         show (bool, optional): Whether to show the plot. Defaults to True. If set to false, the figure will be returned.
     """
 
@@ -261,6 +259,104 @@ def plot_orbit_elements(
         col_i = (col_i + 1) % 2
         if col_i == 0:
             row_i = (row_i + 1) % 4
+
+    finalize_plot(fig, title, copyright=copyright)
+
+    if html_out:
+        with open(html_out, "w") as f:
+            f.write(fig.to_html())
+        print(f"Saved HTML to {html_out}")
+
+    if show:
+        fig.show()
+    else:
+        return fig
+
+
+def plot_ric_traj(
+    dfs,
+    title,
+    names=[],
+    ric=True,
+    vertical=False,
+    html_out=None,
+    copyright=None,
+    show=True,
+):
+    """
+    Plot the trajectories in the Radial, In-track, Cross-track frame
+
+    Args:
+        dfs (pandas.DataFrame): The data frame containing the trajectory (or a list thereof), must include the RIC components (`x_ric (km)`, `y_ric (km)`, `z_ric (km)`).
+        title (str): The title of the plot
+        names (List[str]): The names of each data frame
+        ric (bool): Set to False to plot the Cartesian X, Y, and Z components in the frame of the data, defaults to `True`.
+        vertical (bool): Set to True to plot X, Y, and Z of each data frame side by side (vertical layout) instead of one above another (horizontal layout).
+        html_out (str, optional): The path to save the HTML to. Defaults to None.
+        copyright (str, optional): The copyright to display on the plot. Defaults to None.
+        show (bool, optional): Whether to show the plot. Defaults to True. If set to false, the figure will be returned.
+    """
+
+    if not isinstance(dfs, list):
+        dfs = [dfs]
+
+    for df in dfs:
+        pd_ok_epochs = []
+        for epoch in df["Epoch:Gregorian UTC"]:
+            epoch = epoch.replace("UTC", "").strip()
+            if "." not in epoch:
+                epoch += ".0"
+            pd_ok_epochs += [epoch]
+        df["Epoch"] = pd.to_datetime(pd_ok_epochs)
+
+    if not isinstance(names, list):
+        names = [names]
+
+    if len(names) > 1:
+        assert len(names) == len(dfs), "Number of names must match number of dataframes"
+
+    if ric:
+        columns = [
+            "x_ric (km)",
+            "y_ric (km)",
+            "z_ric (km)",
+        ]
+    else:
+        columns = [
+            "x (km)",
+            "y (km)",
+            "z (km)",
+        ]
+
+    if vertical:
+        fig = make_subplots(rows=1, cols=3, subplot_titles=columns)
+    else:
+        fig = make_subplots(rows=3, cols=1, subplot_titles=columns)
+
+    row_i = 0
+    col_i = 0
+
+    for col in columns:
+        for k, df in enumerate(dfs):
+            try:
+                name = f"{names[k]} {col}"
+            except IndexError:
+                name = col
+
+            try:
+                fig.add_trace(
+                    go.Scatter(x=df["Epoch"], y=df[col], name=name),
+                    row=row_i + 1,
+                    col=col_i + 1,
+                )
+            except KeyError:
+                raise KeyError(
+                    f"Rebuild the trajectory and export the RIC frame: missing `{col}` for df `{names[k]}`"
+                )
+        if vertical:
+            col_i += 1
+        else:
+            row_i += 1
 
     finalize_plot(fig, title, copyright=copyright)
 

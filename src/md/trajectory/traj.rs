@@ -23,7 +23,7 @@ use crate::errors::NyxError;
 use crate::io::watermark::pq_writer;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
-use crate::md::prelude::{GuidanceMode, StateParameter};
+use crate::md::prelude::{Frame, GuidanceMode, StateParameter};
 use crate::md::EventEvaluator;
 use crate::time::{Duration, Epoch, TimeSeries, TimeUnits, Unit};
 use arrow::array::{Array, Float64Builder, StringBuilder};
@@ -475,6 +475,17 @@ where
             hdrs.push(field.to_field(more_meta.clone()));
         }
 
+        // Add the RIC frame headers
+        for coord in ["x", "y", "z"] {
+            let mut meta = HashMap::new();
+            meta.insert("unit".to_string(), "km".to_string());
+
+            let field = Field::new(format!("{coord}_ric (km)"), DataType::Float64, false)
+                .with_metadata(meta);
+
+            hdrs.push(field);
+        }
+
         if let Some(events) = events.as_ref() {
             for event in events {
                 let field = Field::new(format!("{event}"), DataType::Float64, false);
@@ -529,6 +540,23 @@ where
                 record.push(Arc::new(data.finish()));
             }
         }
+
+        // Add the RIC frame headers
+        for coord_no in 0..3 {
+            let mut data = Float64Builder::new();
+            for s in &states {
+                // Convert to RIC.
+                let dcm_inertial2ric = s
+                    .orbit()
+                    .dcm_from_traj_frame(Frame::RIC)
+                    .unwrap()
+                    .transpose();
+                let s_pos = dcm_inertial2ric * s.orbit().radius();
+                data.append_value(s_pos[coord_no]);
+            }
+            record.push(Arc::new(data.finish()));
+        }
+
         info!("Serialized {} states", states.len());
 
         // Add all of the evaluated events

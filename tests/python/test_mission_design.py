@@ -1,19 +1,22 @@
 import logging
-from pathlib import Path
 import pickle
+import sys
+from pathlib import Path
 from timeit import timeit
 
-from nyx_space.cosmic import Spacecraft, Orbit, SrpConfig, Cosm
+import pandas as pd
+from nyx_space.cosmic import Cosm, Orbit, Spacecraft, SrpConfig
 from nyx_space.mission_design import (
-    propagate,
-    two_body,
-    StateParameter,
     Event,
     SpacecraftDynamics,
+    StateParameter,
     TrajectoryLoader,
+    propagate,
+    two_body,
 )
-from nyx_space.time import Duration, Unit, Epoch, TimeSeries
-from nyx_space.monte_carlo import generate_orbits, StateParameter
+from nyx_space.monte_carlo import StateParameter, generate_orbits
+from nyx_space.plots.traj import plot_ric_traj
+from nyx_space.time import Duration, Epoch, TimeSeries, Unit
 
 
 def test_propagate():
@@ -94,9 +97,45 @@ def test_propagate():
     traj = traj.resample(Unit.Second * 25.0)
 
     # Export this trajectory with additional metadata and the events
+    # Base path
+    root = Path(__file__).joinpath("../../../").resolve()
+    outpath = root.joinpath("output_data/")
+
+    # Note: Python interface only supports strings for paths, not Path objects.
     traj.to_parquet(
-        "lofi_with_events.parquet", metadata={"test key": "test value"}, events=[event]
+        str(outpath.joinpath("./lofi_with_events.parquet")),
+        metadata={"dynamics": str(dynamics["lofi"])},
+        events=[event],
     )
+
+    # Propagate until the lo-fi epoch to compare
+    _, traj_hifi = propagate(
+        sc,
+        dynamics["hifi"],
+        epoch=rslt_apo.epoch,
+    )
+    traj_hifi.to_parquet(
+        str(outpath.joinpath("./hifi_with_events.parquet")),
+        metadata={"dynamics": str(dynamics["hifi"])},
+        events=[event],
+    )
+
+    # Plot both trajectories in RIC frame
+    if sys.platform != "win32":
+        # We must reload these as dataframes
+        traj_lofi_df = pd.read_parquet(outpath.joinpath("./lofi_with_events.parquet"))
+        traj_hifi_df = pd.read_parquet(outpath.joinpath("./hifi_with_events.parquet"))
+
+        plot_ric_traj(
+            [traj_lofi_df, traj_hifi_df],
+            "LoFi vs HiFi",
+            ["LoFi", "HiFi"],
+            html_out=outpath.joinpath("./md_ric_lofi_hifi_diff.html"),
+            show=False,
+        )
+
+    # Resample the trajectory at fixed step size of 25 seconds
+    traj = traj.resample(Unit.Second * 25.0)
 
     # Also export this ground track
     cosm = Cosm.de438()
@@ -260,4 +299,4 @@ def test_merge_traj():
 
 
 if __name__ == "__main__":
-    test_merge_traj()
+    test_propagate()
