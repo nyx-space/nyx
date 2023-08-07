@@ -15,7 +15,7 @@ from nyx_space.mission_design import (
     two_body,
 )
 from nyx_space.monte_carlo import StateParameter, generate_orbits
-from nyx_space.plots.traj import plot_ric_traj
+from nyx_space.plots.traj import plot_traj_errors
 from nyx_space.time import Duration, Epoch, TimeSeries, Unit
 
 
@@ -126,7 +126,7 @@ def test_propagate():
         traj_lofi_df = pd.read_parquet(outpath.joinpath("./lofi_with_events.parquet"))
         traj_hifi_df = pd.read_parquet(outpath.joinpath("./hifi_with_events.parquet"))
 
-        plot_ric_traj(
+        plot_traj_errors(
             [traj_lofi_df, traj_hifi_df],
             "LoFi vs HiFi",
             ["LoFi", "HiFi"],

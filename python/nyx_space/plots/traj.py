@@ -273,10 +273,10 @@ def plot_orbit_elements(
         return fig
 
 
-def plot_ric_traj(
+def plot_traj_errors(
     dfs,
     title,
-    names=[],
+    names,
     ric=True,
     vertical=False,
     html_out=None,
@@ -284,10 +284,10 @@ def plot_ric_traj(
     show=True,
 ):
     """
-    Plot the trajectories in the Radial, In-track, Cross-track frame
+    Plot the provided trajectory data frames in the Radial, In-track, Cross-track frame of the first trajectory
 
     Args:
-        dfs (pandas.DataFrame): The data frame containing the trajectory (or a list thereof), must include the RIC components (`x_ric (km)`, `y_ric (km)`, `z_ric (km)`).
+        dfs (pandas.DataFrame): The data frame containing at least two trajectory data frames
         title (str): The title of the plot
         names (List[str]): The names of each data frame
         ric (bool): Set to False to plot the Cartesian X, Y, and Z components in the frame of the data, defaults to `True`.
@@ -297,8 +297,16 @@ def plot_ric_traj(
         show (bool, optional): Whether to show the plot. Defaults to True. If set to false, the figure will be returned.
     """
 
-    if not isinstance(dfs, list):
-        dfs = [dfs]
+    # TODO: This must read in an OrbitTraj or an ScTraj and a sample rate.
+    # For each state, build the RIC DCM of the first trajectory and convert the other trajectory states to that frame.
+    # And then plot that.
+    # You can't use the data frames as-is because the epochs may not be aligned (and that would cause weird plotting artifacts).
+    # You also can't convert everything to RIC beforehand because each object would be in its own RIC frame, so I and C will be zero for all.
+
+    if isinstance(dfs, list) or len(dfs) < 2:
+        raise ValueError("Please provide at least two trajectories to compare")
+
+    dfs = [dfs]
 
     for df in dfs:
         pd_ok_epochs = []
@@ -312,8 +320,7 @@ def plot_ric_traj(
     if not isinstance(names, list):
         names = [names]
 
-    if len(names) > 1:
-        assert len(names) == len(dfs), "Number of names must match number of dataframes"
+    assert len(names) == len(dfs), "Number of names must match number of dataframes"
 
     if ric:
         columns = [
