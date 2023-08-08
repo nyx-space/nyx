@@ -244,6 +244,8 @@ def plot_orbit_elements(
     row_i = 0
     col_i = 0
 
+    color_values = list(colors.values())
+
     for col in columns:
         for k, df in enumerate(dfs):
             try:
@@ -251,8 +253,12 @@ def plot_orbit_elements(
             except IndexError:
                 name = col
 
+            # Build the color for this data frame
+            color = color_values[k % len(color_values)]
+            color = f"rgb({int(color[0])}, {int(color[1])}, {int(color[2])})"
+
             fig.add_trace(
-                go.Scatter(x=df["Epoch"], y=df[col], name=name),
+                go.Scatter(x=df["Epoch"], y=df[col], name=name, marker_color=color),
                 row=row_i + 1,
                 col=col_i + 1,
             )
@@ -276,37 +282,34 @@ def plot_orbit_elements(
 def plot_traj_errors(
     dfs,
     title,
-    names,
+    names=[],
     ric=True,
     vertical=False,
+    velocity=False,
     html_out=None,
     copyright=None,
     show=True,
 ):
     """
-    Plot the provided trajectory data frames in the Radial, In-track, Cross-track frame of the first trajectory
+    Plot the trajectory error data in the Radial, In-track, Cross-track frame.
 
     Args:
-        dfs (pandas.DataFrame): The data frame containing at least two trajectory data frames
+        dfs (List[pandas.DataFrame]): The list of trajectory data frames
         title (str): The title of the plot
-        names (List[str]): The names of each data frame
-        ric (bool): Set to False to plot the Cartesian X, Y, and Z components in the frame of the data, defaults to `True`.
-        vertical (bool): Set to True to plot X, Y, and Z of each data frame side by side (vertical layout) instead of one above another (horizontal layout).
-        html_out (str, optional): The path to save the HTML to. Defaults to None.
-        copyright (str, optional): The copyright to display on the plot. Defaults to None.
-        show (bool, optional): Whether to show the plot. Defaults to True. If set to false, the figure will be returned.
+        names (List[str]): The name of each trajectory
+        ric (bool): Set to False to plot Cartesian errors instead of RIC.
+        vertical (bool): Set True to plot components vertically instead of stacked.
+        velocity (bool): Set True to also plot velocity errors instead of the position errors.
+        html_out (str, optional): Path to save HTML plot to.
+        copyright (str, optional): Copyright notice.
+        show (bool, optional): Whether to show the plot.
+
+    Returns:
+        plotly.graph_objects.Figure: The Figure instance
     """
 
-    # TODO: This must read in an OrbitTraj or an ScTraj and a sample rate.
-    # For each state, build the RIC DCM of the first trajectory and convert the other trajectory states to that frame.
-    # And then plot that.
-    # You can't use the data frames as-is because the epochs may not be aligned (and that would cause weird plotting artifacts).
-    # You also can't convert everything to RIC beforehand because each object would be in its own RIC frame, so I and C will be zero for all.
-
-    if isinstance(dfs, list) or len(dfs) < 2:
-        raise ValueError("Please provide at least two trajectories to compare")
-
-    dfs = [dfs]
+    if not isinstance(dfs, list):
+        dfs = [dfs]
 
     for df in dfs:
         pd_ok_epochs = []
@@ -320,20 +323,32 @@ def plot_traj_errors(
     if not isinstance(names, list):
         names = [names]
 
-    assert len(names) == len(dfs), "Number of names must match number of dataframes"
-
-    if ric:
-        columns = [
-            "x_ric (km)",
-            "y_ric (km)",
-            "z_ric (km)",
-        ]
+    if velocity:
+        if ric:
+            columns = [
+                "delta_vx_ric (km/s)",
+                "delta_vy_ric (km/s)",
+                "delta_vz_ric (km/s)",
+            ]
+        else:
+            columns = [
+                "vx (km/s)",
+                "vy (km/s)",
+                "vz (km/s)",
+            ]
     else:
-        columns = [
-            "x (km)",
-            "y (km)",
-            "z (km)",
-        ]
+        if ric:
+            columns = [
+                "delta_x_ric (km)",
+                "delta_y_ric (km)",
+                "delta_z_ric (km)",
+            ]
+        else:
+            columns = [
+                "x (km)",
+                "y (km)",
+                "z (km)",
+            ]
 
     if vertical:
         fig = make_subplots(rows=1, cols=3, subplot_titles=columns)
@@ -358,7 +373,7 @@ def plot_traj_errors(
                 )
             except KeyError:
                 raise KeyError(
-                    f"Rebuild the trajectory and export the RIC frame: missing `{col}` for df `{names[k]}`"
+                    f"Rebuild the trajectory and export the RIC frame: missing `{col}`"
                 )
         if vertical:
             col_i += 1

@@ -184,6 +184,22 @@ impl SpacecraftTraj {
         Ok(Self { inner: conv_traj })
     }
 
+    fn ric_diff_to_parquet(
+        &self,
+        other: &Self,
+        path: String,
+        cfg: Option<ExportCfg>,
+    ) -> Result<String, NyxError> {
+        match self.inner.ric_diff_to_parquet(
+            &other.inner,
+            path,
+            cfg.unwrap_or_else(|| ExportCfg::default()),
+        ) {
+            Ok(path) => Ok(format!("{}", path.to_str().unwrap())),
+            Err(e) => Err(NyxError::CustomError(e.to_string())),
+        }
+    }
+
     fn __add__(&self, rhs: &Self) -> Result<Self, NyxError> {
         let inner = (self.inner.clone() + rhs.inner.clone())?;
 

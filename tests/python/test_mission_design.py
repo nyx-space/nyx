@@ -15,7 +15,7 @@ from nyx_space.mission_design import (
     two_body,
 )
 from nyx_space.monte_carlo import StateParameter, generate_orbits
-from nyx_space.plots.traj import plot_traj_errors
+from nyx_space.plots import plot_traj_errors
 from nyx_space.time import Duration, Epoch, TimeSeries, Unit
 
 
@@ -114,23 +114,27 @@ def test_propagate():
         dynamics["hifi"],
         epoch=rslt_apo.epoch,
     )
-    traj_hifi.to_parquet(
-        str(outpath.joinpath("./hifi_with_events.parquet")),
-        metadata={"dynamics": str(dynamics["hifi"])},
-        events=[event],
-    )
 
     # Plot both trajectories in RIC frame
     if sys.platform != "win32":
-        # We must reload these as dataframes
-        traj_lofi_df = pd.read_parquet(outpath.joinpath("./lofi_with_events.parquet"))
-        traj_hifi_df = pd.read_parquet(outpath.joinpath("./hifi_with_events.parquet"))
+        diff_path = str(outpath.joinpath("./lofi_hifi_ric_diff.parquet"))
+        traj.ric_diff_to_parquet(traj_hifi, diff_path)
+
+        traj_diff_ric = pd.read_parquet(diff_path)
 
         plot_traj_errors(
-            [traj_lofi_df, traj_hifi_df],
+            traj_diff_ric,
             "LoFi vs HiFi",
-            ["LoFi", "HiFi"],
             html_out=outpath.joinpath("./md_ric_lofi_hifi_diff.html"),
+            show=False,
+        )
+
+        plot_traj_errors(
+            traj_diff_ric,
+            "LoFi vs HiFi",
+            html_out=outpath.joinpath("./md_ric_lofi_hifi_diff_velocity.html"),
+            vertical=True,
+            velocity=True,
             show=False,
         )
 

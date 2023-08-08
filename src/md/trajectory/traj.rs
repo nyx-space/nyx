@@ -26,6 +26,7 @@ use crate::linalg::DefaultAllocator;
 use crate::md::prelude::{Frame, GuidanceMode, StateParameter};
 use crate::md::EventEvaluator;
 use crate::time::{Duration, Epoch, TimeSeries, TimeUnits, Unit};
+use crate::utils::dcm_finite_differencing;
 use arrow::array::{Array, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
@@ -624,6 +625,20 @@ where
             hdrs.push(field);
         }
 
+        for coord in ["x", "y", "z"] {
+            let mut meta = HashMap::new();
+            meta.insert("unit".to_string(), "km/s".to_string());
+
+            let field = Field::new(
+                format!("delta_v{coord}_ric (km/s)"),
+                DataType::Float64,
+                false,
+            )
+            .with_metadata(meta);
+
+            hdrs.push(field);
+        }
+
         let more_meta = Some(vec![(
             "Frame".to_string(),
             format!("{}", self.states[0].frame()),
@@ -640,10 +655,13 @@ where
         fields.retain(|param| match self.first().value(*param) {
             Ok(_) => true,
             Err(_) => {
-                warn!("Removed unavailable field `{param}` from trajectory export",);
+                warn!("Removed unavailable field `{param}` from RIC export",);
                 false
             }
         });
+
+        // Disallowed fields
+        fields.retain(|param| param != &StateParameter::GuidanceMode);
 
         for field in &fields {
             hdrs.push(field.to_field(more_meta.clone()));
@@ -672,6 +690,56 @@ where
             .every_between(step, cfg.start_epoch.unwrap(), cfg.end_epoch.unwrap())
             .collect::<Vec<S>>();
 
+        let self_states_pre = self
+            .every_between(
+                step,
+                cfg.start_epoch.unwrap() + step - 1.seconds(),
+                cfg.end_epoch.unwrap(),
+            )
+            .collect::<Vec<S>>();
+
+        let self_states_post = self
+            .every_between(
+                step,
+                cfg.start_epoch.unwrap() + 1.seconds(),
+                cfg.end_epoch.unwrap(),
+            )
+            .collect::<Vec<S>>();
+
+        // Build the list of 6x6 RIC DCM
+        // Assuming identical rate just before and after the first DCM and for the last DCM
+        let mut inertial2ric_dcms = Vec::with_capacity(self_states.len());
+        for ii in 0..self_states.len() {
+            let dcm_cur = self_states[ii]
+                .orbit()
+                .dcm_from_traj_frame(Frame::RIC)
+                .unwrap()
+                .transpose();
+
+            let dcm_pre = if ii == 0 {
+                dcm_cur
+            } else {
+                self_states_pre[ii - 1]
+                    .orbit()
+                    .dcm_from_traj_frame(Frame::RIC)
+                    .unwrap()
+                    .transpose()
+            };
+
+            let dcm_post = if ii == self_states.len() {
+                dcm_cur
+            } else {
+                self_states_post[ii]
+                    .orbit()
+                    .dcm_from_traj_frame(Frame::RIC)
+                    .unwrap()
+                    .transpose()
+            };
+
+            let dcm6x6 = dcm_finite_differencing(dcm_pre, dcm_cur, dcm_post);
+            inertial2ric_dcms.push(dcm6x6);
+        }
+
         let other_states = other
             .every_between(step, cfg.start_epoch.unwrap(), cfg.end_epoch.unwrap())
             .collect::<Vec<S>>();
@@ -692,24 +760,22 @@ where
         record.push(Arc::new(tai_s.finish()));
 
         // Add the RIC data
-        for coord_no in 0..3 {
+        for coord_no in 0..6 {
             let mut data = Float64Builder::new();
-            for (ii, self_state) in self_states.iter().enumerate() {
-                let self_orbit = self_state.orbit();
-                let other_orbit = other_states[ii].orbit();
-                let dcm_inertial2ric = self_orbit
-                    .dcm_from_traj_frame(Frame::RIC)
-                    .unwrap()
-                    .transpose();
+            for (ii, other_state) in other_states.iter().enumerate() {
+                let mut self_orbit = *self_states[ii].orbit();
+                let mut other_orbit = *other_state.orbit();
 
-                // TODO: Build the dcm time derivative
+                // Grab the DCM
+                let dcm_inertial2ric = inertial2ric_dcms[ii];
 
-                let self_ric = dcm_inertial2ric * self_orbit.radius();
-                let other_ric = dcm_inertial2ric * other_orbit.radius();
+                // Rotate both into the "self" RIC
+                self_orbit.rotate_by(dcm_inertial2ric);
+                other_orbit.rotate_by(dcm_inertial2ric);
 
-                let delta_ric = (self_ric - other_ric)[coord_no];
-
-                data.append_value(delta_ric);
+                data.append_value(
+                    (self_orbit.to_cartesian_vec() - other_orbit.to_cartesian_vec())[coord_no],
+                );
             }
             record.push(Arc::new(data.finish()));
         }
