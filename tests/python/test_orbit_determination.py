@@ -24,6 +24,7 @@ from nyx_space.plots.od import (
     plot_residual_histogram,
 )
 from nyx_space.plots.traj import plot_orbit_elements
+from nyx_space.analysis import diff_traj_parquet
 
 
 def test_filter_arc():
@@ -172,6 +173,15 @@ def test_filter_arc():
             show=False,
         )
 
+        # Plot the errors between the nominal and estimation
+        err_df = diff_traj_parquet(traj_file, rslt_path)
+        plot_orbit_elements(
+            err_df,
+            "Error in orbital elements",
+            html_out=str(outpath.joinpath("./od_vs_ref_error_elements.html")),
+            show=False,
+        )
+
 
 def test_one_way_msr():
     """
@@ -202,9 +212,17 @@ def test_one_way_msr():
     gs = devices[1]
     print(f"Using {gs}")
     cosm = Cosm.de438()
-    data = {"epoch": [], "range (km)": [], "doppler (km/s)": [], "azimuth (deg)": [], "elevation (deg)": []}
+    data = {
+        "epoch": [],
+        "range (km)": [],
+        "doppler (km/s)": [],
+        "azimuth (deg)": [],
+        "elevation (deg)": [],
+    }
     # Start by building a time series
-    ts = TimeSeries(traj.first().epoch, traj.last().epoch, step=Unit.Minute*30, inclusive=True)
+    ts = TimeSeries(
+        traj.first().epoch, traj.last().epoch, step=Unit.Minute * 30, inclusive=True
+    )
     # And iterate over it
     for epoch in ts:
         orbit = traj.at(epoch).orbit
@@ -235,11 +253,12 @@ def test_one_way_msr():
     assert abs(doppler_km_s - -0.2498238312640348) < 0.1
 
     # Azimuth and elevation
-    
+
     az_deg, el_deg = devices[0].compute_azimuth_elevation(end_sc.orbit, cosm)
 
     assert abs(az_deg - 128.66181520071825) < 1e-10
     assert abs(el_deg - 27.904687635388676) < 1e-10
+
 
 def test_pure_prediction():
     # Initialize logging
@@ -304,4 +323,4 @@ def test_pure_prediction():
 
 
 if __name__ == "__main__":
-    test_one_way_msr()
+    test_filter_arc()

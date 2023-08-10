@@ -23,9 +23,10 @@ use crate::errors::NyxError;
 use crate::io::watermark::pq_writer;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
-use crate::md::prelude::{GuidanceMode, StateParameter};
+use crate::md::prelude::{Frame, GuidanceMode, StateParameter};
 use crate::md::EventEvaluator;
 use crate::time::{Duration, Epoch, TimeSeries, TimeUnits, Unit};
+use crate::utils::dcm_finite_differencing;
 use arrow::array::{Array, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
@@ -529,6 +530,7 @@ where
                 record.push(Arc::new(data.finish()));
             }
         }
+
         info!("Serialized {} states", states.len());
 
         // Add all of the evaluated events
@@ -587,6 +589,238 @@ where
         traj.finalize();
 
         Ok(traj)
+    }
+
+    /// Export the difference in RIC from of this trajectory compare to the "other" trajectory in parquet format.
+    ///
+    /// # Notes
+    /// + The RIC frame accounts for the transport theorem by performing a finite differencing of the RIC frame.
+    pub fn ric_diff_to_parquet<P: AsRef<Path>>(
+        &self,
+        other: &Self,
+        path: P,
+        cfg: ExportCfg,
+    ) -> Result<PathBuf, Box<dyn Error>> {
+        let tick = Epoch::now().unwrap();
+        info!("Exporting trajectory to parquet file...");
+
+        // Grab the path here before we move stuff.
+        let path_buf = cfg.actual_path(path);
+
+        // Build the schema
+        let mut hdrs = vec![
+            Field::new("Epoch:Gregorian UTC", DataType::Utf8, false),
+            Field::new("Epoch:Gregorian TAI", DataType::Utf8, false),
+            Field::new("Epoch:TAI (s)", DataType::Float64, false),
+        ];
+
+        // Add the RIC headers
+        for coord in ["x", "y", "z"] {
+            let mut meta = HashMap::new();
+            meta.insert("unit".to_string(), "km".to_string());
+
+            let field = Field::new(format!("delta_{coord}_ric (km)"), DataType::Float64, false)
+                .with_metadata(meta);
+
+            hdrs.push(field);
+        }
+
+        for coord in ["x", "y", "z"] {
+            let mut meta = HashMap::new();
+            meta.insert("unit".to_string(), "km/s".to_string());
+
+            let field = Field::new(
+                format!("delta_v{coord}_ric (km/s)"),
+                DataType::Float64,
+                false,
+            )
+            .with_metadata(meta);
+
+            hdrs.push(field);
+        }
+
+        let more_meta = Some(vec![(
+            "Frame".to_string(),
+            format!("{}", self.states[0].frame()),
+        )]);
+
+        let mut cfg = cfg;
+
+        let mut fields = match cfg.fields {
+            Some(fields) => fields,
+            None => S::export_params(),
+        };
+
+        // Check that we can retrieve this information
+        fields.retain(|param| match self.first().value(*param) {
+            Ok(_) => true,
+            Err(_) => {
+                warn!("Removed unavailable field `{param}` from RIC export",);
+                false
+            }
+        });
+
+        // Disallowed fields
+        fields.retain(|param| param != &StateParameter::GuidanceMode);
+
+        for field in &fields {
+            hdrs.push(field.to_field(more_meta.clone()));
+        }
+
+        // Build the schema
+        let schema = Arc::new(Schema::new(hdrs));
+        let mut record: Vec<Arc<dyn Array>> = Vec::new();
+
+        // Ensure the times match.
+        cfg.start_epoch = if self.first().epoch() > other.first().epoch() {
+            Some(self.first().epoch())
+        } else {
+            Some(other.first().epoch())
+        };
+
+        cfg.end_epoch = if self.last().epoch() > other.last().epoch() {
+            Some(other.last().epoch())
+        } else {
+            Some(self.last().epoch())
+        };
+
+        // Build the states iterator
+        let step = cfg.step.unwrap_or_else(|| 1.minutes());
+        let self_states = self
+            .every_between(step, cfg.start_epoch.unwrap(), cfg.end_epoch.unwrap())
+            .collect::<Vec<S>>();
+
+        let self_states_pre = self
+            .every_between(
+                step,
+                cfg.start_epoch.unwrap() + step - 1.seconds(),
+                cfg.end_epoch.unwrap(),
+            )
+            .collect::<Vec<S>>();
+
+        let self_states_post = self
+            .every_between(
+                step,
+                cfg.start_epoch.unwrap() + 1.seconds(),
+                cfg.end_epoch.unwrap(),
+            )
+            .collect::<Vec<S>>();
+
+        // Build the list of 6x6 RIC DCM
+        // Assuming identical rate just before and after the first DCM and for the last DCM
+        let mut inertial2ric_dcms = Vec::with_capacity(self_states.len());
+        for ii in 0..self_states.len() {
+            let dcm_cur = self_states[ii]
+                .orbit()
+                .dcm_from_traj_frame(Frame::RIC)
+                .unwrap()
+                .transpose();
+
+            let dcm_pre = if ii == 0 {
+                dcm_cur
+            } else {
+                self_states_pre[ii - 1]
+                    .orbit()
+                    .dcm_from_traj_frame(Frame::RIC)
+                    .unwrap()
+                    .transpose()
+            };
+
+            let dcm_post = if ii == self_states.len() {
+                dcm_cur
+            } else {
+                self_states_post[ii]
+                    .orbit()
+                    .dcm_from_traj_frame(Frame::RIC)
+                    .unwrap()
+                    .transpose()
+            };
+
+            let dcm6x6 = dcm_finite_differencing(dcm_pre, dcm_cur, dcm_post);
+            inertial2ric_dcms.push(dcm6x6);
+        }
+
+        let other_states = other
+            .every_between(step, cfg.start_epoch.unwrap(), cfg.end_epoch.unwrap())
+            .collect::<Vec<S>>();
+
+        // Build all of the records
+
+        // Epochs (both match for self and others)
+        let mut utc_epoch = StringBuilder::new();
+        let mut tai_epoch = StringBuilder::new();
+        let mut tai_s = Float64Builder::new();
+        for s in &self_states {
+            utc_epoch.append_value(format!("{}", s.epoch()));
+            tai_epoch.append_value(format!("{:x}", s.epoch()));
+            tai_s.append_value(s.epoch().to_tai_seconds());
+        }
+        record.push(Arc::new(utc_epoch.finish()));
+        record.push(Arc::new(tai_epoch.finish()));
+        record.push(Arc::new(tai_s.finish()));
+
+        // Add the RIC data
+        for coord_no in 0..6 {
+            let mut data = Float64Builder::new();
+            for (ii, other_state) in other_states.iter().enumerate() {
+                let mut self_orbit = *self_states[ii].orbit();
+                let mut other_orbit = *other_state.orbit();
+
+                // Grab the DCM
+                let dcm_inertial2ric = inertial2ric_dcms[ii];
+
+                // Rotate both into the "self" RIC
+                self_orbit.rotate_by(dcm_inertial2ric);
+                other_orbit.rotate_by(dcm_inertial2ric);
+
+                data.append_value(
+                    (self_orbit.to_cartesian_vec() - other_orbit.to_cartesian_vec())[coord_no],
+                );
+            }
+            record.push(Arc::new(data.finish()));
+        }
+
+        // Add all of the fields
+        for field in fields {
+            let mut data = Float64Builder::new();
+            for (ii, self_state) in self_states.iter().enumerate() {
+                let self_val = self_state.value(field).unwrap();
+                let other_val = other_states[ii].value(field).unwrap();
+                data.append_value(self_val - other_val);
+            }
+            record.push(Arc::new(data.finish()));
+        }
+
+        info!("Serialized {} states differences", self_states.len());
+
+        // Serialize all of the devices and add that to the parquet file too.
+        let mut metadata = HashMap::new();
+        metadata.insert(
+            "Purpose".to_string(),
+            "Trajectory difference data".to_string(),
+        );
+        if let Some(add_meta) = cfg.metadata {
+            for (k, v) in add_meta {
+                metadata.insert(k, v);
+            }
+        }
+
+        let props = pq_writer(Some(metadata));
+
+        let file = File::create(&path_buf)?;
+        let mut writer = ArrowWriter::try_new(file, schema.clone(), props).unwrap();
+
+        let batch = RecordBatch::try_new(schema, record)?;
+        writer.write(&batch)?;
+        writer.close()?;
+
+        // Return the path this was written to
+        let tock_time = Epoch::now().unwrap() - tick;
+        info!(
+            "Trajectory written to {} in {tock_time}",
+            path_buf.display()
+        );
+        Ok(path_buf)
     }
 }
 
