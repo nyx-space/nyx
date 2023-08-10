@@ -644,7 +644,7 @@ where
             format!("{}", self.states[0].frame()),
         )]);
 
-        let mut cfg = cfg.clone();
+        let mut cfg = cfg;
 
         let mut fields = match cfg.fields {
             Some(fields) => fields,
