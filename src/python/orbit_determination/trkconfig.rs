@@ -1,5 +1,3 @@
-use std::{collections::HashMap, str::FromStr};
-
 /*
     Nyx, blazing fast astrodynamics
     Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
@@ -23,6 +21,7 @@ use crate::{io::ConfigRepr, od::simulator::Availability, NyxError};
 use hifitime::{Duration, Epoch};
 use pyo3::prelude::*;
 use pyo3::types::PyType;
+use std::{collections::HashMap, str::FromStr};
 
 #[pymethods]
 impl TrkConfig {

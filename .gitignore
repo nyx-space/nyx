@@ -10,7 +10,7 @@ node_modules/
 *.svg
 *.data
 *.folded
-*.venv
+*.venv*
 dist/
 *.parquet
 *.profraw

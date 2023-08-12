@@ -26,9 +26,10 @@ use crate::NyxError;
 pub use crate::{io::ConfigError, od::prelude::GroundStation};
 
 use crate::python::cosmic::Cosm as CosmPy;
+use crate::python::pyo3utils::pyany_to_value;
 
 use pyo3::prelude::*;
-use pyo3::types::PyType;
+use pyo3::types::{PyDict, PyList, PyType};
 
 #[pymethods]
 impl GroundStation {
@@ -46,6 +47,25 @@ impl GroundStation {
     #[classmethod]
     fn load_named(_cls: &PyType, path: &str) -> Result<HashMap<String, Self>, ConfigError> {
         <Self as ConfigRepr>::load_named(path)
+    }
+
+    /// Tries to load a GroundStation from the provided Python data
+    #[classmethod]
+    fn loads(_cls: &PyType, data: &PyAny) -> Result<HashMap<String, Self>, ConfigError> {
+        if let Ok(as_list) = data.downcast::<PyList>() {
+            let mut as_map = HashMap::new();
+            for item in as_list.iter() {
+                // Check that the item is a dictionary
+                let next: Self = serde_yaml::from_value(pyany_to_value(item)?)
+                    .map_err(ConfigError::ParseError)?;
+                as_map.insert(next.name.clone(), next);
+            }
+            Ok(as_map)
+        } else {
+            Err(ConfigError::InvalidConfig(
+                "config must be dict, list, or str".to_string(),
+            ))
+        }
     }
 
     /// Perform a one-way measurement of the given orbit at the epoch stored in that orbit instance.

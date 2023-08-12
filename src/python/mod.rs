@@ -28,6 +28,7 @@ pub(crate) mod cosmic;
 pub(crate) mod mission_design;
 mod monte_carlo;
 mod orbit_determination;
+pub(crate) mod pyo3utils;
 
 impl From<NyxError> for PyErr {
     fn from(err: NyxError) -> PyErr {
