@@ -22,8 +22,9 @@ use crate::cosmic::{Cosm, Orbit};
 use crate::io::ConfigRepr;
 use crate::od::simulator::TrackingDeviceSim;
 pub use crate::od::simulator::TrkConfig;
+use crate::time::Duration;
 use crate::NyxError;
-pub use crate::{io::ConfigError, od::prelude::GroundStation};
+pub use crate::{io::ConfigError, od::noise::GaussMarkov, od::prelude::GroundStation};
 
 use crate::python::cosmic::Cosm as CosmPy;
 use crate::python::pyo3utils::pyany_to_value;
@@ -33,7 +34,70 @@ use pyo3::types::{PyDict, PyList, PyType};
 
 #[pymethods]
 impl GroundStation {
-    #[cfg(feature = "python")]
+    #[new]
+    fn new(
+        name: String,
+        elevation_mask_deg: f64,
+        latitude_deg: f64,
+        longitude_deg: f64,
+        height_km: f64,
+        frame_name: String,
+        light_time_correction: bool,
+        integration_time: Option<Duration>,
+        timestamp_noise_s: Option<GaussMarkov>,
+        range_noise_km: Option<GaussMarkov>,
+        doppler_noise_km_s: Option<GaussMarkov>,
+    ) -> Result<Self, NyxError> {
+        let cosm = Cosm::de438();
+        let frame = cosm.try_frame(&frame_name)?;
+        Ok(Self {
+            name,
+            elevation_mask_deg,
+            latitude_deg,
+            longitude_deg,
+            height_km,
+            frame,
+            integration_time,
+            light_time_correction,
+            timestamp_noise_s,
+            range_noise_km,
+            doppler_noise_km_s,
+        })
+    }
+
+    fn __getnewargs__(
+        &self,
+    ) -> Result<
+        (
+            String,
+            f64,
+            f64,
+            f64,
+            f64,
+            String,
+            bool,
+            Option<Duration>,
+            Option<GaussMarkov>,
+            Option<GaussMarkov>,
+            Option<GaussMarkov>,
+        ),
+        NyxError,
+    > {
+        Ok((
+            self.name.clone(),
+            self.elevation_mask_deg,
+            self.latitude_deg,
+            self.longitude_deg,
+            self.height_km,
+            self.frame.to_string(),
+            self.light_time_correction,
+            self.integration_time,
+            self.timestamp_noise_s,
+            self.range_noise_km,
+            self.doppler_noise_km_s,
+        ))
+    }
+
     #[classmethod]
     fn load(_cls: &PyType, path: &str) -> Result<Self, ConfigError> {
         <Self as ConfigRepr>::load(path)
@@ -50,6 +114,8 @@ impl GroundStation {
     }
 
     /// Tries to load a GroundStation from the provided Python data
+    /// TODO: Load from dict directly
+    /// TODO: Pickle via ConfigRepr, probably need a Dumps function
     #[classmethod]
     fn loads(_cls: &PyType, data: &PyAny) -> Result<HashMap<String, Self>, ConfigError> {
         if let Ok(as_list) = data.downcast::<PyList>() {
@@ -59,6 +125,33 @@ impl GroundStation {
                 let next: Self = serde_yaml::from_value(pyany_to_value(item)?)
                     .map_err(ConfigError::ParseError)?;
                 as_map.insert(next.name.clone(), next);
+            }
+            Ok(as_map)
+        } else if let Ok(as_dict) = data.downcast::<PyDict>() {
+            let mut as_map = HashMap::new();
+            for item_as_list in as_dict.items() {
+                let k_any = item_as_list.get_item(0).or_else(|_| {
+                    Err(ConfigError::InvalidConfig(
+                        "could not get key from provided dictionary item".to_string(),
+                    ))
+                })?;
+                let v_any = item_as_list.get_item(1).or_else(|_| {
+                    Err(ConfigError::InvalidConfig(
+                        "could not get key from provided dictionary item".to_string(),
+                    ))
+                })?;
+                // Check that it's a string, or abort here
+                if let Ok(as_str) = k_any.extract::<String>() {
+                    // Try to convert the underlying data
+                    let next: Self = serde_yaml::from_value(pyany_to_value(v_any)?)
+                        .map_err(ConfigError::ParseError)?;
+                    as_map.insert(as_str, next);
+                } else {
+                    return Err(ConfigError::InvalidConfig(
+                        "keys for `loads` must be strings, otherwise, use GroundStation(**data)"
+                            .to_string(),
+                    ));
+                }
             }
             Ok(as_map)
         } else {
