@@ -41,7 +41,7 @@ impl GroundStation {
         latitude_deg: f64,
         longitude_deg: f64,
         height_km: f64,
-        frame_name: String,
+        frame: String,
         light_time_correction: bool,
         integration_time: Option<Duration>,
         timestamp_noise_s: Option<GaussMarkov>,
@@ -49,14 +49,14 @@ impl GroundStation {
         doppler_noise_km_s: Option<GaussMarkov>,
     ) -> Result<Self, NyxError> {
         let cosm = Cosm::de438();
-        let frame = cosm.try_frame(&frame_name)?;
+        let frame_obj = cosm.try_frame(&frame)?;
         Ok(Self {
             name,
             elevation_mask_deg,
             latitude_deg,
             longitude_deg,
             height_km,
-            frame,
+            frame: frame_obj,
             integration_time,
             light_time_correction,
             timestamp_noise_s,
@@ -114,8 +114,6 @@ impl GroundStation {
     }
 
     /// Tries to load a GroundStation from the provided Python data
-    /// TODO: Load from dict directly
-    /// TODO: Pickle via ConfigRepr, probably need a Dumps function
     #[classmethod]
     fn loads(_cls: &PyType, data: &PyAny) -> Result<HashMap<String, Self>, ConfigError> {
         if let Ok(as_list) = data.downcast::<PyList>() {
@@ -143,9 +141,21 @@ impl GroundStation {
                 // Check that it's a string, or abort here
                 if let Ok(as_str) = k_any.extract::<String>() {
                     // Try to convert the underlying data
-                    let next: Self = serde_yaml::from_value(pyany_to_value(v_any)?)
-                        .map_err(ConfigError::ParseError)?;
-                    as_map.insert(as_str, next);
+                    match pyany_to_value(v_any) {
+                        Ok(value) => {
+                            let next: Self =
+                                serde_yaml::from_value(value).map_err(ConfigError::ParseError)?;
+                            as_map.insert(as_str, next);
+                        }
+                        Err(_) => {
+                            // Maybe this was to be parsed in full as a single item
+                            let me: Self = serde_yaml::from_value(pyany_to_value(as_dict)?)
+                                .map_err(ConfigError::ParseError)?;
+                            as_map.clear();
+                            as_map.insert(me.name.clone(), me);
+                            return Ok(as_map);
+                        }
+                    }
                 } else {
                     return Err(ConfigError::InvalidConfig(
                         "keys for `loads` must be strings, otherwise, use GroundStation(**data)"

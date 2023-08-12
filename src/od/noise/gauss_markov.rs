@@ -20,6 +20,8 @@ use crate::cosmic::SPEED_OF_LIGHT_KMS;
 use crate::io::watermark::pq_writer;
 use crate::io::{duration_from_str, duration_to_str, ConfigError, ConfigRepr, Configurable};
 use crate::md::prelude::Cosm;
+#[cfg(feature = "python")]
+use crate::python::pyo3utils::pyany_to_value;
 use crate::NyxError;
 use arrow::array::{ArrayRef, Float64Array, UInt32Array};
 use arrow::datatypes::{DataType, Field, Schema};
@@ -29,7 +31,7 @@ use parquet::arrow::ArrowWriter;
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 #[cfg(feature = "python")]
-use pyo3::types::PyType;
+use pyo3::types::{PyDict, PyList, PyType};
 use rand::{Rng, SeedableRng};
 use rand_distr::Normal;
 use rand_pcg::Pcg64Mcg;
@@ -58,6 +60,7 @@ use std::sync::Arc;
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass)]
 #[cfg_attr(feature = "python", pyo3(text_signature = "(tau, sigma, state_state)"))]
+#[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
 pub struct GaussMarkov {
     /// The time constant, tau gives the correlation time, or the time over which the intensity of the time correlation will fade to 1/e of its prior value. (This is sometimes incorrectly referred to as the "half-life" of the process.)
     #[serde(
@@ -354,8 +357,37 @@ impl GaussMarkov {
 
     #[cfg(feature = "python")]
     #[new]
-    fn py_new(tau: Duration, sigma: f64, steady_state: f64) -> Result<Self, ConfigError> {
-        Self::new(tau, sigma, steady_state)
+    fn py_new(
+        tau: Duration,
+        sigma: f64,
+        steady_state: f64,
+        bias: Option<f64>,
+        epoch: Option<Epoch>,
+    ) -> Result<Self, ConfigError> {
+        if tau <= Duration::ZERO {
+            return Err(ConfigError::InvalidConfig(format!(
+                "tau must be positive but got {tau}"
+            )));
+        }
+
+        Ok(Self {
+            tau,
+            bias_sigma: sigma,
+            steady_state_sigma: steady_state,
+            bias,
+            epoch,
+        })
+    }
+
+    #[cfg(feature = "python")]
+    fn __getnewargs__(&self) -> Result<(Duration, f64, f64, Option<f64>, Option<Epoch>), NyxError> {
+        Ok((
+            self.tau,
+            self.bias_sigma,
+            self.steady_state_sigma,
+            self.bias,
+            self.epoch,
+        ))
     }
 
     #[cfg(feature = "python")]
@@ -402,6 +434,29 @@ impl GaussMarkov {
     #[classmethod]
     fn white(_cls: &PyType, sigma: f64) -> Result<Self, NyxError> {
         Ok(Self::white_noise(sigma))
+    }
+
+    #[cfg(feature = "python")]
+    /// Tries to load a GroundStation from the provided Python data
+    #[classmethod]
+    fn loads(_cls: &PyType, data: &PyAny) -> Result<Vec<Self>, ConfigError> {
+        if let Ok(as_list) = data.downcast::<PyList>() {
+            let mut selves = Vec::new();
+            for item in as_list.iter() {
+                // Check that the item is a dictionary
+                let next: Self = serde_yaml::from_value(pyany_to_value(item)?)
+                    .map_err(ConfigError::ParseError)?;
+                selves.push(next);
+            }
+            Ok(selves)
+        } else if let Ok(as_dict) = data.downcast::<PyDict>() {
+            Ok(vec![serde_yaml::from_value(pyany_to_value(as_dict)?)
+                .map_err(ConfigError::ParseError)?])
+        } else {
+            Err(ConfigError::InvalidConfig(
+                "config must be dict, list, or str".to_string(),
+            ))
+        }
     }
 }
 
