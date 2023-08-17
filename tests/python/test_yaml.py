@@ -1,4 +1,4 @@
-from nyx_space.orbit_determination import GroundStation, GaussMarkov
+from nyx_space.orbit_determination import GroundStation, GaussMarkov, FltResid
 from nyx_space.time import Unit
 
 import pickle
@@ -109,30 +109,42 @@ def test_ground_station():
     fourth = gs_data["four"]
     fourth.pop("range_noise_km")
     fourth.pop("doppler_noise_km_s")
-    # Using loads
-    unique = GroundStation(**fourth)
-    assert unique.name == "Maspalomas, ES"
-
-    # Or the constructor
+    # Using the constructor
     unique = GroundStation(**fourth)
     assert unique.name == "Maspalomas, ES"
 
     # Check pickle
     pkld = pickle.dumps(unique)
     unpkld = pickle.loads(pkld)
-    assert unpkld.name == "Maspalomas, ES"
+    assert unpkld == unique
 
 
 def test_gauss_markov():
+    from_dict = GaussMarkov.loads(gm_data)
+    assert len(from_dict) == 2
+
     from_list = GaussMarkov.loads(list(gm_data.values()))
     assert len(from_list) == 2
 
     unique_range = GaussMarkov.loads(gm_data["range_noise_km"])[0]
     assert unique_range.tau == Unit.Day * 1.0
 
-    # NOTE: We cannot pickle GaussMarkov because it includes hifitime Duration which is of type `builtin.Duration` and I can't change that.
+    # NOTE: We can only pickle via the `dumps` and `loads` functions.
+    # This looses the stateful info.
+
+    pkld = pickle.dumps(unique_range)
+    unpkl = pickle.loads(pkld)
+    assert unpkl.tau == Unit.Day * 1.0
+
+
+def test_flt_resid():
+    # Test pickle
+    flt = FltResid(min_accepted=10, num_sigmas=3.0)
+    unplkd = pickle.loads(pickle.dumps(flt))
+    assert unplkd == flt
 
 
 if __name__ == "__main__":
     test_ground_station()
     test_gauss_markov()
+    test_flt_resid()

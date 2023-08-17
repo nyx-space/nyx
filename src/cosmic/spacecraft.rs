@@ -82,6 +82,7 @@ impl From<GuidanceMode> for f64 {
 /// Optionally, the spacecraft state can also store the state transition matrix from the start of the propagation until the current time (i.e. trajectory STM, not step-size STM).
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyo3(module = "nyx_space.cosmic"))]
 #[cfg_attr(
     feature = "python",
     pyo3(
@@ -127,6 +128,7 @@ impl Default for Spacecraft {
 
 #[cfg_attr(feature = "python", pyclass)]
 #[cfg_attr(feature = "python", pyo3(text_signature = "(area_m2, cr=1.8)"))]
+#[cfg_attr(feature = "python", pyo3(module = "nyx_space.cosmic"))]
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 /// The Solar Radiation Pressure configuration for a spacecraft
 pub struct SrpConfig {
@@ -157,6 +159,7 @@ impl Default for SrpConfig {
 
 #[cfg_attr(feature = "python", pyclass)]
 #[cfg_attr(feature = "python", pyo3(text_signature = "(area_m2, cd=2.2)"))]
+#[cfg_attr(feature = "python", pyo3(module = "nyx_space.cosmic"))]
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 /// The drag configuration for a spacecraft
 pub struct DragConfig {

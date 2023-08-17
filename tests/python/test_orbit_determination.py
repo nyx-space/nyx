@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+import pickle
 import numpy as np
 import pandas as pd
 import sys
@@ -70,6 +71,11 @@ def test_filter_arc():
 
     # Load the tracking configuration as a dictionary
     trk_cfg = TrkConfig.load_named(str(config_path.joinpath("tracking_cfg.yaml")))
+    # Check that we can pickle and compare
+    trk_cfg_demo = trk_cfg["Demo ground station"]
+    print(trk_cfg_demo.dumps())
+    unpkld = pickle.loads(pickle.dumps(trk_cfg_demo))
+    assert unpkld == trk_cfg_demo
 
     # Load the trajectory
     traj = TrajectoryLoader(traj_file)

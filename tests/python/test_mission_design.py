@@ -174,7 +174,7 @@ def test_build_spacecraft():
     sc = Spacecraft(orbit, 150.0, 15.0, srp)
     print(sc)
 
-    assert sc.srp().__eq__(srp)  # Not sure why the `==` operator doesn't work here
+    assert sc.srp() == srp
     assert sc.drag().area_m2 == 0.0
     assert (
         sc.drag().cd == 2.2
@@ -192,7 +192,7 @@ def test_build_spacecraft():
     # Check that we can pickle the trajectory loader object
     traj_pkl = pickle.dumps(traj)
     traj_unpkl = pickle.loads(traj_pkl)
-    assert traj_unpkl.__eq__(traj)
+    assert traj_unpkl == traj
     # Check that we can convert this to a spacecraft trajectory
     traj_sc = traj.to_spacecraft_traj()
     traj_orbit = traj.to_orbit_traj()
@@ -215,7 +215,7 @@ def test_build_spacecraft():
         # Check the downcasted version
         assert dc_orbit.x_km == sc_orbit.x_km
         assert dc_orbit.vx_km_s == sc_orbit.vx_km_s
-        assert dc_orbit.__eq__(sc_orbit)
+        assert dc_orbit == sc_orbit
 
 
 def test_two_body():

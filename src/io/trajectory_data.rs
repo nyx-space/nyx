@@ -35,6 +35,8 @@ use crate::Spacecraft;
 #[cfg(feature = "python")]
 use log::warn;
 #[cfg(feature = "python")]
+use pyo3::class::basic::CompareOp;
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
 
 use crate::cosmic::Cosm;
@@ -345,7 +347,12 @@ impl TrajectoryLoader {
         Ok((self.path.clone(),))
     }
 
-    fn __eq__(&self, other: &Self) -> bool {
-        self == other
+    #[cfg(feature = "python")]
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, NyxError> {
+        match op {
+            CompareOp::Eq => Ok(self == other),
+            CompareOp::Ne => Ok(self != other),
+            _ => Err(NyxError::CustomError(format!("{op:?} not available"))),
+        }
     }
 }

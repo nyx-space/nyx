@@ -26,31 +26,41 @@ use crate::{md::StateParameter, NyxError};
 use std::collections::HashMap;
 
 use hifitime::Epoch;
+use pyo3::class::basic::CompareOp;
 use pyo3::prelude::*;
 use pyo3::types::PyType;
+use pythonize::{depythonize, pythonize};
 
 #[pymethods]
 impl Spacecraft {
     /// Initialize a new Spacecraft with optional thruster, mode, SRP, and Drag parameters.
     #[new]
     pub fn py_new(
-        orbit: Orbit,
-        dry_mass_kg: f64,
-        fuel_mass_kg: f64,
+        orbit: Option<Orbit>,
+        dry_mass_kg: Option<f64>,
+        fuel_mass_kg: Option<f64>,
         srp: Option<SrpConfig>,
         drag: Option<DragConfig>,
         thruster: Option<Thruster>,
         mode: Option<GuidanceMode>,
-    ) -> Self {
-        Self {
-            orbit,
-            dry_mass_kg,
-            fuel_mass_kg,
-            thruster,
-            mode: mode.unwrap_or(GuidanceMode::Coast),
-            stm: None,
-            srp: srp.unwrap_or_else(|| SrpConfig::default()),
-            drag: drag.unwrap_or_else(|| DragConfig::default()),
+    ) -> Result<Self, NyxError> {
+        if orbit.is_none() && dry_mass_kg.is_none() && fuel_mass_kg.is_none() {
+            Ok(Self::default())
+        } else if orbit.is_none() || dry_mass_kg.is_none() || fuel_mass_kg.is_none() {
+            Err(NyxError::CustomError(format!(
+                "orbit and dry_mass_kg must be specified"
+            )))
+        } else {
+            Ok(Self {
+                orbit: orbit.unwrap(),
+                dry_mass_kg: dry_mass_kg.unwrap(),
+                fuel_mass_kg: fuel_mass_kg.unwrap_or(0.0),
+                thruster,
+                mode: mode.unwrap_or(GuidanceMode::Coast),
+                stm: None,
+                srp: srp.unwrap_or_else(|| SrpConfig::default()),
+                drag: drag.unwrap_or_else(|| DragConfig::default()),
+            })
         }
     }
 
@@ -77,8 +87,25 @@ impl Spacecraft {
         format!("{self}\n{self:x}")
     }
 
-    fn __eq__(&self, other: &Self) -> bool {
-        self == other
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, NyxError> {
+        match op {
+            CompareOp::Eq => Ok(self == other),
+            CompareOp::Ne => Ok(self != other),
+            _ => Err(NyxError::CustomError(format!("{op:?} not available"))),
+        }
+    }
+
+    fn dumps(&self, py: Python) -> Result<PyObject, NyxError> {
+        pythonize(py, &self).map_err(|e| NyxError::CustomError(e.to_string()))
+    }
+
+    fn __getstate__(&self, py: Python) -> Result<PyObject, NyxError> {
+        self.dumps(py)
+    }
+
+    fn __setstate__(&mut self, state: &PyAny) -> Result<(), ConfigError> {
+        *self = depythonize(state).map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
+        Ok(())
     }
 
     /// Note: this returns a COPY of the orbit, not a mutable reference to it!
@@ -116,9 +143,9 @@ impl Spacecraft {
 #[pymethods]
 impl SrpConfig {
     #[new]
-    pub fn py_new(area_m2: f64, cr: Option<f64>) -> Self {
+    pub fn py_new(area_m2: Option<f64>, cr: Option<f64>) -> Self {
         Self {
-            area_m2,
+            area_m2: area_m2.unwrap_or(0.0),
             cr: cr.unwrap_or(1.8),
         }
     }
@@ -127,8 +154,25 @@ impl SrpConfig {
         format!("{self:?}")
     }
 
-    fn __eq__(&self, other: Self) -> bool {
-        *self == other
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, NyxError> {
+        match op {
+            CompareOp::Eq => Ok(self == other),
+            CompareOp::Ne => Ok(self != other),
+            _ => Err(NyxError::CustomError(format!("{op:?} not available"))),
+        }
+    }
+
+    fn dumps(&self, py: Python) -> Result<PyObject, NyxError> {
+        pythonize(py, &self).map_err(|e| NyxError::CustomError(e.to_string()))
+    }
+
+    fn __getstate__(&self, py: Python) -> Result<PyObject, NyxError> {
+        self.dumps(py)
+    }
+
+    fn __setstate__(&mut self, state: &PyAny) -> Result<(), ConfigError> {
+        *self = depythonize(state).map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
+        Ok(())
     }
 
     #[getter]
@@ -157,9 +201,9 @@ impl SrpConfig {
 #[pymethods]
 impl DragConfig {
     #[new]
-    pub fn py_new(area_m2: f64, cd: Option<f64>) -> Self {
+    pub fn py_new(area_m2: Option<f64>, cd: Option<f64>) -> Self {
         Self {
-            area_m2,
+            area_m2: area_m2.unwrap_or(0.0),
             cd: cd.unwrap_or(1.8),
         }
     }
@@ -168,8 +212,25 @@ impl DragConfig {
         format!("{self:?}")
     }
 
-    fn __eq__(&self, other: Self) -> bool {
-        *self == other
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, NyxError> {
+        match op {
+            CompareOp::Eq => Ok(self == other),
+            CompareOp::Ne => Ok(self != other),
+            _ => Err(NyxError::CustomError(format!("{op:?} not available"))),
+        }
+    }
+
+    fn dumps(&self, py: Python) -> Result<PyObject, NyxError> {
+        pythonize(py, &self).map_err(|e| NyxError::CustomError(e.to_string()))
+    }
+
+    fn __getstate__(&self, py: Python) -> Result<PyObject, NyxError> {
+        self.dumps(py)
+    }
+
+    fn __setstate__(&mut self, state: &PyAny) -> Result<(), ConfigError> {
+        *self = depythonize(state).map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
+        Ok(())
     }
 
     #[getter]

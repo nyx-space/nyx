@@ -32,6 +32,8 @@ use parquet::arrow::ArrowWriter;
 use pyo3::prelude::*;
 #[cfg(feature = "python")]
 use pyo3::types::{PyDict, PyList, PyType};
+#[cfg(feature = "python")]
+use pythonize::{depythonize, pythonize};
 use rand::{Rng, SeedableRng};
 use rand_distr::Normal;
 use rand_pcg::Pcg64Mcg;
@@ -358,12 +360,25 @@ impl GaussMarkov {
     #[cfg(feature = "python")]
     #[new]
     fn py_new(
-        tau: Duration,
-        sigma: f64,
-        steady_state: f64,
+        tau: Option<Duration>,
+        sigma: Option<f64>,
+        steady_state: Option<f64>,
         bias: Option<f64>,
         epoch: Option<Epoch>,
     ) -> Result<Self, ConfigError> {
+        if tau.is_none() && sigma.is_none() && bias.is_none() {
+            // We're called from pickle, return a non initialized state
+            return Ok(Self::ZERO);
+        } else if tau.is_none() || sigma.is_none() || bias.is_none() {
+            return Err(ConfigError::InvalidConfig(format!(
+                "tau, sigma, and bias must be specified"
+            )));
+        }
+
+        let tau = tau.unwrap();
+        let sigma = sigma.unwrap();
+        let steady_state = steady_state.unwrap();
+
         if tau <= Duration::ZERO {
             return Err(ConfigError::InvalidConfig(format!(
                 "tau must be positive but got {tau}"
@@ -380,26 +395,29 @@ impl GaussMarkov {
     }
 
     #[cfg(feature = "python")]
-    fn __getnewargs__(&self) -> Result<(Duration, f64, f64, Option<f64>, Option<Epoch>), NyxError> {
-        Ok((
-            self.tau,
-            self.bias_sigma,
-            self.steady_state_sigma,
-            self.bias,
-            self.epoch,
-        ))
-    }
-
-    #[cfg(feature = "python")]
     #[getter]
     fn get_tau(&self) -> Duration {
         self.tau
     }
 
     #[cfg(feature = "python")]
+    #[setter]
+    fn set_tau(&mut self, tau: Duration) -> PyResult<()> {
+        self.tau = tau;
+        Ok(())
+    }
+
+    #[cfg(feature = "python")]
     #[getter]
     fn get_bias(&self) -> Option<f64> {
         self.bias
+    }
+
+    #[cfg(feature = "python")]
+    #[setter]
+    fn set_sampling(&mut self, bias: f64) -> PyResult<()> {
+        self.bias_sigma = bias;
+        Ok(())
     }
 
     /// Initializes a new Gauss Markov process for the provided kind of model.
@@ -450,13 +468,59 @@ impl GaussMarkov {
             }
             Ok(selves)
         } else if let Ok(as_dict) = data.downcast::<PyDict>() {
-            Ok(vec![serde_yaml::from_value(pyany_to_value(as_dict)?)
-                .map_err(ConfigError::ParseError)?])
+            let mut selves = Vec::new();
+            for item_as_list in as_dict.items() {
+                let v_any = item_as_list.get_item(1).or_else(|_| {
+                    Err(ConfigError::InvalidConfig(
+                        "could not get key from provided dictionary item".to_string(),
+                    ))
+                })?;
+
+                // Try to convert the underlying data
+                match pyany_to_value(v_any) {
+                    Ok(value) => {
+                        match serde_yaml::from_value(value) {
+                            Ok(next) => selves.push(next),
+                            Err(_) => {
+                                // Maybe this was to be parsed in full as a single item
+                                let me: Self = depythonize(data)
+                                    .map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
+                                selves.clear();
+                                selves.push(me);
+                                return Ok(selves);
+                            }
+                        }
+                    }
+                    Err(_) => {
+                        // Maybe this was to be parsed in full as a single item
+                        let me: Self = depythonize(data)
+                            .map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
+                        selves.clear();
+                        selves.push(me);
+                        return Ok(selves);
+                    }
+                }
+            }
+            Ok(selves)
         } else {
-            Err(ConfigError::InvalidConfig(
-                "config must be dict, list, or str".to_string(),
-            ))
+            depythonize(data).map_err(|e| ConfigError::InvalidConfig(e.to_string()))
         }
+    }
+
+    #[cfg(feature = "python")]
+    fn dumps(&self, py: Python) -> Result<PyObject, NyxError> {
+        pythonize(py, &self).map_err(|e| NyxError::CustomError(e.to_string()))
+    }
+
+    #[cfg(feature = "python")]
+    fn __getstate__(&self, py: Python) -> Result<PyObject, NyxError> {
+        self.dumps(py)
+    }
+
+    #[cfg(feature = "python")]
+    fn __setstate__(&mut self, state: &PyAny) -> Result<(), ConfigError> {
+        *self = depythonize(state).map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
+        Ok(())
     }
 }
 

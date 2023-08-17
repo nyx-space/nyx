@@ -29,8 +29,10 @@ pub use crate::{io::ConfigError, od::noise::GaussMarkov, od::prelude::GroundStat
 use crate::python::cosmic::Cosm as CosmPy;
 use crate::python::pyo3utils::pyany_to_value;
 
+use pyo3::class::basic::CompareOp;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyType};
+use pythonize::pythonize;
 
 #[pymethods]
 impl GroundStation {
@@ -171,6 +173,10 @@ impl GroundStation {
         }
     }
 
+    fn dumps(&self, py: Python) -> Result<PyObject, NyxError> {
+        pythonize(py, &self).map_err(|e| NyxError::CustomError(e.to_string()))
+    }
+
     /// Perform a one-way measurement of the given orbit at the epoch stored in that orbit instance.
     /// Returns the range in kilometers and the Doppler measurement in kilometers per second.
     fn measure(&mut self, orbit: Orbit) -> Result<(f64, f64), NyxError> {
@@ -253,5 +259,13 @@ impl GroundStation {
 
     fn __str__(&self) -> String {
         format!("{self}")
+    }
+
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, NyxError> {
+        match op {
+            CompareOp::Eq => Ok(self == other),
+            CompareOp::Ne => Ok(self != other),
+            _ => Err(NyxError::CustomError(format!("{op:?} not available"))),
+        }
     }
 }
