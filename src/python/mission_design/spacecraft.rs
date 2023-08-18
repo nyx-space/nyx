@@ -103,6 +103,12 @@ impl Spacecraft {
         self.dumps(py)
     }
 
+    #[classmethod]
+    /// Loads the SpacecraftDynamics from its YAML representation
+    fn loads(_cls: &PyType, state: &PyAny) -> Result<Self, ConfigError> {
+        depythonize(state).map_err(|e| ConfigError::InvalidConfig(e.to_string()))
+    }
+
     fn __setstate__(&mut self, state: &PyAny) -> Result<(), ConfigError> {
         *self = depythonize(state).map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
         Ok(())

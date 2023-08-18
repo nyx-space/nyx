@@ -5,6 +5,7 @@ from pathlib import Path
 from timeit import timeit
 
 import pandas as pd
+import yaml
 from nyx_space.cosmic import Cosm, Orbit, Spacecraft, SrpConfig
 from nyx_space.mission_design import (
     Event,
@@ -283,6 +284,13 @@ def test_merge_traj():
         str(config_path.joinpath("dynamics.yaml"))
     )["lofi"]
 
+    # Check loading from the YAML read from Python
+    with open(config_path.joinpath("dynamics.yaml")) as fh:
+        data = yaml.safe_load(fh)
+
+    loaded = SpacecraftDynamics.loads(data["lofi"])
+    assert loaded == dynamics
+
     sc2, traj1 = propagate(sc1, dynamics, Unit.Day * 5)
     # And propagate again
     sc3, traj2 = propagate(sc2, dynamics, Unit.Day * 5)
@@ -303,4 +311,5 @@ def test_merge_traj():
 
 
 if __name__ == "__main__":
-    test_propagate()
+    # test_propagate()
+    test_merge_traj()

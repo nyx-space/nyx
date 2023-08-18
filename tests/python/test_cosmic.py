@@ -79,6 +79,8 @@ def test_define_spacecraft():
     # Check that we can pickle and dump the config of this spacecraft
     pkld = pickle.dumps(sc)
     print(sc.dumps())
+    sc_loaded = Spacecraft.loads(sc.dumps())
+    assert sc_loaded == sc
     unpkld = pickle.loads(pkld)
     assert unpkld == sc
 

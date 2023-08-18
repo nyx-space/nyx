@@ -37,9 +37,13 @@ use crate::cosmic::Cosm;
 #[cfg(feature = "python")]
 use crate::io::ConfigRepr;
 #[cfg(feature = "python")]
+use pyo3::class::basic::CompareOp;
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
 #[cfg(feature = "python")]
 use pyo3::types::PyType;
+#[cfg(feature = "python")]
+use pythonize::depythonize;
 #[cfg(feature = "python")]
 use std::collections::HashMap;
 
@@ -50,6 +54,7 @@ const NORM_ERR: f64 = 1e-4;
 /// Note: if the spacecraft runs out of fuel, the propagation segment will return an error.
 #[derive(Clone)]
 #[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyo3(module = "nyx_space.mission_design"))]
 pub struct SpacecraftDynamics {
     pub orbital_dyn: OrbitalDynamics,
     pub force_models: Vec<Arc<dyn ForceModel>>,
@@ -211,6 +216,25 @@ impl SpacecraftDynamics {
     #[cfg(feature = "python")]
     fn __repr__(&self) -> String {
         format!("{self}")
+    }
+
+    #[cfg(feature = "python")]
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, NyxError> {
+        match op {
+            CompareOp::Eq => Ok(self.__repr__() == other.__repr__()),
+            CompareOp::Ne => Ok(self.__repr__() != other.__repr__()),
+            _ => Err(NyxError::CustomError(format!("{op:?} not available"))),
+        }
+    }
+
+    #[cfg(feature = "python")]
+    #[classmethod]
+    /// Loads the SpacecraftDynamics from its YAML representation
+    fn loads(_cls: &PyType, state: &PyAny) -> Result<Self, ConfigError> {
+        <Self as Configurable>::from_config(
+            depythonize(state).map_err(|e| ConfigError::InvalidConfig(e.to_string()))?,
+            Cosm::de438(),
+        )
     }
 }
 

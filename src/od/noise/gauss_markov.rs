@@ -455,7 +455,7 @@ impl GaussMarkov {
     }
 
     #[cfg(feature = "python")]
-    /// Tries to load a GroundStation from the provided Python data
+    /// Loads the SpacecraftDynamics from its YAML representation
     #[classmethod]
     fn loads(_cls: &PyType, data: &PyAny) -> Result<Vec<Self>, ConfigError> {
         if let Ok(as_list) = data.downcast::<PyList>() {

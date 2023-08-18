@@ -115,8 +115,8 @@ impl GroundStation {
         <Self as ConfigRepr>::load_named(path)
     }
 
-    /// Tries to load a GroundStation from the provided Python data
     #[classmethod]
+    /// Loads the SpacecraftDynamics from its YAML representation
     fn loads(_cls: &PyType, data: &PyAny) -> Result<HashMap<String, Self>, ConfigError> {
         if let Ok(as_list) = data.downcast::<PyList>() {
             let mut as_map = HashMap::new();
