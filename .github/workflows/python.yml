@@ -44,7 +44,7 @@ jobs:
           set -e
           ls -lh dist
           pip install nyx_space --find-links dist --force-reinstall -v --no-cache-dir
-          pip install pytest numpy pandas plotly pyarrow scipy
+          pip install pytest numpy pandas plotly pyarrow scipy pyyaml
           pytest
 
       - name: Upload python tests HTMLs
@@ -82,7 +82,7 @@ jobs:
           set -e
           ls -lh dist
           pip install --find-links dist --force-reinstall nyx_space
-          pip install pytest numpy pandas plotly pyarrow
+          pip install pytest numpy pandas plotly pyarrow pyyaml
           pytest
 
   macos:
@@ -115,7 +115,7 @@ jobs:
           set -e
           ls -lh dist
           pip install --find-links dist --force-reinstall nyx_space
-          pip install pytest numpy pandas plotly pyarrow
+          pip install pytest numpy pandas plotly pyarrow pyyaml
           pytest
 
   sdist:
