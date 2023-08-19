@@ -33,7 +33,7 @@ use std::sync::Arc;
 /// If unsure, use the default: `FltResid::default()` in Rust, and `FltResid()` in Python (i.e. construct without arguments).
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass)]
-#[cfg_attr(feature = "python", pyo3(module = "nyx_space.mission_design"))]
+#[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
 #[cfg_attr(
     feature = "python",
     pyo3(text_signature = "(min_accepted=None, num_sigmas=None)")

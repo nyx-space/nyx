@@ -366,12 +366,12 @@ impl GaussMarkov {
         bias: Option<f64>,
         epoch: Option<Epoch>,
     ) -> Result<Self, ConfigError> {
-        if tau.is_none() && sigma.is_none() && bias.is_none() {
+        if tau.is_none() && sigma.is_none() && steady_state.is_none() {
             // We're called from pickle, return a non initialized state
             return Ok(Self::ZERO);
-        } else if tau.is_none() || sigma.is_none() || bias.is_none() {
+        } else if tau.is_none() || sigma.is_none() || steady_state.is_none() {
             return Err(ConfigError::InvalidConfig(format!(
-                "tau, sigma, and bias must be specified"
+                "tau, sigma, and steady_state must be specified"
             )));
         }
 
