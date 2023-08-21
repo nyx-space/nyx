@@ -1,5 +1,3 @@
-use std::{collections::HashMap, str::FromStr};
-
 /*
     Nyx, blazing fast astrodynamics
     Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
@@ -21,8 +19,11 @@ pub use crate::io::ConfigError;
 pub use crate::od::simulator::{Schedule, TrkConfig};
 use crate::{io::ConfigRepr, od::simulator::Availability, NyxError};
 use hifitime::{Duration, Epoch};
+use pyo3::basic::CompareOp;
 use pyo3::prelude::*;
 use pyo3::types::PyType;
+use pythonize::{depythonize, pythonize};
+use std::{collections::HashMap, str::FromStr};
 
 #[pymethods]
 impl TrkConfig {
@@ -101,6 +102,27 @@ impl TrkConfig {
 
     fn __str__(&self) -> String {
         format!("{self:?}")
+    }
+
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, NyxError> {
+        match op {
+            CompareOp::Eq => Ok(self == other),
+            CompareOp::Ne => Ok(self != other),
+            _ => Err(NyxError::CustomError(format!("{op:?} not available"))),
+        }
+    }
+
+    fn dumps(&self, py: Python) -> Result<PyObject, NyxError> {
+        pythonize(py, &self).map_err(|e| NyxError::CustomError(e.to_string()))
+    }
+
+    fn __getstate__(&self, py: Python) -> Result<PyObject, NyxError> {
+        self.dumps(py)
+    }
+
+    fn __setstate__(&mut self, state: &PyAny) -> Result<(), ConfigError> {
+        *self = depythonize(state).map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
+        Ok(())
     }
 
     #[getter]

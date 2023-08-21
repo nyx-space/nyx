@@ -26,8 +26,10 @@ use crate::{
 };
 use nalgebra::Matrix6;
 use numpy::PyReadonlyArrayDyn;
+use pyo3::class::basic::CompareOp;
 use pyo3::prelude::*;
 use pyo3::types::PyType;
+use pythonize::depythonize;
 
 use super::ConfigError;
 
@@ -120,6 +122,23 @@ impl OrbitEstimate {
         }
 
         Ok(selves)
+    }
+
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, NyxError> {
+        match op {
+            CompareOp::Eq => Ok(self.__repr__() == other.__repr__()),
+            CompareOp::Ne => Ok(self.__repr__() != other.__repr__()),
+            _ => Err(NyxError::CustomError(format!("{op:?} not available"))),
+        }
+    }
+
+    #[classmethod]
+    /// Loads the SpacecraftDynamics from its YAML representation
+    fn loads(_cls: &PyType, state: &PyAny) -> Result<Self, ConfigError> {
+        <Self as Configurable>::from_config(
+            depythonize(state).map_err(|e| ConfigError::InvalidConfig(e.to_string()))?,
+            Cosm::de438(),
+        )
     }
 
     // Manual getter/setters -- waiting on https://github.com/PyO3/pyo3/pull/2786

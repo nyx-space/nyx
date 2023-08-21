@@ -1,6 +1,7 @@
 from nyx_space.cosmic import Cosm, Orbit, Spacecraft, SrpConfig, DragConfig
 from nyx_space.time import Epoch, Unit, Duration
 from nyx_space.monte_carlo import generate_orbits, generate_spacecraft, StateParameter
+import pickle
 
 
 def test_load_cosm():
@@ -75,9 +76,17 @@ def test_define_spacecraft():
 
     print(sc.orbit)
 
+    # Check that we can pickle and dump the config of this spacecraft
+    pkld = pickle.dumps(sc)
+    print(sc.dumps())
+    sc_loaded = Spacecraft.loads(sc.dumps())
+    assert sc_loaded == sc
+    unpkld = pickle.loads(pkld)
+    assert unpkld == sc
+
     # NOTE: This does not return a pointer to the object, but a new object!
     # Therefore the equality _will_ fail!
-    assert orbit != sc.orbit
+    assert orbit == sc.orbit
     # But the printed information is identical
     assert f"{orbit}" == f"{sc.orbit}"
     # And the epochs match
@@ -152,3 +161,7 @@ def test_generate_states():
         seed=42,
     )
     assert len(spacecraft) == 100
+
+
+if __name__ == "__main__":
+    test_define_spacecraft()

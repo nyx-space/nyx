@@ -1,30 +1,32 @@
 import logging
+import pickle
+import sys
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
-import sys
-
+import yaml
+from nyx_space.analysis import diff_traj_parquet
+from nyx_space.cosmic import Cosm, Spacecraft
+from nyx_space.mission_design import SpacecraftDynamics, TrajectoryLoader, propagate
 from nyx_space.orbit_determination import (
-    GroundStation,
-    GroundTrackingArcSim,
-    TrkConfig,
-    OrbitEstimate,
-    process_tracking_arc,
-    predictor,
     DynamicTrackingArc,
     ExportCfg,
+    GroundStation,
+    GroundTrackingArcSim,
+    OrbitEstimate,
+    TrkConfig,
+    predictor,
+    process_tracking_arc,
 )
-from nyx_space.mission_design import TrajectoryLoader, SpacecraftDynamics, propagate
-from nyx_space.cosmic import Spacecraft, Cosm
-from nyx_space.time import Unit, TimeSeries
 from nyx_space.plots.od import (
     plot_covar,
     plot_estimates,
-    plot_residuals,
     plot_residual_histogram,
+    plot_residuals,
 )
 from nyx_space.plots.traj import plot_orbit_elements
-from nyx_space.analysis import diff_traj_parquet
+from nyx_space.time import TimeSeries, Unit
 
 
 def test_filter_arc():
@@ -70,6 +72,11 @@ def test_filter_arc():
 
     # Load the tracking configuration as a dictionary
     trk_cfg = TrkConfig.load_named(str(config_path.joinpath("tracking_cfg.yaml")))
+    # Check that we can pickle and compare
+    trk_cfg_demo = trk_cfg["Demo ground station"]
+    print(trk_cfg_demo.dumps())
+    unpkld = pickle.loads(pickle.dumps(trk_cfg_demo))
+    assert unpkld == trk_cfg_demo
 
     # Load the trajectory
     traj = TrajectoryLoader(traj_file)
@@ -94,6 +101,13 @@ def test_filter_arc():
     orbit_est = OrbitEstimate(
         sc.orbit, covar=np.diag([100.0, 100.0, 100.0, 1.0, 1.0, 1.0])
     )
+
+    # Check loading from the YAML read from Python
+    with open(config_path.joinpath("orbit_estimates.yaml")) as fh:
+        data = yaml.safe_load(fh)
+
+    loaded = OrbitEstimate.loads(data["example 1"])
+    print(loaded)
 
     msr_noise = [1e-3, 0, 0, 1e-6]
     # Switch from sequential to EKF after 100 measurements

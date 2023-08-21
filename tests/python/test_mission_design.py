@@ -5,6 +5,7 @@ from pathlib import Path
 from timeit import timeit
 
 import pandas as pd
+import yaml
 from nyx_space.cosmic import Cosm, Orbit, Spacecraft, SrpConfig
 from nyx_space.mission_design import (
     Event,
@@ -174,7 +175,7 @@ def test_build_spacecraft():
     sc = Spacecraft(orbit, 150.0, 15.0, srp)
     print(sc)
 
-    assert sc.srp().__eq__(srp)  # Not sure why the `==` operator doesn't work here
+    assert sc.srp() == srp
     assert sc.drag().area_m2 == 0.0
     assert (
         sc.drag().cd == 2.2
@@ -192,7 +193,7 @@ def test_build_spacecraft():
     # Check that we can pickle the trajectory loader object
     traj_pkl = pickle.dumps(traj)
     traj_unpkl = pickle.loads(traj_pkl)
-    assert traj_unpkl.__eq__(traj)
+    assert traj_unpkl == traj
     # Check that we can convert this to a spacecraft trajectory
     traj_sc = traj.to_spacecraft_traj()
     traj_orbit = traj.to_orbit_traj()
@@ -215,7 +216,7 @@ def test_build_spacecraft():
         # Check the downcasted version
         assert dc_orbit.x_km == sc_orbit.x_km
         assert dc_orbit.vx_km_s == sc_orbit.vx_km_s
-        assert dc_orbit.__eq__(sc_orbit)
+        assert dc_orbit == sc_orbit
 
 
 def test_two_body():
@@ -283,6 +284,13 @@ def test_merge_traj():
         str(config_path.joinpath("dynamics.yaml"))
     )["lofi"]
 
+    # Check loading from the YAML read from Python
+    with open(config_path.joinpath("dynamics.yaml")) as fh:
+        data = yaml.safe_load(fh)
+
+    loaded = SpacecraftDynamics.loads(data["lofi"])
+    assert loaded == dynamics
+
     sc2, traj1 = propagate(sc1, dynamics, Unit.Day * 5)
     # And propagate again
     sc3, traj2 = propagate(sc2, dynamics, Unit.Day * 5)
@@ -303,4 +311,5 @@ def test_merge_traj():
 
 
 if __name__ == "__main__":
-    test_propagate()
+    # test_propagate()
+    test_merge_traj()

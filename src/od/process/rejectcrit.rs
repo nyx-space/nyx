@@ -19,14 +19,21 @@
 use crate::cosmic::Cosm;
 use crate::io::{ConfigError, ConfigRepr, Configurable};
 #[cfg(feature = "python")]
+use crate::NyxError;
+#[cfg(feature = "python")]
+use pyo3::class::basic::CompareOp;
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
+#[cfg(feature = "python")]
+use pythonize::{depythonize, pythonize};
 use serde_derive::{Deserialize, Serialize};
 use std::sync::Arc;
 
 /// Reject measurements with a residual ratio greater than the provided sigmas values. Will only be turned used if at least min_accepted measurements have been processed so far.
 /// If unsure, use the default: `FltResid::default()` in Rust, and `FltResid()` in Python (i.e. construct without arguments).
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
 #[cfg_attr(
     feature = "python",
     pyo3(text_signature = "(min_accepted=None, num_sigmas=None)")
@@ -81,6 +88,27 @@ impl FltResid {
 
     fn __str__(&self) -> String {
         format!("{self:?}")
+    }
+
+    fn dumps(&self, py: Python) -> Result<PyObject, NyxError> {
+        pythonize(py, &self).map_err(|e| NyxError::CustomError(e.to_string()))
+    }
+
+    fn __getstate__(&self, py: Python) -> Result<PyObject, NyxError> {
+        self.dumps(py)
+    }
+
+    fn __setstate__(&mut self, state: &PyAny) -> Result<(), ConfigError> {
+        *self = depythonize(state).map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
+        Ok(())
+    }
+
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, NyxError> {
+        match op {
+            CompareOp::Eq => Ok(self == other),
+            CompareOp::Ne => Ok(self != other),
+            _ => Err(NyxError::CustomError(format!("{op:?} not available"))),
+        }
     }
 }
 

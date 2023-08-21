@@ -48,6 +48,8 @@ use crate::io::ConfigError;
 #[cfg(feature = "python")]
 use crate::python::cosmic::Frame as PyFrame;
 #[cfg(feature = "python")]
+use pyo3::class::basic::CompareOp;
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
 #[cfg(feature = "python")]
 use pyo3::types::PyType;
@@ -1321,7 +1323,11 @@ impl Orbit {
                         .to_degrees(),
                     )
                 } else if self.ecc() > 1.0 {
-                    info!("computing the hyperbolic anomaly");
+                    info!(
+                        "computing the hyperbolic anomaly (ecc = {:.6} @ {})",
+                        self.ecc(),
+                        self.epoch
+                    );
                     // From GMAT's TrueToHyperbolicAnomaly
                     ((self.ta_deg().to_radians().sin() * (self.ecc().powi(2) - 1.0)).sqrt()
                         / (1.0 + self.ecc() * self.ta_deg().to_radians().cos()))
@@ -1591,8 +1597,12 @@ impl Orbit {
     }
 
     #[cfg(feature = "python")]
-    fn __eq__(&self, other: &Self) -> bool {
-        self == other
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, NyxError> {
+        match op {
+            CompareOp::Eq => Ok(self == other),
+            CompareOp::Ne => Ok(self != other),
+            _ => Err(NyxError::CustomError(format!("{op:?} not available"))),
+        }
     }
 
     /// Creates a new Orbit in the provided frame at the provided Epoch given the position and velocity components.

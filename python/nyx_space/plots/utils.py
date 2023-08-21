@@ -23,13 +23,13 @@ import numpy as np
 # Color blindness friendly colors, from https://jfly.uni-koeln.de/color/#pallet
 # And from https://davidmathlogic.com/colorblind/#%23E1BE6A-%2340B0A6-%237bcb12-%233d9087
 colors = {
-    "orange": (230, 159, 0),  # #e69f00
     "sky_blue": (86, 180, 233),  # #56b4e9
-    "green": (0, 158, 115),  # #009e73
-    "yellow": (240, 228, 66),  # #f0e442
-    "blue": (0, 114, 178),  # #0072b2
-    "red_ish": (213, 94, 0),  # #d55e00
     "purple": (204, 121, 167),  # #cc79a7
+    "green": (0, 158, 115),  # #009e73
+    "red_ish": (213, 94, 0),  # #d55e00
+    "orange": (230, 159, 0),  # #e69f00
+    "blue": (0, 114, 178),  # #0072b2
+    "yellow": (240, 228, 66),  # #f0e442
     "yellow2": (255, 194, 10),  # #ffc20a
     "blue2": (12, 123, 220),  # #0c7bdc
     "bright_green": (26, 255, 26),  # #1aff1a

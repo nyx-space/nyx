@@ -218,7 +218,7 @@ pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {
         serde_yaml::from_reader(reader).map_err(ConfigError::ParseError)
     }
 
-    // Builds a sequence of "Selves" from the provided string of a yaml
+    /// Builds a sequence of "Selves" from the provided string of a yaml
     fn loads_many(data: &str) -> Result<Vec<Self>, ConfigError> {
         debug!("Loading YAML:\n{data}");
         serde_yaml::from_str(data).map_err(ConfigError::ParseError)

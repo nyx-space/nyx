@@ -37,6 +37,7 @@ use super::Availability;
 /// In Python, any value that is set to None at initialization will use the default values.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
 #[cfg_attr(
     feature = "python",
     pyo3(

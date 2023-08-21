@@ -531,7 +531,12 @@ where
             }
         }
 
-        info!("Serialized {} states", states.len());
+        info!(
+            "Serialized {} states from {} to {}",
+            states.len(),
+            states.first().unwrap().epoch(),
+            states.last().unwrap().epoch()
+        );
 
         // Add all of the evaluated events
         if let Some(events) = events {

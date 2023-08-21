@@ -20,6 +20,8 @@ use crate::cosmic::SPEED_OF_LIGHT_KMS;
 use crate::io::watermark::pq_writer;
 use crate::io::{duration_from_str, duration_to_str, ConfigError, ConfigRepr, Configurable};
 use crate::md::prelude::Cosm;
+#[cfg(feature = "python")]
+use crate::python::pyo3utils::pyany_to_value;
 use crate::NyxError;
 use arrow::array::{ArrayRef, Float64Array, UInt32Array};
 use arrow::datatypes::{DataType, Field, Schema};
@@ -29,7 +31,9 @@ use parquet::arrow::ArrowWriter;
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 #[cfg(feature = "python")]
-use pyo3::types::PyType;
+use pyo3::types::{PyDict, PyList, PyType};
+#[cfg(feature = "python")]
+use pythonize::{depythonize, pythonize};
 use rand::{Rng, SeedableRng};
 use rand_distr::Normal;
 use rand_pcg::Pcg64Mcg;
@@ -58,6 +62,7 @@ use std::sync::Arc;
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass)]
 #[cfg_attr(feature = "python", pyo3(text_signature = "(tau, sigma, state_state)"))]
+#[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
 pub struct GaussMarkov {
     /// The time constant, tau gives the correlation time, or the time over which the intensity of the time correlation will fade to 1/e of its prior value. (This is sometimes incorrectly referred to as the "half-life" of the process.)
     #[serde(
@@ -354,8 +359,39 @@ impl GaussMarkov {
 
     #[cfg(feature = "python")]
     #[new]
-    fn py_new(tau: Duration, sigma: f64, steady_state: f64) -> Result<Self, ConfigError> {
-        Self::new(tau, sigma, steady_state)
+    fn py_new(
+        tau: Option<Duration>,
+        sigma: Option<f64>,
+        steady_state: Option<f64>,
+        bias: Option<f64>,
+        epoch: Option<Epoch>,
+    ) -> Result<Self, ConfigError> {
+        if tau.is_none() && sigma.is_none() && steady_state.is_none() {
+            // We're called from pickle, return a non initialized state
+            return Ok(Self::ZERO);
+        } else if tau.is_none() || sigma.is_none() || steady_state.is_none() {
+            return Err(ConfigError::InvalidConfig(format!(
+                "tau, sigma, and steady_state must be specified"
+            )));
+        }
+
+        let tau = tau.unwrap();
+        let sigma = sigma.unwrap();
+        let steady_state = steady_state.unwrap();
+
+        if tau <= Duration::ZERO {
+            return Err(ConfigError::InvalidConfig(format!(
+                "tau must be positive but got {tau}"
+            )));
+        }
+
+        Ok(Self {
+            tau,
+            bias_sigma: sigma,
+            steady_state_sigma: steady_state,
+            bias,
+            epoch,
+        })
     }
 
     #[cfg(feature = "python")]
@@ -365,9 +401,23 @@ impl GaussMarkov {
     }
 
     #[cfg(feature = "python")]
+    #[setter]
+    fn set_tau(&mut self, tau: Duration) -> PyResult<()> {
+        self.tau = tau;
+        Ok(())
+    }
+
+    #[cfg(feature = "python")]
     #[getter]
     fn get_bias(&self) -> Option<f64> {
         self.bias
+    }
+
+    #[cfg(feature = "python")]
+    #[setter]
+    fn set_sampling(&mut self, bias: f64) -> PyResult<()> {
+        self.bias_sigma = bias;
+        Ok(())
     }
 
     /// Initializes a new Gauss Markov process for the provided kind of model.
@@ -402,6 +452,75 @@ impl GaussMarkov {
     #[classmethod]
     fn white(_cls: &PyType, sigma: f64) -> Result<Self, NyxError> {
         Ok(Self::white_noise(sigma))
+    }
+
+    #[cfg(feature = "python")]
+    /// Loads the SpacecraftDynamics from its YAML representation
+    #[classmethod]
+    fn loads(_cls: &PyType, data: &PyAny) -> Result<Vec<Self>, ConfigError> {
+        if let Ok(as_list) = data.downcast::<PyList>() {
+            let mut selves = Vec::new();
+            for item in as_list.iter() {
+                // Check that the item is a dictionary
+                let next: Self = serde_yaml::from_value(pyany_to_value(item)?)
+                    .map_err(ConfigError::ParseError)?;
+                selves.push(next);
+            }
+            Ok(selves)
+        } else if let Ok(as_dict) = data.downcast::<PyDict>() {
+            let mut selves = Vec::new();
+            for item_as_list in as_dict.items() {
+                let v_any = item_as_list.get_item(1).or_else(|_| {
+                    Err(ConfigError::InvalidConfig(
+                        "could not get key from provided dictionary item".to_string(),
+                    ))
+                })?;
+
+                // Try to convert the underlying data
+                match pyany_to_value(v_any) {
+                    Ok(value) => {
+                        match serde_yaml::from_value(value) {
+                            Ok(next) => selves.push(next),
+                            Err(_) => {
+                                // Maybe this was to be parsed in full as a single item
+                                let me: Self = depythonize(data)
+                                    .map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
+                                selves.clear();
+                                selves.push(me);
+                                return Ok(selves);
+                            }
+                        }
+                    }
+                    Err(_) => {
+                        // Maybe this was to be parsed in full as a single item
+                        let me: Self = depythonize(data)
+                            .map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
+                        selves.clear();
+                        selves.push(me);
+                        return Ok(selves);
+                    }
+                }
+            }
+            Ok(selves)
+        } else {
+            depythonize(data).map_err(|e| ConfigError::InvalidConfig(e.to_string()))
+        }
+    }
+
+    #[cfg(feature = "python")]
+    fn dumps(&self, py: Python) -> Result<PyObject, NyxError> {
+        pythonize(py, &self).map_err(|e| NyxError::CustomError(e.to_string()))
+    }
+
+    #[cfg(feature = "python")]
+    fn __getstate__(&self, py: Python) -> Result<PyObject, NyxError> {
+        self.dumps(py)
+    }
+
+    #[cfg(feature = "python")]
+    fn __setstate__(&mut self, state: &PyAny) -> Result<(), ConfigError> {
+        *self = depythonize(state).map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
+        Ok(())
     }
 }
 

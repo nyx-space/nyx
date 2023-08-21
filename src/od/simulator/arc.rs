@@ -168,6 +168,7 @@ where
             prev: Option<Epoch>,
             end: Option<Epoch>,
         }
+
         let mut schedule: HashMap<String, ScheduleData> = HashMap::new();
 
         let mut start_trace_msg = HashSet::new();
