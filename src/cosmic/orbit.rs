@@ -1323,7 +1323,11 @@ impl Orbit {
                         .to_degrees(),
                     )
                 } else if self.ecc() > 1.0 {
-                    info!("computing the hyperbolic anomaly");
+                    info!(
+                        "computing the hyperbolic anomaly (ecc = {:.6} @ {})",
+                        self.ecc(),
+                        self.epoch
+                    );
                     // From GMAT's TrueToHyperbolicAnomaly
                     ((self.ta_deg().to_radians().sin() * (self.ecc().powi(2) - 1.0)).sqrt()
                         / (1.0 + self.ecc() * self.ta_deg().to_radians().cos()))
