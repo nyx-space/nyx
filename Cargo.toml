@@ -62,7 +62,7 @@ numpy = { version = "0.19", optional = true }
 indicatif = { version = "0.17", features = ["rayon"] }
 rstats = "1.2.50"
 thiserror = "1.0"
-parquet = { version = "45.0.0", default-features = false, features = [
+parquet = { version = "46.0.0", default-features = false, features = [
     "arrow",
     "brotli",
 ] }
