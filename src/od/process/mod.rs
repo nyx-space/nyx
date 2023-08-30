@@ -26,7 +26,6 @@ pub use crate::od::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::propagators::PropInstance;
 pub use crate::time::{Duration, Unit};
-use crate::State;
 mod conf;
 pub use conf::{IterationConf, SmoothingArc};
 mod trigger;
