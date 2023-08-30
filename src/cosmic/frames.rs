@@ -196,6 +196,20 @@ impl fmt::Display for Frame {
     }
 }
 
+impl Default for Frame {
+    /// Builds a default WGS84 Geoid reference frame
+    fn default() -> Self {
+        Self::Geoid {
+            gm: 0.0_f64, // TODO
+            flattening: 1.0 / 298.257223563,
+            semi_major_radius: 6378137.0,
+            equatorial_radius: 0.0_f64, // TODO
+            ephem_path: [None, None, None],
+            frame_path: [None, None, None],
+        }
+    }
+}
+
 #[allow(non_snake_case, clippy::upper_case_acronyms)]
 impl fmt::Debug for Frame {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
