@@ -1,11 +1,6 @@
 name: Rust performance
 
 on:
-  push:
-    branches:
-      - master
-    tags:
-      - "*"
   workflow_dispatch:
 
 env:
@@ -59,7 +54,7 @@ jobs:
     - name: Run flamegraph
       run: |
         sudo sysctl kernel.perf_event_paranoid=-1
-        sudo flamegraph -o flame-${{ matrix.test }}.svg -- ${{ steps.executable.outputs.exec }} ${{ matrix.test }}
+        flamegraph -o flame-${{ matrix.test }}.svg -- ${{ steps.executable.outputs.exec }} ${{ matrix.test }}
     
     - name: Upload python tests HTMLs
       uses: actions/upload-artifact@v3
