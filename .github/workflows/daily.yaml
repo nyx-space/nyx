@@ -61,7 +61,7 @@ jobs:
               RUSTFLAGS: "-Cinstrument-coverage"
               LLVM_PROFILE_FILE: "target/coverage/nyx_space-%p-%m.profraw"
             run: |
-              cargo test -- orbit_determination
+              cargo test -- orbit_determination::trackingarc orbit_determination::filtererrors orbit_determination::measurements orbit_determination::simulator orbit_determination::spacecraft
               grcov . --binary-path ./target/debug/ -t lcov -s . --keep-only 'src/*' > lcov-od.txt
           
           - name: Generate coverage report for propulsion integr. tests
