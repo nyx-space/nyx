@@ -47,18 +47,34 @@ impl GroundTrackingArcSim {
         trajectory: TrajectoryLoader,
         configs: HashMap<String, TrkConfig>,
         seed: u64,
+        allow_overlap: Option<bool>,
     ) -> Result<Self, NyxError> {
         // Try to convert the dynamic trajectory into a trajectory
         let inner = if let Ok(sc_traj) = trajectory.to_traj::<Spacecraft>() {
-            Either::Left(
-                TrackingArcSim::with_seed(devices, sc_traj, configs, seed)
-                    .map_err(NyxError::ConfigError)?,
-            )
+            let mut inner = TrackingArcSim::with_seed(devices, sc_traj, configs, seed)
+                .map_err(NyxError::ConfigError)?;
+
+            if let Some(allow_overlap) = allow_overlap {
+                if allow_overlap {
+                    inner.allow_overlap();
+                } else {
+                    inner.disallow_overlap();
+                }
+            }
+            Either::Left(inner)
         } else if let Ok(traj) = trajectory.to_traj::<Orbit>() {
-            Either::Right(
-                TrackingArcSim::with_seed(devices, traj, configs, seed)
-                    .map_err(NyxError::ConfigError)?,
-            )
+            let inner = TrackingArcSim::with_seed(devices, traj, configs, seed)
+                .map_err(NyxError::ConfigError)?;
+
+            if let Some(allow_overlap) = allow_overlap {
+                if allow_overlap {
+                    inner.allow_overlap();
+                } else {
+                    inner.disallow_overlap();
+                }
+            }
+
+            Either::Right(inner)
         } else {
             return Err(NyxError::CustomError("Provided trajectory could neither be parsed as an orbit trajectory or a spacecraft trajectory".to_string()));
         };

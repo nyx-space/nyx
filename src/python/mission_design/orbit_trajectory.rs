@@ -69,6 +69,13 @@ impl OrbitTraj {
         Ok(Self { inner })
     }
 
+    /// Copies this object and rebuilds it with the provided epochs
+    fn rebuild(&self, epochs: &[Epoch]) -> Result<Self, NyxError> {
+        let inner = self.inner.rebuild(epochs)?;
+
+        Ok(Self { inner })
+    }
+
     /// Finds a specific event in a trajectory.
     ///
     /// If a start or end epoch is provided (or both are provided), this function will return a list of a single event.

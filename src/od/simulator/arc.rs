@@ -156,6 +156,11 @@ where
         self.allow_overlap = false;
     }
 
+    /// Allows overlapping measurements
+    pub fn allow_overlap(&mut self) {
+        self.allow_overlap = true;
+    }
+
     /// Generates measurements from the simulated tracking arc.
     ///
     /// Notes:
