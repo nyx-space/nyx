@@ -1,6 +1,7 @@
 name: Daily Workflow
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: '0 0 * * *' # Run at midnight every day
 
