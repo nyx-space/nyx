@@ -38,12 +38,6 @@ use super::Availability;
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass)]
 #[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
-#[cfg_attr(
-    feature = "python",
-    pyo3(
-        text_signature = "(start=None, end=None, schedule_on=None, schedule_off=None, sampling=None)"
-    )
-)]
 pub struct TrkConfig {
     /// Availability configuration to start the tracking arc
     #[serde(default)]

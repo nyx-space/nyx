@@ -34,10 +34,6 @@ use std::sync::Arc;
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass)]
 #[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
-#[cfg_attr(
-    feature = "python",
-    pyo3(text_signature = "(min_accepted=None, num_sigmas=None)")
-)]
 pub struct FltResid {
     /// Minimum number of accepted measurements before applying the rejection criteria.
     pub min_accepted: usize,
@@ -49,6 +45,7 @@ pub struct FltResid {
 #[pymethods]
 impl FltResid {
     #[new]
+    #[pyo3(text_signature = "(min_accepted=None, num_sigmas=None)")]
     fn py_new(min_accepted: Option<usize>, num_sigmas: Option<f64>) -> Self {
         let mut me = Self::default();
         if let Some(min_accepted) = min_accepted {

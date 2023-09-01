@@ -43,6 +43,9 @@ impl TrkConfig {
     }
 
     #[new]
+    #[pyo3(
+        text_signature = "(start=None, end=None, schedule_on=None, schedule_off=None, sampling=None)"
+    )]
     fn py_new(
         start: Option<String>,
         end: Option<String>,

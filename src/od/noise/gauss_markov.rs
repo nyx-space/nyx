@@ -61,7 +61,6 @@ use std::sync::Arc;
 /// This allows the users to model a white noise process without having to change the process type.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass)]
-#[cfg_attr(feature = "python", pyo3(text_signature = "(tau, sigma, state_state)"))]
 #[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
 pub struct GaussMarkov {
     /// The time constant, tau gives the correlation time, or the time over which the intensity of the time correlation will fade to 1/e of its prior value. (This is sometimes incorrectly referred to as the "half-life" of the process.)
@@ -359,6 +358,7 @@ impl GaussMarkov {
 
     #[cfg(feature = "python")]
     #[new]
+    #[pyo3(text_signature = "(tau, sigma, state_state)")]
     fn py_new(
         tau: Option<Duration>,
         sigma: Option<f64>,

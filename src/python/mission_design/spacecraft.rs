@@ -35,6 +35,9 @@ use pythonize::{depythonize, pythonize};
 impl Spacecraft {
     /// Initialize a new Spacecraft with optional thruster, mode, SRP, and Drag parameters.
     #[new]
+    #[pyo3(
+        text_signature = "(orbit, dry_mass_kg, fuel_mass_kg, srp_area_m2, drag_area_m2, cr, cd, thruster, mode)"
+    )]
     pub fn py_new(
         orbit: Option<Orbit>,
         dry_mass_kg: Option<f64>,
@@ -149,6 +152,7 @@ impl Spacecraft {
 #[pymethods]
 impl SrpConfig {
     #[new]
+    #[pyo3(text_signature = "(area_m2, cr=1.8)")]
     pub fn py_new(area_m2: Option<f64>, cr: Option<f64>) -> Self {
         Self {
             area_m2: area_m2.unwrap_or(0.0),
@@ -207,6 +211,7 @@ impl SrpConfig {
 #[pymethods]
 impl DragConfig {
     #[new]
+    #[pyo3(text_signature = "(area_m2, cd=2.2)")]
     pub fn py_new(area_m2: Option<f64>, cd: Option<f64>) -> Self {
         Self {
             area_m2: area_m2.unwrap_or(0.0),

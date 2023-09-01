@@ -596,6 +596,25 @@ where
         Ok(traj)
     }
 
+    /// Rebuilds this trajectory with the provided epochs.
+    /// This may lead to aliasing due to the Nyquist–Shannon sampling theorem.
+    pub fn rebuild(&self, epochs: &[Epoch]) -> Result<Self, NyxError> {
+        if self.states.is_empty() {
+            return Err(NyxError::Trajectory(TrajError::CreationError(
+                "No trajectory to convert".to_string(),
+            )));
+        }
+
+        let mut traj = Self::new();
+        for epoch in epochs {
+            traj.states.push(self.at(*epoch)?);
+        }
+
+        traj.finalize();
+
+        Ok(traj)
+    }
+
     /// Export the difference in RIC from of this trajectory compare to the "other" trajectory in parquet format.
     ///
     /// # Notes

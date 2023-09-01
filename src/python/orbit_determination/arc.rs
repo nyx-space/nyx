@@ -16,8 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::collections::HashMap;
-
 use crate::cosmic::Cosm;
 use crate::io::trajectory_data::TrajectoryLoader;
 use crate::io::ExportCfg;
@@ -25,13 +23,18 @@ use crate::od::msr::RangeDoppler;
 use crate::od::simulator::TrackingArcSim;
 pub use crate::od::simulator::TrkConfig;
 pub use crate::{io::ConfigError, od::prelude::GroundStation};
-use crate::{NyxError, Spacecraft};
+use crate::{NyxError, Orbit, Spacecraft};
+use either::Either;
 use pyo3::prelude::*;
+use std::collections::HashMap;
 
 #[derive(Clone)]
 #[pyclass]
 pub struct GroundTrackingArcSim {
-    inner: TrackingArcSim<Spacecraft, RangeDoppler, GroundStation>,
+    inner: Either<
+        TrackingArcSim<Spacecraft, RangeDoppler, GroundStation>,
+        TrackingArcSim<Orbit, RangeDoppler, GroundStation>,
+    >,
 }
 
 #[pymethods]
@@ -43,14 +46,37 @@ impl GroundTrackingArcSim {
         trajectory: TrajectoryLoader,
         configs: HashMap<String, TrkConfig>,
         seed: u64,
+        allow_overlap: Option<bool>,
     ) -> Result<Self, NyxError> {
-        // Try to convert the dynamic trajectory into an Orbit trajectory
-        let traj = trajectory
-            .to_traj()
-            .map_err(|e| NyxError::CustomError(e.to_string()))?;
+        // Try to convert the dynamic trajectory into a trajectory
+        let inner = if let Ok(sc_traj) = trajectory.to_traj::<Spacecraft>() {
+            let mut inner = TrackingArcSim::with_seed(devices, sc_traj, configs, seed)
+                .map_err(NyxError::ConfigError)?;
 
-        let inner = TrackingArcSim::with_seed(devices, traj, configs, seed)
-            .map_err(NyxError::ConfigError)?;
+            if let Some(allow_overlap) = allow_overlap {
+                if allow_overlap {
+                    inner.allow_overlap();
+                } else {
+                    inner.disallow_overlap();
+                }
+            }
+            Either::Left(inner)
+        } else if let Ok(traj) = trajectory.to_traj::<Orbit>() {
+            let mut inner = TrackingArcSim::with_seed(devices, traj, configs, seed)
+                .map_err(NyxError::ConfigError)?;
+
+            if let Some(allow_overlap) = allow_overlap {
+                if allow_overlap {
+                    inner.allow_overlap();
+                } else {
+                    inner.disallow_overlap();
+                }
+            }
+
+            Either::Right(inner)
+        } else {
+            return Err(NyxError::CustomError("Provided trajectory could neither be parsed as an orbit trajectory or a spacecraft trajectory".to_string()));
+        };
 
         Ok(Self { inner })
     }
@@ -64,7 +90,10 @@ impl GroundTrackingArcSim {
         export_cfg: ExportCfg,
     ) -> Result<String, NyxError> {
         let cosm = Cosm::de438();
-        let arc = self.inner.generate_measurements(cosm)?;
+        let arc = match &mut self.inner {
+            Either::Left(arc_sim) => arc_sim.generate_measurements(cosm)?,
+            Either::Right(arc_sim) => arc_sim.generate_measurements(cosm)?,
+        };
 
         // Save the tracking arc
         let maybe = arc.to_parquet(path, export_cfg);
