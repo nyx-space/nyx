@@ -493,8 +493,16 @@ where
                     self.prop.details.step
                 });
 
-                // Remove old states from the trajectory
-                traj.states.retain(|state: &S| state.epoch() <= epoch);
+                // Remove old states from the trajectory (this is a manual implementation of `retaint` because we know it's a sorted vec)
+                // traj.states.retain(|state: &S| state.epoch() <= epoch);
+                let mut index = traj.states.len();
+                while index > 0 {
+                    index -= 1;
+                    if traj.states[index].epoch() > epoch {
+                        break;
+                    }
+                }
+                traj.states.truncate(index);
 
                 debug!("advancing propagator by {next_step_size} (Δt to next msr: {delta_t})");
                 let (_, traj_covar) = self.prop.for_duration_with_traj(next_step_size)?;
