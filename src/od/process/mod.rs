@@ -498,7 +498,7 @@ where
                 let mut index = traj.states.len();
                 while index > 0 {
                     index -= 1;
-                    if traj.states[index].epoch() > epoch {
+                    if traj.states[index].epoch() >= epoch {
                         break;
                     }
                 }
