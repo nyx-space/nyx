@@ -466,7 +466,7 @@ where
         info!("Processing {num_msrs} measurements with covariance mapping");
 
         // We'll build a trajectory of the estimated states. This will be used to compute the measurements.
-        let mut traj = Traj::new();
+        let mut traj: Traj<S> = Traj::new();
 
         let mut msr_accepted_cnt = 0;
 
