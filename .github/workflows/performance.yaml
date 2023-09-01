@@ -52,6 +52,7 @@ jobs:
 
     - name: Install flamegraph
       run: |
+        sudo apt-get update
         sudo apt install linux-tools-common linux-tools-generic linux-tools-`uname -r`
         cargo install flamegraph
     
