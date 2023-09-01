@@ -56,10 +56,10 @@ jobs:
         cargo install flamegraph
     
     - name: Run flamegraph
-      run: flamegraph -o ~/flame-${{ matrix.test }}.svg -- ${{ steps.executable.outputs.exec }} ${{ matrix.test }}
+      run: flamegraph -o flame-${{ matrix.test }}.svg -- ${{ steps.executable.outputs.exec }} ${{ matrix.test }}
     
     - name: Upload python tests HTMLs
       uses: actions/upload-artifact@v3
       with:
         name: flamegraph
-        path: *.svg
+        path: flame-*.svg
