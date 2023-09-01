@@ -1,0 +1,65 @@
+name: Rust performance
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - "*"
+  workflow_dispatch:
+
+env:
+  RUST_BACKTRACE: 1
+
+jobs:
+
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        test: [od_robust_test_ekf_realistic_two_way, traj_spacecraft, gmat_val_leo_day_adaptive, stop_cond_nrho_apo]
+    
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install stable toolchain
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: 1.72
+
+    - name: Set up cargo cache
+      uses: actions/cache@v3
+      continue-on-error: false
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: perf-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: perf-cargo-
+
+    - name: Run cargo test
+      run: cargo test --no-run ${{ matrix.test }}
+
+    - name: Parse executable 
+      id: executable
+      run: |
+        executable=$(echo "${{ steps.test.outputs.stdout }}" | awk '/^  Executable / { match($0, /Executable .* (\S+) \(/, groups); print groups[1] }')
+        echo "::set-output name=exec::$executable"
+
+    - name: Install flamegraph
+      run: |
+        apt install linux-tools-common linux-tools-generic linux-tools-`uname -r`
+        cargo install flamegraph
+    
+    - name: Run flamegraph
+      run: flamegraph -o flame-${{ matrix.test }}.svg -- ${{ steps.executable.outputs.exec }} ${{ matrix.test }}
+    
+    - name: Upload python tests HTMLs
+      uses: actions/upload-artifact@v3
+      with:
+        name: flamegraph
+        path: flame-*.svg

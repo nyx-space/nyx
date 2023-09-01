@@ -466,7 +466,7 @@ where
         info!("Processing {num_msrs} measurements with covariance mapping");
 
         // We'll build a trajectory of the estimated states. This will be used to compute the measurements.
-        let mut traj = Traj::new();
+        let mut traj: Traj<S> = Traj::new();
 
         let mut msr_accepted_cnt = 0;
 
@@ -493,8 +493,16 @@ where
                     self.prop.details.step
                 });
 
-                // Remove old states from the trajectory
-                traj.states.retain(|state: &S| state.epoch() <= epoch);
+                // Remove old states from the trajectory (this is a manual implementation of `retaint` because we know it's a sorted vec)
+                // traj.states.retain(|state: &S| state.epoch() <= epoch);
+                let mut index = traj.states.len();
+                while index > 0 {
+                    index -= 1;
+                    if traj.states[index].epoch() > epoch {
+                        break;
+                    }
+                }
+                traj.states.truncate(index);
 
                 debug!("advancing propagator by {next_step_size} (Δt to next msr: {delta_t})");
                 let (_, traj_covar) = self.prop.for_duration_with_traj(next_step_size)?;
