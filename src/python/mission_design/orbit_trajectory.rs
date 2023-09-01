@@ -70,8 +70,8 @@ impl OrbitTraj {
     }
 
     /// Copies this object and rebuilds it with the provided epochs
-    fn rebuild(&self, epochs: &[Epoch]) -> Result<Self, NyxError> {
-        let inner = self.inner.rebuild(epochs)?;
+    fn rebuild(&self, epochs: Vec<Epoch>) -> Result<Self, NyxError> {
+        let inner = self.inner.rebuild(&epochs)?;
 
         Ok(Self { inner })
     }

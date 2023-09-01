@@ -64,12 +64,6 @@ use pyo3::prelude::*;
 /// Configuration for exporting a trajectory to parquet.
 #[derive(Clone, Default, Serialize, Deserialize, TypedBuilder)]
 #[cfg_attr(feature = "python", pyclass)]
-#[cfg_attr(
-    feature = "python",
-    pyo3(
-        text_signature = "(timestamp=None, fields=None, start_epoch=None, step=None, end_epoch=None, metadata=None)"
-    )
-)]
 pub struct ExportCfg {
     /// Fields to export, if unset, defaults to all possible fields.
     #[builder(default, setter(strip_option))]
@@ -147,6 +141,9 @@ impl ExportCfg {
 #[pymethods]
 impl ExportCfg {
     #[new]
+    #[pyo3(
+        text_signature = "(timestamp=None, fields=None, start_epoch=None, step=None, end_epoch=None, metadata=None)"
+    )]
     fn py_new(
         timestamp: Option<bool>,
         fields: Option<Vec<StateParameter>>,

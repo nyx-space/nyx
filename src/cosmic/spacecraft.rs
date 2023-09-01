@@ -83,12 +83,6 @@ impl From<GuidanceMode> for f64 {
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "python", pyclass)]
 #[cfg_attr(feature = "python", pyo3(module = "nyx_space.cosmic"))]
-#[cfg_attr(
-    feature = "python",
-    pyo3(
-        text_signature = "(orbit, dry_mass_kg, fuel_mass_kg, srp_area_m2, drag_area_m2, cr, cd, thruster, mode)"
-    )
-)]
 pub struct Spacecraft {
     /// Initial orbit the vehicle is in
     #[serde(deserialize_with = "orbit_from_str")]
@@ -127,7 +121,6 @@ impl Default for Spacecraft {
 }
 
 #[cfg_attr(feature = "python", pyclass)]
-#[cfg_attr(feature = "python", pyo3(text_signature = "(area_m2, cr=1.8)"))]
 #[cfg_attr(feature = "python", pyo3(module = "nyx_space.cosmic"))]
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 /// The Solar Radiation Pressure configuration for a spacecraft
@@ -158,7 +151,6 @@ impl Default for SrpConfig {
 }
 
 #[cfg_attr(feature = "python", pyclass)]
-#[cfg_attr(feature = "python", pyo3(text_signature = "(area_m2, cd=2.2)"))]
 #[cfg_attr(feature = "python", pyo3(module = "nyx_space.cosmic"))]
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 /// The drag configuration for a spacecraft

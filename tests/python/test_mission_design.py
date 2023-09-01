@@ -97,6 +97,19 @@ def test_propagate():
     # Resample the trajectory at fixed step size of 25 seconds
     traj = traj.resample(Unit.Second * 25.0)
 
+    # Rebuild the trajectory with specific epochs
+    ts = TimeSeries(
+        traj.first().epoch,
+        traj.last().epoch,
+        step=Duration("0.3 min 56 s 15 ns"),
+        inclusive=True,
+    )
+    epochs = [epoch for epoch in ts]
+    rebuilt_traj = traj.rebuild(epochs[1:-1])
+    assert rebuilt_traj.first().epoch == epochs[1]
+    assert rebuilt_traj.last().epoch == epochs[-2]
+
+
     # Export this trajectory with additional metadata and the events
     # Base path
     root = Path(__file__).joinpath("../../../").resolve()
@@ -311,5 +324,5 @@ def test_merge_traj():
 
 
 if __name__ == "__main__":
-    # test_propagate()
+    test_propagate()
     test_merge_traj()

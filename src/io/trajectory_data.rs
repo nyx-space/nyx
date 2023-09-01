@@ -44,10 +44,6 @@ use crate::cosmic::Cosm;
 /// A dynamic trajectory allows loading a trajectory Parquet file and converting it
 /// to the concrete trajectory state type when desired.
 #[cfg_attr(feature = "python", pyclass)]
-#[cfg_attr(
-    feature = "python",
-    pyo3(text_signature = "(path, format='parquet', parquet_path=None, spacecraft_template=None)")
-)]
 #[cfg_attr(feature = "python", pyo3(module = "nyx_space.mission_design"))]
 #[derive(Clone, PartialEq)]
 pub struct TrajectoryLoader {
@@ -276,6 +272,9 @@ impl Display for TrajectoryLoader {
 impl TrajectoryLoader {
     /// Initializes a new dynamic trajectory from the provided file, and the format kind
     #[new]
+    #[pyo3(
+        text_signature = "(path, format='parquet', parquet_path=None, spacecraft_template=None)"
+    )]
     fn new(
         path: String,
         format: Option<String>,

@@ -51,12 +51,6 @@ where
 /// Defines a state parameter event finder
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "python", pyclass)]
-#[cfg_attr(
-    feature = "python",
-    pyo3(
-        text_signature = "(parameter, desired_value, epoch_precision=None, value_precision=None)"
-    )
-)]
 pub struct Event {
     /// The state parameter
     pub parameter: StateParameter,

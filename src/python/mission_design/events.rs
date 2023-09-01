@@ -25,6 +25,9 @@ use hifitime::Unit;
 impl Event {
     /// Initializes a new event. Arguments are "parameter: StateParameter" and "desired_value: float".
     #[new]
+    #[pyo3(
+        text_signature = "(parameter, desired_value, epoch_precision=None, value_precision=None)"
+    )]
     fn py_new(
         parameter: StateParameter,
         desired_value: f64,

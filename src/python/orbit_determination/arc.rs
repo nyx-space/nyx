@@ -19,7 +19,6 @@
 use crate::cosmic::Cosm;
 use crate::io::trajectory_data::TrajectoryLoader;
 use crate::io::ExportCfg;
-use crate::md::prelude::Traj;
 use crate::od::msr::RangeDoppler;
 use crate::od::simulator::TrackingArcSim;
 pub use crate::od::simulator::TrkConfig;
@@ -63,7 +62,7 @@ impl GroundTrackingArcSim {
             }
             Either::Left(inner)
         } else if let Ok(traj) = trajectory.to_traj::<Orbit>() {
-            let inner = TrackingArcSim::with_seed(devices, traj, configs, seed)
+            let mut inner = TrackingArcSim::with_seed(devices, traj, configs, seed)
                 .map_err(NyxError::ConfigError)?;
 
             if let Some(allow_overlap) = allow_overlap {

@@ -36,7 +36,6 @@ use super::ConfigError;
 /// An estimate of an orbit with its covariance, the latter should be a numpy array of size 36.
 #[derive(Debug, Clone, PartialEq)]
 #[pyclass]
-#[pyo3(text_signature = "(nominal_orbit, covariance)")]
 pub(crate) struct OrbitEstimate(pub(crate) KfEstimate<Orbit>);
 
 impl Configurable for OrbitEstimate {
@@ -60,6 +59,7 @@ impl Configurable for OrbitEstimate {
 #[pymethods]
 impl OrbitEstimate {
     #[new]
+    #[pyo3(text_signature = "(nominal_orbit, covariance)")]
     fn new(nominal: Orbit, covar: PyReadonlyArrayDyn<f64>) -> Result<Self, NyxError> {
         // Check the shape of the input
         let mat6 = match covar.shape() {
