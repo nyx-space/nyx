@@ -22,8 +22,12 @@ use std::convert::TryFrom;
 use std::default::Default;
 use std::fmt;
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
 /// Defines the stopping condition for the smoother
 #[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "python", pyclass)]
 pub enum SmoothingArc {
     /// Stop smoothing when the gap between estimate is the provided floating point number in seconds
     TimeGap(Duration),
@@ -33,6 +37,43 @@ pub enum SmoothingArc {
     Prediction,
     /// Only stop once all estimates have been processed
     All,
+}
+
+#[cfg(feature = "python")]
+#[pymethods]
+impl SmoothingArc {
+    #[new]
+    fn py_new(
+        strategy: Option<Epoch>,
+        duration: Option<Duration>,
+        epoch: Option<Epoch>,
+    ) -> Result<Self, NyxError> {
+        if let Some(strategy) = strategy {
+            match strategy.to_lowercase().trim() {
+                "all" => Ok(Self::All),
+                "prediction" => Ok(Self::Prediction),
+                _ => Err(NyxError::CustomError(format!(
+                    "strategy should be `all` or `prediction`"
+                ))),
+            }
+        } else if Some(duration) = duration {
+            Ok(Self::TimeGap(duration))
+        } else if Some(epoch) = epoch {
+            Ok(Self::Epoch(epoch))
+        } else {
+            Err(NyxError::CustomError(
+                "Smoothing arc strategy not specified",
+            ))
+        }
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self}")
+    }
+
+    fn __str__(&self) -> String {
+        format!("Smoothing {self}")
+    }
 }
 
 impl fmt::Display for SmoothingArc {
@@ -49,6 +90,7 @@ impl fmt::Display for SmoothingArc {
 /// Defines a filter iteration configuration. Allows iterating on an OD solution until convergence criteria is met.
 /// The root mean squared of the prefit residuals ratios is used to assess convergence between iterations.
 #[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "python", pyclass)]
 pub struct IterationConf {
     /// The number of measurements to account for in the iteration
     pub smoother: SmoothingArc,
@@ -71,6 +113,52 @@ impl IterationConf {
             max_iterations: 1,
             ..Default::default()
         }
+    }
+}
+
+#[cfg(feature = "python")]
+#[pymethods]
+impl IterationConf {
+    #[new]
+    fn py_new(
+        smoother: SmoothingArc,
+        absolute_tol: Option<f64>,
+        relative_tol: Option<f64>,
+        max_iterations: Option<usize>,
+        max_divergences: Option<usize>,
+        force_failure: Option<bool>,
+    ) -> Self {
+        let mut me = Self::default();
+        me.smoother = smoother;
+        if let Some(abs_tol) = absolute_tol {
+            me.absolute_tol = abs_tol;
+        }
+
+        if let Some(rel_tol) = relative_tol {
+            me.relative_tol = rel_toll
+        }
+
+        if let Some(max_it) = max_iterations {
+            me.max_iterations = max_it;
+        }
+
+        if let Some(max_div) = max_divergences {
+            me.max_divergences = max_div;
+        }
+
+        if let Some(force_failure) = force_failure {
+            me.force_failure = force_failure;
+        }
+
+        me
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self}")
+    }
+
+    fn __str__(&self) -> String {
+        format!("Smoothing {self}")
     }
 }
 
