@@ -27,7 +27,6 @@ use pyo3::prelude::*;
 
 /// Defines the stopping condition for the smoother
 #[derive(Clone, Copy, Debug)]
-#[cfg_attr(feature = "python", pyclass)]
 pub enum SmoothingArc {
     /// Stop smoothing when the gap between estimate is the provided floating point number in seconds
     TimeGap(Duration),
@@ -37,43 +36,6 @@ pub enum SmoothingArc {
     Prediction,
     /// Only stop once all estimates have been processed
     All,
-}
-
-#[cfg(feature = "python")]
-#[pymethods]
-impl SmoothingArc {
-    #[new]
-    fn py_new(
-        strategy: Option<Epoch>,
-        duration: Option<Duration>,
-        epoch: Option<Epoch>,
-    ) -> Result<Self, NyxError> {
-        if let Some(strategy) = strategy {
-            match strategy.to_lowercase().trim() {
-                "all" => Ok(Self::All),
-                "prediction" => Ok(Self::Prediction),
-                _ => Err(NyxError::CustomError(format!(
-                    "strategy should be `all` or `prediction`"
-                ))),
-            }
-        } else if Some(duration) = duration {
-            Ok(Self::TimeGap(duration))
-        } else if Some(epoch) = epoch {
-            Ok(Self::Epoch(epoch))
-        } else {
-            Err(NyxError::CustomError(
-                "Smoothing arc strategy not specified",
-            ))
-        }
-    }
-
-    fn __repr__(&self) -> String {
-        format!("{self}")
-    }
-
-    fn __str__(&self) -> String {
-        format!("Smoothing {self}")
-    }
 }
 
 impl fmt::Display for SmoothingArc {
@@ -121,21 +83,41 @@ impl IterationConf {
 impl IterationConf {
     #[new]
     fn py_new(
-        smoother: SmoothingArc,
+        strategy: Option<String>,
+        duration: Option<Duration>,
+        epoch: Option<Epoch>,
         absolute_tol: Option<f64>,
         relative_tol: Option<f64>,
         max_iterations: Option<usize>,
         max_divergences: Option<usize>,
         force_failure: Option<bool>,
-    ) -> Self {
+    ) -> Result<Self, NyxError> {
         let mut me = Self::default();
-        me.smoother = smoother;
+        me.smoother = if let Some(strategy) = strategy {
+            match strategy.to_lowercase().trim() {
+                "all" => SmoothingArc::All,
+                "prediction" => SmoothingArc::Prediction,
+                _ => {
+                    return Err(NyxError::CustomError(format!(
+                        "strategy should be `all` or `prediction`"
+                    )))
+                }
+            }
+        } else if let Some(duration) = duration {
+            SmoothingArc::TimeGap(duration)
+        } else if let Some(epoch) = epoch {
+            SmoothingArc::Epoch(epoch)
+        } else {
+            return Err(NyxError::CustomError(
+                "Smoothing arc strategy not specified".to_string(),
+            ));
+        };
         if let Some(abs_tol) = absolute_tol {
             me.absolute_tol = abs_tol;
         }
 
         if let Some(rel_tol) = relative_tol {
-            me.relative_tol = rel_toll
+            me.relative_tol = rel_tol;
         }
 
         if let Some(max_it) = max_iterations {
@@ -150,7 +132,7 @@ impl IterationConf {
             me.force_failure = force_failure;
         }
 
-        me
+        Ok(me)
     }
 
     fn __repr__(&self) -> String {
