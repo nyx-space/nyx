@@ -22,6 +22,9 @@ use std::convert::TryFrom;
 use std::default::Default;
 use std::fmt;
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
 /// Defines the stopping condition for the smoother
 #[derive(Clone, Copy, Debug)]
 pub enum SmoothingArc {
@@ -49,6 +52,7 @@ impl fmt::Display for SmoothingArc {
 /// Defines a filter iteration configuration. Allows iterating on an OD solution until convergence criteria is met.
 /// The root mean squared of the prefit residuals ratios is used to assess convergence between iterations.
 #[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "python", pyclass)]
 pub struct IterationConf {
     /// The number of measurements to account for in the iteration
     pub smoother: SmoothingArc,
@@ -71,6 +75,72 @@ impl IterationConf {
             max_iterations: 1,
             ..Default::default()
         }
+    }
+}
+
+#[cfg(feature = "python")]
+#[pymethods]
+impl IterationConf {
+    #[new]
+    fn py_new(
+        strategy: Option<String>,
+        duration: Option<Duration>,
+        epoch: Option<Epoch>,
+        absolute_tol: Option<f64>,
+        relative_tol: Option<f64>,
+        max_iterations: Option<usize>,
+        max_divergences: Option<usize>,
+        force_failure: Option<bool>,
+    ) -> Result<Self, NyxError> {
+        let mut me = Self::default();
+        me.smoother = if let Some(strategy) = strategy {
+            match strategy.to_lowercase().trim() {
+                "all" => SmoothingArc::All,
+                "prediction" => SmoothingArc::Prediction,
+                _ => {
+                    return Err(NyxError::CustomError(format!(
+                        "strategy should be `all` or `prediction`"
+                    )))
+                }
+            }
+        } else if let Some(duration) = duration {
+            SmoothingArc::TimeGap(duration)
+        } else if let Some(epoch) = epoch {
+            SmoothingArc::Epoch(epoch)
+        } else {
+            return Err(NyxError::CustomError(
+                "Smoothing arc strategy not specified".to_string(),
+            ));
+        };
+        if let Some(abs_tol) = absolute_tol {
+            me.absolute_tol = abs_tol;
+        }
+
+        if let Some(rel_tol) = relative_tol {
+            me.relative_tol = rel_tol;
+        }
+
+        if let Some(max_it) = max_iterations {
+            me.max_iterations = max_it;
+        }
+
+        if let Some(max_div) = max_divergences {
+            me.max_divergences = max_div;
+        }
+
+        if let Some(force_failure) = force_failure {
+            me.force_failure = force_failure;
+        }
+
+        Ok(me)
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self}")
+    }
+
+    fn __str__(&self) -> String {
+        format!("Smoothing {self}")
     }
 }
 

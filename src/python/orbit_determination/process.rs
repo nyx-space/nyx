@@ -26,7 +26,7 @@ use crate::{
     md::prelude::{Cosm, Propagator, SpacecraftDynamics},
     od::{
         filter::kalman::KF,
-        process::{EkfTrigger, FltResid, ODProcess},
+        process::{EkfTrigger, FltResid, IterationConf, ODProcess},
     },
     NyxError, Spacecraft,
 };
@@ -54,8 +54,8 @@ pub(crate) fn process_tracking_arc(
     predict_for: Option<Duration>,
     predict_step: Option<Duration>,
     fixed_step: Option<bool>,
+    iter_conf: Option<IterationConf>,
 ) -> Result<String, NyxError> {
-    // TODO: Return a navigation trajectory or use a class that mimics the better ODProcess -- https://github.com/nyx-space/nyx/issues/134
     let msr_noise = Matrix2::from_iterator(measurement_noise);
 
     let init_sc = spacecraft.with_orbit(initial_estimate.0.nominal_state.with_stm());
@@ -83,18 +83,20 @@ pub(crate) fn process_tracking_arc(
 
     let concrete_arc = arc.to_tracking_arc()?;
 
-    odp.process_arc::<GroundStation>(&concrete_arc).unwrap();
+    odp.process_arc::<GroundStation>(&concrete_arc)?;
+
+    if let Some(iter_conf) = iter_conf {
+        odp.iterate_arc::<GroundStation>(&concrete_arc, iter_conf)?;
+    }
 
     if let Some(epoch) = predict_until {
         let max_step =
             predict_step.ok_or_else(|| NyxError::CustomError("predict_step unset".to_string()))?;
-        odp.predict_until(max_step, fixed_step.unwrap_or_else(|| false), epoch)
-            .unwrap();
+        odp.predict_until(max_step, fixed_step.unwrap_or_else(|| false), epoch)?;
     } else if let Some(duration) = predict_for {
         let max_step =
             predict_step.ok_or_else(|| NyxError::CustomError("predict_step unset".to_string()))?;
-        odp.predict_for(max_step, fixed_step.unwrap_or_else(|| false), duration)
-            .unwrap();
+        odp.predict_for(max_step, fixed_step.unwrap_or_else(|| false), duration)?;
     }
 
     let maybe = odp.to_parquet(
