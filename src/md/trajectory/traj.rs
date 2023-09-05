@@ -750,7 +750,7 @@ where
                     .transpose()
             };
 
-            let dcm_post = if ii == self_states.len() {
+            let dcm_post = if ii == self_states_post.len() {
                 dcm_cur
             } else {
                 self_states_post[ii]
