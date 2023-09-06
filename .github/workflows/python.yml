@@ -24,6 +24,11 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install Perl for openssl
+        run: | # Perl should just die by now
+          apt-get update
+          apt-get install -y libipc-run-safehandles-perl
+
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
