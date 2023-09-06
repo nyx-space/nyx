@@ -4,7 +4,7 @@ FROM opensuse/tumbleweed
 
 # Install Python 3.10 and other necessary packages
 RUN zypper ref && \
-    zypper -n in gcc make python310 python310-pip uuid-runtime perl perl-IPC-Run && \
+    zypper -n in gcc make python310 python310-pip uuid-runtime perl perl-IPC-System-Simple && \
     zypper clean
 
 WORKDIR /app
