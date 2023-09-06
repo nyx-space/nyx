@@ -68,7 +68,7 @@ def plot_traj(
     if not isinstance(dfs, list):
         dfs = [dfs]
 
-    for df in dfs:
+    for k, df in enumerate(dfs):
         print(df.describe())
         print(df.columns)
         color_values = list(colors.values())
@@ -78,7 +78,7 @@ def plot_traj(
                 df["y (km)"],
                 df["z (km)"],
                 df["Epoch:Gregorian UTC"],
-                color=color_values[len(fig.data) % len(color_values)],
+                color=color_values[k % len(color_values)],
                 name=title,
             )
         ]
