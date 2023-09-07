@@ -29,8 +29,8 @@ jobs:
         with:
           target: ${{ matrix.target }}
           args: --release --out dist --find-interpreter -F python
-          sccache: 'true'
-          manylinux: false
+          # sccache: 'true'
+          # manylinux: false
 
       - name: Upload wheels
         uses: actions/upload-artifact@v3
