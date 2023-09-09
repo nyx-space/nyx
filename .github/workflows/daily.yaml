@@ -31,7 +31,7 @@ jobs:
               LLVM_PROFILE_FILE: "target/coverage/nyx_space-%p-%m.profraw"
             run: |
               cargo test --lib
-              grcov . --binary-path ./target/debug/ -t lcov -s . --keep-only 'src/*' > lcov-lib.txt
+              grcov . --branch --binary-path ./target/debug/ -t lcov -s . --keep-only 'src/*' > ${{ github.workspace }}/lcov-lib.txt
         
           - name: Generate coverage report for doc tests
             env:
@@ -39,7 +39,7 @@ jobs:
                 LLVM_PROFILE_FILE: "target/coverage/nyx_space-%p-%m.profraw"
             run: |
                 cargo test --doc
-                grcov . --binary-path ./target/debug/ -t lcov -s . --keep-only 'src/*' > lcov-docs.txt
+                grcov . --branch --binary-path ./target/debug/ -t lcov -s . --keep-only 'src/*' > ${{ github.workspace }}/lcov-docs.txt
           
           - name: Generate coverage report for cosmic integr. tests
             env:
@@ -47,7 +47,7 @@ jobs:
               LLVM_PROFILE_FILE: "target/coverage/nyx_space-%p-%m.profraw"
             run: |
               cargo test -- cosmic
-              grcov . --binary-path ./target/debug/ -t lcov -s . --keep-only 'src/*' > lcov-cosmic.txt
+              grcov . --branch --binary-path ./target/debug/ -t lcov -s . --keep-only 'src/*' > ${{ github.workspace }}/lcov-cosmic.txt
           
           - name: Generate coverage report for mission_design integr. tests
             env:
@@ -55,7 +55,7 @@ jobs:
               LLVM_PROFILE_FILE: "target/coverage/nyx_space-%p-%m.profraw"
             run: |
               cargo test -- mission_design
-              grcov . --binary-path ./target/debug/ -t lcov -s . --keep-only 'src/*' > lcov-mission_design.txt
+              grcov . --branch --binary-path ./target/debug/ -t lcov -s . --keep-only 'src/*' > ${{ github.workspace }}/lcov-mission_design.txt
           
           - name: Generate coverage report for OD integr. tests
             env:
@@ -63,7 +63,7 @@ jobs:
               LLVM_PROFILE_FILE: "target/coverage/nyx_space-%p-%m.profraw"
             run: |
               cargo test -- orbit_determination::trackingarc orbit_determination::filtererrors orbit_determination::measurements orbit_determination::simulator orbit_determination::spacecraft
-              grcov . --binary-path ./target/debug/ -t lcov -s . --keep-only 'src/*' > lcov-od.txt
+              grcov . --branch --binary-path ./target/debug/ -t lcov -s . --keep-only 'src/*' > ${{ github.workspace }}/lcov-od.txt
           
           - name: Generate coverage report for propulsion integr. tests
             env:
@@ -71,7 +71,7 @@ jobs:
               LLVM_PROFILE_FILE: "target/coverage/nyx_space-%p-%m.profraw"
             run: |
               cargo test -- propulsion
-              grcov . --binary-path ./target/debug/ -t lcov -s . --keep-only 'src/*' > lcov-prop.txt
+              grcov . --branch --binary-path ./target/debug/ -t lcov -s . --keep-only 'src/*' > ${{ github.workspace }}/lcov-prop.txt
           
           - name: Generate coverage report for monte carlo integr. tests
             env:
@@ -79,10 +79,10 @@ jobs:
               LLVM_PROFILE_FILE: "target/coverage/nyx_space-%p-%m.profraw"
             run: |
               cargo test -- test_monte_carlo_epoch
-              grcov . --binary-path ./target/debug/ -t lcov -s . --keep-only 'src/*' > lcov-mc.txt
+              grcov . --branch --binary-path ./target/debug/ -t lcov -s . --keep-only 'src/*' > ${{ github.workspace }}/lcov-mc.txt
     
           - name: Upload coverage report
             uses: codecov/codecov-action@v3
             with:
               token: ${{ secrets.CODECOV_TOKEN }}
-              files: ./lcov-*.txt
+              files: ${{ github.workspace }}/lcov-*.txt
