@@ -7,6 +7,7 @@ Nyx is provided under the AGPLv3 License. By using this software, you assume res
 [![nyx-space on crates.io][cratesio-image]][cratesio]
 [![nyx-space on docs.rs][docsrs-image]][docsrs]
 [![LoC](https://tokei.rs/b1/github/nyx-space/nyx?category=lines)](https://github.com/nyx-space/nyx).
+[![codecov](https://codecov.io/gh/nyx-space/nyx/graph/badge.svg?token=gEiAvwzwh5)](https://codecov.io/gh/nyx-space/nyx)
 
 [cratesio-image]: https://img.shields.io/crates/v/nyx-space.svg
 [cratesio]: https://crates.io/crates/nyx-space
