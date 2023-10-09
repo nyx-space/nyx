@@ -60,7 +60,7 @@ pyo3 = { version = "0.19.0", optional = true, features = ["extension-module"] }
 pyo3-log = { version = "0.8.2", optional = true }
 numpy = { version = "0.19", optional = true }
 indicatif = { version = "0.17", features = ["rayon"] }
-rstats = "1.2.50"
+rstats = "2.0.1"
 thiserror = "1.0"
 parquet = { version = "47.0.0", default-features = false, features = [
     "arrow",
