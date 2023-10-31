@@ -77,7 +77,7 @@ impl FrameTree {
     /// Seek an ephemeris from its celestial name (e.g. Earth Moon Barycenter)
     fn frame_seek_by_name(
         name: &str,
-        cur_path: &mut [usize],
+        cur_path: &[usize],
         f: &FrameTree,
     ) -> Result<Vec<usize>, NyxError> {
         if f.name == name {
@@ -91,7 +91,7 @@ impl FrameTree {
             for (cno, child) in f.children.iter().enumerate() {
                 let mut this_path = cur_path.to_owned();
                 this_path.push(cno);
-                let child_attempt = Self::frame_seek_by_name(name, &mut this_path, child);
+                let child_attempt = Self::frame_seek_by_name(name, &this_path, child);
                 if let Ok(found_path) = child_attempt {
                     return Ok(found_path);
                 }
@@ -230,15 +230,15 @@ impl Cosm {
             // Return an empty vector (but OK because we're asking for the root)
             Ok(Vec::new())
         } else {
-            let mut path = Vec::new();
-            Self::frame_find_path(name, &mut path, &self.frame_root)
+            let path = Vec::new();
+            Self::frame_find_path(name, &path, &self.frame_root)
         }
     }
 
     /// Seek a frame from its orientation name
     fn frame_find_path(
         frame_name: &str,
-        cur_path: &mut [usize],
+        cur_path: &[usize],
         f: &FrameTree,
     ) -> Result<Vec<usize>, NyxError> {
         if f.name == frame_name {
@@ -250,8 +250,8 @@ impl Cosm {
             ))
         } else {
             for child in &f.children {
-                let mut this_path = cur_path.to_owned();
-                let child_attempt = Self::frame_find_path(frame_name, &mut this_path, child);
+                let this_path = cur_path.to_owned();
+                let child_attempt = Self::frame_find_path(frame_name, &this_path, child);
                 if let Ok(found_path) = child_attempt {
                     return Ok(found_path);
                 }
@@ -565,10 +565,10 @@ impl Cosm {
             // Return an empty vector (but OK because we're asking for the root)
             Ok(self.frame_root.frame)
         } else {
-            let mut path = Vec::new();
+            let path = Vec::new();
             Ok(self.frame_from_frame_path(&FrameTree::frame_seek_by_name(
                 &name,
-                &mut path,
+                &path,
                 &self.frame_root,
             )?))
         }

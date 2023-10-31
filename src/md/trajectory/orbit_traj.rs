@@ -238,7 +238,7 @@ impl Traj<Orbit> {
         // Grab the path here before we move stuff.
         let path_buf = cfg.actual_path(path);
 
-        let metadata = cfg.metadata.unwrap_or(HashMap::new());
+        let metadata = cfg.metadata.unwrap_or_default();
 
         let file = File::create(&path_buf)
             .map_err(|e| NyxError::CCSDS(format!("File creation error: {e}")))?;
