@@ -37,7 +37,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         rust:
-          - { version: "1.70", name: MSRV }
+          #- { version: "1.70", name: MSRV } # Reenable this before stablizing version 2.0
           - { version: stable, name: stable }
 
     runs-on: ${{ matrix.os }}
