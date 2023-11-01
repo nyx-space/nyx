@@ -75,7 +75,7 @@ num = "0.4.0"
 enum-iterator = "1.4.0"
 getrandom = { version = "0.2", features = ["js"] }
 typed-builder = "0.18.0"
-pythonize = { version = "0.19", optional = true }
+pythonize = { version = "0.20", optional = true }
 
 [dev-dependencies]
 polars = { version = "0.34.2", features = ["parquet"] }
