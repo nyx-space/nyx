@@ -25,7 +25,7 @@ use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
 use crate::md::StateParameter;
 use crate::time::{Duration, Epoch, Unit};
 use hifitime::SECONDS_PER_DAY;
-use std::fmt;
+use std::fmt::{self, Write};
 use std::fs::File;
 use std::io::Read;
 #[cfg(not(target_arch = "wasm32"))]
@@ -207,7 +207,10 @@ impl Xb {
                 }
                 for pos in path {
                     if root.children.get(*pos).is_none() {
-                        let hpath: String = path.iter().map(|p| format!("{p}")).collect::<String>();
+                        let hpath = path.iter().fold(String::new(), |mut output, p| {
+                            let _ = write!(output, "{p}");
+                            output
+                        });
                         return Err(NyxError::ObjectNotFound(hpath, self.ephemeris_get_names()));
                     }
                 }
@@ -231,7 +234,7 @@ impl Xb {
     /// Seek an ephemeris from its celestial name (e.g. Earth Moon Barycenter)
     fn ephemeris_seek_by_name(
         name: &str,
-        cur_path: &mut [usize],
+        cur_path: &[usize],
         e: &Ephemeris,
     ) -> Result<Vec<usize>, NyxError> {
         if e.name == name {
@@ -245,7 +248,7 @@ impl Xb {
             for (cno, child) in e.children.iter().enumerate() {
                 let mut this_path = cur_path.to_owned();
                 this_path.push(cno);
-                let child_attempt = Self::ephemeris_seek_by_name(name, &mut this_path, child);
+                let child_attempt = Self::ephemeris_seek_by_name(name, &this_path, child);
                 if let Ok(found_path) = child_attempt {
                     return Ok(found_path);
                 }
@@ -270,8 +273,8 @@ impl Xb {
                     // Return an empty vector (but OK because we're asking for the root)
                     Ok(Vec::new())
                 } else {
-                    let mut path = Vec::new();
-                    Self::ephemeris_seek_by_name(&name, &mut path, root)
+                    let path = Vec::new();
+                    Self::ephemeris_seek_by_name(&name, &path, root)
                 }
             }
         }

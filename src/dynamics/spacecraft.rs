@@ -30,7 +30,7 @@ pub use crate::md::prelude::SolarPressure;
 use crate::md::prelude::{Harmonics, PointMasses};
 use crate::State;
 
-use std::fmt;
+use std::fmt::{self, Write};
 use std::sync::Arc;
 
 use crate::cosmic::Cosm;
@@ -243,7 +243,12 @@ impl fmt::Display for SpacecraftDynamics {
         let force_models: String = if self.force_models.is_empty() {
             "No force models;".to_string()
         } else {
-            self.force_models.iter().map(|x| format!("{x}; ")).collect()
+            self.force_models
+                .iter()
+                .fold(String::new(), |mut output, x| {
+                    let _ = write!(output, "{x}; ");
+                    output
+                })
         };
         write!(
             f,
