@@ -35,7 +35,7 @@ gitlab = { repository = "nyx-space/nyx", branch = "master" }
 [dependencies]
 nalgebra = "=0.32"
 log = "0.4"
-hifitime = { version = "3.8.3", features = ["std"] }
+hifitime = "3.8.5"
 flate2 = { version = "1.0", features = [
     "rust_backend",
 ], default-features = false }
@@ -58,7 +58,7 @@ approx = "0.5"
 rand_pcg = "0.3"
 pyo3 = { version = "0.20.0", optional = true, features = ["extension-module"] }
 pyo3-log = { version = "0.9.0", optional = true }
-numpy = { version = "0.19", optional = true }
+numpy = { version = "0.20", optional = true }
 indicatif = { version = "0.17", features = ["rayon"] }
 rstats = "2.0.1"
 thiserror = "1.0"
@@ -75,7 +75,7 @@ num = "0.4.0"
 enum-iterator = "1.4.0"
 getrandom = { version = "0.2", features = ["js"] }
 typed-builder = "0.17.0"
-pythonize = { version = "0.19", optional = true }
+pythonize = { version = "0.20", optional = true }
 
 [dev-dependencies]
 polars = { version = "0.34.2", features = ["parquet"] }
