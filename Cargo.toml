@@ -35,7 +35,7 @@ gitlab = { repository = "nyx-space/nyx", branch = "master" }
 [dependencies]
 nalgebra = "=0.32"
 log = "0.4"
-hifitime = "3.8.5"
+hifitime = { version = "3.8.5", features = [ "std" ] }
 flate2 = { version = "1.0", features = [
     "rust_backend",
 ], default-features = false }
@@ -74,7 +74,7 @@ either = { version = "1.8.1", features = ["serde"] }
 num = "0.4.0"
 enum-iterator = "1.4.0"
 getrandom = { version = "0.2", features = ["js"] }
-typed-builder = "0.17.0"
+typed-builder = "0.18.0"
 pythonize = { version = "0.20", optional = true }
 
 [dev-dependencies]
