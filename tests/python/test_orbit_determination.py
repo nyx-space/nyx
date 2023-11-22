@@ -77,6 +77,8 @@ def test_filter_arc():
     print(trk_cfg_demo.dumps())
     unpkld = pickle.loads(pickle.dumps(trk_cfg_demo))
     assert unpkld == trk_cfg_demo
+    # Check that we can also call the `.loads` function directly
+    assert TrkConfig.loads(trk_cfg_demo.dumps()) == trk_cfg_demo
 
     # Load the trajectory
     traj = TrajectoryLoader(traj_file)

@@ -128,6 +128,12 @@ impl TrkConfig {
         Ok(())
     }
 
+    #[classmethod]
+    /// Loads the TrkConfig from its YAML representation
+    fn loads(_cls: &PyType, state: &PyAny) -> Result<Self, ConfigError> {
+        depythonize(state).map_err(|e| ConfigError::InvalidConfig(e.to_string()))
+    }
+
     #[getter]
     fn get_sampling(&self) -> PyResult<Duration> {
         Ok(self.sampling)
