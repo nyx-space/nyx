@@ -105,6 +105,7 @@ jobs:
           target: ${{ matrix.target }}
           args: --release --out dist --find-interpreter -F python
           sccache: 'true'
+          rust-toolchain: 1.73
       
       - name: Upload wheels
         uses: actions/upload-artifact@v3
