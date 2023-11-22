@@ -95,6 +95,10 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
+
+      - name: Update cargo packages
+        run: cargo update
+
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -136,7 +140,7 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    if: ${{ startsWith(github.ref, 'refs/tags/') }}
+    if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
     needs: [linux, windows, macos, sdist]
     steps:
       - uses: actions/download-artifact@v3
