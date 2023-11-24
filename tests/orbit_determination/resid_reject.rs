@@ -21,7 +21,7 @@ fn epoch() -> Epoch {
 
 #[fixture]
 fn traj(epoch: Epoch) -> Traj<Orbit> {
-    if try_init().is_err() {}
+    let _ = try_init().is_err();
 
     // Load cosm
     let cosm = Cosm::de438();

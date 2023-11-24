@@ -132,8 +132,26 @@ def test_filter_arc():
 
     print(f"Stored to {rslt_path}")
 
+    # Repeat with SNC to compare results
+    snc_rslt_path = process_tracking_arc(
+        dynamics["hifi"],
+        sc,
+        orbit_est,
+        msr_noise,
+        arc,
+        str(outpath.joinpath("./od_result_snc.parquet")),
+        cfg,
+        ekf_num_msr_trig,
+        ekf_disable_time,
+        snc_disable_time=Unit.Minute * 10.0,
+        snc_diagonals=[5e-12, 5e-12, 5e-12]
+    )
+
+    print(f"Stored to {rslt_path}")
+
     # Load the results
     oddf = pd.read_parquet(rslt_path)
+    oddf_snc = pd.read_parquet(snc_rslt_path)
     # Load the reference trajectory
     ref_traj = pd.read_parquet(traj_file)
     # Load the measurements
@@ -150,6 +168,16 @@ def test_filter_arc():
             ref_traj=ref_traj,
             msr_df=msr_df,
             html_out=str(outpath.joinpath("./od_estimate_plots.html")),
+            show=False,
+        )
+
+        plot_estimates(
+            oddf_snc,
+            "OD with SNC results from Python",
+            cov_frame="RIC",
+            ref_traj=ref_traj,
+            msr_df=msr_df,
+            html_out=str(outpath.joinpath("./od_estimate_snc_plots.html")),
             show=False,
         )
 
@@ -180,6 +208,13 @@ def test_filter_arc():
             html_out=str(outpath.joinpath("./od_residual_plots.html")),
             show=False,
         )
+        plot_residuals(
+            oddf_snc,
+            "OD residuals with SNC enabled",
+            msr_df=msr_df,
+            html_out=str(outpath.joinpath("./od_residual_snc_plots.html")),
+            show=False,
+        )
         # And the postfit histograms
         plot_residual_histogram(
             oddf,
@@ -195,6 +230,14 @@ def test_filter_arc():
             err_df,
             "Error in orbital elements",
             html_out=str(outpath.joinpath("./od_vs_ref_error_elements.html")),
+            show=False,
+        )
+
+        err_snc_df = diff_traj_parquet(traj_file, snc_rslt_path)
+        plot_orbit_elements(
+            err_snc_df,
+            "Error in orbital elements with SNC",
+            html_out=str(outpath.joinpath("./od_snc_vs_ref_error_elements.html")),
             show=False,
         )
 

@@ -1,4 +1,5 @@
 extern crate nyx_space as nyx;
+use std::fmt::Write;
 
 #[test]
 fn event_tracker_true_anomaly() {
@@ -35,8 +36,10 @@ fn event_tracker_true_anomaly() {
         let found_events = traj.find_all(e).unwrap();
         let pretty = found_events
             .iter()
-            .map(|orbit| format!("{:x}\tevent value: {}\n", orbit, e.eval(orbit)))
-            .collect::<String>();
+            .fold(String::new(), |mut output, orbit| {
+                let _ = writeln!(output, "{orbit:x}\tevent value: {}", e.eval(orbit));
+                output
+            });
         println!("[ta_tracker] {} =>\n{}", e, pretty);
     }
 
@@ -89,16 +92,17 @@ fn event_tracker_true_anomaly() {
 
     let pretty = umbra_events
         .iter()
-        .map(|orbit| {
-            format!(
-                "{:x}\tevent value: {}\t(-10s: {}\t+10s: {})\n",
+        .fold(String::new(), |mut output, orbit| {
+            let _ = writeln!(
+                output,
+                "{:x}\tevent value: {}\t(-10s: {}\t+10s: {})",
                 orbit,
                 &e_loc.compute(orbit),
                 &e_loc.compute(&traj.at(orbit.epoch() - 10 * Unit::Second).unwrap()),
                 &e_loc.compute(&traj.at(orbit.epoch() + 10 * Unit::Second).unwrap())
-            )
-        })
-        .collect::<String>();
+            );
+            output
+        });
     println!("[eclipses] {} =>\n{}", umbra_event_loc, pretty);
 
     let penumbra_event_loc = e_loc.to_penumbra_event();
@@ -106,15 +110,16 @@ fn event_tracker_true_anomaly() {
 
     let pretty = penumbra_events
         .iter()
-        .map(|orbit| {
-            format!(
-                "{:x}\tevent value: {}\t(-10s: {}\t+10s: {})\n",
+        .fold(String::new(), |mut output, orbit| {
+            let _ = writeln!(
+                output,
+                "{:x}\tevent value: {}\t(-10s: {}\t+10s: {})",
                 orbit,
                 &e_loc.compute(orbit),
                 &e_loc.compute(&traj.at(orbit.epoch() - 10 * Unit::Second).unwrap()),
                 &e_loc.compute(&traj.at(orbit.epoch() + 10 * Unit::Second).unwrap())
-            )
-        })
-        .collect::<String>();
+            );
+            output
+        });
     println!("[eclipses] {} =>\n{}", penumbra_event_loc, pretty);
 }
