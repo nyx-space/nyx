@@ -27,6 +27,7 @@ use crate::{
     od::{
         filter::kalman::KF,
         process::{EkfTrigger, FltResid, IterationConf, ODProcess},
+        snc::SNC3,
     },
     NyxError, Spacecraft,
 };
@@ -55,13 +56,27 @@ pub(crate) fn process_tracking_arc(
     predict_step: Option<Duration>,
     fixed_step: Option<bool>,
     iter_conf: Option<IterationConf>,
+    snc_disable_time: Option<Duration>,
+    snc_diagonals: Option<Vec<f64>>,
 ) -> Result<String, NyxError> {
     let msr_noise = Matrix2::from_iterator(measurement_noise);
 
     let init_sc = spacecraft.with_orbit(initial_estimate.0.nominal_state.with_stm());
 
     // Build KF without SNC
-    let kf = KF::no_snc(initial_estimate.0, msr_noise);
+    let kf = if (snc_disable_time.is_some() && snc_diagonals.as_ref().is_none())
+        || (snc_disable_time.is_none() && snc_diagonals.as_ref().is_some())
+        || (snc_diagonals.as_ref().is_some() && snc_diagonals.as_ref().unwrap().len() != 3)
+    {
+        return Err(NyxError::CustomError(format!(
+            "SNC set up requirest both a disable time and the snc_diagonals (3 items required)."
+        )));
+    } else if snc_disable_time.is_some() && snc_diagonals.is_some() {
+        let snc = SNC3::from_diagonal(snc_disable_time.unwrap(), &snc_diagonals.unwrap());
+        KF::new(initial_estimate.0, snc, msr_noise)
+    } else {
+        KF::no_snc(initial_estimate.0, msr_noise)
+    };
 
     let prop = Propagator::default(dynamics);
     let prop_est = prop.with(init_sc);

@@ -244,8 +244,6 @@ fn od_robust_test_ekf_realistic_two_way() {
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
-    let step_size = 10.0 * Unit::Second;
-    let opts = PropOpts::with_fixed_step(step_size);
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
@@ -326,7 +324,7 @@ fn od_robust_test_ekf_realistic_two_way() {
         Bodies::SaturnBarycenter,
     ];
     let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm.clone());
-    let truth_setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
+    let truth_setup = Propagator::default(orbital_dyn);
     let (_, traj) = truth_setup
         .with(initial_state)
         .for_duration_with_traj(prop_time)
@@ -354,7 +352,7 @@ fn od_robust_test_ekf_realistic_two_way() {
     // We expect the estimated orbit to be _nearly_ perfect because we've removed Saturn from the estimated trajectory
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let estimator = OrbitalDynamics::point_masses(&bodies, cosm.clone());
-    let setup = Propagator::new::<RK4Fixed>(estimator, opts);
+    let setup = Propagator::default(estimator);
     let prop_est = setup.with(initial_state_dev.with_stm());
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
