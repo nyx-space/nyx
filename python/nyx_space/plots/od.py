@@ -595,7 +595,7 @@ def plot_residuals(
     show=True,
 ):
     """
-    Plot of residuals, with 3-σ lines
+    Plot of residuals, with 3-σ lines. Returns a tuple of the plots if show=False.
     """
 
     try:
@@ -620,6 +620,8 @@ def plot_residuals(
     x_title = "Epoch {}".format(time_col_name[-3:])
 
     plt_any = False
+
+    rtn_plots = []
 
     for col in df.columns:
         if col.startswith(kind):
@@ -689,9 +691,14 @@ def plot_residuals(
 
             if show:
                 fig.show()
+            else:
+                rtn_plots += [fig]
 
     if not plt_any:
         raise ValueError(f"No columns ending with {kind} found -- nothing plotted")
+
+    if not show:
+        return rtn_plots
 
 
 def plot_residual_histogram(
