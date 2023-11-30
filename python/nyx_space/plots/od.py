@@ -96,8 +96,8 @@ def plot_estimates(
             epoch = epoch.replace("UTC", "").strip()
             if "." not in epoch:
                 epoch += ".0"
-            pd_ok_epochs += [epoch]
-        time_col = pd.to_datetime(pd_ok_epochs)
+            pd_ok_epochs += [datetime.fromisoformat(str(epoch).replace("UTC", "").strip())]
+        time_col = pd.Series(pd_ok_epochs)
         x_title = "Epoch {}".format(time_col_name[-3:])
 
         # Check that the requested covariance frame exists
@@ -336,8 +336,8 @@ def plot_covar(
             epoch = epoch.replace("UTC", "").strip()
             if "." not in epoch:
                 epoch += ".0"
-            pd_ok_epochs += [epoch]
-        time_col = pd.to_datetime(pd_ok_epochs)
+            pd_ok_epochs += [datetime.fromisoformat(str(epoch).replace("UTC", "").strip())]
+        time_col = pd.Series(pd_ok_epochs)
         x_title = "Epoch {}".format(time_col_name[-3:])
 
         # Check that the requested covariance frame exists
@@ -525,8 +525,8 @@ def overlay_measurements(
             epoch = epoch.replace("UTC", "").strip()
             if "." not in epoch:
                 epoch += ".0"
-            pd_ok_epochs += [epoch]
-        time_col = pd.to_datetime(pd_ok_epochs)
+            pd_ok_epochs += [datetime.fromisoformat(str(epoch).replace("UTC", "").strip())]
+        time_col = pd.Series(pd_ok_epochs)
         x_title = "Epoch {}".format(time_col_name[-3:])
 
         # Diff the epochs of the measurements to find when there is a start and end.
@@ -622,8 +622,8 @@ def plot_residuals(
         epoch = epoch.replace("UTC", "").strip()
         if "." not in epoch:
             epoch += ".0"
-        pd_ok_epochs += [epoch]
-    time_col = pd.to_datetime(pd_ok_epochs)
+        pd_ok_epochs += [datetime.fromisoformat(str(epoch).replace("UTC", "").strip())]
+        time_col = pd.Series(pd_ok_epochs)
     x_title = "Epoch {}".format(time_col_name[-3:])
 
     plt_any = False
