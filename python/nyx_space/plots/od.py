@@ -17,6 +17,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 import plotly.graph_objects as go
+import plotly.express as px
+from datetime import datetime
 
 from .utils import plot_with_error, plot_line, finalize_plot, colors
 
@@ -28,6 +30,7 @@ import pandas as pd
 import numpy as np
 from scipy.stats import norm
 
+from nyx_space.time import Epoch
 
 def plot_estimates(
     dfs,
@@ -247,11 +250,11 @@ def plot_estimates(
 
     if msr_df is not None:
         # Plot the measurements on both plots
-        pos_fig = plot_measurements(
+        pos_fig = overlay_measurements(
             msr_df, title, time_col_name, fig=pos_fig, show=False
         )
 
-        vel_fig = plot_measurements(
+        vel_fig = overlay_measurements(
             msr_df, title, time_col_name, fig=vel_fig, show=False
         )
 
@@ -454,11 +457,11 @@ def plot_covar(
 
     if msr_df is not None:
         # Plot the measurements on both plots
-        pos_fig = plot_measurements(
+        pos_fig = overlay_measurements(
             msr_df, title, time_col_name, fig=pos_fig, show=False
         )
 
-        vel_fig = plot_measurements(
+        vel_fig = overlay_measurements(
             msr_df, title, time_col_name, fig=vel_fig, show=False
         )
 
@@ -481,15 +484,19 @@ def plot_covar(
         return pos_fig, vel_fig
 
 
-def plot_measurements(
+def overlay_measurements(
+    fig,
     dfs,
     title,
     time_col_name="Epoch:Gregorian UTC",
     html_out=None,
     copyright=None,
-    fig=None,
     show=True,
 ):
+    """
+    Given a plotly figure, overlay the measurements as shaded regions on top of the existing plot.
+    For a plot of measurements only, use `plot_measurements`.
+    """
     if not isinstance(dfs, list):
         dfs = [dfs]
 
@@ -571,7 +578,7 @@ def plot_measurements(
                 line_width=0,
             )
 
-        finalize_plot(fig, title, x_title, copyright, show)
+        finalize_plot(fig, title, x_title, None, copyright)
 
     if html_out:
         with open(html_out, "w") as f:
@@ -673,7 +680,7 @@ def plot_residuals(
 
             if msr_df is not None:
                 # Plot the measurements on both plots
-                fig = plot_measurements(
+                fig = overlay_measurements(
                     msr_df, title, time_col_name, fig=fig, show=False
                 )
 
@@ -744,3 +751,65 @@ def plot_residual_histogram(
 
             if show:
                 fig.show()
+
+def plot_measurements(
+    df,
+    msr_type,
+    title=None,
+    time_col_name="Epoch:Gregorian UTC",
+    html_out=None,
+    copyright=None,
+    show=True,
+):
+    """
+    Plot the provided measurement type, fuzzy matching of the column name
+    """
+    
+    msr_col_name = [col for col in df.columns if msr_type in col.lower()]
+
+    if title is None:
+        # Build a title
+        station_names = ", ".join([name for name in df["Tracking device"].unique()])
+        start = Epoch(df["Epoch:Gregorian UTC"].iloc[0])
+        end = Epoch(df["Epoch:Gregorian UTC"].iloc[-1])
+        arc_duration = end.timedelta(start)
+        title = f"Measurements from {station_names} spanning {start} to {end} ({arc_duration})"
+
+    try:
+        orig_tim_col = df[time_col_name]
+    except KeyError:
+        # Find the time column
+        try:
+            col_name = [x for x in df.columns if x.startswith("Epoch")][0]
+        except IndexError:
+            raise KeyError("Could not find any Epoch column")
+        print(f"Could not find time column {time_col_name}, using `{col_name}`")
+        orig_tim_col = df[col_name]
+
+    # Build a Python datetime column
+    pd_ok_epochs = []
+    for epoch in orig_tim_col:
+        epoch = epoch.replace("UTC", "").strip()
+        if "." not in epoch:
+            epoch += ".0"
+        pd_ok_epochs += [datetime.fromisoformat(str(epoch).replace("UTC", "").strip())]
+    df["time_col"] = pd.Series(pd_ok_epochs)
+    x_title = "Epoch {}".format(time_col_name[-3:])
+
+    fig = px.scatter(df, x="time_col", y=msr_col_name, color="Tracking device")
+
+    finalize_plot(fig, title, x_title, msr_col_name[0], copyright)
+
+    if html_out:
+        with open(html_out, "w") as f:
+            f.write(fig.to_html())
+        print(f"Saved HTML to {html_out}")
+
+    if show:
+        fig.show()
+    else:
+        return fig
+
+if __name__ == "__main__":
+    df = pd.read_parquet("output_data/msr-2023-11-25T06-14-01.parquet")
+    plot_measurements(df, "range")
