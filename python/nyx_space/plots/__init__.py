@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 from .gauss_markov import plot_gauss_markov
-from .od import plot_covar, plot_estimates, overlay_measurements
+from .od import plot_covar, plot_estimates, plot_measurements, overlay_measurements
 from .traj import plot_traj, plot_ground_track, plot_traj_errors
 
 __all__ = [
@@ -27,5 +27,6 @@ __all__ = [
     "plot_traj",
     "plot_traj_errors",
     "plot_ground_track",
+    "plot_measurements",
     "overlay_measurements",
 ]

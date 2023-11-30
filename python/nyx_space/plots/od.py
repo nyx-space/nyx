@@ -251,11 +251,11 @@ def plot_estimates(
     if msr_df is not None:
         # Plot the measurements on both plots
         pos_fig = overlay_measurements(
-            msr_df, title, time_col_name, fig=pos_fig, show=False
+            pos_fig, msr_df, title, time_col_name, show=False
         )
 
         vel_fig = overlay_measurements(
-            msr_df, title, time_col_name, fig=vel_fig, show=False
+            vel_fig, msr_df, title, time_col_name, show=False
         )
 
     if html_out:
@@ -458,11 +458,11 @@ def plot_covar(
     if msr_df is not None:
         # Plot the measurements on both plots
         pos_fig = overlay_measurements(
-            msr_df, title, time_col_name, fig=pos_fig, show=False
+            pos_fig, msr_df, title, time_col_name, show=False
         )
 
         vel_fig = overlay_measurements(
-            msr_df, title, time_col_name, fig=vel_fig, show=False
+            vel_fig, msr_df, title, time_col_name, show=False
         )
 
     if html_out:
@@ -681,7 +681,7 @@ def plot_residuals(
             if msr_df is not None:
                 # Plot the measurements on both plots
                 fig = overlay_measurements(
-                    msr_df, title, time_col_name, fig=fig, show=False
+                    fig, msr_df, title, time_col_name, show=False
                 )
 
             finalize_plot(
