@@ -500,9 +500,6 @@ def overlay_measurements(
     if not isinstance(dfs, list):
         dfs = [dfs]
 
-    if fig is None:
-        fig = go.Figure()
-
     color_values = list(colors.values())
 
     station_colors = {}
@@ -754,7 +751,7 @@ def plot_residual_histogram(
 
 def plot_measurements(
     df,
-    msr_type,
+    msr_type=None,
     title=None,
     time_col_name="Epoch:Gregorian UTC",
     html_out=None,
@@ -762,10 +759,8 @@ def plot_measurements(
     show=True,
 ):
     """
-    Plot the provided measurement type, fuzzy matching of the column name
+    Plot the provided measurement type, fuzzy matching of the column name, or plot all as a strip
     """
-    
-    msr_col_name = [col for col in df.columns if msr_type in col.lower()]
 
     if title is None:
         # Build a title
@@ -796,9 +791,14 @@ def plot_measurements(
     df["time_col"] = pd.Series(pd_ok_epochs)
     x_title = "Epoch {}".format(time_col_name[-3:])
 
-    fig = px.scatter(df, x="time_col", y=msr_col_name, color="Tracking device")
+    if msr_type is None:
+        fig = px.strip(df, x="time_col", y="Tracking device", color="Tracking device")
+        finalize_plot(fig, title, x_title, "All tracking data", copyright)
+    else:
+        msr_col_name = [col for col in df.columns if msr_type in col.lower()]
 
-    finalize_plot(fig, title, x_title, msr_col_name[0], copyright)
+        fig = px.scatter(df, x="time_col", y=msr_col_name, color="Tracking device")
+        finalize_plot(fig, title, x_title, msr_col_name[0], copyright)
 
     if html_out:
         with open(html_out, "w") as f:
@@ -809,7 +809,3 @@ def plot_measurements(
         fig.show()
     else:
         return fig
-
-if __name__ == "__main__":
-    df = pd.read_parquet("output_data/msr-2023-11-25T06-14-01.parquet")
-    plot_measurements(df, "range")
