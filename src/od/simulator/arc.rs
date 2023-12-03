@@ -264,7 +264,10 @@ impl TrackingArcSim<Orbit, RangeDoppler, GroundStation> {
     /// 4. Repeat 2, 3 until the end of the trajectory
     /// 5. Build each of these as "tracking strands" for this tracking device.
     /// 6. THEN REMOVE OVERLAPPING MEASUREMENTS - ALGO TBD
-    pub fn build_schedule(&self, cosm: Arc<Cosm>) -> Result<HashMap<String, TrkConfig>, NyxError> {
+    pub fn generate_schedule(
+        &self,
+        cosm: Arc<Cosm>,
+    ) -> Result<HashMap<String, TrkConfig>, NyxError> {
         let mut built_cfg = self.configs.clone();
         'devices: for (name, device) in self.devices.iter() {
             let cfg = &self.configs[name];
@@ -339,9 +342,9 @@ impl TrackingArcSim<Orbit, RangeDoppler, GroundStation> {
         Ok(built_cfg)
     }
 
-    /// Sets the schedule to that built in `build_schedule`
-    pub fn compute_schedule(&mut self, cosm: Arc<Cosm>) -> Result<(), NyxError> {
-        self.configs = self.build_schedule(cosm)?;
+    /// Sets the schedule to that built in `generate_schedule`
+    pub fn build_schedule(&mut self, cosm: Arc<Cosm>) -> Result<(), NyxError> {
+        self.configs = self.generate_schedule(cosm)?;
 
         Ok(())
     }
@@ -359,7 +362,10 @@ impl TrackingArcSim<Spacecraft, RangeDoppler, GroundStation> {
     /// 4. Repeat 2, 3 until the end of the trajectory
     /// 5. Build each of these as "tracking strands" for this tracking device.
     /// 6. THEN REMOVE OVERLAPPING MEASUREMENTS - ALGO TBD
-    pub fn build_schedule(&self, cosm: Arc<Cosm>) -> Result<HashMap<String, TrkConfig>, NyxError> {
+    pub fn generate_schedule(
+        &self,
+        cosm: Arc<Cosm>,
+    ) -> Result<HashMap<String, TrkConfig>, NyxError> {
         let mut built_cfg = self.configs.clone();
         'devices: for (name, device) in self.devices.iter() {
             let cfg = &self.configs[name];
@@ -435,8 +441,8 @@ impl TrackingArcSim<Spacecraft, RangeDoppler, GroundStation> {
     }
 
     /// Sets the schedule to that built in `build_schedule`
-    pub fn compute_schedule(&mut self, cosm: Arc<Cosm>) -> Result<(), NyxError> {
-        self.configs = self.build_schedule(cosm)?;
+    pub fn build_schedule(&mut self, cosm: Arc<Cosm>) -> Result<(), NyxError> {
+        self.configs = self.generate_schedule(cosm)?;
 
         Ok(())
     }

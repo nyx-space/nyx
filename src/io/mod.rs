@@ -64,6 +64,7 @@ use pyo3::prelude::*;
 /// Configuration for exporting a trajectory to parquet.
 #[derive(Clone, Default, Serialize, Deserialize, TypedBuilder)]
 #[cfg_attr(feature = "python", pyclass)]
+#[builder(doc)]
 pub struct ExportCfg {
     /// Fields to export, if unset, defaults to all possible fields.
     #[builder(default, setter(strip_option))]

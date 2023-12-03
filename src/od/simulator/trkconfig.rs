@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use super::scheduler::Scheduler;
 pub use crate::dynamics::{Dynamics, NyxError};
 use crate::io::{duration_from_str, duration_to_str, epoch_from_str, epoch_to_str, ConfigError};
 use crate::io::{ConfigRepr, Configurable};
@@ -28,26 +29,29 @@ use serde::Deserialize;
 use serde_derive::Serialize;
 use std::fmt::Debug;
 use std::sync::Arc;
-
-use super::scheduler::Scheduler;
+use typed_builder::TypedBuilder;
 
 /// Stores a tracking configuration, there is one per tracking data simulator (e.g. one for ground station #1 and another for #2).
 /// By default, the tracking configuration is continuous and the tracking arc is from the beginning of the simulation to the end.
 /// In Python, any value that is set to None at initialization will use the default values.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypedBuilder)]
 #[cfg_attr(feature = "python", pyclass)]
 #[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
+#[builder(doc)]
 pub struct TrkConfig {
     /// Set to automatically build a tracking schedule based on some criteria
     #[serde(default)]
+    #[builder(default, setter(strip_option))]
     pub scheduler: Option<Scheduler>,
     #[serde(
         serialize_with = "duration_to_str",
         deserialize_with = "duration_from_str"
     )]
     /// Sampling rate once tracking has started
+    #[builder(default = 1.minutes())]
     pub sampling: Duration,
     /// List of tracking strands during which the given tracker will be tracking
+    #[builder(default, setter(strip_option))]
     pub strands: Option<Vec<EpochRanges>>,
 }
 
@@ -246,5 +250,26 @@ mod trkconfig_ut {
 
         let configs: HashMap<String, TrkConfig> = TrkConfig::load_named(trkconfg_yaml).unwrap();
         dbg!(configs);
+    }
+
+    #[test]
+    fn api_trk_config() {
+        use serde_yaml;
+
+        let cfg = TrkConfig::builder()
+            .sampling(15.seconds())
+            .scheduler(Scheduler::builder().handoff(Handoff::Overlap).build())
+            .build();
+
+        let serialized = serde_yaml::to_string(&cfg).unwrap();
+        println!("{serialized}");
+        let deserd: TrkConfig = serde_yaml::from_str(&serialized).unwrap();
+        assert_eq!(deserd, cfg);
+
+        let cfg = TrkConfig::builder()
+            .scheduler(Scheduler::builder().handoff(Handoff::Overlap).build())
+            .build();
+
+        assert_eq!(cfg.sampling, 60.seconds());
     }
 }

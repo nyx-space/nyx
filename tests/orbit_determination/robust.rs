@@ -116,7 +116,7 @@ fn od_robust_test_ekf_realistic_one_way() {
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
-    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+    arc_sim.build_schedule(cosm.clone()).unwrap();
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
@@ -268,24 +268,8 @@ fn od_robust_test_ekf_realistic_two_way() {
 
     // Define the tracking configurations
     let configs = HashMap::from([
-        (
-            dss65_madrid.name.clone(),
-            TrkConfig {
-                // Make sure to start the tracking one integration time after the start of the trajectory
-                start: simulator::Availability::Epoch(dt + 60.seconds()),
-                sampling: 60.seconds(),
-                ..Default::default()
-            },
-        ),
-        (
-            dss34_canberra.name.clone(),
-            TrkConfig {
-                // Make sure to start the tracking one integration time after the start of the trajectory
-                start: simulator::Availability::Epoch(dt + 60.seconds()),
-                sampling: 60.seconds(),
-                ..Default::default()
-            },
-        ),
+        (dss65_madrid.name.clone(), TrkConfig::default()),
+        (dss34_canberra.name.clone(), TrkConfig::default()),
     ]);
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
@@ -332,7 +316,7 @@ fn od_robust_test_ekf_realistic_two_way() {
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(devices.clone(), traj.clone(), configs, 0).unwrap();
-    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+    arc_sim.build_schedule(cosm.clone()).unwrap();
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
