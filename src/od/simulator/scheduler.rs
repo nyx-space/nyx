@@ -23,6 +23,7 @@ use hifitime::Duration;
 use serde::Deserialize;
 use serde_derive::Serialize;
 use std::fmt::Debug;
+use typed_builder::TypedBuilder;
 
 /// Defines the handoff from a current ground station to the next one that is visible to prevent overlapping of measurements
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -42,7 +43,7 @@ impl Default for Handoff {
 }
 
 /// A scheduler allows building a scheduling of spaceraft tracking for a set of ground stations.
-#[derive(Copy, Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, Default, Deserialize, PartialEq, Serialize, TypedBuilder)]
 pub struct Scheduler {
     pub handoff: Handoff,
     pub cadence: Cadence,
@@ -95,7 +96,7 @@ mod scheduler_ut {
     use super::Scheduler;
 
     #[test]
-    fn serde_schedule() {
+    fn serde_cadence() {
         use hifitime::TimeUnits;
         use serde_yaml;
 
@@ -119,6 +120,34 @@ mod scheduler_ut {
         let serialized = serde_yaml::to_string(&int).unwrap();
         let deserd: Cadence = serde_yaml::from_str(&serialized).unwrap();
         assert_eq!(deserd, int);
+    }
+
+    #[test]
+    fn api_and_serde_scheduler() {
+        use hifitime::TimeUnits;
+        use serde_yaml;
+
+        let scheduler = Scheduler::default();
+        let serialized = serde_yaml::to_string(&scheduler).unwrap();
+        assert_eq!(serialized, "handoff: Eager\ncadence: Continuous\n");
+        let deserd: Scheduler = serde_yaml::from_str(&serialized).unwrap();
+        assert_eq!(deserd, scheduler);
+
+        let scheduler = Scheduler::builder()
+            .handoff(Handoff::Eager)
+            .cadence(Cadence::Intermittent {
+                on: 0.2.hours(),
+                off: 17.hours() + 5.minutes(),
+            })
+            .build();
+
+        let serialized = serde_yaml::to_string(&scheduler).unwrap();
+        assert_eq!(
+            serialized,
+            "handoff: Eager\ncadence: !Intermittent\n  on: 12 min\n  off: 17 h 5 min\n"
+        );
+        let deserd: Scheduler = serde_yaml::from_str(&serialized).unwrap();
+        assert_eq!(deserd, scheduler);
     }
 
     #[test]
