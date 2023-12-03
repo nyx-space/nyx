@@ -50,7 +50,7 @@ pub enum StateParameter {
     Cd,
     /// Coefficient of reflectivity
     Cr,
-    /// Declination (deg)
+    /// Declination (deg) (also called elevation if in a body fixed frame)
     Declination,
     /// Dry mass (kg)
     DryMass,

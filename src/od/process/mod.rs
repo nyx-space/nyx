@@ -411,7 +411,15 @@ where
         let mut devices = arc.rebuild_devices::<S, Dev>(self.cosm.clone()).unwrap();
 
         let measurements = &arc.measurements;
-        let step_size = arc.min_duration_sep().unwrap();
+        let step_size = Duration::ZERO;
+        match arc.min_duration_sep() {
+            Some(step_size) => step_size,
+            None => {
+                return Err(NyxError::CustomError(
+                    "empty measurement set provided".to_string(),
+                ))
+            }
+        };
 
         self.iterate(measurements, &mut devices, step_size, config)
     }
@@ -425,7 +433,15 @@ where
         let mut devices = arc.rebuild_devices::<S, Dev>(self.cosm.clone()).unwrap();
 
         let measurements = &arc.measurements;
-        let step_size = arc.min_duration_sep().unwrap();
+        let step_size = Duration::ZERO;
+        match arc.min_duration_sep() {
+            Some(step_size) => step_size,
+            None => {
+                return Err(NyxError::CustomError(
+                    "empty measurement set provided".to_string(),
+                ))
+            }
+        };
 
         self.process(measurements, &mut devices, step_size)
     }

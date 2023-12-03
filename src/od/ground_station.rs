@@ -21,11 +21,13 @@ use super::noise::GaussMarkov;
 use super::TrackingDeviceSim;
 use crate::cosmic::{Cosm, Frame, Orbit};
 use crate::io::{frame_from_str, frame_to_str, ConfigRepr, Configurable};
-use crate::md::prelude::Traj;
+use crate::md::prelude::{Interpolatable, Traj};
+use crate::md::EventEvaluator;
 use crate::time::Epoch;
 use crate::utils::between_0_360;
 use crate::{NyxError, Spacecraft};
-use hifitime::Duration;
+use hifitime::{Duration, TimeUnits};
+use nalgebra::{allocator::Allocator, DefaultAllocator};
 use rand_pcg::Pcg64Mcg;
 use serde_derive::{Deserialize, Serialize};
 use std::fmt;
@@ -410,6 +412,50 @@ impl fmt::Display for GroundStation {
             self.longitude_deg,
             self.height_km * 1e3,
         )
+    }
+}
+
+impl<S: Interpolatable> EventEvaluator<S> for &GroundStation
+where
+    DefaultAllocator:
+        Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size> + Allocator<f64, S::VecLength>,
+{
+    /// Compute the elevation in the SEZ frame. This call will panic if the frame of the input state does not match that of the ground station.
+    fn eval(&self, rx_gs_frame: &S) -> f64 {
+        let dt = rx_gs_frame.epoch();
+        // Then, compute the rotation matrix from the body fixed frame of the ground station to its topocentric frame SEZ.
+        let tx_gs_frame = self.to_orbit(dt);
+        // Note: we're only looking at the radii so we don't need to apply the transport theorem here.
+        let dcm_topo2fixed = tx_gs_frame.dcm_from_traj_frame(Frame::SEZ).unwrap();
+
+        // Now, rotate the spacecraft in the SEZ frame to compute its elevation as seen from the ground station.
+        // We transpose the DCM so that it's the fixed to topocentric rotation.
+        let rx_sez = rx_gs_frame
+            .orbit()
+            .with_position_rotated_by(dcm_topo2fixed.transpose());
+        let tx_sez = tx_gs_frame.with_position_rotated_by(dcm_topo2fixed.transpose());
+        // Now, let's compute the range ρ.
+        let rho_sez = rx_sez - tx_sez;
+
+        // Finally, compute the elevation (math is the same as declination)
+        // Source: Vallado, section 4.4.3
+        // Only the sine is needed as per Vallado, and the formula is the same as the declination
+        // because we're in the SEZ frame.
+        rho_sez.declination_deg()
+    }
+
+    fn eval_string(&self, state: &S) -> String {
+        format!("{} elevation is {} degrees", self.name, self.eval(state))
+    }
+
+    /// Epoch precision of the election evaluator is 1 ms
+    fn epoch_precision(&self) -> Duration {
+        1.0_f64.milliseconds()
+    }
+
+    /// Angle precision of the elevation evaluator is 1 millidegree.
+    fn value_precision(&self) -> f64 {
+        1e-3
     }
 }
 

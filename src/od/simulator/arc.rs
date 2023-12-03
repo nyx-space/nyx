@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use hifitime::{Duration, Epoch, TimeSeries};
+use hifitime::{Duration, Epoch, TimeSeries, TimeUnits};
 use num::integer::gcd;
 use rand::SeedableRng;
 use rand_pcg::Pcg64Mcg;
@@ -24,13 +24,15 @@ use rand_pcg::Pcg64Mcg;
 pub use crate::dynamics::{Dynamics, NyxError};
 use crate::io::ConfigError;
 use crate::md::trajectory::Interpolatable;
-use crate::od::msr::TrackingArc;
-use crate::od::simulator::{Availability, Schedule};
-use crate::od::Measurement;
+use crate::od::msr::{RangeDoppler, TrackingArc};
+use crate::od::prelude::EpochRanges;
+use crate::od::simulator::Cadence;
+use crate::od::{GroundStation, Measurement};
+use crate::Orbit;
 pub use crate::{cosmic::Cosm, State, TimeTagged};
 use crate::{linalg::allocator::Allocator, od::TrackingDeviceSim};
 use crate::{linalg::DefaultAllocator, md::prelude::Traj};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fmt::Display;
 use std::marker::PhantomData;
 use std::sync::Arc;
@@ -79,6 +81,7 @@ where
         + Allocator<f64, Msr::MeasurementSize, <MsrIn as State>::Size>
         + Allocator<f64, Msr::MeasurementSize>,
 {
+    /// Build a new tracking arc simulator using the provided seeded random number generator.
     pub fn with_rng(
         devices: Vec<D>,
         trajectory: Traj<MsrIn>,
@@ -130,6 +133,7 @@ where
         Ok(me)
     }
 
+    /// Build a new tracking arc simulator using the provided seed to initialize the random number generator.
     pub fn with_seed(
         devices: Vec<D>,
         trajectory: Traj<MsrIn>,
@@ -141,6 +145,7 @@ where
         Self::with_rng(devices, trajectory, configs, rng)
     }
 
+    /// Build a new tracking arc simulator using the system entropy to seed the random number generator.
     pub fn new(
         devices: Vec<D>,
         trajectory: Traj<MsrIn>,
@@ -151,193 +156,80 @@ where
         Self::with_rng(devices, trajectory, configs, rng)
     }
 
-    /// Disallows overlapping measurements
+    /// Disallows overlapping measurements --  TODO(now): remove now
     pub fn disallow_overlap(&mut self) {
         self.allow_overlap = false;
     }
 
-    /// Allows overlapping measurements
+    /// Allows overlapping measurements -- TODO(now): remove now
     pub fn allow_overlap(&mut self) {
         self.allow_overlap = true;
     }
 
-    /// Generates measurements from the simulated tracking arc.
+    /// Generates measurements for the tracking arc using the defined strands
     ///
-    /// Notes:
+    /// # Warning
+    /// This function will return an error if any of the devices defines as a scheduler.
+    /// You must create the schedule first using `build_schedule` first.
+    ///
+    /// # Notes
     /// Although mutable, this function may be called several times to generate different measurements.
+    ///
+    /// # Algorithm
+    /// For each tracking device, and for each strand within that device, sample the trajectory at the sample
+    /// rate of the tracking device, adding a measurement whenever the spacecraft is visible.
+    /// Build the measurements as a vector, ordered chronologically.
+    ///
     pub fn generate_measurements(&mut self, cosm: Arc<Cosm>) -> Result<TrackingArc<Msr>, NyxError> {
-        // Stores the first measurement and last measurement of a given sub-arc for each device.
-        #[derive(Copy, Clone, Debug)]
-        struct ScheduleData {
-            start: Option<Epoch>,
-            prev: Option<Epoch>,
-            end: Option<Epoch>,
-        }
-
-        let mut schedule: HashMap<String, ScheduleData> = HashMap::new();
-
-        let mut start_trace_msg = HashSet::new();
-        let mut end_trace_msg = HashSet::new();
-        let mut schedule_trace_msg = HashSet::new();
-
-        let start = Epoch::now().unwrap();
         let mut measurements = Vec::new();
-        // Clone the time series so we don't consume it.
-        let ts = self.time_series.clone();
-        'ts: for epoch in ts {
-            'devices: for (name, device) in self.devices.iter_mut() {
-                let cfg = &self.configs[name];
-                // Check the start condition
-                if let Availability::Epoch(start_epoch) = cfg.start {
-                    if start_epoch > epoch {
-                        if !start_trace_msg.contains(name) {
-                            info!(
-                                "{name} tracking starts in {} (start = {start_epoch})",
-                                start_epoch - epoch
-                            );
-                            start_trace_msg.insert(name.clone());
-                        }
-                        continue;
-                    }
+
+        for (name, device) in self.devices.iter_mut() {
+            let cfg = &self.configs[name];
+            if cfg.scheduler.is_some() {
+                if cfg.strands.is_none() {
+                    return Err(NyxError::CustomError(format!(
+                        "schedule for {name} must be built before generating measurements"
+                    )));
+                } else {
+                    warn!("scheduler for {name} is ignored, using the defined tracking strands instead")
                 }
+            }
 
-                // Check the end condition
-                if let Availability::Epoch(end_epoch) = cfg.end {
-                    if end_epoch < epoch {
-                        if !end_trace_msg.contains(name) {
-                            info!(
-                                "{name} tracking ended {} ago (end = {end_epoch})",
-                                epoch - end_epoch
-                            );
-                            end_trace_msg.insert(name.clone());
-                        }
-                        continue;
-                    }
-                }
+            let init_msr_count = measurements.len();
+            let tick = Epoch::now().unwrap();
 
-                // Check the schedule
-                if let Some(device_schedule) = schedule.get(name) {
-                    // Check that we aren't generating too many measurements
-                    if let Some(prev_epoch) = device_schedule.prev {
-                        if (epoch - prev_epoch) < cfg.sampling {
-                            continue;
-                        }
-                    }
-                    match cfg.schedule {
-                        Schedule::Intermittent { on, off } => {
-                            // Check that we haven't been on for too long
-                            if let Some(start_epoch) = device_schedule.start {
-                                if (epoch - start_epoch) > on {
-                                    if !schedule_trace_msg.contains(name) {
-                                        info!(
-                                            "{name} is now turned off after being on for {}",
-                                            epoch - start_epoch
-                                        );
-                                        schedule_trace_msg.insert(name.clone());
-                                    }
-                                    continue;
-                                }
-                            }
-                            // Check that we haven't been off for enough time
-                            if let Some(end_epoch) = device_schedule.end {
-                                if (epoch - end_epoch) <= off {
-                                    if !schedule_trace_msg.contains(name) {
-                                        info!(
-                                            "{name} will be available again in {}",
-                                            epoch - end_epoch
-                                        );
-                                        schedule_trace_msg.insert(name.clone());
-                                    }
-                                    continue;
-                                }
-                            }
-                        }
-                        Schedule::Continuous => {
-                            // No filtering, pass through
-                        }
-                    }
-                }
-
-                // Check the exclusion epochs
-                if let Some(excl_list) = &cfg.exclusion_epochs {
-                    for excl in excl_list {
-                        if excl.contains(epoch) {
-                            // We are in an exclusion epoch, move to next device.
-                            debug!("Exclusion guard for {name} at {epoch}");
-                            continue 'devices;
-                        }
-                    }
-                }
-
-                // Check the inclusion epochs
-                if let Some(incl_list) = &cfg.inclusion_epochs {
-                    for incl in incl_list {
-                        if !incl.contains(epoch) {
-                            // Current epoch is not included in the inclusion epochs list, move to next device.
-                            debug!("Inclusion guard for {name} at {epoch}");
-                            continue 'devices;
-                        }
-                    }
-                }
-
-                // Availability OK, so let's remove this device from the trace messages if needed.
-                start_trace_msg.remove(name);
-                schedule_trace_msg.remove(name);
-                end_trace_msg.remove(name);
-
-                if let Some(msr) =
-                    device.measure(epoch, &self.trajectory, Some(&mut self.rng), cosm.clone())?
-                {
-                    measurements.push((name.clone(), msr));
-                    // We have a new measurement, let's update the schedule.
-                    if let Some(device_schedule) = schedule.get_mut(name) {
-                        if device_schedule.start.is_none() {
-                            // Set the start time of this pass
-                            device_schedule.start = Some(epoch);
-                            info!("{name} is now tracking {epoch}");
-                        }
-                        // In any case, set the end to none and set the prev to now.
-                        device_schedule.prev = Some(epoch);
-                        device_schedule.end = None;
-                    } else {
-                        info!("{name} is now tracking {epoch}");
-                        // Oh, great, first measurement for this device!
-                        schedule.insert(
-                            name.to_string(),
-                            ScheduleData {
-                                start: Some(epoch),
-                                prev: Some(epoch),
-                                end: None,
-                            },
-                        );
-                    }
-
-                    if !self.allow_overlap {
-                        // No need to check for the availability of other around station for this epoch
-                        // so let's move to the next epoch in the time series.
-                        continue 'ts;
-                    }
-                } else if let Some(device_schedule) = schedule.get_mut(name) {
-                    // No measurement was generated, so let's update the schedule if there is one.
-                    if device_schedule.end.is_none() {
-                        device_schedule.start = None;
-                        device_schedule.end = Some(epoch);
+            let strands = cfg.strands.as_ref().unwrap();
+            // Strands are defined at this point
+            for strand in strands {
+                // Build the time series for this strand, sampling at the correct rate
+                for epoch in TimeSeries::inclusive(strand.start, strand.end, cfg.sampling) {
+                    if let Some(msr) = device.measure(
+                        epoch,
+                        &self.trajectory,
+                        Some(&mut self.rng),
+                        cosm.clone(),
+                    )? {
+                        measurements.push((name.clone(), msr));
                     }
                 }
             }
-        }
 
-        info!(
-            "Generated {} measurements in {}",
-            measurements.len(),
-            Epoch::now().unwrap() - start
-        );
+            info!(
+                "Generated {} measurements for {name} for {} tracking strands in {}",
+                measurements.len() - init_msr_count,
+                strands.len(),
+                (Epoch::now().unwrap() - tick).round(1.0_f64.milliseconds())
+            );
+        }
 
         let mut devices = Vec::new();
         for device in self.devices.values() {
             let repr = device.to_config().unwrap();
             devices.push(repr);
         }
+
+        // Reorder the measurements
+        measurements.sort_by_key(|(_name, msr)| msr.epoch());
 
         // Build the tracking arc.
         let trk = TrackingArc {
@@ -352,7 +244,6 @@ where
 impl<MsrIn, Msr, D> Display for TrackingArcSim<MsrIn, Msr, D>
 where
     D: TrackingDeviceSim<MsrIn, Msr>,
-    MsrIn: State,
     Msr: Measurement,
     MsrIn: Interpolatable,
     DefaultAllocator: Allocator<f64, <MsrIn as State>::Size>
@@ -369,5 +260,92 @@ where
             self.devices.keys(),
             self.time_series
         )
+    }
+}
+
+impl TrackingArcSim<Orbit, RangeDoppler, GroundStation> {
+    /// Builds the schedule provided the config. Requires the tracker to be a ground station.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. For each tracking device:
+    /// 2. Find when the vehicle trajectory has an elevation greater or equal to zero, and use that as the first start of the first tracking arc for this station
+    /// 3. Find when the vehicle trajectory has an elevation less than zero (i.e. disappears below the horizon), after that initial epoch
+    /// 4. Repeat 2, 3 until the end of the trajectory
+    /// 5. Build each of these as "tracking strands" for this tracking device.
+    /// 6. THEN REMOVE OVERLAPPING MEASUREMENTS - ALGO TBD
+    pub fn build_schedule(&self, cosm: Arc<Cosm>) -> Result<HashMap<String, TrkConfig>, NyxError> {
+        let mut built_cfg = self.configs.clone();
+        'devices: for (name, device) in self.devices.iter() {
+            let cfg = &self.configs[name];
+            if let Some(scheduler) = cfg.scheduler {
+                info!("Building schedule for {name}");
+                built_cfg.get_mut(name).unwrap().scheduler = None;
+                built_cfg.get_mut(name).unwrap().strands = Some(Vec::new());
+                // Convert the trajectory into the ground station frame.
+                let traj = self.trajectory.to_frame(device.frame, cosm.clone())?;
+                let mut start_at = traj.first().epoch;
+                let end_at = traj.last().epoch;
+
+                while start_at < end_at {
+                    if let Ok(visibility_event) = traj.find_bracketed(start_at, end_at, &device) {
+                        // We've found when the spacecraft is visible
+                        start_at = visibility_event.epoch;
+                        // Search for when the spacecraft is no longer visible.
+                        if let Ok(visibility_event) =
+                            traj.find_bracketed(start_at + 1.0_f64.seconds(), end_at, &device)
+                        {
+                            let strand_end = visibility_event.epoch;
+                            let mut strand_range = EpochRanges {
+                                start: start_at,
+                                end: strand_end,
+                            };
+
+                            if let Cadence::Intermittent { on, off } = scheduler.cadence {
+                                // Check that the next start time is within the allocated time
+                                if let Some(prev_strand) =
+                                    built_cfg[name].strands.as_ref().unwrap().last()
+                                {
+                                    if prev_strand.end + off > strand_range.start {
+                                        // We're turning on the tracking sooner than the schedule allows, so let's fix that.
+                                        strand_range.start = prev_strand.end + off;
+                                        // Check that we didn't eat into the whole tracking opportunity
+                                        if strand_range.start > strand_end {
+                                            // Lost this whole opportunity.
+                                            info!("Discarding {name} opportunity from {} to {} due to cadence {:?}", start_at, strand_end, scheduler.cadence);
+                                        }
+                                    }
+                                }
+                                // Check that we aren't tracking for longer than configured
+                                if strand_range.end - strand_range.start > on {
+                                    strand_range.end = strand_range.start + on;
+                                }
+                            }
+
+                            // We've found when the spacecraft is below the horizon, so this is a new strand.
+                            built_cfg
+                                .get_mut(name)
+                                .unwrap()
+                                .strands
+                                .as_mut()
+                                .unwrap()
+                                .push(strand_range);
+                            // Set the new start time and continue searching
+                            start_at = strand_end;
+                        } else {
+                            continue 'devices;
+                        }
+                    } else {
+                        info!(
+                            "Built {} tracking strands for {name}",
+                            built_cfg[name].strands.as_ref().unwrap().len()
+                        );
+                        continue 'devices;
+                    }
+                }
+            }
+        }
+        // todo!("remove overlaps")
+        Ok(built_cfg)
     }
 }

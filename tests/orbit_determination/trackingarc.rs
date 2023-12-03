@@ -4,7 +4,7 @@ use nyx_space::md::prelude::*;
 use nyx_space::od::msr::RangeDoppler;
 use nyx_space::od::prelude::*;
 use nyx_space::od::simulator::TrackingArcSim;
-use nyx_space::od::simulator::{Availability, EpochRanges, Schedule, TrkConfig};
+use nyx_space::od::simulator::{Availability, Cadence, EpochRanges, TrkConfig};
 use rstest::*;
 use std::collections::HashMap;
 use std::env;
@@ -33,7 +33,7 @@ fn traj() -> Traj<Orbit> {
     // Generate a trajectory
     let (_, trajectory) = Propagator::default(OrbitalDynamics::two_body())
         .with(orbit)
-        .for_duration_with_traj(1.5.days())
+        .for_duration_with_traj(3.days())
         .unwrap();
 
     println!("{trajectory}");
@@ -209,7 +209,7 @@ fn trkconfig_zero_inclusion(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
 
     // Build a tracking config that should always see this vehicle.
     let trkcfg_always = TrkConfig {
-        inclusion_epochs: Some(vec![EpochRanges {
+        strands: Some(vec![EpochRanges {
             start: traj.first().epoch(),
             end: traj.last().epoch(),
         }]),
@@ -278,7 +278,7 @@ fn trkconfig_delayed_start(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
     let cosm = Cosm::de438();
 
     let trkcfg = TrkConfig {
-        inclusion_epochs: Some(vec![EpochRanges {
+        strands: Some(vec![EpochRanges {
             start: traj.first().epoch() + 2.hours(),
             end: traj.last().epoch(),
         }]),
@@ -328,7 +328,7 @@ fn trkconfig_cadence(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
         devices[0].name.clone(),
         TrkConfig {
             start: Availability::Visible,
-            schedule: Schedule::Intermittent {
+            scheduler: Cadence::Intermittent {
                 on: 0.2.hours(),
                 off: 20.days(),
             },
