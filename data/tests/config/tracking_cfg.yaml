@@ -1,11 +1,11 @@
 Demo ground station:
-  start: Visible
-  end: Visible
-  schedule: Continuous
+  scheduler:
+    handoff: Eager
+    cadence: Continuous
   sampling: 1 min
 
 Canberra:
-  start: Visible
-  end: Visible
-  schedule: Continuous
+  scheduler:
+    handoff: Eager
+    cadence: Continuous
   sampling: 1 min

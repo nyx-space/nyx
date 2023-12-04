@@ -45,7 +45,7 @@ fn traj() -> Traj<Orbit> {
 fn devices() -> Vec<GroundStation> {
     // Load the ground stations from the test data.
     let ground_station_file: PathBuf = [
-        &env::var("CARGO_MANIFEST_DIR").unwrap(),
+        env!("CARGO_MANIFEST_DIR"),
         "data",
         "tests",
         "config",
@@ -86,7 +86,7 @@ fn trk_simple(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
 
     // Load the tracking configuration from the test data.
     let trkconfg_yaml: PathBuf = [
-        &env::var("CARGO_MANIFEST_DIR").unwrap(),
+        env!("CARGO_MANIFEST_DIR"),
         "data",
         "tests",
         "config",
@@ -151,7 +151,7 @@ fn trk_simple(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
 
     // And serialize to disk
     let path: PathBuf = [
-        &env::var("CARGO_MANIFEST_DIR").unwrap(),
+        env!("CARGO_MANIFEST_DIR"),
         "output_data",
         "simple_arc.parquet",
     ]

@@ -93,9 +93,9 @@ impl TrkConfig {
                     .to_string(),
             ));
         } else if let Some(strands) = &self.strands {
-            if strands.is_empty() {
+            if strands.is_empty() && self.scheduler.is_none() {
                 return Err(ConfigError::InvalidConfig(
-                    "Provided tracking strands is empty (set to None to use scheduler)".to_string(),
+                    "Provided tracking strands is empty and no scheduler is defined".to_string(),
                 ));
             }
             for (ii, strand) in strands.iter().enumerate() {

@@ -229,7 +229,7 @@ fn od_tb_val_with_arc() {
 
     // Load the tracking configs
     let trkconfig_yaml: PathBuf = [
-        &env::var("CARGO_MANIFEST_DIR").unwrap(),
+        env!("CARGO_MANIFEST_DIR"),
         "data",
         "tests",
         "config",
@@ -248,7 +248,7 @@ fn od_tb_val_with_arc() {
 
     // And serialize to disk
     let path: PathBuf = [
-        &env::var("CARGO_MANIFEST_DIR").unwrap(),
+        env!("CARGO_MANIFEST_DIR"),
         "output_data",
         "two_body_od_val_arc.parquet",
     ]

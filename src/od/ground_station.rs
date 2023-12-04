@@ -459,76 +459,38 @@ where
     }
 }
 
-#[test]
-fn test_load_single() {
-    use std::env;
-    use std::path::PathBuf;
+#[cfg(test)]
+mod gs_ut {
+    use crate::io::ConfigRepr;
+    use crate::od::prelude::*;
 
-    use hifitime::TimeUnits;
+    #[test]
+    fn test_load_single() {
+        use std::env;
+        use std::path::PathBuf;
 
-    let cosm = Cosm::de438();
+        use hifitime::TimeUnits;
 
-    // Get the path to the root directory of the current Cargo project
-    let test_data: PathBuf = [
-        env::var("CARGO_MANIFEST_DIR").unwrap(),
-        "data".to_string(),
-        "tests".to_string(),
-        "config".to_string(),
-        "one_ground_station.yaml".to_string(),
-    ]
-    .iter()
-    .collect();
+        let cosm = Cosm::de438();
 
-    assert!(test_data.exists(), "Could not find the test data");
+        // Get the path to the root directory of the current Cargo project
+        let test_data: PathBuf = [
+            env::var("CARGO_MANIFEST_DIR").unwrap(),
+            "data".to_string(),
+            "tests".to_string(),
+            "config".to_string(),
+            "one_ground_station.yaml".to_string(),
+        ]
+        .iter()
+        .collect();
 
-    let gs = GroundStation::load(test_data).unwrap();
+        assert!(test_data.exists(), "Could not find the test data");
 
-    dbg!(&gs);
+        let gs = GroundStation::load(test_data).unwrap();
 
-    let expected_gs = GroundStation {
-        name: "Demo ground station".to_string(),
-        frame: cosm.frame("IAU Earth"),
-        elevation_mask_deg: 5.0,
-        range_noise_km: Some(GaussMarkov::new(1.days(), 5e-3, 1e-4).unwrap()),
-        doppler_noise_km_s: Some(GaussMarkov::new(1.days(), 5e-5, 1.5e-6).unwrap()),
-        latitude_deg: 2.3522,
-        longitude_deg: 48.8566,
-        height_km: 0.4,
-        light_time_correction: false,
-        timestamp_noise_s: None,
-        integration_time: None,
-    };
+        dbg!(&gs);
 
-    assert_eq!(expected_gs, gs);
-}
-
-#[test]
-fn test_load_many() {
-    use crate::cosmic::Cosm;
-    use hifitime::TimeUnits;
-    use std::env;
-    use std::path::PathBuf;
-
-    // Get the path to the root directory of the current Cargo project
-
-    let test_file: PathBuf = [
-        env::var("CARGO_MANIFEST_DIR").unwrap(),
-        "data".to_string(),
-        "tests".to_string(),
-        "config".to_string(),
-        "many_ground_stations.yaml".to_string(),
-    ]
-    .iter()
-    .collect();
-
-    let stations = GroundStation::load_many(test_file).unwrap();
-
-    dbg!(&stations);
-
-    let cosm = Cosm::de438();
-
-    let expected = vec![
-        GroundStation {
+        let expected_gs = GroundStation {
             name: "Demo ground station".to_string(),
             frame: cosm.frame("IAU Earth"),
             elevation_mask_deg: 5.0,
@@ -540,21 +502,65 @@ fn test_load_many() {
             light_time_correction: false,
             timestamp_noise_s: None,
             integration_time: None,
-        },
-        GroundStation {
-            name: "Canberra".to_string(),
-            frame: cosm.frame("IAU Earth"),
-            elevation_mask_deg: 5.0,
-            range_noise_km: Some(GaussMarkov::new(1.days(), 5e-3, 1e-4).unwrap()),
-            doppler_noise_km_s: Some(GaussMarkov::new(1.days(), 5e-5, 1.5e-6).unwrap()),
-            latitude_deg: -35.398333,
-            longitude_deg: 148.981944,
-            height_km: 0.691750,
-            light_time_correction: false,
-            timestamp_noise_s: None,
-            integration_time: None,
-        },
-    ];
+        };
 
-    assert_eq!(expected, stations);
+        assert_eq!(expected_gs, gs);
+    }
+
+    #[test]
+    fn test_load_many() {
+        use crate::cosmic::Cosm;
+        use hifitime::TimeUnits;
+        use std::env;
+        use std::path::PathBuf;
+
+        // Get the path to the root directory of the current Cargo project
+
+        let test_file: PathBuf = [
+            env::var("CARGO_MANIFEST_DIR").unwrap(),
+            "data".to_string(),
+            "tests".to_string(),
+            "config".to_string(),
+            "many_ground_stations.yaml".to_string(),
+        ]
+        .iter()
+        .collect();
+
+        let stations = GroundStation::load_many(test_file).unwrap();
+
+        dbg!(&stations);
+
+        let cosm = Cosm::de438();
+
+        let expected = vec![
+            GroundStation {
+                name: "Demo ground station".to_string(),
+                frame: cosm.frame("IAU Earth"),
+                elevation_mask_deg: 5.0,
+                range_noise_km: Some(GaussMarkov::new(1.days(), 5e-3, 1e-4).unwrap()),
+                doppler_noise_km_s: Some(GaussMarkov::new(1.days(), 5e-5, 1.5e-6).unwrap()),
+                latitude_deg: 2.3522,
+                longitude_deg: 48.8566,
+                height_km: 0.4,
+                light_time_correction: false,
+                timestamp_noise_s: None,
+                integration_time: None,
+            },
+            GroundStation {
+                name: "Canberra".to_string(),
+                frame: cosm.frame("IAU Earth"),
+                elevation_mask_deg: 5.0,
+                range_noise_km: Some(GaussMarkov::new(1.days(), 5e-3, 1e-4).unwrap()),
+                doppler_noise_km_s: Some(GaussMarkov::new(1.days(), 5e-5, 1.5e-6).unwrap()),
+                latitude_deg: -35.398333,
+                longitude_deg: 148.981944,
+                height_km: 0.691750,
+                light_time_correction: false,
+                timestamp_noise_s: None,
+                integration_time: None,
+            },
+        ];
+
+        assert_eq!(expected, stations);
+    }
 }

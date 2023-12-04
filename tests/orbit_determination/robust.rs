@@ -122,7 +122,7 @@ fn od_robust_test_ekf_realistic_one_way() {
 
     // And serialize to disk
     let path: PathBuf = [
-        &env::var("CARGO_MANIFEST_DIR").unwrap(),
+        env!("CARGO_MANIFEST_DIR"),
         "output_data",
         "ekf_robust_msr.parquet",
     ]
@@ -321,9 +321,7 @@ fn od_robust_test_ekf_realistic_two_way() {
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
     // And serialize to disk
-    let path: PathBuf = [&env::var("CARGO_MANIFEST_DIR").unwrap(), "output_data"]
-        .iter()
-        .collect();
+    let path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "output_data"].iter().collect();
 
     traj.to_parquet_simple(path.with_file_name("ekf_robust_two_way_traj.parquet"))
         .unwrap();
