@@ -196,9 +196,19 @@ where
 
         for _ in 0..max_iter {
             if ya.abs() < event.value_precision().abs() {
+                debug!(
+                    "{event} -- found with |{ya}| < {} @ {}",
+                    event.value_precision().abs(),
+                    xa_e + xa * Unit::Second
+                );
                 return self.at(xa_e + xa * Unit::Second);
             }
             if yb.abs() < event.value_precision().abs() {
+                debug!(
+                    "{event} -- found with |{yb}| < {} @ {}",
+                    event.value_precision().abs(),
+                    xa_e + xb * Unit::Second
+                );
                 return self.at(xa_e + xb * Unit::Second);
             }
             if has_converged(xa, xb) {

@@ -286,7 +286,7 @@ impl TrackingArcSim<Orbit, RangeDoppler, GroundStation> {
                         start_at = visibility_event.epoch;
                         // Search for when the spacecraft is no longer visible.
                         if let Ok(visibility_event) =
-                            traj.find_bracketed(start_at + 1.0_f64.seconds(), end_at, &device)
+                            traj.find_bracketed(start_at + cfg.sampling, end_at, &device)
                         {
                             let strand_end = visibility_event.epoch;
                             let mut strand_range = EpochRanges {
