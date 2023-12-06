@@ -8,7 +8,7 @@ use nyx::cosmic::{Bodies, Cosm, Orbit};
 use nyx::dynamics::guidance::{FiniteBurns, Mnvr, Thruster};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::SpacecraftDynamics;
-use nyx::md::{Event, EventEvaluator, StateParameter};
+use nyx::md::{Event, StateParameter};
 use nyx::propagators::error_ctrl::RSSCartesianStep;
 use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, TimeUnits, Unit};
@@ -35,12 +35,12 @@ fn stop_cond_3rd_apo() {
     // NOTE: We start counting at ZERO, so finding the 3rd means grabbing the second found.
     let (third_apo, traj) = prop.until_nth_event(5 * period, &apo_event, 2).unwrap();
 
-    let events = traj.find_all(&apo_event).unwrap();
-    let mut prev_event_match = events[0].epoch();
+    let events = traj.find(&apo_event).unwrap();
+    let mut prev_event_match = events[0].state.epoch();
     for event_match in events.iter().skip(1) {
-        let delta_period = event_match.epoch() - prev_event_match - period;
+        let delta_period = event_match.state.epoch() - prev_event_match - period;
         assert!(delta_period.abs() < 50.microseconds(), "in two body dyn, event finding should be extremely precise, instead time error of {delta_period}");
-        prev_event_match = event_match.epoch();
+        prev_event_match = event_match.state.epoch();
     }
 
     let min_epoch = start_dt + 2.0 * period;
@@ -88,12 +88,12 @@ fn stop_cond_3rd_peri() {
     // which the event finder will find.
     let (third_peri, traj) = prop.until_nth_event(5 * period, &peri_event, 2).unwrap();
 
-    let events = traj.find_all(&peri_event).unwrap();
-    let mut prev_event_match = events[0].epoch();
+    let events = traj.find(&peri_event).unwrap();
+    let mut prev_event_match = events[0].state.epoch();
     for event_match in events.iter().skip(1) {
-        let delta_period = event_match.epoch() - prev_event_match - period;
+        let delta_period = event_match.state.epoch() - prev_event_match - period;
         assert!(delta_period.abs() < 50.microseconds(), "in two body dyn, event finding should be extremely precise, instead time error of {delta_period}");
-        prev_event_match = event_match.epoch();
+        prev_event_match = event_match.state.epoch();
     }
 
     let min_epoch = start_dt + 2.0 * period;
@@ -193,15 +193,16 @@ fn stop_cond_nrho_apo() {
     );
 
     // Now, find all of the requested events
-    let events = traj_luna.find_all(&near_apo_event).unwrap();
+    let events = traj_luna.find(&near_apo_event).unwrap();
     println!(
         "Found all {} events in {} ms",
         near_apo_event,
         (Instant::now() - end_conv).as_millis()
     );
-    for event_state in &events {
+    for event in &events {
+        let event_state = event.state;
         let delta_t = event_state.epoch() - dt;
-        println!("{} after start:\n{:x}", delta_t, event_state);
+        println!("{delta_t} after start:\n{event_state:x}");
         assert!((event_state.ta_deg() - 172.0).abs() < near_apo_event.value_precision);
     }
 }
@@ -355,27 +356,29 @@ fn event_and_combination() {
     // NOTE: We're unwrapping here, so if the event isn't found, this will cause the test to fail.
     let event = Event::specific(StateParameter::Declination, 6.0, 3.0, Unit::Minute);
     let mut decl_deg = 0.0;
-    if let Ok(matching_states) = traj_moon.find_all(&event) {
+    if let Ok(matching_states) = traj_moon.find(&event) {
         for sc_decl_zero in matching_states {
-            decl_deg = sc_decl_zero.value(StateParameter::Declination).unwrap();
-            println!(
-                "{event}: {} => decl = {} deg",
-                event.eval_string(&sc_decl_zero),
-                decl_deg,
-            );
+            decl_deg = sc_decl_zero
+                .state
+                .value(StateParameter::Declination)
+                .unwrap();
+            println!("{sc_decl_zero} => decl = {} deg", decl_deg,);
             assert!((decl_deg - 6.0).abs() < 3.0);
         }
 
         // We should be able to find a similar event with a tighter bound too.
-        if let Ok(tighter_states) = traj_moon.find_all(&Event::specific(
+        if let Ok(tighter_states) = traj_moon.find(&Event::specific(
             StateParameter::Declination,
             decl_deg,
             1.0,
             Unit::Minute,
         )) {
             for sc_decl_zero in tighter_states {
-                let found_decl_deg = sc_decl_zero.value(StateParameter::Declination).unwrap();
-                println!("{sc_decl_zero:x} => decl = {} deg", found_decl_deg);
+                let found_decl_deg = sc_decl_zero
+                    .state
+                    .value(StateParameter::Declination)
+                    .unwrap();
+                println!("{sc_decl_zero} => decl = {} deg", found_decl_deg);
                 assert!((decl_deg - found_decl_deg).abs() < 1.0);
             }
         }

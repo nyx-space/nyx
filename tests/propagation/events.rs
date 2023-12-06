@@ -5,7 +5,6 @@ use std::fmt::Write;
 fn event_tracker_true_anomaly() {
     use nyx::cosmic::eclipse::{EclipseLocator, EclipseState};
     use nyx::md::prelude::*;
-    use nyx::md::EventEvaluator; // Only needed because we're manually calling e.eval
     use nyx::od::GroundStation;
 
     let cosm = Cosm::de438();
@@ -33,11 +32,15 @@ fn event_tracker_true_anomaly() {
 
     // Find all of the events
     for e in &events {
-        let found_events = traj.find_all(e).unwrap();
+        let found_events = traj.find(e).unwrap();
         let pretty = found_events
             .iter()
-            .fold(String::new(), |mut output, orbit| {
-                let _ = writeln!(output, "{orbit:x}\tevent value: {}", e.eval(orbit));
+            .fold(String::new(), |mut output, orbit_event| {
+                let _ = writeln!(
+                    output,
+                    "{:x}\tevent value: {}",
+                    orbit_event.state, orbit_event.value
+                );
                 output
             });
         println!("[ta_tracker] {} =>\n{}", e, pretty);
@@ -88,16 +91,17 @@ fn event_tracker_true_anomaly() {
     println!("Max elevation {} degrees @ {}", max_el, max_dt);
 
     let umbra_event_loc = e_loc.to_umbra_event();
-    let umbra_events = traj.find_all(&umbra_event_loc).unwrap();
+    let umbra_events = traj.find(&umbra_event_loc).unwrap();
 
     let pretty = umbra_events
         .iter()
-        .fold(String::new(), |mut output, orbit| {
+        .fold(String::new(), |mut output, orbit_event| {
+            let orbit = orbit_event.state;
             let _ = writeln!(
                 output,
                 "{:x}\tevent value: {}\t(-10s: {}\t+10s: {})",
                 orbit,
-                &e_loc.compute(orbit),
+                &e_loc.compute(&orbit),
                 &e_loc.compute(&traj.at(orbit.epoch() - 10 * Unit::Second).unwrap()),
                 &e_loc.compute(&traj.at(orbit.epoch() + 10 * Unit::Second).unwrap())
             );
@@ -106,16 +110,17 @@ fn event_tracker_true_anomaly() {
     println!("[eclipses] {} =>\n{}", umbra_event_loc, pretty);
 
     let penumbra_event_loc = e_loc.to_penumbra_event();
-    let penumbra_events = traj.find_all(&penumbra_event_loc).unwrap();
+    let penumbra_events = traj.find(&penumbra_event_loc).unwrap();
 
     let pretty = penumbra_events
         .iter()
-        .fold(String::new(), |mut output, orbit| {
+        .fold(String::new(), |mut output, orbit_event| {
+            let orbit = orbit_event.state;
             let _ = writeln!(
                 output,
                 "{:x}\tevent value: {}\t(-10s: {}\t+10s: {})",
                 orbit,
-                &e_loc.compute(orbit),
+                &e_loc.compute(&orbit),
                 &e_loc.compute(&traj.at(orbit.epoch() - 10 * Unit::Second).unwrap()),
                 &e_loc.compute(&traj.at(orbit.epoch() + 10 * Unit::Second).unwrap())
             );

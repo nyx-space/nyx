@@ -268,6 +268,7 @@ impl TrackingArcSim<Orbit, RangeDoppler, GroundStation> {
         &self,
         cosm: Arc<Cosm>,
     ) -> Result<HashMap<String, TrkConfig>, NyxError> {
+        // Consider using find_all via the heuristic
         let mut built_cfg = self.configs.clone();
         'devices: for (name, device) in self.devices.iter() {
             let cfg = &self.configs[name];
@@ -280,62 +281,73 @@ impl TrackingArcSim<Orbit, RangeDoppler, GroundStation> {
                 let mut start_at = traj.first().epoch;
                 let end_at = traj.last().epoch;
 
-                while start_at < end_at {
-                    if let Ok(visibility_event) = traj.find_bracketed(start_at, end_at, &device) {
-                        // We've found when the spacecraft is visible
-                        start_at = visibility_event.epoch;
-                        // Search for when the spacecraft is no longer visible.
-                        if let Ok(visibility_event) =
-                            traj.find_bracketed(start_at + cfg.sampling, end_at, &device)
-                        {
-                            let strand_end = visibility_event.epoch;
-                            let mut strand_range = EpochRanges {
-                                start: start_at,
-                                end: strand_end,
-                            };
-
-                            if let Cadence::Intermittent { on, off } = scheduler.cadence {
-                                // Check that the next start time is within the allocated time
-                                if let Some(prev_strand) =
-                                    built_cfg[name].strands.as_ref().unwrap().last()
-                                {
-                                    if prev_strand.end + off > strand_range.start {
-                                        // We're turning on the tracking sooner than the schedule allows, so let's fix that.
-                                        strand_range.start = prev_strand.end + off;
-                                        // Check that we didn't eat into the whole tracking opportunity
-                                        if strand_range.start > strand_end {
-                                            // Lost this whole opportunity.
-                                            info!("Discarding {name} opportunity from {} to {} due to cadence {:?}", start_at, strand_end, scheduler.cadence);
-                                        }
-                                    }
-                                }
-                                // Check that we aren't tracking for longer than configured
-                                if strand_range.end - strand_range.start > on {
-                                    strand_range.end = strand_range.start + on;
-                                }
-                            }
-
-                            // We've found when the spacecraft is below the horizon, so this is a new strand.
-                            built_cfg
-                                .get_mut(name)
-                                .unwrap()
-                                .strands
-                                .as_mut()
-                                .unwrap()
-                                .push(strand_range);
-                            // Set the new start time and continue searching
-                            start_at = strand_end;
-                        } else {
-                            continue 'devices;
-                        }
-                    } else {
-                        info!(
-                            "Built {} tracking strands for {name}",
-                            built_cfg[name].strands.as_ref().unwrap().len()
-                        );
-                        continue 'devices;
-                    }
+                let elevation_events = traj.find_arcs(&device).unwrap();
+                for (rise, fall) in elevation_events {
+                    println!(
+                        "{name} -> {:?} at {} -> {:?} {}",
+                        rise.edge,
+                        rise.state.epoch(),
+                        fall.edge,
+                        fall.state.epoch()
+                    );
                 }
+
+                // while start_at < end_at {
+                //     if let Ok(visibility_event) = traj.find_bracketed(start_at, end_at, &device) {
+                //         // We've found when the spacecraft is visible
+                //         start_at = visibility_event.epoch;
+                //         // Search for when the spacecraft is no longer visible.
+                //         if let Ok(visibility_event) =
+                //             traj.find_bracketed(start_at + cfg.sampling, end_at, &device)
+                //         {
+                //             let strand_end = visibility_event.epoch;
+                //             let mut strand_range = EpochRanges {
+                //                 start: start_at,
+                //                 end: strand_end,
+                //             };
+
+                //             if let Cadence::Intermittent { on, off } = scheduler.cadence {
+                //                 // Check that the next start time is within the allocated time
+                //                 if let Some(prev_strand) =
+                //                     built_cfg[name].strands.as_ref().unwrap().last()
+                //                 {
+                //                     if prev_strand.end + off > strand_range.start {
+                //                         // We're turning on the tracking sooner than the schedule allows, so let's fix that.
+                //                         strand_range.start = prev_strand.end + off;
+                //                         // Check that we didn't eat into the whole tracking opportunity
+                //                         if strand_range.start > strand_end {
+                //                             // Lost this whole opportunity.
+                //                             info!("Discarding {name} opportunity from {} to {} due to cadence {:?}", start_at, strand_end, scheduler.cadence);
+                //                         }
+                //                     }
+                //                 }
+                //                 // Check that we aren't tracking for longer than configured
+                //                 if strand_range.end - strand_range.start > on {
+                //                     strand_range.end = strand_range.start + on;
+                //                 }
+                //             }
+
+                //             // We've found when the spacecraft is below the horizon, so this is a new strand.
+                //             built_cfg
+                //                 .get_mut(name)
+                //                 .unwrap()
+                //                 .strands
+                //                 .as_mut()
+                //                 .unwrap()
+                //                 .push(strand_range);
+                //             // Set the new start time and continue searching
+                //             start_at = strand_end;
+                //         } else {
+                //             continue 'devices;
+                //         }
+                //     } else {
+                //         info!(
+                //             "Built {} tracking strands for {name}",
+                //             built_cfg[name].strands.as_ref().unwrap().len()
+                //         );
+                //         continue 'devices;
+                //     }
+                // }
             }
         }
         // todo!("remove overlaps")
@@ -381,12 +393,12 @@ impl TrackingArcSim<Spacecraft, RangeDoppler, GroundStation> {
                 while start_at < end_at {
                     if let Ok(visibility_event) = traj.find_bracketed(start_at, end_at, &device) {
                         // We've found when the spacecraft is visible
-                        start_at = visibility_event.epoch();
+                        start_at = visibility_event.state.epoch();
                         // Search for when the spacecraft is no longer visible.
                         if let Ok(visibility_event) =
                             traj.find_bracketed(start_at + 1.0_f64.seconds(), end_at, &device)
                         {
-                            let strand_end = visibility_event.epoch();
+                            let strand_end = visibility_event.state.epoch();
                             let mut strand_range = EpochRanges {
                                 start: start_at,
                                 end: strand_end,

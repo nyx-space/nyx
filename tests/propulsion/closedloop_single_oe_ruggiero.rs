@@ -660,7 +660,7 @@ fn rugg_raan() {
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_raan] {:x}", final_state.orbit);
     let event = Event::new(StateParameter::RAAN, 5.0);
-    println!("[rugg_raan] {} => {:?}", event, traj.find_all(&event));
+    println!("[rugg_raan] {} => {:?}", event, traj.find(&event));
     println!("[rugg_raan] fuel usage: {:.3} kg", fuel_usage);
 
     assert!(

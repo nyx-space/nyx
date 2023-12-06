@@ -71,7 +71,7 @@ fn continuous_tracking() {
 
     let devices = GroundStation::load_many(ground_station_file).unwrap();
 
-    dbg!(&devices);
+    // dbg!(&devices);
 
     // Load the tracking configuration from the test data.
     let trkconfg_yaml: PathBuf = [

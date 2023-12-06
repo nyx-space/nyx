@@ -24,7 +24,7 @@ use crate::md::StateParameter;
 use crate::utils::between_pm_x;
 use crate::{Spacecraft, State};
 
-fn angled_value(cur_angle: f64, desired_angle: f64) -> f64 {
+pub(crate) fn angled_value(cur_angle: f64, desired_angle: f64) -> f64 {
     if between_pm_x(cur_angle, desired_angle) > 0.0 {
         cur_angle - desired_angle
     } else {

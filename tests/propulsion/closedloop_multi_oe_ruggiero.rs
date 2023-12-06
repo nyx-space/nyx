@@ -67,7 +67,7 @@ fn qlaw_as_ruggiero_case_a() {
     for e in &events {
         println!(
             "[qlaw_as_ruggiero_case_a] Found {} events of kind {}",
-            traj.find_all(e).unwrap().len(),
+            traj.find(e).unwrap().len(),
             e
         );
     }

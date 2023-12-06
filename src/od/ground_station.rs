@@ -26,7 +26,7 @@ use crate::md::EventEvaluator;
 use crate::time::Epoch;
 use crate::utils::between_0_360;
 use crate::{NyxError, Spacecraft};
-use hifitime::{Duration, TimeUnits};
+use hifitime::{Duration, Unit};
 use nalgebra::{allocator::Allocator, DefaultAllocator};
 use rand_pcg::Pcg64Mcg;
 use serde_derive::{Deserialize, Serialize};
@@ -441,16 +441,22 @@ where
         // Source: Vallado, section 4.4.3
         // Only the sine is needed as per Vallado, and the formula is the same as the declination
         // because we're in the SEZ frame.
-        rho_sez.declination_deg()
+        // angled_value(rho_sez.declination_deg(), self.elevation_mask_deg)
+        rho_sez.declination_deg() - self.elevation_mask_deg
     }
 
     fn eval_string(&self, state: &S) -> String {
-        format!("{} elevation is {} degrees", self.name, self.eval(state))
+        format!(
+            "Elevation from {} is {:.6} deg on {}",
+            self.name,
+            self.eval(state) + self.elevation_mask_deg,
+            state.epoch()
+        )
     }
 
     /// Epoch precision of the election evaluator is 1 ms
     fn epoch_precision(&self) -> Duration {
-        1.0_f64.milliseconds()
+        1 * Unit::Second
     }
 
     /// Angle precision of the elevation evaluator is 1 millidegree.
