@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub mod edge;
+pub mod details;
 pub mod evaluators;
 pub mod search;
 use super::StateParameter;

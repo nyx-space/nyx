@@ -115,7 +115,7 @@ fn continuous_tracking() {
 
     println!("{arc_concrete}");
 
-    assert_eq!(arc.measurements.len(), 146);
+    assert_eq!(arc.measurements.len(), 144);
     // Check that we've loaded all of the measurements
     assert_eq!(arc_concrete.measurements.len(), arc.measurements.len());
     // Check that we find the same device names too

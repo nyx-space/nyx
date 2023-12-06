@@ -441,7 +441,6 @@ where
         // Source: Vallado, section 4.4.3
         // Only the sine is needed as per Vallado, and the formula is the same as the declination
         // because we're in the SEZ frame.
-        // angled_value(rho_sez.declination_deg(), self.elevation_mask_deg)
         rho_sez.declination_deg() - self.elevation_mask_deg
     }
 

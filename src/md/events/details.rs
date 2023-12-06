@@ -165,3 +165,29 @@ where
         )
     }
 }
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct EventArc<S: Interpolatable>
+where
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+{
+    pub rise: EventDetails<S>,
+    pub fall: EventDetails<S>,
+}
+
+impl<S: Interpolatable> fmt::Display for EventArc<S>
+where
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} until {} (lasts {})",
+            self.rise,
+            self.fall.state.epoch(),
+            self.fall.state.epoch() - self.rise.state.epoch()
+        )
+    }
+}

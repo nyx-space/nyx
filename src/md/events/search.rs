@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::edge::{EventDetails, EventEdge};
+use super::details::{EventArc, EventDetails, EventEdge};
 use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
@@ -283,11 +283,11 @@ where
         states.dedup();
 
         match states.len() {
-            0 => info!("{event} not found"),
-            1 => info!("{event} found once on {}", states[0].state.epoch()),
+            0 => info!("Event {event} not found"),
+            1 => info!("Event {event} found once on {}", states[0].state.epoch()),
             _ => {
                 info!(
-                    "{event} found {} times from {} until {}",
+                    "Event {event} found {} times from {} until {}",
                     states.len(),
                     states.first().unwrap().state.epoch(),
                     states.last().unwrap().state.epoch()
@@ -346,7 +346,7 @@ where
     /// - `event`: A reference to an object implementing the `EventEvaluator<S>` trait, which is used to evaluate and classify events in the trajectory.
     ///
     /// # Returns
-    /// - `Result<Vec<(EventDetails<S>, EventDetails<S>)>, NyxError>`: On success, returns a vector of tuples, where each tuple contains a pair of `EventDetails` (one for the rising edge and one for the falling edge). Returns an error if any issues occur during the event evaluation process.
+    /// - `Result<Vec<EventArc>, NyxError>`: On success, returns a vector of EventArc, where each struct contains a pair of `EventDetails` (one for the rising edge and one for the falling edge). Returns an error if any issues occur during the event evaluation process.
     ///
     /// # Logic
     /// - Sorts the events by their epoch to ensure chronological processing.
@@ -356,10 +356,7 @@ where
     /// - Prints debug information for each event and arc.
     ///
 
-    pub fn find_arcs<E>(
-        &self,
-        event: &E,
-    ) -> Result<Vec<(EventDetails<S>, EventDetails<S>)>, NyxError>
+    pub fn find_arcs<E>(&self, event: &E) -> Result<Vec<EventArc<S>>, NyxError>
     where
         E: EventEvaluator<S>,
     {
@@ -389,7 +386,6 @@ where
         };
 
         for event in events {
-            println!("{event}");
             if event.edge == EventEdge::Rising {
                 if prev_rise.is_none() && prev_fall.is_none() {
                     // This is a new rising edge
@@ -397,18 +393,21 @@ where
                 } else if prev_fall.is_some() {
                     // We've found a transition from a fall to a rise, so we can close this arc out.
                     if prev_rise.is_some() {
-                        arcs.push((prev_rise.clone().unwrap(), prev_fall.clone().unwrap()));
+                        let arc = EventArc {
+                            rise: prev_rise.clone().unwrap(),
+                            fall: prev_fall.clone().unwrap(),
+                        };
+                        arcs.push(arc);
                     } else {
-                        arcs.push((event.clone(), prev_fall.clone().unwrap()));
+                        let arc = EventArc {
+                            rise: event.clone(),
+                            fall: prev_fall.clone().unwrap(),
+                        };
+                        arcs.push(arc);
                     }
                     prev_fall = None;
                     // We have a new rising edge since this is how we ended up here.
                     prev_rise = Some(event.clone());
-                    println!(
-                        "{} <-> {}",
-                        arcs.last().unwrap().0.state.epoch(),
-                        arcs.last().unwrap().1.state.epoch()
-                    );
                 }
             } else if event.edge == EventEdge::Falling {
                 prev_fall = Some(event.clone());
@@ -418,12 +417,20 @@ where
         // Add the final pass
         if prev_rise.is_some() {
             if prev_fall.is_some() {
-                arcs.push((prev_rise.clone().unwrap(), prev_fall.clone().unwrap()));
+                let arc = EventArc {
+                    rise: prev_rise.clone().unwrap(),
+                    fall: prev_fall.clone().unwrap(),
+                };
+                arcs.push(arc);
             } else {
                 // Use the last trajectory as the end of the arc
                 let value = event.eval(self.last());
                 let fall = EventDetails::new(*self.last(), value, event, self)?;
-                arcs.push((prev_rise.clone().unwrap(), fall));
+                let arc = EventArc {
+                    rise: prev_rise.clone().unwrap(),
+                    fall,
+                };
+                arcs.push(arc);
             }
         }
 
