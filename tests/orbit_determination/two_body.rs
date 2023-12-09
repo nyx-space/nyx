@@ -127,7 +127,8 @@ fn od_tb_val_ekf_fixed_step_perfect_stations() {
     println!("Final estimate:\n{est}");
     assert!(
         est.state_deviation().norm() < 1e-12,
-        "In perfect modeling, the state deviation should be near zero"
+        "In perfect modeling, the state deviation should be near zero, got {:.3e}",
+        est.state_deviation().norm()
     );
     for i in 0..6 {
         assert!(
@@ -295,8 +296,9 @@ fn od_tb_val_with_arc() {
     let est = &odp.estimates[odp.estimates.len() - 1];
     println!("Final estimate:\n{est}");
     assert!(
-        dbg!(est.state_deviation().norm()) < f64::EPSILON,
-        "In perfect modeling, the state deviation should be near zero"
+        est.state_deviation().norm() < f64::EPSILON,
+        "In perfect modeling, the state deviation should be near zero, got {:.3e}",
+        est.state_deviation().norm()
     );
     for i in 0..6 {
         assert!(

@@ -433,8 +433,7 @@ where
         let mut devices = arc.rebuild_devices::<S, Dev>(self.cosm.clone()).unwrap();
 
         let measurements = &arc.measurements;
-        let step_size = Duration::ZERO;
-        match arc.min_duration_sep() {
+        let step_size = match arc.min_duration_sep() {
             Some(step_size) => step_size,
             None => {
                 return Err(NyxError::CustomError(
@@ -451,12 +450,13 @@ where
     /// # Argument details
     /// + The measurements must be a list mapping the name of the measurement device to the measurement itself.
     /// + The name of all measurement devices must be present in the provided devices, i.e. the key set of `devices` must be a superset of the measurement device names present in the list.
+    /// + The maximum step size to ensure we don't skip any measurements.
     #[allow(clippy::erasing_op)]
     pub fn process<Dev>(
         &mut self,
         measurements: &[(String, Msr)],
         devices: &mut HashMap<String, Dev>,
-        step_size: Duration,
+        max_step: Duration,
     ) -> Result<(), NyxError>
     where
         Dev: TrackingDeviceSim<S, Msr>,
@@ -465,16 +465,19 @@ where
             measurements.len() >= 2,
             "must have at least two measurements"
         );
+
+        assert!(
+            max_step.abs() > (0.0 * Unit::Nanosecond),
+            "step size is zero"
+        );
+
         // Start by propagating the estimator (on the same thread).
         let num_msrs = measurements.len();
 
-        // Update the step size of the navigation propagator if it isn't already fixed step
-        if !self.prop.fixed_step {
-            self.prop.set_step(step_size, false);
-        }
+        self.prop.set_step(max_step, self.prop.fixed_step);
 
         let prop_time = measurements[num_msrs - 1].1.epoch() - self.kf.previous_estimate().epoch();
-        info!("Navigation propagating for a total of {prop_time} with step size {step_size}");
+        info!("Navigation propagating for a total of {prop_time} with step size {max_step}");
 
         let mut epoch = self.prop.state.epoch();
 
@@ -501,16 +504,12 @@ where
             loop {
                 let delta_t = next_msr_epoch - epoch;
 
-                // Propagator for the minimum time between the step size and the duration to the next measurement.
-                // Ensure that we don't go backward if the previous step we took was indeed backward.
-                let next_step_size = delta_t.min(if self.prop.details.step.is_negative() {
-                    step_size
-                } else {
-                    self.prop.details.step
-                });
+                // Propagator for the minimum time between the maximum step size and the duration to the next measurement.
 
-                // Remove old states from the trajectory (this is a manual implementation of `retaint` because we know it's a sorted vec)
-                // traj.states.retain(|state: &S| state.epoch() <= epoch);
+                let next_step_size = delta_t.min(max_step);
+
+                // Remove old states from the trajectory
+                // This is a manual implementation of `retaint` because we know it's a sorted vec, so no need to resort every time
                 let mut index = traj.states.len();
                 while index > 0 {
                     index -= 1;
@@ -520,8 +519,13 @@ where
                 }
                 traj.states.truncate(index);
 
-                debug!("advancing propagator by {next_step_size} (Δt to next msr: {delta_t})");
+                debug!("propagate for {next_step_size} (Δt to next msr: {delta_t})");
                 let (_, traj_covar) = self.prop.for_duration_with_traj(next_step_size)?;
+
+                // Restore the step size if needed
+                // if let Some(prev_step) = saved_step {
+                //     self.prop.set_step(prev_step, false);
+                // }
 
                 for state in traj_covar.states {
                     traj.states.push(S::extract(state));
