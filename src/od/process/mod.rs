@@ -314,7 +314,7 @@ where
             }
 
             info!("***************************");
-            info!("*** Iteration number {} ***", iter_cnt);
+            info!("*** Iteration number {iter_cnt:02} ***");
             info!("***************************");
 
             // First, smooth the estimates
@@ -331,8 +331,9 @@ where
 
             // Compute the new RMS
             let new_rms = self.rms_residual_ratios();
-            let cur_rel_rms = (new_rms - best_rms).abs() / best_rms;
-            if cur_rel_rms < config.relative_tol {
+            let cur_rms_num = (new_rms - previous_rms).abs();
+            let cur_rel_rms = cur_rms_num / previous_rms;
+            if cur_rel_rms < config.relative_tol || cur_rms_num < config.absolute_tol * best_rms {
                 info!("*****************");
                 info!("*** CONVERGED ***");
                 info!("*****************");
@@ -340,18 +341,22 @@ where
                     "New residual RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
                     new_rms, previous_rms, best_rms
                 );
-                info!(
-                    "Filter converged to relative tolerance ({:.2e} < {:.2e}) after {} iterations",
-                    cur_rel_rms, config.relative_tol, iter_cnt
-                );
-
+                if cur_rel_rms < config.relative_tol {
+                    info!(
+                        "Filter converged on relative tolerance ({:.2e} < {:.2e}) after {} iterations",
+                        cur_rel_rms, config.relative_tol, iter_cnt
+                    );
+                } else {
+                    info!(
+                        "Filter converged on relative change ({:.2e} < {:.2e} * {:.2e}) after {} iterations",
+                        cur_rms_num, config.absolute_tol, best_rms, iter_cnt
+                    );
+                }
                 break;
-            }
-
-            if new_rms > previous_rms {
+            } else if new_rms > previous_rms {
                 warn!(
-                    "New residual RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
-                    new_rms, previous_rms, best_rms
+                    "New residual RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5} ({cur_rel_rms:.2e} > {:.2e})",
+                    new_rms, previous_rms, best_rms, config.relative_tol
                 );
                 divergence_cnt += 1;
                 previous_rms = new_rms;
@@ -371,8 +376,8 @@ where
                 }
             } else {
                 info!(
-                    "New residual RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
-                    new_rms, previous_rms, best_rms
+                    "New residual RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5} ({cur_rel_rms:.2e} > {:.2e})",
+                    new_rms, previous_rms, best_rms, config.relative_tol
                 );
                 // Reset the counter
                 divergence_cnt = 0;
@@ -411,8 +416,7 @@ where
         let mut devices = arc.rebuild_devices::<S, Dev>(self.cosm.clone()).unwrap();
 
         let measurements = &arc.measurements;
-        let step_size = Duration::ZERO;
-        match arc.min_duration_sep() {
+        let step_size = match arc.min_duration_sep() {
             Some(step_size) => step_size,
             None => {
                 return Err(NyxError::CustomError(

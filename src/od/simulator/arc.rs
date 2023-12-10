@@ -279,51 +279,56 @@ impl TrackingArcSim<Orbit, RangeDoppler, GroundStation> {
                 // Convert the trajectory into the ground station frame.
                 let traj = self.trajectory.to_frame(device.frame, cosm.clone())?;
 
-                let elevation_arcs = traj.find_arcs(&device).unwrap();
-                for arc in elevation_arcs {
-                    info!("Working on {arc}");
-                    let strand_start = arc.rise.state.epoch();
-                    let strand_end = arc.fall.state.epoch();
+                match traj.find_arcs(&device) {
+                    Err(_) => info!("No measurements from {name}"),
+                    Ok(elevation_arcs) => {
+                        for arc in elevation_arcs {
+                            info!("Working on {arc}");
+                            let strand_start = arc.rise.state.epoch();
+                            let strand_end = arc.fall.state.epoch();
 
-                    let mut strand_range = EpochRanges {
-                        start: strand_start,
-                        end: strand_end,
-                    };
+                            let mut strand_range = EpochRanges {
+                                start: strand_start,
+                                end: strand_end,
+                            };
 
-                    if let Cadence::Intermittent { on, off } = scheduler.cadence {
-                        // Check that the next start time is within the allocated time
-                        if let Some(prev_strand) = built_cfg[name].strands.as_ref().unwrap().last()
-                        {
-                            if prev_strand.end + off > strand_range.start {
-                                // We're turning on the tracking sooner than the schedule allows, so let's fix that.
-                                strand_range.start = prev_strand.end + off;
-                                // Check that we didn't eat into the whole tracking opportunity
-                                if strand_range.start > strand_end {
-                                    // Lost this whole opportunity.
-                                    info!("Discarding {name} opportunity from {} to {} due to cadence {:?}", strand_start, strand_end, scheduler.cadence);
+                            if let Cadence::Intermittent { on, off } = scheduler.cadence {
+                                // Check that the next start time is within the allocated time
+                                if let Some(prev_strand) =
+                                    built_cfg[name].strands.as_ref().unwrap().last()
+                                {
+                                    if prev_strand.end + off > strand_range.start {
+                                        // We're turning on the tracking sooner than the schedule allows, so let's fix that.
+                                        strand_range.start = prev_strand.end + off;
+                                        // Check that we didn't eat into the whole tracking opportunity
+                                        if strand_range.start > strand_end {
+                                            // Lost this whole opportunity.
+                                            info!("Discarding {name} opportunity from {} to {} due to cadence {:?}", strand_start, strand_end, scheduler.cadence);
+                                        }
+                                    }
+                                }
+                                // Check that we aren't tracking for longer than configured
+                                if strand_range.end - strand_range.start > on {
+                                    strand_range.end = strand_range.start + on;
                                 }
                             }
+
+                            // We've found when the spacecraft is below the horizon, so this is a new strand.
+                            built_cfg
+                                .get_mut(name)
+                                .unwrap()
+                                .strands
+                                .as_mut()
+                                .unwrap()
+                                .push(strand_range);
                         }
-                        // Check that we aren't tracking for longer than configured
-                        if strand_range.end - strand_range.start > on {
-                            strand_range.end = strand_range.start + on;
-                        }
+
+                        info!(
+                            "Built {} tracking strands for {name}",
+                            built_cfg[name].strands.as_ref().unwrap().len()
+                        );
                     }
-
-                    // We've found when the spacecraft is below the horizon, so this is a new strand.
-                    built_cfg
-                        .get_mut(name)
-                        .unwrap()
-                        .strands
-                        .as_mut()
-                        .unwrap()
-                        .push(strand_range);
                 }
-
-                info!(
-                    "Built {} tracking strands for {name}",
-                    built_cfg[name].strands.as_ref().unwrap().len()
-                );
             }
         }
         // todo!("remove overlaps")

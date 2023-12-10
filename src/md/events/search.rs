@@ -355,12 +355,39 @@ where
     /// - Handles edge cases where the trajectory starts or ends with a rising or falling edge.
     /// - Prints debug information for each event and arc.
     ///
-
+    /// ## Note
+    /// If no zero crossing happens in the trajectory, i.e. the there is "event is true" _and_ "event is false",
+    /// then this function checks whether the event is true at the start and end of the trajectory. If so, it means
+    /// that there is a single arc that spans the whole trajectory.
+    ///
     pub fn find_arcs<E>(&self, event: &E) -> Result<Vec<EventArc<S>>, NyxError>
     where
         E: EventEvaluator<S>,
     {
-        let mut events = self.find(event)?;
+        let mut events = match self.find(event) {
+            Ok(events) => events,
+            Err(_) => {
+                // We haven't found the start or end of an arc, i.e. no zero crossing on the event.
+                // However, if the trajectory start and end are above the event value, then we found an arc.
+                let first_eval = event.eval(self.first());
+                let last_eval = event.eval(self.last());
+                if first_eval > 0.0 && last_eval > 0.0 {
+                    // No event crossing found, but from the start until the end of the trajectory, we're in the same arc
+                    // because the evaluation of the event is above the zero crossing.
+                    // Hence, there's a single arc, and it's from start until the end of the trajectory.
+                    vec![
+                        EventDetails::new(*self.first(), first_eval, event, self)?,
+                        EventDetails::new(*self.last(), last_eval, event, self)?,
+                    ]
+                } else {
+                    return Err(NyxError::from(TrajError::EventNotFound {
+                        start: self.first().epoch(),
+                        end: self.last().epoch(),
+                        event: format!("{event}"),
+                    }));
+                }
+            }
+        };
         events.sort_by_key(|event| event.state.epoch());
 
         // Now, let's pair the events.
