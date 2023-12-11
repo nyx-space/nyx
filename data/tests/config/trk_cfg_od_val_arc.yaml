@@ -1,19 +1,21 @@
 Madrid:
-  start: Visible
-  end: !Epoch 2020-01-01 03:00:00 UTC
-  schedule: Continuous
+  strands:
+    - start: 2020-01-01 00:00:00 UTC
+      end: 2020-01-01 03:00:00 UTC
   sampling: 1 min
 
 Canberra:
-  start: Visible
-  end: !Epoch 2020-01-01 19:00:00 UTC
-  schedule: !Intermittent
-    on: 4 h
-    off: 8 h
+  strands:
+    - start: 2020-01-01 15:00:00 UTC
+      end: 2020-01-01 17:00:00 UTC
+    - start: 2020-01-01 19:00:00 UTC
+      end: 2020-01-02 00:00:00 UTC
   sampling: 1 min
 
 Goldstone:
-  start: !Epoch 2020-01-01 09:00:00 UTC
-  end: Visible
-  schedule: Continuous
+  strands:
+    - start: 2020-01-01 06:00:00 UTC
+      end: 2020-01-01 08:00:00 UTC
+    - start: 2020-01-01 09:00:00 UTC
+      end: 2020-01-01 12:00:00 UTC
   sampling: 1 min

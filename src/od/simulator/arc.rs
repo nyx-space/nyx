@@ -188,28 +188,45 @@ where
             let init_msr_count = measurements.len();
             let tick = Epoch::now().unwrap();
 
-            let strands = cfg.strands.as_ref().unwrap();
-            // Strands are defined at this point
-            for strand in strands {
-                // Build the time series for this strand, sampling at the correct rate
-                for epoch in TimeSeries::inclusive(strand.start, strand.end, cfg.sampling) {
-                    if let Some(msr) = device.measure(
-                        epoch,
-                        &self.trajectory,
-                        Some(&mut self.rng),
-                        cosm.clone(),
-                    )? {
-                        measurements.push((name.clone(), msr));
+            match cfg.strands.as_ref() {
+                Some(strands) => {
+                    // Strands are defined at this point
+                    'strands: for strand in strands {
+                        // Build the time series for this strand, sampling at the correct rate
+                        for epoch in TimeSeries::inclusive(strand.start, strand.end, cfg.sampling) {
+                            match device.measure(
+                                epoch,
+                                &self.trajectory,
+                                Some(&mut self.rng),
+                                cosm.clone(),
+                            ) {
+                                Ok(msr_opt) => {
+                                    if let Some(msr) = msr_opt {
+                                        measurements.push((name.clone(), msr));
+                                    }
+                                }
+                                Err(e) => {
+                                    error!(
+                                        "Skipping the remaining strand ending on {}: {e}",
+                                        strand.end
+                                    );
+                                    continue 'strands;
+                                }
+                            }
+                        }
                     }
+
+                    info!(
+                        "Generated {} measurements for {name} for {} tracking strands in {}",
+                        measurements.len() - init_msr_count,
+                        strands.len(),
+                        (Epoch::now().unwrap() - tick).round(1.0_f64.milliseconds())
+                    );
+                }
+                None => {
+                    warn!("No tracking strands defined for {name}, skipping");
                 }
             }
-
-            info!(
-                "Generated {} measurements for {name} for {} tracking strands in {}",
-                measurements.len() - init_msr_count,
-                strands.len(),
-                (Epoch::now().unwrap() - tick).round(1.0_f64.milliseconds())
-            );
         }
 
         let mut devices = Vec::new();
