@@ -134,6 +134,7 @@ impl Default for TrkConfig {
 /// Stores an epoch range for tracking.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
 pub struct EpochRanges {
     #[serde(serialize_with = "epoch_to_str", deserialize_with = "epoch_from_str")]
     pub start: Epoch,

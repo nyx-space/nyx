@@ -100,9 +100,14 @@ impl SpacecraftTraj {
                 self.inner.last().epoch()
             };
 
-            Ok(vec![self.inner.find_bracketed(start, end, &event)?])
+            Ok(vec![self.inner.find_bracketed(start, end, &event)?.state])
         } else {
-            self.inner.find_all(&event)
+            Ok(self
+                .inner
+                .find(&event)?
+                .iter()
+                .map(|details| details.state)
+                .collect::<Vec<Spacecraft>>())
         }
     }
 

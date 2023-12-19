@@ -25,8 +25,13 @@ use serde_derive::Serialize;
 use std::fmt::Debug;
 use typed_builder::TypedBuilder;
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
 /// Defines the handoff from a current ground station to the next one that is visible to prevent overlapping of measurements
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
 pub enum Handoff {
     /// If a new station is in visibility of the spacecraft, the "Eager" station will immediately stop tracking and switch over (default)
     Eager,
@@ -45,6 +50,8 @@ impl Default for Handoff {
 /// A scheduler allows building a scheduling of spaceraft tracking for a set of ground stations.
 #[derive(Copy, Clone, Debug, Default, Deserialize, PartialEq, Serialize, TypedBuilder)]
 #[builder(doc)]
+#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
 pub struct Scheduler {
     #[builder(default)]
     pub handoff: Handoff,

@@ -16,14 +16,15 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 pub use crate::io::ConfigError;
-pub use crate::od::simulator::{Schedule, TrkConfig};
-use crate::{io::ConfigRepr, od::simulator::Availability, NyxError};
-use hifitime::{Duration, Epoch};
+pub use crate::od::simulator::{EpochRanges, Scheduler, TrkConfig};
+use crate::{io::ConfigRepr, NyxError};
+use hifitime::Duration;
 use pyo3::basic::CompareOp;
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 use pythonize::{depythonize, pythonize};
-use std::{collections::HashMap, str::FromStr};
+use std::collections::HashMap;
+use std::str::FromStr;
 
 #[pymethods]
 impl TrkConfig {
@@ -43,57 +44,24 @@ impl TrkConfig {
     }
 
     #[new]
-    #[pyo3(
-        text_signature = "(start=None, end=None, schedule_on=None, schedule_off=None, sampling=None)"
-    )]
+    #[pyo3(text_signature = "(sampling=None, strands=None, scheduler=None)")]
     fn py_new(
-        start: Option<String>,
-        end: Option<String>,
-        schedule_on: Option<String>,
-        schedule_off: Option<String>,
         sampling: Option<String>,
+        strands: Option<Vec<EpochRanges>>,
+        scheduler: Option<Scheduler>,
     ) -> Result<Self, ConfigError> {
         let mut me = Self::default();
-
-        if schedule_on.is_some() || schedule_off.is_some() {
-            me.schedule = Schedule::Intermittent {
-                on: Duration::from_str(schedule_on.unwrap().as_str()).map_err(|e| {
-                    ConfigError::InvalidConfig(format!(
-                        "{e} invalid format for schedule on (must be specified if schedule off is)"
-                    ))
-                })?,
-                off: Duration::from_str(schedule_off.unwrap().as_str()).map_err(|e| {
-                    ConfigError::InvalidConfig(format!(
-                        "{e} invalid format for schedule off (must be specified if schedule on is)"
-                    ))
-                })?,
-            };
-        }
-
-        if let Some(start) = start {
-            if start.to_ascii_lowercase() == "visible" {
-                me.start = Availability::Visible
-            } else {
-                me.start = Availability::Epoch(Epoch::from_str(&start).map_err(|e| {
-                    ConfigError::InvalidConfig(format!("{e} invalid format for start availability"))
-                })?)
-            }
-        }
-
-        if let Some(end) = end {
-            if end.to_ascii_lowercase() == "visible" {
-                me.end = Availability::Visible
-            } else {
-                me.end = Availability::Epoch(Epoch::from_str(&end).map_err(|e| {
-                    ConfigError::InvalidConfig(format!("{e} invalid format for end availability"))
-                })?)
-            }
-        }
 
         if let Some(sampling) = sampling {
             me.sampling = Duration::from_str(&sampling).map_err(|e| {
                 ConfigError::InvalidConfig(format!("{e} invalid format for sampling"))
             })?;
+        }
+
+        me.strands = strands;
+
+        if scheduler.is_some() {
+            me.scheduler = scheduler;
         }
 
         Ok(me)
@@ -142,40 +110,6 @@ impl TrkConfig {
     #[setter]
     fn set_sampling(&mut self, sampling: Duration) -> PyResult<()> {
         self.sampling = sampling;
-        Ok(())
-    }
-
-    /// Allows setting the start and end availabilities and the sampling.
-    /// Availabilities must be either `Visible` or an Epoch as a string.
-    /// The sampling must be a Duration object.
-    /// Example usage: `cfg.set(start='Visible', end='2020-01-01 15.26.30 UTC')`
-    fn set(
-        &mut self,
-        start: Option<String>,
-        end: Option<String>,
-        sampling: Option<Duration>,
-    ) -> Result<(), NyxError> {
-        if let Some(start) = start {
-            if start.to_ascii_lowercase() == "visible" {
-                self.start = Availability::Visible
-            } else {
-                self.start = Availability::Epoch(Epoch::from_str(&start).map_err(|e| {
-                    NyxError::CustomError(format!("{e} invalid format for start availability"))
-                })?)
-            }
-        }
-        if let Some(end) = end {
-            if end.to_ascii_lowercase() == "visible" {
-                self.end = Availability::Visible
-            } else {
-                self.end = Availability::Epoch(Epoch::from_str(&end).map_err(|e| {
-                    NyxError::CustomError(format!("{e} invalid format for end availability"))
-                })?)
-            }
-        }
-        if let Some(sampling) = sampling {
-            self.sampling = sampling;
-        }
         Ok(())
     }
 }
