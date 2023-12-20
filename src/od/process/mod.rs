@@ -510,7 +510,7 @@ where
 
                 // Propagator for the minimum time between the maximum step size and the duration to the next measurement.
 
-                let next_step_size = delta_t.min(max_step);
+                let next_step_size = delta_t.min(self.prop.step_size);
 
                 // Remove old states from the trajectory
                 // This is a manual implementation of `retaint` because we know it's a sorted vec, so no need to resort every time

@@ -68,7 +68,6 @@ impl GroundTrackingArcSim {
 
     /// Generates simulated measurements and returns the path where the parquet file containing said measurements is stored.
     /// You may specify a metadata dictionary to be stored in the parquet file and whether the filename should include the timestamp.
-    #[pyo3(text_signature = "(path, metadata=None, timestamp=False)")]
     pub fn generate_measurements(
         &mut self,
         path: String,
@@ -86,6 +85,24 @@ impl GroundTrackingArcSim {
         match maybe {
             Ok(path) => Ok(format!("{}", path.to_str().unwrap())),
             Err(e) => Err(NyxError::CustomError(e.to_string())),
+        }
+    }
+
+    /// Generates a tracking schedule
+    pub fn generate_schedule(&self) -> Result<HashMap<String, TrkConfig>, NyxError> {
+        let cosm = Cosm::de438();
+        match &self.inner {
+            Either::Left(arc_sim) => arc_sim.generate_schedule(cosm),
+            Either::Right(arc_sim) => arc_sim.generate_schedule(cosm),
+        }
+    }
+
+    /// Builds a tracking schedule by generating it and storing it in this object.
+    pub fn build_schedule(&mut self) -> Result<(), NyxError> {
+        let cosm = Cosm::de438();
+        match &mut self.inner {
+            Either::Left(arc_sim) => arc_sim.build_schedule(cosm),
+            Either::Right(arc_sim) => arc_sim.build_schedule(cosm),
         }
     }
 

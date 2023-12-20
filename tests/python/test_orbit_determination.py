@@ -33,7 +33,7 @@ def test_filter_arc():
     # Initialize logging
     FORMAT = "%(levelname)s %(name)s %(asctime)-15s %(filename)s:%(lineno)d %(message)s"
     logging.basicConfig(format=FORMAT)
-    logging.getLogger().setLevel(logging.INFO)
+    logging.getLogger().setLevel(logging.DEBUG)
 
     # Base path
     root = Path(__file__).joinpath("../../../").resolve()
@@ -90,6 +90,8 @@ def test_filter_arc():
     # Build the simulated tracking arc, setting the seed to zero
     arc_sim = GroundTrackingArcSim(devices, traj, trk_cfg, 0)
     # Generate the measurements
+    print(arc_sim.generate_schedule())
+    arc_sim.build_schedule()
     msr_path = arc_sim.generate_measurements(
         str(outpath.joinpath("./msr.parquet")), cfg
     )
