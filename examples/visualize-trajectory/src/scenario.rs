@@ -1,18 +1,45 @@
+use std::fmt;
+
+use log::info;
 use nyx_space::{
     cosmic::{Bodies, Cosm},
     dynamics::{Drag, Harmonics, OrbitalDynamics, PointMasses, SolarPressure, SpacecraftDynamics},
     io::gravity::HarmonicsMem,
     md::Event,
+    od::ui::GroundStation,
     propagators::Propagator,
     time::{Epoch, Unit},
     Orbit, Spacecraft,
 };
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Scenarios {
     LunarTransfer,
+    OrbitDesign,
 }
 
-pub fn lunar_transfer() {
+impl fmt::Display for Scenarios {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), std::fmt::Error> {
+        match self {
+            Scenarios::LunarTransfer => write!(f, "Lunar Transfer"),
+            Scenarios::OrbitDesign => write!(f, "Orbit Design"),
+        }
+    }
+}
+
+impl Scenarios {
+    pub fn run(&self) {
+
+        info!("running scenario: {:?}", self.to_string());
+        match self {
+            Scenarios::LunarTransfer => lunar_transfer(),
+            Scenarios::OrbitDesign => orbit_design(),
+        }
+        info!("done.")
+    }
+}
+
+fn lunar_transfer() {
     // Initialize the cosm which stores the ephemeris
     let cosm = Cosm::de438();
     // Grab the frames we'll use
@@ -35,10 +62,14 @@ pub fn lunar_transfer() {
     // Define the spacecraft
     let sat = Spacecraft::new(orbit, 1000.0, 0.0, 1.0, 15.0, 1.7, 2.2);
 
+    info!("loading assets");
     // Set up the harmonics first because we need to pass them to the overarching orbital dynamics
     // Load the harmonics from the JGM3 file (GMAT uses the JGM2 in this case).
     // It's gunzipped (hence `true` as the last parameter)
-    let stor = HarmonicsMem::from_cof("assets/JGM3.cof.gz", 20, 20, true).unwrap();
+    let stor = match HarmonicsMem::from_cof("assets/JGM3.cof.gz", 20, 20, true) {
+        Ok(stor) => stor,
+        Err(error) => panic!("Problem reading harmonics file: {:?}", error),
+    };
     // Set up the orbital dynamics: we need to specify the models one by one here
     // because the usual functions wrap the dynamics so that they can be used in a Monte Carlo
     // setup.
@@ -61,8 +92,51 @@ pub fn lunar_transfer() {
     // Propagate until periapse
     let prop = Propagator::default(sc_dyn);
 
+    info!("propagating");
     let (out, traj) = prop
         .with(sat)
-        .until_event(0.5 * Unit::Day, &Event::periapsis())
+        .until_event(30. * Unit::Day, &Event::periapsis())
         .unwrap();
+}
+
+fn orbit_design() {
+    // Load the NASA NAIF DE438 planetary ephemeris.
+    let cosm = Cosm::de438();
+    // Grab the Earth Mean Equator J2000 frame
+    let eme2k = cosm.frame("EME2000");
+    // Set the initial start time of the scenario
+    let epoch = Epoch::from_gregorian_tai_at_noon(2021, 2, 25);
+    // Nearly circular orbit (ecc of 0.01), inclination of 49 degrees and TA at 30.0
+    let orbit = Orbit::keplerian_altitude(500.0, 0.01, 49.0, 0.0, 0.0, 30.0, epoch, eme2k);
+
+    // Define the landmark by specifying a name, a latitude, a longitude,
+    // an altitude (in km) and a frame. Note that we're also "cloning"
+    // the Cosm: don't worry, it's a shared object, so we're just cloning the
+    // the reference to it in memory, and never loading it more than once.
+    let landmark = GroundStation::from_point(
+        "Eiffel Tower".to_string(),
+        36.0544,
+        112.1402,
+        0.0,
+        cosm.frame("IAU Earth"),
+        cosm.clone(),
+    );
+
+    // Let's print this landmark to make sure we've created it correctly.
+    info!("target: {:}", landmark);
+
+    // Let's specify the force model to be two body dynamics
+    // And use the default propagator setup: a variable step Runge-Kutta 8-9
+    let setup = Propagator::default(OrbitalDynamics::two_body());
+
+    // Use the setup to seed a propagator with the initial state we defined above.
+    let mut prop = setup.with(orbit);
+    // Now let's propagate and generate the trajectory so we can analyse it.
+    let (final_state, traj) = match prop.for_duration_with_traj(1 * Unit::Day) {
+        Ok(state) => state,
+        Err(error) => panic!("Error during propagation: {:?}", error)
+    };
+
+    // Printing the state with `:o` will print its Keplerian elements
+    info!("{:?}", final_state);
 }

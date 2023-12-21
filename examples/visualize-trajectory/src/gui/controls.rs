@@ -1,4 +1,4 @@
-use crate::scenario::{lunar_transfer, Scenarios};
+use crate::scenario::Scenarios;
 pub struct ScenarioPicker {
     scenario: Scenarios,
 }
@@ -14,12 +14,21 @@ impl Default for ScenarioPicker {
 impl super::View for ScenarioPicker {
     fn ui(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
+            // change the scenario enum from a dropdown
+            egui::ComboBox::from_label("Scenario")
+                    .selected_text(self.scenario.to_string())
+                    .show_ui(ui, |ui| {
+                        for scen in &[
+                            Scenarios::LunarTransfer,
+                            Scenarios::OrbitDesign,
+                        ] {
+                            ui.selectable_value(&mut self.scenario, *scen, scen.to_string());
+                        }
+                    });
+
             // run the scenario when button is clicked
-            if ui.button("go").clicked() {
-                match self.scenario {
-                    Scenarios::LunarTransfer => lunar_transfer(),
-                    _ => {}
-                }
+            if ui.button("run").clicked() {
+                self.scenario.run()
             };
         });
     }

@@ -5,12 +5,15 @@ use crate::gui::controls::ScenarioPicker;
 
 use super::View;
 
-pub struct NyxGui;
+pub struct NyxGui {
+    scenario_picker: ScenarioPicker,
+}
 
 impl Default for NyxGui {
     fn default() -> Self {
         Self {
             // specify defaults here
+            scenario_picker: ScenarioPicker::default(),
         }
     }
 }
@@ -29,7 +32,7 @@ impl App for NyxGui {
     /// (like mouse movements) or there are some animations in the GUI.
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            ScenarioPicker::default().ui(ui);
+            self.scenario_picker.ui(ui);
         });
     }
 }
