@@ -17,6 +17,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 import plotly.graph_objects as go
+import plotly.express as px
+from datetime import datetime
 
 from .utils import plot_with_error, plot_line, finalize_plot, colors
 
@@ -28,6 +30,7 @@ import pandas as pd
 import numpy as np
 from scipy.stats import norm
 
+from nyx_space.time import Epoch
 
 def plot_estimates(
     dfs,
@@ -93,8 +96,8 @@ def plot_estimates(
             epoch = epoch.replace("UTC", "").strip()
             if "." not in epoch:
                 epoch += ".0"
-            pd_ok_epochs += [epoch]
-        time_col = pd.to_datetime(pd_ok_epochs)
+            pd_ok_epochs += [datetime.fromisoformat(str(epoch).replace("UTC", "").strip())]
+        time_col = pd.Series(pd_ok_epochs)
         x_title = "Epoch {}".format(time_col_name[-3:])
 
         # Check that the requested covariance frame exists
@@ -247,12 +250,12 @@ def plot_estimates(
 
     if msr_df is not None:
         # Plot the measurements on both plots
-        pos_fig = plot_measurements(
-            msr_df, title, time_col_name, fig=pos_fig, show=False
+        pos_fig = overlay_measurements(
+            pos_fig, msr_df, title, time_col_name, show=False
         )
 
-        vel_fig = plot_measurements(
-            msr_df, title, time_col_name, fig=vel_fig, show=False
+        vel_fig = overlay_measurements(
+            vel_fig, msr_df, title, time_col_name, show=False
         )
 
     if html_out:
@@ -333,8 +336,8 @@ def plot_covar(
             epoch = epoch.replace("UTC", "").strip()
             if "." not in epoch:
                 epoch += ".0"
-            pd_ok_epochs += [epoch]
-        time_col = pd.to_datetime(pd_ok_epochs)
+            pd_ok_epochs += [datetime.fromisoformat(str(epoch).replace("UTC", "").strip())]
+        time_col = pd.Series(pd_ok_epochs)
         x_title = "Epoch {}".format(time_col_name[-3:])
 
         # Check that the requested covariance frame exists
@@ -454,12 +457,12 @@ def plot_covar(
 
     if msr_df is not None:
         # Plot the measurements on both plots
-        pos_fig = plot_measurements(
-            msr_df, title, time_col_name, fig=pos_fig, show=False
+        pos_fig = overlay_measurements(
+            pos_fig, msr_df, title, time_col_name, show=False
         )
 
-        vel_fig = plot_measurements(
-            msr_df, title, time_col_name, fig=vel_fig, show=False
+        vel_fig = overlay_measurements(
+            vel_fig, msr_df, title, time_col_name, show=False
         )
 
     if html_out:
@@ -481,20 +484,21 @@ def plot_covar(
         return pos_fig, vel_fig
 
 
-def plot_measurements(
+def overlay_measurements(
+    fig,
     dfs,
     title,
     time_col_name="Epoch:Gregorian UTC",
     html_out=None,
     copyright=None,
-    fig=None,
     show=True,
 ):
+    """
+    Given a plotly figure, overlay the measurements as shaded regions on top of the existing plot.
+    For a plot of measurements only, use `plot_measurements`.
+    """
     if not isinstance(dfs, list):
         dfs = [dfs]
-
-    if fig is None:
-        fig = go.Figure()
 
     color_values = list(colors.values())
 
@@ -518,8 +522,8 @@ def plot_measurements(
             epoch = epoch.replace("UTC", "").strip()
             if "." not in epoch:
                 epoch += ".0"
-            pd_ok_epochs += [epoch]
-        time_col = pd.to_datetime(pd_ok_epochs)
+            pd_ok_epochs += [datetime.fromisoformat(str(epoch).replace("UTC", "").strip())]
+        time_col = pd.Series(pd_ok_epochs)
         x_title = "Epoch {}".format(time_col_name[-3:])
 
         # Diff the epochs of the measurements to find when there is a start and end.
@@ -571,7 +575,7 @@ def plot_measurements(
                 line_width=0,
             )
 
-        finalize_plot(fig, title, x_title, copyright, show)
+        finalize_plot(fig, title, x_title, None, copyright)
 
     if html_out:
         with open(html_out, "w") as f:
@@ -595,7 +599,7 @@ def plot_residuals(
     show=True,
 ):
     """
-    Plot of residuals, with 3-σ lines
+    Plot of residuals, with 3-σ lines. Returns a tuple of the plots if show=False.
     """
 
     try:
@@ -615,11 +619,13 @@ def plot_residuals(
         epoch = epoch.replace("UTC", "").strip()
         if "." not in epoch:
             epoch += ".0"
-        pd_ok_epochs += [epoch]
-    time_col = pd.to_datetime(pd_ok_epochs)
+        pd_ok_epochs += [datetime.fromisoformat(str(epoch).replace("UTC", "").strip())]
+        time_col = pd.Series(pd_ok_epochs)
     x_title = "Epoch {}".format(time_col_name[-3:])
 
     plt_any = False
+
+    rtn_plots = []
 
     for col in df.columns:
         if col.startswith(kind):
@@ -671,8 +677,8 @@ def plot_residuals(
 
             if msr_df is not None:
                 # Plot the measurements on both plots
-                fig = plot_measurements(
-                    msr_df, title, time_col_name, fig=fig, show=False
+                fig = overlay_measurements(
+                    fig, msr_df, title, time_col_name, show=False
                 )
 
             finalize_plot(
@@ -689,9 +695,14 @@ def plot_residuals(
 
             if show:
                 fig.show()
+            else:
+                rtn_plots += [fig]
 
     if not plt_any:
         raise ValueError(f"No columns ending with {kind} found -- nothing plotted")
+
+    if not show:
+        return rtn_plots
 
 
 def plot_residual_histogram(
@@ -737,3 +748,64 @@ def plot_residual_histogram(
 
             if show:
                 fig.show()
+
+def plot_measurements(
+    df,
+    msr_type=None,
+    title=None,
+    time_col_name="Epoch:Gregorian UTC",
+    html_out=None,
+    copyright=None,
+    show=True,
+):
+    """
+    Plot the provided measurement type, fuzzy matching of the column name, or plot all as a strip
+    """
+
+    if title is None:
+        # Build a title
+        station_names = ", ".join([name for name in df["Tracking device"].unique()])
+        start = Epoch(df["Epoch:Gregorian UTC"].iloc[0])
+        end = Epoch(df["Epoch:Gregorian UTC"].iloc[-1])
+        arc_duration = end.timedelta(start)
+        title = f"Measurements from {station_names} spanning {start} to {end} ({arc_duration})"
+
+    try:
+        orig_tim_col = df[time_col_name]
+    except KeyError:
+        # Find the time column
+        try:
+            col_name = [x for x in df.columns if x.startswith("Epoch")][0]
+        except IndexError:
+            raise KeyError("Could not find any Epoch column")
+        print(f"Could not find time column {time_col_name}, using `{col_name}`")
+        orig_tim_col = df[col_name]
+
+    # Build a Python datetime column
+    pd_ok_epochs = []
+    for epoch in orig_tim_col:
+        epoch = epoch.replace("UTC", "").strip()
+        if "." not in epoch:
+            epoch += ".0"
+        pd_ok_epochs += [datetime.fromisoformat(str(epoch).replace("UTC", "").strip())]
+    df["time_col"] = pd.Series(pd_ok_epochs)
+    x_title = "Epoch {}".format(time_col_name[-3:])
+
+    if msr_type is None:
+        fig = px.strip(df, x="time_col", y="Tracking device", color="Tracking device")
+        finalize_plot(fig, title, x_title, "All tracking data", copyright)
+    else:
+        msr_col_name = [col for col in df.columns if msr_type in col.lower()]
+
+        fig = px.scatter(df, x="time_col", y=msr_col_name, color="Tracking device")
+        finalize_plot(fig, title, x_title, msr_col_name[0], copyright)
+
+    if html_out:
+        with open(html_out, "w") as f:
+            f.write(fig.to_html())
+        print(f"Saved HTML to {html_out}")
+
+    if show:
+        fig.show()
+    else:
+        return fig

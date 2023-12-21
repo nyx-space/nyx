@@ -19,6 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import pandas as pd
+from datetime import datetime
 
 from .utils import (
     radii,
@@ -219,8 +220,8 @@ def plot_orbit_elements(
             epoch = epoch.replace("UTC", "").strip()
             if "." not in epoch:
                 epoch += ".0"
-            pd_ok_epochs += [epoch]
-        df["Epoch"] = pd.to_datetime(pd_ok_epochs)
+            pd_ok_epochs += [datetime.fromisoformat(str(epoch).replace("UTC", "").strip())]
+        df["Epoch"] = pd.Series(pd_ok_epochs)
 
     if not isinstance(names, list):
         names = [names]
@@ -317,8 +318,8 @@ def plot_traj_errors(
             epoch = epoch.replace("UTC", "").strip()
             if "." not in epoch:
                 epoch += ".0"
-            pd_ok_epochs += [epoch]
-        df["Epoch"] = pd.to_datetime(pd_ok_epochs)
+            pd_ok_epochs += [datetime.fromisoformat(str(epoch).replace("UTC", "").strip())]
+        df["Epoch"] = pd.Series(pd_ok_epochs)
 
     if not isinstance(names, list):
         names = [names]

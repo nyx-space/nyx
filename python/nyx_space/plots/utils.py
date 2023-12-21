@@ -104,7 +104,7 @@ nyx_tpl = go.layout.Template()
 nyx_tpl.layout.annotations = [
     dict(
         name="watermark",
-        text=f"Nyx Space 🄯 AGPLv3 {year}",
+        text=f"Powered by Nyx Space © {year}",
         opacity=0.75,
         font=dict(color="#3d84e8", size=12),
         xref="paper",
@@ -201,7 +201,7 @@ def finalize_plot(fig, title, xtitle=None, ytitle=None, copyright=None):
     """
 
     annotations = [dict(templateitemname="watermark")]
-    if copyright:
+    if copyright is not None:
         annotations += [
             dict(
                 templateitemname="watermark",
