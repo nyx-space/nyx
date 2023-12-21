@@ -112,7 +112,7 @@ impl TrkConfig {
             }
         } else if self.strands.is_none() && self.scheduler.is_none() {
             return Err(ConfigError::InvalidConfig(
-                "Provided tracking strands is empty (set to None to use scheduler)".to_string(),
+                "Neither tracking strands not a scheduler is provided".to_string(),
             ));
         }
 

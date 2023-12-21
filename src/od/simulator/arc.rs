@@ -94,15 +94,25 @@ where
         let mut sampling_rates_ns = Vec::with_capacity(devices.len());
         for device in devices {
             if let Some(cfg) = configs.get(&device.name()) {
-                cfg.sanity_check()?;
+                if let Err(e) = cfg.sanity_check() {
+                    warn!("Ignoring device {}: {e}", device.name());
+                    continue;
+                }
                 sampling_rates_ns.push(cfg.sampling.truncated_nanoseconds());
             } else {
-                return Err(ConfigError::InvalidConfig(format!(
-                    "device {} has no associated configuration",
+                warn!(
+                    "Ignoring device {}: no associated tracking configuration",
                     device.name()
-                )));
+                );
+                continue;
             }
             devices_map.insert(device.name(), device);
+        }
+
+        if devices_map.is_empty() {
+            return Err(ConfigError::InvalidConfig(
+                "None of the devices are properly configured".to_string(),
+            ));
         }
 
         let common_sampling_rate_ns = sampling_rates_ns

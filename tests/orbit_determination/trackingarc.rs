@@ -103,6 +103,8 @@ fn trk_simple(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
     let mut trk =
         TrackingArcSim::<Orbit, RangeDoppler, _>::with_seed(devices, traj, configs, 12345).unwrap();
 
+    trk.build_schedule(cosm.clone()).unwrap();
+
     let arc = trk.generate_measurements(cosm).unwrap();
 
     // Test filtering by epoch
@@ -147,7 +149,7 @@ fn trk_simple(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
     );
 
     // Regression
-    assert_eq!(arc.measurements.len(), 146);
+    assert_eq!(arc.measurements.len(), 215);
 
     // And serialize to disk
     let path: PathBuf = [
@@ -195,10 +197,12 @@ fn trkconfig_zero_inclusion(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
 
     let mut trk = TrackingArcSim::<Orbit, RangeDoppler, _>::new(devices, traj, configs).unwrap();
 
+    trk.build_schedule(cosm.clone()).unwrap();
+
     let arc = trk.generate_measurements(cosm).unwrap();
 
     // Regression
-    assert_eq!(arc.measurements.len(), 79);
+    assert_eq!(arc.measurements.len(), 113);
 
     assert_eq!(
         arc.device_names().len(),
@@ -232,31 +236,24 @@ fn trkconfig_invalid(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
 fn trkconfig_delayed_start(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
     let cosm = Cosm::de438();
 
-    let trkcfg = TrkConfig {
-        strands: Some(vec![EpochRanges {
+    let trkcfg = TrkConfig::builder()
+        .strands(vec![EpochRanges {
             start: traj.first().epoch() + 2.hours(),
             end: traj.last().epoch(),
-        }]),
-        sampling: 1.26.minutes(),
-        ..Default::default()
-    };
+        }])
+        .sampling(1.26.minutes())
+        .build();
 
     // Build the configs map with a single ground station
     let mut configs = HashMap::new();
 
     configs.insert(devices[0].name.clone(), trkcfg);
 
-    // Check that if if a device does not have an associated trkconfig, the tracking arc cannot be created.
-    assert!(TrackingArcSim::<Orbit, RangeDoppler, _>::new(
-        devices.clone(),
-        traj.clone(),
-        configs.clone()
-    )
-    .is_err());
-
     let mut trk =
         TrackingArcSim::<Orbit, RangeDoppler, _>::new(vec![devices[0].clone()], traj, configs)
             .unwrap();
+
+    trk.build_schedule(cosm.clone()).unwrap();
 
     let arc = trk.generate_measurements(cosm).unwrap();
 
@@ -268,7 +265,7 @@ fn trkconfig_delayed_start(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
     );
 
     // Regression
-    assert_eq!(arc.measurements.len(), 53);
+    assert_eq!(arc.measurements.len(), 108);
 }
 
 /// Test different cadences and availabilities
@@ -295,10 +292,15 @@ fn trkconfig_cadence(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
 
     configs.insert(
         devices[1].name.clone(),
-        TrkConfig::builder().sampling(26.1.seconds()).build(),
+        TrkConfig::builder()
+            .sampling(26.1.seconds())
+            .scheduler(Scheduler::default())
+            .build(),
     );
 
     let mut trk = TrackingArcSim::<Orbit, RangeDoppler, _>::new(devices, traj, configs).unwrap();
+
+    trk.build_schedule(cosm.clone()).unwrap();
 
     let arc = trk.generate_measurements(cosm).unwrap();
 
@@ -310,5 +312,5 @@ fn trkconfig_cadence(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
     );
 
     // Regression
-    assert_eq!(arc.measurements.len(), 90);
+    assert_eq!(arc.measurements.len(), 216);
 }
