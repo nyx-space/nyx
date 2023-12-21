@@ -2,10 +2,12 @@ Demo ground station:
   scheduler:
     handoff: Eager
     cadence: Continuous
+    min_samples: 10
   sampling: 1 min
 
 Canberra:
   scheduler:
     handoff: Eager
     cadence: Continuous
+    min_samples: 10
   sampling: 1 min

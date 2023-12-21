@@ -310,9 +310,17 @@ impl TrackingArcSim<Orbit, RangeDoppler, GroundStation> {
                     Err(_) => info!("No measurements from {name}"),
                     Ok(elevation_arcs) => {
                         for arc in elevation_arcs {
-                            info!("Working on {arc}");
                             let strand_start = arc.rise.state.epoch();
                             let strand_end = arc.fall.state.epoch();
+
+                            if strand_end - strand_start
+                                < cfg.sampling * i64::from(scheduler.min_samples)
+                            {
+                                info!(
+                                    "Too few samples from {name} opportunity from {strand_start} to {strand_end}, discarding strand",
+                                );
+                                continue;
+                            }
 
                             let mut strand_range = EpochRanges {
                                 start: strand_start,
@@ -330,7 +338,8 @@ impl TrackingArcSim<Orbit, RangeDoppler, GroundStation> {
                                         // Check that we didn't eat into the whole tracking opportunity
                                         if strand_range.start > strand_end {
                                             // Lost this whole opportunity.
-                                            info!("Discarding {name} opportunity from {} to {} due to cadence {:?}", strand_start, strand_end, scheduler.cadence);
+                                            info!("Discarding {name} opportunity from {strand_start} to {strand_end} due to cadence {:?}", scheduler.cadence);
+                                            continue;
                                         }
                                     }
                                 }

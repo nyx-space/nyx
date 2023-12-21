@@ -526,11 +526,6 @@ where
                 debug!("propagate for {next_step_size} (Δt to next msr: {delta_t})");
                 let (_, traj_covar) = self.prop.for_duration_with_traj(next_step_size)?;
 
-                // Restore the step size if needed
-                // if let Some(prev_step) = saved_step {
-                //     self.prop.set_step(prev_step, false);
-                // }
-
                 for state in traj_covar.states {
                     traj.states.push(S::extract(state));
                 }

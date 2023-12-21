@@ -31,11 +31,13 @@ impl Scheduler {
         handoff: Handoff,
         cadence_on: Option<String>,
         cadence_off: Option<String>,
+        min_samples: Option<u32>,
     ) -> Result<Self, ConfigError> {
-        let mut me = Self {
-            handoff,
-            cadence: Cadence::default(),
-        };
+        let mut me = Self::builder().handoff(handoff).build();
+
+        if let Some(min_samples) = min_samples {
+            me.min_samples = min_samples;
+        }
 
         if cadence_on.is_some() || cadence_off.is_some() {
             me.cadence = Cadence::Intermittent {

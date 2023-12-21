@@ -53,10 +53,15 @@ impl Default for Handoff {
 #[cfg_attr(feature = "python", pyclass)]
 #[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
 pub struct Scheduler {
+    /// Handoff strategy if two trackers see the vehicle at the same time
     #[builder(default)]
     pub handoff: Handoff,
+    /// On/off cadence of this scheduler
     #[builder(default)]
     pub cadence: Cadence,
+    /// Minimum number of samples for a valid arc, i.e. if there are less than this many samples during a pass, the strand is discarded.
+    #[builder(default = 10)]
+    pub min_samples: u32,
 }
 
 /// Determines whether tracking is continuous or intermittent.
