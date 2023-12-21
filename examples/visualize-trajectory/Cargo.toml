@@ -1,0 +1,16 @@
+[package]
+name = "visualize-trajectory"
+version = "0.1.0"
+edition = "2021"
+authors = ["Philip Linden <lindenphilipj@gmail.com>"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+eframe = "0.24.1"
+egui = "0.24.1"
+egui_plot = "0.24.1"
+log = "0.4.20"
+nyx-space = "1.1.2"
+pretty_env_logger = "0.5.0"
+serde = { version = "1.0.193", features = ["derive"] }
