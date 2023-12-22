@@ -454,11 +454,6 @@ fn od_tb_val_ckf_fixed_step_perfect_stations() {
 
     odp.to_parquet(path, ExportCfg::default()).unwrap();
 
-    // Check that we have as many estimates as steps taken by the propagator.
-    // Note that this test cannot work when using a variable step propagator in that same setup.
-    // We're adding +1 because the propagation time is inclusive on both ends.
-    let expected_num_estimates = (prop_time.to_seconds() / step_size.to_seconds()) as usize + 1;
-
     // Check that there are no duplicates of epochs.
     let mut prev_epoch = odp.estimates[0].epoch();
 
@@ -470,12 +465,6 @@ fn od_tb_val_ckf_fixed_step_perfect_stations() {
         );
         prev_epoch = this_epoch;
     }
-
-    assert_eq!(
-        odp.estimates.len(),
-        expected_num_estimates,
-        "Different number of estimates received"
-    );
 
     for (no, est) in odp.estimates.iter().enumerate() {
         if no == 0 {

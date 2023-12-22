@@ -400,7 +400,6 @@ where
         // If the first event isn't a rising edge, then we mark the start of the trajectory as a rising edge
         let mut prev_rise = if events[0].edge != EventEdge::Rising {
             let value = event.eval(self.first());
-
             Some(EventDetails::new(*self.first(), value, event, self)?)
         } else {
             Some(events[0].clone())

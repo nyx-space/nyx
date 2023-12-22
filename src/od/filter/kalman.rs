@@ -372,12 +372,12 @@ where
 
         if let Some(ratio_thresh) = resid_ratio_check {
             if ratio > ratio_thresh {
-                warn!("{epoch} msr rejected: residual ratio {ratio} > {ratio_thresh}");
+                warn!("{epoch} msr rejected: residual ratio {ratio:.3e} > {ratio_thresh}");
                 // Perform only a time update and return
                 let pred_est = self.time_update(nominal_state)?;
                 return Ok((pred_est, Residual::rejected(epoch, prefit, ratio)));
             } else {
-                debug!("{epoch} msr accepted: residual ratio {ratio} < {ratio_thresh}");
+                debug!("{epoch} msr accepted: residual ratio {ratio:.3e} < {ratio_thresh}");
             }
         }
 

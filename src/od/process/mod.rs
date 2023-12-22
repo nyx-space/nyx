@@ -478,7 +478,10 @@ where
         // Start by propagating the estimator (on the same thread).
         let num_msrs = measurements.len();
 
-        self.prop.set_step(max_step, self.prop.fixed_step);
+        // Update the step size of the navigation propagator if it isn't already fixed step
+        if !self.prop.fixed_step {
+            self.prop.set_step(max_step, false);
+        }
 
         let prop_time = measurements[num_msrs - 1].1.epoch() - self.kf.previous_estimate().epoch();
         info!("Navigation propagating for a total of {prop_time} with step size {max_step}");
@@ -511,6 +514,12 @@ where
                 // Propagator for the minimum time between the maximum step size and the duration to the next measurement.
 
                 let next_step_size = delta_t.min(self.prop.step_size);
+
+                // let next_step_size = delta_t.min(if self.prop.details.step.is_negative() {
+                //     max_step
+                // } else {
+                //     self.prop.details.step
+                // });
 
                 // Remove old states from the trajectory
                 // This is a manual implementation of `retaint` because we know it's a sorted vec, so no need to resort every time
