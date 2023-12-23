@@ -17,7 +17,9 @@
 */
 
 pub use crate::dynamics::{Dynamics, NyxError};
-use crate::io::{duration_from_str, duration_to_str};
+use crate::io::{
+    duration_from_str, duration_to_str, maybe_duration_from_str, maybe_duration_to_str,
+};
 pub use crate::{cosmic::Cosm, State, TimeTagged};
 use hifitime::Duration;
 use serde::Deserialize;
@@ -62,6 +64,14 @@ pub struct Scheduler {
     /// Minimum number of samples for a valid arc, i.e. if there are less than this many samples during a pass, the strand is discarded.
     #[builder(default = 10)]
     pub min_samples: u32,
+    /// Round the time of the samples to the provided duration. For example, if the vehicle is above the horizon at 01:02:03.456 and the alignment
+    /// is set to 01 seconds, then this will cause the tracking to start at 01:02:03 as it is rounded to the nearest second.
+    #[builder(default, setter(strip_option))]
+    #[serde(
+        serialize_with = "maybe_duration_to_str",
+        deserialize_with = "maybe_duration_from_str"
+    )]
+    pub sample_alignment: Option<Duration>,
 }
 
 /// Determines whether tracking is continuous or intermittent.

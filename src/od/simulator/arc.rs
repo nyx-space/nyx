@@ -327,6 +327,12 @@ impl TrackingArcSim<Orbit, RangeDoppler, GroundStation> {
                                 end: strand_end,
                             };
 
+                            // If there is an alignment, apply it
+                            if let Some(alignment) = scheduler.sample_alignment {
+                                strand_range.start = strand_range.start.round(alignment);
+                                strand_range.end = strand_range.end.round(alignment);
+                            }
+
                             if let Cadence::Intermittent { on, off } = scheduler.cadence {
                                 // Check that the next start time is within the allocated time
                                 if let Some(prev_strand) =

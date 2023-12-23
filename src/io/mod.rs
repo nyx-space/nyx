@@ -328,6 +328,35 @@ where
     Ok(orbit_serde.into())
 }
 
+pub(crate) fn maybe_duration_to_str<S>(
+    duration: &Option<Duration>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    if let Some(duration) = duration {
+        duration_to_str(duration, serializer)
+    } else {
+        serializer.serialize_str("")
+    }
+}
+
+pub(crate) fn maybe_duration_from_str<'de, D>(deserializer: D) -> Result<Option<Duration>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    if let Ok(s) = String::deserialize(deserializer) {
+        if let Ok(duration) = Duration::from_str(&s) {
+            Ok(Some(duration))
+        } else {
+            Ok(None)
+        }
+    } else {
+        Ok(None)
+    }
+}
+
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug)]
 pub enum ParsingError {

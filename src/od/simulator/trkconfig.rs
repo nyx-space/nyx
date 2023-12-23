@@ -223,6 +223,7 @@ mod trkconfig_ut {
                 },
                 handoff: Handoff::Eager,
                 min_samples: 10,
+                ..Default::default()
             }),
             sampling: 45.2.seconds(),
             ..Default::default()
