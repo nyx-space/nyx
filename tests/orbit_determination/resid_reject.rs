@@ -51,7 +51,7 @@ fn traj(epoch: Epoch) -> Traj<Orbit> {
 }
 
 #[fixture]
-fn devices_n_configs() -> (Vec<GroundStation>, HashMap<String, TrkConfig>) {
+fn devices_n_configs(epoch: Epoch) -> (Vec<GroundStation>, HashMap<String, TrkConfig>) {
     // Load cosm
     let cosm = Cosm::de438();
 
@@ -78,8 +78,14 @@ fn devices_n_configs() -> (Vec<GroundStation>, HashMap<String, TrkConfig>) {
 
     // Define the tracking configurations
     let mut configs = HashMap::new();
-    configs.insert(dss65_madrid.name.clone(), TrkConfig::default());
-    configs.insert(dss34_canberra.name.clone(), TrkConfig::default());
+    let cfg = TrkConfig::builder()
+        .strands(vec![EpochRanges {
+            start: epoch + 60.seconds(),
+            end: epoch + 2.hours(),
+        }])
+        .build();
+    configs.insert(dss65_madrid.name.clone(), cfg.clone());
+    configs.insert(dss34_canberra.name.clone(), cfg);
 
     (vec![dss65_madrid, dss34_canberra], configs)
 }

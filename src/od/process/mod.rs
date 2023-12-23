@@ -489,6 +489,7 @@ where
         let mut epoch = self.prop.state.epoch();
 
         let mut reported = [false; 11];
+        reported[0] = true; // Prevent showing "0% done"
         info!("Processing {num_msrs} measurements with covariance mapping");
 
         // We'll build a trajectory of the estimated states. This will be used to compute the measurements.
@@ -624,7 +625,7 @@ where
                     if !reported[msr_prct] {
                         info!(
                             "{:>3}% done ({msr_accepted_cnt:.0} measurements accepted, {:.0} rejected)",
-                            10 * msr_prct, msr_cnt - (msr_accepted_cnt - 1)
+                            10 * msr_prct, msr_cnt - msr_accepted_cnt.saturating_sub(1)
                         );
                         reported[msr_prct] = true;
                     }

@@ -21,7 +21,7 @@ use crate::io::{
     duration_from_str, duration_to_str, maybe_duration_from_str, maybe_duration_to_str,
 };
 pub use crate::{cosmic::Cosm, State, TimeTagged};
-use hifitime::Duration;
+use hifitime::{Duration, Unit};
 use serde::Deserialize;
 use serde_derive::Serialize;
 use std::fmt::Debug;
@@ -66,7 +66,7 @@ pub struct Scheduler {
     pub min_samples: u32,
     /// Round the time of the samples to the provided duration. For example, if the vehicle is above the horizon at 01:02:03.456 and the alignment
     /// is set to 01 seconds, then this will cause the tracking to start at 01:02:03 as it is rounded to the nearest second.
-    #[builder(default, setter(strip_option))]
+    #[builder(default = Some(Unit::Second * 1.0), setter(strip_option))]
     #[serde(
         serialize_with = "maybe_duration_to_str",
         deserialize_with = "maybe_duration_from_str"

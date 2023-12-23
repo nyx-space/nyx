@@ -386,30 +386,33 @@ impl TrackingArcSim<Orbit, RangeDoppler, GroundStation> {
             cfg_as_vec.iter().take(cfg_as_vec.len() - 1).enumerate()
         {
             // Grab the config
-            let config = self.configs[this_name].scheduler.as_ref().unwrap();
-            // Grab the next strand, chronologically
-            if let Some((next_name, next_pos, next_strand)) = cfg_as_vec.get(ii + 1) {
-                if config.handoff == Handoff::Greedy && this_strand.end >= next_strand.start {
-                    // Modify the built configurations to change the start time of the next strand because the current one is greedy.
-                    let next_config = built_cfg.get_mut(next_name).unwrap();
-                    let new_start = this_strand.end + next_config.sampling;
-                    next_config.strands.as_mut().unwrap()[*next_pos].start = new_start;
-                    info!(
-                        "{this_name} being {:?}, {next_name} now starts on {new_start}",
-                        config.handoff
-                    );
-                } else if config.handoff == Handoff::Eager && this_strand.end >= next_strand.start {
-                    let this_config = built_cfg.get_mut(this_name).unwrap();
-                    let new_end = next_strand.start - this_config.sampling;
-                    this_config.strands.as_mut().unwrap()[*this_pos].end = new_end;
-                    info!(
-                        "{this_name} being {:?}, it now now emds on {new_end} for handoff",
-                        config.handoff
-                    );
+            if let Some(config) = self.configs[this_name].scheduler.as_ref() {
+                // Grab the next strand, chronologically
+                if let Some((next_name, next_pos, next_strand)) = cfg_as_vec.get(ii + 1) {
+                    if config.handoff == Handoff::Greedy && this_strand.end >= next_strand.start {
+                        // Modify the built configurations to change the start time of the next strand because the current one is greedy.
+                        let next_config = built_cfg.get_mut(next_name).unwrap();
+                        let new_start = this_strand.end + next_config.sampling;
+                        next_config.strands.as_mut().unwrap()[*next_pos].start = new_start;
+                        info!(
+                            "{this_name} being {:?}, {next_name} now starts on {new_start}",
+                            config.handoff
+                        );
+                    } else if config.handoff == Handoff::Eager
+                        && this_strand.end >= next_strand.start
+                    {
+                        let this_config = built_cfg.get_mut(this_name).unwrap();
+                        let new_end = next_strand.start - this_config.sampling;
+                        this_config.strands.as_mut().unwrap()[*this_pos].end = new_end;
+                        info!(
+                            "{this_name} being {:?}, it now now emds on {new_end} for handoff",
+                            config.handoff
+                        );
+                    }
+                } else {
+                    // Reached the end
+                    break;
                 }
-            } else {
-                // Reached the end
-                break;
             }
         }
 
