@@ -203,8 +203,8 @@ impl GaussMarkov {
     pub fn high_precision_doppler_km_s() -> Self {
         Self {
             tau: 12.hours(),
-            bias_sigma: 50.0e-6,        // 5 cm/s
-            steady_state_sigma: 1.5e-6, // 0.15 cm/s
+            bias_sigma: 35.0e-7,        // 3.5 mm/s
+            steady_state_sigma: 3.5e-7, // 0.35 mm/s
             bias: None,
             epoch: None,
         }

@@ -106,7 +106,7 @@ where
                     {
                         if log_progress {
                             let tock: Duration = tick.elapsed().into();
-                            info!("Done in {}", tock);
+                            debug!("Done in {}", tock);
                         }
                     }
                     return Ok(self.state);
@@ -136,7 +136,7 @@ where
                 {
                     if log_progress {
                         let tock: Duration = tick.elapsed().into();
-                        info!("Done in {}", tock);
+                        debug!("Done in {}", tock);
                     }
                 }
 

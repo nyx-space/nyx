@@ -178,7 +178,10 @@ fn multi_body_ckf_covar_map() {
     let mut configs = HashMap::new();
     configs.insert(
         dss13_goldstone.name.clone(),
-        TrkConfig::from_sample_rate(10.seconds()),
+        TrkConfig::builder()
+            .sampling(10.seconds())
+            .scheduler(Scheduler::builder().sample_alignment(10.seconds()).build())
+            .build(),
     );
 
     let all_stations = vec![dss13_goldstone];
@@ -278,6 +281,6 @@ fn multi_body_ckf_covar_map() {
     let aop_event = Event::apoapsis();
     for found_event in nav_traj.find(&aop_event).unwrap() {
         println!("{:x}", found_event.state);
-        assert!((found_event.value - 180.0).abs() < 1e-2)
+        assert!((found_event.state.ta_deg() - 180.0).abs() < 1e-2)
     }
 }

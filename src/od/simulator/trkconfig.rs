@@ -76,11 +76,12 @@ impl Configurable for TrkConfig {
 }
 
 impl TrkConfig {
-    /// Initialize a default TrkConfig providing only the sample rate
+    /// Initialize a default TrkConfig providing only the sample rate.
+    /// Note: this will also set the sample alignment time to the provided duration.
     pub fn from_sample_rate(sampling: Duration) -> Self {
         Self {
             sampling,
-            scheduler: Some(Scheduler::default()),
+            scheduler: Some(Scheduler::builder().sample_alignment(sampling).build()),
             ..Default::default()
         }
     }
@@ -124,7 +125,8 @@ impl Default for TrkConfig {
     /// The default configuration is to generate a measurement every minute (continuously) while the vehicle is visible
     fn default() -> Self {
         Self {
-            scheduler: Some(Scheduler::default()),
+            // Allows calling the builder's defaults
+            scheduler: Some(Scheduler::builder().build()),
             sampling: 1.minutes(),
             strands: None,
         }

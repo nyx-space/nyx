@@ -149,7 +149,7 @@ fn trk_simple(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
     );
 
     // Regression
-    assert_eq!(arc.measurements.len(), 215);
+    assert_eq!(arc.measurements.len(), 197);
 
     // And serialize to disk
     let path: PathBuf = [

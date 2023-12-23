@@ -1,6 +1,6 @@
 Demo ground station:
   scheduler:
-    handoff: Eager
+    handoff: Overlap
     cadence: Continuous
     min_samples: 10
     sample_alignment: null

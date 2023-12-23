@@ -46,8 +46,8 @@ pub enum EventEdge {
 /// S: Interpolatable - A type that represents the state of the trajectory. This type must implement the `Interpolatable` trait, ensuring that it can be interpolated and manipulated according to the trajectory's requirements.
 ///
 /// # Fields
-/// - `state: S` - The state of the trajectory at the found event.
-/// - `edge: EventEdge` - Indicates whether the event is a rising edge, falling edge, or unclear. This helps in understanding the direction of change at the event point.
+/// - `state: S` -
+/// - `edge: EventEdge` -
 /// - `value: f64` - The numerical evaluation of the event for the returned state.
 #[derive(Clone, Debug, PartialEq)]
 pub struct EventDetails<S: Interpolatable>
@@ -55,11 +55,17 @@ where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
 {
+    /// The state of the trajectory at the found event.
     pub state: S,
+    /// Indicates whether the event is a rising edge, falling edge, or unclear. This helps in understanding the direction of change at the event point.
     pub edge: EventEdge,
+    /// Numerical evaluation of the event condition, e.g. if seeking the apoapsis, this returns the near zero
     pub value: f64,
+    /// Numertical evaluation of the event condition one epoch step before the found event (used to compute the rising/falling edge).
     pub prev_value: Option<f64>,
+    /// Numertical evaluation of the event condition one epoch step after the found event (used to compute the rising/falling edge).
     pub next_value: Option<f64>,
+    /// Precision of the epoch for this value
     pub pm_duration: Duration,
     // Store the representation of this event as a string because we can't move or clone the event reference
     pub repr: String,

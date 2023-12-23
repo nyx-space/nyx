@@ -395,7 +395,7 @@ impl TrackingArcSim<Orbit, RangeDoppler, GroundStation> {
                         let new_start = this_strand.end + next_config.sampling;
                         next_config.strands.as_mut().unwrap()[*next_pos].start = new_start;
                         info!(
-                            "{this_name} being {:?}, {next_name} now starts on {new_start}",
+                            "{this_name} configured as {:?}, so {next_name} now starts on {new_start}",
                             config.handoff
                         );
                     } else if config.handoff == Handoff::Eager
@@ -405,7 +405,7 @@ impl TrackingArcSim<Orbit, RangeDoppler, GroundStation> {
                         let new_end = next_strand.start - this_config.sampling;
                         this_config.strands.as_mut().unwrap()[*this_pos].end = new_end;
                         info!(
-                            "{this_name} being {:?}, it now now emds on {new_end} for handoff",
+                            "{this_name} now hands off to {next_name} on {new_end} because it's configured as {:?}",
                             config.handoff
                         );
                     }
