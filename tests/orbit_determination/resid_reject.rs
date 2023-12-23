@@ -78,24 +78,14 @@ fn devices_n_configs(epoch: Epoch) -> (Vec<GroundStation>, HashMap<String, TrkCo
 
     // Define the tracking configurations
     let mut configs = HashMap::new();
-    configs.insert(
-        dss65_madrid.name.clone(),
-        TrkConfig {
-            // Make sure to start the tracking one integration time after the start of the trajectory
-            start: simulator::Availability::Epoch(epoch + 60.seconds()),
-            sampling: 60.seconds(),
-            ..Default::default()
-        },
-    );
-    configs.insert(
-        dss34_canberra.name.clone(),
-        TrkConfig {
-            // Make sure to start the tracking one integration time after the start of the trajectory
-            start: simulator::Availability::Epoch(epoch + 60.seconds()),
-            sampling: 60.seconds(),
-            ..Default::default()
-        },
-    );
+    let cfg = TrkConfig::builder()
+        .strands(vec![Strand {
+            start: epoch + 60.seconds(),
+            end: epoch + 2.hours(),
+        }])
+        .build();
+    configs.insert(dss65_madrid.name.clone(), cfg.clone());
+    configs.insert(dss34_canberra.name.clone(), cfg);
 
     (vec![dss65_madrid, dss34_canberra], configs)
 }
@@ -112,7 +102,7 @@ fn tracking_arc(
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(devices, traj, configs, 0).unwrap();
-    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+    arc_sim.build_schedule(cosm.clone()).unwrap();
 
     let arc = arc_sim.generate_measurements(cosm).unwrap();
 

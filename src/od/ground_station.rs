@@ -21,11 +21,13 @@ use super::noise::GaussMarkov;
 use super::TrackingDeviceSim;
 use crate::cosmic::{Cosm, Frame, Orbit};
 use crate::io::{frame_from_str, frame_to_str, ConfigRepr, Configurable};
-use crate::md::prelude::Traj;
+use crate::md::prelude::{Interpolatable, Traj};
+use crate::md::EventEvaluator;
 use crate::time::Epoch;
 use crate::utils::between_0_360;
 use crate::{NyxError, Spacecraft};
-use hifitime::Duration;
+use hifitime::{Duration, Unit};
+use nalgebra::{allocator::Allocator, DefaultAllocator};
 use rand_pcg::Pcg64Mcg;
 use serde_derive::{Deserialize, Serialize};
 use std::fmt;
@@ -403,86 +405,97 @@ impl fmt::Display for GroundStation {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "[{}] {} (lat.: {:.4} deg    long.: {:.4} deg    alt.: {:.3} m)",
-            self.frame,
+            "{} (lat.: {:.4} deg    long.: {:.4} deg    alt.: {:.3} m) [{}]",
             self.name,
             self.latitude_deg,
             self.longitude_deg,
             self.height_km * 1e3,
+            self.frame,
         )
     }
 }
 
-#[test]
-fn test_load_single() {
-    use std::env;
-    use std::path::PathBuf;
+impl<S: Interpolatable> EventEvaluator<S> for &GroundStation
+where
+    DefaultAllocator:
+        Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size> + Allocator<f64, S::VecLength>,
+{
+    /// Compute the elevation in the SEZ frame. This call will panic if the frame of the input state does not match that of the ground station.
+    fn eval(&self, rx_gs_frame: &S) -> f64 {
+        let dt = rx_gs_frame.epoch();
+        // Then, compute the rotation matrix from the body fixed frame of the ground station to its topocentric frame SEZ.
+        let tx_gs_frame = self.to_orbit(dt);
+        // Note: we're only looking at the radii so we don't need to apply the transport theorem here.
+        let dcm_topo2fixed = tx_gs_frame.dcm_from_traj_frame(Frame::SEZ).unwrap();
 
-    use hifitime::TimeUnits;
+        // Now, rotate the spacecraft in the SEZ frame to compute its elevation as seen from the ground station.
+        // We transpose the DCM so that it's the fixed to topocentric rotation.
+        let rx_sez = rx_gs_frame
+            .orbit()
+            .with_position_rotated_by(dcm_topo2fixed.transpose());
+        let tx_sez = tx_gs_frame.with_position_rotated_by(dcm_topo2fixed.transpose());
+        // Now, let's compute the range ρ.
+        let rho_sez = rx_sez - tx_sez;
 
-    let cosm = Cosm::de438();
+        // Finally, compute the elevation (math is the same as declination)
+        // Source: Vallado, section 4.4.3
+        // Only the sine is needed as per Vallado, and the formula is the same as the declination
+        // because we're in the SEZ frame.
+        rho_sez.declination_deg() - self.elevation_mask_deg
+    }
 
-    // Get the path to the root directory of the current Cargo project
-    let test_data: PathBuf = [
-        env::var("CARGO_MANIFEST_DIR").unwrap(),
-        "data".to_string(),
-        "tests".to_string(),
-        "config".to_string(),
-        "one_ground_station.yaml".to_string(),
-    ]
-    .iter()
-    .collect();
+    fn eval_string(&self, state: &S) -> String {
+        format!(
+            "Elevation from {} is {:.6} deg on {}",
+            self.name,
+            self.eval(state) + self.elevation_mask_deg,
+            state.epoch()
+        )
+    }
 
-    assert!(test_data.exists(), "Could not find the test data");
+    /// Epoch precision of the election evaluator is 1 ms
+    fn epoch_precision(&self) -> Duration {
+        1 * Unit::Second
+    }
 
-    let gs = GroundStation::load(test_data).unwrap();
-
-    dbg!(&gs);
-
-    let expected_gs = GroundStation {
-        name: "Demo ground station".to_string(),
-        frame: cosm.frame("IAU Earth"),
-        elevation_mask_deg: 5.0,
-        range_noise_km: Some(GaussMarkov::new(1.days(), 5e-3, 1e-4).unwrap()),
-        doppler_noise_km_s: Some(GaussMarkov::new(1.days(), 5e-5, 1.5e-6).unwrap()),
-        latitude_deg: 2.3522,
-        longitude_deg: 48.8566,
-        height_km: 0.4,
-        light_time_correction: false,
-        timestamp_noise_s: None,
-        integration_time: None,
-    };
-
-    assert_eq!(expected_gs, gs);
+    /// Angle precision of the elevation evaluator is 1 millidegree.
+    fn value_precision(&self) -> f64 {
+        1e-3
+    }
 }
 
-#[test]
-fn test_load_many() {
-    use crate::cosmic::Cosm;
-    use hifitime::TimeUnits;
-    use std::env;
-    use std::path::PathBuf;
+#[cfg(test)]
+mod gs_ut {
+    use crate::io::ConfigRepr;
+    use crate::od::prelude::*;
 
-    // Get the path to the root directory of the current Cargo project
+    #[test]
+    fn test_load_single() {
+        use std::env;
+        use std::path::PathBuf;
 
-    let test_file: PathBuf = [
-        env::var("CARGO_MANIFEST_DIR").unwrap(),
-        "data".to_string(),
-        "tests".to_string(),
-        "config".to_string(),
-        "many_ground_stations.yaml".to_string(),
-    ]
-    .iter()
-    .collect();
+        use hifitime::TimeUnits;
 
-    let stations = GroundStation::load_many(test_file).unwrap();
+        let cosm = Cosm::de438();
 
-    dbg!(&stations);
+        // Get the path to the root directory of the current Cargo project
+        let test_data: PathBuf = [
+            env::var("CARGO_MANIFEST_DIR").unwrap(),
+            "data".to_string(),
+            "tests".to_string(),
+            "config".to_string(),
+            "one_ground_station.yaml".to_string(),
+        ]
+        .iter()
+        .collect();
 
-    let cosm = Cosm::de438();
+        assert!(test_data.exists(), "Could not find the test data");
 
-    let expected = vec![
-        GroundStation {
+        let gs = GroundStation::load(test_data).unwrap();
+
+        dbg!(&gs);
+
+        let expected_gs = GroundStation {
             name: "Demo ground station".to_string(),
             frame: cosm.frame("IAU Earth"),
             elevation_mask_deg: 5.0,
@@ -494,21 +507,65 @@ fn test_load_many() {
             light_time_correction: false,
             timestamp_noise_s: None,
             integration_time: None,
-        },
-        GroundStation {
-            name: "Canberra".to_string(),
-            frame: cosm.frame("IAU Earth"),
-            elevation_mask_deg: 5.0,
-            range_noise_km: Some(GaussMarkov::new(1.days(), 5e-3, 1e-4).unwrap()),
-            doppler_noise_km_s: Some(GaussMarkov::new(1.days(), 5e-5, 1.5e-6).unwrap()),
-            latitude_deg: -35.398333,
-            longitude_deg: 148.981944,
-            height_km: 0.691750,
-            light_time_correction: false,
-            timestamp_noise_s: None,
-            integration_time: None,
-        },
-    ];
+        };
 
-    assert_eq!(expected, stations);
+        assert_eq!(expected_gs, gs);
+    }
+
+    #[test]
+    fn test_load_many() {
+        use crate::cosmic::Cosm;
+        use hifitime::TimeUnits;
+        use std::env;
+        use std::path::PathBuf;
+
+        // Get the path to the root directory of the current Cargo project
+
+        let test_file: PathBuf = [
+            env::var("CARGO_MANIFEST_DIR").unwrap(),
+            "data".to_string(),
+            "tests".to_string(),
+            "config".to_string(),
+            "many_ground_stations.yaml".to_string(),
+        ]
+        .iter()
+        .collect();
+
+        let stations = GroundStation::load_many(test_file).unwrap();
+
+        dbg!(&stations);
+
+        let cosm = Cosm::de438();
+
+        let expected = vec![
+            GroundStation {
+                name: "Demo ground station".to_string(),
+                frame: cosm.frame("IAU Earth"),
+                elevation_mask_deg: 5.0,
+                range_noise_km: Some(GaussMarkov::new(1.days(), 5e-3, 1e-4).unwrap()),
+                doppler_noise_km_s: Some(GaussMarkov::new(1.days(), 5e-5, 1.5e-6).unwrap()),
+                latitude_deg: 2.3522,
+                longitude_deg: 48.8566,
+                height_km: 0.4,
+                light_time_correction: false,
+                timestamp_noise_s: None,
+                integration_time: None,
+            },
+            GroundStation {
+                name: "Canberra".to_string(),
+                frame: cosm.frame("IAU Earth"),
+                elevation_mask_deg: 5.0,
+                range_noise_km: Some(GaussMarkov::new(1.days(), 5e-3, 1e-4).unwrap()),
+                doppler_noise_km_s: Some(GaussMarkov::new(1.days(), 5e-5, 1.5e-6).unwrap()),
+                latitude_deg: -35.398333,
+                longitude_deg: 148.981944,
+                height_km: 0.691750,
+                light_time_correction: false,
+                timestamp_noise_s: None,
+                integration_time: None,
+            },
+        ];
+
+        assert_eq!(expected, stations);
+    }
 }

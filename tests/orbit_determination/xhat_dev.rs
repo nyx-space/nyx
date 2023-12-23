@@ -71,7 +71,7 @@ fn xhat_dev_test_ekf_two_body() {
 
     let (err_p, err_v) = rss_orbit_errors(&initial_state_dev, &initial_state);
     println!(
-        "Initial state dev: {:.3} m\t{:.3} m/s\n{}",
+        "Initial state dev: {:.3} m\t{:.3} m/s\nDelta: {}",
         err_p * 1e3,
         err_v * 1e3,
         initial_state - initial_state_dev
@@ -85,8 +85,9 @@ fn xhat_dev_test_ekf_two_body() {
         .unwrap();
 
     // Simulate tracking data
+    println!("{traj}");
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
-    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+    arc_sim.build_schedule(cosm.clone()).unwrap();
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
@@ -296,7 +297,7 @@ fn xhat_dev_test_ekf_multi_body() {
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
-    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+    arc_sim.build_schedule(cosm.clone()).unwrap();
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
@@ -473,7 +474,7 @@ fn xhat_dev_test_ekf_harmonics() {
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
-    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+    arc_sim.build_schedule(cosm.clone()).unwrap();
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
@@ -624,7 +625,7 @@ fn xhat_dev_test_ekf_realistic() {
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
-    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+    arc_sim.build_schedule(cosm.clone()).unwrap();
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
@@ -777,7 +778,7 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
-    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+    arc_sim.build_schedule(cosm.clone()).unwrap();
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
@@ -1048,7 +1049,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
-    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+    arc_sim.build_schedule(cosm.clone()).unwrap();
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
@@ -1318,7 +1319,7 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
-    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+    arc_sim.build_schedule(cosm.clone()).unwrap();
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 

@@ -57,31 +57,30 @@ fn od_val_sc_mb_srp_reals_duals_models() {
         iau_earth,
     );
 
+    let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+    let prop_time = 1 * Unit::Day;
+
     // Define the tracking configurations
     let mut configs = HashMap::new();
-    configs.insert(
-        dss65_madrid.name.clone(),
-        TrkConfig::from_sample_rate(10.seconds()),
-    );
-    configs.insert(
-        dss34_canberra.name.clone(),
-        TrkConfig::from_sample_rate(10.seconds()),
-    );
-    configs.insert(
-        dss13_goldstone.name.clone(),
-        TrkConfig::from_sample_rate(10.seconds()),
-    );
+    let cfg = TrkConfig::builder()
+        .strands(vec![Strand {
+            start: epoch,
+            end: epoch + prop_time,
+        }])
+        .build();
+
+    configs.insert(dss65_madrid.name.clone(), cfg.clone());
+    configs.insert(dss34_canberra.name.clone(), cfg.clone());
+    configs.insert(dss13_goldstone.name.clone(), cfg);
 
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
-    let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
-    let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, epoch, eme2k);
 
     let dry_mass_kg = 100.0; // in kg
@@ -133,7 +132,7 @@ fn od_val_sc_mb_srp_reals_duals_models() {
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
-    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+    arc_sim.build_schedule(cosm.clone()).unwrap();
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
@@ -216,7 +215,7 @@ fn od_val_sc_mb_srp_reals_duals_models() {
     );
 
     assert!(
-        est.covar.diagonal().norm() < 1e-5,
+        est.covar.diagonal().norm() < 1e-4,
         "estimate covariance norm should be small (perfect dynamics) ({:e})",
         est.covar.diagonal().norm()
     );

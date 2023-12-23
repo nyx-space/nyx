@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use super::scheduler::Scheduler;
 pub use crate::dynamics::{Dynamics, NyxError};
 use crate::io::{duration_from_str, duration_to_str, epoch_from_str, epoch_to_str, ConfigError};
 use crate::io::{ConfigRepr, Configurable};
@@ -28,36 +29,30 @@ use serde::Deserialize;
 use serde_derive::Serialize;
 use std::fmt::Debug;
 use std::sync::Arc;
-
-use super::schedule::Schedule;
-use super::Availability;
+use typed_builder::TypedBuilder;
 
 /// Stores a tracking configuration, there is one per tracking data simulator (e.g. one for ground station #1 and another for #2).
 /// By default, the tracking configuration is continuous and the tracking arc is from the beginning of the simulation to the end.
 /// In Python, any value that is set to None at initialization will use the default values.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypedBuilder)]
 #[cfg_attr(feature = "python", pyclass)]
 #[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
+#[builder(doc)]
 pub struct TrkConfig {
-    /// Availability configuration to start the tracking arc
+    /// Set to automatically build a tracking schedule based on some criteria
     #[serde(default)]
-    pub start: Availability,
-    /// Availability configuration to end the tracking arc
-    #[serde(default)]
-    pub end: Availability,
-    #[serde(default)]
-    pub schedule: Schedule,
+    #[builder(default, setter(strip_option))]
+    pub scheduler: Option<Scheduler>,
     #[serde(
         serialize_with = "duration_to_str",
         deserialize_with = "duration_from_str"
     )]
+    /// Sampling rate once tracking has started
+    #[builder(default = 1.minutes())]
     pub sampling: Duration,
-    /// List of epoch ranges to include
-    #[serde(rename = "inclusion epochs")]
-    pub inclusion_epochs: Option<Vec<EpochRanges>>,
-    /// List of epoch ranges to exclude
-    #[serde(rename = "exclusion epochs")]
-    pub exclusion_epochs: Option<Vec<EpochRanges>>,
+    /// List of tracking strands during which the given tracker will be tracking
+    #[builder(default, setter(strip_option))]
+    pub strands: Option<Vec<Strand>>,
 }
 
 impl ConfigRepr for TrkConfig {}
@@ -81,47 +76,45 @@ impl Configurable for TrkConfig {
 }
 
 impl TrkConfig {
-    /// Initialize a default TrkConfig providing only the sample rate
+    /// Initialize a default TrkConfig providing only the sample rate.
+    /// Note: this will also set the sample alignment time to the provided duration.
     pub fn from_sample_rate(sampling: Duration) -> Self {
         Self {
             sampling,
+            scheduler: Some(Scheduler::builder().sample_alignment(sampling).build()),
             ..Default::default()
         }
     }
 
-    /// Check that the configuration is valid
+    /// Check that the configuration is valid: a successful call means that either we have a set of tracking strands or we have a valid scheduler
     pub(crate) fn sanity_check(&self) -> Result<(), ConfigError> {
-        if let Some(excl_list) = &self.exclusion_epochs {
-            for excl in excl_list {
-                if excl.end - excl.start < self.sampling {
+        if self.strands.is_some() && self.scheduler.is_some() {
+            return Err(ConfigError::InvalidConfig(
+                "Both tracking strands and a scheduler are configured, must be one or the other"
+                    .to_string(),
+            ));
+        } else if let Some(strands) = &self.strands {
+            if strands.is_empty() && self.scheduler.is_none() {
+                return Err(ConfigError::InvalidConfig(
+                    "Provided tracking strands is empty and no scheduler is defined".to_string(),
+                ));
+            }
+            for (ii, strand) in strands.iter().enumerate() {
+                if strand.duration() < self.sampling {
                     return Err(ConfigError::InvalidConfig(format!(
-                        "Exclusion epoch range {:?} is shorter than the sampling period of {} and therefore ineffective",
-                        excl, self.sampling
+                        "Strand #{ii} is shorter than sampling time"
+                    )));
+                }
+                if strand.duration().is_negative() {
+                    return Err(ConfigError::InvalidConfig(format!(
+                        "Strand #{ii} is anti-chronological"
                     )));
                 }
             }
-        }
-
-        if let Some(incl_list) = &self.inclusion_epochs {
-            for incl in incl_list {
-                if incl.end - incl.start < self.sampling {
-                    return Err(ConfigError::InvalidConfig(format!(
-                        "Inclusion epoch range {:?} is shorter than the sampling period of {} and therefore ineffective",
-                        incl, self.sampling
-                    )));
-                }
-            }
-        }
-
-        if let Availability::Epoch(epoch) = self.start {
-            if let Availability::Epoch(epoch2) = self.end {
-                if epoch2 < epoch {
-                    return Err(ConfigError::InvalidConfig(format!(
-                        "End epoch {} is before start epoch {}",
-                        epoch2, epoch
-                    )));
-                }
-            }
+        } else if self.strands.is_none() && self.scheduler.is_none() {
+            return Err(ConfigError::InvalidConfig(
+                "Neither tracking strands not a scheduler is provided".to_string(),
+            ));
         }
 
         Ok(())
@@ -132,84 +125,159 @@ impl Default for TrkConfig {
     /// The default configuration is to generate a measurement every minute (continuously) while the vehicle is visible
     fn default() -> Self {
         Self {
-            start: Availability::Visible,
-            end: Availability::Visible,
-            schedule: Schedule::Continuous,
+            // Allows calling the builder's defaults
+            scheduler: Some(Scheduler::builder().build()),
             sampling: 1.minutes(),
-            inclusion_epochs: None,
-            exclusion_epochs: None,
+            strands: None,
         }
     }
 }
 
-/// Stores an epoch range for tracking.
+/// Stores a tracking strand with a start and end epoch
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass)]
-pub struct EpochRanges {
+#[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
+pub struct Strand {
     #[serde(serialize_with = "epoch_to_str", deserialize_with = "epoch_from_str")]
     pub start: Epoch,
     #[serde(serialize_with = "epoch_to_str", deserialize_with = "epoch_from_str")]
     pub end: Epoch,
 }
 
-impl EpochRanges {
+impl Strand {
     /// Returns whether the provided epoch is within the range
     pub fn contains(&self, epoch: Epoch) -> bool {
         (self.start..=self.end).contains(&epoch)
     }
+
+    pub fn duration(&self) -> Duration {
+        self.end - self.start
+    }
 }
 
-#[test]
-fn serde_trkconfig() {
-    use hifitime::{Epoch, TimeScale};
-    use serde_yaml;
+#[cfg(test)]
+mod trkconfig_ut {
+    use crate::io::ConfigRepr;
+    use crate::od::prelude::*;
 
-    // Test the default config
-    let cfg = TrkConfig::default();
-    let serialized = serde_yaml::to_string(&cfg).unwrap();
-    println!("{serialized}");
-    let deserd: TrkConfig = serde_yaml::from_str(&serialized).unwrap();
-    assert_eq!(deserd, cfg);
+    #[test]
+    fn sanity_checks() {
+        let mut cfg = TrkConfig::default();
+        assert!(cfg.sanity_check().is_ok(), "default config should be sane");
 
-    // Specify an intermittent schedule and a specific start epoch.
-    let cfg = TrkConfig {
-        start: Availability::Epoch(Epoch::from_gregorian_at_midnight(
-            2023,
-            2,
-            22,
-            TimeScale::TAI,
-        )),
-        end: Availability::Visible,
-        schedule: Schedule::Intermittent {
-            on: 23.1.hours(),
-            off: 0.9.hours(),
-        },
-        sampling: 45.2.seconds(),
-        ..Default::default()
-    };
-    let serialized = serde_yaml::to_string(&cfg).unwrap();
-    println!("{serialized}");
-    let deserd: TrkConfig = serde_yaml::from_str(&serialized).unwrap();
-    assert_eq!(deserd, cfg);
-}
+        cfg.scheduler = None;
+        assert!(
+            cfg.sanity_check().is_err(),
+            "no scheduler should mark this insane"
+        );
 
-#[test]
-fn deserialize_from_file() {
-    use std::collections::HashMap;
-    use std::env;
-    use std::path::PathBuf;
+        cfg.strands = Some(Vec::new());
+        assert!(
+            cfg.sanity_check().is_err(),
+            "no scheduler and empty strands should mark this insane"
+        );
 
-    // Load the tracking configuration from the test data.
-    let trkconfg_yaml: PathBuf = [
-        &env::var("CARGO_MANIFEST_DIR").unwrap(),
-        "data",
-        "tests",
-        "config",
-        "tracking_cfg.yaml",
-    ]
-    .iter()
-    .collect();
+        let start = Epoch::now().unwrap();
+        let end = start + 10.seconds();
+        cfg.strands = Some(vec![Strand { start, end }]);
+        assert!(
+            cfg.sanity_check().is_err(),
+            "strand of too short of a duration should mark this insane"
+        );
 
-    let configs: HashMap<String, TrkConfig> = TrkConfig::load_named(trkconfg_yaml).unwrap();
-    dbg!(configs);
+        let end = start + cfg.sampling;
+        cfg.strands = Some(vec![Strand { start, end }]);
+        assert!(
+            cfg.sanity_check().is_ok(),
+            "strand allowing for a single measurement should be OK"
+        );
+
+        // An anti-chronological strand should be invalid
+        cfg.strands = Some(vec![Strand {
+            start: end,
+            end: start,
+        }]);
+        assert!(
+            cfg.sanity_check().is_err(),
+            "anti chronological strand should be insane"
+        );
+    }
+
+    #[test]
+    fn serde_trkconfig() {
+        use serde_yaml;
+
+        // Test the default config
+        let cfg = TrkConfig::default();
+        let serialized = serde_yaml::to_string(&cfg).unwrap();
+        println!("{serialized}");
+        let deserd: TrkConfig = serde_yaml::from_str(&serialized).unwrap();
+        assert_eq!(deserd, cfg);
+        assert_eq!(
+            cfg.scheduler.unwrap(),
+            Scheduler::builder().min_samples(10).build()
+        );
+        assert!(cfg.strands.is_none());
+
+        // Specify an intermittent schedule and a specific start epoch.
+        let cfg = TrkConfig {
+            scheduler: Some(Scheduler {
+                cadence: Cadence::Intermittent {
+                    on: 23.1.hours(),
+                    off: 0.9.hours(),
+                },
+                handoff: Handoff::Eager,
+                min_samples: 10,
+                ..Default::default()
+            }),
+            sampling: 45.2.seconds(),
+            ..Default::default()
+        };
+        let serialized = serde_yaml::to_string(&cfg).unwrap();
+        println!("{serialized}");
+        let deserd: TrkConfig = serde_yaml::from_str(&serialized).unwrap();
+        assert_eq!(deserd, cfg);
+    }
+
+    #[test]
+    fn deserialize_from_file() {
+        use std::collections::HashMap;
+        use std::env;
+        use std::path::PathBuf;
+
+        // Load the tracking configuration from the test data.
+        let trkconfg_yaml: PathBuf = [
+            &env::var("CARGO_MANIFEST_DIR").unwrap(),
+            "data",
+            "tests",
+            "config",
+            "tracking_cfg.yaml",
+        ]
+        .iter()
+        .collect();
+
+        let configs: HashMap<String, TrkConfig> = TrkConfig::load_named(trkconfg_yaml).unwrap();
+        dbg!(configs);
+    }
+
+    #[test]
+    fn api_trk_config() {
+        use serde_yaml;
+
+        let cfg = TrkConfig::builder()
+            .sampling(15.seconds())
+            .scheduler(Scheduler::builder().handoff(Handoff::Overlap).build())
+            .build();
+
+        let serialized = serde_yaml::to_string(&cfg).unwrap();
+        println!("{serialized}");
+        let deserd: TrkConfig = serde_yaml::from_str(&serialized).unwrap();
+        assert_eq!(deserd, cfg);
+
+        let cfg = TrkConfig::builder()
+            .scheduler(Scheduler::builder().handoff(Handoff::Overlap).build())
+            .build();
+
+        assert_eq!(cfg.sampling, 60.seconds());
+    }
 }

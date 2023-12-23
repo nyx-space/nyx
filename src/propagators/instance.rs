@@ -106,7 +106,7 @@ where
                     {
                         if log_progress {
                             let tock: Duration = tick.elapsed().into();
-                            info!("Done in {}", tock);
+                            debug!("Done in {}", tock);
                         }
                     }
                     return Ok(self.state);
@@ -136,7 +136,7 @@ where
                 {
                     if log_progress {
                         let tock: Duration = tick.elapsed().into();
-                        info!("Done in {}", tock);
+                        debug!("Done in {}", tock);
                     }
                 }
 
@@ -262,9 +262,9 @@ where
 
         let (_, traj) = self.for_duration_with_traj(max_duration)?;
         // Now, find the requested event
-        let events = traj.find_all(event)?;
+        let events = traj.find(event)?;
         match events.get(trigger) {
-            Some(event_state) => Ok((*event_state, traj)),
+            Some(event_state) => Ok((event_state.state, traj)),
             None => Err(NyxError::UnsufficientTriggers(trigger, events.len())),
         }
     }

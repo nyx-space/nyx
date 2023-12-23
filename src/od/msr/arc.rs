@@ -204,17 +204,20 @@ where
     /// Returns the minimum duration between two subsequent measurements.
     /// This is important to correctly set up the propagator and not miss any measurement.
     pub fn min_duration_sep(&self) -> Option<Duration> {
-        let mut windows = self.measurements.windows(2);
-        let first_window = windows.next()?;
-        let mut min_interval = first_window[1].1.epoch() - first_window[0].1.epoch();
-        for window in windows {
-            let interval = window[1].1.epoch() - window[0].1.epoch();
-            if interval != Duration::ZERO && interval < min_interval {
-                min_interval = interval;
+        if self.measurements.is_empty() {
+            None
+        } else {
+            let mut windows = self.measurements.windows(2);
+            let first_window = windows.next()?;
+            let mut min_interval = first_window[1].1.epoch() - first_window[0].1.epoch();
+            for window in windows {
+                let interval = window[1].1.epoch() - window[0].1.epoch();
+                if interval != Duration::ZERO && interval < min_interval {
+                    min_interval = interval;
+                }
             }
+            Some(min_interval)
         }
-
-        Some(min_interval)
     }
 
     /// If this tracking arc has devices that can be used to generate simulated measurements,

@@ -4,7 +4,7 @@ use nyx_space::md::prelude::*;
 use nyx_space::od::msr::RangeDoppler;
 use nyx_space::od::prelude::*;
 use nyx_space::od::simulator::TrackingArcSim;
-use nyx_space::od::simulator::{Availability, EpochRanges, Schedule, TrkConfig};
+use nyx_space::od::simulator::{Cadence, Strand, TrkConfig};
 use rstest::*;
 use std::collections::HashMap;
 use std::env;
@@ -33,7 +33,7 @@ fn traj() -> Traj<Orbit> {
     // Generate a trajectory
     let (_, trajectory) = Propagator::default(OrbitalDynamics::two_body())
         .with(orbit)
-        .for_duration_with_traj(1.5.days())
+        .for_duration_with_traj(3.days())
         .unwrap();
 
     println!("{trajectory}");
@@ -45,7 +45,7 @@ fn traj() -> Traj<Orbit> {
 fn devices() -> Vec<GroundStation> {
     // Load the ground stations from the test data.
     let ground_station_file: PathBuf = [
-        &env::var("CARGO_MANIFEST_DIR").unwrap(),
+        env!("CARGO_MANIFEST_DIR"),
         "data",
         "tests",
         "config",
@@ -86,7 +86,7 @@ fn trk_simple(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
 
     // Load the tracking configuration from the test data.
     let trkconfg_yaml: PathBuf = [
-        &env::var("CARGO_MANIFEST_DIR").unwrap(),
+        env!("CARGO_MANIFEST_DIR"),
         "data",
         "tests",
         "config",
@@ -102,6 +102,8 @@ fn trk_simple(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
     // Build the tracking arc simulation to generate a "standard measurement".
     let mut trk =
         TrackingArcSim::<Orbit, RangeDoppler, _>::with_seed(devices, traj, configs, 12345).unwrap();
+
+    trk.build_schedule(cosm.clone()).unwrap();
 
     let arc = trk.generate_measurements(cosm).unwrap();
 
@@ -147,11 +149,11 @@ fn trk_simple(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
     );
 
     // Regression
-    assert_eq!(arc.measurements.len(), 146);
+    assert_eq!(arc.measurements.len(), 197);
 
     // And serialize to disk
     let path: PathBuf = [
-        &env::var("CARGO_MANIFEST_DIR").unwrap(),
+        env!("CARGO_MANIFEST_DIR"),
         "output_data",
         "simple_arc.parquet",
     ]
@@ -176,74 +178,31 @@ fn trk_simple(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
     assert_eq!(arc_concrete.device_cfg, arc.device_cfg);
 }
 
-/// Tests that exclusion epochs work
-#[rstest]
-fn trkconfig_zero_exclusion(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
-    let cosm = Cosm::de438();
-
-    // Build a tracking config that should never see this vehicle.
-    let trkcfg = TrkConfig {
-        exclusion_epochs: Some(vec![EpochRanges {
-            start: traj.first().epoch(),
-            end: traj.last().epoch(),
-        }]),
-        ..Default::default()
-    };
-    // Build the configs map
-    let mut configs = HashMap::new();
-    for device in &devices {
-        configs.insert(device.name.clone(), trkcfg.clone());
-    }
-
-    let mut trk = TrackingArcSim::<Orbit, RangeDoppler, _>::new(devices, traj, configs).unwrap();
-
-    let arc = trk.generate_measurements(cosm).unwrap();
-
-    assert_eq!(arc.measurements.len(), 0);
-}
-
 /// Tests that inclusion epochs work
 #[rstest]
 fn trkconfig_zero_inclusion(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
     let cosm = Cosm::de438();
 
     // Build a tracking config that should always see this vehicle.
-    let trkcfg_always = TrkConfig {
-        inclusion_epochs: Some(vec![EpochRanges {
+    let trkcfg_always = TrkConfig::builder()
+        .strands(vec![Strand {
             start: traj.first().epoch(),
             end: traj.last().epoch(),
-        }]),
-        ..Default::default()
-    };
+        }])
+        .build();
 
-    // And one that is never included
-    let trkcfg_never = TrkConfig {
-        exclusion_epochs: Some(vec![EpochRanges {
-            start: traj.first().epoch(),
-            end: traj.last().epoch(),
-        }]),
-        ..Default::default()
-    };
-    // Build the configs map
+    // Build the configs map, where we only have one of the two stations configured
     let mut configs = HashMap::new();
-    for (dno, device) in devices.iter().enumerate() {
-        configs.insert(
-            device.name.clone(),
-            if dno == 0 {
-                println!("{}", device.name);
-                trkcfg_never.clone()
-            } else {
-                trkcfg_always.clone()
-            },
-        );
-    }
+    configs.insert(devices[1].name.clone(), trkcfg_always);
 
     let mut trk = TrackingArcSim::<Orbit, RangeDoppler, _>::new(devices, traj, configs).unwrap();
+
+    trk.build_schedule(cosm.clone()).unwrap();
 
     let arc = trk.generate_measurements(cosm).unwrap();
 
     // Regression
-    assert_eq!(arc.measurements.len(), 79);
+    assert_eq!(arc.measurements.len(), 113);
 
     assert_eq!(
         arc.device_names().len(),
@@ -256,13 +215,13 @@ fn trkconfig_zero_inclusion(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
 #[rstest]
 fn trkconfig_invalid(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
     // Build a tracking config where the exclusion range is less than the sampling rate
-    let trkcfg = TrkConfig {
-        exclusion_epochs: Some(vec![EpochRanges {
+    let trkcfg = TrkConfig::builder()
+        .strands(vec![Strand {
             start: traj.first().epoch(),
             end: traj.first().epoch(),
-        }]),
-        ..Default::default()
-    };
+        }])
+        .build();
+
     // Build the configs map
     let mut configs = HashMap::new();
     for device in &devices {
@@ -277,31 +236,24 @@ fn trkconfig_invalid(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
 fn trkconfig_delayed_start(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
     let cosm = Cosm::de438();
 
-    let trkcfg = TrkConfig {
-        inclusion_epochs: Some(vec![EpochRanges {
+    let trkcfg = TrkConfig::builder()
+        .strands(vec![Strand {
             start: traj.first().epoch() + 2.hours(),
             end: traj.last().epoch(),
-        }]),
-        sampling: 1.26.minutes(),
-        ..Default::default()
-    };
+        }])
+        .sampling(1.26.minutes())
+        .build();
 
     // Build the configs map with a single ground station
     let mut configs = HashMap::new();
 
     configs.insert(devices[0].name.clone(), trkcfg);
 
-    // Check that if if a device does not have an associated trkconfig, the tracking arc cannot be created.
-    assert!(TrackingArcSim::<Orbit, RangeDoppler, _>::new(
-        devices.clone(),
-        traj.clone(),
-        configs.clone()
-    )
-    .is_err());
-
     let mut trk =
         TrackingArcSim::<Orbit, RangeDoppler, _>::new(vec![devices[0].clone()], traj, configs)
             .unwrap();
+
+    trk.build_schedule(cosm.clone()).unwrap();
 
     let arc = trk.generate_measurements(cosm).unwrap();
 
@@ -313,7 +265,7 @@ fn trkconfig_delayed_start(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
     );
 
     // Regression
-    assert_eq!(arc.measurements.len(), 53);
+    assert_eq!(arc.measurements.len(), 108);
 }
 
 /// Test different cadences and availabilities
@@ -326,26 +278,29 @@ fn trkconfig_cadence(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
 
     configs.insert(
         devices[0].name.clone(),
-        TrkConfig {
-            start: Availability::Visible,
-            schedule: Schedule::Intermittent {
-                on: 0.2.hours(),
-                off: 20.days(),
-            },
-            ..Default::default()
-        },
+        TrkConfig::builder()
+            .scheduler(
+                Scheduler::builder()
+                    .cadence(Cadence::Intermittent {
+                        on: 0.2.hours(),
+                        off: 20.days(),
+                    })
+                    .build(),
+            )
+            .build(),
     );
 
     configs.insert(
         devices[1].name.clone(),
-        TrkConfig {
-            start: Availability::Epoch(traj.last().epoch() - 10.hours()),
-            sampling: 26.1.seconds(),
-            ..Default::default()
-        },
+        TrkConfig::builder()
+            .sampling(26.1.seconds())
+            .scheduler(Scheduler::default())
+            .build(),
     );
 
     let mut trk = TrackingArcSim::<Orbit, RangeDoppler, _>::new(devices, traj, configs).unwrap();
+
+    trk.build_schedule(cosm.clone()).unwrap();
 
     let arc = trk.generate_measurements(cosm).unwrap();
 
@@ -357,5 +312,5 @@ fn trkconfig_cadence(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
     );
 
     // Regression
-    assert_eq!(arc.measurements.len(), 90);
+    assert_eq!(arc.measurements.len(), 216);
 }

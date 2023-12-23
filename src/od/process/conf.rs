@@ -56,9 +56,9 @@ impl fmt::Display for SmoothingArc {
 pub struct IterationConf {
     /// The number of measurements to account for in the iteration
     pub smoother: SmoothingArc,
-    /// The absolute tolerance of the RMS postfit residual
+    /// The absolute tolerance of the RMS prefit residual ratios
     pub absolute_tol: f64,
-    /// The relative tolerance between the latest RMS postfit residual and the best RMS postfit residual so far
+    /// The relative tolerance between the latest RMS prefit residual ratios and the best RMS prefit residual ratios so far
     pub relative_tol: f64,
     /// The maximum number of iterations to allow (will raise an error if the filter has not converged after this many iterations)
     pub max_iterations: usize,
@@ -149,8 +149,8 @@ impl Default for IterationConf {
     fn default() -> Self {
         Self {
             smoother: SmoothingArc::All,
-            absolute_tol: 1e-2,
-            relative_tol: 1e-3,
+            absolute_tol: 1e-1,
+            relative_tol: 1e-2,
             max_iterations: 15,
             max_divergences: 3,
             force_failure: false,

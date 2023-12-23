@@ -314,7 +314,7 @@ where
             }
 
             info!("***************************");
-            info!("*** Iteration number {} ***", iter_cnt);
+            info!("*** Iteration number {iter_cnt:02} ***");
             info!("***************************");
 
             // First, smooth the estimates
@@ -331,8 +331,9 @@ where
 
             // Compute the new RMS
             let new_rms = self.rms_residual_ratios();
-            let cur_rel_rms = (new_rms - best_rms).abs() / best_rms;
-            if cur_rel_rms < config.relative_tol {
+            let cur_rms_num = (new_rms - previous_rms).abs();
+            let cur_rel_rms = cur_rms_num / previous_rms;
+            if cur_rel_rms < config.relative_tol || cur_rms_num < config.absolute_tol * best_rms {
                 info!("*****************");
                 info!("*** CONVERGED ***");
                 info!("*****************");
@@ -340,18 +341,22 @@ where
                     "New residual RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
                     new_rms, previous_rms, best_rms
                 );
-                info!(
-                    "Filter converged to relative tolerance ({:.2e} < {:.2e}) after {} iterations",
-                    cur_rel_rms, config.relative_tol, iter_cnt
-                );
-
+                if cur_rel_rms < config.relative_tol {
+                    info!(
+                        "Filter converged on relative tolerance ({:.2e} < {:.2e}) after {} iterations",
+                        cur_rel_rms, config.relative_tol, iter_cnt
+                    );
+                } else {
+                    info!(
+                        "Filter converged on relative change ({:.2e} < {:.2e} * {:.2e}) after {} iterations",
+                        cur_rms_num, config.absolute_tol, best_rms, iter_cnt
+                    );
+                }
                 break;
-            }
-
-            if new_rms > previous_rms {
+            } else if new_rms > previous_rms {
                 warn!(
-                    "New residual RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
-                    new_rms, previous_rms, best_rms
+                    "New residual RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5} ({cur_rel_rms:.2e} > {:.2e})",
+                    new_rms, previous_rms, best_rms, config.relative_tol
                 );
                 divergence_cnt += 1;
                 previous_rms = new_rms;
@@ -371,8 +376,8 @@ where
                 }
             } else {
                 info!(
-                    "New residual RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
-                    new_rms, previous_rms, best_rms
+                    "New residual RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5} ({cur_rel_rms:.2e} > {:.2e})",
+                    new_rms, previous_rms, best_rms, config.relative_tol
                 );
                 // Reset the counter
                 divergence_cnt = 0;
@@ -411,7 +416,14 @@ where
         let mut devices = arc.rebuild_devices::<S, Dev>(self.cosm.clone()).unwrap();
 
         let measurements = &arc.measurements;
-        let step_size = arc.min_duration_sep().unwrap();
+        let step_size = match arc.min_duration_sep() {
+            Some(step_size) => step_size,
+            None => {
+                return Err(NyxError::CustomError(
+                    "empty measurement set provided".to_string(),
+                ))
+            }
+        };
 
         self.iterate(measurements, &mut devices, step_size, config)
     }
@@ -425,7 +437,14 @@ where
         let mut devices = arc.rebuild_devices::<S, Dev>(self.cosm.clone()).unwrap();
 
         let measurements = &arc.measurements;
-        let step_size = arc.min_duration_sep().unwrap();
+        let step_size = match arc.min_duration_sep() {
+            Some(step_size) => step_size,
+            None => {
+                return Err(NyxError::CustomError(
+                    "empty measurement set provided".to_string(),
+                ))
+            }
+        };
 
         self.process(measurements, &mut devices, step_size)
     }
@@ -435,12 +454,13 @@ where
     /// # Argument details
     /// + The measurements must be a list mapping the name of the measurement device to the measurement itself.
     /// + The name of all measurement devices must be present in the provided devices, i.e. the key set of `devices` must be a superset of the measurement device names present in the list.
+    /// + The maximum step size to ensure we don't skip any measurements.
     #[allow(clippy::erasing_op)]
     pub fn process<Dev>(
         &mut self,
         measurements: &[(String, Msr)],
         devices: &mut HashMap<String, Dev>,
-        step_size: Duration,
+        max_step: Duration,
     ) -> Result<(), NyxError>
     where
         Dev: TrackingDeviceSim<S, Msr>,
@@ -449,20 +469,27 @@ where
             measurements.len() >= 2,
             "must have at least two measurements"
         );
+
+        assert!(
+            max_step.abs() > (0.0 * Unit::Nanosecond),
+            "step size is zero"
+        );
+
         // Start by propagating the estimator (on the same thread).
         let num_msrs = measurements.len();
 
         // Update the step size of the navigation propagator if it isn't already fixed step
         if !self.prop.fixed_step {
-            self.prop.set_step(step_size, false);
+            self.prop.set_step(max_step, false);
         }
 
         let prop_time = measurements[num_msrs - 1].1.epoch() - self.kf.previous_estimate().epoch();
-        info!("Navigation propagating for a total of {prop_time} with step size {step_size}");
+        info!("Navigation propagating for a total of {prop_time} with step size {max_step}");
 
         let mut epoch = self.prop.state.epoch();
 
         let mut reported = [false; 11];
+        reported[0] = true; // Prevent showing "0% done"
         info!("Processing {num_msrs} measurements with covariance mapping");
 
         // We'll build a trajectory of the estimated states. This will be used to compute the measurements.
@@ -485,16 +512,12 @@ where
             loop {
                 let delta_t = next_msr_epoch - epoch;
 
-                // Propagator for the minimum time between the step size and the duration to the next measurement.
-                // Ensure that we don't go backward if the previous step we took was indeed backward.
-                let next_step_size = delta_t.min(if self.prop.details.step.is_negative() {
-                    step_size
-                } else {
-                    self.prop.details.step
-                });
+                // Propagator for the minimum time between the maximum step size and the duration to the next measurement.
 
-                // Remove old states from the trajectory (this is a manual implementation of `retaint` because we know it's a sorted vec)
-                // traj.states.retain(|state: &S| state.epoch() <= epoch);
+                let next_step_size = delta_t.min(self.prop.step_size);
+
+                // Remove old states from the trajectory
+                // This is a manual implementation of `retaint` because we know it's a sorted vec, so no need to resort every time
                 let mut index = traj.states.len();
                 while index > 0 {
                     index -= 1;
@@ -504,7 +527,7 @@ where
                 }
                 traj.states.truncate(index);
 
-                debug!("advancing propagator by {next_step_size} (Δt to next msr: {delta_t})");
+                debug!("propagate for {next_step_size} (Δt to next msr: {delta_t})");
                 let (_, traj_covar) = self.prop.for_duration_with_traj(next_step_size)?;
 
                 for state in traj_covar.states {
@@ -602,7 +625,7 @@ where
                     if !reported[msr_prct] {
                         info!(
                             "{:>3}% done ({msr_accepted_cnt:.0} measurements accepted, {:.0} rejected)",
-                            10 * msr_prct, msr_cnt - (msr_accepted_cnt - 1)
+                            10 * msr_prct, msr_cnt - msr_accepted_cnt.saturating_sub(1)
                         );
                         reported[msr_prct] = true;
                     }

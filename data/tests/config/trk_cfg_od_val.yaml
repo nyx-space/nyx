@@ -1,0 +1,7 @@
+scheduler:
+  handoff: Overlap # Allow for overlapping measurement
+  cadence: Continuous
+  min_samples: 10
+  sample_alignment: 10 s
+sampling: 10 s
+strands: null

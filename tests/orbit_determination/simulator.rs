@@ -60,7 +60,7 @@ fn continuous_tracking() {
 
     // Load the ground stations from the test data.
     let ground_station_file: PathBuf = [
-        &env::var("CARGO_MANIFEST_DIR").unwrap(),
+        env!("CARGO_MANIFEST_DIR"),
         "data",
         "tests",
         "config",
@@ -71,11 +71,11 @@ fn continuous_tracking() {
 
     let devices = GroundStation::load_many(ground_station_file).unwrap();
 
-    dbg!(&devices);
+    // dbg!(&devices);
 
     // Load the tracking configuration from the test data.
     let trkconfg_yaml: PathBuf = [
-        &env::var("CARGO_MANIFEST_DIR").unwrap(),
+        env!("CARGO_MANIFEST_DIR"),
         "data",
         "tests",
         "config",
@@ -93,13 +93,12 @@ fn continuous_tracking() {
         TrackingArcSim::<Orbit, RangeDoppler, _>::with_seed(devices, trajectory, configs, 12345)
             .unwrap();
 
+    trk.build_schedule(cosm.clone()).unwrap();
     let arc = trk.generate_measurements(cosm).unwrap();
-
-    assert_eq!(arc.measurements.len(), 146);
 
     // And serialize to disk
     let path: PathBuf = [
-        &env::var("CARGO_MANIFEST_DIR").unwrap(),
+        env!("CARGO_MANIFEST_DIR"),
         "output_data",
         "simple_arc.parquet",
     ]
@@ -116,6 +115,7 @@ fn continuous_tracking() {
 
     println!("{arc_concrete}");
 
+    assert_eq!(arc.measurements.len(), 116);
     // Check that we've loaded all of the measurements
     assert_eq!(arc_concrete.measurements.len(), arc.measurements.len());
     // Check that we find the same device names too

@@ -55,7 +55,7 @@ impl Traj<Orbit> {
         traj.finalize();
 
         #[cfg(not(target_arch = "wasm32"))]
-        info!(
+        debug!(
             "Converted trajectory from {} to {} in {} ms: {traj}",
             self.first().frame,
             new_frame,
@@ -63,7 +63,7 @@ impl Traj<Orbit> {
         );
 
         #[cfg(target_arch = "wasm32")]
-        info!(
+        debug!(
             "Converted trajectory from {} to {}: {traj}",
             self.first().frame,
             new_frame,

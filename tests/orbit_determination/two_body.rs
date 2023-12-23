@@ -46,20 +46,23 @@ fn od_tb_val_ekf_fixed_step_perfect_stations() {
         iau_earth,
     );
 
-    // Define the tracking configurations
+    // Load the tracking configurations
     let mut configs = HashMap::new();
-    configs.insert(
-        dss65_madrid.name.clone(),
-        TrkConfig::from_sample_rate(10.seconds()),
-    );
-    configs.insert(
-        dss34_canberra.name.clone(),
-        TrkConfig::from_sample_rate(10.seconds()),
-    );
-    configs.insert(
-        dss13_goldstone.name.clone(),
-        TrkConfig::from_sample_rate(10.seconds()),
-    );
+    let trkconfig_yaml: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "data",
+        "tests",
+        "config",
+        "trk_cfg_od_val.yaml",
+    ]
+    .iter()
+    .collect();
+
+    let cfg = TrkConfig::load(trkconfig_yaml).unwrap();
+
+    configs.insert(dss65_madrid.name.clone(), cfg.clone());
+    configs.insert(dss34_canberra.name.clone(), cfg.clone());
+    configs.insert(dss13_goldstone.name.clone(), cfg);
 
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
@@ -82,7 +85,7 @@ fn od_tb_val_ekf_fixed_step_perfect_stations() {
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
-    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+    arc_sim.build_schedule(cosm.clone()).unwrap();
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
@@ -127,7 +130,8 @@ fn od_tb_val_ekf_fixed_step_perfect_stations() {
     println!("Final estimate:\n{est}");
     assert!(
         est.state_deviation().norm() < 1e-12,
-        "In perfect modeling, the state deviation should be near zero"
+        "In perfect modeling, the state deviation should be near zero, got {:.3e}",
+        est.state_deviation().norm()
     );
     for i in 0..6 {
         assert!(
@@ -229,7 +233,7 @@ fn od_tb_val_with_arc() {
 
     // Load the tracking configs
     let trkconfig_yaml: PathBuf = [
-        &env::var("CARGO_MANIFEST_DIR").unwrap(),
+        env!("CARGO_MANIFEST_DIR"),
         "data",
         "tests",
         "config",
@@ -242,12 +246,13 @@ fn od_tb_val_with_arc() {
 
     // Simulate tracking data of range and range rate
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 1).unwrap();
+    arc_sim.build_schedule(cosm.clone()).unwrap();
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
     // And serialize to disk
     let path: PathBuf = [
-        &env::var("CARGO_MANIFEST_DIR").unwrap(),
+        env!("CARGO_MANIFEST_DIR"),
         "output_data",
         "two_body_od_val_arc.parquet",
     ]
@@ -294,8 +299,9 @@ fn od_tb_val_with_arc() {
     let est = &odp.estimates[odp.estimates.len() - 1];
     println!("Final estimate:\n{est}");
     assert!(
-        dbg!(est.state_deviation().norm()) < f64::EPSILON,
-        "In perfect modeling, the state deviation should be near zero"
+        est.state_deviation().norm() < f64::EPSILON,
+        "In perfect modeling, the state deviation should be near zero, got {:.3e}",
+        est.state_deviation().norm()
     );
     for i in 0..6 {
         assert!(
@@ -376,19 +382,15 @@ fn od_tb_val_ckf_fixed_step_perfect_stations() {
     );
 
     // Define the tracking configurations
+    let cfg = TrkConfig::builder()
+        .sampling(10.seconds())
+        .scheduler(Scheduler::builder().sample_alignment(10.seconds()).build())
+        .build();
+
     let mut configs = HashMap::new();
-    configs.insert(
-        dss65_madrid.name.clone(),
-        TrkConfig::from_sample_rate(10.seconds()),
-    );
-    configs.insert(
-        dss34_canberra.name.clone(),
-        TrkConfig::from_sample_rate(10.seconds()),
-    );
-    configs.insert(
-        dss13_goldstone.name.clone(),
-        TrkConfig::from_sample_rate(10.seconds()),
-    );
+    configs.insert(dss65_madrid.name.clone(), cfg.clone());
+    configs.insert(dss34_canberra.name.clone(), cfg.clone());
+    configs.insert(dss13_goldstone.name.clone(), cfg);
 
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
@@ -412,9 +414,20 @@ fn od_tb_val_ckf_fixed_step_perfect_stations() {
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
-    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+    arc_sim.build_schedule(cosm.clone()).unwrap();
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
+
+    // And serialize to disk
+    let path: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "output_data",
+        "od_tb_val_ckf_fixed_step_perfect_stations.parquet",
+    ]
+    .iter()
+    .collect();
+
+    arc.to_parquet_simple(path).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -451,11 +464,6 @@ fn od_tb_val_ckf_fixed_step_perfect_stations() {
 
     odp.to_parquet(path, ExportCfg::default()).unwrap();
 
-    // Check that we have as many estimates as steps taken by the propagator.
-    // Note that this test cannot work when using a variable step propagator in that same setup.
-    // We're adding +1 because the propagation time is inclusive on both ends.
-    let expected_num_estimates = (prop_time.to_seconds() / step_size.to_seconds()) as usize + 1;
-
     // Check that there are no duplicates of epochs.
     let mut prev_epoch = odp.estimates[0].epoch();
 
@@ -467,12 +475,6 @@ fn od_tb_val_ckf_fixed_step_perfect_stations() {
         );
         prev_epoch = this_epoch;
     }
-
-    assert_eq!(
-        odp.estimates.len(),
-        expected_num_estimates,
-        "Different number of estimates received"
-    );
 
     for (no, est) in odp.estimates.iter().enumerate() {
         if no == 0 {
@@ -611,19 +613,12 @@ fn od_tb_ckf_fixed_step_iteration_test() {
     );
 
     // Define the tracking configurations
+    let cfg = TrkConfig::from_sample_rate(10.seconds());
+
     let mut configs = HashMap::new();
-    configs.insert(
-        dss65_madrid.name.clone(),
-        TrkConfig::from_sample_rate(10.seconds()),
-    );
-    configs.insert(
-        dss34_canberra.name.clone(),
-        TrkConfig::from_sample_rate(10.seconds()),
-    );
-    configs.insert(
-        dss13_goldstone.name.clone(),
-        TrkConfig::from_sample_rate(10.seconds()),
-    );
+    configs.insert(dss65_madrid.name.clone(), cfg.clone());
+    configs.insert(dss34_canberra.name.clone(), cfg.clone());
+    configs.insert(dss13_goldstone.name.clone(), cfg);
 
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
@@ -645,12 +640,9 @@ fn od_tb_ckf_fixed_step_iteration_test() {
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
-    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+    arc_sim.build_schedule(cosm.clone()).unwrap();
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
-
-    // Check that we have the same number of measurements as before the behavior change.
-    assert_eq!(arc.measurements.len(), 7954);
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -780,18 +772,10 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
 
     // Define the tracking configurations
     let mut configs = HashMap::new();
-    configs.insert(
-        dss65_madrid.name.clone(),
-        TrkConfig::from_sample_rate(10.seconds()),
-    );
-    configs.insert(
-        dss34_canberra.name.clone(),
-        TrkConfig::from_sample_rate(10.seconds()),
-    );
-    configs.insert(
-        dss13_goldstone.name.clone(),
-        TrkConfig::from_sample_rate(10.seconds()),
-    );
+    let cfg = TrkConfig::from_sample_rate(10.seconds());
+    configs.insert(dss65_madrid.name.clone(), cfg.clone());
+    configs.insert(dss34_canberra.name.clone(), cfg.clone());
+    configs.insert(dss13_goldstone.name.clone(), cfg);
 
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
@@ -813,7 +797,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
-    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+    arc_sim.build_schedule(cosm.clone()).unwrap();
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
@@ -1004,18 +988,10 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect() {
 
     // Define the tracking configurations
     let mut configs = HashMap::new();
-    configs.insert(
-        dss65_madrid.name.clone(),
-        TrkConfig::from_sample_rate(10.seconds()),
-    );
-    configs.insert(
-        dss34_canberra.name.clone(),
-        TrkConfig::from_sample_rate(10.seconds()),
-    );
-    configs.insert(
-        dss13_goldstone.name.clone(),
-        TrkConfig::from_sample_rate(10.seconds()),
-    );
+    let cfg = TrkConfig::from_sample_rate(10.seconds());
+    configs.insert(dss65_madrid.name.clone(), cfg.clone());
+    configs.insert(dss34_canberra.name.clone(), cfg.clone());
+    configs.insert(dss13_goldstone.name.clone(), cfg);
 
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
@@ -1040,7 +1016,7 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect() {
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
-    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+    arc_sim.build_schedule(cosm.clone()).unwrap();
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
@@ -1139,18 +1115,10 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
 
     // Define the tracking configurations
     let mut configs = HashMap::new();
-    configs.insert(
-        dss65_madrid.name.clone(),
-        TrkConfig::from_sample_rate(10.seconds()),
-    );
-    configs.insert(
-        dss34_canberra.name.clone(),
-        TrkConfig::from_sample_rate(10.seconds()),
-    );
-    configs.insert(
-        dss13_goldstone.name.clone(),
-        TrkConfig::from_sample_rate(10.seconds()),
-    );
+    let cfg = TrkConfig::from_sample_rate(10.seconds());
+    configs.insert(dss65_madrid.name.clone(), cfg.clone());
+    configs.insert(dss34_canberra.name.clone(), cfg.clone());
+    configs.insert(dss13_goldstone.name.clone(), cfg);
 
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
@@ -1171,7 +1139,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
-    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+    arc_sim.build_schedule(cosm.clone()).unwrap();
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 

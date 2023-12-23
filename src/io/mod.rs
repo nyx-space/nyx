@@ -64,6 +64,7 @@ use pyo3::prelude::*;
 /// Configuration for exporting a trajectory to parquet.
 #[derive(Clone, Default, Serialize, Deserialize, TypedBuilder)]
 #[cfg_attr(feature = "python", pyclass)]
+#[builder(doc)]
 pub struct ExportCfg {
     /// Fields to export, if unset, defaults to all possible fields.
     #[builder(default, setter(strip_option))]
@@ -325,6 +326,35 @@ where
 {
     let orbit_serde: OrbitSerde = Deserialize::deserialize(deserializer)?;
     Ok(orbit_serde.into())
+}
+
+pub(crate) fn maybe_duration_to_str<S>(
+    duration: &Option<Duration>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    if let Some(duration) = duration {
+        duration_to_str(duration, serializer)
+    } else {
+        serializer.serialize_none()
+    }
+}
+
+pub(crate) fn maybe_duration_from_str<'de, D>(deserializer: D) -> Result<Option<Duration>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    if let Ok(s) = String::deserialize(deserializer) {
+        if let Ok(duration) = Duration::from_str(&s) {
+            Ok(Some(duration))
+        } else {
+            Ok(None)
+        }
+    } else {
+        Ok(None)
+    }
 }
 
 #[allow(clippy::upper_case_acronyms)]

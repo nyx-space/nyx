@@ -1,11 +1,15 @@
 Demo ground station:
-  start: Visible
-  end: Visible
-  schedule: Continuous
+  scheduler:
+    handoff: Overlap
+    cadence: Continuous
+    min_samples: 10
+    sample_alignment: null
   sampling: 1 min
 
 Canberra:
-  start: Visible
-  end: Visible
-  schedule: Continuous
+  scheduler:
+    handoff: Eager
+    cadence: Continuous
+    min_samples: 10
+    sample_alignment: 10 s
   sampling: 1 min

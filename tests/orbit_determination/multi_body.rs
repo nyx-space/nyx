@@ -78,7 +78,7 @@ fn od_val_multi_body_ckf_perfect_stations() {
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
-    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+    arc_sim.build_schedule(cosm.clone()).unwrap();
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
@@ -178,7 +178,10 @@ fn multi_body_ckf_covar_map() {
     let mut configs = HashMap::new();
     configs.insert(
         dss13_goldstone.name.clone(),
-        TrkConfig::from_sample_rate(10.seconds()),
+        TrkConfig::builder()
+            .sampling(10.seconds())
+            .scheduler(Scheduler::builder().sample_alignment(10.seconds()).build())
+            .build(),
     );
 
     let all_stations = vec![dss13_goldstone];
@@ -203,7 +206,7 @@ fn multi_body_ckf_covar_map() {
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
-    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+    arc_sim.build_schedule(cosm.clone()).unwrap();
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
@@ -276,8 +279,8 @@ fn multi_body_ckf_covar_map() {
     // Test that we can generate a navigation trajectory and search it
     let nav_traj = odp.to_traj().unwrap();
     let aop_event = Event::apoapsis();
-    for found_event in nav_traj.find_all(&aop_event).unwrap() {
-        println!("{:x}", found_event);
-        assert!((found_event.ta_deg() - 180.0).abs() < 1e-2)
+    for found_event in nav_traj.find(&aop_event).unwrap() {
+        println!("{:x}", found_event.state);
+        assert!((found_event.state.ta_deg() - 180.0).abs() < 1e-2)
     }
 }
