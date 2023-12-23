@@ -4,7 +4,7 @@ use nyx_space::md::prelude::*;
 use nyx_space::od::msr::RangeDoppler;
 use nyx_space::od::prelude::*;
 use nyx_space::od::simulator::TrackingArcSim;
-use nyx_space::od::simulator::{Cadence, EpochRanges, TrkConfig};
+use nyx_space::od::simulator::{Cadence, Strand, TrkConfig};
 use rstest::*;
 use std::collections::HashMap;
 use std::env;
@@ -185,7 +185,7 @@ fn trkconfig_zero_inclusion(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
 
     // Build a tracking config that should always see this vehicle.
     let trkcfg_always = TrkConfig::builder()
-        .strands(vec![EpochRanges {
+        .strands(vec![Strand {
             start: traj.first().epoch(),
             end: traj.last().epoch(),
         }])
@@ -216,7 +216,7 @@ fn trkconfig_zero_inclusion(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
 fn trkconfig_invalid(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
     // Build a tracking config where the exclusion range is less than the sampling rate
     let trkcfg = TrkConfig::builder()
-        .strands(vec![EpochRanges {
+        .strands(vec![Strand {
             start: traj.first().epoch(),
             end: traj.first().epoch(),
         }])
@@ -237,7 +237,7 @@ fn trkconfig_delayed_start(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
     let cosm = Cosm::de438();
 
     let trkcfg = TrkConfig::builder()
-        .strands(vec![EpochRanges {
+        .strands(vec![Strand {
             start: traj.first().epoch() + 2.hours(),
             end: traj.last().epoch(),
         }])

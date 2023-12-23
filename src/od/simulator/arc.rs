@@ -25,7 +25,7 @@ pub use crate::dynamics::{Dynamics, NyxError};
 use crate::io::ConfigError;
 use crate::md::trajectory::Interpolatable;
 use crate::od::msr::{RangeDoppler, TrackingArc};
-use crate::od::prelude::EpochRanges;
+use crate::od::prelude::Strand;
 use crate::od::simulator::Cadence;
 use crate::od::{GroundStation, Measurement};
 pub use crate::{cosmic::Cosm, State, TimeTagged};
@@ -322,7 +322,7 @@ impl TrackingArcSim<Orbit, RangeDoppler, GroundStation> {
                                 continue;
                             }
 
-                            let mut strand_range = EpochRanges {
+                            let mut strand_range = Strand {
                                 start: strand_start,
                                 end: strand_end,
                             };
@@ -464,7 +464,7 @@ impl TrackingArcSim<Spacecraft, RangeDoppler, GroundStation> {
                             traj.find_bracketed(start_at + 1.0_f64.seconds(), end_at, &device)
                         {
                             let strand_end = visibility_event.state.epoch();
-                            let mut strand_range = EpochRanges {
+                            let mut strand_range = Strand {
                                 start: start_at,
                                 end: strand_end,
                             };

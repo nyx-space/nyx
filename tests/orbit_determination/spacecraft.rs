@@ -63,7 +63,7 @@ fn od_val_sc_mb_srp_reals_duals_models() {
     // Define the tracking configurations
     let mut configs = HashMap::new();
     let cfg = TrkConfig::builder()
-        .strands(vec![EpochRanges {
+        .strands(vec![Strand {
             start: epoch,
             end: epoch + prop_time,
         }])

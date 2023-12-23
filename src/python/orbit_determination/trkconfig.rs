@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 pub use crate::io::ConfigError;
-pub use crate::od::simulator::{EpochRanges, Scheduler, TrkConfig};
+pub use crate::od::simulator::{Scheduler, Strand, TrkConfig};
 use crate::{io::ConfigRepr, NyxError};
 use hifitime::Duration;
 use pyo3::basic::CompareOp;
@@ -47,7 +47,7 @@ impl TrkConfig {
     #[pyo3(text_signature = "(sampling=None, strands=None, scheduler=None)")]
     fn py_new(
         sampling: Option<String>,
-        strands: Option<Vec<EpochRanges>>,
+        strands: Option<Vec<Strand>>,
         scheduler: Option<Scheduler>,
     ) -> Result<Self, ConfigError> {
         let mut me = Self::default();

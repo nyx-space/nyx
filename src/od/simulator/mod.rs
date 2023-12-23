@@ -25,4 +25,4 @@ pub use scheduler::{Cadence, Handoff, Scheduler};
 mod trackdata;
 pub use trackdata::TrackingDeviceSim;
 mod trkconfig;
-pub use trkconfig::{EpochRanges, TrkConfig};
+pub use trkconfig::{Strand, TrkConfig};

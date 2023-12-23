@@ -79,7 +79,7 @@ fn devices_n_configs(epoch: Epoch) -> (Vec<GroundStation>, HashMap<String, TrkCo
     // Define the tracking configurations
     let mut configs = HashMap::new();
     let cfg = TrkConfig::builder()
-        .strands(vec![EpochRanges {
+        .strands(vec![Strand {
             start: epoch + 60.seconds(),
             end: epoch + 2.hours(),
         }])

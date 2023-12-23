@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 pub use crate::io::ConfigError;
-pub use crate::od::simulator::{Cadence, EpochRanges, Handoff, Scheduler};
+pub use crate::od::simulator::{Cadence, Handoff, Scheduler, Strand};
 use crate::NyxError;
 use hifitime::Duration;
 use pyo3::basic::CompareOp;

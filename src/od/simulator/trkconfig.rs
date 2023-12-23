@@ -52,7 +52,7 @@ pub struct TrkConfig {
     pub sampling: Duration,
     /// List of tracking strands during which the given tracker will be tracking
     #[builder(default, setter(strip_option))]
-    pub strands: Option<Vec<EpochRanges>>,
+    pub strands: Option<Vec<Strand>>,
 }
 
 impl ConfigRepr for TrkConfig {}
@@ -133,18 +133,18 @@ impl Default for TrkConfig {
     }
 }
 
-/// Stores an epoch range for tracking.
+/// Stores a tracking strand with a start and end epoch
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass)]
 #[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
-pub struct EpochRanges {
+pub struct Strand {
     #[serde(serialize_with = "epoch_to_str", deserialize_with = "epoch_from_str")]
     pub start: Epoch,
     #[serde(serialize_with = "epoch_to_str", deserialize_with = "epoch_from_str")]
     pub end: Epoch,
 }
 
-impl EpochRanges {
+impl Strand {
     /// Returns whether the provided epoch is within the range
     pub fn contains(&self, epoch: Epoch) -> bool {
         (self.start..=self.end).contains(&epoch)
@@ -179,21 +179,21 @@ mod trkconfig_ut {
 
         let start = Epoch::now().unwrap();
         let end = start + 10.seconds();
-        cfg.strands = Some(vec![EpochRanges { start, end }]);
+        cfg.strands = Some(vec![Strand { start, end }]);
         assert!(
             cfg.sanity_check().is_err(),
             "strand of too short of a duration should mark this insane"
         );
 
         let end = start + cfg.sampling;
-        cfg.strands = Some(vec![EpochRanges { start, end }]);
+        cfg.strands = Some(vec![Strand { start, end }]);
         assert!(
             cfg.sanity_check().is_ok(),
             "strand allowing for a single measurement should be OK"
         );
 
         // An anti-chronological strand should be invalid
-        cfg.strands = Some(vec![EpochRanges {
+        cfg.strands = Some(vec![Strand {
             start: end,
             end: start,
         }]);
