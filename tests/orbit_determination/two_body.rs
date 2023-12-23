@@ -419,6 +419,17 @@ fn od_tb_val_ckf_fixed_step_perfect_stations() {
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
+    // And serialize to disk
+    let path: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "output_data",
+        "od_tb_val_ckf_fixed_step_perfect_stations.parquet",
+    ]
+    .iter()
+    .collect();
+
+    arc.to_parquet_simple(path).unwrap();
+
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.

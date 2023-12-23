@@ -37,7 +37,7 @@ use std::fmt::Display;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use super::TrkConfig;
+use super::{Handoff, TrkConfig};
 
 #[derive(Clone)]
 pub struct TrackingArcSim<MsrIn, Msr, D>
@@ -367,7 +367,46 @@ impl TrackingArcSim<Orbit, RangeDoppler, GroundStation> {
                 }
             }
         }
-        // todo!("remove overlaps")
+        // Build all of the strands, remembering which tracker they come from.
+        let mut cfg_as_vec = Vec::new();
+        for (name, cfg) in &built_cfg {
+            for (ii, strand) in cfg.strands.as_ref().unwrap().iter().enumerate() {
+                cfg_as_vec.push((name.clone(), ii, *strand));
+            }
+        }
+        // Iterate through the strands by chronological order. Cannot use maps because we change types.
+        cfg_as_vec.sort_by_key(|(_, _, strand)| strand.start);
+        for (ii, (this_name, this_pos, this_strand)) in
+            cfg_as_vec.iter().take(cfg_as_vec.len() - 1).enumerate()
+        {
+            // Grab the config
+            let config = self.configs[this_name].scheduler.as_ref().unwrap();
+            // Grab the next strand, chronologically
+            if let Some((next_name, next_pos, next_strand)) = cfg_as_vec.get(ii + 1) {
+                if config.handoff == Handoff::Greedy && this_strand.end >= next_strand.start {
+                    // Modify the built configurations to change the start time of the next strand because the current one is greedy.
+                    let next_config = built_cfg.get_mut(next_name).unwrap();
+                    let new_start = this_strand.end + next_config.sampling;
+                    next_config.strands.as_mut().unwrap()[*next_pos].start = new_start;
+                    info!(
+                        "{this_name} being {:?}, {next_name} now starts on {new_start}",
+                        config.handoff
+                    );
+                } else if config.handoff == Handoff::Eager && this_strand.end >= next_strand.start {
+                    let this_config = built_cfg.get_mut(this_name).unwrap();
+                    let new_end = next_strand.start - this_config.sampling;
+                    this_config.strands.as_mut().unwrap()[*this_pos].end = new_end;
+                    info!(
+                        "{this_name} being {:?}, it now now emds on {new_end} for handoff",
+                        config.handoff
+                    );
+                }
+            } else {
+                // Reached the end
+                break;
+            }
+        }
+
         Ok(built_cfg)
     }
 

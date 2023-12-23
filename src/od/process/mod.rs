@@ -515,12 +515,6 @@ where
 
                 let next_step_size = delta_t.min(self.prop.step_size);
 
-                // let next_step_size = delta_t.min(if self.prop.details.step.is_negative() {
-                //     max_step
-                // } else {
-                //     self.prop.details.step
-                // });
-
                 // Remove old states from the trajectory
                 // This is a manual implementation of `retaint` because we know it's a sorted vec, so no need to resort every time
                 let mut index = traj.states.len();
