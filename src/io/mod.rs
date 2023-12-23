@@ -338,7 +338,7 @@ where
     if let Some(duration) = duration {
         duration_to_str(duration, serializer)
     } else {
-        serializer.serialize_str("")
+        serializer.serialize_none()
     }
 }
 

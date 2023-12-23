@@ -3,6 +3,7 @@ Demo ground station:
     handoff: Eager
     cadence: Continuous
     min_samples: 10
+    sample_alignment: null
   sampling: 1 min
 
 Canberra:
@@ -10,4 +11,5 @@ Canberra:
     handoff: Eager
     cadence: Continuous
     min_samples: 10
+    sample_alignment: 10 s
   sampling: 1 min
