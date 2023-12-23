@@ -58,9 +58,6 @@ where
     pub trajectory: Traj<MsrIn>,
     /// Configuration of each device
     pub configs: HashMap<String, TrkConfig>,
-    /// Set to true to allow for overlapping measurements (enabled by default),
-    /// i.e. if N ground stations are available at a given epoch, generate N measurements not just one.
-    pub allow_overlap: bool,
     /// Random number generator used for this tracking arc, ensures repeatability
     rng: Pcg64Mcg,
     /// Greatest common denominator time series that allows this arc to meet all of the conditions.
@@ -131,7 +128,6 @@ where
             devices: devices_map,
             trajectory,
             configs,
-            allow_overlap: false,
             rng,
             time_series,
             _msr_in: PhantomData,
@@ -290,7 +286,10 @@ impl TrackingArcSim<Orbit, RangeDoppler, GroundStation> {
     /// 3. Find when the vehicle trajectory has an elevation less than zero (i.e. disappears below the horizon), after that initial epoch
     /// 4. Repeat 2, 3 until the end of the trajectory
     /// 5. Build each of these as "tracking strands" for this tracking device.
-    /// 6. THEN REMOVE OVERLAPPING MEASUREMENTS - ALGO TBD
+    /// 6. Organize all of the built tracking strands chronologically.
+    /// 7. Iterate through all of the strands:
+    /// 7.a. if that tracker is marked as `Greedy` and it ends after the start of the next strand, change the start date of the next strand.
+    /// 7.b. if that tracker is marked as `Eager` and it ends after the start of the next strand, change the end date of the current strand.
     pub fn generate_schedule(
         &self,
         cosm: Arc<Cosm>,
@@ -438,7 +437,10 @@ impl TrackingArcSim<Spacecraft, RangeDoppler, GroundStation> {
     /// 3. Find when the vehicle trajectory has an elevation less than zero (i.e. disappears below the horizon), after that initial epoch
     /// 4. Repeat 2, 3 until the end of the trajectory
     /// 5. Build each of these as "tracking strands" for this tracking device.
-    /// 6. THEN REMOVE OVERLAPPING MEASUREMENTS - ALGO TBD
+    /// 6. Organize all of the built tracking strands chronologically.
+    /// 7. Iterate through all of the strands:
+    /// 7.a. if that tracker is marked as `Greedy` and it ends after the start of the next strand, change the start date of the next strand.
+    /// 7.b. if that tracker is marked as `Eager` and it ends after the start of the next strand, change the end date of the current strand.
     pub fn generate_schedule(
         &self,
         cosm: Arc<Cosm>,
@@ -513,7 +515,50 @@ impl TrackingArcSim<Spacecraft, RangeDoppler, GroundStation> {
                 }
             }
         }
-        // todo!("remove overlaps")
+
+        // Build all of the strands, remembering which tracker they come from.
+        let mut cfg_as_vec = Vec::new();
+        for (name, cfg) in &built_cfg {
+            for (ii, strand) in cfg.strands.as_ref().unwrap().iter().enumerate() {
+                cfg_as_vec.push((name.clone(), ii, *strand));
+            }
+        }
+        // Iterate through the strands by chronological order. Cannot use maps because we change types.
+        cfg_as_vec.sort_by_key(|(_, _, strand)| strand.start);
+        for (ii, (this_name, this_pos, this_strand)) in
+            cfg_as_vec.iter().take(cfg_as_vec.len() - 1).enumerate()
+        {
+            // Grab the config
+            if let Some(config) = self.configs[this_name].scheduler.as_ref() {
+                // Grab the next strand, chronologically
+                if let Some((next_name, next_pos, next_strand)) = cfg_as_vec.get(ii + 1) {
+                    if config.handoff == Handoff::Greedy && this_strand.end >= next_strand.start {
+                        // Modify the built configurations to change the start time of the next strand because the current one is greedy.
+                        let next_config = built_cfg.get_mut(next_name).unwrap();
+                        let new_start = this_strand.end + next_config.sampling;
+                        next_config.strands.as_mut().unwrap()[*next_pos].start = new_start;
+                        info!(
+                            "{this_name} configured as {:?}, so {next_name} now starts on {new_start}",
+                            config.handoff
+                        );
+                    } else if config.handoff == Handoff::Eager
+                        && this_strand.end >= next_strand.start
+                    {
+                        let this_config = built_cfg.get_mut(this_name).unwrap();
+                        let new_end = next_strand.start - this_config.sampling;
+                        this_config.strands.as_mut().unwrap()[*this_pos].end = new_end;
+                        info!(
+                            "{this_name} now hands off to {next_name} on {new_end} because it's configured as {:?}",
+                            config.handoff
+                        );
+                    }
+                } else {
+                    // Reached the end
+                    break;
+                }
+            }
+        }
+
         Ok(built_cfg)
     }
 

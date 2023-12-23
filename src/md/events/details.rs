@@ -27,14 +27,13 @@ use core::fmt;
 /// Enumerates the possible edges of an event in a trajectory.
 ///
 /// `EventEdge` is used to describe the nature of a trajectory event, particularly in terms of its temporal dynamics relative to a specified condition or threshold. This enum helps in distinguishing whether the event is occurring at a rising edge, a falling edge, or if the edge is unclear due to insufficient data or ambiguous conditions.
-///
-/// # Variants
-/// - `Rising` - Represents a rising edge of the event. This indicates that the event is transitioning from a lower to a higher evaluation of the event. For example, in the context of elevation, a rising edge would indicate an increase in elevation from a lower angle.
-/// - `Falling` - Represents a falling edge of the event. This is the opposite of the rising edge, indicating a transition from a higher to a lower value of the event evaluator. For example, if tracking the elevation of an object, a falling edge would signify a
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum EventEdge {
+    /// Represents a rising edge of the event. This indicates that the event is transitioning from a lower to a higher evaluation of the event. For example, in the context of elevation, a rising edge would indicate an increase in elevation from a lower angle.
     Rising,
+    /// Represents a falling edge of the event. This is the opposite of the rising edge, indicating a transition from a higher to a lower value of the event evaluator. For example, if tracking the elevation of an object, a falling edge would signify a
     Falling,
+    /// If the edge cannot be clearly defined, it will be marked as unclear. This happens if the event is at a saddle point and the epoch precision is too large to find the exact slope.
     Unclear,
 }
 
@@ -44,11 +43,6 @@ pub enum EventEdge {
 ///
 /// # Generics
 /// S: Interpolatable - A type that represents the state of the trajectory. This type must implement the `Interpolatable` trait, ensuring that it can be interpolated and manipulated according to the trajectory's requirements.
-///
-/// # Fields
-/// - `state: S` -
-/// - `edge: EventEdge` -
-/// - `value: f64` - The numerical evaluation of the event for the returned state.
 #[derive(Clone, Debug, PartialEq)]
 pub struct EventDetails<S: Interpolatable>
 where

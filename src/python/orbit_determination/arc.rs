@@ -46,7 +46,6 @@ impl GroundTrackingArcSim {
         trajectory: TrajectoryLoader,
         configs: HashMap<String, TrkConfig>,
         seed: u64,
-        _allow_overlap: Option<bool>,
     ) -> Result<Self, NyxError> {
         // Try to convert the dynamic trajectory into a trajectory
         let inner = if let Ok(sc_traj) = trajectory.to_traj::<Spacecraft>() {

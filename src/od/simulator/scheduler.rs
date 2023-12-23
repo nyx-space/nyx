@@ -172,7 +172,7 @@ mod scheduler_ut {
         let serialized = serde_yaml::to_string(&scheduler).unwrap();
         assert_eq!(
             serialized,
-            "handoff: Eager\ncadence: !Intermittent\n  on: 12 min\n  off: 17 h 5 min\nmin_samples: 10\nsample_alignment: null\n"
+            "handoff: Eager\ncadence: !Intermittent\n  on: 12 min\n  off: 17 h 5 min\nmin_samples: 10\nsample_alignment: 1 s\n"
         );
         let deserd: Scheduler = serde_yaml::from_str(&serialized).unwrap();
         assert_eq!(deserd, scheduler);

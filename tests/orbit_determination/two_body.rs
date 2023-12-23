@@ -644,9 +644,6 @@ fn od_tb_ckf_fixed_step_iteration_test() {
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
-    // Check that we have the same number of measurements as before the behavior change.
-    // assert_eq!(arc.measurements.len(), 7954);
-
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.

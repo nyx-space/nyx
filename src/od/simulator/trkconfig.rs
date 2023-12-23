@@ -213,7 +213,10 @@ mod trkconfig_ut {
         println!("{serialized}");
         let deserd: TrkConfig = serde_yaml::from_str(&serialized).unwrap();
         assert_eq!(deserd, cfg);
-        assert_eq!(cfg.scheduler.unwrap(), Scheduler::default());
+        assert_eq!(
+            cfg.scheduler.unwrap(),
+            Scheduler::builder().min_samples(10).build()
+        );
         assert!(cfg.strands.is_none());
 
         // Specify an intermittent schedule and a specific start epoch.
