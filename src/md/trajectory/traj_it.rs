@@ -47,7 +47,7 @@ where
                         && next_epoch <= self.traj.last().epoch()
                     {
                         let msg = format!(
-                            "!!! [BUG] TrajIterator: {e} not found but should be present in {} !",
+                            "{e} out of bounds in {}! Please submit bug report with exported traj",
                             self.traj
                         );
                         if log_enabled!(log::Level::Error) {
