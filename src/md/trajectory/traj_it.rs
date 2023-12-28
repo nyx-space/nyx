@@ -53,7 +53,7 @@ where
                         if log_enabled!(log::Level::Error) {
                             error!("{msg}");
                         } else {
-                            println!("{msg}");
+                            eprintln!("{msg}");
                         };
                     }
                     None
