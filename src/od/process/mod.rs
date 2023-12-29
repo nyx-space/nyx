@@ -465,15 +465,15 @@ where
     where
         Dev: TrackingDeviceSim<S, Msr>,
     {
-        assert!(
-            measurements.len() >= 2,
-            "must have at least two measurements"
-        );
+        if measurements.len() < 2 {
+            return Err(NyxError::CustomError(
+                "must have at least two measurements".to_string(),
+            ));
+        }
 
-        assert!(
-            max_step.abs() > (0.0 * Unit::Nanosecond),
-            "step size is zero"
-        );
+        if max_step.is_negative() || max_step == Duration::ZERO {
+            return Err(NyxError::CustomError("step size is zero".to_string()));
+        }
 
         // Start by propagating the estimator (on the same thread).
         let num_msrs = measurements.len();

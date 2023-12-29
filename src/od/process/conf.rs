@@ -21,6 +21,7 @@ use crate::NyxError;
 use std::convert::TryFrom;
 use std::default::Default;
 use std::fmt;
+use typed_builder::TypedBuilder;
 
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
@@ -49,22 +50,34 @@ impl fmt::Display for SmoothingArc {
     }
 }
 
+impl Default for SmoothingArc {
+    fn default() -> Self {
+        Self::All
+    }
+}
+
 /// Defines a filter iteration configuration. Allows iterating on an OD solution until convergence criteria is met.
 /// The root mean squared of the prefit residuals ratios is used to assess convergence between iterations.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, TypedBuilder)]
 #[cfg_attr(feature = "python", pyclass)]
 pub struct IterationConf {
     /// The number of measurements to account for in the iteration
+    #[builder(default)]
     pub smoother: SmoothingArc,
     /// The absolute tolerance of the RMS prefit residual ratios
+    #[builder(default = 1e-1)]
     pub absolute_tol: f64,
     /// The relative tolerance between the latest RMS prefit residual ratios and the best RMS prefit residual ratios so far
+    #[builder(default = 1e-2)]
     pub relative_tol: f64,
     /// The maximum number of iterations to allow (will raise an error if the filter has not converged after this many iterations)
+    #[builder(default = 15)]
     pub max_iterations: usize,
     /// The maximum number of subsequent divergences in RMS.
+    #[builder(default = 3)]
     pub max_divergences: usize,
     /// Set to true to force an ODP failure when the convergence criteria is not met
+    #[builder(default = false)]
     pub force_failure: bool,
 }
 
