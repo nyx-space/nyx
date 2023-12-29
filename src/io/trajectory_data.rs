@@ -243,6 +243,9 @@ impl TrajectoryLoader {
             }
         }
 
+        // Remove any duplicates that may exist in the imported trajectory.
+        traj.finalize();
+
         Ok(traj)
     }
 

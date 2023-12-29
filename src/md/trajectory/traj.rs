@@ -400,17 +400,10 @@ where
             None => S::export_params(),
         };
 
-        // Check that we can retrieve this information
-        fields.retain(|param| match self.first().value(*param) {
-            Ok(_) => true,
-            Err(_) => {
-                warn!("Removed unavailable field `{param}` from RIC export",);
-                false
-            }
+        // Remove disallowed field and check that we can retrieve this information
+        fields.retain(|param| {
+            param != &StateParameter::GuidanceMode && self.first().value(*param).is_ok()
         });
-
-        // Disallowed fields
-        fields.retain(|param| param != &StateParameter::GuidanceMode);
 
         for field in &fields {
             hdrs.push(field.to_field(more_meta.clone()));
@@ -458,8 +451,8 @@ where
         // Build the list of 6x6 RIC DCM
         // Assuming identical rate just before and after the first DCM and for the last DCM
         let mut inertial2ric_dcms = Vec::with_capacity(self_states.len());
-        for ii in 0..self_states.len() {
-            let dcm_cur = self_states[ii]
+        for (ii, self_state) in self_states.iter().enumerate() {
+            let dcm_cur = self_state
                 .orbit()
                 .dcm_from_traj_frame(Frame::RIC)
                 .unwrap()
@@ -468,21 +461,27 @@ where
             let dcm_pre = if ii == 0 {
                 dcm_cur
             } else {
-                self_states_pre[ii - 1]
-                    .orbit()
-                    .dcm_from_traj_frame(Frame::RIC)
-                    .unwrap()
-                    .transpose()
+                match self_states_pre.get(ii - 1) {
+                    Some(state) => state
+                        .orbit()
+                        .dcm_from_traj_frame(Frame::RIC)
+                        .unwrap()
+                        .transpose(),
+                    None => dcm_cur,
+                }
             };
 
             let dcm_post = if ii == self_states_post.len() {
                 dcm_cur
             } else {
-                self_states_post[ii]
-                    .orbit()
-                    .dcm_from_traj_frame(Frame::RIC)
-                    .unwrap()
-                    .transpose()
+                match self_states_post.get(ii) {
+                    Some(state) => state
+                        .orbit()
+                        .dcm_from_traj_frame(Frame::RIC)
+                        .unwrap()
+                        .transpose(),
+                    None => dcm_cur,
+                }
             };
 
             let dcm6x6 = dcm_finite_differencing(dcm_pre, dcm_cur, dcm_post);
