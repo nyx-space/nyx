@@ -197,7 +197,7 @@ where
             match cfg.strands.as_ref() {
                 Some(strands) => {
                     // Strands are defined at this point
-                    'strands: for strand in strands {
+                    'strands: for (ii, strand) in strands.iter().enumerate() {
                         // Build the time series for this strand, sampling at the correct rate
                         for epoch in TimeSeries::inclusive(strand.start, strand.end, cfg.sampling) {
                             match device.measure(
@@ -212,10 +212,12 @@ where
                                     }
                                 }
                                 Err(e) => {
-                                    error!(
-                                        "Skipping the remaining strand ending on {}: {e}",
-                                        strand.end
-                                    );
+                                    if epoch != strand.end {
+                                        warn!(
+                                            "Skipping the remaining strand #{ii} ending on {}: {e}",
+                                            strand.end
+                                        );
+                                    }
                                     continue 'strands;
                                 }
                             }
