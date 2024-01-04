@@ -110,7 +110,7 @@ impl OrbitEstimate {
     }
 
     #[classmethod]
-    fn load_named(_cls: &PyType, path: &str) -> Result<HashMap<String, Self>, ConfigError> {
+    fn load_named(_cls: &PyType, path: &str) -> Result<BTreeMap<String, Self>, ConfigError> {
         let orbits = OrbitEstimateSerde::load_named(path)?;
 
         let cosm = Cosm::de438();

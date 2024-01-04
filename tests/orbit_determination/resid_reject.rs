@@ -12,7 +12,7 @@ use nyx_space::od::prelude::*;
 use nyx_space::propagators::{PropOpts, Propagator, RK4Fixed};
 use nyx_space::time::{Epoch, TimeUnits};
 use nyx_space::utils::rss_orbit_errors;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 #[fixture]
 fn epoch() -> Epoch {
@@ -51,7 +51,7 @@ fn traj(epoch: Epoch) -> Traj<Orbit> {
 }
 
 #[fixture]
-fn devices_n_configs(epoch: Epoch) -> (Vec<GroundStation>, HashMap<String, TrkConfig>) {
+fn devices_n_configs(epoch: Epoch) -> (Vec<GroundStation>, BTreeMap<String, TrkConfig>) {
     // Load cosm
     let cosm = Cosm::de438();
 
@@ -77,7 +77,7 @@ fn devices_n_configs(epoch: Epoch) -> (Vec<GroundStation>, HashMap<String, TrkCo
     dss34_canberra.integration_time = Some(60.seconds());
 
     // Define the tracking configurations
-    let mut configs = HashMap::new();
+    let mut configs = BTreeMap::new();
     let cfg = TrkConfig::builder()
         .strands(vec![Strand {
             start: epoch + 60.seconds(),
@@ -93,7 +93,7 @@ fn devices_n_configs(epoch: Epoch) -> (Vec<GroundStation>, HashMap<String, TrkCo
 #[fixture]
 fn tracking_arc(
     traj: Traj<Orbit>,
-    devices_n_configs: (Vec<GroundStation>, HashMap<String, TrkConfig>),
+    devices_n_configs: (Vec<GroundStation>, BTreeMap<String, TrkConfig>),
 ) -> TrackingArc<RangeDoppler> {
     // Load cosm
     let cosm = Cosm::de438();
@@ -145,7 +145,7 @@ fn initial_estimate(traj: Traj<Orbit>) -> KfEstimate<Orbit> {
 fn od_resid_reject_all_ckf_two_way(
     tracking_arc: TrackingArc<RangeDoppler>,
     initial_estimate: KfEstimate<Orbit>,
-    devices_n_configs: (Vec<GroundStation>, HashMap<String, TrkConfig>),
+    devices_n_configs: (Vec<GroundStation>, BTreeMap<String, TrkConfig>),
 ) {
     // Load cosm
     let cosm = Cosm::de438();
@@ -193,7 +193,7 @@ fn od_resid_reject_all_ckf_two_way(
     let mut devices_map = devices
         .into_iter()
         .map(|dev| (dev.name.clone(), dev))
-        .collect::<HashMap<_, _>>();
+        .collect::<BTreeMap<_, _>>();
 
     odp.process(
         &tracking_arc.measurements,
@@ -222,7 +222,7 @@ fn od_resid_reject_default_ckf_two_way(
     traj: Traj<Orbit>,
     tracking_arc: TrackingArc<RangeDoppler>,
     initial_estimate: KfEstimate<Orbit>,
-    devices_n_configs: (Vec<GroundStation>, HashMap<String, TrkConfig>),
+    devices_n_configs: (Vec<GroundStation>, BTreeMap<String, TrkConfig>),
 ) {
     // Load cosm
     let cosm = Cosm::de438();
@@ -257,7 +257,7 @@ fn od_resid_reject_default_ckf_two_way(
     let mut devices_map = devices
         .into_iter()
         .map(|dev| (dev.name.clone(), dev))
-        .collect::<HashMap<_, _>>();
+        .collect::<BTreeMap<_, _>>();
 
     odp.process(
         &tracking_arc.measurements,

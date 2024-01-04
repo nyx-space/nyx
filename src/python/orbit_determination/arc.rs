@@ -44,7 +44,7 @@ impl GroundTrackingArcSim {
     pub fn with_seed(
         devices: Vec<GroundStation>,
         trajectory: TrajectoryLoader,
-        configs: HashMap<String, TrkConfig>,
+        configs: BTreeMap<String, TrkConfig>,
         seed: u64,
     ) -> Result<Self, NyxError> {
         // Try to convert the dynamic trajectory into a trajectory
@@ -88,7 +88,7 @@ impl GroundTrackingArcSim {
     }
 
     /// Generates a tracking schedule
-    pub fn generate_schedule(&self) -> Result<HashMap<String, TrkConfig>, NyxError> {
+    pub fn generate_schedule(&self) -> Result<BTreeMap<String, TrkConfig>, NyxError> {
         let cosm = Cosm::de438();
         match &self.inner {
             Either::Left(arc_sim) => arc_sim.generate_schedule(cosm),

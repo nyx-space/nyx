@@ -10,7 +10,7 @@ use nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
 use nyx::od::noise::GaussMarkov;
 use nyx::od::prelude::*;
 use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::env;
 use std::path::PathBuf;
 
@@ -47,7 +47,7 @@ fn od_tb_val_ekf_fixed_step_perfect_stations() {
     );
 
     // Load the tracking configurations
-    let mut configs = HashMap::new();
+    let mut configs = BTreeMap::new();
     let trkconfig_yaml: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
         "data",
@@ -242,7 +242,7 @@ fn od_tb_val_with_arc() {
     .iter()
     .collect();
 
-    let configs: HashMap<String, TrkConfig> = TrkConfig::load_named(trkconfig_yaml).unwrap();
+    let configs: BTreeMap<String, TrkConfig> = TrkConfig::load_named(trkconfig_yaml).unwrap();
 
     // Simulate tracking data of range and range rate
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 1).unwrap();
@@ -387,7 +387,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations() {
         .scheduler(Scheduler::builder().sample_alignment(10.seconds()).build())
         .build();
 
-    let mut configs = HashMap::new();
+    let mut configs = BTreeMap::new();
     configs.insert(dss65_madrid.name.clone(), cfg.clone());
     configs.insert(dss34_canberra.name.clone(), cfg.clone());
     configs.insert(dss13_goldstone.name.clone(), cfg);
@@ -615,7 +615,7 @@ fn od_tb_ckf_fixed_step_iteration_test() {
     // Define the tracking configurations
     let cfg = TrkConfig::from_sample_rate(10.seconds());
 
-    let mut configs = HashMap::new();
+    let mut configs = BTreeMap::new();
     configs.insert(dss65_madrid.name.clone(), cfg.clone());
     configs.insert(dss34_canberra.name.clone(), cfg.clone());
     configs.insert(dss13_goldstone.name.clone(), cfg);
@@ -771,7 +771,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
     );
 
     // Define the tracking configurations
-    let mut configs = HashMap::new();
+    let mut configs = BTreeMap::new();
     let cfg = TrkConfig::from_sample_rate(10.seconds());
     configs.insert(dss65_madrid.name.clone(), cfg.clone());
     configs.insert(dss34_canberra.name.clone(), cfg.clone());
@@ -987,7 +987,7 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect() {
     );
 
     // Define the tracking configurations
-    let mut configs = HashMap::new();
+    let mut configs = BTreeMap::new();
     let cfg = TrkConfig::from_sample_rate(10.seconds());
     configs.insert(dss65_madrid.name.clone(), cfg.clone());
     configs.insert(dss34_canberra.name.clone(), cfg.clone());
@@ -1114,7 +1114,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
     );
 
     // Define the tracking configurations
-    let mut configs = HashMap::new();
+    let mut configs = BTreeMap::new();
     let cfg = TrkConfig::from_sample_rate(10.seconds());
     configs.insert(dss65_madrid.name.clone(), cfg.clone());
     configs.insert(dss34_canberra.name.clone(), cfg.clone());

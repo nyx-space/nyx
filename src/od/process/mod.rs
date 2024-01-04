@@ -33,7 +33,7 @@ pub use trigger::EkfTrigger;
 mod rejectcrit;
 use self::msr::TrackingArc;
 pub use self::rejectcrit::FltResid;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::marker::PhantomData;
 use std::ops::Add;
 mod export;
@@ -280,7 +280,7 @@ where
     pub fn iterate<Dev>(
         &mut self,
         measurements: &[(String, Msr)],
-        devices: &mut HashMap<String, Dev>,
+        devices: &mut BTreeMap<String, Dev>,
         step_size: Duration,
         config: IterationConf,
     ) -> Result<(), NyxError>
@@ -459,7 +459,7 @@ where
     pub fn process<Dev>(
         &mut self,
         measurements: &[(String, Msr)],
-        devices: &mut HashMap<String, Dev>,
+        devices: &mut BTreeMap<String, Dev>,
         max_step: Duration,
     ) -> Result<(), NyxError>
     where

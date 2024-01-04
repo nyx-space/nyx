@@ -10,7 +10,7 @@ use nyx::od::noise::GaussMarkov;
 use nyx::od::prelude::*;
 use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use nyx::utils::rss_orbit_errors;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::convert::TryFrom;
 
 /*
@@ -43,7 +43,7 @@ fn xhat_dev_test_ekf_two_body() {
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
-    let mut configs = HashMap::new();
+    let mut configs = BTreeMap::new();
     configs.insert(
         dss65_madrid.name.clone(),
         TrkConfig::from_sample_rate(10.seconds()),
@@ -252,7 +252,7 @@ fn xhat_dev_test_ekf_multi_body() {
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
-    let mut configs = HashMap::new();
+    let mut configs = BTreeMap::new();
     configs.insert(
         dss65_madrid.name.clone(),
         TrkConfig::from_sample_rate(10.seconds()),
@@ -421,7 +421,7 @@ fn xhat_dev_test_ekf_harmonics() {
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
-    let mut configs = HashMap::new();
+    let mut configs = BTreeMap::new();
     configs.insert(
         dss65_madrid.name.clone(),
         TrkConfig::from_sample_rate(10.seconds()),
@@ -581,7 +581,7 @@ fn xhat_dev_test_ekf_realistic() {
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
-    let mut configs = HashMap::new();
+    let mut configs = BTreeMap::new();
     configs.insert(
         dss65_madrid.name.clone(),
         TrkConfig::from_sample_rate(10.seconds()),
@@ -735,7 +735,7 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
-    let mut configs = HashMap::new();
+    let mut configs = BTreeMap::new();
     configs.insert(
         dss65_madrid.name.clone(),
         TrkConfig::from_sample_rate(10.seconds()),
@@ -1006,7 +1006,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
-    let mut configs = HashMap::new();
+    let mut configs = BTreeMap::new();
     configs.insert(
         dss65_madrid.name.clone(),
         TrkConfig::from_sample_rate(10.seconds()),
@@ -1276,7 +1276,7 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
-    let mut configs = HashMap::new();
+    let mut configs = BTreeMap::new();
     configs.insert(
         dss65_madrid.name.clone(),
         TrkConfig::from_sample_rate(10.seconds()),

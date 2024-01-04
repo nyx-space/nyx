@@ -54,7 +54,7 @@ use pyo3::prelude::*;
 #[cfg(feature = "python")]
 use pyo3::types::PyType;
 #[cfg(feature = "python")]
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 /// If an orbit has an eccentricity below the following value, it is considered circular (only affects warning messages)
 pub const ECC_EPSILON: f64 = 1e-11;
@@ -1660,12 +1660,12 @@ impl Orbit {
 
     #[cfg(feature = "python")]
     #[classmethod]
-    fn load_named(_cls: &PyType, path: &str) -> Result<HashMap<String, Self>, ConfigError> {
+    fn load_named(_cls: &PyType, path: &str) -> Result<BTreeMap<String, Self>, ConfigError> {
         let orbits = OrbitSerde::load_named(path)?;
 
         let cosm = Cosm::de438();
 
-        let mut selves = HashMap::with_capacity(orbits.len());
+        let mut selves = BTreeMap::with_capacity(orbits.len());
 
         for (k, v) in orbits {
             selves.insert(k, Self::from_config(v, cosm.clone())?);

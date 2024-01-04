@@ -146,14 +146,23 @@ pub struct Strand {
     pub end: Epoch,
 }
 
+#[cfg_attr(feature = "python", pymethods)]
 impl Strand {
     /// Returns whether the provided epoch is within the range
     pub fn contains(&self, epoch: Epoch) -> bool {
         (self.start..=self.end).contains(&epoch)
     }
 
+    /// Returns the duration of this tracking strand
     pub fn duration(&self) -> Duration {
         self.end - self.start
+    }
+
+    /// Builds a new strand with the start and end epochs of this tracking strand.
+    #[cfg(feature = "python")]
+    #[new]
+    fn py_new(start: Epoch, end: Epoch) -> Self {
+        Self { start, end }
     }
 }
 
@@ -243,7 +252,7 @@ mod trkconfig_ut {
 
     #[test]
     fn deserialize_from_file() {
-        use std::collections::HashMap;
+        use std::collections::BTreeMap;
         use std::env;
         use std::path::PathBuf;
 
@@ -258,7 +267,7 @@ mod trkconfig_ut {
         .iter()
         .collect();
 
-        let configs: HashMap<String, TrkConfig> = TrkConfig::load_named(trkconfg_yaml).unwrap();
+        let configs: BTreeMap<String, TrkConfig> = TrkConfig::load_named(trkconfg_yaml).unwrap();
         dbg!(configs);
     }
 

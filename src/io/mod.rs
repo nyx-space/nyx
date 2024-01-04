@@ -28,7 +28,7 @@ use serde::ser::SerializeSeq;
 use serde::{Deserialize, Deserializer};
 use serde::{Serialize, Serializer};
 use serde_yaml::Error as YamlError;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::convert::From;
 use std::fmt::Debug;
 use std::fs::File;
@@ -206,7 +206,7 @@ pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {
     }
 
     /// Builds a map of names to "selves" from the provided path to a yaml
-    fn load_named<P>(path: P) -> Result<HashMap<String, Self>, ConfigError>
+    fn load_named<P>(path: P) -> Result<BTreeMap<String, Self>, ConfigError>
     where
         P: AsRef<Path>,
     {

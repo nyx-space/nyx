@@ -10,7 +10,7 @@ use self::nyx::od::prelude::*;
 // Extra testing imports
 use self::nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
 use self::nyx::propagators::RK4Fixed;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 #[allow(clippy::identity_op)]
 #[test]
@@ -43,7 +43,7 @@ fn od_val_multi_body_ckf_perfect_stations() {
     );
 
     // Define the tracking configurations
-    let mut configs = HashMap::new();
+    let mut configs = BTreeMap::new();
     configs.insert(
         dss65_madrid.name.clone(),
         TrkConfig::from_sample_rate(10.seconds()),
@@ -175,7 +175,7 @@ fn multi_body_ckf_covar_map() {
         iau_earth,
     );
     // Define the tracking configurations
-    let mut configs = HashMap::new();
+    let mut configs = BTreeMap::new();
     configs.insert(
         dss13_goldstone.name.clone(),
         TrkConfig::builder()

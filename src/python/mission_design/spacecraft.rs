@@ -78,7 +78,7 @@ impl Spacecraft {
     }
 
     #[classmethod]
-    fn load_named(_cls: &PyType, path: &str) -> Result<HashMap<String, Self>, ConfigError> {
+    fn load_named(_cls: &PyType, path: &str) -> Result<BTreeMap<String, Self>, ConfigError> {
         <Self as ConfigRepr>::load_named(path)
     }
 

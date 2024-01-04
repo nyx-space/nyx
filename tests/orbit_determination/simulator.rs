@@ -6,7 +6,7 @@ use nyx_space::od::msr::RangeDoppler;
 use nyx_space::od::prelude::*;
 use nyx_space::od::simulator::TrackingArcSim;
 use nyx_space::od::simulator::TrkConfig;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::env;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -84,7 +84,7 @@ fn continuous_tracking() {
     .iter()
     .collect();
 
-    let configs: HashMap<String, TrkConfig> = TrkConfig::load_named(trkconfg_yaml).unwrap();
+    let configs: BTreeMap<String, TrkConfig> = TrkConfig::load_named(trkconfg_yaml).unwrap();
 
     dbg!(&configs);
 

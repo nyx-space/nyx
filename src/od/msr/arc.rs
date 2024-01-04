@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::error::Error;
 use std::fmt::{Debug, Display};
 use std::fs::File;
@@ -227,7 +227,7 @@ where
     pub fn rebuild_devices<MsrIn, D>(
         &self,
         cosm: Arc<Cosm>,
-    ) -> Result<HashMap<String, D>, ConfigError>
+    ) -> Result<BTreeMap<String, D>, ConfigError>
     where
         MsrIn: Interpolatable,
         D: TrackingDeviceSim<MsrIn, Msr>,
@@ -237,7 +237,7 @@ where
     {
         let devices_repr = D::IntermediateRepr::loads_many(&self.device_cfg)?;
 
-        let mut devices = HashMap::new();
+        let mut devices = BTreeMap::new();
 
         for serde in devices_repr {
             let device = D::from_config(serde, cosm.clone())?;
