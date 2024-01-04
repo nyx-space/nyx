@@ -1665,7 +1665,7 @@ impl Orbit {
 
         let cosm = Cosm::de438();
 
-        let mut selves = BTreeMap::with_capacity(orbits.len());
+        let mut selves = BTreeMap::new();
 
         for (k, v) in orbits {
             selves.insert(k, Self::from_config(v, cosm.clone())?);

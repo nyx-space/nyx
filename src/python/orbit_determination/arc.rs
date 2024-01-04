@@ -26,7 +26,7 @@ pub use crate::{io::ConfigError, od::prelude::GroundStation};
 use crate::{NyxError, Orbit, Spacecraft};
 use either::Either;
 use pyo3::prelude::*;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 #[derive(Clone)]
 #[pyclass]

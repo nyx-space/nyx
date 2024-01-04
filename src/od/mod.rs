@@ -52,6 +52,7 @@ pub use simulator::TrackingDeviceSim;
 /// Provides all state noise compensation functionality
 pub mod snc;
 
+#[allow(unused_imports)]
 pub mod prelude {
     pub use super::estimate::*;
     pub use super::filter::kalman::*;

@@ -23,7 +23,7 @@ use crate::{
     Orbit, Spacecraft, State,
 };
 use crate::{md::StateParameter, NyxError};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use hifitime::Epoch;
 use pyo3::class::basic::CompareOp;

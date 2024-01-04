@@ -17,10 +17,9 @@
 */
 
 use super::scheduler::Scheduler;
-pub use crate::dynamics::{Dynamics, NyxError};
+use crate::cosmic::Cosm;
 use crate::io::{duration_from_str, duration_to_str, epoch_from_str, epoch_to_str, ConfigError};
 use crate::io::{ConfigRepr, Configurable};
-pub use crate::{cosmic::Cosm, State, TimeTagged};
 use hifitime::TimeUnits;
 use hifitime::{Duration, Epoch};
 #[cfg(feature = "python")]

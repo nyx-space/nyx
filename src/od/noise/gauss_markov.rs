@@ -38,6 +38,8 @@ use rand::{Rng, SeedableRng};
 use rand_distr::Normal;
 use rand_pcg::Pcg64Mcg;
 use serde_derive::{Deserialize, Serialize};
+#[cfg(feature = "python")]
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::fmt;
 use std::fs::File;

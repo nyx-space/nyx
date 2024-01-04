@@ -22,7 +22,6 @@ use crate::md::prelude::*;
 use crate::md::StateParameter;
 pub use crate::md::{Variable, Vary};
 use crate::propagators::error_ctrl::ErrorCtrl;
-use std::convert::TryInto;
 use std::fmt;
 
 use super::solution::TargeterSolution;
@@ -71,9 +70,9 @@ impl<'a, E: ErrorCtrl, const O: usize> Optimizer<'a, E, 3, O> {
             prop,
             objectives,
             variables: [
-                Vary::VelocityX.try_into().unwrap(),
-                Vary::VelocityY.try_into().unwrap(),
-                Vary::VelocityZ.try_into().unwrap(),
+                Vary::VelocityX.into(),
+                Vary::VelocityY.into(),
+                Vary::VelocityZ.into(),
             ],
             iterations: 100,
             objective_frame: None,
@@ -90,9 +89,9 @@ impl<'a, E: ErrorCtrl, const O: usize> Optimizer<'a, E, 3, O> {
             prop,
             objectives,
             variables: [
-                Vary::PositionX.try_into().unwrap(),
-                Vary::PositionY.try_into().unwrap(),
-                Vary::PositionZ.try_into().unwrap(),
+                Vary::PositionX.into(),
+                Vary::PositionY.into(),
+                Vary::PositionZ.into(),
             ],
             iterations: 100,
             objective_frame: None,
@@ -109,9 +108,9 @@ impl<'a, E: ErrorCtrl, const O: usize> Optimizer<'a, E, 3, O> {
             prop,
             objectives,
             variables: [
-                Vary::VelocityX.try_into().unwrap(),
-                Vary::VelocityY.try_into().unwrap(),
-                Vary::VelocityZ.try_into().unwrap(),
+                Vary::VelocityX.into(),
+                Vary::VelocityY.into(),
+                Vary::VelocityZ.into(),
             ],
             iterations: 100,
             objective_frame: None,
