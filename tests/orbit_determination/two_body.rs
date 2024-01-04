@@ -928,7 +928,7 @@ fn od_tb_ckf_map_covar() {
         KF<Orbit, nalgebra::Const<3>, nalgebra::Const<2>>,
     > = ODProcess::ckf(prop_est, ckf, None, cosm);
 
-    odp.predict_for(30.seconds(), false, duration).unwrap();
+    odp.predict_for(30.seconds(), duration).unwrap();
 
     // Check that the covariance inflated (we don't get the norm of the estimate because it's zero without any truth data)
     let estimates = odp.estimates;
