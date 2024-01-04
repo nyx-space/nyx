@@ -37,6 +37,7 @@ use typed_builder::TypedBuilder;
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypedBuilder)]
 #[cfg_attr(feature = "python", pyclass)]
 #[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
+#[cfg_attr(feature = "python", pyo3(get_all, set_all))]
 #[builder(doc)]
 pub struct TrkConfig {
     /// Set to automatically build a tracking schedule based on some criteria
@@ -137,6 +138,7 @@ impl Default for TrkConfig {
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass)]
 #[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
+#[cfg_attr(feature = "python", pyo3(get_all, set_all))]
 pub struct Strand {
     #[serde(serialize_with = "epoch_to_str", deserialize_with = "epoch_from_str")]
     pub start: Epoch,
