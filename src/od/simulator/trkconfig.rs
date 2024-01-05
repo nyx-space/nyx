@@ -17,10 +17,9 @@
 */
 
 use super::scheduler::Scheduler;
-pub use crate::dynamics::{Dynamics, NyxError};
+use crate::cosmic::Cosm;
 use crate::io::{duration_from_str, duration_to_str, epoch_from_str, epoch_to_str, ConfigError};
 use crate::io::{ConfigRepr, Configurable};
-pub use crate::{cosmic::Cosm, State, TimeTagged};
 use hifitime::TimeUnits;
 use hifitime::{Duration, Epoch};
 #[cfg(feature = "python")]
@@ -37,6 +36,7 @@ use typed_builder::TypedBuilder;
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypedBuilder)]
 #[cfg_attr(feature = "python", pyclass)]
 #[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
+#[cfg_attr(feature = "python", pyo3(get_all, set_all))]
 #[builder(doc)]
 pub struct TrkConfig {
     /// Set to automatically build a tracking schedule based on some criteria
@@ -137,6 +137,7 @@ impl Default for TrkConfig {
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass)]
 #[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
+#[cfg_attr(feature = "python", pyo3(get_all, set_all))]
 pub struct Strand {
     #[serde(serialize_with = "epoch_to_str", deserialize_with = "epoch_from_str")]
     pub start: Epoch,
@@ -144,14 +145,23 @@ pub struct Strand {
     pub end: Epoch,
 }
 
+#[cfg_attr(feature = "python", pymethods)]
 impl Strand {
     /// Returns whether the provided epoch is within the range
     pub fn contains(&self, epoch: Epoch) -> bool {
         (self.start..=self.end).contains(&epoch)
     }
 
+    /// Returns the duration of this tracking strand
     pub fn duration(&self) -> Duration {
         self.end - self.start
+    }
+
+    /// Builds a new strand with the start and end epochs of this tracking strand.
+    #[cfg(feature = "python")]
+    #[new]
+    fn py_new(start: Epoch, end: Epoch) -> Self {
+        Self { start, end }
     }
 }
 
@@ -241,7 +251,7 @@ mod trkconfig_ut {
 
     #[test]
     fn deserialize_from_file() {
-        use std::collections::HashMap;
+        use std::collections::BTreeMap;
         use std::env;
         use std::path::PathBuf;
 
@@ -256,7 +266,7 @@ mod trkconfig_ut {
         .iter()
         .collect();
 
-        let configs: HashMap<String, TrkConfig> = TrkConfig::load_named(trkconfg_yaml).unwrap();
+        let configs: BTreeMap<String, TrkConfig> = TrkConfig::load_named(trkconfg_yaml).unwrap();
         dbg!(configs);
     }
 

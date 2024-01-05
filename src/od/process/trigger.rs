@@ -21,7 +21,7 @@ use hifitime::Epoch;
 use super::estimate::Estimate;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
-pub use crate::time::{Duration, Unit};
+use crate::time::Duration;
 use crate::State;
 
 /// An EkfTrigger on the number of measurements processed and a time between measurements.

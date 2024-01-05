@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc};
 
 use crate::{
     cosmic::Cosm,
@@ -110,12 +110,12 @@ impl OrbitEstimate {
     }
 
     #[classmethod]
-    fn load_named(_cls: &PyType, path: &str) -> Result<HashMap<String, Self>, ConfigError> {
+    fn load_named(_cls: &PyType, path: &str) -> Result<BTreeMap<String, Self>, ConfigError> {
         let orbits = OrbitEstimateSerde::load_named(path)?;
 
         let cosm = Cosm::de438();
 
-        let mut selves = HashMap::with_capacity(orbits.len());
+        let mut selves = BTreeMap::new();
 
         for (k, v) in orbits {
             selves.insert(k, Self::from_config(v, cosm.clone())?);

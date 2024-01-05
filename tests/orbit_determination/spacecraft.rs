@@ -11,7 +11,7 @@ use nyx::od::noise::GaussMarkov;
 use nyx::od::prelude::*;
 use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use nyx::time::{Epoch, TimeUnits, Unit};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 #[allow(clippy::identity_op)]
@@ -61,7 +61,7 @@ fn od_val_sc_mb_srp_reals_duals_models() {
     let prop_time = 1 * Unit::Day;
 
     // Define the tracking configurations
-    let mut configs = HashMap::new();
+    let mut configs = BTreeMap::new();
     let cfg = TrkConfig::builder()
         .strands(vec![Strand {
             start: epoch,

@@ -101,9 +101,9 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
             max_iterations: 100,
             improvement_threshold: 0.01,
             variables: [
-                Vary::VelocityX.try_into().unwrap(),
-                Vary::VelocityY.try_into().unwrap(),
-                Vary::VelocityZ.try_into().unwrap(),
+                Vary::VelocityX.into(),
+                Vary::VelocityY.into(),
+                Vary::VelocityZ.into(),
             ],
             all_dvs: Vec::with_capacity(node_count),
         })

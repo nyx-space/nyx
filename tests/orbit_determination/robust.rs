@@ -12,7 +12,7 @@ use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use nyx::time::{Epoch, TimeUnits, Unit};
 use nyx::utils::rss_orbit_errors;
 use polars::prelude::*;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::env;
 use std::fs::File;
 use std::path::PathBuf;
@@ -51,7 +51,7 @@ fn od_robust_test_ekf_realistic_one_way() {
     );
 
     // Define the tracking configurations
-    let configs = HashMap::from([
+    let configs = BTreeMap::from([
         (
             dss65_madrid.name.clone(),
             TrkConfig::from_sample_rate(60.seconds()),
@@ -267,7 +267,7 @@ fn od_robust_test_ekf_realistic_two_way() {
     dss34_canberra.integration_time = Some(60.seconds());
 
     // Define the tracking configurations
-    let configs = HashMap::from([
+    let configs = BTreeMap::from([
         (dss65_madrid.name.clone(), TrkConfig::default()),
         (dss34_canberra.name.clone(), TrkConfig::default()),
     ]);
@@ -354,11 +354,11 @@ fn od_robust_test_ekf_realistic_two_way() {
     // Without it, we're stuck having to rebuild them from scratch.
     // https://github.com/nyx-space/nyx/issues/140
 
-    // Build the hashmap of devices from the vector using their names
+    // Build the BTreeMap of devices from the vector using their names
     let mut devices_map = devices
         .into_iter()
         .map(|dev| (dev.name.clone(), dev))
-        .collect::<HashMap<_, _>>();
+        .collect::<BTreeMap<_, _>>();
 
     // Check that exporting an empty set returns an error.
     assert!(odp

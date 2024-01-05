@@ -23,7 +23,7 @@ use pyo3::basic::CompareOp;
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 use pythonize::{depythonize, pythonize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::str::FromStr;
 
 #[pymethods]
@@ -39,7 +39,7 @@ impl TrkConfig {
     }
 
     #[classmethod]
-    fn load_named(_cls: &PyType, path: &str) -> Result<HashMap<String, Self>, ConfigError> {
+    fn load_named(_cls: &PyType, path: &str) -> Result<BTreeMap<String, Self>, ConfigError> {
         <Self as ConfigRepr>::load_named(path)
     }
 

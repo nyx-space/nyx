@@ -33,7 +33,7 @@ pub use trigger::EkfTrigger;
 mod rejectcrit;
 use self::msr::TrackingArc;
 pub use self::rejectcrit::FltResid;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::marker::PhantomData;
 use std::ops::Add;
 mod export;
@@ -280,7 +280,7 @@ where
     pub fn iterate<Dev>(
         &mut self,
         measurements: &[(String, Msr)],
-        devices: &mut HashMap<String, Dev>,
+        devices: &mut BTreeMap<String, Dev>,
         step_size: Duration,
         config: IterationConf,
     ) -> Result<(), NyxError>
@@ -459,7 +459,7 @@ where
     pub fn process<Dev>(
         &mut self,
         measurements: &[(String, Msr)],
-        devices: &mut HashMap<String, Dev>,
+        devices: &mut BTreeMap<String, Dev>,
         max_step: Duration,
     ) -> Result<(), NyxError>
     where
@@ -512,9 +512,8 @@ where
             loop {
                 let delta_t = next_msr_epoch - epoch;
 
-                // Propagator for the minimum time between the maximum step size and the duration to the next measurement.
-
-                let next_step_size = delta_t.min(self.prop.step_size);
+                // Propagator for the minimum time between the maximum step size, the next step size, and the duration to the next measurement.
+                let next_step_size = delta_t.min(self.prop.step_size).min(max_step);
 
                 // Remove old states from the trajectory
                 // This is a manual implementation of `retaint` because we know it's a sorted vec, so no need to resort every time
@@ -661,23 +660,18 @@ where
     }
 
     /// Continuously predicts the trajectory until the provided end epoch, with covariance mapping at each step. In other words, this performs a time update.
-    pub fn predict_until(
-        &mut self,
-        step: Duration,
-        fixed_step: bool,
-        end_epoch: Epoch,
-    ) -> Result<(), NyxError> {
+    pub fn predict_until(&mut self, step: Duration, end_epoch: Epoch) -> Result<(), NyxError> {
         let prop_time = end_epoch - self.kf.previous_estimate().epoch();
-        info!("Propagating for {prop_time} seconds and mapping covariance",);
-        self.prop.set_step(step, fixed_step);
+        info!("Propagating for {prop_time} and mapping covariance",);
 
         loop {
             let mut epoch = self.prop.state.epoch();
             if epoch + self.prop.details.step > end_epoch {
                 self.prop.until_epoch(end_epoch)?;
             } else {
-                self.prop.single_step()?;
+                self.prop.for_duration(step)?;
             }
+
             // Perform time update
 
             // Extract the state and update the STM in the filter.
@@ -706,15 +700,9 @@ where
     }
 
     /// Continuously predicts the trajectory for the provided duration, with covariance mapping at each step. In other words, this performs a time update.
-    pub fn predict_for(
-        &mut self,
-        step: Duration,
-        fixed_step: bool,
-        duration: Duration,
-    ) -> Result<(), NyxError> {
+    pub fn predict_for(&mut self, step: Duration, duration: Duration) -> Result<(), NyxError> {
         let end_epoch = self.kf.previous_estimate().epoch() + duration;
-
-        self.predict_until(step, fixed_step, end_epoch)
+        self.predict_until(step, end_epoch)
     }
 
     /// Builds the navigation trajectory for the estimated state only

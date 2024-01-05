@@ -6,7 +6,7 @@ use nyx_space::od::prelude::*;
 use nyx_space::od::simulator::TrackingArcSim;
 use nyx_space::od::simulator::{Cadence, Strand, TrkConfig};
 use rstest::*;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::env;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -95,13 +95,23 @@ fn trk_simple(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
     .iter()
     .collect();
 
-    let configs: HashMap<String, TrkConfig> = TrkConfig::load_named(trkconfg_yaml).unwrap();
+    let configs: BTreeMap<String, TrkConfig> = TrkConfig::load_named(trkconfg_yaml).unwrap();
 
     dbg!(&configs);
 
     // Build the tracking arc simulation to generate a "standard measurement".
     let mut trk =
         TrackingArcSim::<Orbit, RangeDoppler, _>::with_seed(devices, traj, configs, 12345).unwrap();
+
+    // Test that building the schedule is deterministic
+    let orig_sched = trk.generate_schedule(cosm.clone()).unwrap();
+    for ii in 0..5 {
+        let sched = trk.generate_schedule(cosm.clone()).unwrap();
+        assert_eq!(
+            sched, orig_sched,
+            "{ii} was different:\n orig {orig_sched:?}\n sched {sched:?}"
+        );
+    }
 
     trk.build_schedule(cosm.clone()).unwrap();
 
@@ -192,7 +202,7 @@ fn trkconfig_zero_inclusion(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
         .build();
 
     // Build the configs map, where we only have one of the two stations configured
-    let mut configs = HashMap::new();
+    let mut configs = BTreeMap::new();
     configs.insert(devices[1].name.clone(), trkcfg_always);
 
     let mut trk = TrackingArcSim::<Orbit, RangeDoppler, _>::new(devices, traj, configs).unwrap();
@@ -223,7 +233,7 @@ fn trkconfig_invalid(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
         .build();
 
     // Build the configs map
-    let mut configs = HashMap::new();
+    let mut configs = BTreeMap::new();
     for device in &devices {
         configs.insert(device.name.clone(), trkcfg.clone());
     }
@@ -245,7 +255,7 @@ fn trkconfig_delayed_start(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
         .build();
 
     // Build the configs map with a single ground station
-    let mut configs = HashMap::new();
+    let mut configs = BTreeMap::new();
 
     configs.insert(devices[0].name.clone(), trkcfg);
 
@@ -274,7 +284,7 @@ fn trkconfig_cadence(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
     let cosm = Cosm::de438();
 
     // Build the configs map with a single ground station
-    let mut configs = HashMap::new();
+    let mut configs = BTreeMap::new();
 
     configs.insert(
         devices[0].name.clone(),

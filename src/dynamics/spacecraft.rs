@@ -45,7 +45,7 @@ use pyo3::types::PyType;
 #[cfg(feature = "python")]
 use pythonize::depythonize;
 #[cfg(feature = "python")]
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 const NORM_ERR: f64 = 1e-4;
 
@@ -199,12 +199,12 @@ impl SpacecraftDynamics {
 
     #[cfg(feature = "python")]
     #[classmethod]
-    fn load_named(_cls: &PyType, path: &str) -> Result<HashMap<String, Self>, ConfigError> {
+    fn load_named(_cls: &PyType, path: &str) -> Result<BTreeMap<String, Self>, ConfigError> {
         let orbits = DynamicsSerde::load_named(path)?;
 
         let cosm = Cosm::de438();
 
-        let mut selves = HashMap::with_capacity(orbits.len());
+        let mut selves = BTreeMap::new();
 
         for (k, v) in orbits {
             selves.insert(k, Self::from_config(v, cosm.clone())?);

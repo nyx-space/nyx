@@ -21,18 +21,18 @@ use num::integer::gcd;
 use rand::SeedableRng;
 use rand_pcg::Pcg64Mcg;
 
-pub use crate::dynamics::{Dynamics, NyxError};
+use crate::dynamics::NyxError;
 use crate::io::ConfigError;
 use crate::md::trajectory::Interpolatable;
 use crate::od::msr::{RangeDoppler, TrackingArc};
 use crate::od::prelude::Strand;
 use crate::od::simulator::Cadence;
 use crate::od::{GroundStation, Measurement};
-pub use crate::{cosmic::Cosm, State, TimeTagged};
+use crate::{cosmic::Cosm, State};
 use crate::{linalg::allocator::Allocator, od::TrackingDeviceSim};
 use crate::{linalg::DefaultAllocator, md::prelude::Traj};
 use crate::{Orbit, Spacecraft};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::marker::PhantomData;
 use std::sync::Arc;
@@ -53,11 +53,11 @@ where
         + Allocator<f64, Msr::MeasurementSize>,
 {
     /// Map of devices from their names.
-    pub devices: HashMap<String, D>,
+    pub devices: BTreeMap<String, D>,
     /// Receiver trajectory
     pub trajectory: Traj<MsrIn>,
     /// Configuration of each device
-    pub configs: HashMap<String, TrkConfig>,
+    pub configs: BTreeMap<String, TrkConfig>,
     /// Random number generator used for this tracking arc, ensures repeatability
     rng: Pcg64Mcg,
     /// Greatest common denominator time series that allows this arc to meet all of the conditions.
@@ -82,12 +82,12 @@ where
     pub fn with_rng(
         devices: Vec<D>,
         trajectory: Traj<MsrIn>,
-        configs: HashMap<String, TrkConfig>,
+        configs: BTreeMap<String, TrkConfig>,
         rng: Pcg64Mcg,
     ) -> Result<Self, ConfigError> {
         // Check that each device has an associated configurations.
         // We don't care if there are more configurations than chosen devices.
-        let mut devices_map = HashMap::new();
+        let mut devices_map = BTreeMap::new();
         let mut sampling_rates_ns = Vec::with_capacity(devices.len());
         for device in devices {
             if let Some(cfg) = configs.get(&device.name()) {
@@ -143,7 +143,7 @@ where
     pub fn with_seed(
         devices: Vec<D>,
         trajectory: Traj<MsrIn>,
-        configs: HashMap<String, TrkConfig>,
+        configs: BTreeMap<String, TrkConfig>,
         seed: u64,
     ) -> Result<Self, ConfigError> {
         let rng = Pcg64Mcg::new(seed as u128);
@@ -155,7 +155,7 @@ where
     pub fn new(
         devices: Vec<D>,
         trajectory: Traj<MsrIn>,
-        configs: HashMap<String, TrkConfig>,
+        configs: BTreeMap<String, TrkConfig>,
     ) -> Result<Self, ConfigError> {
         let rng = Pcg64Mcg::from_entropy();
 
@@ -197,7 +197,7 @@ where
             match cfg.strands.as_ref() {
                 Some(strands) => {
                     // Strands are defined at this point
-                    'strands: for strand in strands {
+                    'strands: for (ii, strand) in strands.iter().enumerate() {
                         // Build the time series for this strand, sampling at the correct rate
                         for epoch in TimeSeries::inclusive(strand.start, strand.end, cfg.sampling) {
                             match device.measure(
@@ -212,10 +212,12 @@ where
                                     }
                                 }
                                 Err(e) => {
-                                    error!(
-                                        "Skipping the remaining strand ending on {}: {e}",
-                                        strand.end
-                                    );
+                                    if epoch != strand.end {
+                                        warn!(
+                                            "Skipping the remaining strand #{ii} ending on {}: {e}",
+                                            strand.end
+                                        );
+                                    }
                                     continue 'strands;
                                 }
                             }
@@ -293,7 +295,7 @@ impl TrackingArcSim<Orbit, RangeDoppler, GroundStation> {
     pub fn generate_schedule(
         &self,
         cosm: Arc<Cosm>,
-    ) -> Result<HashMap<String, TrkConfig>, NyxError> {
+    ) -> Result<BTreeMap<String, TrkConfig>, NyxError> {
         // Consider using find_all via the heuristic
         let mut built_cfg = self.configs.clone();
         for (name, device) in self.devices.iter() {
@@ -444,7 +446,7 @@ impl TrackingArcSim<Spacecraft, RangeDoppler, GroundStation> {
     pub fn generate_schedule(
         &self,
         cosm: Arc<Cosm>,
-    ) -> Result<HashMap<String, TrkConfig>, NyxError> {
+    ) -> Result<BTreeMap<String, TrkConfig>, NyxError> {
         let mut built_cfg = self.configs.clone();
         'devices: for (name, device) in self.devices.iter() {
             let cfg = &self.configs[name];

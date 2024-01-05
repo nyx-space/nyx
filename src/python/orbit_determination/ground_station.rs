@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use crate::cosmic::{Cosm, Orbit};
 use crate::io::ConfigRepr;
@@ -111,15 +111,15 @@ impl GroundStation {
     }
 
     #[classmethod]
-    fn load_named(_cls: &PyType, path: &str) -> Result<HashMap<String, Self>, ConfigError> {
+    fn load_named(_cls: &PyType, path: &str) -> Result<BTreeMap<String, Self>, ConfigError> {
         <Self as ConfigRepr>::load_named(path)
     }
 
     #[classmethod]
     /// Loads the SpacecraftDynamics from its YAML representation
-    fn loads(_cls: &PyType, data: &PyAny) -> Result<HashMap<String, Self>, ConfigError> {
+    fn loads(_cls: &PyType, data: &PyAny) -> Result<BTreeMap<String, Self>, ConfigError> {
         if let Ok(as_list) = data.downcast::<PyList>() {
-            let mut as_map = HashMap::new();
+            let mut as_map = BTreeMap::new();
             for item in as_list.iter() {
                 // Check that the item is a dictionary
                 let next: Self = serde_yaml::from_value(pyany_to_value(item)?)
@@ -128,7 +128,7 @@ impl GroundStation {
             }
             Ok(as_map)
         } else if let Ok(as_dict) = data.downcast::<PyDict>() {
-            let mut as_map = HashMap::new();
+            let mut as_map = BTreeMap::new();
             for item_as_list in as_dict.items() {
                 let k_any = item_as_list.get_item(0).or_else(|_| {
                     Err(ConfigError::InvalidConfig(
