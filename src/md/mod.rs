@@ -101,14 +101,8 @@ pub enum TargetingError {
     SingularJacobian,
     #[snafu(display("propagation error during targeting: {source}"))]
     PropError { source: PropagationError },
-    #[snafu(display("during an optimization,  encountered {source}"))]
+    #[snafu(display("during an optimization, encountered {source}"))]
     TargetingTrajError { source: TrajError },
-}
-
-impl From<TargetingError> for NyxError {
-    fn from(e: TargetingError) -> Self {
-        NyxError::Targeter {
-            source: Box::new(e),
-        }
-    }
+    #[snafu(display("during an optimization targets are too close"))]
+    TargetsTooClose,
 }

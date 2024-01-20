@@ -21,7 +21,6 @@ use crate::io::ConfigError;
 use crate::md::trajectory::TrajError;
 use crate::md::StateParameter;
 pub use crate::md::TargetingError;
-pub use crate::time::Errors as TimeErrors;
 use snafu::prelude::*;
 use std::convert::From;
 
@@ -31,21 +30,9 @@ pub enum NyxError {
     /// Maximum iterations reached
     #[error("Maximum iterations of {msg} reached")]
     MaxIterReached { msg: String },
-    /// The sensitivity matrix must be updated prior to a filter measurement update
-    #[error("The sensitivity matrix must be updated prior to a filter measurement update")]
-    SensitivityNotUpdated,
-    /// Kalman Gain could not be computed because H*P_bar*H + R is singular
-    #[error("Gain could not be computed because H*P_bar*H + R is singular")]
-    SingularKalmanGain,
-    /// Singular Covariance
-    #[error("Singular Covariance")]
-    SingularCovarianceMatrix,
     /// Covariance is not positive semi definite
     #[error("Covariance is not positive semi definite")]
     CovarianceMatrixNotPsd,
-    /// Singular Jacobian
-    #[error("Singular Jacobian")]
-    SingularJacobian,
     /// Targets in Lambert solver too close: Δν ~=0 and A ~=0
     #[error("Lambert too close: Δν ~=0 and A ~=0")]
     TargetsTooClose,
@@ -55,9 +42,6 @@ pub enum NyxError {
     /// Multi revolution Lambert not supported, use the Izzo algorithm for multi-rev transfers
     #[error("Use the Izzo algorithm for multi-rev transfers")]
     LambertMultiRevNotSupported,
-    /// Partials for this dynamical model are not defined
-    #[error("Partials for this model are not defined")]
-    PartialsUndefined,
     /// State parameter cannot be used in this function
     #[error("Unavailable parameter {param:?}: {msg}")]
     StateParameterUnavailable { param: StateParameter, msg: String },
@@ -85,12 +69,6 @@ pub enum NyxError {
     /// No thruster attached to spacecraft
     #[error("No thruster attached to spacecraft")]
     NoThrusterAvail,
-    /// Control vector is not a unit vector
-    #[error("Control vector is not a unit vector: {norm}")]
-    CtrlNotAUnitVector { norm: f64 },
-    /// Throttle is not between 0.0 and 1.0
-    #[error("Throttle is not between 0.0 and 1.0: {ratio}")]
-    CtrlThrottleRangeErr { ratio: f64 },
     /// Happens when trying to modify a polynomial's (error)-th error but the polynomial has less orders than that
     #[error("Happens when trying to modify a polynomial's (error)-th error but the polynomial has less orders than that")]
     PolynomialOrderError { order: usize },
@@ -100,26 +78,14 @@ pub enum NyxError {
     /// This computation requires the orbit to be hyperbolic
     #[error("This computation requires the orbit to be hyperbolic: {msg}")]
     NotHyperbolic { msg: String },
-    /// Control variables to not decrease targeting error in differential corrector
-    #[error("Control variables to not decrease targeting error in differential corrector: {msg}")]
-    CorrectionIneffective { msg: String },
     /// Monte Carlo error
     #[error("Monte Carlo error: {msg}")]
     MonteCarlo { msg: String },
     /// CCSDS error
     #[error("CCSDS error: {msg}")]
     CCSDS { msg: String },
-    /// Multiple shooting failed with the provided error at the provided node computation
-    #[error("Multiple shooting failed on node {nth} with {err}")]
-    MultipleShootingTargeter { nth: usize, err: Box<NyxError> },
     #[error("Custom error: {0}")]
     CustomError(String),
-    /// Time related error
-    #[error("Time related error: {source}")]
-    TimeError { source: TimeErrors },
-    /// Targeting error
-    #[error("Targeting error: {source}")]
-    Targeter { source: Box<TargetingError> },
     /// Trajectory error
     #[error("Trajectory error: {source}")]
     Trajectory { source: TrajError },
@@ -132,12 +98,6 @@ pub enum NyxError {
     /// Configuration file error
     #[error("Config error: {source}")]
     ConfigError { source: ConfigError },
-}
-
-impl From<TimeErrors> for NyxError {
-    fn from(source: TimeErrors) -> Self {
-        NyxError::TimeError { source }
-    }
 }
 
 impl From<TrajError> for NyxError {

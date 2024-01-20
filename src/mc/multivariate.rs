@@ -108,8 +108,6 @@ where
             col *= sqrt_s[i];
         }
 
-        // OMatrix<f64, S::Size, <S::Size as DimMin<S::Size>>::Output, <DefaultAllocator as Allocator<f64, S::Size, <S::Size as DimMin<S::Size>>::Output>>::Buffer>
-
         Ok(Self {
             template,
             params,

@@ -355,12 +355,13 @@ impl<T: MultishootNode<O>, const O: usize> MultipleShootingSolution<T, O> {
     pub fn build_trajectories<'a, E: ErrorCtrl>(
         &self,
         prop: &'a Propagator<'a, SpacecraftDynamics, E>,
-    ) -> Result<Vec<ScTraj>, NyxError> {
+    ) -> Result<Vec<ScTraj>, MultipleShootingError> {
         let mut trajz = Vec::with_capacity(self.nodes.len());
 
         for (i, node) in self.nodes.iter().enumerate() {
-            let (_, traj) =
-                Optimizer::delta_v(prop, (*node).into()).apply_with_traj(&self.solutions[i])?;
+            let (_, traj) = Optimizer::delta_v(prop, (*node).into())
+                .apply_with_traj(&self.solutions[i])
+                .with_context(|_| TargetingSnafu { segment: i })?;
             trajz.push(traj);
         }
 

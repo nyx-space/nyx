@@ -55,7 +55,7 @@ pub struct NodeSerde {
 impl NodeSerde {
     pub fn to_node(&self, cosm: Arc<Cosm>) -> Result<Node, NyxError> {
         let frame = cosm.try_frame(self.frame.as_str())?;
-        let epoch = Epoch::from_str(&self.epoch)?;
+        let epoch = Epoch::from_str(&self.epoch).unwrap();
 
         Ok(Node {
             x: self.x,
