@@ -1493,9 +1493,9 @@ impl Orbit {
     /// Returns the radius of periapse in kilometers for the provided turn angle of this hyperbolic orbit.
     pub fn vinf_periapsis_km(&self, turn_angle_degrees: f64) -> Result<f64, NyxError> {
         if self.ecc() <= 1.0 {
-            Err(NyxError::NotHyperbolic(
-                "Orbit is not hyperbolic. Convert to target object first".to_string(),
-            ))
+            Err(NyxError::NotHyperbolic {
+                msg: "Orbit is not hyperbolic. Convert to target object first".to_string(),
+            })
         } else {
             let cos_rho = (0.5 * (PI - turn_angle_degrees.to_radians())).cos();
 
@@ -1506,9 +1506,9 @@ impl Orbit {
     /// Returns the turn angle in degrees for the provided radius of periapse passage of this hyperbolic orbit
     pub fn vinf_turn_angle_deg(&self, periapsis_km: f64) -> Result<f64, NyxError> {
         if self.ecc() <= 1.0 {
-            Err(NyxError::NotHyperbolic(
-                "Orbit is not hyperbolic. Convert to target object first".to_string(),
-            ))
+            Err(NyxError::NotHyperbolic {
+                msg: "Orbit is not hyperbolic. Convert to target object first".to_string(),
+            })
         } else {
             let rho =
                 (1.0 / (1.0 + self.vmag_km_s().powi(2) * (periapsis_km / self.frame.gm()))).acos();
@@ -1519,9 +1519,9 @@ impl Orbit {
     /// Returns the hyperbolic anomaly in degrees between 0 and 360.0
     pub fn hyperbolic_anomaly_deg(&self) -> Result<f64, NyxError> {
         if self.ecc() <= 1.0 {
-            Err(NyxError::NotHyperbolic(
-                "Orbit is not hyperbolic so there is no hyperbolic anomaly.".to_string(),
-            ))
+            Err(NyxError::NotHyperbolic {
+                msg: "Orbit is not hyperbolic so there is no hyperbolic anomaly.".to_string(),
+            })
         } else {
             let (sin_ta, cos_ta) = self.ta_deg().to_radians().sin_cos();
             let sinh_h = (sin_ta * (self.ecc().powi(2) - 1.0).sqrt()) / (1.0 + self.ecc() * cos_ta);
@@ -2191,10 +2191,10 @@ impl State for Orbit {
             StateParameter::VX => Ok(self.vx_km_s),
             StateParameter::VY => Ok(self.vy_km_s),
             StateParameter::VZ => Ok(self.vz_km_s),
-            _ => Err(NyxError::StateParameterUnavailable(
+            _ => Err(NyxError::StateParameterUnavailable {
                 param,
-                "no such parameter for orbit structure".to_string(),
-            )),
+                msg: "no such parameter for orbit structure".to_string(),
+            }),
         }
     }
 
@@ -2231,10 +2231,10 @@ impl State for Orbit {
                 self.vz_km_s = new_radius.z;
             }
             _ => {
-                return Err(NyxError::StateParameterUnavailable(
+                return Err(NyxError::StateParameterUnavailable {
                     param,
-                    "not settable for orbit structure with set_value".to_string(),
-                ))
+                    msg: "not settable for orbit structure with set_value".to_string(),
+                })
             }
         }
         Ok(())
@@ -2326,7 +2326,9 @@ fn compute_mean_to_true_anomaly(ma_radians: f64, ecc: f64, tol: f64) -> Result<f
         loop {
             iter += 1;
             if iter > 1000 {
-                return Err(NyxError::MaxIterReached(format!("{iter}")));
+                return Err(NyxError::MaxIterReached {
+                    msg: format!("{iter}"),
+                });
             }
 
             // GTDS MathSpec Equation 3-180  Note: a little difference here is that it uses Cos(E) instead of Cos(E-0.5*f)
@@ -2403,7 +2405,9 @@ fn compute_mean_to_true_anomaly(ma_radians: f64, ecc: f64, tol: f64) -> Result<f
         loop {
             iter += 1;
             if iter > 1000 {
-                return Err(NyxError::MaxIterReached(format!("{iter}")));
+                return Err(NyxError::MaxIterReached {
+                    msg: format!("{iter}"),
+                });
             }
 
             let normalizer = ecc * f2.cosh() - 1.0;

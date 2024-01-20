@@ -18,8 +18,7 @@
 
 use crate::errors::NyxError;
 use crate::{Orbit, Spacecraft};
-use std::error::Error;
-use std::fmt;
+use snafu::prelude::*;
 
 pub mod prelude {
     pub use super::{
@@ -61,37 +60,29 @@ pub use param::StateParameter;
 pub use opti::target_variable::{Variable, Vary};
 
 #[allow(clippy::result_large_err)]
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Snafu)]
 pub enum TargetingError {
-    /// Raised if the variables to be adjusted lead to an under-determined of the problem for the targeter
+    #[snafu(display(
+        "The variables to be adjusted lead to an under-determined of the problem for the targeter"
+    ))]
     UnderdeterminedProblem,
     /// Raised if the variables of the problem are incorrectly configured
-    VariableError(String),
+    #[snafu(display("Incorrectly configured variable: {msg}"))]
+    VariableError { msg: String },
     /// Raised in case of a targeting frame error
-    FrameError(String),
+    #[snafu(display("Frame error in targeter: {msg}"))]
+    FrameError { msg: String },
     /// Raised if the targeted was configured with a variable that isn't supported (e.g. a maneuver alpha variable in the multiple shooting)
-    UnsupportedVariable(Variable),
-    /// Raised when the verification of a solution has failed
-    Verification(String),
+    #[snafu(display("Unsupported variable in problem: {var:?}"))]
+    UnsupportedVariable { var: Variable },
+    #[snafu(display("Verification of targeting solution failed: {msg}"))]
+    Verification { msg: String },
 }
-
-impl fmt::Display for TargetingError {
-    // Prints the Keplerian orbital elements with units
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::UnderdeterminedProblem => write!(f, "The variables to be adjusted lead to an under-determined of the problem for the targeter"),
-            Self::VariableError(e) => write!(f, "Incorrectly configured variable: {e}"),
-            Self::FrameError(e) => write!(f, "Frame error in targeter: {e}"),
-            Self::UnsupportedVariable(v) => write!(f, "Unsupported variable in problem: {v:?}"),
-            Self::Verification(e) => write!(f, "Verification of targeting solution failed: {e}")
-        }
-    }
-}
-
-impl Error for TargetingError {}
 
 impl From<TargetingError> for NyxError {
     fn from(e: TargetingError) -> Self {
-        NyxError::Targeter(Box::new(e))
+        NyxError::Targeter {
+            source: Box::new(e),
+        }
     }
 }

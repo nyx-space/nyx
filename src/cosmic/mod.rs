@@ -108,19 +108,19 @@ where
 
     /// Return the value of the parameter, returns an error by default
     fn value(&self, param: StateParameter) -> Result<f64, NyxError> {
-        Err(NyxError::StateParameterUnavailable(
+        Err(NyxError::StateParameterUnavailable {
             param,
-            "unimplemented in State trait".to_string(),
-        ))
+            msg: "unimplemented in State trait".to_string(),
+        })
     }
 
     /// Allows setting the value of the given parameter.
     /// NOTE: Most parameters where the `value` is available CANNOT be also set for that parameter (it's a much harder problem!)
     fn set_value(&mut self, param: StateParameter, _val: f64) -> Result<(), NyxError> {
-        Err(NyxError::StateParameterUnavailable(
+        Err(NyxError::StateParameterUnavailable {
             param,
-            "unimplemented in State trait".to_string(),
-        ))
+            msg: "unimplemented in State trait".to_string(),
+        })
     }
 }
 
@@ -163,10 +163,16 @@ impl Xb {
         let mut input_xb_buf = Vec::new();
 
         match File::open(input_filename) {
-            Err(e) => return Err(NyxError::LoadingError(format!("{e}"))),
+            Err(e) => {
+                return Err(NyxError::LoadingError {
+                    msg: format!("{e}"),
+                })
+            }
             Ok(mut f) => {
                 if f.read_to_end(&mut input_xb_buf).is_err() {
-                    return Err(NyxError::LoadingError("Could not read buffer".to_string()));
+                    return Err(NyxError::LoadingError {
+                        msg: "Could not read buffer".to_string(),
+                    });
                 }
             }
         };
@@ -178,7 +184,9 @@ impl Xb {
     pub fn from_buffer(input_xb_buf: &[u8]) -> Result<Self, NyxError> {
         use prost::Message;
         if input_xb_buf.is_empty() {
-            return Err(NyxError::LoadingError("XB buffer is empty".to_string()));
+            return Err(NyxError::LoadingError {
+                msg: "XB buffer is empty".to_string(),
+            });
         }
 
         #[cfg(not(target_arch = "wasm32"))]
@@ -190,17 +198,19 @@ impl Xb {
                 debug!("Loaded XB in {} ms.", decode_start.elapsed().as_millis());
                 Ok(xb)
             }
-            Err(e) => Err(NyxError::LoadingError(format!("Could not decode XB: {e}"))),
+            Err(e) => Err(NyxError::LoadingError {
+                msg: format!("Could not decode XB: {e}"),
+            }),
         }
     }
 
     /// Finds the ephemeris provided the path as usize, e.g. [3,1] would return the Moon with any DE xb.
     pub fn ephemeris_from_path<'a>(&'a self, path: &[usize]) -> Result<&'a Ephemeris, NyxError> {
         match &self.ephemeris_root {
-            None => Err(NyxError::ObjectNotFound(
-                "not ephemeris root".to_string(),
-                self.ephemeris_get_names(),
-            )),
+            None => Err(NyxError::ObjectNotFound {
+                needle: "not ephemeris root".to_string(),
+                haystack: self.ephemeris_get_names(),
+            }),
             Some(root) => {
                 if path.is_empty() {
                     return Ok(root);
@@ -211,7 +221,10 @@ impl Xb {
                             let _ = write!(output, "{p}");
                             output
                         });
-                        return Err(NyxError::ObjectNotFound(hpath, self.ephemeris_get_names()));
+                        return Err(NyxError::ObjectNotFound {
+                            needle: hpath,
+                            haystack: self.ephemeris_get_names(),
+                        });
                     }
                 }
 
@@ -240,10 +253,10 @@ impl Xb {
         if e.name == name {
             Ok(cur_path.to_vec())
         } else if e.children.is_empty() {
-            Err(NyxError::ObjectNotFound(
-                name.to_string(),
-                e.children.iter().map(|c| c.name.clone()).collect(),
-            ))
+            Err(NyxError::ObjectNotFound {
+                needle: name.to_string(),
+                haystack: e.children.iter().map(|c| c.name.clone()).collect(),
+            })
         } else {
             for (cno, child) in e.children.iter().enumerate() {
                 let mut this_path = cur_path.to_owned();
@@ -254,20 +267,20 @@ impl Xb {
                 }
             }
             // Could not find name in iteration, fail
-            Err(NyxError::ObjectNotFound(
-                name.to_string(),
-                e.children.iter().map(|c| c.name.clone()).collect(),
-            ))
+            Err(NyxError::ObjectNotFound {
+                needle: name.to_string(),
+                haystack: e.children.iter().map(|c| c.name.clone()).collect(),
+            })
         }
     }
 
     /// Returns the machine path of the requested ephemeris
     pub fn ephemeris_find_path(&self, name: String) -> Result<Vec<usize>, NyxError> {
         match &self.ephemeris_root {
-            None => Err(NyxError::ObjectNotFound(
-                "No root!".to_string(),
-                self.ephemeris_get_names(),
-            )),
+            None => Err(NyxError::ObjectNotFound {
+                needle: "No root!".to_string(),
+                haystack: self.ephemeris_get_names(),
+            }),
             Some(root) => {
                 if root.name == name {
                     // Return an empty vector (but OK because we're asking for the root)

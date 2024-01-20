@@ -366,7 +366,7 @@ where
                         config.max_divergences, config
                     );
                     if config.force_failure {
-                        return Err(NyxError::MaxIterReached(msg));
+                        return Err(NyxError::MaxIterReached { msg });
                     } else {
                         error!("{}", msg);
                         break;
@@ -393,7 +393,7 @@ where
                     config.max_iterations, config
                 );
                 if config.force_failure {
-                    return Err(NyxError::MaxIterReached(msg));
+                    return Err(NyxError::MaxIterReached { msg });
                 } else {
                     error!("{}", msg);
                     break;
@@ -712,9 +712,9 @@ where
         S: Interpolatable,
     {
         if self.estimates.is_empty() {
-            Err(NyxError::NoStateData(
-                "No navigation trajectory to generate: run the OD process first".to_string(),
-            ))
+            Err(NyxError::NoStateData {
+                msg: "No navigation trajectory to generate: run the OD process first".to_string(),
+            })
         } else {
             Ok(Traj {
                 states: self

@@ -166,9 +166,9 @@ where
                 }
             }
         }
-        Err(NyxError::MaxIterReached(format!(
-            "Brent solver failed after {max_iter} iterations",
-        )))
+        Err(NyxError::MaxIterReached {
+            msg: format!("Brent solver failed after {max_iter} iterations",),
+        })
     }
 
     /// Find all of the states where the event happens

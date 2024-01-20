@@ -101,7 +101,12 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
                     self.targets[i].epoch(),
                 ) {
                     Ok(sol) => sol,
-                    Err(e) => return Err(NyxError::MultipleShootingTargeter(i, Box::new(e))),
+                    Err(e) => {
+                        return Err(NyxError::MultipleShootingTargeter {
+                            nth: i,
+                            err: Box::new(e),
+                        })
+                    }
                 };
 
                 let nominal_delta_v = sol.correction;
@@ -138,7 +143,12 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
                         self.targets[i].epoch(),
                     ) {
                         Ok(sol) => sol,
-                        Err(e) => return Err(NyxError::MultipleShootingTargeter(i, Box::new(e))),
+                        Err(e) => {
+                            return Err(NyxError::MultipleShootingTargeter {
+                                nth: i,
+                                err: Box::new(e),
+                            })
+                        }
                     };
 
                     // ∂Δv_x / ∂r_x
@@ -276,7 +286,9 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
             }
             self.current_iteration += 1;
         }
-        Err(NyxError::MaxIterReached(format!("{}", self.max_iterations)))
+        Err(NyxError::MaxIterReached {
+            msg: format!("{}", self.max_iterations),
+        })
     }
 }
 

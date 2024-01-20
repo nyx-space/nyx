@@ -225,10 +225,10 @@ where
                 }
             }
             // Oh, this parameter was not found!
-            return Err(NyxError::StateParameterUnavailable(
+            return Err(NyxError::StateParameterUnavailable {
                 param,
-                "not among dispersions of Monte Carlo setup".to_string(),
-            ));
+                msg: "not among dispersions of Monte Carlo setup".to_string(),
+            });
         }
         Ok(report)
     }

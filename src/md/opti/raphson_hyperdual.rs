@@ -38,9 +38,9 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
         achievement_epoch: Epoch,
     ) -> Result<TargeterSolution<V, O>, NyxError> {
         if self.objectives.is_empty() {
-            return Err(NyxError::Targeter(Box::new(
-                TargetingError::UnderdeterminedProblem,
-            )));
+            return Err(NyxError::Targeter {
+                source: Box::new(TargetingError::UnderdeterminedProblem),
+            });
         }
 
         let mut is_bplane_tgt = false;
@@ -88,9 +88,9 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                     xi.orbit.vz_km_s += var.init_guess;
                 }
                 _ => {
-                    return Err(NyxError::Targeter(Box::new(
-                        TargetingError::UnsupportedVariable(*var),
-                    )))
+                    return Err(NyxError::Targeter {
+                        source: Box::new(TargetingError::UnsupportedVariable { var: *var }),
+                    })
                 }
             }
             total_correction[i] += var.init_guess;
@@ -233,9 +233,9 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                         Vary::VelocityY => state.orbit.vy_km_s += total_correction[i],
                         Vary::VelocityZ => state.orbit.vz_km_s += total_correction[i],
                         _ => {
-                            return Err(NyxError::Targeter(Box::new(
-                                TargetingError::UnsupportedVariable(*var),
-                            )))
+                            return Err(NyxError::Targeter {
+                                source: Box::new(TargetingError::UnsupportedVariable { var: *var }),
+                            })
                         }
                     }
                 }
@@ -259,9 +259,9 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
             // We haven't converged yet, so let's build the error vector
             if (err_vector.norm() - prev_err_norm).abs() < 1e-10 {
-                return Err(NyxError::CorrectionIneffective(
-                    "No change in objective errors".to_string(),
-                ));
+                return Err(NyxError::CorrectionIneffective {
+                    msg: "No change in objective errors".to_string(),
+                });
             }
             prev_err_norm = err_vector.norm();
 
@@ -312,9 +312,9 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                         xi.orbit.vz_km_s += delta[i];
                     }
                     _ => {
-                        return Err(NyxError::Targeter(Box::new(
-                            TargetingError::UnsupportedVariable(*var),
-                        )))
+                        return Err(NyxError::Targeter {
+                            source: Box::new(TargetingError::UnsupportedVariable { var: *var }),
+                        })
                     }
                 }
             }
@@ -328,9 +328,11 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             }
         }
 
-        Err(NyxError::MaxIterReached(format!(
-            "Failed after {} iterations:\nError: {}\n\n{}",
-            self.iterations, prev_err_norm, self
-        )))
+        Err(NyxError::MaxIterReached {
+            msg: format!(
+                "Failed after {} iterations:\nError: {}\n\n{}",
+                self.iterations, prev_err_norm, self
+            ),
+        })
     }
 }

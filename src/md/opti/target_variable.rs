@@ -146,7 +146,7 @@ impl Variable {
                 self.component, self.max_step
             );
             error!("{}", msg);
-            return Err(TargetingError::VariableError(msg));
+            return Err(TargetingError::VariableError { msg });
         }
         if self.max_value < 0.0 {
             let msg = format!(
@@ -154,7 +154,7 @@ impl Variable {
                 self.component, self.max_value
             );
             error!("{}", msg);
-            return Err(TargetingError::VariableError(msg));
+            return Err(TargetingError::VariableError { msg });
         }
         if self.min_value > self.max_value {
             let msg = format!(
@@ -162,7 +162,7 @@ impl Variable {
                 self.component, self.min_value, self.max_value
             );
             error!("{}", msg);
-            return Err(TargetingError::VariableError(msg));
+            return Err(TargetingError::VariableError { msg });
         }
         Ok(())
     }

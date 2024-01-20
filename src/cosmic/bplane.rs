@@ -52,9 +52,9 @@ impl BPlane {
     /// Returns a newly define B-Plane if the orbit is hyperbolic and already in Dual form
     pub fn from_dual(orbit: OrbitDual) -> Result<Self, NyxError> {
         if orbit.ecc().real() <= 1.0 {
-            Err(NyxError::NotHyperbolic(
-                "Orbit is not hyperbolic. Convert to target object first".to_string(),
-            ))
+            Err(NyxError::NotHyperbolic {
+                msg: "Orbit is not hyperbolic. Convert to target object first".to_string(),
+            })
         } else {
             let one = OHyperdual::from(1.0);
             let zero = OHyperdual::from(0.0);
@@ -333,9 +333,9 @@ pub fn try_achieve_b_plane(
         // If no LTOF is targeted, we'll solve this with a least squared approach.
         loop {
             if attempt_no > max_iter {
-                return Err(NyxError::MaxIterReached(format!(
-                    "Error norm of {prev_b_plane_err} km after {max_iter} iterations",
-                )));
+                return Err(NyxError::MaxIterReached {
+                    msg: format!("Error norm of {prev_b_plane_err} km after {max_iter} iterations",),
+                });
             }
 
             // Build current B Plane
@@ -354,9 +354,9 @@ pub fn try_achieve_b_plane(
 
             if b_plane_err.norm() >= prev_b_plane_err {
                 // If the error is not going down, we'll raise an error
-                return Err(NyxError::CorrectionIneffective(
-                    format!("Delta-V correction is ineffective at reducing the B-Plane error:\nprev err norm: {prev_b_plane_err:.3} km\tcur err norm: {:.3} km", b_plane_err.norm())
-                ));
+                return Err(NyxError::CorrectionIneffective{
+                    msg: format!("Delta-V correction is ineffective at reducing the B-Plane error:\nprev err norm: {prev_b_plane_err:.3} km\tcur err norm: {:.3} km", b_plane_err.norm())
+                });
             }
             prev_b_plane_err = b_plane_err.norm();
 
@@ -381,9 +381,9 @@ pub fn try_achieve_b_plane(
         // The LTOF targeting seems to break often, but it's still implemented
         loop {
             if attempt_no > max_iter {
-                return Err(NyxError::MaxIterReached(format!(
-                    "Error norm of {prev_b_plane_err} km after {max_iter} iterations",
-                )));
+                return Err(NyxError::MaxIterReached {
+                    msg: format!("Error norm of {prev_b_plane_err} km after {max_iter} iterations",),
+                });
             }
 
             // Build current B Plane
@@ -405,9 +405,9 @@ pub fn try_achieve_b_plane(
             let b_plane_err = Vector3::new(bt_err, br_err, ltof_err);
 
             if b_plane_err.norm() >= prev_b_plane_err {
-                return Err(NyxError::CorrectionIneffective(
-                    format!("LTOF enabled correction is failing. Try to not set an LTOF target. Delta-V correction is ineffective are reducing the B-Plane error:\nprev err norm: {:.3} km\tcur err norm: {:.3} km", prev_b_plane_err, b_plane_err.norm()),
-                ));
+                return Err(NyxError::CorrectionIneffective{
+                    msg: format!("LTOF enabled correction is failing. Try to not set an LTOF target. Delta-V correction is ineffective are reducing the B-Plane error:\nprev err norm: {:.3} km\tcur err norm: {:.3} km", prev_b_plane_err, b_plane_err.norm()),
+                });
             }
             prev_b_plane_err = b_plane_err.norm();
 

@@ -108,17 +108,17 @@ impl DynamicTrackingArc {
         }
 
         if !has_epoch {
-            return Err(NyxError::FileUnreadable(
+            return Err(NyxError::FileUnreadable{msg: 
                 "Missing `Epoch:TAI (s)` field".to_string(),
-            ));
+            });
         } else if !has_tracking_dev {
-            return Err(NyxError::FileUnreadable(
+            return Err(NyxError::FileUnreadable{msg: 
                 "Missing `Tracking device` field".to_string(),
-            ));
+            });
         } else if !range_avail && !rate_avail {
-            return Err(NyxError::FileUnreadable(
+            return Err(NyxError::FileUnreadable{msg: 
                 "Missing both range and range rate data".to_string(),
-            ));
+            });
         }
 
         let expected_type = std::any::type_name::<Msr>().split("::").last().unwrap();
@@ -127,30 +127,30 @@ impl DynamicTrackingArc {
         match expected_type {
             "RangeDoppler" => {
                 if !range_avail || !rate_avail {
-                    return Err(NyxError::FileUnreadable(
+                    return Err(NyxError::FileUnreadable{msg: 
                         "Cannot convert to simultaneous range and range rate, missing one of them"
                             .to_string(),
-                    ));
+                        });
                 }
             }
             "RangeMsr" => {
                 if !range_avail {
-                    return Err(NyxError::FileUnreadable(
+                    return Err(NyxError::FileUnreadable{msg: 
                         "Cannot convert to range measurement: data missing".to_string(),
-                    ));
+                    });
                 }
             }
             "RangeRate" => {
                 if !rate_avail {
-                    return Err(NyxError::FileUnreadable(
+                    return Err(NyxError::FileUnreadable{msg: 
                         "Cannot convert to range rate measurement: data missing".to_string(),
-                    ));
+                    });
                 }
             }
             _ => {
-                return Err(NyxError::FileUnreadable(format!(
+                return Err(NyxError::FileUnreadable{msg: format!(
                     "Yet unsupported measurement {expected_type}"
-                )));
+                )});
             }
         }
 

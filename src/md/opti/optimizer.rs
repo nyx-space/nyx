@@ -337,9 +337,9 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                     param_errors[i]
                 ));
             }
-            Err(NyxError::Targeter(Box::new(TargetingError::Verification(
-                objmsg,
-            ))))
+            Err(NyxError::Targeter {
+                source: Box::new(TargetingError::Verification { msg: objmsg }),
+            })
         }
     }
 }

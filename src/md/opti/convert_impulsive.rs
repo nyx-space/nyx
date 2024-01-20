@@ -323,9 +323,9 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
 
             // We haven't converged yet, so let's build t
             if (err_vector.norm() - prev_err_norm).abs() < 1e-10 {
-                return Err(NyxError::CorrectionIneffective(
-                    "No change in objective errors".to_string(),
-                ));
+                return Err(NyxError::CorrectionIneffective {
+                    msg: "No change in objective errors".to_string(),
+                });
             }
             prev_err_norm = err_vector.norm();
             dbg!(prev_err_norm);

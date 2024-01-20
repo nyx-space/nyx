@@ -705,9 +705,9 @@ impl OrbitDual {
     /// Returns the hyperbolic anomaly in degrees between 0 and 360.0
     pub fn hyperbolic_anomaly(&self) -> Result<OrbitPartial, NyxError> {
         if self.ecc().real() <= 1.0 {
-            Err(NyxError::NotHyperbolic(
-                "Orbit is not hyperbolic so there is no hyperbolic anomaly.".to_string(),
-            ))
+            Err(NyxError::NotHyperbolic {
+                msg: "Orbit is not hyperbolic so there is no hyperbolic anomaly.".to_string(),
+            })
         } else {
             let (sin_ta, cos_ta) = self.ta().dual.to_radians().sin_cos();
             let sinh_h = (sin_ta * (self.ecc().dual.powi(2) - OHyperdual::from(1.0)).sqrt())

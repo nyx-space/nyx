@@ -126,12 +126,14 @@ impl TrajectoryLoader {
                                 if frame.is_none() {
                                     frame = Some(frame_info.to_string())
                                 } else if frame.as_ref().unwrap().as_str() != frame_info {
-                                    return Err(Box::new(NyxError::FileUnreadable(format!(
+                                    return Err(Box::new(NyxError::FileUnreadable {
+                                        msg: format!(
                                         "Frame previous set to `{}` but set to `{}` in field `{}`",
                                         frame.unwrap(),
                                         frame_info,
                                         field.name()
-                                    ))));
+                                    ),
+                                    }));
                                 }
                             }
                         }
@@ -142,21 +144,20 @@ impl TrajectoryLoader {
         }
 
         if !has_epoch {
-            return Err(Box::new(NyxError::FileUnreadable(
-                "Missing `Epoch:TAI (s)` field".to_string(),
-            )));
+            return Err(Box::new(NyxError::FileUnreadable {
+                msg: "Missing `Epoch:TAI (s)` field".to_string(),
+            }));
         } else if frame.is_none() {
-            return Err(Box::new(NyxError::FileUnreadable(
-                "Missing `Frame` in column metadata".to_string(),
-            )));
+            return Err(Box::new(NyxError::FileUnreadable {
+                msg: "Missing `Frame` in column metadata".to_string(),
+            }));
         }
 
         for (field, exists) in found_fields.iter().take(found_fields.len() - 1) {
             if !exists {
-                return Err(Box::new(NyxError::FileUnreadable(format!(
-                    "Missing `{}` field",
-                    field.to_field(None).name()
-                ))));
+                return Err(Box::new(NyxError::FileUnreadable {
+                    msg: format!("Missing `{}` field", field.to_field(None).name()),
+                }));
             }
         }
 
@@ -167,10 +168,12 @@ impl TrajectoryLoader {
         if expected_type == "Spacecraft" {
             if !sc_compat {
                 // Oops, missing fuel data (using the full call in case the field name changes in the future)
-                return Err(Box::new(NyxError::FileUnreadable(format!(
-                    "Missing `{}` field",
-                    found_fields.last().unwrap().0.to_field(None).name()
-                ))));
+                return Err(Box::new(NyxError::FileUnreadable {
+                    msg: format!(
+                        "Missing `{}` field",
+                        found_fields.last().unwrap().0.to_field(None).name()
+                    ),
+                }));
             }
         } else if sc_compat {
             // Not a spacecraft, remove the fuel mass

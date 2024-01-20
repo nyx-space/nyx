@@ -189,9 +189,11 @@ where
         prct: f64,
     ) -> Result<Self, NyxError> {
         if !(0.0..=1.0).contains(&prct) {
-            return Err(NyxError::MonteCarlo(format!(
-                "Generator dispersion percentages must be between 0 and 1, got {prct}"
-            )));
+            return Err(NyxError::MonteCarlo {
+                msg: format!(
+                    "Generator dispersion percentages must be between 0 and 1, got {prct}"
+                ),
+            });
         }
         let mut me: Self = template.into();
 
@@ -209,9 +211,11 @@ where
 
         for (param, prct) in prcts {
             if !(0.0..=1.0).contains(prct) {
-                return Err(NyxError::MonteCarlo(format!(
-                    "Generator dispersion percentages must be between 0 and 1, got {prct}"
-                )));
+                return Err(NyxError::MonteCarlo {
+                    msg: format!(
+                        "Generator dispersion percentages must be between 0 and 1, got {prct}"
+                    ),
+                });
             }
 
             me.add_3std_dev(*param, template.value(*param)? * prct)?;
@@ -241,9 +245,11 @@ where
 
         for (param, prct) in prcts {
             if *prct < 0.0 || *prct > 1.0 {
-                return Err(NyxError::MonteCarlo(format!(
-                    "Generator dispersion percentages must be between 0 and 1, got {prct}"
-                )));
+                return Err(NyxError::MonteCarlo {
+                    msg: format!(
+                        "Generator dispersion percentages must be between 0 and 1, got {prct}"
+                    ),
+                });
             }
 
             me.add_std_dev(*param, template.value(*param)? * prct)?;
@@ -272,9 +278,11 @@ where
         prct: f64,
     ) -> Result<Self, NyxError> {
         if !(0.0..=1.0).contains(&prct) {
-            return Err(NyxError::MonteCarlo(format!(
-                "Generator dispersion percentages must be between 0 and 1, got {prct}"
-            )));
+            return Err(NyxError::MonteCarlo {
+                msg: format!(
+                    "Generator dispersion percentages must be between 0 and 1, got {prct}"
+                ),
+            });
         }
 
         let mut me: Self = template.into();

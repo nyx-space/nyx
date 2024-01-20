@@ -76,6 +76,7 @@ enum-iterator = "1.4.0"
 getrandom = { version = "0.2", features = ["js"] }
 typed-builder = "0.18.0"
 pythonize = { version = "0.20", optional = true }
+snafu = { version = "0.8.0", features = ["backtrace"] }
 
 [dev-dependencies]
 polars = { version = "0.36.2", features = ["parquet"] }

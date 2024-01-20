@@ -153,7 +153,7 @@ where
             };
             Ok(h.to_polynomial())
         }
-        Err(e) => Err(NyxError::InvalidInterpolationData(e.to_string())),
+        Err(e) => Err(NyxError::InvalidInterpolationData { msg: e.to_string() }),
     }
 }
 
@@ -163,19 +163,19 @@ pub fn hermite<const DEGREE: usize>(
     derivs: &[f64],
 ) -> Result<Polynomial<DEGREE>, NyxError> {
     if xs.is_empty() {
-        return Err(NyxError::InvalidInterpolationData(
-            "No X data to interpolate".to_owned(),
-        ));
+        return Err(NyxError::InvalidInterpolationData {
+            msg: "No X data to interpolate".to_owned(),
+        });
     }
     if xs.len() != ys.len() {
-        return Err(NyxError::InvalidInterpolationData(
-            "Lengths of X and Y data differ".to_owned(),
-        ));
+        return Err(NyxError::InvalidInterpolationData {
+            msg: "Lengths of X and Y data differ".to_owned(),
+        });
     }
     if xs.len() != derivs.len() {
-        return Err(NyxError::InvalidInterpolationData(
-            "Lengths of X and its derivatives data differ".to_owned(),
-        ));
+        return Err(NyxError::InvalidInterpolationData {
+            msg: "Lengths of X and its derivatives data differ".to_owned(),
+        });
     }
 
     if DEGREE < 2 * xs.len() - 1 {
@@ -220,9 +220,9 @@ pub fn hermite<const DEGREE: usize>(
 
     if hermite.is_nan() {
         dbg!(xs, ys, derivs);
-        return Err(NyxError::InvalidInterpolationData(format!(
-            "Invalid interpolation {hermite:x}",
-        )));
+        return Err(NyxError::InvalidInterpolationData {
+            msg: format!("Invalid interpolation {hermite:x}",),
+        });
     }
 
     Ok(hermite)

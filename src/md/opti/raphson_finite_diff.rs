@@ -42,9 +42,9 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
         achievement_epoch: Epoch,
     ) -> Result<TargeterSolution<V, O>, NyxError> {
         if self.objectives.is_empty() {
-            return Err(NyxError::Targeter(Box::new(
-                TargetingError::UnderdeterminedProblem,
-            )));
+            return Err(NyxError::Targeter {
+                source: Box::new(TargetingError::UnderdeterminedProblem),
+            });
         }
 
         let mut is_bplane_tgt = false;
@@ -96,9 +96,9 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                     var.component
                 );
                 error!("{}", msg);
-                return Err(NyxError::Targeter(Box::new(TargetingError::FrameError(
-                    msg,
-                ))));
+                return Err(NyxError::Targeter {
+                    source: Box::new(TargetingError::FrameError { msg }),
+                });
             }
 
             // Check that a thruster is provided since we'll be changing that and the burn duration
@@ -509,9 +509,9 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
             // We haven't converged yet, so let's build t
             if (err_vector.norm() - prev_err_norm).abs() < 1e-10 {
-                return Err(NyxError::CorrectionIneffective(
-                    "No change in objective errors".to_string(),
-                ));
+                return Err(NyxError::CorrectionIneffective {
+                    msg: "No change in objective errors".to_string(),
+                });
             }
             prev_err_norm = err_vector.norm();
 
@@ -648,9 +648,11 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             }
         }
 
-        Err(NyxError::MaxIterReached(format!(
-            "Failed after {} iterations:\nError: {}\n\n{}",
-            self.iterations, prev_err_norm, self
-        )))
+        Err(NyxError::MaxIterReached {
+            msg: format!(
+                "Failed after {} iterations:\nError: {}\n\n{}",
+                self.iterations, prev_err_norm, self
+            ),
+        })
     }
 }

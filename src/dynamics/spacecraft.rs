@@ -267,7 +267,9 @@ impl Dynamics for SpacecraftDynamics {
     fn finally(&self, next_state: Self::StateType) -> Result<Self::StateType, NyxError> {
         if next_state.fuel_mass_kg < 0.0 {
             error!("negative fuel mass at {}", next_state.epoch());
-            return Err(NyxError::FuelExhausted(Box::new(next_state)));
+            return Err(NyxError::FuelExhausted {
+                sc: Box::new(next_state),
+            });
         }
 
         if let Some(guid_law) = &self.guid_law {
@@ -336,12 +338,16 @@ impl Dynamics for SpacecraftDynamics {
                 let thruster = osc_sc.thruster.unwrap();
                 let thrust_throttle_lvl = guid_law.throttle(&osc_sc);
                 if !(0.0..=1.0).contains(&thrust_throttle_lvl) {
-                    return Err(NyxError::CtrlThrottleRangeErr(thrust_throttle_lvl));
+                    return Err(NyxError::CtrlThrottleRangeErr {
+                        ratio: thrust_throttle_lvl,
+                    });
                 } else if thrust_throttle_lvl > 0.0 {
                     // Thrust arc
                     let thrust_inertial = guid_law.direction(&osc_sc);
                     if (thrust_inertial.norm() - 1.0).abs() > NORM_ERR {
-                        return Err(NyxError::CtrlNotAUnitVector(thrust_inertial.norm()));
+                        return Err(NyxError::CtrlNotAUnitVector {
+                            norm: thrust_inertial.norm(),
+                        });
                     } else if thrust_inertial.norm().is_normal() {
                         // Compute the thrust in Newtons and Isp
                         let total_thrust = (thrust_throttle_lvl * thruster.thrust_N) * 1e-3; // Convert m/s^-2 to km/s^-2

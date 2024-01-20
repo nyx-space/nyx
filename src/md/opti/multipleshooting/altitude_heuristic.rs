@@ -40,15 +40,17 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
     ) -> Result<Self, NyxError> {
         if node_count < 3 {
             error!("At least three nodes are needed for a multiple shooting optimization");
-            return Err(NyxError::Targeter(Box::new(
-                TargetingError::UnderdeterminedProblem,
-            )));
+            return Err(NyxError::Targeter {
+                source: Box::new(TargetingError::UnderdeterminedProblem),
+            });
         }
 
         if !body_frame.is_body_fixed() {
-            return Err(NyxError::Targeter(Box::new(TargetingError::FrameError(
-                "Body frame is not body fixed".to_string(),
-            ))));
+            return Err(NyxError::Targeter {
+                source: Box::new(TargetingError::FrameError {
+                    msg: "Body frame is not body fixed".to_string(),
+                }),
+            });
         }
 
         let delta_t = xf.epoch() - x0.epoch();

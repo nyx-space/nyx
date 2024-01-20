@@ -265,7 +265,10 @@ where
         let events = traj.find(event)?;
         match events.get(trigger) {
             Some(event_state) => Ok((event_state.state, traj)),
-            None => Err(NyxError::UnsufficientTriggers(trigger, events.len())),
+            None => Err(NyxError::UnsufficientTriggers {
+                req: trigger,
+                found: events.len(),
+            }),
         }
     }
 

@@ -37,9 +37,9 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
     ) -> Result<Self, NyxError> {
         if node_count < 3 {
             error!("At least three nodes are needed for a multiple shooting optimization");
-            return Err(NyxError::Targeter(Box::new(
-                TargetingError::UnderdeterminedProblem,
-            )));
+            return Err(NyxError::Targeter {
+                source: Box::new(TargetingError::UnderdeterminedProblem),
+            });
         }
 
         // Compute the direction of the objective
