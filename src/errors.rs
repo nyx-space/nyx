@@ -28,21 +28,9 @@ use std::convert::From;
 // #[derive(Error, Debug, PartialEq, Snafu)]
 #[derive(Error, Debug, PartialEq)]
 pub enum NyxError {
-    /// STM is singular, propagation or smoothing cannot proceed
-    #[error("STM is singular, propagation or smoothing cannot proceed")]
-    SingularStateTransitionMatrix,
-    /// Propagation event not triggered within the max propagation time
-    #[error("Propagation event not triggered within the max propagation time")]
-    ConditionNeverTriggered,
-    /// Propagation event not hit enough times (requested, found).
-    #[error("Requested propagation until #{req} event, but only {found} found")]
-    UnsufficientTriggers { req: usize, found: usize },
     /// Maximum iterations reached
     #[error("Maximum iterations of {msg} reached")]
     MaxIterReached { msg: String },
-    /// The operation was expecting the state to have an STM, but it isn't present.
-    #[error("The operation was expecting the state to have an STM, but it isn't present.")]
-    StateTransitionMatrixUnset,
     /// The sensitivity matrix must be updated prior to a filter measurement update
     #[error("The sensitivity matrix must be updated prior to a filter measurement update")]
     SensitivityNotUpdated,

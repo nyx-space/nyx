@@ -103,7 +103,7 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
                         initial_states[i].epoch(),
                         self.targets[i].epoch(),
                     )
-                    .with_context(|source| TargetingSnafu { segment: i })?;
+                    .with_context(|_| TargetingSnafu { segment: i })?;
 
                 let nominal_delta_v = sol.correction;
 
@@ -139,7 +139,7 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
                             initial_states[i].epoch(),
                             self.targets[i].epoch(),
                         )
-                        .with_context(|source| TargetingSnafu { segment: i })?;
+                        .with_context(|_| TargetingSnafu { segment: i })?;
 
                     // ∂Δv_x / ∂r_x
                     outer_jacobian[(3 * i, OT * i + axis)] = (inner_sol_a.correction[0]
@@ -164,7 +164,7 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
                             inner_sol_a.achieved_state.epoch(),
                             self.targets[i + 1].epoch(),
                         )
-                        .with_context(|source| TargetingSnafu { segment: i })?;
+                        .with_context(|_| TargetingSnafu { segment: i })?;
 
                     // Compute the partials wrt the next Δv
                     // ∂Δv_x / ∂r_x
@@ -253,7 +253,7 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
                             initial_states[i].epoch(),
                             node.epoch(),
                         )
-                        .with_context(|source| TargetingSnafu { segment: i })?;
+                        .with_context(|_| TargetingSnafu { segment: i })?;
                     initial_states.push(sol.achieved_state);
                     ms_sol.solutions.push(sol);
                 }
@@ -264,7 +264,7 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
             prev_cost = new_cost;
             // 2. Solve for the next position of the nodes using a pseudo inverse.
             let inv_jac = pseudo_inverse!(&outer_jacobian)
-                .with_context(|source| TargetingSnafu { segment: 0_usize })?;
+                .with_context(|_| TargetingSnafu { segment: 0_usize })?;
             let delta_r = inv_jac * cost_vec;
             // 3. Apply the correction to the node positions and iterator
             let node_vector = -delta_r;
