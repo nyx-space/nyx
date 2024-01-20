@@ -140,14 +140,14 @@ pub enum NyxError {
     #[error("Trajectory error: {source}")]
     Trajectory { source: TrajError },
     /// Math domain
-    #[error("Math domain error: {0}")]
-    MathDomain(String),
+    #[error("Math domain error: {msg}")]
+    MathDomain { msg: String },
     /// Guidance law config error
-    #[error("Guidance law config error: {0}")]
-    GuidanceConfigError(String),
+    #[error("Guidance law config error: {msg}")]
+    GuidanceConfigError { msg: String },
     /// Configuration file error
-    #[error("Config error: {0}")]
-    ConfigError(ConfigError),
+    #[error("Config error: {source}")]
+    ConfigError { source: ConfigError },
 }
 
 impl From<TimeErrors> for NyxError {
@@ -163,7 +163,7 @@ impl From<TrajError> for NyxError {
 }
 
 impl From<ConfigError> for NyxError {
-    fn from(e: ConfigError) -> Self {
-        NyxError::ConfigError(e)
+    fn from(source: ConfigError) -> Self {
+        NyxError::ConfigError { source }
     }
 }

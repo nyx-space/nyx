@@ -57,16 +57,20 @@ impl Ruggiero {
         let mut objs: [Option<Objective>; 5] = [None, None, None, None, None];
         let mut eff: [f64; 5] = [0.0; 5];
         if objectives.len() > 5 || objectives.is_empty() {
-            return Err(NyxError::GuidanceConfigError(format!(
-                "Must provide between 1 and 5 objectives (included), provided {}",
-                objectives.len()
-            )));
+            return Err(NyxError::GuidanceConfigError {
+                msg: format!(
+                    "Must provide between 1 and 5 objectives (included), provided {}",
+                    objectives.len()
+                ),
+            });
         } else if objectives.len() > ηthresholds.len() {
-            return Err(NyxError::GuidanceConfigError(format!(
-                "Must provide at least {} efficiency threshold values, provided {}",
-                objectives.len(),
-                ηthresholds.len()
-            )));
+            return Err(NyxError::GuidanceConfigError {
+                msg: format!(
+                    "Must provide at least {} efficiency threshold values, provided {}",
+                    objectives.len(),
+                    ηthresholds.len()
+                ),
+            });
         }
 
         for (i, obj) in objectives.iter().enumerate() {
@@ -81,10 +85,9 @@ impl Ruggiero {
             {
                 objs[i] = Some(*obj);
             } else {
-                return Err(NyxError::GuidanceConfigError(format!(
-                    "Objective {} not supported in Ruggerio",
-                    obj.parameter
-                )));
+                return Err(NyxError::GuidanceConfigError {
+                    msg: format!("Objective {} not supported in Ruggerio", obj.parameter),
+                });
             }
         }
         for i in 0..objectives.len() {

@@ -21,14 +21,15 @@ use super::solution::TargeterSolution;
 use crate::dynamics::guidance::Mnvr;
 use crate::errors::TargetingError;
 use crate::linalg::{SMatrix, SVector, Vector6};
-use crate::md::prelude::*;
-use crate::md::StateParameter;
+use crate::md::{prelude::*, AstroSnafu, GuidanceSnafu, UnderdeterminedProblemSnafu};
+use crate::md::{NoThrustersDefinedSnafu, StateParameter};
 pub use crate::md::{Variable, Vary};
 use crate::polyfit::CommonPolynomial;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::pseudo_inverse;
 use hifitime::TimeUnits;
 use rayon::prelude::*;
+use snafu::{ensure, ResultExt};
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
@@ -40,12 +41,8 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
         initial_state: Spacecraft,
         correction_epoch: Epoch,
         achievement_epoch: Epoch,
-    ) -> Result<TargeterSolution<V, O>, NyxError> {
-        if self.objectives.is_empty() {
-            return Err(NyxError::Targeter {
-                source: Box::new(TargetingError::UnderdeterminedProblem),
-            });
-        }
+    ) -> Result<TargeterSolution<V, O>, TargetingError> {
+        ensure!(!self.objectives.is_empty(), UnderdeterminedProblemSnafu);
 
         let mut is_bplane_tgt = false;
         for obj in &self.objectives {
@@ -96,17 +93,13 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                     var.component
                 );
                 error!("{}", msg);
-                return Err(NyxError::Targeter {
-                    source: Box::new(TargetingError::FrameError { msg }),
-                });
+                return Err(TargetingError::FrameError { msg });
             }
 
             // Check that a thruster is provided since we'll be changing that and the burn duration
             if var.component.is_finite_burn() {
-                if xi_start.thruster.is_none() {
-                    // Can't do any conversion to finite burns without a thruster
-                    return Err(NyxError::NoThrusterAvail);
-                }
+                ensure!(xi_start.thruster.is_some(), NoThrustersDefinedSnafu);
+
                 finite_burn_target = true;
                 // Modify the default maneuver
                 match var.component {
@@ -128,17 +121,17 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                     Vary::ThrustX | Vary::ThrustY | Vary::ThrustZ => {
                         let mut vector = mnvr.direction();
                         vector[var.component.vec_index()] += var.perturbation;
-                        mnvr.set_direction(vector)?;
+                        mnvr.set_direction(vector).with_context(|_| GuidanceSnafu);
                     }
                     Vary::ThrustRateX | Vary::ThrustRateY | Vary::ThrustRateZ => {
                         let mut vector = mnvr.rate();
                         vector[(var.component.vec_index() - 1) % 3] += var.perturbation;
-                        mnvr.set_rate(vector)?;
+                        mnvr.set_rate(vector).with_context(|_| GuidanceSnafu);
                     }
                     Vary::ThrustAccelX | Vary::ThrustAccelY | Vary::ThrustAccelZ => {
                         let mut vector = mnvr.accel();
                         vector[(var.component.vec_index() - 1) % 3] += var.perturbation;
-                        mnvr.set_accel(vector)?;
+                        mnvr.set_accel(vector).with_context(|_| GuidanceSnafu);
                     }
                     Vary::ThrustLevel => {
                         mnvr.thrust_prct += var.perturbation;
@@ -156,7 +149,10 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                 // Now, let's apply the correction to the initial state
                 if let Some(frame) = self.correction_frame {
                     // The following will error if the frame is not local
-                    let dcm_vnc2inertial = xi.orbit.dcm_from_traj_frame(frame)?;
+                    let dcm_vnc2inertial = xi
+                        .orbit
+                        .dcm_from_traj_frame(frame)
+                        .with_context(|_| AstroSnafu)?;
                     let velocity_correction =
                         dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
                     xi.orbit.apply_dv(velocity_correction);
@@ -236,7 +232,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
             // Build the B-Plane once, if needed, and always in the objective frame
             let b_plane = if is_bplane_tgt {
-                Some(BPlane::from_dual(xf_dual_obj_frame)?)
+                Some(BPlane::from_dual(xf_dual_obj_frame).with_context(|_| AstroSnafu)?)
             } else {
                 None
             };
@@ -257,7 +253,9 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                         _ => unreachable!(),
                     }
                 } else {
-                    xf_dual_obj_frame.partial_for(obj.parameter)?
+                    xf_dual_obj_frame
+                        .partial_for(obj.parameter)
+                        .with_context(|_| AstroSnafu)?
                 };
 
                 let achieved = partial.real();
@@ -509,8 +507,10 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
             // We haven't converged yet, so let's build t
             if (err_vector.norm() - prev_err_norm).abs() < 1e-10 {
-                return Err(NyxError::CorrectionIneffective {
-                    msg: "No change in objective errors".to_string(),
+                return Err(TargetingError::CorrectionIneffective {
+                    prev_val: prev_err_norm,
+                    cur_val: err_vector.norm(),
+                    action: "Raphson targeter",
                 });
             }
             prev_err_norm = err_vector.norm();
@@ -595,21 +595,21 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                             let mut vector = mnvr.direction();
                             vector[var.component.vec_index()] += corr;
                             var.ensure_bounds(&mut vector[var.component.vec_index()]);
-                            mnvr.set_direction(vector)?;
+                            mnvr.set_direction(vector).with_context(|_| GuidanceSnafu);
                         }
                         Vary::ThrustRateX | Vary::ThrustRateY | Vary::ThrustRateZ => {
                             let mut vector = mnvr.rate();
                             let idx = (var.component.vec_index() - 1) % 3;
                             vector[idx] += corr;
                             var.ensure_bounds(&mut vector[idx]);
-                            mnvr.set_rate(vector)?;
+                            mnvr.set_rate(vector).with_context(|_| GuidanceSnafu);
                         }
                         Vary::ThrustAccelX | Vary::ThrustAccelY | Vary::ThrustAccelZ => {
                             let mut vector = mnvr.accel();
                             let idx = (var.component.vec_index() - 1) % 3;
                             vector[idx] += corr;
                             var.ensure_bounds(&mut vector[idx]);
-                            mnvr.set_accel(vector)?;
+                            mnvr.set_accel(vector).with_context(|_| GuidanceSnafu);
                         }
                         Vary::ThrustLevel => {
                             mnvr.thrust_prct += corr;
@@ -632,7 +632,10 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
             // Now, let's apply the correction to the initial state
             if let Some(frame) = self.correction_frame {
-                let dcm_vnc2inertial = xi.orbit.dcm_from_traj_frame(frame)?;
+                let dcm_vnc2inertial = xi
+                    .orbit
+                    .dcm_from_traj_frame(frame)
+                    .with_context(|_| AstroSnafu)?;
                 let velocity_correction = dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
                 xi.orbit.apply_dv(velocity_correction);
             } else {
@@ -648,11 +651,6 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             }
         }
 
-        Err(NyxError::MaxIterReached {
-            msg: format!(
-                "Failed after {} iterations:\nError: {}\n\n{}",
-                self.iterations, prev_err_norm, self
-            ),
-        })
+        Err(TargetingError::TooManyIterations)
     }
 }

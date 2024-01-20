@@ -236,13 +236,13 @@ pub fn hermite_eval(
 ) -> Result<(f64, f64), NyxError> {
     if xs.len() != ys.len() || xs.len() != ydots.len() {
         let msg = format!("Abscissas (xs), ordinates (ys), and first derivatives (ydots) must contain the same number of items, but they are of lengths {}, {}, and {}", xs.len(), ys.len(), ydots.len());
-        return Err(NyxError::MathDomain(msg));
+        return Err(NyxError::MathDomain { msg });
     } else if xs.is_empty() {
         let msg = "No interpolation data provided".to_string();
-        return Err(NyxError::MathDomain(msg));
+        return Err(NyxError::MathDomain { msg });
     } else if xs.len() > 3 * INTERPOLATION_SAMPLES {
         let msg = format!("More than {} samples provided, which is the maximum number of items allowed for a Hermite interpolation", 3 * INTERPOLATION_SAMPLES);
-        return Err(NyxError::MathDomain(msg));
+        return Err(NyxError::MathDomain { msg });
     }
 
     // At this point, we know that the lengths of items is correct, so we can directly address them without worry for overflowing the array.
@@ -275,7 +275,7 @@ pub fn hermite_eval(
         let denom = xs[i] - xs[i - 1];
         if denom.abs() < f64::EPSILON {
             let msg = format!("duplicate abscissa data: denominator near zero ({denom:e})");
-            return Err(NyxError::MathDomain(msg));
+            return Err(NyxError::MathDomain { msg });
         }
 
         /*        The second column of WORK contains interpolated derivative */
@@ -333,7 +333,7 @@ pub fn hermite_eval(
                 let msg = format!(
                     "duplicate abscissa data in interp table: denominator near zero ({denom:e})"
                 );
-                return Err(NyxError::MathDomain(msg));
+                return Err(NyxError::MathDomain { msg });
             }
 
             /*           Compute the interpolated derivative at X for the Ith */

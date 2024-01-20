@@ -16,29 +16,17 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use snafu::Snafu;
+use pyo3::class::basic::CompareOp;
+use pyo3::{exceptions::PyException, prelude::*};
 
-use crate::md::TargetingError;
-
-pub mod altitude_heuristic;
-pub mod ctrlnodes;
-pub mod equidistant_heuristic;
-pub mod multishoot;
-
-/// Built-in cost functions to minimize
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum CostFunction {
-    /// J = ∫ \vec{u}^T\vec{u} dt
-    MinimumEnergy,
-    /// J = ∫ |\vec{u}| dt -- Warning, this may lead to loads to bang-coast-bang solutions
-    MinimumFuel,
+#[derive(Snafu, Debug)]
+pub(crate) enum PythonError {
+    #[snafu(display("operation {op:?} not available on this type"))]
+    OperationError { op: CompareOp },
 }
 
-#[derive(Clone, Debug, PartialEq, Snafu)]
-pub enum MultipleShootingError {
-    #[snafu(display("segment #{segment} encountered {source}"))]
-    TargetingError {
-        segment: usize,
-        source: TargetingError,
-    },
+impl From<PythonError> for PyErr {
+    fn from(err: PythonError) -> PyErr {
+        PyException::new_err(err.to_string())
+    }
 }

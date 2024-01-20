@@ -107,9 +107,9 @@ where
         }
 
         if devices_map.is_empty() {
-            return Err(ConfigError::InvalidConfig(
-                "None of the devices are properly configured".to_string(),
-            ));
+            return Err(ConfigError::InvalidConfig {
+                msg: "None of the devices are properly configured".to_string(),
+            });
         }
 
         let common_sampling_rate_ns = sampling_rates_ns

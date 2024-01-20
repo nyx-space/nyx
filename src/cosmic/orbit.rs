@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use super::AstroError;
 use super::Cosm;
 use super::State;
 use super::{BPlane, Frame};
@@ -696,7 +697,7 @@ impl Orbit {
     /// ## Example
     /// let dcm_vnc2inertial = orbit.dcm_from_traj_frame(Frame::VNC)?;
     /// let vector_inertial = dcm_vnc2inertial * vector_vnc;
-    pub fn dcm_from_traj_frame(&self, from: Frame) -> Result<Matrix3<f64>, NyxError> {
+    pub fn dcm_from_traj_frame(&self, from: Frame) -> Result<Matrix3<f64>, AstroError> {
         match from {
             Frame::RIC => Ok(r3(-self.raan_deg().to_radians())
                 * r1(-self.inc_deg().to_radians())
@@ -740,15 +741,13 @@ impl Orbit {
                     z_hat[2],
                 ))
             }
-            _ => Err(NyxError::CustomError(
-                "did not provide a local frame".to_string(),
-            )),
+            _ => Err(AstroError::NotLocalFrame),
         }
     }
 
     /// Returns a 6x6 DCM to convert to this inertial state.
     /// WARNING: This DCM does NOT contain the corrections needed for the transport theorem, and therefore the velocity rotation is wrong.
-    pub fn dcm6x6_from_traj_frame(&self, from: Frame) -> Result<Matrix6<f64>, NyxError> {
+    pub fn dcm6x6_from_traj_frame(&self, from: Frame) -> Result<Matrix6<f64>, AstroError> {
         let dcm3x3 = self.dcm_from_traj_frame(from)?;
 
         let mut dcm = Matrix6::zeros();
@@ -1481,7 +1480,7 @@ impl Orbit {
         between_pm_180((self.vz_km_s / self.vmag_km_s()).asin().to_degrees())
     }
 
-    pub fn b_plane(&self) -> Result<BPlane, NyxError> {
+    pub fn b_plane(&self) -> Result<BPlane, AstroError> {
         BPlane::new(*self)
     }
 
@@ -2154,9 +2153,9 @@ impl State for Orbit {
             StateParameter::ApoapsisRadius => Ok(self.apoapsis_km()),
             StateParameter::AoL => Ok(self.aol_deg()),
             StateParameter::AoP => Ok(self.aop_deg()),
-            StateParameter::BdotR => Ok(BPlane::new(*self)?.b_r.real()),
-            StateParameter::BdotT => Ok(BPlane::new(*self)?.b_t.real()),
-            StateParameter::BLTOF => Ok(BPlane::new(*self)?.ltof_s.real()),
+            StateParameter::BdotR => Ok(BPlane::new(*self).unwrap().b_r.real()),
+            StateParameter::BdotT => Ok(BPlane::new(*self).unwrap().b_t.real()),
+            StateParameter::BLTOF => Ok(BPlane::new(*self).unwrap().ltof_s.real()),
             StateParameter::C3 => Ok(self.c3_km2_s2()),
             StateParameter::Declination => Ok(self.declination_deg()),
             StateParameter::EccentricAnomaly => Ok(self.ea_deg()),
@@ -2335,9 +2334,9 @@ fn compute_mean_to_true_anomaly(ma_radians: f64, ecc: f64, tol: f64) -> Result<f
             let normalized_anomaly = 1.0 - ecc * e2.cos();
 
             if normalized_anomaly.abs() < MA_EPSILON {
-                return Err(NyxError::MathDomain(format!(
-                    "normalizer too small {normalized_anomaly}"
-                )));
+                return Err(NyxError::MathDomain {
+                    msg: format!("normalizer too small {normalized_anomaly}"),
+                });
             }
 
             // GTDS MathSpec Equation 3-181
@@ -2362,17 +2361,17 @@ fn compute_mean_to_true_anomaly(ma_radians: f64, ecc: f64, tol: f64) -> Result<f
             let normalized_anomaly = 1.0 - ecc;
 
             if (normalized_anomaly).abs() < MA_EPSILON {
-                return Err(NyxError::MathDomain(format!(
-                    "normalized anomaly too small {normalized_anomaly}"
-                )));
+                return Err(NyxError::MathDomain {
+                    msg: format!("normalized anomaly too small {normalized_anomaly}"),
+                });
             }
 
             let eccentricity_ratio = (1.0 + ecc) / normalized_anomaly; // temp2 = (1+ecc)/(1-ecc)
 
             if eccentricity_ratio < 0.0 {
-                return Err(NyxError::MathDomain(format!(
-                    "eccentric ratio too small {eccentricity_ratio}"
-                )));
+                return Err(NyxError::MathDomain {
+                    msg: format!("eccentric ratio too small {eccentricity_ratio}"),
+                });
             }
 
             let f = eccentricity_ratio.sqrt();
@@ -2413,9 +2412,9 @@ fn compute_mean_to_true_anomaly(ma_radians: f64, ecc: f64, tol: f64) -> Result<f
             let normalizer = ecc * f2.cosh() - 1.0;
 
             if normalizer.abs() < MA_EPSILON {
-                return Err(NyxError::MathDomain(format!(
-                    "normalizer too small {normalizer}"
-                )));
+                return Err(NyxError::MathDomain {
+                    msg: format!("normalizer too small {normalizer}"),
+                });
             }
 
             let f1 = f2 - (ecc * f2.sinh() - f2 - rm) / normalizer; // GTDS MathSpec Equation 3-186
@@ -2429,17 +2428,17 @@ fn compute_mean_to_true_anomaly(ma_radians: f64, ecc: f64, tol: f64) -> Result<f
         let normalized_anomaly = ecc - 1.0;
 
         if normalized_anomaly.abs() < MA_EPSILON {
-            return Err(NyxError::MathDomain(format!(
-                "eccentric ratio too small {normalized_anomaly}"
-            )));
+            return Err(NyxError::MathDomain {
+                msg: format!("eccentric ratio too small {normalized_anomaly}"),
+            });
         }
 
         let eccentricity_ratio = (ecc + 1.0) / normalized_anomaly; // temp2 = (ecc+1)/(ecc-1)
 
         if eccentricity_ratio < 0.0 {
-            return Err(NyxError::MathDomain(format!(
-                "eccentric ratio too small {eccentricity_ratio}"
-            )));
+            return Err(NyxError::MathDomain {
+                msg: format!("eccentric ratio too small {eccentricity_ratio}"),
+            });
         }
 
         let e = eccentricity_ratio.sqrt();

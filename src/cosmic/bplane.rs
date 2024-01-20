@@ -16,17 +16,17 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::{Frame, Orbit, OrbitDual, OrbitPartial};
+use super::{AstroError, Frame, Orbit, OrbitDual, OrbitPartial};
 use crate::linalg::{Matrix2, Matrix3, Vector2, Vector3};
 use crate::md::objective::Objective;
-use crate::md::StateParameter;
+use crate::md::{AstroSnafu, StateParameter, TargetingError};
 use crate::time::{Duration, Epoch, Unit};
 use crate::utils::between_pm_180;
-use crate::NyxError;
 use hyperdual::linalg::norm;
 use hyperdual::{Float, OHyperdual};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
+use snafu::ResultExt;
 use std::convert::From;
 use std::fmt;
 
@@ -50,11 +50,9 @@ pub struct BPlane {
 
 impl BPlane {
     /// Returns a newly define B-Plane if the orbit is hyperbolic and already in Dual form
-    pub fn from_dual(orbit: OrbitDual) -> Result<Self, NyxError> {
+    pub fn from_dual(orbit: OrbitDual) -> Result<Self, AstroError> {
         if orbit.ecc().real() <= 1.0 {
-            Err(NyxError::NotHyperbolic {
-                msg: "Orbit is not hyperbolic. Convert to target object first".to_string(),
-            })
+            Err(AstroError::NotHyperbolic)
         } else {
             let one = OHyperdual::from(1.0);
             let zero = OHyperdual::from(0.0);
@@ -128,7 +126,7 @@ impl BPlane {
     }
 
     /// Returns a newly defined B-Plane if the orbit is hyperbolic.
-    pub fn new(orbit: Orbit) -> Result<Self, NyxError> {
+    pub fn new(orbit: Orbit) -> Result<Self, AstroError> {
         // Convert to OrbitDual so we can target it
         Self::from_dual(OrbitDual::from(orbit))
     }
@@ -154,7 +152,7 @@ impl BPlane {
     }
 
     /// Returns the Jacobian of the B plane (BT, BR) with respect to two of the velocity components
-    pub fn jacobian2(&self, invariant: StateParameter) -> Result<Matrix2<f64>, NyxError> {
+    pub fn jacobian2(&self, invariant: StateParameter) -> Result<Matrix2<f64>, AstroError> {
         match invariant {
             StateParameter::VX => Ok(Matrix2::new(
                 self.b_t.wtr_vy(),
@@ -174,9 +172,7 @@ impl BPlane {
                 self.b_r.wtr_vx(),
                 self.b_r.wtr_vy(),
             )),
-            _ => Err(NyxError::CustomError(
-                "B Plane jacobian invariant must be either VX, VY or VZ".to_string(),
-            )),
+            _ => Err(AstroError::BPlaneInvariant),
         }
     }
 }
@@ -321,7 +317,7 @@ impl fmt::Display for BPlaneTarget {
 pub fn try_achieve_b_plane(
     orbit: Orbit,
     target: BPlaneTarget,
-) -> Result<(Vector3<f64>, BPlane), NyxError> {
+) -> Result<(Vector3<f64>, BPlane), TargetingError> {
     let mut total_dv = Vector3::zeros();
     let mut attempt_no = 0;
     let max_iter = 10;
@@ -333,13 +329,11 @@ pub fn try_achieve_b_plane(
         // If no LTOF is targeted, we'll solve this with a least squared approach.
         loop {
             if attempt_no > max_iter {
-                return Err(NyxError::MaxIterReached {
-                    msg: format!("Error norm of {prev_b_plane_err} km after {max_iter} iterations",),
-                });
+                return Err(TargetingError::TooManyIterations);
             }
 
             // Build current B Plane
-            let b_plane = BPlane::new(real_orbit)?;
+            let b_plane = BPlane::new(real_orbit).with_context(|_| AstroSnafu)?;
 
             // Check convergence
             let br_err = target.b_r_km - b_plane.b_dot_r();
@@ -354,8 +348,10 @@ pub fn try_achieve_b_plane(
 
             if b_plane_err.norm() >= prev_b_plane_err {
                 // If the error is not going down, we'll raise an error
-                return Err(NyxError::CorrectionIneffective{
-                    msg: format!("Delta-V correction is ineffective at reducing the B-Plane error:\nprev err norm: {prev_b_plane_err:.3} km\tcur err norm: {:.3} km", b_plane_err.norm())
+                return Err(TargetingError::CorrectionIneffective {
+                    prev_val: prev_b_plane_err,
+                    cur_val: b_plane_err.norm(),
+                    action: "Delta-V correction is ineffective at reducing the B-Plane error",
                 });
             }
             prev_b_plane_err = b_plane_err.norm();
@@ -381,13 +377,11 @@ pub fn try_achieve_b_plane(
         // The LTOF targeting seems to break often, but it's still implemented
         loop {
             if attempt_no > max_iter {
-                return Err(NyxError::MaxIterReached {
-                    msg: format!("Error norm of {prev_b_plane_err} km after {max_iter} iterations",),
-                });
+                return Err(TargetingError::TooManyIterations);
             }
 
             // Build current B Plane
-            let b_plane = BPlane::new(real_orbit)?;
+            let b_plane = BPlane::new(real_orbit).with_context(|_| AstroSnafu)?;
 
             // Check convergence
             let br_err = target.b_r_km - b_plane.b_dot_r();
@@ -405,8 +399,10 @@ pub fn try_achieve_b_plane(
             let b_plane_err = Vector3::new(bt_err, br_err, ltof_err);
 
             if b_plane_err.norm() >= prev_b_plane_err {
-                return Err(NyxError::CorrectionIneffective{
-                    msg: format!("LTOF enabled correction is failing. Try to not set an LTOF target. Delta-V correction is ineffective are reducing the B-Plane error:\nprev err norm: {:.3} km\tcur err norm: {:.3} km", prev_b_plane_err, b_plane_err.norm()),
+                return Err(TargetingError::CorrectionIneffective {
+                    prev_val: prev_b_plane_err,
+                    cur_val: b_plane_err.norm(),
+                    action: "LTOF enabled correction is failing. Try to not set an LTOF target. Delta-V correction is ineffective at reducing the B-Plane error",
                 });
             }
             prev_b_plane_err = b_plane_err.norm();

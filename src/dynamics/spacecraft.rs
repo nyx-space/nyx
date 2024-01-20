@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use snafu::prelude::*;
+
 use super::guidance::GuidanceLaw;
 use super::orbital::OrbitalDynamics;
 use super::{AccelModel, Dynamics, ForceModel};
@@ -443,23 +445,23 @@ impl Configurable for SpacecraftDynamics {
                 let gunzipped = hh.coeffs.ends_with(".gz");
                 let stor = if hh.coeffs.contains("cof") {
                     HarmonicsMem::from_cof(&hh.coeffs, hh.degree, hh.order, gunzipped)
-                        .map_err(|e| ConfigError::InvalidConfig(e.to_string()))?
+                        .map_err(|e| ConfigError::InvalidConfig { msg: e.to_string() })?
                 } else if hh.coeffs.contains("sha") {
                     HarmonicsMem::from_shadr(&hh.coeffs, hh.degree, hh.order, gunzipped)
-                        .map_err(|e| ConfigError::InvalidConfig(e.to_string()))?
+                        .map_err(|e| ConfigError::InvalidConfig { msg: e.to_string() })?
                 } else if hh.coeffs.contains("EGM") {
                     HarmonicsMem::from_egm(&hh.coeffs, hh.degree, hh.order, gunzipped)
-                        .map_err(|e| ConfigError::InvalidConfig(e.to_string()))?
+                        .map_err(|e| ConfigError::InvalidConfig { msg: e.to_string() })?
                 } else {
-                    return Err(ConfigError::InvalidConfig(
-                        "Unknown coefficients file type".to_string(),
-                    ));
+                    return Err(ConfigError::InvalidConfig {
+                        msg: "Unknown coefficients file type".to_string(),
+                    });
                 };
 
                 // Grab the frame
                 let frame = cosm
                     .try_frame(&hh.frame)
-                    .map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
+                    .map_err(|e| ConfigError::InvalidConfig { msg: e.to_string() })?;
 
                 accel_models.push(Harmonics::from_stor(frame, stor, cosm.clone()));
             }

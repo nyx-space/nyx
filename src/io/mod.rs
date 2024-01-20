@@ -20,6 +20,7 @@ use crate::errors::NyxError;
 use crate::md::StateParameter;
 use crate::time::Epoch;
 use crate::Orbit;
+use snafu::prelude::*;
 pub(crate) mod watermark;
 use hifitime::prelude::{Format, Formatter};
 use hifitime::Duration;
@@ -56,7 +57,6 @@ pub mod tracking_data;
 pub mod trajectory_data;
 
 use std::io;
-use thiserror::Error;
 
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
@@ -163,16 +163,17 @@ impl ExportCfg {
     }
 }
 
-#[derive(Error, Debug)]
+#[derive(Debug, Snafu)]
+#[snafu(visibility(pub(crate)))]
 pub enum ConfigError {
-    #[error("Failed to read configuration file: {0}")]
-    ReadError(#[from] io::Error),
+    #[snafu(display("Failed to read configuration file: {source}"))]
+    ReadError { source: io::Error },
 
-    #[error("Failed to parse YAML configuration file: {0}")]
-    ParseError(#[source] serde_yaml::Error),
+    #[snafu(display("Failed to parse YAML configuration file: {source}"))]
+    ParseError { source: serde_yaml::Error },
 
-    #[error("Invalid configuration: {0}")]
-    InvalidConfig(String),
+    #[snafu(display("Invalid configuration: {msg}"))]
+    InvalidConfig { msg: String },
 }
 
 impl PartialEq for ConfigError {
@@ -188,10 +189,10 @@ pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {
     where
         P: AsRef<Path>,
     {
-        let file = File::open(path)?;
+        let file = File::open(path).with_context(|_| ReadSnafu)?;
         let reader = BufReader::new(file);
 
-        serde_yaml::from_reader(reader).map_err(ConfigError::ParseError)
+        serde_yaml::from_reader(reader).with_context(|_| ParseSnafu)
     }
 
     /// Builds a sequence of "Selves" from the provided path to a yaml
@@ -199,10 +200,10 @@ pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {
     where
         P: AsRef<Path>,
     {
-        let file = File::open(path)?;
+        let file = File::open(path).with_context(|_| ReadSnafu)?;
         let reader = BufReader::new(file);
 
-        serde_yaml::from_reader(reader).map_err(ConfigError::ParseError)
+        serde_yaml::from_reader(reader).with_context(|_| ParseSnafu)
     }
 
     /// Builds a map of names to "selves" from the provided path to a yaml
@@ -210,16 +211,16 @@ pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {
     where
         P: AsRef<Path>,
     {
-        let file = File::open(path)?;
+        let file = File::open(path).with_context(|_| ReadSnafu)?;
         let reader = BufReader::new(file);
 
-        serde_yaml::from_reader(reader).map_err(ConfigError::ParseError)
+        serde_yaml::from_reader(reader).with_context(|_| ParseSnafu)
     }
 
     /// Builds a sequence of "Selves" from the provided string of a yaml
     fn loads_many(data: &str) -> Result<Vec<Self>, ConfigError> {
         debug!("Loading YAML:\n{data}");
-        serde_yaml::from_str(data).map_err(ConfigError::ParseError)
+        serde_yaml::from_str(data).with_context(|_| ParseSnafu)
     }
 }
 

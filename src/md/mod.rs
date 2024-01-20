@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use crate::cosmic::AstroError;
+use crate::dynamics::guidance::GuidanceErrors;
 use crate::errors::NyxError;
 use crate::{Orbit, Spacecraft};
 use snafu::prelude::*;
@@ -61,6 +63,7 @@ pub use opti::target_variable::{Variable, Vary};
 
 #[allow(clippy::result_large_err)]
 #[derive(Clone, PartialEq, Debug, Snafu)]
+#[snafu(visibility(pub(crate)))]
 pub enum TargetingError {
     #[snafu(display(
         "The variables to be adjusted lead to an under-determined of the problem for the targeter"
@@ -77,6 +80,24 @@ pub enum TargetingError {
     UnsupportedVariable { var: Variable },
     #[snafu(display("Verification of targeting solution failed: {msg}"))]
     Verification { msg: String },
+    #[snafu(display("astro error during targeting: {source}"))]
+    Astro { source: AstroError },
+    #[snafu(display("No thruster attached to spacecraft"))]
+    NoThrustersDefined,
+    #[snafu(display("targeting aborted, too many iterations"))]
+    TooManyIterations,
+    #[snafu(display("correction is ineffective at {action}: value at previous iteration {prev_val}, current value: {cur_val}"))]
+    CorrectionIneffective {
+        prev_val: f64,
+        cur_val: f64,
+        action: &'static str,
+    },
+    #[snafu(display("encountered a guidance error: {source}"))]
+    GuidanceError { source: GuidanceErrors },
+    #[snafu(display("not a finite burn"))]
+    NotFinite,
+    #[snafu(display("Jacobian is signular"))]
+    SingularJacobian,
 }
 
 impl From<TargetingError> for NyxError {

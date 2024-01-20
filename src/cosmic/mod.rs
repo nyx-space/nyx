@@ -25,6 +25,7 @@ use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
 use crate::md::StateParameter;
 use crate::time::{Duration, Epoch, Unit};
 use hifitime::SECONDS_PER_DAY;
+use snafu::Snafu;
 use std::fmt::{self, Write};
 use std::fs::File;
 use std::io::Read;
@@ -122,6 +123,18 @@ where
             msg: "unimplemented in State trait".to_string(),
         })
     }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Snafu)]
+pub enum AstroError {
+    #[snafu(display("B Plane jacobian invariant must be either VX, VY or VZ"))]
+    BPlaneInvariant,
+    #[snafu(display("operation requires a local frame"))]
+    NotLocalFrame,
+    #[snafu(display("partial derivatives not defined for this parameter"))]
+    PartialsUndefined,
+    #[snafu(display("Orbit is not hyperbolic so there is no hyperbolic anomaly."))]
+    NotHyperbolic,
 }
 
 impl XbEpoch {

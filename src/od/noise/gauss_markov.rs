@@ -105,9 +105,9 @@ impl GaussMarkov {
         steady_state_sigma: f64,
     ) -> Result<Self, ConfigError> {
         if tau <= Duration::ZERO {
-            return Err(ConfigError::InvalidConfig(format!(
-                "tau must be positive but got {tau}"
-            )));
+            return Err(ConfigError::InvalidConfig {
+                msg: format!("tau must be positive but got {tau}"),
+            });
         }
 
         Ok(Self {

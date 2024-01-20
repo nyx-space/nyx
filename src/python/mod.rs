@@ -24,6 +24,8 @@ use hifitime::ut1::Ut1Provider;
 use pyo3::py_run;
 use pyo3::{exceptions::PyException, prelude::*};
 
+mod py_errors;
+
 pub(crate) mod cosmic;
 pub(crate) mod mission_design;
 mod monte_carlo;

@@ -16,11 +16,13 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use snafu::{ensure, ResultExt};
+
 use super::solution::TargeterSolution;
 use crate::errors::TargetingError;
 use crate::linalg::{DMatrix, SVector};
-use crate::md::prelude::*;
-use crate::md::StateParameter;
+use crate::md::{prelude::*, UnderdeterminedProblemSnafu};
+use crate::md::{AstroSnafu, StateParameter};
 pub use crate::md::{Variable, Vary};
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::pseudo_inverse;
@@ -36,12 +38,8 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
         initial_state: Spacecraft,
         correction_epoch: Epoch,
         achievement_epoch: Epoch,
-    ) -> Result<TargeterSolution<V, O>, NyxError> {
-        if self.objectives.is_empty() {
-            return Err(NyxError::Targeter {
-                source: Box::new(TargetingError::UnderdeterminedProblem),
-            });
-        }
+    ) -> Result<TargeterSolution<V, O>, TargetingError> {
+        ensure!(!self.objectives.is_empty(), UnderdeterminedProblemSnafu);
 
         let mut is_bplane_tgt = false;
         for obj in &self.objectives {
@@ -88,9 +86,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                     xi.orbit.vz_km_s += var.init_guess;
                 }
                 _ => {
-                    return Err(NyxError::Targeter {
-                        source: Box::new(TargetingError::UnsupportedVariable { var: *var }),
-                    })
+                    return Err(TargetingError::UnsupportedVariable { var: *var });
                 }
             }
             total_correction[i] += var.init_guess;
@@ -151,7 +147,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
             // Build the B-Plane once, if needed, and always in the objective frame
             let b_plane = if is_bplane_tgt {
-                Some(BPlane::from_dual(xf_dual_obj_frame)?)
+                Some(BPlane::from_dual(xf_dual_obj_frame).with_context(|_| AstroSnafu)?)
             } else {
                 None
             };
@@ -232,11 +228,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                         Vary::VelocityX => state.orbit.vx_km_s += total_correction[i],
                         Vary::VelocityY => state.orbit.vy_km_s += total_correction[i],
                         Vary::VelocityZ => state.orbit.vz_km_s += total_correction[i],
-                        _ => {
-                            return Err(NyxError::Targeter {
-                                source: Box::new(TargetingError::UnsupportedVariable { var: *var }),
-                            })
-                        }
+                        _ => return Err(TargetingError::UnsupportedVariable { var: *var }),
                     }
                 }
 
@@ -259,8 +251,10 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
             // We haven't converged yet, so let's build the error vector
             if (err_vector.norm() - prev_err_norm).abs() < 1e-10 {
-                return Err(NyxError::CorrectionIneffective {
-                    msg: "No change in objective errors".to_string(),
+                return Err(TargetingError::CorrectionIneffective {
+                    cur_val: err_vector.norm(),
+                    prev_val: prev_err_norm,
+                    action: "No change in objective errors",
                 });
             }
             prev_err_norm = err_vector.norm();
@@ -312,9 +306,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                         xi.orbit.vz_km_s += delta[i];
                     }
                     _ => {
-                        return Err(NyxError::Targeter {
-                            source: Box::new(TargetingError::UnsupportedVariable { var: *var }),
-                        })
+                        return Err(TargetingError::UnsupportedVariable { var: *var });
                     }
                 }
             }
@@ -328,11 +320,6 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             }
         }
 
-        Err(NyxError::MaxIterReached {
-            msg: format!(
-                "Failed after {} iterations:\nError: {}\n\n{}",
-                self.iterations, prev_err_norm, self
-            ),
-        })
+        Err(TargetingError::TooManyIterations)
     }
 }
