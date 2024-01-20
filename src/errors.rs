@@ -22,7 +22,6 @@ use crate::md::trajectory::TrajError;
 use crate::md::StateParameter;
 pub use crate::md::TargetingError;
 pub use crate::time::Errors as TimeErrors;
-use crate::Spacecraft;
 use snafu::prelude::*;
 use std::convert::From;
 
@@ -32,9 +31,6 @@ pub enum NyxError {
     /// STM is singular, propagation or smoothing cannot proceed
     #[error("STM is singular, propagation or smoothing cannot proceed")]
     SingularStateTransitionMatrix,
-    /// Fuel exhausted at the provided spacecraft state
-    #[error("Fuel exhausted at {sc}")]
-    FuelExhausted { sc: Box<Spacecraft> },
     /// Propagation event not triggered within the max propagation time
     #[error("Propagation event not triggered within the max propagation time")]
     ConditionNeverTriggered,

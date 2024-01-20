@@ -20,7 +20,8 @@ use self::kalman::Residual;
 
 use super::estimate::Estimate;
 use super::snc::SNC;
-pub use crate::dynamics::{Dynamics, NyxError};
+use super::ODError;
+pub use crate::dynamics::Dynamics;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
 use crate::time::Epoch;
@@ -59,7 +60,7 @@ where
     /// Computes a time update/prediction at the provided nominal state (i.e. advances the filter estimate with the updated STM).
     ///
     /// Returns an error if the STM was not updated.
-    fn time_update(&mut self, nominal_state: T) -> Result<Self::Estimate, NyxError>;
+    fn time_update(&mut self, nominal_state: T) -> Result<Self::Estimate, ODError>;
 
     /// Computes the measurement update with a provided real observation and computed observation.
     ///
@@ -81,7 +82,7 @@ where
         real_obs: &OVector<f64, M>,
         computed_obs: &OVector<f64, M>,
         resid_ratio_check: Option<f64>,
-    ) -> Result<(Self::Estimate, Residual<M>), NyxError>;
+    ) -> Result<(Self::Estimate, Residual<M>), ODError>;
 
     /// Returns whether the filter is an extended filter (e.g. EKF)
     fn is_extended(&self) -> bool;

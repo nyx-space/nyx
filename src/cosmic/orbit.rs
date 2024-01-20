@@ -20,6 +20,7 @@ use super::AstroError;
 use super::Cosm;
 use super::State;
 use super::{BPlane, Frame};
+use crate::dynamics::DynamicsError;
 use crate::io::orbit::OrbitSerde;
 use crate::io::{
     epoch_from_str, epoch_to_str, frame_from_str, frame_to_str, ConfigRepr, Configurable,
@@ -2097,7 +2098,7 @@ impl State for Orbit {
         }
     }
 
-    fn as_vector(&self) -> Result<OVector<f64, Const<42>>, NyxError> {
+    fn as_vector(&self) -> OVector<f64, Const<42>> {
         let mut as_vec = OVector::<f64, Const<42>>::zeros();
         as_vec[0] = self.x_km;
         as_vec[1] = self.y_km;
@@ -2110,10 +2111,10 @@ impl State for Orbit {
                 as_vec[idx + 6] = *stm_val;
             }
         }
-        Ok(as_vec)
+        as_vec
     }
 
-    fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Const<42>>) -> Result<(), NyxError> {
+    fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Const<42>>) {
         self.set_epoch(epoch);
         self.x_km = vector[0];
         self.y_km = vector[1];
@@ -2126,13 +2127,12 @@ impl State for Orbit {
             let stm_k_to_0 = Matrix6::from_column_slice(&vector.as_slice()[6..]);
             self.stm = Some(stm_k_to_0);
         }
-        Ok(())
     }
 
-    fn stm(&self) -> Result<Matrix6<f64>, NyxError> {
+    fn stm(&self) -> Result<Matrix6<f64>, DynamicsError> {
         match self.stm {
             Some(stm) => Ok(stm),
-            None => Err(NyxError::StateTransitionMatrixUnset),
+            None => Err(DynamicsError::StateTransitionMatrixUnset),
         }
     }
 

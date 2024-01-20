@@ -21,7 +21,7 @@ use snafu::{ensure, ResultExt};
 use super::solution::TargeterSolution;
 use crate::errors::TargetingError;
 use crate::linalg::{DMatrix, SVector};
-use crate::md::{prelude::*, UnderdeterminedProblemSnafu};
+use crate::md::{prelude::*, PropSnafu, UnderdeterminedProblemSnafu};
 use crate::md::{AstroSnafu, StateParameter};
 pub use crate::md::{Variable, Vary};
 use crate::propagators::error_ctrl::ErrorCtrl;
@@ -54,7 +54,8 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
         let xi_start = self
             .prop
             .with(initial_state)
-            .until_epoch(correction_epoch)?;
+            .until_epoch(correction_epoch)
+            .with_context(|_| PropSnafu)?;
 
         debug!("initial_state = {}", initial_state);
         debug!("xi_start = {}", xi_start);
@@ -123,7 +124,12 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             xi.enable_stm();
 
             // Full propagation for a half period duration is slightly more precise than a step by step one with multiplications in between.
-            let xf = self.prop.with(xi).until_epoch(achievement_epoch)?.orbit;
+            let xf = self
+                .prop
+                .with(xi)
+                .until_epoch(achievement_epoch)
+                .with_context(|_| PropSnafu)?
+                .orbit;
 
             // Check linearization
             if !are_eigenvalues_stable(xf.stm().unwrap().complex_eigenvalues()) {
@@ -168,7 +174,9 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                         _ => unreachable!(),
                     }
                 } else {
-                    xf_dual_obj_frame.partial_for(obj.parameter)?
+                    xf_dual_obj_frame
+                        .partial_for(obj.parameter)
+                        .with_context(|_| AstroSnafu)?
                 };
 
                 let achieved = xf_partial.real();

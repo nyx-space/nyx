@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use snafu::prelude::*;
 use std::fmt;
 
 /// Provides different methods for controlling the error computation of the integrator.
@@ -32,7 +33,7 @@ pub use rk_methods::*;
 mod options;
 pub use options::*;
 
-use crate::time::Duration;
+use crate::{dynamics::DynamicsError, md::trajectory::TrajError, time::Duration};
 
 /// Stores the details of the previous integration step of a given propagator. Access as `my_prop.clone().latest_details()`.
 #[derive(Copy, Clone, Debug)]
@@ -53,4 +54,14 @@ impl fmt::Display for IntegrationDetails {
             self.step, self.error, self.attempts
         )
     }
+}
+
+#[derive(Clone, Debug, Snafu, PartialEq)]
+pub enum PropagationError {
+    #[snafu(display("encountered a dynamics error {source}"))]
+    Dynamics { source: DynamicsError },
+    #[snafu(display("when propagating until an event: {source}"))]
+    TrajectoryEventError { source: TrajError },
+    #[snafu(display("requested propagation until event #{nth} but only {found} found"))]
+    NthEventError { nth: usize, found: usize },
 }

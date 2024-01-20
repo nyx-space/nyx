@@ -18,11 +18,11 @@
 
 use super::optimizer::Optimizer;
 use super::solution::TargeterSolution;
-use crate::dynamics::guidance::Mnvr;
+use crate::dynamics::guidance::{GuidanceErrors, Mnvr};
 use crate::errors::TargetingError;
 use crate::linalg::{SMatrix, SVector, Vector6};
 use crate::md::{prelude::*, AstroSnafu, GuidanceSnafu, UnderdeterminedProblemSnafu};
-use crate::md::{NoThrustersDefinedSnafu, StateParameter};
+use crate::md::{PropSnafu, StateParameter};
 pub use crate::md::{Variable, Vary};
 use crate::polyfit::CommonPolynomial;
 use crate::propagators::error_ctrl::ErrorCtrl;
@@ -57,7 +57,8 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
         let xi_start = self
             .prop
             .with(initial_state)
-            .until_epoch(correction_epoch)?;
+            .until_epoch(correction_epoch)
+            .with_context(|_| PropSnafu)?;
 
         debug!("initial_state = {}", initial_state);
         debug!("xi_start = {}", xi_start);
@@ -98,7 +99,11 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
             // Check that a thruster is provided since we'll be changing that and the burn duration
             if var.component.is_finite_burn() {
-                ensure!(xi_start.thruster.is_some(), NoThrustersDefinedSnafu);
+                if xi_start.thruster.is_none() {
+                    return Err(TargetingError::GuidanceError {
+                        source: GuidanceErrors::NoThrustersDefined,
+                    });
+                }
 
                 finite_burn_target = true;
                 // Modify the default maneuver
@@ -204,18 +209,29 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                 info!("#{} {}", it, mnvr);
                 let mut prop = self.prop.clone();
                 let prop_opts = prop.opts;
-                let pre_mnvr = prop.with(cur_xi).until_epoch(mnvr.start)?;
+                let pre_mnvr = prop
+                    .with(cur_xi)
+                    .until_epoch(mnvr.start)
+                    .with_context(|_| PropSnafu)?;
                 prop.dynamics = prop.dynamics.with_guidance_law(Arc::new(mnvr));
                 prop.set_max_step(mnvr.duration());
                 let post_mnvr = prop
                     .with(pre_mnvr.with_guidance_mode(GuidanceMode::Thrust))
-                    .until_epoch(mnvr.end)?;
+                    .until_epoch(mnvr.end)
+                    .with_context(|_| PropSnafu)?;
                 // Reset the propagator options to their previous configuration
                 prop.opts = prop_opts;
                 // And propagate until the achievement epoch
-                prop.with(post_mnvr).until_epoch(achievement_epoch)?.orbit
+                prop.with(post_mnvr)
+                    .until_epoch(achievement_epoch)
+                    .with_context(|_| PropSnafu)?
+                    .orbit
             } else {
-                self.prop.with(cur_xi).until_epoch(achievement_epoch)?.orbit
+                self.prop
+                    .with(cur_xi)
+                    .until_epoch(achievement_epoch)
+                    .with_context(|_| PropSnafu)?
+                    .orbit
             };
 
             let xf_dual_obj_frame = match &self.objective_frame {

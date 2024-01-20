@@ -124,21 +124,21 @@ impl<const V: usize, const O: usize> TargeterSolution<V, O> {
                     let mut vector = mnvr.direction();
                     vector[var.component.vec_index()] += corr;
                     var.ensure_bounds(&mut vector[var.component.vec_index()]);
-                    mnvr.set_direction(vector).with_context(|_| GuidanceSnafu);
+                    mnvr.set_direction(vector).with_context(|_| GuidanceSnafu)?;
                 }
                 Vary::ThrustRateX | Vary::ThrustRateY | Vary::ThrustRateZ => {
                     let mut vector = mnvr.rate();
                     let idx = (var.component.vec_index() - 1) % 3;
                     vector[idx] += corr;
                     var.ensure_bounds(&mut vector[idx]);
-                    mnvr.set_rate(vector).with_context(|_| GuidanceSnafu);
+                    mnvr.set_rate(vector).with_context(|_| GuidanceSnafu)?;
                 }
                 Vary::ThrustAccelX | Vary::ThrustAccelY | Vary::ThrustAccelZ => {
                     let mut vector = mnvr.accel();
                     let idx = (var.component.vec_index() - 1) % 3;
                     vector[idx] += corr;
                     var.ensure_bounds(&mut vector[idx]);
-                    mnvr.set_accel(vector).with_context(|_| GuidanceSnafu);
+                    mnvr.set_accel(vector).with_context(|_| GuidanceSnafu)?;
                 }
                 Vary::ThrustLevel => {
                     mnvr.thrust_prct += corr;

@@ -207,8 +207,8 @@ fn test_multivariate_state() {
             let mut cnt = 0;
             for idx in 0..6 {
                 let val_std_dev = std_dev[idx];
-                let cur_val = dispersed_state.state.as_vector().unwrap()[idx];
-                let nom_val = state.as_vector().unwrap()[idx];
+                let cur_val = dispersed_state.state.as_vector()[idx];
+                let nom_val = state.as_vector()[idx];
                 if (cur_val - nom_val).abs() > val_std_dev {
                     cnt += 1;
                 }

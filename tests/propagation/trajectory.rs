@@ -341,7 +341,7 @@ fn traj_spacecraft() {
     let mut max_pos_err = (eval_state.orbit.radius() - start_state.orbit.radius()).norm();
     let mut max_vel_err = (eval_state.orbit.velocity() - start_state.orbit.velocity()).norm();
     let mut max_fuel_err = eval_state.fuel_mass_kg - start_state.fuel_mass_kg;
-    let mut max_err = (eval_state.as_vector().unwrap() - start_state.as_vector().unwrap()).norm();
+    let mut max_err = (eval_state.as_vector() - start_state.as_vector()).norm();
 
     while let Ok(prop_state) = rx.recv() {
         let eval_state = traj.at(prop_state.epoch()).unwrap();
@@ -369,7 +369,7 @@ fn traj_spacecraft() {
                 prop_state.epoch()
             );
         }
-        let err = (eval_state.as_vector().unwrap() - prop_state.as_vector().unwrap()).norm();
+        let err = (eval_state.as_vector() - prop_state.as_vector()).norm();
         if err > max_err {
             max_err = err;
         }
@@ -527,7 +527,7 @@ fn traj_ephem_backward() {
 
     let mut max_pos_err = (eval_state.radius() - start_state.radius()).norm();
     let mut max_vel_err = (eval_state.velocity() - start_state.velocity()).norm();
-    let mut max_err = (eval_state.as_vector().unwrap() - start_state.as_vector().unwrap()).norm();
+    let mut max_err = (eval_state.as_vector() - start_state.as_vector()).norm();
 
     println!("{}", ephem);
 
@@ -542,7 +542,7 @@ fn traj_ephem_backward() {
         if vel_err > max_vel_err {
             max_vel_err = vel_err;
         }
-        let err = (eval_state.as_vector().unwrap() - prop_state.as_vector().unwrap()).norm();
+        let err = (eval_state.as_vector() - prop_state.as_vector()).norm();
         if err > max_err {
             max_err = err;
         }

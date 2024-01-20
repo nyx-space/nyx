@@ -17,23 +17,19 @@
 */
 
 use rayon::prelude::*;
+use snafu::ResultExt;
 
-use crate::dynamics::guidance::{ra_dec_from_unit_vector, Mnvr};
-// use crate::errors::TargetingError;
+use crate::dynamics::guidance::{ra_dec_from_unit_vector, GuidanceErrors, Mnvr};
 use crate::linalg::{SMatrix, SVector, Vector3};
 use crate::md::objective::Objective;
-use crate::md::prelude::*;
-use crate::md::StateParameter;
+use crate::md::{prelude::*, PropSnafu, TargetingError};
+use crate::md::{StateParameter, TargetingTrajSnafu};
 pub use crate::md::{Variable, Vary};
 use crate::polyfit::CommonPolynomial;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::pseudo_inverse;
 use crate::time::TimeUnits;
 use core::f64::consts::TAU;
-// use std::convert::TryInto;
-// use std::fmt;
-
-// use super::solution::TargeterSolution;
 
 impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
     /// Create a new Targeter which will apply an impulsive delta-v correction.
@@ -42,10 +38,11 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
         spacecraft: Spacecraft,
         dv: Vector3<f64>,
         prop: &'a Propagator<'a, SpacecraftDynamics, E>,
-    ) -> Result<Mnvr, NyxError> {
+    ) -> Result<Mnvr, TargetingError> {
         if spacecraft.thruster.is_none() {
-            // Can't do any conversion to finite burns without a thruster
-            return Err(NyxError::NoThrusterAvail);
+            return Err(TargetingError::GuidanceError {
+                source: GuidanceErrors::NoThrustersDefined,
+            });
         }
 
         /* ************************* */
@@ -88,12 +85,19 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
         /* Compute the nominal traj */
         /* ************************ */
         // Pre-traj is the trajectory _before_ the impulsive maneuver
-        let pre_sc = prop.with(spacecraft).for_duration(-60.0 * Unit::Minute)?;
-        let (_, pre_traj) = prop.with(pre_sc).until_epoch_with_traj(impulse_epoch)?;
+        let pre_sc = prop
+            .with(spacecraft)
+            .for_duration(-60.0 * Unit::Minute)
+            .with_context(|_| PropSnafu)?;
+        let (_, pre_traj) = prop
+            .with(pre_sc)
+            .until_epoch_with_traj(impulse_epoch)
+            .with_context(|_| PropSnafu)?;
         // Post-traj is the trajectory _after_ the impulsive maneuver
         let (_, post_traj) = prop
             .with(spacecraft.with_dv(dv))
-            .for_duration_with_traj(60.0 * Unit::Minute)?;
+            .for_duration_with_traj(60.0 * Unit::Minute)
+            .with_context(|_| PropSnafu)?;
 
         println!("{pre_traj}");
         println!("{post_traj}");
@@ -115,8 +119,12 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
         // The correction stores, in order, alpha_0, \dot{alpha_0}, \ddot{alpha_0}, beta_0, \dot{beta_0}, \ddot{beta_0}
         let mut prev_err_norm = std::f64::INFINITY;
         // The objectives will be updated if the duration of the maneuver is changed
-        let mut sc_x0 = pre_traj.at(mnvr.start)?;
-        let mut sc_xf_desired = post_traj.at(mnvr.end)?;
+        let mut sc_x0 = pre_traj
+            .at(mnvr.start)
+            .with_context(|_| TargetingTrajSnafu)?;
+        let mut sc_xf_desired = post_traj
+            .at(mnvr.end)
+            .with_context(|_| TargetingTrajSnafu)?;
         let mut objectives = [
             Objective {
                 parameter: StateParameter::X,
@@ -193,7 +201,8 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
             prop.dynamics = prop.dynamics.with_guidance_law(Arc::new(mnvr));
             let sc_xf_achieved = prop
                 .with(sc_x0.with_guidance_mode(GuidanceMode::Thrust))
-                .until_epoch(mnvr.end)?;
+                .until_epoch(mnvr.end)
+                .with_context(|_| PropSnafu)?;
 
             println!("#{it} INIT: {sc_x0}\nAchieved: {sc_xf_achieved}\nDesired: {sc_xf_desired}");
 
@@ -209,7 +218,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
 
             // For each objective, we'll perturb the variables to compute the Jacobian with finite differencing.
             for (i, obj) in objectives.iter().enumerate() {
-                let achieved = sc_xf_achieved.value(obj.parameter)?;
+                let achieved = sc_xf_achieved.value(obj.parameter).unwrap();
                 // Check if this objective has been achieved
                 let (ok, param_err) = obj.assess_raw(achieved);
                 if !ok {
@@ -323,8 +332,10 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
 
             // We haven't converged yet, so let's build t
             if (err_vector.norm() - prev_err_norm).abs() < 1e-10 {
-                return Err(NyxError::CorrectionIneffective {
-                    msg: "No change in objective errors".to_string(),
+                return Err(TargetingError::CorrectionIneffective {
+                    action: "this is not expected to work yet",
+                    cur_val: err_vector.norm(),
+                    prev_val: prev_err_norm,
                 });
             }
             prev_err_norm = err_vector.norm();
@@ -398,8 +409,12 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
 
             println!("New mnvr {mnvr}");
             if update_obj {
-                sc_x0 = pre_traj.at(mnvr.start)?;
-                sc_xf_desired = post_traj.at(mnvr.end)?;
+                sc_x0 = pre_traj
+                    .at(mnvr.start)
+                    .with_context(|_| TargetingTrajSnafu)?;
+                sc_xf_desired = post_traj
+                    .at(mnvr.end)
+                    .with_context(|_| TargetingTrajSnafu)?;
                 objectives = [
                     Objective::within_tolerance(StateParameter::X, sc_xf_desired.orbit.x_km, 1e-3),
                     Objective::within_tolerance(StateParameter::Y, sc_xf_desired.orbit.y_km, 1e-3),

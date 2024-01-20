@@ -19,6 +19,7 @@ use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 use crate::md::trajectory::{Interpolatable, Traj};
 use crate::md::StateParameter;
+use crate::propagators::PropagationError;
 use crate::time::{Duration, Epoch};
 use crate::NyxError;
 pub use rstats::Stats;
@@ -39,7 +40,7 @@ where
     /// The original dispersed state
     pub dispersed_state: DispersedState<S>,
     /// The result from this run
-    pub result: Result<R, NyxError>,
+    pub result: Result<R, PropagationError>,
 }
 
 /// A structure of Monte Carlo results

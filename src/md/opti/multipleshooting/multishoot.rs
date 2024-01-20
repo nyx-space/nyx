@@ -20,7 +20,6 @@ use snafu::ResultExt;
 
 pub use super::CostFunction;
 use super::{MultipleShootingError, TargetingSnafu};
-// use crate::dynamics::guidance::{FiniteBurns, Mnvr};
 use crate::linalg::{DMatrix, DVector, SVector};
 use crate::md::opti::solution::TargeterSolution;
 use crate::md::optimizer::Optimizer;

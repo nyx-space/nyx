@@ -22,6 +22,7 @@ use crate::errors::TargetingError;
 use crate::md::objective::Objective;
 use crate::md::prelude::*;
 use crate::md::AstroSnafu;
+use crate::md::PropSnafu;
 use crate::md::StateParameter;
 pub use crate::md::{Variable, Vary};
 use crate::propagators::error_ctrl::ErrorCtrl;
@@ -277,14 +278,16 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                 let mut prop = self.prop.clone();
                 prop.dynamics = prop.dynamics.with_guidance_law(Arc::new(mnvr));
                 prop.with(solution.corrected_state)
-                    .until_epoch_with_traj(solution.achieved_state.epoch())?
+                    .until_epoch_with_traj(solution.achieved_state.epoch())
+                    .with_context(|_| PropSnafu)?
             }
             Err(_) => {
                 // This isn't a finite burn maneuver, let's just apply the correction
                 // Propagate until achievement epoch
                 self.prop
                     .with(solution.corrected_state)
-                    .until_epoch_with_traj(solution.achieved_state.epoch())?
+                    .until_epoch_with_traj(solution.achieved_state.epoch())
+                    .with_context(|_| PropSnafu)?
             }
         };
 

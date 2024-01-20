@@ -19,6 +19,7 @@
 use crate::cosmic::AstroError;
 use crate::dynamics::guidance::GuidanceErrors;
 use crate::errors::NyxError;
+use crate::propagators::PropagationError;
 use crate::{Orbit, Spacecraft};
 use snafu::prelude::*;
 
@@ -61,6 +62,8 @@ pub use param::StateParameter;
 
 pub use opti::target_variable::{Variable, Vary};
 
+use self::trajectory::TrajError;
+
 #[allow(clippy::result_large_err)]
 #[derive(Clone, PartialEq, Debug, Snafu)]
 #[snafu(visibility(pub(crate)))]
@@ -82,8 +85,6 @@ pub enum TargetingError {
     Verification { msg: String },
     #[snafu(display("astro error during targeting: {source}"))]
     Astro { source: AstroError },
-    #[snafu(display("No thruster attached to spacecraft"))]
-    NoThrustersDefined,
     #[snafu(display("targeting aborted, too many iterations"))]
     TooManyIterations,
     #[snafu(display("correction is ineffective at {action}: value at previous iteration {prev_val}, current value: {cur_val}"))]
@@ -98,6 +99,10 @@ pub enum TargetingError {
     NotFinite,
     #[snafu(display("Jacobian is signular"))]
     SingularJacobian,
+    #[snafu(display("propagation error during targeting: {source}"))]
+    PropError { source: PropagationError },
+    #[snafu(display("during an optimization,  encountered {source}"))]
+    TargetingTrajError { source: TrajError },
 }
 
 impl From<TargetingError> for NyxError {

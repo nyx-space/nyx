@@ -115,6 +115,10 @@ pub(crate) fn ra_dec_from_unit_vector(vhat: Vector3<f64>) -> (f64, f64) {
 
 #[derive(Copy, Clone, Debug, PartialEq, Snafu)]
 pub enum GuidanceErrors {
+    #[snafu(display("No thruster attached to spacecraft"))]
+    NoThrustersDefined,
+    #[snafu(display("Throttle is not between 0.0 and 1.0: {ratio}"))]
+    ThrottleRatio { ratio: f64 },
     #[snafu(display("Invalid finite burn control direction u = [{x}, {y}, {z}] => i-plane = {in_plane_deg} deg, Delta = {out_of_plane_deg} deg",))]
     InvalidDirection {
         x: f64,

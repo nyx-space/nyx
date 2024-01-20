@@ -19,6 +19,7 @@
 pub use self::xb::Xb;
 use self::xb::{Ephemeris, Epoch as XbEpoch};
 pub use crate::cosmic::{Frame, GuidanceMode, Orbit, Spacecraft};
+use crate::dynamics::DynamicsError;
 pub use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
@@ -65,11 +66,11 @@ where
     }
 
     /// Return this state as a vector for the propagation/estimation
-    fn as_vector(&self) -> Result<OVector<f64, Self::VecLength>, NyxError>;
+    fn as_vector(&self) -> OVector<f64, Self::VecLength>;
 
     /// Return this state as a vector for the propagation/estimation
     /// By default, this is not implemented. This function must be implemented when filtering on this state.
-    fn stm(&self) -> Result<OMatrix<f64, Self::Size, Self::Size>, NyxError> {
+    fn stm(&self) -> Result<OMatrix<f64, Self::Size, Self::Size>, DynamicsError> {
         unimplemented!()
     }
 
@@ -83,8 +84,7 @@ where
     fn unset_stm(&mut self);
 
     /// Set this state
-    fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Self::VecLength>)
-        -> Result<(), NyxError>;
+    fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Self::VecLength>);
 
     /// Reconstruct a new State from the provided delta time in seconds compared to the current state
     /// and with the provided vector.
@@ -93,7 +93,7 @@ where
         DefaultAllocator: Allocator<f64, Self::VecLength>,
     {
         let mut me = self;
-        me.set(me.epoch() + delta_t_s, vector).unwrap();
+        me.set(me.epoch() + delta_t_s, vector);
         me
     }
 

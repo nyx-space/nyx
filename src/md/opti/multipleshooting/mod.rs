@@ -18,7 +18,7 @@
 
 use snafu::Snafu;
 
-use crate::md::TargetingError;
+use crate::md::{trajectory::TrajError, TargetingError};
 
 pub mod altitude_heuristic;
 pub mod ctrlnodes;
@@ -41,4 +41,6 @@ pub enum MultipleShootingError {
         segment: usize,
         source: TargetingError,
     },
+    #[snafu(display("during a multiple shooting,  encountered {source}"))]
+    MultiShootTrajError { source: TrajError },
 }

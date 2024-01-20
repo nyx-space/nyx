@@ -16,10 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::ForceModel;
+use super::{DynamicsError, ForceModel};
 use crate::cosmic::eclipse::EclipseLocator;
 use crate::cosmic::{Cosm, Frame, Spacecraft, AU, SPEED_OF_LIGHT};
-use crate::errors::NyxError;
 use crate::linalg::{Const, Matrix3, Vector3};
 use hyperdual::{hyperspace_from_vector, linalg::norm, Float, OHyperdual};
 use std::fmt;
@@ -58,7 +57,7 @@ impl SolarPressure {
 }
 
 impl ForceModel for SolarPressure {
-    fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, NyxError> {
+    fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, DynamicsError> {
         let osc = &ctx.orbit;
         // Compute the position of the Sun as seen from the spacecraft
         let r_sun = self
@@ -80,7 +79,7 @@ impl ForceModel for SolarPressure {
         Ok(1e-3 * ctx.srp.cr * ctx.srp.area_m2 * flux_pressure * r_sun_unit)
     }
 
-    fn dual_eom(&self, ctx: &Spacecraft) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
+    fn dual_eom(&self, ctx: &Spacecraft) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
         let osc = &ctx.orbit;
 
         // Compute the position of the Sun as seen from the spacecraft

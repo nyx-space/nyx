@@ -24,9 +24,9 @@ use rand_pcg::Pcg64Mcg;
 use crate::linalg::DefaultAllocator;
 use crate::md::prelude::{Frame, Traj};
 use crate::md::trajectory::Interpolatable;
-use crate::od::Measurement;
+use crate::od::{Measurement, ODError};
+use crate::Orbit;
 use crate::{io::Configurable, linalg::allocator::Allocator};
-use crate::{NyxError, Orbit};
 
 use super::Cosm;
 
@@ -59,7 +59,7 @@ where
         traj: &Traj<MsrIn>,
         rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
-    ) -> Result<Option<Msr>, NyxError>;
+    ) -> Result<Option<Msr>, ODError>;
 
     /// Returns the device location at the given epoch and in the given frame.
     fn location(&self, epoch: Epoch, frame: Frame, cosm: &Cosm) -> Orbit;
@@ -70,5 +70,5 @@ where
         rx: MsrIn,
         rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
-    ) -> Result<Option<Msr>, NyxError>;
+    ) -> Result<Option<Msr>, ODError>;
 }

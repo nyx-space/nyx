@@ -185,18 +185,18 @@ where
     /// If this heuristic fails to find any such events, then `find_minmax` is called on the event with a time precision of `Unit::Second`.
     /// Then we search only within the min and max bounds of the provided event.
     #[allow(clippy::identity_op)]
-    pub fn find<E>(&self, event: &E) -> Result<Vec<EventDetails<S>>, NyxError>
+    pub fn find<E>(&self, event: &E) -> Result<Vec<EventDetails<S>>, TrajError>
     where
         E: EventEvaluator<S>,
     {
         let start_epoch = self.first().epoch();
         let end_epoch = self.last().epoch();
         if start_epoch == end_epoch {
-            return Err(NyxError::from(TrajError::EventNotFound {
+            return Err(TrajError::EventNotFound {
                 start: start_epoch,
                 end: end_epoch,
                 event: format!("{event}"),
-            }));
+            });
         }
         let heuristic = (end_epoch - start_epoch) / 100;
         info!("Searching for {event} with initial heuristic of {heuristic}",);
@@ -262,19 +262,19 @@ where
 
                     // If there still isn't any match, report that the event was not found
                     if states.is_empty() {
-                        return Err(NyxError::from(TrajError::EventNotFound {
+                        return Err(TrajError::EventNotFound {
                             start: start_epoch,
                             end: end_epoch,
                             event: format!("{event}"),
-                        }));
+                        });
                     }
                 }
                 Err(_) => {
-                    return Err(NyxError::from(TrajError::EventNotFound {
+                    return Err(TrajError::EventNotFound {
                         start: start_epoch,
                         end: end_epoch,
                         event: format!("{event}"),
-                    }));
+                    });
                 }
             };
         }
