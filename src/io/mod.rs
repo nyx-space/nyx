@@ -211,6 +211,12 @@ pub enum InputOutputError {
     },
 }
 
+impl PartialEq for InputOutputError {
+    fn eq(&self, _other: &Self) -> bool {
+        false
+    }
+}
+
 pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {
     /// Builds the configuration representation from the path to a yaml
     fn load<P>(path: P) -> Result<Self, ConfigError>

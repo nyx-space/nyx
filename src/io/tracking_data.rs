@@ -20,8 +20,11 @@ use crate::{
     io::{MissingDataSnafu, ParquetSnafu},
     linalg::{allocator::Allocator, DefaultAllocator, OVector},
     od::{msr::TrackingArc, Measurement},
-    NyxError,
 };
+
+#[cfg(feature = "python")]
+use crate::NyxError;
+
 use arrow::{
     array::{Float64Array, StringArray},
     record_batch::RecordBatchReader,
