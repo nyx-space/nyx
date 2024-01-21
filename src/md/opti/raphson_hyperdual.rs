@@ -87,7 +87,9 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                     xi.orbit.vz_km_s += var.init_guess;
                 }
                 _ => {
-                    return Err(TargetingError::UnsupportedVariable { var: *var });
+                    return Err(TargetingError::UnsupportedVariable {
+                        var: var.to_string(),
+                    });
                 }
             }
             total_correction[i] += var.init_guess;
@@ -236,7 +238,11 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                         Vary::VelocityX => state.orbit.vx_km_s += total_correction[i],
                         Vary::VelocityY => state.orbit.vy_km_s += total_correction[i],
                         Vary::VelocityZ => state.orbit.vz_km_s += total_correction[i],
-                        _ => return Err(TargetingError::UnsupportedVariable { var: *var }),
+                        _ => {
+                            return Err(TargetingError::UnsupportedVariable {
+                                var: var.to_string(),
+                            })
+                        }
                     }
                 }
 
@@ -314,7 +320,9 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                         xi.orbit.vz_km_s += delta[i];
                     }
                     _ => {
-                        return Err(TargetingError::UnsupportedVariable { var: *var });
+                        return Err(TargetingError::UnsupportedVariable {
+                            var: var.to_string(),
+                        });
                     }
                 }
             }

@@ -79,8 +79,8 @@ pub enum TargetingError {
     #[snafu(display("Frame error in targeter: {msg}"))]
     FrameError { msg: String },
     /// Raised if the targeted was configured with a variable that isn't supported (e.g. a maneuver alpha variable in the multiple shooting)
-    #[snafu(display("Unsupported variable in problem: {var:?}"))]
-    UnsupportedVariable { var: Variable },
+    #[snafu(display("Unsupported variable in problem: {var}"))]
+    UnsupportedVariable { var: String },
     #[snafu(display("Verification of targeting solution failed: {msg}"))]
     Verification { msg: String },
     #[snafu(display("astro error during targeting: {source}"))]
