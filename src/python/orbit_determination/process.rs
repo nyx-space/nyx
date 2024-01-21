@@ -116,7 +116,7 @@ pub(crate) fn process_tracking_arc(
 
     match maybe {
         Ok(path) => Ok(format!("{}", path.to_str().unwrap())),
-        Err(e) => Err(NyxError::CustomError(e.to_string())),
+        Err(e) => Err(NyxError::CustomError { msg: e.to_string() }),
     }
 }
 
@@ -166,6 +166,6 @@ pub(crate) fn predictor(
 
     match maybe {
         Ok(path) => Ok(format!("{}", path.to_str().unwrap())),
-        Err(e) => Err(NyxError::CustomError(e.to_string())),
+        Err(e) => Err(NyxError::CustomError { msg: e.to_string() }),
     }
 }

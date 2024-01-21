@@ -99,7 +99,7 @@ impl Spacecraft {
     }
 
     fn dumps(&self, py: Python) -> Result<PyObject, NyxError> {
-        pythonize(py, &self).map_err(|e| NyxError::CustomError(e.to_string()))
+        pythonize(py, &self).map_err(|e| NyxError::CustomError { msg: e.to_string() })
     }
 
     fn __getstate__(&self, py: Python) -> Result<PyObject, NyxError> {
@@ -173,7 +173,7 @@ impl SrpConfig {
     }
 
     fn dumps(&self, py: Python) -> Result<PyObject, NyxError> {
-        pythonize(py, &self).map_err(|e| NyxError::CustomError(e.to_string()))
+        pythonize(py, &self).map_err(|e| NyxError::CustomError { msg: e.to_string() })
     }
 
     fn __getstate__(&self, py: Python) -> Result<PyObject, NyxError> {
@@ -232,7 +232,7 @@ impl DragConfig {
     }
 
     fn dumps(&self, py: Python) -> Result<PyObject, NyxError> {
-        pythonize(py, &self).map_err(|e| NyxError::CustomError(e.to_string()))
+        pythonize(py, &self).map_err(|e| NyxError::CustomError { msg: e.to_string() })
     }
 
     fn __getstate__(&self, py: Python) -> Result<PyObject, NyxError> {

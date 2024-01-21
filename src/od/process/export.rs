@@ -80,13 +80,13 @@ where
         cfg: ExportCfg,
     ) -> Result<PathBuf, Box<dyn Error>> {
         if self.estimates.is_empty() {
-            return Err(Box::new(NyxError::CustomError(
-                "No data: run the ODProcess before exporting it.".to_string(),
-            )));
+            return Err(Box::new(NyxError::CustomError {
+                msg: "No data: run the ODProcess before exporting it.".to_string(),
+            }));
         } else if self.estimates.len() != self.residuals.len() {
-            return Err(Box::new(NyxError::CustomError(
-                "Estimates and residuals are not aligned.".to_string(),
-            )));
+            return Err(Box::new(NyxError::CustomError {
+                msg: "Estimates and residuals are not aligned.".to_string(),
+            }));
         }
 
         let tick = Epoch::now().unwrap();

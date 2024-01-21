@@ -15,18 +15,18 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-
 use crate::{
+    io::MissingDataSnafu,
     linalg::{allocator::Allocator, DefaultAllocator},
     md::{prelude::Traj, trajectory::Interpolatable, StateParameter},
-    NyxError,
 };
 use arrow::{array::Float64Array, record_batch::RecordBatchReader};
 use hifitime::Epoch;
+use snafu::prelude::*;
 
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use std::fs::File;
-use std::{collections::HashMap, error::Error, fmt::Display, path::Path};
+use std::{collections::HashMap, fmt::Display, path::Path};
 
 #[cfg(feature = "python")]
 use crate::python::mission_design::{OrbitTraj as OrbitTrajPy, SpacecraftTraj as ScTrajPy};
@@ -41,6 +41,8 @@ use pyo3::prelude::*;
 
 use crate::cosmic::Cosm;
 
+use super::{InputOutputError, ParquetSnafu, StdIOSnafu};
+
 /// A dynamic trajectory allows loading a trajectory Parquet file and converting it
 /// to the concrete trajectory state type when desired.
 #[cfg_attr(feature = "python", pyclass)]
@@ -52,8 +54,10 @@ pub struct TrajectoryLoader {
 }
 
 impl TrajectoryLoader {
-    pub fn from_parquet<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn Error>> {
-        let file = File::open(&path)?;
+    pub fn from_parquet<P: AsRef<Path>>(path: P) -> Result<Self, InputOutputError> {
+        let file = File::open(&path).with_context(|_| StdIOSnafu {
+            action: "opening trajectory file",
+        })?;
 
         let builder = ParquetRecordBatchReaderBuilder::try_new(file).unwrap();
 
@@ -87,7 +91,7 @@ impl TrajectoryLoader {
     /// # Design limitations
     /// For Python compatibility, the file is actually re-read here, although it was read and closed during initialization.
     /// This is required because the parquet file reader is not clonable.
-    pub fn to_traj<S>(&self) -> Result<Traj<S>, Box<dyn Error>>
+    pub fn to_traj<S>(&self) -> Result<Traj<S>, InputOutputError>
     where
         S: Interpolatable,
         DefaultAllocator: Allocator<f64, S::VecLength>
@@ -108,11 +112,15 @@ impl TrajectoryLoader {
             (StateParameter::FuelMass, false),
         ];
 
-        let file = File::open(&self.path)?;
+        let file = File::open(&self.path).with_context(|_| StdIOSnafu {
+            action: "opening output trajectory file",
+        })?;
 
         let builder = ParquetRecordBatchReaderBuilder::try_new(file).unwrap();
 
-        let reader = builder.build()?;
+        let reader = builder.build().with_context(|_| ParquetSnafu {
+            action: "building output trajectory file",
+        })?;
 
         for field in &reader.schema().fields {
             if field.name().as_str() == "Epoch:TAI (s)" {
@@ -126,14 +134,14 @@ impl TrajectoryLoader {
                                 if frame.is_none() {
                                     frame = Some(frame_info.to_string())
                                 } else if frame.as_ref().unwrap().as_str() != frame_info {
-                                    return Err(Box::new(NyxError::FileUnreadable {
+                                    return Err(InputOutputError::Inconsistency {
                                         msg: format!(
                                         "Frame previous set to `{}` but set to `{}` in field `{}`",
                                         frame.unwrap(),
                                         frame_info,
                                         field.name()
                                     ),
-                                    }));
+                                    });
                                 }
                             }
                         }
@@ -143,22 +151,27 @@ impl TrajectoryLoader {
             }
         }
 
-        if !has_epoch {
-            return Err(Box::new(NyxError::FileUnreadable {
-                msg: "Missing `Epoch:TAI (s)` field".to_string(),
-            }));
-        } else if frame.is_none() {
-            return Err(Box::new(NyxError::FileUnreadable {
-                msg: "Missing `Frame` in column metadata".to_string(),
-            }));
-        }
+        ensure!(
+            has_epoch,
+            MissingDataSnafu {
+                which: "Epoch: TAI (s)"
+            }
+        );
+
+        ensure!(
+            frame.is_some(),
+            MissingDataSnafu {
+                which: "Frame in metadata"
+            }
+        );
 
         for (field, exists) in found_fields.iter().take(found_fields.len() - 1) {
-            if !exists {
-                return Err(Box::new(NyxError::FileUnreadable {
-                    msg: format!("Missing `{}` field", field.to_field(None).name()),
-                }));
-            }
+            ensure!(
+                exists,
+                MissingDataSnafu {
+                    which: format!("Missing `{}` field", field.to_field(None).name())
+                }
+            );
         }
 
         let sc_compat = found_fields.last().unwrap().1;
@@ -166,15 +179,15 @@ impl TrajectoryLoader {
         let expected_type = std::any::type_name::<S>().split("::").last().unwrap();
 
         if expected_type == "Spacecraft" {
-            if !sc_compat {
-                // Oops, missing fuel data (using the full call in case the field name changes in the future)
-                return Err(Box::new(NyxError::FileUnreadable {
-                    msg: format!(
+            ensure!(
+                sc_compat,
+                MissingDataSnafu {
+                    which: format!(
                         "Missing `{}` field",
                         found_fields.last().unwrap().0.to_field(None).name()
-                    ),
-                }));
-            }
+                    )
+                }
+            );
         } else if sc_compat {
             // Not a spacecraft, remove the fuel mass
             if let Some(last_field) = found_fields.last_mut() {
@@ -227,7 +240,7 @@ impl TrajectoryLoader {
             // TODO: This is ugly and wrong because we might be using another frame info! -- Hopefully fix via https://github.com/nyx-space/nyx/issues/86
             // So arguably, the cosm to load should be in the metadata or passed to this function!
             let cosm = Cosm::de438();
-            let frame = cosm.try_frame(frame.as_ref().unwrap().as_str())?;
+            let frame = cosm.try_frame(frame.as_ref().unwrap().as_str()).unwrap();
 
             // Build the states
             for i in 0..batch.num_rows() {
@@ -238,7 +251,7 @@ impl TrajectoryLoader {
 
                 for (j, (param, exists)) in found_fields.iter().enumerate() {
                     if *exists {
-                        state.set_value(*param, shared_data[j].value(i))?;
+                        state.set_value(*param, shared_data[j].value(i)).unwrap();
                     }
                 }
 
@@ -288,20 +301,19 @@ impl TrajectoryLoader {
         spacecraft_template: Option<Spacecraft>,
     ) -> Result<Self, NyxError> {
         if format.is_none() {
-            Self::from_parquet(path).map_err(|e| NyxError::CustomError(e.to_string()))
+            Self::from_parquet(path).map_err(|e| NyxError::CustomError { msg: e.to_string() })
         } else {
             let uformat = format.unwrap().to_lowercase();
             match uformat.as_str() {
-                "parquet" => {
-                    Self::from_parquet(path).map_err(|e| NyxError::CustomError(e.to_string()))
-                }
+                "parquet" => Self::from_parquet(path)
+                    .map_err(|e| NyxError::CustomError { msg: e.to_string() }),
                 "oem" => {
                     // Now we check that everything is set correctly.
                     if parquet_path.is_none() {
-                        return Err(NyxError::CustomError(
-                            "Loading an OEM requires `parquet_path` parameter for output file"
+                        return Err(NyxError::CustomError {
+                            msg: "Loading an OEM requires `parquet_path` parameter for output file"
                                 .to_string(),
-                        ));
+                        });
                     }
                     let sc_tpl = match spacecraft_template {
                         Some(sc) => sc,
@@ -315,9 +327,10 @@ impl TrajectoryLoader {
                     let out_pq = parquet_path.unwrap();
                     // Convert to parquet
                     traj.to_parquet_simple(&out_pq)
-                        .map_err(|e| NyxError::CustomError(e.to_string()))?;
+                        .map_err(|e| NyxError::CustomError { msg: e.to_string() })?;
                     // Return Self with this path
-                    Self::from_parquet(out_pq).map_err(|e| NyxError::CustomError(e.to_string()))
+                    Self::from_parquet(out_pq)
+                        .map_err(|e| NyxError::CustomError { msg: e.to_string() })
                 }
                 &_ => Err(NyxError::CustomError(format!(
                     "Unexpected format `{uformat}`"
@@ -331,7 +344,7 @@ impl TrajectoryLoader {
         Ok(OrbitTrajPy {
             inner: self
                 .to_traj()
-                .map_err(|e| NyxError::CustomError(e.to_string()))?,
+                .map_err(|e| NyxError::CustomError { msg: e.to_string() })?,
         })
     }
 
@@ -340,7 +353,7 @@ impl TrajectoryLoader {
         Ok(ScTrajPy {
             inner: self
                 .to_traj()
-                .map_err(|e| NyxError::CustomError(e.to_string()))?,
+                .map_err(|e| NyxError::CustomError { msg: e.to_string() })?,
         })
     }
 

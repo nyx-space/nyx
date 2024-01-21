@@ -38,6 +38,8 @@ use crate::cosmic::{AstroError, Cosm};
 #[cfg(feature = "python")]
 use crate::io::ConfigRepr;
 #[cfg(feature = "python")]
+use crate::python::PythonError;
+#[cfg(feature = "python")]
 use pyo3::class::basic::CompareOp;
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
@@ -224,7 +226,7 @@ impl SpacecraftDynamics {
         match op {
             CompareOp::Eq => Ok(self.__repr__() == other.__repr__()),
             CompareOp::Ne => Ok(self.__repr__() != other.__repr__()),
-            _ => Err(NyxError::CustomError(format!("{op:?} not available"))),
+            _ => Err(PythonError::OperationError { op }),
         }
     }
 

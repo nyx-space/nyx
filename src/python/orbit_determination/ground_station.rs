@@ -174,7 +174,7 @@ impl GroundStation {
     }
 
     fn dumps(&self, py: Python) -> Result<PyObject, NyxError> {
-        pythonize(py, &self).map_err(|e| NyxError::CustomError(e.to_string()))
+        pythonize(py, &self).map_err(|e| NyxError::CustomError { msg: e.to_string() })
     }
 
     /// Perform a one-way measurement of the given orbit at the epoch stored in that orbit instance.

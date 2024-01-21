@@ -183,9 +183,11 @@ where
             let cfg = &self.configs[name];
             if cfg.scheduler.is_some() {
                 if cfg.strands.is_none() {
-                    return Err(NyxError::CustomError(format!(
-                        "schedule for {name} must be built before generating measurements"
-                    )));
+                    return Err(NyxError::CustomError {
+                        msg: format!(
+                            "schedule for {name} must be built before generating measurements"
+                        ),
+                    });
                 } else {
                     warn!("scheduler for {name} is ignored, using the defined tracking strands instead")
                 }

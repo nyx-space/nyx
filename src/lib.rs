@@ -68,7 +68,6 @@ extern crate log;
 extern crate hifitime;
 extern crate nalgebra as na;
 extern crate prost_derive;
-extern crate thiserror;
 
 /// Re-export of hifitime
 pub mod time {

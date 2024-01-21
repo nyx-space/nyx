@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::io::ConfigError;
+use crate::io::{ConfigError, InputOutputError};
 use crate::NyxError;
 use hifitime::leap_seconds::{LatestLeapSeconds, LeapSecondsFile};
 use hifitime::prelude::*;
@@ -40,6 +40,12 @@ impl From<NyxError> for PyErr {
 
 impl From<ConfigError> for PyErr {
     fn from(err: ConfigError) -> PyErr {
+        PyException::new_err(err.to_string())
+    }
+}
+
+impl From<InputOutputError> for PyErr {
+    fn from(err: InputOutputError) -> PyErr {
         PyException::new_err(err.to_string())
     }
 }

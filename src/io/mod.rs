@@ -20,6 +20,7 @@ use crate::errors::NyxError;
 use crate::md::StateParameter;
 use crate::time::Epoch;
 use crate::Orbit;
+use parquet::errors::ParquetError;
 use snafu::prelude::*;
 pub(crate) mod watermark;
 use hifitime::prelude::{Format, Formatter};
@@ -181,6 +182,27 @@ impl PartialEq for ConfigError {
     fn eq(&self, _other: &Self) -> bool {
         false
     }
+}
+
+#[derive(Debug, Snafu)]
+#[snafu(visibility(pub(crate)))]
+pub enum InputOutputError {
+    #[snafu(display("{action} encountered i/o error: {source}"))]
+    StdIOError {
+        source: io::Error,
+        action: &'static str,
+    },
+    #[snafu(display("missing required data {which}"))]
+    MissingData { which: String },
+    #[snafu(display("unknown data column `{which}`"))]
+    UnsupportedData { which: String },
+    #[snafu(display("{action} encountered parquet error: {source}"))]
+    ParquetError {
+        source: ParquetError,
+        action: &'static str,
+    },
+    #[snafu(display("inconsistency detected: {msg}"))]
+    Inconsistency { msg: String },
 }
 
 pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {

@@ -16,7 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::thiserror::Error;
 use crate::io::ConfigError;
 use crate::md::trajectory::TrajError;
 use crate::md::StateParameter;
@@ -24,79 +23,81 @@ pub use crate::md::TargetingError;
 use snafu::prelude::*;
 use std::convert::From;
 
-// #[derive(Error, Debug, PartialEq, Snafu)]
-#[derive(Error, Debug, PartialEq)]
+#[derive(Debug, PartialEq, Snafu)]
+// #[derive(Error, Debug, PartialEq)]
 pub enum NyxError {
     /// Maximum iterations reached
-    #[error("Maximum iterations of {msg} reached")]
+    #[snafu(display("Maximum iterations of {msg} reached"))]
     MaxIterReached { msg: String },
     /// Covariance is not positive semi definite
-    #[error("Covariance is not positive semi definite")]
+    #[snafu(display("Covariance is not positive semi definite"))]
     CovarianceMatrixNotPsd,
     /// Targets in Lambert solver too close: Δν ~=0 and A ~=0
-    #[error("Lambert too close: Δν ~=0 and A ~=0")]
+    #[snafu(display("Lambert too close: Δν ~=0 and A ~=0"))]
     TargetsTooClose,
     /// No reasonable phi found to connect both radii
-    #[error("No reasonable phi found to connect both radii")]
+    #[snafu(display("No reasonable phi found to connect both radii"))]
     LambertNotReasonablePhi,
     /// Multi revolution Lambert not supported, use the Izzo algorithm for multi-rev transfers
-    #[error("Use the Izzo algorithm for multi-rev transfers")]
+    #[snafu(display("Use the Izzo algorithm for multi-rev transfers"))]
     LambertMultiRevNotSupported,
     /// State parameter cannot be used in this function
-    #[error("Unavailable parameter {param:?}: {msg}")]
+    #[snafu(display("Unavailable parameter {param:?}: {msg}"))]
     StateParameterUnavailable { param: StateParameter, msg: String },
     /// Could not load file
-    #[error("Could not load file: {msg}")]
+    #[snafu(display("Could not load file: {msg}"))]
     LoadingError { msg: String },
     /// Could not read file
-    #[error("Could not read file: {msg}")]
+    #[snafu(display("Could not read file: {msg}"))]
     FileUnreadable { msg: String },
     /// Celestial object or spacecraft not found
-    #[error("Cosm object not found: `{needle}` (available: {haystack:?})")]
+    #[snafu(display("Cosm object not found: `{needle}` (available: {haystack:?})"))]
     ObjectNotFound {
         needle: String,
         haystack: Vec<String>,
     },
     /// No interpolation data
-    #[error("No interpolation data: {msg}")]
+    #[snafu(display("No interpolation data: {msg}"))]
     NoInterpolationData { msg: String },
     /// Invalid interpolation data
-    #[error("Invalid interpolation data: {msg}")]
+    #[snafu(display("Invalid interpolation data: {msg}"))]
     InvalidInterpolationData { msg: String },
     /// No state data
-    #[error("No state data: {msg}")]
+    #[snafu(display("No state data: {msg}"))]
     NoStateData { msg: String },
     /// No thruster attached to spacecraft
-    #[error("No thruster attached to spacecraft")]
+    #[snafu(display("No thruster attached to spacecraft"))]
     NoThrusterAvail,
     /// Happens when trying to modify a polynomial's (error)-th error but the polynomial has less orders than that
-    #[error("Happens when trying to modify a polynomial's (error)-th error but the polynomial has less orders than that")]
+    #[snafu(display("Happens when trying to modify a polynomial's (error)-th error but the polynomial has less orders than that"))]
     PolynomialOrderError { order: usize },
     /// An objective based analysis or control was attempted, but no objective was defined
-    #[error("An objective based analysis or control was attempted, but no objective was defined")]
+    #[snafu(display(
+        "An objective based analysis or control was attempted, but no objective was defined"
+    ))]
     NoObjectiveDefined,
     /// This computation requires the orbit to be hyperbolic
-    #[error("This computation requires the orbit to be hyperbolic: {msg}")]
+    #[snafu(display("This computation requires the orbit to be hyperbolic: {msg}"))]
     NotHyperbolic { msg: String },
     /// Monte Carlo error
-    #[error("Monte Carlo error: {msg}")]
+    #[snafu(display("Monte Carlo error: {msg}"))]
     MonteCarlo { msg: String },
     /// CCSDS error
-    #[error("CCSDS error: {msg}")]
+    #[snafu(display("CCSDS error: {msg}"))]
     CCSDS { msg: String },
-    #[error("Custom error: {0}")]
-    CustomError(String),
+    #[snafu(display("Error: {msg}"))]
+    CustomError { msg: String },
     /// Trajectory error
-    #[error("Trajectory error: {source}")]
+    #[snafu(display("Trajectory error: {source}"))]
     Trajectory { source: TrajError },
     /// Math domain
-    #[error("Math domain error: {msg}")]
+    #[snafu(display("Math domain error: {msg}"))]
     MathDomain { msg: String },
     /// Guidance law config error
-    #[error("Guidance law config error: {msg}")]
+    #[snafu(display("Guidance law config error: {msg}"))]
     GuidanceConfigError { msg: String },
     /// Configuration file error
-    #[error("Config error: {source}")]
+    #[snafu(display("Config error: {source}"))]
     ConfigError { source: ConfigError },
 }
 

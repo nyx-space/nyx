@@ -50,6 +50,8 @@ use crate::io::ConfigError;
 #[cfg(feature = "python")]
 use crate::python::cosmic::Frame as PyFrame;
 #[cfg(feature = "python")]
+use crate::python::PythonError;
+#[cfg(feature = "python")]
 use pyo3::class::basic::CompareOp;
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
@@ -1601,7 +1603,7 @@ impl Orbit {
         match op {
             CompareOp::Eq => Ok(self == other),
             CompareOp::Ne => Ok(self != other),
-            _ => Err(NyxError::CustomError(format!("{op:?} not available"))),
+            _ => Err(PythonError::OperationError { op }),
         }
     }
 

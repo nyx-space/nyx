@@ -17,9 +17,9 @@
 */
 
 use crate::{
+    io::{MissingDataSnafu, ParquetSnafu},
     linalg::{allocator::Allocator, DefaultAllocator, OVector},
     od::{msr::TrackingArc, Measurement},
-    NyxError,
 };
 use arrow::{
     array::{Float64Array, StringArray},
@@ -27,11 +27,14 @@ use arrow::{
 };
 use hifitime::Epoch;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+use snafu::prelude::*;
 use std::fs::File;
 use std::{collections::HashMap, error::Error, fmt::Display, path::Path};
 
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
+
+use super::{InputOutputError, StdIOSnafu};
 
 /// A dynamic tracking arc allows loading a set of measurements from a parquet file and converting them
 /// to the concrete measurement type when desired.
@@ -79,18 +82,20 @@ impl DynamicTrackingArc {
     }
 
     /// Reads through the loaded parquet file and attempts to convert to the provided tracking arc.
-    pub fn to_tracking_arc<Msr>(&self) -> Result<TrackingArc<Msr>, NyxError>
+    pub fn to_tracking_arc<Msr>(&self) -> Result<TrackingArc<Msr>, InputOutputError>
     where
         Msr: Measurement,
         DefaultAllocator: Allocator<f64, Msr::MeasurementSize>,
     {
         // Read the file since we closed it earlier
-        let file = File::open(&self.path).map_err(|e| NyxError::CustomError(e.to_string()))?;
+        let file = File::open(&self.path).with_context(|_| StdIOSnafu {
+            action: "opening file for tracking arc",
+        })?;
         let builder = ParquetRecordBatchReaderBuilder::try_new(file).unwrap();
 
-        let reader = builder
-            .build()
-            .map_err(|e| NyxError::CustomError(e.to_string()))?;
+        let reader = builder.build().with_context(|_| ParquetSnafu {
+            action: "reading tracking arc",
+        })?;
 
         // Check the schema
         let mut has_epoch = false;
@@ -107,19 +112,26 @@ impl DynamicTrackingArc {
             }
         }
 
-        if !has_epoch {
-            return Err(NyxError::FileUnreadable {
-                msg: "Missing `Epoch:TAI (s)` field".to_string(),
-            });
-        } else if !has_tracking_dev {
-            return Err(NyxError::FileUnreadable {
-                msg: "Missing `Tracking device` field".to_string(),
-            });
-        } else if !range_avail && !rate_avail {
-            return Err(NyxError::FileUnreadable {
-                msg: "Missing both range and range rate data".to_string(),
-            });
-        }
+        ensure!(
+            has_epoch,
+            MissingDataSnafu {
+                which: "Epoch: TAI (s)"
+            }
+        );
+
+        ensure!(
+            has_tracking_dev,
+            MissingDataSnafu {
+                which: "Tracking device"
+            }
+        );
+
+        ensure!(
+            range_avail || rate_avail,
+            MissingDataSnafu {
+                which: "`Range (km)` or `Doppler (km/s)`"
+            }
+        );
 
         let expected_type = std::any::type_name::<Msr>().split("::").last().unwrap();
 
@@ -127,28 +139,26 @@ impl DynamicTrackingArc {
         match expected_type {
             "RangeDoppler" => {
                 if !range_avail || !rate_avail {
-                    return Err(NyxError::FileUnreadable {
-                        msg: "Missing either range or Doppler data".to_string(),
+                    return Err(InputOutputError::MissingData {
+                        which: "`Range (km)` and `Doppler (km/s)`".to_string(),
                     });
                 }
             }
             "RangeMsr" => {
                 if !range_avail {
-                    return Err(NyxError::FileUnreadable {
-                        msg: "Cannot convert to range measurement: data missing".to_string(),
+                    return Err(InputOutputError::MissingData {
+                        which: "`Range (km)`".to_string(),
                     });
                 }
             }
             "RangeRate" => {
-                if !rate_avail {
-                    return Err(NyxError::FileUnreadable {
-                        msg: "Cannot convert to range rate measurement: data missing".to_string(),
-                    });
-                }
+                return Err(InputOutputError::MissingData {
+                    which: "`Doppler (km/s)`".to_string(),
+                });
             }
             _ => {
-                return Err(NyxError::FileUnreadable {
-                    msg: format!("Yet unsupported measurement {expected_type}"),
+                return Err(InputOutputError::UnsupportedData {
+                    which: expected_type.to_string(),
                 });
             }
         }
@@ -283,8 +293,8 @@ impl Display for DynamicTrackingArc {
 impl DynamicTrackingArc {
     /// Initializes a new dynamic tracking arc from the provided parquet file
     #[new]
-    fn new(path: String) -> Result<Self, NyxError> {
-        Self::from_parquet(path).map_err(|e| NyxError::CustomError(e.to_string()))
+    fn new(path: String) -> Result<Self, InputOutputError> {
+        Self::from_parquet(path)
     }
 
     fn __repr__(&self) -> String {

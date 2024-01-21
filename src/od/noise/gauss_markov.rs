@@ -234,9 +234,9 @@ impl GaussMarkov {
             "Doppler" => Ok(Self::default_doppler_km_s()),
             "RangeHP" => Ok(Self::high_precision_range_km()),
             "DopplerHP" => Ok(Self::high_precision_doppler_km_s()),
-            _ => Err(NyxError::CustomError(format!(
-                "No default Gauss Markov model for `{kind}`"
-            ))),
+            _ => Err(NyxError::CustomError {
+                msg: format!("No default Gauss Markov model for `{kind}`"),
+            }),
         }
     }
 }
@@ -328,17 +328,17 @@ impl GaussMarkov {
 
         let props = pq_writer(Some(metadata));
 
-        let file = File::create(path).map_err(|e| NyxError::CustomError(e.to_string()))?;
+        let file = File::create(path).map_err(|e| NyxError::CustomError { msg: e.to_string() })?;
         let mut writer = ArrowWriter::try_new(file, schema.clone(), props).unwrap();
 
         let batch = RecordBatch::try_new(schema, record)
-            .map_err(|e| NyxError::CustomError(e.to_string()))?;
+            .map_err(|e| NyxError::CustomError { msg: e.to_string() })?;
         writer
             .write(&batch)
-            .map_err(|e| NyxError::CustomError(e.to_string()))?;
+            .map_err(|e| NyxError::CustomError { msg: e.to_string() })?;
         writer
             .close()
-            .map_err(|e| NyxError::CustomError(e.to_string()))?;
+            .map_err(|e| NyxError::CustomError { msg: e.to_string() })?;
 
         Ok(())
     }
@@ -511,7 +511,7 @@ impl GaussMarkov {
 
     #[cfg(feature = "python")]
     fn dumps(&self, py: Python) -> Result<PyObject, NyxError> {
-        pythonize(py, &self).map_err(|e| NyxError::CustomError(e.to_string()))
+        pythonize(py, &self).map_err(|e| NyxError::CustomError { msg: e.to_string() })
     }
 
     #[cfg(feature = "python")]

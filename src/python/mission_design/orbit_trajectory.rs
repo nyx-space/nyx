@@ -175,7 +175,7 @@ impl OrbitTraj {
 
         match maybe {
             Ok(path) => Ok(format!("{}", path.to_str().unwrap())),
-            Err(e) => Err(NyxError::CustomError(e.to_string())),
+            Err(e) => Err(NyxError::CustomError { msg: e.to_string() }),
         }
     }
 
@@ -204,7 +204,7 @@ impl OrbitTraj {
             cfg.unwrap_or_else(|| ExportCfg::default()),
         ) {
             Ok(path) => Ok(format!("{}", path.to_str().unwrap())),
-            Err(e) => Err(NyxError::CustomError(e.to_string())),
+            Err(e) => Err(NyxError::CustomError { msg: e.to_string() }),
         }
     }
 
