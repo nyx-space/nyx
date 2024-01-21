@@ -1599,7 +1599,7 @@ impl Orbit {
     }
 
     #[cfg(feature = "python")]
-    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, NyxError> {
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, PythonError> {
         match op {
             CompareOp::Eq => Ok(self == other),
             CompareOp::Ne => Ok(self != other),

@@ -21,7 +21,7 @@ use crate::io::{ConfigError, ExportCfg};
 use crate::md::prelude::{PropOpts, Propagator, SpacecraftDynamics};
 use crate::md::{Event, StateParameter};
 use crate::propagators::{
-    CashKarp45, Dormand45, Dormand78, Fehlberg45, RK2Fixed, RK4Fixed, Verner56,
+    CashKarp45, Dormand45, Dormand78, Fehlberg45, PropagationError, RK2Fixed, RK4Fixed, Verner56,
 };
 use crate::{NyxError, Orbit, Spacecraft};
 use hifitime::{Duration, Epoch, Unit};
@@ -78,7 +78,7 @@ fn propagate(
     fixed_step: Option<Duration>,
     tolerance: Option<f64>,
     method: Option<String>,
-) -> Result<(Spacecraft, SpacecraftTraj), NyxError> {
+) -> Result<(Spacecraft, SpacecraftTraj), PropagationError> {
     let opts = match fixed_step {
         Some(step) => PropOpts::with_fixed_step(step),
         None => {
@@ -108,10 +108,11 @@ fn propagate(
             "rk4" => Propagator::new::<RK4Fixed>(dynamics, opts),
             "rk2" => Propagator::new::<RK2Fixed>(dynamics, opts),
             _ => {
-                return Err(NyxError::ConfigError(ConfigError::InvalidConfig(format!(
-                    "Unknown propagation method: {}",
-                    value
-                ))))
+                return Err(PropagationError::PropConfigError {
+                    source: ConfigError::InvalidConfig {
+                        msg: format!("Unknown propagation method: {}", value),
+                    },
+                })
             }
         },
         None => Propagator::rk89(dynamics, opts),
@@ -149,9 +150,12 @@ fn propagate(
 
         Ok((sc, SpacecraftTraj { inner: traj }))
     } else {
-        Err(NyxError::ConfigError(ConfigError::InvalidConfig(
-            "Either duration or epoch must be provided for a propagation to happen".to_string(),
-        )))
+        Err(PropagationError::PropConfigError {
+            source: ConfigError::InvalidConfig {
+                msg: "Either duration or epoch must be provided for a propagation to happen"
+                    .to_string(),
+            },
+        })
     }
 }
 
@@ -167,20 +171,25 @@ fn two_body(
     let rslt_epochs: Result<Vec<Epoch>, NyxError> = if (new_epochs.is_some() && durations.is_some())
         || (new_epochs.is_none() && durations.is_none())
     {
-        Err(NyxError::ConfigError(ConfigError::InvalidConfig(
-            "Either duration or epoch must be provided for a propagation to happen, but not both"
-                .to_string(),
-        )))
+        Err(NyxError::ConfigError {
+            source: ConfigError::InvalidConfig {
+                msg: "Either duration or epoch must be provided for a propagation".to_string(),
+            },
+        })
     } else if let Some(new_epochs) = new_epochs {
         if new_epochs.len() == 1 {
             Ok(vec![new_epochs[0]; orbits.len()])
         } else if new_epochs.len() == orbits.len() {
             Ok(new_epochs)
         } else {
-            Err(NyxError::ConfigError(ConfigError::InvalidConfig(format!(
-                "Expecting either one or {} items in epochs vector",
-                orbits.len()
-            ))))
+            Err(NyxError::ConfigError {
+                source: ConfigError::InvalidConfig {
+                    msg: format!(
+                        "Expecting either one or {} items in epochs vector",
+                        orbits.len()
+                    ),
+                },
+            })
         }
     } else if let Some(durations) = durations {
         if durations.len() == 1 {
@@ -195,15 +204,19 @@ fn two_body(
                 .map(|(duration, orbit)| orbit.epoch + *duration)
                 .collect())
         } else {
-            Err(NyxError::ConfigError(ConfigError::InvalidConfig(format!(
-                "Expecting either one or {} items in durations vector",
-                orbits.len()
-            ))))
+            Err(NyxError::ConfigError {
+                source: ConfigError::InvalidConfig {
+                    msg: format!(
+                        "Expecting either one or {} items in durations vector",
+                        orbits.len()
+                    ),
+                },
+            })
         }
     } else {
-        Err(NyxError::CustomError(
-            "you have entered unreachable code, please report a bug".to_string(),
-        ))
+        Err(NyxError::CustomError {
+            msg: "you have entered unreachable code, please report a bug".to_string(),
+        })
     };
 
     let epochs = rslt_epochs?;

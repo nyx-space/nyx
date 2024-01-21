@@ -20,6 +20,7 @@ use crate::errors::NyxError;
 use crate::md::StateParameter;
 use crate::time::Epoch;
 use crate::Orbit;
+use arrow::error::ArrowError;
 use parquet::errors::ParquetError;
 use snafu::prelude::*;
 pub(crate) mod watermark;
@@ -196,13 +197,18 @@ pub enum InputOutputError {
     MissingData { which: String },
     #[snafu(display("unknown data column `{which}`"))]
     UnsupportedData { which: String },
-    #[snafu(display("{action} encountered parquet error: {source}"))]
+    #[snafu(display("{action} encountered a Parquet error: {source}"))]
     ParquetError {
         source: ParquetError,
         action: &'static str,
     },
     #[snafu(display("inconsistency detected: {msg}"))]
     Inconsistency { msg: String },
+    #[snafu(display("{action} encountered an Arrow error: {source}"))]
+    ArrowError {
+        source: ArrowError,
+        action: &'static str,
+    },
 }
 
 pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {

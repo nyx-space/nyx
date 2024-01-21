@@ -222,7 +222,7 @@ impl SpacecraftDynamics {
     }
 
     #[cfg(feature = "python")]
-    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, NyxError> {
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, PythonError> {
         match op {
             CompareOp::Eq => Ok(self.__repr__() == other.__repr__()),
             CompareOp::Ne => Ok(self.__repr__() != other.__repr__()),
@@ -235,7 +235,7 @@ impl SpacecraftDynamics {
     /// Loads the SpacecraftDynamics from its YAML representation
     fn loads(_cls: &PyType, state: &PyAny) -> Result<Self, ConfigError> {
         <Self as Configurable>::from_config(
-            depythonize(state).map_err(|e| ConfigError::InvalidConfig(e.to_string()))?,
+            depythonize(state).map_err(|e| ConfigError::InvalidConfig { msg: e.to_string() })?,
             Cosm::de438(),
         )
     }

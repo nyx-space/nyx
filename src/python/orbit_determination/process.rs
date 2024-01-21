@@ -19,6 +19,7 @@
 use hifitime::{Duration, Epoch};
 use nalgebra::Matrix2;
 use pyo3::prelude::*;
+use snafu::ResultExt;
 
 use crate::{
     io::tracking_data::DynamicTrackingArc,
@@ -26,13 +27,14 @@ use crate::{
     md::prelude::{Cosm, Propagator, SpacecraftDynamics},
     od::{
         filter::kalman::KF,
-        process::{EkfTrigger, FltResid, IterationConf, ODProcess},
+        process::{EkfTrigger, FltResid, IterationConf, ODIOSnafu, ODProcess},
         snc::SNC3,
+        ODError,
     },
-    NyxError, Spacecraft,
+    Spacecraft,
 };
 
-use super::{estimate::OrbitEstimate, GroundStation};
+use super::{estimate::OrbitEstimate, ConfigError, GroundStation};
 
 /// Runs an orbit determination process and returns the path to those results.
 #[pyfunction]
@@ -53,7 +55,7 @@ pub(crate) fn process_tracking_arc(
     iter_conf: Option<IterationConf>,
     snc_disable_time: Option<Duration>,
     snc_diagonals: Option<Vec<f64>>,
-) -> Result<String, NyxError> {
+) -> Result<String, ODError> {
     let msr_noise = Matrix2::from_iterator(measurement_noise);
 
     let init_sc = spacecraft.with_orbit(initial_estimate.0.nominal_state.with_stm());
@@ -63,9 +65,12 @@ pub(crate) fn process_tracking_arc(
         || (snc_disable_time.is_none() && snc_diagonals.as_ref().is_some())
         || (snc_diagonals.as_ref().is_some() && snc_diagonals.as_ref().unwrap().len() != 3)
     {
-        return Err(NyxError::CustomError(format!(
-            "SNC set up requirest both a disable time and the snc_diagonals (3 items required)."
-        )));
+        return Err(ODError::ODConfigError {
+            source: ConfigError::InvalidConfig {
+                msg: "SNC requires a disable time and the snc_diagonals (3 items required)."
+                    .to_string(),
+            },
+        });
     } else if snc_disable_time.is_some() && snc_diagonals.is_some() {
         let snc = SNC3::from_diagonal(snc_disable_time.unwrap(), &snc_diagonals.unwrap());
         KF::new(initial_estimate.0, snc, msr_noise)
@@ -79,9 +84,12 @@ pub(crate) fn process_tracking_arc(
     if (ekf_disable_time.is_some() && ekf_num_meas.is_none())
         || (ekf_disable_time.is_none() && ekf_num_meas.is_some())
     {
-        return Err(NyxError::CustomError(format!(
-            "For an EKF trigger, you must provide both a disable time and a num measurements."
-        )));
+        return Err(ODError::ODConfigError {
+            source: ConfigError::InvalidConfig {
+                msg: "For an EKF trigger, you must provide both a disable time and a num measurements."
+                    .to_string(),
+            },
+        });
     }
 
     let trigger = match ekf_num_meas {
@@ -91,7 +99,7 @@ pub(crate) fn process_tracking_arc(
 
     let mut odp = ODProcess::new(prop_est, kf, trigger, resid_crit, Cosm::de438());
 
-    let concrete_arc = arc.to_tracking_arc()?;
+    let concrete_arc = arc.to_tracking_arc().with_context(|_| ODIOSnafu)?;
 
     odp.process_arc::<GroundStation>(&concrete_arc)?;
 
@@ -100,24 +108,27 @@ pub(crate) fn process_tracking_arc(
     }
 
     if let Some(epoch) = predict_until {
-        let max_step =
-            predict_step.ok_or_else(|| NyxError::CustomError("predict_step unset".to_string()))?;
+        let max_step = predict_step.ok_or_else(|| ODError::ODConfigError {
+            source: ConfigError::InvalidConfig {
+                msg: "predict_step unset.".to_string(),
+            },
+        })?;
         odp.predict_until(max_step, epoch)?;
     } else if let Some(duration) = predict_for {
-        let max_step =
-            predict_step.ok_or_else(|| NyxError::CustomError("predict_step unset".to_string()))?;
+        let max_step = predict_step.ok_or_else(|| ODError::ODConfigError {
+            source: ConfigError::InvalidConfig {
+                msg: "predict_step unset.".to_string(),
+            },
+        })?;
         odp.predict_for(max_step, duration)?;
     }
 
-    let maybe = odp.to_parquet(
+    let path = odp.to_parquet(
         export_path,
         export_cfg.unwrap_or_else(|| ExportCfg::default()),
-    );
+    )?;
 
-    match maybe {
-        Ok(path) => Ok(format!("{}", path.to_str().unwrap())),
-        Err(e) => Err(NyxError::CustomError { msg: e.to_string() }),
-    }
+    Ok(format!("{}", path.to_str().unwrap()))
 }
 
 /// Runs an orbit determination prediction-only process and returns the path to those results.
@@ -131,7 +142,7 @@ pub(crate) fn predictor(
     export_cfg: Option<ExportCfg>,
     predict_until: Option<Epoch>,
     predict_for: Option<Duration>,
-) -> Result<String, NyxError> {
+) -> Result<String, ODError> {
     // TODO: Return a navigation trajectory or use a class that mimics the better ODProcess -- https://github.com/nyx-space/nyx/issues/134
     let msr_noise = Matrix2::from_iterator(vec![1e-10, 0.0, 0.0, 1e-10]);
 
@@ -146,9 +157,11 @@ pub(crate) fn predictor(
     if (predict_until.is_some() && predict_for.is_some())
         || (predict_until.is_none() && predict_for.is_none())
     {
-        return Err(NyxError::CustomError(format!(
-            "You must provide either the predict_until argument or the predict_for argument"
-        )));
+        return Err(ODError::ODConfigError {
+            source: ConfigError::InvalidConfig {
+                msg: "predict_step and predict_for unset.".to_string(),
+            },
+        });
     }
 
     let mut odp = ODProcess::ckf(prop_est, kf, None, Cosm::de438());
@@ -159,13 +172,10 @@ pub(crate) fn predictor(
         odp.predict_for(step, duration)?;
     }
 
-    let maybe = odp.to_parquet(
+    let path = odp.to_parquet(
         export_path,
         export_cfg.unwrap_or_else(|| ExportCfg::default()),
-    );
+    )?;
 
-    match maybe {
-        Ok(path) => Ok(format!("{}", path.to_str().unwrap())),
-        Err(e) => Err(NyxError::CustomError { msg: e.to_string() }),
-    }
+    Ok(format!("{}", path.to_str().unwrap()))
 }

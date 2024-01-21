@@ -19,6 +19,8 @@
 use crate::cosmic::Cosm;
 use crate::io::{ConfigError, ConfigRepr, Configurable};
 #[cfg(feature = "python")]
+use crate::python::PythonError;
+#[cfg(feature = "python")]
 use crate::NyxError;
 #[cfg(feature = "python")]
 use pyo3::class::basic::CompareOp;
@@ -96,15 +98,16 @@ impl FltResid {
     }
 
     fn __setstate__(&mut self, state: &PyAny) -> Result<(), ConfigError> {
-        *self = depythonize(state).map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
+        *self =
+            depythonize(state).map_err(|e| ConfigError::InvalidConfig { msg: e.to_string() })?;
         Ok(())
     }
 
-    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, NyxError> {
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, PythonError> {
         match op {
             CompareOp::Eq => Ok(self == other),
             CompareOp::Ne => Ok(self != other),
-            _ => Err(NyxError::CustomError(format!("{op:?} not available"))),
+            _ => Err(PythonError::OperationError { op }),
         }
     }
 }

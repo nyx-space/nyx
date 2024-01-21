@@ -20,6 +20,7 @@ use crate::{
     io::{MissingDataSnafu, ParquetSnafu},
     linalg::{allocator::Allocator, DefaultAllocator, OVector},
     od::{msr::TrackingArc, Measurement},
+    NyxError,
 };
 use arrow::{
     array::{Float64Array, StringArray},
@@ -293,8 +294,8 @@ impl Display for DynamicTrackingArc {
 impl DynamicTrackingArc {
     /// Initializes a new dynamic tracking arc from the provided parquet file
     #[new]
-    fn new(path: String) -> Result<Self, InputOutputError> {
-        Self::from_parquet(path)
+    fn new(path: String) -> Result<Self, NyxError> {
+        Self::from_parquet(path).map_err(|e| NyxError::CustomError { msg: e.to_string() })
     }
 
     fn __repr__(&self) -> String {

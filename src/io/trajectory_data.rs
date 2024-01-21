@@ -31,6 +31,10 @@ use std::{collections::HashMap, fmt::Display, path::Path};
 #[cfg(feature = "python")]
 use crate::python::mission_design::{OrbitTraj as OrbitTrajPy, SpacecraftTraj as ScTrajPy};
 #[cfg(feature = "python")]
+use crate::python::PythonError;
+#[cfg(feature = "python")]
+use crate::NyxError;
+#[cfg(feature = "python")]
 use crate::Spacecraft;
 #[cfg(feature = "python")]
 use log::warn;
@@ -332,9 +336,9 @@ impl TrajectoryLoader {
                     Self::from_parquet(out_pq)
                         .map_err(|e| NyxError::CustomError { msg: e.to_string() })
                 }
-                &_ => Err(NyxError::CustomError(format!(
-                    "Unexpected format `{uformat}`"
-                ))),
+                &_ => Err(NyxError::CustomError {
+                    msg: format!("Unexpected format `{uformat}`"),
+                }),
             }
         }
     }
@@ -366,11 +370,11 @@ impl TrajectoryLoader {
     }
 
     #[cfg(feature = "python")]
-    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, NyxError> {
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, PythonError> {
         match op {
             CompareOp::Eq => Ok(self == other),
             CompareOp::Ne => Ok(self != other),
-            _ => Err(NyxError::CustomError(format!("{op:?} not available"))),
+            _ => Err(PythonError::OperationError { op }),
         }
     }
 }

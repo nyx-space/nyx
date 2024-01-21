@@ -33,7 +33,7 @@ pub use rk_methods::*;
 mod options;
 pub use options::*;
 
-use crate::{dynamics::DynamicsError, md::trajectory::TrajError, time::Duration};
+use crate::{dynamics::DynamicsError, io::ConfigError, md::trajectory::TrajError, time::Duration};
 
 /// Stores the details of the previous integration step of a given propagator. Access as `my_prop.clone().latest_details()`.
 #[derive(Copy, Clone, Debug)]
@@ -56,7 +56,7 @@ impl fmt::Display for IntegrationDetails {
     }
 }
 
-#[derive(Clone, Debug, Snafu, PartialEq)]
+#[derive(Debug, Snafu, PartialEq)]
 pub enum PropagationError {
     #[snafu(display("encountered a dynamics error {source}"))]
     Dynamics { source: DynamicsError },
@@ -64,4 +64,6 @@ pub enum PropagationError {
     TrajectoryEventError { source: TrajError },
     #[snafu(display("requested propagation until event #{nth} but only {found} found"))]
     NthEventError { nth: usize, found: usize },
+    #[snafu(display("propagation failed because {source}"))]
+    PropConfigError { source: ConfigError },
 }

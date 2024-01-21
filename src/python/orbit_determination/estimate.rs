@@ -18,6 +18,7 @@
 
 use std::{collections::BTreeMap, sync::Arc};
 
+use crate::python::PythonError;
 use crate::{
     cosmic::Cosm,
     io::{estimate::OrbitEstimateSerde, ConfigRepr, Configurable},
@@ -64,9 +65,9 @@ impl OrbitEstimate {
         // Check the shape of the input
         let mat6 = match covar.shape() {
             &[36] | &[36, 1] | &[6, 6] => {
-                let data = covar
-                    .as_slice()
-                    .map_err(|e| NyxError::CustomError(format!("{e}")))?;
+                let data = covar.as_slice().map_err(|e| NyxError::CustomError {
+                    msg: format!("{e}"),
+                })?;
                 let mut mat = Matrix6::zeros();
                 for i in 0..6 {
                     for j in 0..6 {
@@ -76,10 +77,9 @@ impl OrbitEstimate {
                 mat
             }
             _ => {
-                return Err(NyxError::CustomError(format!(
-                    "covar must be 6x6 or 36x1 but is {:?}",
-                    covar.shape()
-                )))
+                return Err(NyxError::CustomError {
+                    msg: format!("covar must be 6x6 or 36x1 but is {:?}", covar.shape()),
+                })
             }
         };
         Ok(Self(KfEstimate::from_covar(nominal, mat6)))
@@ -124,11 +124,11 @@ impl OrbitEstimate {
         Ok(selves)
     }
 
-    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, NyxError> {
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, PythonError> {
         match op {
             CompareOp::Eq => Ok(self.__repr__() == other.__repr__()),
             CompareOp::Ne => Ok(self.__repr__() != other.__repr__()),
-            _ => Err(NyxError::CustomError(format!("{op:?} not available"))),
+            _ => Err(PythonError::OperationError { op }),
         }
     }
 
@@ -136,7 +136,7 @@ impl OrbitEstimate {
     /// Loads the SpacecraftDynamics from its YAML representation
     fn loads(_cls: &PyType, state: &PyAny) -> Result<Self, ConfigError> {
         <Self as Configurable>::from_config(
-            depythonize(state).map_err(|e| ConfigError::InvalidConfig(e.to_string()))?,
+            depythonize(state).map_err(|e| ConfigError::InvalidConfig { msg: e.to_string() })?,
             Cosm::de438(),
         )
     }

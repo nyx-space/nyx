@@ -19,9 +19,11 @@
 use std::collections::BTreeMap;
 
 use crate::cosmic::{Cosm, Orbit};
-use crate::io::ConfigRepr;
+use crate::io::{ConfigRepr, ParseSnafu};
 use crate::od::simulator::TrackingDeviceSim;
 pub use crate::od::simulator::TrkConfig;
+use crate::od::ODError;
+use crate::python::PythonError;
 use crate::time::Duration;
 use crate::NyxError;
 pub use crate::{io::ConfigError, od::noise::GaussMarkov, od::prelude::GroundStation};
@@ -33,6 +35,7 @@ use pyo3::class::basic::CompareOp;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyType};
 use pythonize::pythonize;
+use snafu::ResultExt;
 
 #[pymethods]
 impl GroundStation {
@@ -122,8 +125,8 @@ impl GroundStation {
             let mut as_map = BTreeMap::new();
             for item in as_list.iter() {
                 // Check that the item is a dictionary
-                let next: Self = serde_yaml::from_value(pyany_to_value(item)?)
-                    .map_err(ConfigError::ParseError)?;
+                let next: Self =
+                    serde_yaml::from_value(pyany_to_value(item)?).with_context(|_| ParseSnafu)?;
                 as_map.insert(next.name.clone(), next);
             }
             Ok(as_map)
@@ -131,14 +134,14 @@ impl GroundStation {
             let mut as_map = BTreeMap::new();
             for item_as_list in as_dict.items() {
                 let k_any = item_as_list.get_item(0).or_else(|_| {
-                    Err(ConfigError::InvalidConfig(
-                        "could not get key from provided dictionary item".to_string(),
-                    ))
+                    Err(ConfigError::InvalidConfig {
+                        msg: "could not get key from provided dictionary item".to_string(),
+                    })
                 })?;
                 let v_any = item_as_list.get_item(1).or_else(|_| {
-                    Err(ConfigError::InvalidConfig(
-                        "could not get key from provided dictionary item".to_string(),
-                    ))
+                    Err(ConfigError::InvalidConfig {
+                        msg: "could not get key from provided dictionary item".to_string(),
+                    })
                 })?;
                 // Check that it's a string, or abort here
                 if let Ok(as_str) = k_any.extract::<String>() {
@@ -146,30 +149,31 @@ impl GroundStation {
                     match pyany_to_value(v_any) {
                         Ok(value) => {
                             let next: Self =
-                                serde_yaml::from_value(value).map_err(ConfigError::ParseError)?;
+                                serde_yaml::from_value(value).with_context(|_| ParseSnafu)?;
                             as_map.insert(as_str, next);
                         }
                         Err(_) => {
                             // Maybe this was to be parsed in full as a single item
                             let me: Self = serde_yaml::from_value(pyany_to_value(as_dict)?)
-                                .map_err(ConfigError::ParseError)?;
+                                .with_context(|_| ParseSnafu)?;
                             as_map.clear();
                             as_map.insert(me.name.clone(), me);
                             return Ok(as_map);
                         }
                     }
                 } else {
-                    return Err(ConfigError::InvalidConfig(
-                        "keys for `loads` must be strings, otherwise, use GroundStation(**data)"
-                            .to_string(),
-                    ));
+                    return Err(ConfigError::InvalidConfig {
+                        msg:
+                            "keys for `loads` must be strings, otherwise, use GroundStation(**data)"
+                                .to_string(),
+                    });
                 }
             }
             Ok(as_map)
         } else {
-            Err(ConfigError::InvalidConfig(
-                "config must be dict, list, or str".to_string(),
-            ))
+            Err(ConfigError::InvalidConfig {
+                msg: "config must be dict, list, or str".to_string(),
+            })
         }
     }
 
@@ -179,13 +183,10 @@ impl GroundStation {
 
     /// Perform a one-way measurement of the given orbit at the epoch stored in that orbit instance.
     /// Returns the range in kilometers and the Doppler measurement in kilometers per second.
-    fn measure(&mut self, orbit: Orbit) -> Result<(f64, f64), NyxError> {
+    fn measure(&mut self, orbit: Orbit) -> Result<Option<(f64, f64)>, ODError> {
         match self.measure_instantaneous(orbit, None, Cosm::de438())? {
-            Some(msr) => Ok((msr.obs[0], msr.obs[1])),
-            None => Err(NyxError::CustomError(format!(
-                "Orbit not visible at {}.",
-                orbit.epoch
-            ))),
+            Some(msr) => Ok(Some((msr.obs[0], msr.obs[1]))),
+            None => Ok(None),
         }
     }
 
@@ -261,11 +262,11 @@ impl GroundStation {
         format!("{self}")
     }
 
-    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, NyxError> {
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, PythonError> {
         match op {
             CompareOp::Eq => Ok(self == other),
             CompareOp::Ne => Ok(self != other),
-            _ => Err(NyxError::CustomError(format!("{op:?} not available"))),
+            _ => Err(PythonError::OperationError { op }),
         }
     }
 }

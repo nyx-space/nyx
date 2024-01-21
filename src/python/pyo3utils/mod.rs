@@ -42,22 +42,22 @@ pub fn pyany_to_value(any: &PyAny) -> Result<Value, ConfigError> {
         let mut map = Mapping::new();
         for item_as_list in as_dict.items() {
             let k = pyany_to_value(item_as_list.get_item(0).or_else(|_| {
-                Err(ConfigError::InvalidConfig(
-                    "could not get key from provided dictionary item".to_string(),
-                ))
+                Err(ConfigError::InvalidConfig {
+                    msg: "could not get key from provided dictionary item".to_string(),
+                })
             })?)?;
             let v = pyany_to_value(item_as_list.get_item(1).or_else(|_| {
-                Err(ConfigError::InvalidConfig(
-                    "could not get value from provided dictionary item".to_string(),
-                ))
+                Err(ConfigError::InvalidConfig {
+                    msg: "could not get value from provided dictionary item".to_string(),
+                })
             })?)?;
             map.insert(k, v);
         }
 
         Ok(Value::Mapping(map))
     } else {
-        Err(ConfigError::InvalidConfig(
-            "cannot convert input (not one of bool, int, float, str, List, Dict)".to_string(),
-        ))
+        Err(ConfigError::InvalidConfig {
+            msg: "cannot convert input (not one of bool, int, float, str, List, Dict)".to_string(),
+        })
     }
 }

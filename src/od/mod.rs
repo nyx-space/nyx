@@ -18,6 +18,7 @@
 
 use crate::dynamics::DynamicsError;
 pub use crate::dynamics::{Dynamics, NyxError};
+use crate::io::{ConfigError, InputOutputError};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
 use crate::md::trajectory::TrajError;
@@ -156,7 +157,8 @@ where
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Snafu)]
+#[derive(Debug, Snafu)]
+#[snafu(visibility(pub(crate)))]
 pub enum ODError {
     #[snafu(display("during an orbit determination, encountered {source}"))]
     ODPropError { source: PropagationError },
@@ -180,4 +182,8 @@ pub enum ODError {
     NoiseNotConfigured { kind: &'static str },
     #[snafu(display("during an OD encountered {source}"))]
     ODTrajError { source: TrajError },
+    #[snafu(display("OD failed because {source}"))]
+    ODConfigError { source: ConfigError },
+    #[snafu(display("OD failed because of an I/O error: {source}"))]
+    ODIOError { source: InputOutputError },
 }
