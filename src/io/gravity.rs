@@ -105,21 +105,25 @@ impl HarmonicsMem {
         order: usize,
         gunzipped: bool,
     ) -> Result<HarmonicsMem, NyxError> {
-        let mut f = File::open(filepath)
-            .map_err(|_| NyxError::FileUnreadable(format!("File not found: {filepath}")))?;
+        let mut f = File::open(filepath).map_err(|_| NyxError::FileUnreadable {
+            msg: format!("File not found: {filepath}"),
+        })?;
         let mut buffer = vec![0; 0];
         if gunzipped {
             let mut d = GzDecoder::new(f);
-            d.read_to_end(&mut buffer).map_err(|_| {
-                NyxError::FileUnreadable("could not read file as gunzip".to_string())
-            })?;
+            d.read_to_end(&mut buffer)
+                .map_err(|_| NyxError::FileUnreadable {
+                    msg: "could not read file as gunzip".to_string(),
+                })?;
         } else {
             f.read_to_end(&mut buffer)
-                .map_err(|_| NyxError::FileUnreadable("could not read file to end".to_string()))?;
+                .map_err(|_| NyxError::FileUnreadable {
+                    msg: "could not read file to end".to_string(),
+                })?;
         }
 
-        let data_as_str = String::from_utf8(buffer).map_err(|_| {
-            NyxError::FileUnreadable("could not decode file contents as utf8".to_string())
+        let data_as_str = String::from_utf8(buffer).map_err(|_| NyxError::FileUnreadable {
+            msg: "could not decode file contents as utf8".to_string(),
         })?;
 
         // Since the COF files are so specific, we just code everything up in here.
@@ -144,19 +148,23 @@ impl HarmonicsMem {
                     1 => match usize::from_str(item) {
                         Ok(val) => cur_degree = val,
                         Err(_) => {
-                            return Err(NyxError::FileUnreadable(format!(
-                                "Harmonics file: 
+                            return Err(NyxError::FileUnreadable {
+                                msg: format!(
+                                    "Harmonics file: 
                                 could not parse degree `{item}` on line {lno}"
-                            )));
+                                ),
+                            });
                         }
                     },
                     2 => match usize::from_str(item) {
                         Ok(val) => cur_order = val,
                         Err(_) => {
-                            return Err(NyxError::FileUnreadable(format!(
-                                "Harmonics file: 
+                            return Err(NyxError::FileUnreadable {
+                                msg: format!(
+                                    "Harmonics file: 
                                 could not parse order `{item}` on line {lno}"
-                            )));
+                                ),
+                            });
                         }
                     },
                     3 => {
@@ -167,10 +175,12 @@ impl HarmonicsMem {
                             match f64::from_str(item) {
                                 Ok(val) => c_nm = val,
                                 Err(_) => {
-                                    return Err(NyxError::FileUnreadable(format!(
-                                        "Harmonics file: 
+                                    return Err(NyxError::FileUnreadable {
+                                        msg: format!(
+                                            "Harmonics file: 
                                         could not parse C_nm `{item}` on line {lno}"
-                                    )));
+                                        ),
+                                    });
                                 }
                             }
                         } else {
@@ -187,10 +197,12 @@ impl HarmonicsMem {
                                     match f64::from_str(&c_nm_str) {
                                         Ok(val) => c_nm = val,
                                         Err(_) => {
-                                            return Err(NyxError::FileUnreadable(format!(
-                                                "Harmonics file: 
+                                            return Err(NyxError::FileUnreadable {
+                                                msg: format!(
+                                                    "Harmonics file: 
                                                 could not parse C_nm `{item}` on line {lno}"
-                                            )));
+                                                ),
+                                            });
                                         }
                                     }
                                     // That mean we have five minus signs, so both the C and S are negative.
@@ -198,10 +210,12 @@ impl HarmonicsMem {
                                     match f64::from_str(&s_nm_str) {
                                         Ok(val) => s_nm = val,
                                         Err(_) => {
-                                            return Err(NyxError::FileUnreadable(format!(
-                                                "Harmonics file: 
+                                            return Err(NyxError::FileUnreadable {
+                                                msg: format!(
+                                                    "Harmonics file: 
                                                 could not parse S_nm `{item}` on line {lno}"
-                                            )));
+                                                ),
+                                            });
                                         }
                                     }
                                 } else {
@@ -210,10 +224,12 @@ impl HarmonicsMem {
                                     match f64::from_str(&c_nm_str) {
                                         Ok(val) => c_nm = val,
                                         Err(_) => {
-                                            return Err(NyxError::FileUnreadable(format!(
-                                                "Harmonics file: 
+                                            return Err(NyxError::FileUnreadable {
+                                                msg: format!(
+                                                    "Harmonics file: 
                                                 could not parse C_nm `{item}` on line {lno}"
-                                            )));
+                                                ),
+                                            });
                                         }
                                     }
                                     // That mean we have five minus signs, so both the C and S are negative.
@@ -221,10 +237,12 @@ impl HarmonicsMem {
                                     match f64::from_str(&s_nm_str) {
                                         Ok(val) => s_nm = val,
                                         Err(_) => {
-                                            return Err(NyxError::FileUnreadable(format!(
-                                                "Harmonics file: 
+                                            return Err(NyxError::FileUnreadable {
+                                                msg: format!(
+                                                    "Harmonics file: 
                                                 could not parse S_nm `{item}` on line {lno}"
-                                            )));
+                                                ),
+                                            });
                                         }
                                     }
                                 }
@@ -233,10 +251,12 @@ impl HarmonicsMem {
                                 match f64::from_str(item) {
                                     Ok(val) => c_nm = val,
                                     Err(_) => {
-                                        return Err(NyxError::FileUnreadable(format!(
-                                            "Harmonics file: 
+                                        return Err(NyxError::FileUnreadable {
+                                            msg: format!(
+                                                "Harmonics file: 
                                             could not parse C_nm `{item}` on line {lno}"
-                                        )));
+                                            ),
+                                        });
                                     }
                                 }
                             }
@@ -246,10 +266,12 @@ impl HarmonicsMem {
                         // If this exists, then the S_nm is positive.
                         Ok(val) => s_nm = val,
                         Err(_) => {
-                            return Err(NyxError::FileUnreadable(format!(
-                                "Harmonics file: 
+                            return Err(NyxError::FileUnreadable {
+                                msg: format!(
+                                    "Harmonics file: 
                                 could not parse S_nm `{item}` on line {lno}"
-                            )));
+                                ),
+                            });
                         }
                     },
                     _ => break, // We aren't storing the covariance of these harmonics
@@ -306,21 +328,25 @@ impl HarmonicsMem {
         order: usize,
         filepath: &str,
     ) -> Result<HarmonicsMem, NyxError> {
-        let mut f = File::open(filepath)
-            .map_err(|_| NyxError::FileUnreadable(format!("File not found: {filepath}")))?;
+        let mut f = File::open(filepath).map_err(|_| NyxError::FileUnreadable {
+            msg: format!("File not found: {filepath}"),
+        })?;
         let mut buffer = vec![0; 0];
         if gunzipped {
             let mut d = GzDecoder::new(f);
-            d.read_to_end(&mut buffer).map_err(|_| {
-                NyxError::FileUnreadable("could not read file as gunzip".to_string())
-            })?;
+            d.read_to_end(&mut buffer)
+                .map_err(|_| NyxError::FileUnreadable {
+                    msg: "could not read file as gunzip".to_string(),
+                })?;
         } else {
             f.read_to_end(&mut buffer)
-                .map_err(|_| NyxError::FileUnreadable("could not read file to end".to_string()))?;
+                .map_err(|_| NyxError::FileUnreadable {
+                    msg: "could not read file to end".to_string(),
+                })?;
         }
 
-        let data_as_str = String::from_utf8(buffer).map_err(|_| {
-            NyxError::FileUnreadable("could not decode file contents as utf8".to_string())
+        let data_as_str = String::from_utf8(buffer).map_err(|_| NyxError::FileUnreadable {
+            msg: "could not decode file contents as utf8".to_string(),
         })?;
 
         let mut c_nm_mat = DMatrix::from_element(degree + 1, degree + 1, 0.0);
@@ -343,37 +369,45 @@ impl HarmonicsMem {
                     0 => match usize::from_str(item) {
                         Ok(val) => cur_degree = val,
                         Err(_) => {
-                            return Err(NyxError::FileUnreadable(format!(
-                                "Harmonics file: 
+                            return Err(NyxError::FileUnreadable {
+                                msg: format!(
+                                    "Harmonics file: 
                                 could not parse degree on line {lno} (`{item}`)",
-                            )));
+                                ),
+                            });
                         }
                     },
                     1 => match usize::from_str(item) {
                         Ok(val) => cur_order = val,
                         Err(_) => {
-                            return Err(NyxError::FileUnreadable(format!(
-                                "Harmonics file: 
+                            return Err(NyxError::FileUnreadable {
+                                msg: format!(
+                                    "Harmonics file: 
                                 could not parse order on line {lno} (`{item}`)"
-                            )));
+                                ),
+                            });
                         }
                     },
                     2 => match f64::from_str(&item.replace('D', "E")) {
                         Ok(val) => c_nm = val,
                         Err(_) => {
-                            return Err(NyxError::FileUnreadable(format!(
-                                "Harmonics file: 
+                            return Err(NyxError::FileUnreadable {
+                                msg: format!(
+                                    "Harmonics file: 
                                 could not parse C_nm `{item}` on line {lno}"
-                            )));
+                                ),
+                            });
                         }
                     },
                     3 => match f64::from_str(&item.replace('D', "E")) {
                         Ok(val) => s_nm = val,
                         Err(_) => {
-                            return Err(NyxError::FileUnreadable(format!(
-                                "Harmonics file: 
+                            return Err(NyxError::FileUnreadable {
+                                msg: format!(
+                                    "Harmonics file: 
                                 could not parse S_nm `{item}` on line {lno}"
-                            )));
+                                ),
+                            });
                         }
                     },
                     _ => break, // We aren't storing the covariance of these harmonics

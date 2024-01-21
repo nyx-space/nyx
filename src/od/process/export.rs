@@ -17,7 +17,7 @@
 */
 
 use crate::io::watermark::pq_writer;
-use crate::io::ExportCfg;
+use crate::io::{ArrowSnafu, ExportCfg, ParquetSnafu, StdIOSnafu};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName};
 use crate::md::prelude::Frame;
@@ -30,8 +30,8 @@ use arrow::array::{Array, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 use parquet::arrow::ArrowWriter;
+use snafu::prelude::*;
 use std::collections::HashMap;
-use std::error::Error;
 use std::fs::File;
 use std::ops::Add;
 use std::path::{Path, PathBuf};
@@ -74,19 +74,21 @@ where
         + Allocator<f64, A, <S as State>::Size>,
 {
     /// Store the estimates and residuals in a parquet file
-    pub fn to_parquet<P: AsRef<Path>>(
-        &self,
-        path: P,
-        cfg: ExportCfg,
-    ) -> Result<PathBuf, Box<dyn Error>> {
-        if self.estimates.is_empty() {
-            return Err(Box::new(NyxError::CustomError(
-                "No data: run the ODProcess before exporting it.".to_string(),
-            )));
-        } else if self.estimates.len() != self.residuals.len() {
-            return Err(Box::new(NyxError::CustomError(
-                "Estimates and residuals are not aligned.".to_string(),
-            )));
+    pub fn to_parquet<P: AsRef<Path>>(&self, path: P, cfg: ExportCfg) -> Result<PathBuf, ODError> {
+        ensure!(
+            !self.estimates.is_empty(),
+            TooFewMeasurementsSnafu {
+                need: 1_usize,
+                action: "exporting OD results"
+            }
+        );
+
+        if self.estimates.len() != self.residuals.len() {
+            return Err(ODError::ODConfigError {
+                source: ConfigError::InvalidConfig {
+                    msg: "Estimates and residuals are not aligned.".to_string(),
+                },
+            });
         }
 
         let tick = Epoch::now().unwrap();
@@ -344,12 +346,37 @@ where
 
         let props = pq_writer(Some(metadata));
 
-        let file = File::create(&path_buf)?;
-        let mut writer = ArrowWriter::try_new(file, schema.clone(), props)?;
+        let file = File::create(&path_buf)
+            .with_context(|_| StdIOSnafu {
+                action: "creating OD results file",
+            })
+            .with_context(|_| ODIOSnafu)?;
 
-        let batch = RecordBatch::try_new(schema, record)?;
-        writer.write(&batch)?;
-        writer.close()?;
+        let mut writer = ArrowWriter::try_new(file, schema.clone(), props)
+            .with_context(|_| ParquetSnafu {
+                action: "exporting OD results",
+            })
+            .with_context(|_| ODIOSnafu)?;
+
+        let batch = RecordBatch::try_new(schema, record)
+            .with_context(|_| ArrowSnafu {
+                action: "writing OD results",
+            })
+            .with_context(|_| ODIOSnafu)?;
+
+        writer
+            .write(&batch)
+            .with_context(|_| ParquetSnafu {
+                action: "writing OD results",
+            })
+            .with_context(|_| ODIOSnafu)?;
+
+        writer
+            .close()
+            .with_context(|_| ParquetSnafu {
+                action: "closing OD results file",
+            })
+            .with_context(|_| ODIOSnafu)?;
 
         // Return the path this was written to
         let tock_time = Epoch::now().unwrap() - tick;

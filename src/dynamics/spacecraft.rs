@@ -16,10 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::guidance::GuidanceLaw;
+use super::guidance::{ra_dec_from_unit_vector, GuidanceErrors, GuidanceLaw};
 use super::orbital::OrbitalDynamics;
 use super::{AccelModel, Dynamics, ForceModel};
 pub use crate::cosmic::{GuidanceMode, Spacecraft, STD_GRAVITY};
+use crate::dynamics::DynamicsError;
 use crate::errors::NyxError;
 use crate::io::dynamics::DynamicsSerde;
 use crate::io::gravity::HarmonicsMem;
@@ -33,9 +34,11 @@ use crate::State;
 use std::fmt::{self, Write};
 use std::sync::Arc;
 
-use crate::cosmic::Cosm;
+use crate::cosmic::{AstroError, Cosm};
 #[cfg(feature = "python")]
 use crate::io::ConfigRepr;
+#[cfg(feature = "python")]
+use crate::python::PythonError;
 #[cfg(feature = "python")]
 use pyo3::class::basic::CompareOp;
 #[cfg(feature = "python")]
@@ -219,11 +222,11 @@ impl SpacecraftDynamics {
     }
 
     #[cfg(feature = "python")]
-    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, NyxError> {
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, PythonError> {
         match op {
             CompareOp::Eq => Ok(self.__repr__() == other.__repr__()),
             CompareOp::Ne => Ok(self.__repr__() != other.__repr__()),
-            _ => Err(NyxError::CustomError(format!("{op:?} not available"))),
+            _ => Err(PythonError::OperationError { op }),
         }
     }
 
@@ -232,7 +235,7 @@ impl SpacecraftDynamics {
     /// Loads the SpacecraftDynamics from its YAML representation
     fn loads(_cls: &PyType, state: &PyAny) -> Result<Self, ConfigError> {
         <Self as Configurable>::from_config(
-            depythonize(state).map_err(|e| ConfigError::InvalidConfig(e.to_string()))?,
+            depythonize(state).map_err(|e| ConfigError::InvalidConfig { msg: e.to_string() })?,
             Cosm::de438(),
         )
     }
@@ -264,10 +267,12 @@ impl Dynamics for SpacecraftDynamics {
     type HyperdualSize = Const<9>;
     type StateType = Spacecraft;
 
-    fn finally(&self, next_state: Self::StateType) -> Result<Self::StateType, NyxError> {
+    fn finally(&self, next_state: Self::StateType) -> Result<Self::StateType, DynamicsError> {
         if next_state.fuel_mass_kg < 0.0 {
             error!("negative fuel mass at {}", next_state.epoch());
-            return Err(NyxError::FuelExhausted(Box::new(next_state)));
+            return Err(DynamicsError::FuelExhausted {
+                sc: Box::new(next_state),
+            });
         }
 
         if let Some(guid_law) = &self.guid_law {
@@ -285,7 +290,7 @@ impl Dynamics for SpacecraftDynamics {
         delta_t: f64,
         state: &OVector<f64, Const<90>>,
         ctx: &Self::StateType,
-    ) -> Result<OVector<f64, Const<90>>, NyxError> {
+    ) -> Result<OVector<f64, Const<90>>, DynamicsError> {
         // Rebuild the osculating state for the EOM context.
         let osc_sc = ctx.set_with_delta_seconds(delta_t, state);
         let mut d_x = OVector::<f64, Const<90>>::zeros();
@@ -331,17 +336,32 @@ impl Dynamics for SpacecraftDynamics {
         if let Some(guid_law) = &self.guid_law {
             let (thrust_force, fuel_rate) = {
                 if osc_sc.thruster.is_none() {
-                    return Err(NyxError::NoThrusterAvail);
+                    return Err(DynamicsError::DynamicsGuidance {
+                        source: GuidanceErrors::NoThrustersDefined,
+                    });
                 }
                 let thruster = osc_sc.thruster.unwrap();
                 let thrust_throttle_lvl = guid_law.throttle(&osc_sc);
                 if !(0.0..=1.0).contains(&thrust_throttle_lvl) {
-                    return Err(NyxError::CtrlThrottleRangeErr(thrust_throttle_lvl));
+                    return Err(DynamicsError::DynamicsGuidance {
+                        source: GuidanceErrors::ThrottleRatio {
+                            ratio: thrust_throttle_lvl,
+                        },
+                    });
                 } else if thrust_throttle_lvl > 0.0 {
                     // Thrust arc
                     let thrust_inertial = guid_law.direction(&osc_sc);
                     if (thrust_inertial.norm() - 1.0).abs() > NORM_ERR {
-                        return Err(NyxError::CtrlNotAUnitVector(thrust_inertial.norm()));
+                        let (alpha, delta) = ra_dec_from_unit_vector(thrust_inertial);
+                        return Err(DynamicsError::DynamicsGuidance {
+                            source: GuidanceErrors::InvalidDirection {
+                                x: thrust_inertial[0],
+                                y: thrust_inertial[1],
+                                z: thrust_inertial[2],
+                                in_plane_deg: alpha.to_degrees(),
+                                out_of_plane_deg: delta.to_degrees(),
+                            },
+                        });
                     } else if thrust_inertial.norm().is_normal() {
                         // Compute the thrust in Newtons and Isp
                         let total_thrust = (thrust_throttle_lvl * thruster.thrust_N) * 1e-3; // Convert m/s^-2 to km/s^-2
@@ -379,7 +399,7 @@ impl Dynamics for SpacecraftDynamics {
         &self,
         delta_t_s: f64,
         ctx: &Self::StateType,
-    ) -> Result<(OVector<f64, Const<9>>, OMatrix<f64, Const<9>, Const<9>>), NyxError> {
+    ) -> Result<(OVector<f64, Const<9>>, OMatrix<f64, Const<9>, Const<9>>), DynamicsError> {
         // Rebuild the appropriately sized state and STM.
         // This is the orbital state followed by Cr and Cd
         let mut d_x = OVector::<f64, Const<9>>::zeros();
@@ -399,7 +419,9 @@ impl Dynamics for SpacecraftDynamics {
         }
 
         if self.guid_law.is_some() {
-            return Err(NyxError::PartialsUndefined);
+            return Err(DynamicsError::DynamicsAstro {
+                source: AstroError::PartialsUndefined,
+            });
         }
 
         // Call the EOMs
@@ -437,23 +459,23 @@ impl Configurable for SpacecraftDynamics {
                 let gunzipped = hh.coeffs.ends_with(".gz");
                 let stor = if hh.coeffs.contains("cof") {
                     HarmonicsMem::from_cof(&hh.coeffs, hh.degree, hh.order, gunzipped)
-                        .map_err(|e| ConfigError::InvalidConfig(e.to_string()))?
+                        .map_err(|e| ConfigError::InvalidConfig { msg: e.to_string() })?
                 } else if hh.coeffs.contains("sha") {
                     HarmonicsMem::from_shadr(&hh.coeffs, hh.degree, hh.order, gunzipped)
-                        .map_err(|e| ConfigError::InvalidConfig(e.to_string()))?
+                        .map_err(|e| ConfigError::InvalidConfig { msg: e.to_string() })?
                 } else if hh.coeffs.contains("EGM") {
                     HarmonicsMem::from_egm(&hh.coeffs, hh.degree, hh.order, gunzipped)
-                        .map_err(|e| ConfigError::InvalidConfig(e.to_string()))?
+                        .map_err(|e| ConfigError::InvalidConfig { msg: e.to_string() })?
                 } else {
-                    return Err(ConfigError::InvalidConfig(
-                        "Unknown coefficients file type".to_string(),
-                    ));
+                    return Err(ConfigError::InvalidConfig {
+                        msg: "Unknown coefficients file type".to_string(),
+                    });
                 };
 
                 // Grab the frame
                 let frame = cosm
                     .try_frame(&hh.frame)
-                    .map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
+                    .map_err(|e| ConfigError::InvalidConfig { msg: e.to_string() })?;
 
                 accel_models.push(Harmonics::from_stor(frame, stor, cosm.clone()));
             }

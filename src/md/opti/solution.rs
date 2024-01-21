@@ -17,11 +17,12 @@
 */
 
 use hifitime::TimeUnits;
+use snafu::{ensure, ResultExt};
 
 use crate::dynamics::guidance::Mnvr;
 use crate::linalg::SVector;
 use crate::md::objective::Objective;
-use crate::md::prelude::*;
+use crate::md::{prelude::*, GuidanceSnafu, NotFiniteSnafu, TargetingError};
 pub use crate::md::{Variable, Vary};
 use crate::polyfit::CommonPolynomial;
 use std::fmt;
@@ -60,99 +61,94 @@ impl<const V: usize, const O: usize> TargeterSolution<V, O> {
     }
 
     /// Returns a maneuver if targeter solution was a finite burn maneuver
-    pub fn to_mnvr(&self) -> Result<Mnvr, NyxError> {
-        if !self.is_finite_burn() {
-            Err(NyxError::CustomError(
-                "Not a finite burn solution".to_string(),
-            ))
-        } else {
-            let correction_epoch = self.corrected_state.epoch();
-            let achievement_epoch = self.achieved_state.epoch();
-            let mut mnvr = Mnvr {
-                start: correction_epoch,
-                end: achievement_epoch,
-                thrust_prct: 1.0,
-                alpha_inplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
-                delta_outofplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
-                frame: Frame::RCN,
-            };
+    pub fn to_mnvr(&self) -> Result<Mnvr, TargetingError> {
+        ensure!(self.is_finite_burn(), NotFiniteSnafu);
 
-            for (i, var) in self.variables.iter().enumerate() {
-                let corr = self.correction[i];
+        let correction_epoch = self.corrected_state.epoch();
+        let achievement_epoch = self.achieved_state.epoch();
+        let mut mnvr = Mnvr {
+            start: correction_epoch,
+            end: achievement_epoch,
+            thrust_prct: 1.0,
+            alpha_inplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
+            delta_outofplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
+            frame: Frame::RCN,
+        };
 
-                // Modify the maneuver, but do not change the epochs of the maneuver unless the change is greater than one millisecond
-                match var.component {
-                    Vary::Duration => {
-                        if corr.abs() > 1e-3 {
-                            // Check that we are within the bounds
-                            let init_duration_s =
-                                (correction_epoch - achievement_epoch).to_seconds();
-                            let acceptable_corr = var.apply_bounds(init_duration_s).seconds();
-                            mnvr.end = mnvr.start + acceptable_corr;
-                        }
-                    }
-                    Vary::EndEpoch => {
-                        if corr.abs() > 1e-3 {
-                            // Check that we are within the bounds
-                            let total_end_corr =
-                                (mnvr.end + corr.seconds() - achievement_epoch).to_seconds();
-                            let acceptable_corr = var.apply_bounds(total_end_corr).seconds();
-                            mnvr.end += acceptable_corr;
-                        }
-                    }
-                    Vary::StartEpoch => {
-                        if corr.abs() > 1e-3 {
-                            // Check that we are within the bounds
-                            let total_start_corr =
-                                (mnvr.start + corr.seconds() - correction_epoch).to_seconds();
-                            let acceptable_corr = var.apply_bounds(total_start_corr).seconds();
-                            mnvr.end += acceptable_corr;
+        for (i, var) in self.variables.iter().enumerate() {
+            let corr = self.correction[i];
 
-                            mnvr.start += corr.seconds()
-                        }
+            // Modify the maneuver, but do not change the epochs of the maneuver unless the change is greater than one millisecond
+            match var.component {
+                Vary::Duration => {
+                    if corr.abs() > 1e-3 {
+                        // Check that we are within the bounds
+                        let init_duration_s = (correction_epoch - achievement_epoch).to_seconds();
+                        let acceptable_corr = var.apply_bounds(init_duration_s).seconds();
+                        mnvr.end = mnvr.start + acceptable_corr;
                     }
-                    Vary::MnvrAlpha | Vary::MnvrAlphaDot | Vary::MnvrAlphaDDot => {
-                        mnvr.alpha_inplane_radians = mnvr
-                            .alpha_inplane_radians
-                            .add_val_in_order(corr, var.component.vec_index())
-                            .unwrap();
-                    }
-                    Vary::MnvrDelta | Vary::MnvrDeltaDot | Vary::MnvrDeltaDDot => {
-                        mnvr.delta_outofplane_radians = mnvr
-                            .delta_outofplane_radians
-                            .add_val_in_order(corr, var.component.vec_index())
-                            .unwrap();
-                    }
-                    Vary::ThrustX | Vary::ThrustY | Vary::ThrustZ => {
-                        let mut vector = mnvr.direction();
-                        vector[var.component.vec_index()] += corr;
-                        var.ensure_bounds(&mut vector[var.component.vec_index()]);
-                        mnvr.set_direction(vector)?;
-                    }
-                    Vary::ThrustRateX | Vary::ThrustRateY | Vary::ThrustRateZ => {
-                        let mut vector = mnvr.rate();
-                        let idx = (var.component.vec_index() - 1) % 3;
-                        vector[idx] += corr;
-                        var.ensure_bounds(&mut vector[idx]);
-                        mnvr.set_rate(vector)?;
-                    }
-                    Vary::ThrustAccelX | Vary::ThrustAccelY | Vary::ThrustAccelZ => {
-                        let mut vector = mnvr.accel();
-                        let idx = (var.component.vec_index() - 1) % 3;
-                        vector[idx] += corr;
-                        var.ensure_bounds(&mut vector[idx]);
-                        mnvr.set_accel(vector)?;
-                    }
-                    Vary::ThrustLevel => {
-                        mnvr.thrust_prct += corr;
-                        var.ensure_bounds(&mut mnvr.thrust_prct);
-                    }
-                    _ => unreachable!(),
                 }
-            }
+                Vary::EndEpoch => {
+                    if corr.abs() > 1e-3 {
+                        // Check that we are within the bounds
+                        let total_end_corr =
+                            (mnvr.end + corr.seconds() - achievement_epoch).to_seconds();
+                        let acceptable_corr = var.apply_bounds(total_end_corr).seconds();
+                        mnvr.end += acceptable_corr;
+                    }
+                }
+                Vary::StartEpoch => {
+                    if corr.abs() > 1e-3 {
+                        // Check that we are within the bounds
+                        let total_start_corr =
+                            (mnvr.start + corr.seconds() - correction_epoch).to_seconds();
+                        let acceptable_corr = var.apply_bounds(total_start_corr).seconds();
+                        mnvr.end += acceptable_corr;
 
-            Ok(mnvr)
+                        mnvr.start += corr.seconds()
+                    }
+                }
+                Vary::MnvrAlpha | Vary::MnvrAlphaDot | Vary::MnvrAlphaDDot => {
+                    mnvr.alpha_inplane_radians = mnvr
+                        .alpha_inplane_radians
+                        .add_val_in_order(corr, var.component.vec_index())
+                        .unwrap();
+                }
+                Vary::MnvrDelta | Vary::MnvrDeltaDot | Vary::MnvrDeltaDDot => {
+                    mnvr.delta_outofplane_radians = mnvr
+                        .delta_outofplane_radians
+                        .add_val_in_order(corr, var.component.vec_index())
+                        .unwrap();
+                }
+                Vary::ThrustX | Vary::ThrustY | Vary::ThrustZ => {
+                    let mut vector = mnvr.direction();
+                    vector[var.component.vec_index()] += corr;
+                    var.ensure_bounds(&mut vector[var.component.vec_index()]);
+                    mnvr.set_direction(vector).with_context(|_| GuidanceSnafu)?;
+                }
+                Vary::ThrustRateX | Vary::ThrustRateY | Vary::ThrustRateZ => {
+                    let mut vector = mnvr.rate();
+                    let idx = (var.component.vec_index() - 1) % 3;
+                    vector[idx] += corr;
+                    var.ensure_bounds(&mut vector[idx]);
+                    mnvr.set_rate(vector).with_context(|_| GuidanceSnafu)?;
+                }
+                Vary::ThrustAccelX | Vary::ThrustAccelY | Vary::ThrustAccelZ => {
+                    let mut vector = mnvr.accel();
+                    let idx = (var.component.vec_index() - 1) % 3;
+                    vector[idx] += corr;
+                    var.ensure_bounds(&mut vector[idx]);
+                    mnvr.set_accel(vector).with_context(|_| GuidanceSnafu)?;
+                }
+                Vary::ThrustLevel => {
+                    mnvr.thrust_prct += corr;
+                    var.ensure_bounds(&mut mnvr.thrust_prct);
+                }
+                _ => unreachable!(),
+            }
         }
+
+        Ok(mnvr)
     }
 }
 

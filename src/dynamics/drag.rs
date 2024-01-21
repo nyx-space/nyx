@@ -16,9 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::ForceModel;
-use crate::cosmic::{Cosm, Frame, Spacecraft};
-use crate::errors::NyxError;
+use super::{DynamicsError, ForceModel};
+use crate::cosmic::{AstroError, Cosm, Frame, Spacecraft};
 use crate::linalg::{Matrix3, Vector3};
 use std::fmt;
 use std::sync::Arc;
@@ -57,14 +56,19 @@ impl fmt::Display for ConstantDrag {
 }
 
 impl ForceModel for ConstantDrag {
-    fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, NyxError> {
+    fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, DynamicsError> {
         let osc = self.cosm.frame_chg(&ctx.orbit, self.drag_frame);
         let velocity = osc.velocity();
         Ok(-0.5 * self.rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
     }
 
-    fn dual_eom(&self, _osc_ctx: &Spacecraft) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
-        Err(NyxError::PartialsUndefined)
+    fn dual_eom(
+        &self,
+        _osc_ctx: &Spacecraft,
+    ) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
+        Err(DynamicsError::DynamicsAstro {
+            source: AstroError::PartialsUndefined,
+        })
     }
 }
 
@@ -116,7 +120,7 @@ impl fmt::Display for Drag {
 }
 
 impl ForceModel for Drag {
-    fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, NyxError> {
+    fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, DynamicsError> {
         let integration_frame = ctx.orbit.frame;
         let osc = self.cosm.frame_chg(&ctx.orbit, self.drag_frame);
         match self.density {
@@ -168,7 +172,12 @@ impl ForceModel for Drag {
         }
     }
 
-    fn dual_eom(&self, _osc_ctx: &Spacecraft) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
-        Err(NyxError::PartialsUndefined)
+    fn dual_eom(
+        &self,
+        _osc_ctx: &Spacecraft,
+    ) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
+        Err(DynamicsError::DynamicsAstro {
+            source: AstroError::PartialsUndefined,
+        })
     }
 }

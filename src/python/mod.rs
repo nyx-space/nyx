@@ -16,7 +16,13 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::io::ConfigError;
+use snafu::prelude::*;
+
+use crate::cosmic::AstroError;
+use crate::io::{ConfigError, InputOutputError};
+use crate::md::trajectory::TrajError;
+use crate::od::ODError;
+use crate::propagators::PropagationError;
 use crate::NyxError;
 use hifitime::leap_seconds::{LatestLeapSeconds, LeapSecondsFile};
 use hifitime::prelude::*;
@@ -30,6 +36,44 @@ mod monte_carlo;
 mod orbit_determination;
 pub(crate) mod pyo3utils;
 
+use pyo3::class::basic::CompareOp;
+
+#[derive(Snafu, Debug)]
+pub(crate) enum PythonError {
+    #[snafu(display("operation {op:?} not available on this type"))]
+    OperationError { op: CompareOp },
+}
+
+impl From<PythonError> for PyErr {
+    fn from(err: PythonError) -> PyErr {
+        PyException::new_err(err.to_string())
+    }
+}
+
+impl From<TrajError> for PyErr {
+    fn from(err: TrajError) -> PyErr {
+        PyException::new_err(err.to_string())
+    }
+}
+
+impl From<ODError> for PyErr {
+    fn from(err: ODError) -> PyErr {
+        PyException::new_err(err.to_string())
+    }
+}
+
+impl From<PropagationError> for PyErr {
+    fn from(err: PropagationError) -> PyErr {
+        PyException::new_err(err.to_string())
+    }
+}
+
+impl From<AstroError> for PyErr {
+    fn from(err: AstroError) -> PyErr {
+        PyException::new_err(err.to_string())
+    }
+}
+
 impl From<NyxError> for PyErr {
     fn from(err: NyxError) -> PyErr {
         PyException::new_err(err.to_string())
@@ -38,6 +82,12 @@ impl From<NyxError> for PyErr {
 
 impl From<ConfigError> for PyErr {
     fn from(err: ConfigError) -> PyErr {
+        PyException::new_err(err.to_string())
+    }
+}
+
+impl From<InputOutputError> for PyErr {
+    fn from(err: InputOutputError) -> PyErr {
         PyException::new_err(err.to_string())
     }
 }

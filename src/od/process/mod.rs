@@ -26,6 +26,7 @@ pub use crate::od::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::propagators::PropInstance;
 pub use crate::time::{Duration, Unit};
+use snafu::prelude::*;
 mod conf;
 pub use conf::{IterationConf, SmoothingArc};
 mod trigger;
@@ -170,7 +171,7 @@ where
     ///
     /// Estimates must be ordered in chronological order. This function will smooth the
     /// estimates from the last in the list to the first one.
-    pub fn smooth(&self, condition: SmoothingArc) -> Result<Vec<K::Estimate>, NyxError> {
+    pub fn smooth(&self, condition: SmoothingArc) -> Result<Vec<K::Estimate>, ODError> {
         let l = self.estimates.len() - 1;
 
         info!("Smoothing {} estimates until {}", l + 1, condition);
@@ -219,7 +220,7 @@ where
                 .stm()
                 .clone()
                 .try_inverse()
-                .ok_or(NyxError::SingularStateTransitionMatrix)?;
+                .ok_or(ODError::SingularStateTransitionMatrix)?;
 
             // Compute smoothed state deviation
             let x_k_l = phi_kp1_k * x_kp1_l;
@@ -283,7 +284,7 @@ where
         devices: &mut BTreeMap<String, Dev>,
         step_size: Duration,
         config: IterationConf,
-    ) -> Result<(), NyxError>
+    ) -> Result<(), ODError>
     where
         Dev: TrackingDeviceSim<S, Msr>,
     {
@@ -366,7 +367,9 @@ where
                         config.max_divergences, config
                     );
                     if config.force_failure {
-                        return Err(NyxError::MaxIterReached(msg));
+                        return Err(ODError::Diverged {
+                            loops: config.max_divergences,
+                        });
                     } else {
                         error!("{}", msg);
                         break;
@@ -393,7 +396,9 @@ where
                     config.max_iterations, config
                 );
                 if config.force_failure {
-                    return Err(NyxError::MaxIterReached(msg));
+                    return Err(ODError::Diverged {
+                        loops: config.max_divergences,
+                    });
                 } else {
                     error!("{}", msg);
                     break;
@@ -409,7 +414,7 @@ where
         &mut self,
         arc: &TrackingArc<Msr>,
         config: IterationConf,
-    ) -> Result<(), NyxError>
+    ) -> Result<(), ODError>
     where
         Dev: TrackingDeviceSim<S, Msr>,
     {
@@ -419,9 +424,10 @@ where
         let step_size = match arc.min_duration_sep() {
             Some(step_size) => step_size,
             None => {
-                return Err(NyxError::CustomError(
-                    "empty measurement set provided".to_string(),
-                ))
+                return Err(ODError::TooFewMeasurements {
+                    action: "determine the minimum step step",
+                    need: 2,
+                })
             }
         };
 
@@ -430,7 +436,7 @@ where
 
     /// Process the provided tracking arc for this orbit determination process.
     #[allow(clippy::erasing_op)]
-    pub fn process_arc<Dev>(&mut self, arc: &TrackingArc<Msr>) -> Result<(), NyxError>
+    pub fn process_arc<Dev>(&mut self, arc: &TrackingArc<Msr>) -> Result<(), ODError>
     where
         Dev: TrackingDeviceSim<S, Msr>,
     {
@@ -440,9 +446,10 @@ where
         let step_size = match arc.min_duration_sep() {
             Some(step_size) => step_size,
             None => {
-                return Err(NyxError::CustomError(
-                    "empty measurement set provided".to_string(),
-                ))
+                return Err(ODError::TooFewMeasurements {
+                    action: "determining the minimum step size",
+                    need: 2,
+                })
             }
         };
 
@@ -461,19 +468,22 @@ where
         measurements: &[(String, Msr)],
         devices: &mut BTreeMap<String, Dev>,
         max_step: Duration,
-    ) -> Result<(), NyxError>
+    ) -> Result<(), ODError>
     where
         Dev: TrackingDeviceSim<S, Msr>,
     {
-        if measurements.len() < 2 {
-            return Err(NyxError::CustomError(
-                "must have at least two measurements".to_string(),
-            ));
-        }
+        ensure!(
+            measurements.len() >= 2,
+            TooFewMeasurementsSnafu {
+                need: 2_usize,
+                action: "running a Kalman filter"
+            }
+        );
 
-        if max_step.is_negative() || max_step == Duration::ZERO {
-            return Err(NyxError::CustomError("step size is zero".to_string()));
-        }
+        ensure!(
+            !max_step.is_negative() && max_step != Duration::ZERO,
+            StepSizeSnafu { step: max_step }
+        );
 
         // Start by propagating the estimator (on the same thread).
         let num_msrs = measurements.len();
@@ -501,11 +511,13 @@ where
             let next_msr_epoch = msr.epoch();
 
             for val in msr.observation().iter() {
-                if !val.is_finite() {
-                    return Err(NyxError::CustomError(format!(
-                        "invalid measurement @ {next_msr_epoch} = {val}"
-                    )));
-                }
+                ensure!(
+                    val.is_finite(),
+                    InvalidMeasurementSnafu {
+                        epoch: next_msr_epoch,
+                        val: *val
+                    }
+                );
             }
 
             // Advance the propagator
@@ -527,7 +539,10 @@ where
                 traj.states.truncate(index);
 
                 debug!("propagate for {next_step_size} (Δt to next msr: {delta_t})");
-                let (_, traj_covar) = self.prop.for_duration_with_traj(next_step_size)?;
+                let (_, traj_covar) = self
+                    .prop
+                    .for_duration_with_traj(next_step_size)
+                    .with_context(|_| ODPropSnafu)?;
 
                 for state in traj_covar.states {
                     traj.states.push(S::extract(state));
@@ -660,16 +675,18 @@ where
     }
 
     /// Continuously predicts the trajectory until the provided end epoch, with covariance mapping at each step. In other words, this performs a time update.
-    pub fn predict_until(&mut self, step: Duration, end_epoch: Epoch) -> Result<(), NyxError> {
+    pub fn predict_until(&mut self, step: Duration, end_epoch: Epoch) -> Result<(), ODError> {
         let prop_time = end_epoch - self.kf.previous_estimate().epoch();
         info!("Propagating for {prop_time} and mapping covariance",);
 
         loop {
             let mut epoch = self.prop.state.epoch();
             if epoch + self.prop.details.step > end_epoch {
-                self.prop.until_epoch(end_epoch)?;
+                self.prop
+                    .until_epoch(end_epoch)
+                    .with_context(|_| ODPropSnafu)?;
             } else {
-                self.prop.for_duration(step)?;
+                self.prop.for_duration(step).with_context(|_| ODPropSnafu)?;
             }
 
             // Perform time update
@@ -700,7 +717,7 @@ where
     }
 
     /// Continuously predicts the trajectory for the provided duration, with covariance mapping at each step. In other words, this performs a time update.
-    pub fn predict_for(&mut self, step: Duration, duration: Duration) -> Result<(), NyxError> {
+    pub fn predict_for(&mut self, step: Duration, duration: Duration) -> Result<(), ODError> {
         let end_epoch = self.kf.previous_estimate().epoch() + duration;
         self.predict_until(step, end_epoch)
     }
@@ -712,9 +729,9 @@ where
         S: Interpolatable,
     {
         if self.estimates.is_empty() {
-            Err(NyxError::NoStateData(
-                "No navigation trajectory to generate: run the OD process first".to_string(),
-            ))
+            Err(NyxError::NoStateData {
+                msg: "No navigation trajectory to generate: run the OD process first".to_string(),
+            })
         } else {
             Ok(Traj {
                 states: self

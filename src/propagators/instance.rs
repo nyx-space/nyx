@@ -17,17 +17,18 @@
 */
 
 use super::error_ctrl::ErrorCtrl;
-use super::{IntegrationDetails, Propagator};
+use super::{DynamicsSnafu, IntegrationDetails, PropagationError, Propagator};
 use crate::dynamics::Dynamics;
-use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, OVector};
 use crate::md::trajectory::{Interpolatable, Traj};
 use crate::md::EventEvaluator;
+use crate::propagators::TrajectoryEventSnafu;
 use crate::time::{Duration, Epoch, Unit};
 use crate::State;
 use rayon::iter::ParallelBridge;
 use rayon::prelude::ParallelIterator;
+use snafu::ResultExt;
 use std::f64;
 use std::sync::mpsc::{channel, Sender};
 #[cfg(not(target_arch = "wasm32"))]
@@ -74,7 +75,7 @@ where
         &mut self,
         duration: Duration,
         maybe_tx_chan: Option<Sender<D::StateType>>,
-    ) -> Result<D::StateType, NyxError> {
+    ) -> Result<D::StateType, PropagationError> {
         if duration == 0 * Unit::Second {
             return Ok(self.state);
         }
@@ -89,7 +90,11 @@ where
             info!("Propagating for {} until {}", duration, stop_time);
         }
         // Call `finally` on the current state to set anything up
-        self.state = self.prop.dynamics.finally(self.state)?;
+        self.state = self
+            .prop
+            .dynamics
+            .finally(self.state)
+            .with_context(|_| DynamicsSnafu)?;
 
         let backprop = duration.is_negative();
         if backprop {
@@ -154,7 +159,7 @@ where
     }
 
     /// This method propagates the provided Dynamics for the provided duration.
-    pub fn for_duration(&mut self, duration: Duration) -> Result<D::StateType, NyxError> {
+    pub fn for_duration(&mut self, duration: Duration) -> Result<D::StateType, PropagationError> {
         self.for_duration_channel_option(duration, None)
     }
 
@@ -163,12 +168,12 @@ where
         &mut self,
         duration: Duration,
         tx_chan: Sender<D::StateType>,
-    ) -> Result<D::StateType, NyxError> {
+    ) -> Result<D::StateType, PropagationError> {
         self.for_duration_channel_option(duration, Some(tx_chan))
     }
 
     /// Propagates the provided Dynamics until the provided epoch. Returns the end state.
-    pub fn until_epoch(&mut self, end_time: Epoch) -> Result<D::StateType, NyxError> {
+    pub fn until_epoch(&mut self, end_time: Epoch) -> Result<D::StateType, PropagationError> {
         let duration: Duration = end_time - self.state.epoch();
         self.for_duration(duration)
     }
@@ -178,7 +183,7 @@ where
         &mut self,
         end_time: Epoch,
         tx_chan: Sender<D::StateType>,
-    ) -> Result<D::StateType, NyxError> {
+    ) -> Result<D::StateType, PropagationError> {
         let duration: Duration = end_time - self.state.epoch();
         self.for_duration_with_channel(duration, tx_chan)
     }
@@ -189,7 +194,7 @@ where
     pub fn for_duration_with_traj(
         &mut self,
         duration: Duration,
-    ) -> Result<(D::StateType, Traj<D::StateType>), NyxError>
+    ) -> Result<(D::StateType, Traj<D::StateType>), PropagationError>
     where
         <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
         D::StateType: Interpolatable,
@@ -223,7 +228,7 @@ where
     pub fn until_epoch_with_traj(
         &mut self,
         end_time: Epoch,
-    ) -> Result<(D::StateType, Traj<D::StateType>), NyxError>
+    ) -> Result<(D::StateType, Traj<D::StateType>), PropagationError>
     where
         <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
         D::StateType: Interpolatable,
@@ -238,7 +243,7 @@ where
         &mut self,
         max_duration: Duration,
         event: &F,
-    ) -> Result<(D::StateType, Traj<D::StateType>), NyxError>
+    ) -> Result<(D::StateType, Traj<D::StateType>), PropagationError>
     where
         <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
         D::StateType: Interpolatable,
@@ -253,7 +258,7 @@ where
         max_duration: Duration,
         event: &F,
         trigger: usize,
-    ) -> Result<(D::StateType, Traj<D::StateType>), NyxError>
+    ) -> Result<(D::StateType, Traj<D::StateType>), PropagationError>
     where
         <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
         D::StateType: Interpolatable,
@@ -262,18 +267,25 @@ where
 
         let (_, traj) = self.for_duration_with_traj(max_duration)?;
         // Now, find the requested event
-        let events = traj.find(event)?;
+        let events = traj.find(event).with_context(|_| TrajectoryEventSnafu)?;
         match events.get(trigger) {
             Some(event_state) => Ok((event_state.state, traj)),
-            None => Err(NyxError::UnsufficientTriggers(trigger, events.len())),
+            None => Err(PropagationError::NthEventError {
+                nth: trigger,
+                found: events.len(),
+            }),
         }
     }
 
     /// Take a single propagator step and emit the result on the TX channel (if enabled)
-    pub fn single_step(&mut self) -> Result<(), NyxError> {
+    pub fn single_step(&mut self) -> Result<(), PropagationError> {
         let (t, state_vec) = self.derive()?;
-        self.state.set(self.state.epoch() + t, &state_vec)?;
-        self.state = self.prop.dynamics.finally(self.state)?;
+        self.state.set(self.state.epoch() + t, &state_vec);
+        self.state = self
+            .prop
+            .dynamics
+            .finally(self.state)
+            .with_context(|_| DynamicsSnafu)?;
 
         Ok(())
     }
@@ -284,15 +296,20 @@ where
     /// To get the integration details, check `self.latest_details`.
     fn derive(
         &mut self,
-    ) -> Result<(Duration, OVector<f64, <D::StateType as State>::VecLength>), NyxError> {
-        let state_vec = &self.state.as_vector()?;
+    ) -> Result<(Duration, OVector<f64, <D::StateType as State>::VecLength>), PropagationError>
+    {
+        let state_vec = &self.state.as_vector();
         let state_ctx = &self.state;
         // Reset the number of attempts used (we don't reset the error because it's set before it's read)
         self.details.attempts = 1;
         // Convert the step size to seconds -- it's mutable because we may change it below
         let mut step_size = self.step_size.to_seconds();
         loop {
-            let ki = self.prop.dynamics.eom(0.0, state_vec, state_ctx)?;
+            let ki = self
+                .prop
+                .dynamics
+                .eom(0.0, state_vec, state_ctx)
+                .with_context(|_| DynamicsSnafu)?;
             self.k[0] = ki;
             let mut a_idx: usize = 0;
             for i in 0..(self.prop.stages - 1) {
@@ -308,11 +325,11 @@ where
                     a_idx += 1;
                 }
 
-                let ki = self.prop.dynamics.eom(
-                    ci * step_size,
-                    &(state_vec + step_size * wi),
-                    state_ctx,
-                )?;
+                let ki = self
+                    .prop
+                    .dynamics
+                    .eom(ci * step_size, &(state_vec + step_size * wi), state_ctx)
+                    .with_context(|_| DynamicsSnafu)?;
                 self.k[i + 1] = ki;
             }
             // Compute the next state and the error

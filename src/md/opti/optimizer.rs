@@ -16,9 +16,13 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use snafu::ResultExt;
+
 use crate::errors::TargetingError;
 use crate::md::objective::Objective;
 use crate::md::prelude::*;
+use crate::md::AstroSnafu;
+use crate::md::PropSnafu;
 use crate::md::StateParameter;
 pub use crate::md::{Variable, Vary};
 use crate::propagators::error_ctrl::ErrorCtrl;
@@ -252,12 +256,12 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
         initial_state: Spacecraft,
         correction_epoch: Epoch,
         achievement_epoch: Epoch,
-    ) -> Result<TargeterSolution<V, O>, NyxError> {
+    ) -> Result<TargeterSolution<V, O>, TargetingError> {
         self.try_achieve_fd(initial_state, correction_epoch, achievement_epoch)
     }
 
     /// Apply a correction and propagate to achievement epoch. Also checks that the objectives are indeed matched
-    pub fn apply(&self, solution: &TargeterSolution<V, O>) -> Result<Spacecraft, NyxError> {
+    pub fn apply(&self, solution: &TargeterSolution<V, O>) -> Result<Spacecraft, TargetingError> {
         let (xf, _) = self.apply_with_traj(solution)?;
         Ok(xf)
     }
@@ -267,21 +271,23 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
     pub fn apply_with_traj(
         &self,
         solution: &TargeterSolution<V, O>,
-    ) -> Result<(Spacecraft, Traj<Spacecraft>), NyxError> {
+    ) -> Result<(Spacecraft, Traj<Spacecraft>), TargetingError> {
         let (xf, traj) = match solution.to_mnvr() {
             Ok(mnvr) => {
                 println!("{mnvr}");
                 let mut prop = self.prop.clone();
                 prop.dynamics = prop.dynamics.with_guidance_law(Arc::new(mnvr));
                 prop.with(solution.corrected_state)
-                    .until_epoch_with_traj(solution.achieved_state.epoch())?
+                    .until_epoch_with_traj(solution.achieved_state.epoch())
+                    .with_context(|_| PropSnafu)?
             }
             Err(_) => {
                 // This isn't a finite burn maneuver, let's just apply the correction
                 // Propagate until achievement epoch
                 self.prop
                     .with(solution.corrected_state)
-                    .until_epoch_with_traj(solution.achieved_state.epoch())?
+                    .until_epoch_with_traj(solution.achieved_state.epoch())
+                    .with_context(|_| PropSnafu)?
             }
         };
 
@@ -297,7 +303,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
         // Build the B-Plane once, if needed
         let b_plane = if is_bplane_tgt {
-            Some(BPlane::from_dual(xf_dual)?)
+            Some(BPlane::from_dual(xf_dual).with_context(|_| AstroSnafu)?)
         } else {
             None
         };
@@ -313,7 +319,9 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                     _ => unreachable!(),
                 }
             } else {
-                xf_dual.partial_for(obj.parameter)?
+                xf_dual
+                    .partial_for(obj.parameter)
+                    .with_context(|_| AstroSnafu)?
             };
 
             let param_err = obj.desired_value - partial.real();
@@ -337,9 +345,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                     param_errors[i]
                 ));
             }
-            Err(NyxError::Targeter(Box::new(TargetingError::Verification(
-                objmsg,
-            ))))
+            Err(TargetingError::Verification { msg: objmsg })
         }
     }
 }

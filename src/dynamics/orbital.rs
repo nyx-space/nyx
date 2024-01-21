@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::{AccelModel, Dynamics, NyxError};
+use super::{AccelModel, Dynamics, DynamicsError};
 use crate::cosmic::{Bodies, Cosm, Frame, LightTimeCalc, Orbit};
 use crate::linalg::{Const, Matrix3, Matrix6, OVector, Vector3, Vector6};
 use crate::State;
@@ -87,7 +87,7 @@ impl Dynamics for OrbitalDynamics {
         delta_t_s: f64,
         state: &OVector<f64, Const<42>>,
         ctx: &Orbit,
-    ) -> Result<OVector<f64, Const<42>>, NyxError> {
+    ) -> Result<OVector<f64, Const<42>>, DynamicsError> {
         let osc = ctx.set_with_delta_seconds(delta_t_s, state);
         let (new_state, new_stm) = if ctx.stm.is_some() {
             let (state, grad) = self.dual_eom(delta_t_s, &osc)?;
@@ -125,7 +125,7 @@ impl Dynamics for OrbitalDynamics {
         &self,
         _delta_t_s: f64,
         osc: &Orbit,
-    ) -> Result<(Vector6<f64>, Matrix6<f64>), NyxError> {
+    ) -> Result<(Vector6<f64>, Matrix6<f64>), DynamicsError> {
         // Extract data from hyperspace
         // Build full state vector with partials in the right position (hence building with all six components)
         let state: Vector6<OHyperdual<f64, Const<7>>> =
@@ -229,7 +229,7 @@ impl fmt::Display for PointMasses {
 }
 
 impl AccelModel for PointMasses {
-    fn eom(&self, osc: &Orbit) -> Result<Vector3<f64>, NyxError> {
+    fn eom(&self, osc: &Orbit) -> Result<Vector3<f64>, DynamicsError> {
         let mut d_x = Vector3::zeros();
         // Get all of the position vectors between the center body and the third bodies
         for third_body in &self.bodies {
@@ -254,7 +254,7 @@ impl AccelModel for PointMasses {
         Ok(d_x)
     }
 
-    fn dual_eom(&self, osc: &Orbit) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
+    fn dual_eom(&self, osc: &Orbit) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
         // Build the hyperdual space of the radius vector
         let radius: Vector3<OHyperdual<f64, Const<7>>> = hyperspace_from_vector(&osc.radius());
         // Extract result into Vector6 and Matrix6

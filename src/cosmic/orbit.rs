@@ -16,9 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use super::AstroError;
 use super::Cosm;
 use super::State;
 use super::{BPlane, Frame};
+use crate::dynamics::DynamicsError;
 use crate::io::orbit::OrbitSerde;
 use crate::io::{
     epoch_from_str, epoch_to_str, frame_from_str, frame_to_str, ConfigRepr, Configurable,
@@ -47,6 +49,8 @@ use std::sync::Arc;
 use crate::io::ConfigError;
 #[cfg(feature = "python")]
 use crate::python::cosmic::Frame as PyFrame;
+#[cfg(feature = "python")]
+use crate::python::PythonError;
 #[cfg(feature = "python")]
 use pyo3::class::basic::CompareOp;
 #[cfg(feature = "python")]
@@ -696,7 +700,7 @@ impl Orbit {
     /// ## Example
     /// let dcm_vnc2inertial = orbit.dcm_from_traj_frame(Frame::VNC)?;
     /// let vector_inertial = dcm_vnc2inertial * vector_vnc;
-    pub fn dcm_from_traj_frame(&self, from: Frame) -> Result<Matrix3<f64>, NyxError> {
+    pub fn dcm_from_traj_frame(&self, from: Frame) -> Result<Matrix3<f64>, AstroError> {
         match from {
             Frame::RIC => Ok(r3(-self.raan_deg().to_radians())
                 * r1(-self.inc_deg().to_radians())
@@ -740,15 +744,13 @@ impl Orbit {
                     z_hat[2],
                 ))
             }
-            _ => Err(NyxError::CustomError(
-                "did not provide a local frame".to_string(),
-            )),
+            _ => Err(AstroError::NotLocalFrame),
         }
     }
 
     /// Returns a 6x6 DCM to convert to this inertial state.
     /// WARNING: This DCM does NOT contain the corrections needed for the transport theorem, and therefore the velocity rotation is wrong.
-    pub fn dcm6x6_from_traj_frame(&self, from: Frame) -> Result<Matrix6<f64>, NyxError> {
+    pub fn dcm6x6_from_traj_frame(&self, from: Frame) -> Result<Matrix6<f64>, AstroError> {
         let dcm3x3 = self.dcm_from_traj_frame(from)?;
 
         let mut dcm = Matrix6::zeros();
@@ -1481,7 +1483,7 @@ impl Orbit {
         between_pm_180((self.vz_km_s / self.vmag_km_s()).asin().to_degrees())
     }
 
-    pub fn b_plane(&self) -> Result<BPlane, NyxError> {
+    pub fn b_plane(&self) -> Result<BPlane, AstroError> {
         BPlane::new(*self)
     }
 
@@ -1493,9 +1495,9 @@ impl Orbit {
     /// Returns the radius of periapse in kilometers for the provided turn angle of this hyperbolic orbit.
     pub fn vinf_periapsis_km(&self, turn_angle_degrees: f64) -> Result<f64, NyxError> {
         if self.ecc() <= 1.0 {
-            Err(NyxError::NotHyperbolic(
-                "Orbit is not hyperbolic. Convert to target object first".to_string(),
-            ))
+            Err(NyxError::NotHyperbolic {
+                msg: "Orbit is not hyperbolic. Convert to target object first".to_string(),
+            })
         } else {
             let cos_rho = (0.5 * (PI - turn_angle_degrees.to_radians())).cos();
 
@@ -1506,9 +1508,9 @@ impl Orbit {
     /// Returns the turn angle in degrees for the provided radius of periapse passage of this hyperbolic orbit
     pub fn vinf_turn_angle_deg(&self, periapsis_km: f64) -> Result<f64, NyxError> {
         if self.ecc() <= 1.0 {
-            Err(NyxError::NotHyperbolic(
-                "Orbit is not hyperbolic. Convert to target object first".to_string(),
-            ))
+            Err(NyxError::NotHyperbolic {
+                msg: "Orbit is not hyperbolic. Convert to target object first".to_string(),
+            })
         } else {
             let rho =
                 (1.0 / (1.0 + self.vmag_km_s().powi(2) * (periapsis_km / self.frame.gm()))).acos();
@@ -1519,9 +1521,9 @@ impl Orbit {
     /// Returns the hyperbolic anomaly in degrees between 0 and 360.0
     pub fn hyperbolic_anomaly_deg(&self) -> Result<f64, NyxError> {
         if self.ecc() <= 1.0 {
-            Err(NyxError::NotHyperbolic(
-                "Orbit is not hyperbolic so there is no hyperbolic anomaly.".to_string(),
-            ))
+            Err(NyxError::NotHyperbolic {
+                msg: "Orbit is not hyperbolic so there is no hyperbolic anomaly.".to_string(),
+            })
         } else {
             let (sin_ta, cos_ta) = self.ta_deg().to_radians().sin_cos();
             let sinh_h = (sin_ta * (self.ecc().powi(2) - 1.0).sqrt()) / (1.0 + self.ecc() * cos_ta);
@@ -1597,11 +1599,11 @@ impl Orbit {
     }
 
     #[cfg(feature = "python")]
-    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, NyxError> {
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, PythonError> {
         match op {
             CompareOp::Eq => Ok(self == other),
             CompareOp::Ne => Ok(self != other),
-            _ => Err(NyxError::CustomError(format!("{op:?} not available"))),
+            _ => Err(PythonError::OperationError { op }),
         }
     }
 
@@ -2098,7 +2100,7 @@ impl State for Orbit {
         }
     }
 
-    fn as_vector(&self) -> Result<OVector<f64, Const<42>>, NyxError> {
+    fn as_vector(&self) -> OVector<f64, Const<42>> {
         let mut as_vec = OVector::<f64, Const<42>>::zeros();
         as_vec[0] = self.x_km;
         as_vec[1] = self.y_km;
@@ -2111,10 +2113,10 @@ impl State for Orbit {
                 as_vec[idx + 6] = *stm_val;
             }
         }
-        Ok(as_vec)
+        as_vec
     }
 
-    fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Const<42>>) -> Result<(), NyxError> {
+    fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Const<42>>) {
         self.set_epoch(epoch);
         self.x_km = vector[0];
         self.y_km = vector[1];
@@ -2127,13 +2129,12 @@ impl State for Orbit {
             let stm_k_to_0 = Matrix6::from_column_slice(&vector.as_slice()[6..]);
             self.stm = Some(stm_k_to_0);
         }
-        Ok(())
     }
 
-    fn stm(&self) -> Result<Matrix6<f64>, NyxError> {
+    fn stm(&self) -> Result<Matrix6<f64>, DynamicsError> {
         match self.stm {
             Some(stm) => Ok(stm),
-            None => Err(NyxError::StateTransitionMatrixUnset),
+            None => Err(DynamicsError::StateTransitionMatrixUnset),
         }
     }
 
@@ -2154,9 +2155,9 @@ impl State for Orbit {
             StateParameter::ApoapsisRadius => Ok(self.apoapsis_km()),
             StateParameter::AoL => Ok(self.aol_deg()),
             StateParameter::AoP => Ok(self.aop_deg()),
-            StateParameter::BdotR => Ok(BPlane::new(*self)?.b_r.real()),
-            StateParameter::BdotT => Ok(BPlane::new(*self)?.b_t.real()),
-            StateParameter::BLTOF => Ok(BPlane::new(*self)?.ltof_s.real()),
+            StateParameter::BdotR => Ok(BPlane::new(*self).unwrap().b_r.real()),
+            StateParameter::BdotT => Ok(BPlane::new(*self).unwrap().b_t.real()),
+            StateParameter::BLTOF => Ok(BPlane::new(*self).unwrap().ltof_s.real()),
             StateParameter::C3 => Ok(self.c3_km2_s2()),
             StateParameter::Declination => Ok(self.declination_deg()),
             StateParameter::EccentricAnomaly => Ok(self.ea_deg()),
@@ -2191,10 +2192,10 @@ impl State for Orbit {
             StateParameter::VX => Ok(self.vx_km_s),
             StateParameter::VY => Ok(self.vy_km_s),
             StateParameter::VZ => Ok(self.vz_km_s),
-            _ => Err(NyxError::StateParameterUnavailable(
+            _ => Err(NyxError::StateParameterUnavailable {
                 param,
-                "no such parameter for orbit structure".to_string(),
-            )),
+                msg: "no such parameter for orbit structure".to_string(),
+            }),
         }
     }
 
@@ -2231,10 +2232,10 @@ impl State for Orbit {
                 self.vz_km_s = new_radius.z;
             }
             _ => {
-                return Err(NyxError::StateParameterUnavailable(
+                return Err(NyxError::StateParameterUnavailable {
                     param,
-                    "not settable for orbit structure with set_value".to_string(),
-                ))
+                    msg: "not settable for orbit structure with set_value".to_string(),
+                })
             }
         }
         Ok(())
@@ -2326,16 +2327,18 @@ fn compute_mean_to_true_anomaly(ma_radians: f64, ecc: f64, tol: f64) -> Result<f
         loop {
             iter += 1;
             if iter > 1000 {
-                return Err(NyxError::MaxIterReached(format!("{iter}")));
+                return Err(NyxError::MaxIterReached {
+                    msg: format!("{iter}"),
+                });
             }
 
             // GTDS MathSpec Equation 3-180  Note: a little difference here is that it uses Cos(E) instead of Cos(E-0.5*f)
             let normalized_anomaly = 1.0 - ecc * e2.cos();
 
             if normalized_anomaly.abs() < MA_EPSILON {
-                return Err(NyxError::MathDomain(format!(
-                    "normalizer too small {normalized_anomaly}"
-                )));
+                return Err(NyxError::MathDomain {
+                    msg: format!("normalizer too small {normalized_anomaly}"),
+                });
             }
 
             // GTDS MathSpec Equation 3-181
@@ -2360,17 +2363,17 @@ fn compute_mean_to_true_anomaly(ma_radians: f64, ecc: f64, tol: f64) -> Result<f
             let normalized_anomaly = 1.0 - ecc;
 
             if (normalized_anomaly).abs() < MA_EPSILON {
-                return Err(NyxError::MathDomain(format!(
-                    "normalized anomaly too small {normalized_anomaly}"
-                )));
+                return Err(NyxError::MathDomain {
+                    msg: format!("normalized anomaly too small {normalized_anomaly}"),
+                });
             }
 
             let eccentricity_ratio = (1.0 + ecc) / normalized_anomaly; // temp2 = (1+ecc)/(1-ecc)
 
             if eccentricity_ratio < 0.0 {
-                return Err(NyxError::MathDomain(format!(
-                    "eccentric ratio too small {eccentricity_ratio}"
-                )));
+                return Err(NyxError::MathDomain {
+                    msg: format!("eccentric ratio too small {eccentricity_ratio}"),
+                });
             }
 
             let f = eccentricity_ratio.sqrt();
@@ -2403,15 +2406,17 @@ fn compute_mean_to_true_anomaly(ma_radians: f64, ecc: f64, tol: f64) -> Result<f
         loop {
             iter += 1;
             if iter > 1000 {
-                return Err(NyxError::MaxIterReached(format!("{iter}")));
+                return Err(NyxError::MaxIterReached {
+                    msg: format!("{iter}"),
+                });
             }
 
             let normalizer = ecc * f2.cosh() - 1.0;
 
             if normalizer.abs() < MA_EPSILON {
-                return Err(NyxError::MathDomain(format!(
-                    "normalizer too small {normalizer}"
-                )));
+                return Err(NyxError::MathDomain {
+                    msg: format!("normalizer too small {normalizer}"),
+                });
             }
 
             let f1 = f2 - (ecc * f2.sinh() - f2 - rm) / normalizer; // GTDS MathSpec Equation 3-186
@@ -2425,17 +2430,17 @@ fn compute_mean_to_true_anomaly(ma_radians: f64, ecc: f64, tol: f64) -> Result<f
         let normalized_anomaly = ecc - 1.0;
 
         if normalized_anomaly.abs() < MA_EPSILON {
-            return Err(NyxError::MathDomain(format!(
-                "eccentric ratio too small {normalized_anomaly}"
-            )));
+            return Err(NyxError::MathDomain {
+                msg: format!("eccentric ratio too small {normalized_anomaly}"),
+            });
         }
 
         let eccentricity_ratio = (ecc + 1.0) / normalized_anomaly; // temp2 = (ecc+1)/(ecc-1)
 
         if eccentricity_ratio < 0.0 {
-            return Err(NyxError::MathDomain(format!(
-                "eccentric ratio too small {eccentricity_ratio}"
-            )));
+            return Err(NyxError::MathDomain {
+                msg: format!("eccentric ratio too small {eccentricity_ratio}"),
+            });
         }
 
         let e = eccentricity_ratio.sqrt();

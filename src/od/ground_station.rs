@@ -18,18 +18,19 @@
 
 use super::msr::RangeDoppler;
 use super::noise::GaussMarkov;
-use super::TrackingDeviceSim;
+use super::{ODError, ODTrajSnafu, TrackingDeviceSim};
 use crate::cosmic::{Cosm, Frame, Orbit};
 use crate::io::{frame_from_str, frame_to_str, ConfigRepr, Configurable};
 use crate::md::prelude::{Interpolatable, Traj};
 use crate::md::EventEvaluator;
 use crate::time::Epoch;
 use crate::utils::between_0_360;
-use crate::{NyxError, Spacecraft};
+use crate::Spacecraft;
 use hifitime::{Duration, Unit};
 use nalgebra::{allocator::Allocator, DefaultAllocator};
 use rand_pcg::Pcg64Mcg;
 use serde_derive::{Deserialize, Serialize};
+use snafu::ResultExt;
 use std::fmt;
 use std::sync::Arc;
 
@@ -209,7 +210,7 @@ impl GroundStation {
         &mut self,
         epoch: Epoch,
         rng: Option<&mut Pcg64Mcg>,
-    ) -> Result<(f64, f64, f64), NyxError> {
+    ) -> Result<(f64, f64, f64), ODError> {
         let timestamp_noise_s;
         let range_noise_km;
         let doppler_noise_km_s;
@@ -219,15 +220,13 @@ impl GroundStation {
                 // Add the range noise, or return an error if it's not configured.
                 range_noise_km = self
                     .range_noise_km
-                    .ok_or_else(|| NyxError::CustomError("Range noise not configured".to_string()))?
+                    .ok_or(ODError::NoiseNotConfigured { kind: "Range" })?
                     .next_bias(epoch, rng);
 
                 // Add the Doppler noise, or return an error if it's not configured.
                 doppler_noise_km_s = self
                     .doppler_noise_km_s
-                    .ok_or_else(|| {
-                        NyxError::CustomError("Doppler noise not configured".to_string())
-                    })?
+                    .ok_or(ODError::NoiseNotConfigured { kind: "Doppler" })?
                     .next_bias(epoch, rng);
 
                 // Only add the epoch noise if it's configured, it's valid to not have any noise on the clock.
@@ -278,11 +277,13 @@ impl TrackingDeviceSim<Orbit, RangeDoppler> for GroundStation {
         traj: &Traj<Orbit>,
         rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
-    ) -> Result<Option<RangeDoppler>, NyxError> {
+    ) -> Result<Option<RangeDoppler>, ODError> {
         match self.integration_time {
             Some(integration_time) => {
-                let rx_0 = traj.at(epoch - integration_time)?;
-                let rx_1 = traj.at(epoch)?;
+                let rx_0 = traj
+                    .at(epoch - integration_time)
+                    .with_context(|_| ODTrajSnafu)?;
+                let rx_1 = traj.at(epoch).with_context(|_| ODTrajSnafu)?;
 
                 let (_, elevation_0, rx_0, tx_0) = self.azimuth_elevation_of(rx_0, &cosm);
                 let (_, elevation_1, rx_1, tx_1) = self.azimuth_elevation_of(rx_1, &cosm);
@@ -307,7 +308,9 @@ impl TrackingDeviceSim<Orbit, RangeDoppler> for GroundStation {
                     doppler_noise_km_s,
                 )))
             }
-            None => self.measure_instantaneous(traj.at(epoch)?, rng, cosm),
+            None => {
+                self.measure_instantaneous(traj.at(epoch).with_context(|_| ODTrajSnafu)?, rng, cosm)
+            }
         }
     }
 
@@ -324,7 +327,7 @@ impl TrackingDeviceSim<Orbit, RangeDoppler> for GroundStation {
         rx: Orbit,
         rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
-    ) -> Result<Option<RangeDoppler>, NyxError> {
+    ) -> Result<Option<RangeDoppler>, ODError> {
         let (_, elevation, rx, tx) = self.azimuth_elevation_of(rx, &cosm);
 
         if elevation >= self.elevation_mask_deg {
@@ -357,8 +360,8 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
         traj: &Traj<Spacecraft>,
         rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
-    ) -> Result<Option<RangeDoppler>, NyxError> {
-        let rx = traj.at(epoch)?;
+    ) -> Result<Option<RangeDoppler>, ODError> {
+        let rx = traj.at(epoch).with_context(|_| ODTrajSnafu)?;
         self.measure_instantaneous(rx, rng, cosm)
     }
 
@@ -375,7 +378,7 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
         rx: Spacecraft,
         rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
-    ) -> Result<Option<RangeDoppler>, NyxError> {
+    ) -> Result<Option<RangeDoppler>, ODError> {
         let (_, elevation, rx, tx) = self.azimuth_elevation_of(rx.orbit, &cosm);
 
         if elevation >= self.elevation_mask_deg {

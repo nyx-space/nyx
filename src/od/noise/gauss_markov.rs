@@ -105,9 +105,9 @@ impl GaussMarkov {
         steady_state_sigma: f64,
     ) -> Result<Self, ConfigError> {
         if tau <= Duration::ZERO {
-            return Err(ConfigError::InvalidConfig(format!(
-                "tau must be positive but got {tau}"
-            )));
+            return Err(ConfigError::InvalidConfig {
+                msg: format!("tau must be positive but got {tau}"),
+            });
         }
 
         Ok(Self {
@@ -234,9 +234,9 @@ impl GaussMarkov {
             "Doppler" => Ok(Self::default_doppler_km_s()),
             "RangeHP" => Ok(Self::high_precision_range_km()),
             "DopplerHP" => Ok(Self::high_precision_doppler_km_s()),
-            _ => Err(NyxError::CustomError(format!(
-                "No default Gauss Markov model for `{kind}`"
-            ))),
+            _ => Err(NyxError::CustomError {
+                msg: format!("No default Gauss Markov model for `{kind}`"),
+            }),
         }
     }
 }
@@ -328,17 +328,17 @@ impl GaussMarkov {
 
         let props = pq_writer(Some(metadata));
 
-        let file = File::create(path).map_err(|e| NyxError::CustomError(e.to_string()))?;
+        let file = File::create(path).map_err(|e| NyxError::CustomError { msg: e.to_string() })?;
         let mut writer = ArrowWriter::try_new(file, schema.clone(), props).unwrap();
 
         let batch = RecordBatch::try_new(schema, record)
-            .map_err(|e| NyxError::CustomError(e.to_string()))?;
+            .map_err(|e| NyxError::CustomError { msg: e.to_string() })?;
         writer
             .write(&batch)
-            .map_err(|e| NyxError::CustomError(e.to_string()))?;
+            .map_err(|e| NyxError::CustomError { msg: e.to_string() })?;
         writer
             .close()
-            .map_err(|e| NyxError::CustomError(e.to_string()))?;
+            .map_err(|e| NyxError::CustomError { msg: e.to_string() })?;
 
         Ok(())
     }
@@ -372,9 +372,9 @@ impl GaussMarkov {
             // We're called from pickle, return a non initialized state
             return Ok(Self::ZERO);
         } else if tau.is_none() || sigma.is_none() || steady_state.is_none() {
-            return Err(ConfigError::InvalidConfig(format!(
-                "tau, sigma, and steady_state must be specified"
-            )));
+            return Err(ConfigError::InvalidConfig {
+                msg: "tau, sigma, and steady_state must be specified".to_string(),
+            });
         }
 
         let tau = tau.unwrap();
@@ -382,9 +382,9 @@ impl GaussMarkov {
         let steady_state = steady_state.unwrap();
 
         if tau <= Duration::ZERO {
-            return Err(ConfigError::InvalidConfig(format!(
-                "tau must be positive but got {tau}"
-            )));
+            return Err(ConfigError::InvalidConfig {
+                msg: format!("tau must be positive but got {tau}"),
+            });
         }
 
         Ok(Self {
@@ -460,23 +460,27 @@ impl GaussMarkov {
     /// Loads the SpacecraftDynamics from its YAML representation
     #[classmethod]
     fn loads(_cls: &PyType, data: &PyAny) -> Result<Vec<Self>, ConfigError> {
+        use snafu::ResultExt;
+
+        use crate::io::ParseSnafu;
+
         if let Ok(as_list) = data.downcast::<PyList>() {
             let mut selves = Vec::new();
             for item in as_list.iter() {
                 // Check that the item is a dictionary
-                let next: Self = serde_yaml::from_value(pyany_to_value(item)?)
-                    .map_err(ConfigError::ParseError)?;
+                let next: Self =
+                    serde_yaml::from_value(pyany_to_value(item)?).with_context(|_| ParseSnafu)?;
                 selves.push(next);
             }
             Ok(selves)
         } else if let Ok(as_dict) = data.downcast::<PyDict>() {
             let mut selves = Vec::new();
             for item_as_list in as_dict.items() {
-                let v_any = item_as_list.get_item(1).or_else(|_| {
-                    Err(ConfigError::InvalidConfig(
-                        "could not get key from provided dictionary item".to_string(),
-                    ))
-                })?;
+                let v_any = item_as_list
+                    .get_item(1)
+                    .map_err(|_| ConfigError::InvalidConfig {
+                        msg: "could not get key from provided dictionary item".to_string(),
+                    })?;
 
                 // Try to convert the underlying data
                 match pyany_to_value(v_any) {
@@ -485,8 +489,9 @@ impl GaussMarkov {
                             Ok(next) => selves.push(next),
                             Err(_) => {
                                 // Maybe this was to be parsed in full as a single item
-                                let me: Self = depythonize(data)
-                                    .map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
+                                let me: Self = depythonize(data).map_err(|e| {
+                                    ConfigError::InvalidConfig { msg: e.to_string() }
+                                })?;
                                 selves.clear();
                                 selves.push(me);
                                 return Ok(selves);
@@ -496,7 +501,7 @@ impl GaussMarkov {
                     Err(_) => {
                         // Maybe this was to be parsed in full as a single item
                         let me: Self = depythonize(data)
-                            .map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
+                            .map_err(|e| ConfigError::InvalidConfig { msg: e.to_string() })?;
                         selves.clear();
                         selves.push(me);
                         return Ok(selves);
@@ -505,13 +510,13 @@ impl GaussMarkov {
             }
             Ok(selves)
         } else {
-            depythonize(data).map_err(|e| ConfigError::InvalidConfig(e.to_string()))
+            depythonize(data).map_err(|e| ConfigError::InvalidConfig { msg: e.to_string() })
         }
     }
 
     #[cfg(feature = "python")]
     fn dumps(&self, py: Python) -> Result<PyObject, NyxError> {
-        pythonize(py, &self).map_err(|e| NyxError::CustomError(e.to_string()))
+        pythonize(py, &self).map_err(|e| NyxError::CustomError { msg: e.to_string() })
     }
 
     #[cfg(feature = "python")]
@@ -521,7 +526,8 @@ impl GaussMarkov {
 
     #[cfg(feature = "python")]
     fn __setstate__(&mut self, state: &PyAny) -> Result<(), ConfigError> {
-        *self = depythonize(state).map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
+        *self =
+            depythonize(state).map_err(|e| ConfigError::InvalidConfig { msg: e.to_string() })?;
         Ok(())
     }
 }

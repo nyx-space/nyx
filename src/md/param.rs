@@ -303,12 +303,9 @@ impl StateParameter {
 impl FromStr for StateParameter {
     type Err = NyxError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let keyword = s
-            .split_whitespace()
-            .next()
-            .ok_or(NyxError::LoadingError(format!(
-                "Unknown state parameter: {s}"
-            )))?;
+        let keyword = s.split_whitespace().next().ok_or(NyxError::LoadingError {
+            msg: format!("Unknown state parameter: {s}"),
+        })?;
 
         match keyword.to_lowercase().as_str() {
             "apoapsis" => Ok(Self::Apoapsis),
@@ -360,9 +357,9 @@ impl FromStr for StateParameter {
             "vx" => Ok(Self::VX),
             "vy" => Ok(Self::VY),
             "vz" => Ok(Self::VZ),
-            _ => Err(NyxError::LoadingError(format!(
-                "Unknown state parameter: {s}"
-            ))),
+            _ => Err(NyxError::LoadingError {
+                msg: format!("Unknown state parameter: {s}"),
+            }),
         }
     }
 }

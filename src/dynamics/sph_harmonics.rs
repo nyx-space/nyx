@@ -18,7 +18,6 @@
 
 use crate::cosmic::{Cosm, Frame, Orbit};
 use crate::dynamics::AccelModel;
-use crate::errors::NyxError;
 use crate::io::gravity::HarmonicsMem;
 use crate::linalg::{DMatrix, Matrix3, Vector3, U7};
 use hyperdual::linalg::norm;
@@ -26,6 +25,8 @@ use hyperdual::{hyperspace_from_vector, Float, OHyperdual};
 use std::cmp::min;
 use std::fmt;
 use std::sync::Arc;
+
+use super::DynamicsError;
 
 #[derive(Clone)]
 pub struct Harmonics {
@@ -148,7 +149,7 @@ impl fmt::Display for Harmonics {
 }
 
 impl AccelModel for Harmonics {
-    fn eom(&self, osc: &Orbit) -> Result<Vector3<f64>, NyxError> {
+    fn eom(&self, osc: &Orbit) -> Result<Vector3<f64>, DynamicsError> {
         // Convert the osculating orbit to the correct frame (needed for multiple harmonic fields)
         let state = self.cosm.frame_chg(osc, self.compute_frame);
 
@@ -236,11 +237,12 @@ impl AccelModel for Harmonics {
         // No. Therefore, we do not need to account for the transport theorem here.
         let dcm = self
             .cosm
-            .try_position_dcm_from_to(&self.compute_frame, &osc.frame, osc.epoch)?;
+            .try_position_dcm_from_to(&self.compute_frame, &osc.frame, osc.epoch)
+            .unwrap();
         Ok(dcm * accel)
     }
 
-    fn dual_eom(&self, osc: &Orbit) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
+    fn dual_eom(&self, osc: &Orbit) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
         // Convert the osculating orbit to the correct frame (needed for multiple harmonic fields)
         let state = self.cosm.frame_chg(osc, self.compute_frame);
 
@@ -333,7 +335,8 @@ impl AccelModel for Harmonics {
 
         let dcm = self
             .cosm
-            .try_position_dcm_from_to(&self.compute_frame, &osc.frame, osc.epoch)?;
+            .try_position_dcm_from_to(&self.compute_frame, &osc.frame, osc.epoch)
+            .unwrap();
 
         // Convert DCM to OHyperdual DCMs
         let mut dcm_d = Matrix3::<OHyperdual<f64, U7>>::zeros();

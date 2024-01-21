@@ -133,10 +133,9 @@ pub fn standard(
 
     while (cur_tof - tof).abs() > LAMBERT_EPSILON_TIME {
         if iter > MAX_ITERATIONS {
-            return Err(NyxError::MaxIterReached(format!(
-                "Lambert solver failed after {} iterations",
-                MAX_ITERATIONS
-            )));
+            return Err(NyxError::MaxIterReached {
+                msg: format!("Lambert solver failed after {MAX_ITERATIONS} iterations"),
+            });
         }
         iter += 1;
 

@@ -107,9 +107,9 @@ where
         }
 
         if devices_map.is_empty() {
-            return Err(ConfigError::InvalidConfig(
-                "None of the devices are properly configured".to_string(),
-            ));
+            return Err(ConfigError::InvalidConfig {
+                msg: "None of the devices are properly configured".to_string(),
+            });
         }
 
         let common_sampling_rate_ns = sampling_rates_ns
@@ -183,9 +183,11 @@ where
             let cfg = &self.configs[name];
             if cfg.scheduler.is_some() {
                 if cfg.strands.is_none() {
-                    return Err(NyxError::CustomError(format!(
-                        "schedule for {name} must be built before generating measurements"
-                    )));
+                    return Err(NyxError::CustomError {
+                        msg: format!(
+                            "schedule for {name} must be built before generating measurements"
+                        ),
+                    });
                 } else {
                     warn!("scheduler for {name} is ignored, using the defined tracking strands instead")
                 }

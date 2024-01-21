@@ -16,11 +16,13 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use snafu::{ensure, ResultExt};
+
 use super::solution::TargeterSolution;
 use crate::errors::TargetingError;
 use crate::linalg::{DMatrix, SVector};
-use crate::md::prelude::*;
-use crate::md::StateParameter;
+use crate::md::{prelude::*, PropSnafu, UnderdeterminedProblemSnafu};
+use crate::md::{AstroSnafu, StateParameter};
 pub use crate::md::{Variable, Vary};
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::pseudo_inverse;
@@ -36,12 +38,8 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
         initial_state: Spacecraft,
         correction_epoch: Epoch,
         achievement_epoch: Epoch,
-    ) -> Result<TargeterSolution<V, O>, NyxError> {
-        if self.objectives.is_empty() {
-            return Err(NyxError::Targeter(Box::new(
-                TargetingError::UnderdeterminedProblem,
-            )));
-        }
+    ) -> Result<TargeterSolution<V, O>, TargetingError> {
+        ensure!(!self.objectives.is_empty(), UnderdeterminedProblemSnafu);
 
         let mut is_bplane_tgt = false;
         for obj in &self.objectives {
@@ -56,7 +54,8 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
         let xi_start = self
             .prop
             .with(initial_state)
-            .until_epoch(correction_epoch)?;
+            .until_epoch(correction_epoch)
+            .with_context(|_| PropSnafu)?;
 
         debug!("initial_state = {}", initial_state);
         debug!("xi_start = {}", xi_start);
@@ -88,9 +87,9 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                     xi.orbit.vz_km_s += var.init_guess;
                 }
                 _ => {
-                    return Err(NyxError::Targeter(Box::new(
-                        TargetingError::UnsupportedVariable(*var),
-                    )))
+                    return Err(TargetingError::UnsupportedVariable {
+                        var: var.to_string(),
+                    });
                 }
             }
             total_correction[i] += var.init_guess;
@@ -127,7 +126,12 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             xi.enable_stm();
 
             // Full propagation for a half period duration is slightly more precise than a step by step one with multiplications in between.
-            let xf = self.prop.with(xi).until_epoch(achievement_epoch)?.orbit;
+            let xf = self
+                .prop
+                .with(xi)
+                .until_epoch(achievement_epoch)
+                .with_context(|_| PropSnafu)?
+                .orbit;
 
             // Check linearization
             if !are_eigenvalues_stable(xf.stm().unwrap().complex_eigenvalues()) {
@@ -151,7 +155,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
             // Build the B-Plane once, if needed, and always in the objective frame
             let b_plane = if is_bplane_tgt {
-                Some(BPlane::from_dual(xf_dual_obj_frame)?)
+                Some(BPlane::from_dual(xf_dual_obj_frame).with_context(|_| AstroSnafu)?)
             } else {
                 None
             };
@@ -172,7 +176,9 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                         _ => unreachable!(),
                     }
                 } else {
-                    xf_dual_obj_frame.partial_for(obj.parameter)?
+                    xf_dual_obj_frame
+                        .partial_for(obj.parameter)
+                        .with_context(|_| AstroSnafu)?
                 };
 
                 let achieved = xf_partial.real();
@@ -233,9 +239,9 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                         Vary::VelocityY => state.orbit.vy_km_s += total_correction[i],
                         Vary::VelocityZ => state.orbit.vz_km_s += total_correction[i],
                         _ => {
-                            return Err(NyxError::Targeter(Box::new(
-                                TargetingError::UnsupportedVariable(*var),
-                            )))
+                            return Err(TargetingError::UnsupportedVariable {
+                                var: var.to_string(),
+                            })
                         }
                     }
                 }
@@ -259,9 +265,11 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
             // We haven't converged yet, so let's build the error vector
             if (err_vector.norm() - prev_err_norm).abs() < 1e-10 {
-                return Err(NyxError::CorrectionIneffective(
-                    "No change in objective errors".to_string(),
-                ));
+                return Err(TargetingError::CorrectionIneffective {
+                    cur_val: err_vector.norm(),
+                    prev_val: prev_err_norm,
+                    action: "No change in objective errors",
+                });
             }
             prev_err_norm = err_vector.norm();
 
@@ -312,9 +320,9 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                         xi.orbit.vz_km_s += delta[i];
                     }
                     _ => {
-                        return Err(NyxError::Targeter(Box::new(
-                            TargetingError::UnsupportedVariable(*var),
-                        )))
+                        return Err(TargetingError::UnsupportedVariable {
+                            var: var.to_string(),
+                        });
                     }
                 }
             }
@@ -328,9 +336,6 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             }
         }
 
-        Err(NyxError::MaxIterReached(format!(
-            "Failed after {} iterations:\nError: {}\n\n{}",
-            self.iterations, prev_err_norm, self
-        )))
+        Err(TargetingError::TooManyIterations)
     }
 }

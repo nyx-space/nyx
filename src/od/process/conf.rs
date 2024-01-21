@@ -105,26 +105,29 @@ impl IterationConf {
         max_divergences: Option<usize>,
         force_failure: Option<bool>,
     ) -> Result<Self, NyxError> {
-        let mut me = Self::default();
-        me.smoother = if let Some(strategy) = strategy {
-            match strategy.to_lowercase().trim() {
-                "all" => SmoothingArc::All,
-                "prediction" => SmoothingArc::Prediction,
-                _ => {
-                    return Err(NyxError::CustomError(format!(
-                        "strategy should be `all` or `prediction`"
-                    )))
+        let mut me = Self {
+            smoother: if let Some(strategy) = strategy {
+                match strategy.to_lowercase().trim() {
+                    "all" => SmoothingArc::All,
+                    "prediction" => SmoothingArc::Prediction,
+                    _ => {
+                        return Err(NyxError::CustomError {
+                            msg: "strategy should be `all` or `prediction`".to_string(),
+                        })
+                    }
                 }
-            }
-        } else if let Some(duration) = duration {
-            SmoothingArc::TimeGap(duration)
-        } else if let Some(epoch) = epoch {
-            SmoothingArc::Epoch(epoch)
-        } else {
-            return Err(NyxError::CustomError(
-                "Smoothing arc strategy not specified".to_string(),
-            ));
+            } else if let Some(duration) = duration {
+                SmoothingArc::TimeGap(duration)
+            } else if let Some(epoch) = epoch {
+                SmoothingArc::Epoch(epoch)
+            } else {
+                return Err(NyxError::CustomError {
+                    msg: "Smoothing arc strategy not specified".to_string(),
+                });
+            },
+            ..Default::default()
         };
+
         if let Some(abs_tol) = absolute_tol {
             me.absolute_tol = abs_tol;
         }

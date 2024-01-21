@@ -41,9 +41,11 @@ impl Traj<Orbit> {
     #[allow(clippy::map_clone)]
     pub fn to_frame(&self, new_frame: Frame, cosm: Arc<Cosm>) -> Result<Self, NyxError> {
         if self.states.is_empty() {
-            return Err(NyxError::Trajectory(TrajError::CreationError(
-                "No trajectory to convert".to_string(),
-            )));
+            return Err(NyxError::Trajectory {
+                source: TrajError::CreationError {
+                    msg: "No trajectory to convert".to_string(),
+                },
+            });
         }
 
         #[cfg(not(target_arch = "wasm32"))]
@@ -120,8 +122,9 @@ impl Traj<Orbit> {
     pub fn from_oem_file<P: AsRef<Path>>(path: P) -> Result<Self, NyxError> {
         let cosm = Cosm::de438();
         // Open the file
-        let file =
-            File::open(path).map_err(|e| NyxError::CCSDS(format!("File opening error: {e}")))?;
+        let file = File::open(path).map_err(|e| NyxError::CCSDS {
+            msg: format!("File opening error: {e}"),
+        })?;
         let reader = BufReader::new(file);
 
         // Parse the Orbit Element messages
@@ -140,7 +143,9 @@ impl Traj<Orbit> {
         let mut parse = false;
 
         'lines: for (lno, line) in reader.lines().enumerate() {
-            let line = line.map_err(|e| NyxError::CCSDS(format!("File read error: {e}")))?;
+            let line = line.map_err(|e| NyxError::CCSDS {
+                msg: format!("File read error: {e}"),
+            })?;
             let line = line.trim();
             if line.is_empty() {
                 continue;
@@ -193,7 +198,9 @@ impl Traj<Orbit> {
 
                             let orbit = Orbit {
                                 epoch: Epoch::from_str(epoch_str.trim()).map_err(|e| {
-                                    NyxError::CCSDS(format!("Parsing epoch error: {e}"))
+                                    NyxError::CCSDS {
+                                        msg: format!("Parsing epoch error: {e}"),
+                                    }
                                 })?,
                                 x_km,
                                 y_km,
@@ -228,9 +235,9 @@ impl Traj<Orbit> {
         cfg: ExportCfg,
     ) -> Result<PathBuf, NyxError> {
         if self.states.is_empty() {
-            return Err(NyxError::CCSDS(
-                "Cannot export an empty trajectory to OEM".to_string(),
-            ));
+            return Err(NyxError::CCSDS {
+                msg: "Cannot export an empty trajectory to OEM".to_string(),
+            });
         }
         let tick = Epoch::now().unwrap();
         info!("Exporting trajectory to CCSDS OEM file...");
@@ -240,11 +247,14 @@ impl Traj<Orbit> {
 
         let metadata = cfg.metadata.unwrap_or_default();
 
-        let file = File::create(&path_buf)
-            .map_err(|e| NyxError::CCSDS(format!("File creation error: {e}")))?;
+        let file = File::create(&path_buf).map_err(|e| NyxError::CCSDS {
+            msg: format!("File creation error: {e}"),
+        })?;
         let mut writer = BufWriter::new(file);
 
-        let err_hdlr = |e| NyxError::CCSDS(format!("Could not write: {e}"));
+        let err_hdlr = |e| NyxError::CCSDS {
+            msg: format!("Could not write: {e}"),
+        };
 
         // Build the states iterator -- this does require copying the current states but I can't either get a reference or a copy of all the states.
         let states = if cfg.start_epoch.is_some() || cfg.end_epoch.is_some() || cfg.step.is_some() {

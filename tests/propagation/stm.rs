@@ -298,10 +298,10 @@ fn orbit_set_unset_static() {
     let stm_data = (0..36).map(|x| x as f64).collect::<Vec<f64>>();
     init.stm.as_mut().unwrap().copy_from_slice(&stm_data);
 
-    let init_vec = init.as_vector().unwrap();
+    let init_vec = init.as_vector();
 
     let mut init2 = init;
-    init2.set(epoch, &init_vec).unwrap();
+    init2.set(epoch, &init_vec);
 
     assert_eq!(init, init2);
 }
@@ -321,10 +321,10 @@ fn orbit_set_unset() {
 
     let orbit = prop.with(init).for_duration(2 * Unit::Hour).unwrap();
 
-    let vec = orbit.as_vector().unwrap();
+    let vec = orbit.as_vector();
 
     let mut init2 = orbit;
-    init2.set(orbit.epoch(), &vec).unwrap();
+    init2.set(orbit.epoch(), &vec);
 
     assert_eq!(orbit, init2);
 }
@@ -340,17 +340,15 @@ fn sc_set_unset_static() {
 
     // Change the full vector
     let data = (0..90).map(|x| x as f64).collect::<Vec<f64>>();
-    init_sc
-        .set(
-            init.epoch(),
-            &OVector::<f64, Const<90>>::from_column_slice(&data),
-        )
-        .unwrap();
+    init_sc.set(
+        init.epoch(),
+        &OVector::<f64, Const<90>>::from_column_slice(&data),
+    );
 
-    let init_vec = init_sc.as_vector().unwrap();
+    let init_vec = init_sc.as_vector();
 
     let mut init2 = init_sc;
-    init2.set(epoch, &init_vec).unwrap();
+    init2.set(epoch, &init_vec);
 
     assert_eq!(init_sc, init2);
 }

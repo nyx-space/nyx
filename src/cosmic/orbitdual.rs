@@ -16,11 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::{Frame, Orbit, ECC_EPSILON};
+use super::{AstroError, Frame, Orbit, ECC_EPSILON};
 use crate::linalg::{Vector3, U7};
 use crate::md::StateParameter;
 use crate::time::Epoch;
-use crate::{NyxError, TimeTagged};
+use crate::TimeTagged;
 use hyperdual::linalg::norm;
 use hyperdual::{Float, OHyperdual};
 use std::f64::consts::PI;
@@ -114,7 +114,7 @@ impl fmt::Display for OrbitPartial {
 }
 
 impl OrbitDual {
-    pub fn partial_for(&self, param: StateParameter) -> Result<OrbitPartial, NyxError> {
+    pub fn partial_for(&self, param: StateParameter) -> Result<OrbitPartial, AstroError> {
         match param {
             StateParameter::X => Ok(OrbitPartial {
                 dual: self.x,
@@ -168,7 +168,7 @@ impl OrbitDual {
             StateParameter::HyperbolicAnomaly => self.hyperbolic_anomaly(),
             StateParameter::SemiParameter => Ok(self.semi_parameter()),
             StateParameter::SemiMinorAxis => Ok(self.semi_minor_axis()),
-            _ => Err(NyxError::PartialsUndefined),
+            _ => Err(AstroError::PartialsUndefined),
         }
     }
 
@@ -703,11 +703,9 @@ impl OrbitDual {
     }
 
     /// Returns the hyperbolic anomaly in degrees between 0 and 360.0
-    pub fn hyperbolic_anomaly(&self) -> Result<OrbitPartial, NyxError> {
+    pub fn hyperbolic_anomaly(&self) -> Result<OrbitPartial, AstroError> {
         if self.ecc().real() <= 1.0 {
-            Err(NyxError::NotHyperbolic(
-                "Orbit is not hyperbolic so there is no hyperbolic anomaly.".to_string(),
-            ))
+            Err(AstroError::NotHyperbolic)
         } else {
             let (sin_ta, cos_ta) = self.ta().dual.to_radians().sin_cos();
             let sinh_h = (sin_ta * (self.ecc().dual.powi(2) - OHyperdual::from(1.0)).sqrt())

@@ -24,7 +24,7 @@ use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 use crate::polyfit::hermite::hermite_eval;
 use crate::time::Epoch;
-use crate::{NyxError, Orbit, Spacecraft, State};
+use crate::{Orbit, Spacecraft, State};
 
 use enum_iterator::all;
 
@@ -37,7 +37,7 @@ where
         + Allocator<f64, Self::VecLength>,
 {
     /// Interpolates a new state at the provided epochs given a slice of states.
-    fn interpolate(self, epoch: Epoch, states: &[Self]) -> Result<Self, NyxError>;
+    fn interpolate(self, epoch: Epoch, states: &[Self]) -> Self;
 
     /// Returns the frame of this state
     fn frame(&self) -> Frame;
@@ -53,7 +53,7 @@ where
 }
 
 impl Interpolatable for Orbit {
-    fn interpolate(self, epoch: Epoch, states: &[Self]) -> Result<Self, NyxError> {
+    fn interpolate(self, epoch: Epoch, states: &[Self]) -> Self {
         // This is copied from ANISE
 
         // Statically allocated arrays of the maximum number of samples
@@ -81,21 +81,24 @@ impl Interpolatable for Orbit {
             &xs[..states.len()],
             &vxs[..states.len()],
             epoch.to_et_seconds(),
-        )?;
+        )
+        .unwrap();
 
         let (y_km, vy_km_s) = hermite_eval(
             &epochs_tdb[..states.len()],
             &ys[..states.len()],
             &vys[..states.len()],
             epoch.to_et_seconds(),
-        )?;
+        )
+        .unwrap();
 
         let (z_km, vz_km_s) = hermite_eval(
             &epochs_tdb[..states.len()],
             &zs[..states.len()],
             &vzs[..states.len()],
             epoch.to_et_seconds(),
-        )?;
+        )
+        .unwrap();
 
         // And build the result
         let mut me = self;
@@ -107,7 +110,7 @@ impl Interpolatable for Orbit {
         me.vz_km_s = vz_km_s;
         me.set_epoch(epoch);
 
-        Ok(me)
+        me
     }
 
     fn frame(&self) -> Frame {
@@ -160,13 +163,13 @@ impl Interpolatable for Orbit {
 }
 
 impl Interpolatable for Spacecraft {
-    fn interpolate(self, epoch: Epoch, states: &[Self]) -> Result<Self, NyxError> {
+    fn interpolate(self, epoch: Epoch, states: &[Self]) -> Self {
         // Use the Orbit interpolation first.
         let orbit = Orbit::interpolate(
             self.orbit,
             epoch,
             &states.iter().map(|sc| sc.orbit).collect::<Vec<_>>(),
-        )?;
+        );
 
         // Fuel is linearly interpolated -- should really be a Lagrange interpolation here
         let fuel_kg_dt = (states.last().unwrap().fuel_mass_kg
@@ -178,7 +181,7 @@ impl Interpolatable for Spacecraft {
         me.fuel_mass_kg += fuel_kg_dt
             * (epoch.to_tdb_seconds() - states.first().unwrap().epoch().to_tdb_seconds());
 
-        Ok(me)
+        me
     }
 
     fn frame(&self) -> Frame {

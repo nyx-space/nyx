@@ -29,6 +29,7 @@ pub use mnvr::Mnvr;
 
 mod ruggiero;
 pub use ruggiero::{Objective, Ruggiero, StateParameter};
+use snafu::Snafu;
 
 use std::fmt;
 
@@ -110,6 +111,38 @@ pub(crate) fn ra_dec_from_unit_vector(vhat: Vector3<f64>) -> (f64, f64) {
     let alpha = vhat[1].atan2(vhat[0]);
     let delta = vhat[2].asin();
     (alpha, delta)
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Snafu)]
+pub enum GuidanceErrors {
+    #[snafu(display("No thruster attached to spacecraft"))]
+    NoThrustersDefined,
+    #[snafu(display("Throttle is not between 0.0 and 1.0: {ratio}"))]
+    ThrottleRatio { ratio: f64 },
+    #[snafu(display("Invalid finite burn control direction u = [{x}, {y}, {z}] => i-plane = {in_plane_deg} deg, Delta = {out_of_plane_deg} deg",))]
+    InvalidDirection {
+        x: f64,
+        y: f64,
+        z: f64,
+        in_plane_deg: f64,
+        out_of_plane_deg: f64,
+    },
+    #[snafu(display("Invalid finite burn control rate u = [{x}, {y}, {z}] => in-plane = {in_plane_deg_s} deg/s, out of plane = {out_of_plane_deg_s} deg/s",))]
+    InvalidRate {
+        x: f64,
+        y: f64,
+        z: f64,
+        in_plane_deg_s: f64,
+        out_of_plane_deg_s: f64,
+    },
+    #[snafu(display("Invalid finite burn control acceleration u = [{x}, {y}, {z}] => in-plane = {in_plane_deg_s2} deg/s^2, out of plane = {out_of_plane_deg_s2} deg/s^2",))]
+    InvalidAcceleration {
+        x: f64,
+        y: f64,
+        z: f64,
+        in_plane_deg_s2: f64,
+        out_of_plane_deg_s2: f64,
+    },
 }
 
 #[test]

@@ -89,32 +89,34 @@ impl TrkConfig {
     /// Check that the configuration is valid: a successful call means that either we have a set of tracking strands or we have a valid scheduler
     pub(crate) fn sanity_check(&self) -> Result<(), ConfigError> {
         if self.strands.is_some() && self.scheduler.is_some() {
-            return Err(ConfigError::InvalidConfig(
-                "Both tracking strands and a scheduler are configured, must be one or the other"
-                    .to_string(),
-            ));
+            return Err(ConfigError::InvalidConfig {
+                msg:
+                    "Both tracking strands and a scheduler are configured, must be one or the other"
+                        .to_string(),
+            });
         } else if let Some(strands) = &self.strands {
             if strands.is_empty() && self.scheduler.is_none() {
-                return Err(ConfigError::InvalidConfig(
-                    "Provided tracking strands is empty and no scheduler is defined".to_string(),
-                ));
+                return Err(ConfigError::InvalidConfig {
+                    msg: "Provided tracking strands is empty and no scheduler is defined"
+                        .to_string(),
+                });
             }
             for (ii, strand) in strands.iter().enumerate() {
                 if strand.duration() < self.sampling {
-                    return Err(ConfigError::InvalidConfig(format!(
-                        "Strand #{ii} is shorter than sampling time"
-                    )));
+                    return Err(ConfigError::InvalidConfig {
+                        msg: format!("Strand #{ii} is shorter than sampling time"),
+                    });
                 }
                 if strand.duration().is_negative() {
-                    return Err(ConfigError::InvalidConfig(format!(
-                        "Strand #{ii} is anti-chronological"
-                    )));
+                    return Err(ConfigError::InvalidConfig {
+                        msg: format!("Strand #{ii} is anti-chronological"),
+                    });
                 }
             }
         } else if self.strands.is_none() && self.scheduler.is_none() {
-            return Err(ConfigError::InvalidConfig(
-                "Neither tracking strands not a scheduler is provided".to_string(),
-            ));
+            return Err(ConfigError::InvalidConfig {
+                msg: "Neither tracking strands not a scheduler is provided".to_string(),
+            });
         }
 
         Ok(())
