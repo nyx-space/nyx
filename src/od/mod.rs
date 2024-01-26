@@ -16,12 +16,18 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use crate::dynamics::DynamicsError;
 pub use crate::dynamics::{Dynamics, NyxError};
+use crate::io::{ConfigError, InputOutputError};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
+use crate::md::trajectory::TrajError;
+use crate::propagators::PropagationError;
 use crate::time::Epoch;
 use crate::Orbit;
 pub use crate::{cosmic::Cosm, State, TimeTagged};
+use hifitime::Duration;
+use snafu::prelude::Snafu;
 use std::sync::Arc;
 
 pub mod filter;
@@ -149,4 +155,35 @@ where
     {
         OMatrix::<f64, O::MeasurementSize, Self::Size>::identity()
     }
+}
+
+#[derive(Debug, PartialEq, Snafu)]
+#[snafu(visibility(pub(crate)))]
+pub enum ODError {
+    #[snafu(display("during an orbit determination, encountered {source}"))]
+    ODPropError { source: PropagationError },
+    #[snafu(display("during an orbit determination, encountered {source}"))]
+    ODDynamicsError { source: DynamicsError },
+    #[snafu(display("at least {need} measurements required for {action}"))]
+    TooFewMeasurements { need: usize, action: &'static str },
+    #[snafu(display("invalid step size: {step}"))]
+    StepSizeError { step: Duration },
+    #[snafu(display("filter iteration did not converge in {loops} iterations"))]
+    Diverged { loops: usize },
+    #[snafu(display("STM is singular"))]
+    SingularStateTransitionMatrix,
+    #[snafu(display("invalid measurement @ {epoch} = {val}"))]
+    InvalidMeasurement { epoch: Epoch, val: f64 },
+    #[snafu(display("sensitivity matrix must be updated before this call"))]
+    SensitivityNotUpdated,
+    #[snafu(display("Kalman gain is singular"))]
+    SingularKalmanGain,
+    #[snafu(display("{kind} noise not configured"))]
+    NoiseNotConfigured { kind: &'static str },
+    #[snafu(display("during an OD encountered {source}"))]
+    ODTrajError { source: TrajError },
+    #[snafu(display("OD failed because {source}"))]
+    ODConfigError { source: ConfigError },
+    #[snafu(display("OD failed because of an I/O error: {source}"))]
+    ODIOError { source: InputOutputError },
 }

@@ -35,9 +35,11 @@ impl Traj<Spacecraft> {
     #[allow(clippy::map_clone)]
     pub fn to_frame(&self, new_frame: Frame, cosm: Arc<Cosm>) -> Result<Self, NyxError> {
         if self.states.is_empty() {
-            return Err(NyxError::Trajectory(TrajError::CreationError(
-                "No trajectory to convert".to_string(),
-            )));
+            return Err(NyxError::Trajectory {
+                source: TrajError::CreationError {
+                    msg: "No trajectory to convert".to_string(),
+                },
+            });
         }
 
         #[cfg(not(target_arch = "wasm32"))]

@@ -20,7 +20,7 @@ use hifitime::{Duration, Epoch, Unit};
 use pyo3::prelude::*;
 
 use super::SpacecraftTraj;
-use crate::md::trajectory::ExportCfg;
+use crate::md::trajectory::{ExportCfg, TrajError};
 use crate::python::cosmic::Frame;
 use crate::{
     md::{
@@ -48,7 +48,7 @@ impl OrbitTraj {
     }
 
     /// Returns the state at the provided epoch, or raises an exception if the epoch is outside of the bounds of the trajectory
-    fn at(&self, epoch: Epoch) -> Result<Orbit, NyxError> {
+    fn at(&self, epoch: Epoch) -> Result<Orbit, TrajError> {
         self.inner.at(epoch)
     }
 
@@ -175,7 +175,7 @@ impl OrbitTraj {
 
         match maybe {
             Ok(path) => Ok(format!("{}", path.to_str().unwrap())),
-            Err(e) => Err(NyxError::CustomError(e.to_string())),
+            Err(e) => Err(NyxError::CustomError { msg: e.to_string() }),
         }
     }
 
@@ -204,7 +204,7 @@ impl OrbitTraj {
             cfg.unwrap_or_else(|| ExportCfg::default()),
         ) {
             Ok(path) => Ok(format!("{}", path.to_str().unwrap())),
-            Err(e) => Err(NyxError::CustomError(e.to_string())),
+            Err(e) => Err(NyxError::CustomError { msg: e.to_string() }),
         }
     }
 

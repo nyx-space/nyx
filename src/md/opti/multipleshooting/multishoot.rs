@@ -16,12 +16,14 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use snafu::ResultExt;
+
 pub use super::CostFunction;
-// use crate::dynamics::guidance::{FiniteBurns, Mnvr};
+use super::{MultipleShootingError, TargetingSnafu};
 use crate::linalg::{DMatrix, DVector, SVector};
 use crate::md::opti::solution::TargeterSolution;
 use crate::md::optimizer::Optimizer;
-use crate::md::prelude::*;
+use crate::md::{prelude::*, TargetingError};
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::pseudo_inverse;
 use crate::{Orbit, Spacecraft};
@@ -71,7 +73,7 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
     pub fn solve(
         &mut self,
         cost: CostFunction,
-    ) -> Result<MultipleShootingSolution<T, OT>, NyxError> {
+    ) -> Result<MultipleShootingSolution<T, OT>, MultipleShootingError> {
         let mut prev_cost = 1e12; // We don't use infinity because we compare a ratio of cost
         for it in 0..self.max_iterations {
             let mut initial_states = Vec::with_capacity(self.targets.len());
@@ -95,14 +97,13 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
                     objective_frame: None,
                     correction_frame: None,
                 };
-                let sol = match tgt.try_achieve_dual(
-                    initial_states[i],
-                    initial_states[i].epoch(),
-                    self.targets[i].epoch(),
-                ) {
-                    Ok(sol) => sol,
-                    Err(e) => return Err(NyxError::MultipleShootingTargeter(i, Box::new(e))),
-                };
+                let sol = tgt
+                    .try_achieve_dual(
+                        initial_states[i],
+                        initial_states[i].epoch(),
+                        self.targets[i].epoch(),
+                    )
+                    .with_context(|_| TargetingSnafu { segment: i })?;
 
                 let nominal_delta_v = sol.correction;
 
@@ -132,14 +133,13 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
                      ** is the initial state to reach the i-th node.
                      ** *** */
                     let inner_tgt_a = Optimizer::delta_v(self.prop, next_node);
-                    let inner_sol_a = match inner_tgt_a.try_achieve_dual(
-                        initial_states[i],
-                        initial_states[i].epoch(),
-                        self.targets[i].epoch(),
-                    ) {
-                        Ok(sol) => sol,
-                        Err(e) => return Err(NyxError::MultipleShootingTargeter(i, Box::new(e))),
-                    };
+                    let inner_sol_a = inner_tgt_a
+                        .try_achieve_dual(
+                            initial_states[i],
+                            initial_states[i].epoch(),
+                            self.targets[i].epoch(),
+                        )
+                        .with_context(|_| TargetingSnafu { segment: i })?;
 
                     // ∂Δv_x / ∂r_x
                     outer_jacobian[(3 * i, OT * i + axis)] = (inner_sol_a.correction[0]
@@ -158,11 +158,13 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
                      ** 2.C. Rerun the targeter from the new state at the perturbed node to the next unpertubed node
                      ** *** */
                     let inner_tgt_b = Optimizer::delta_v(self.prop, self.targets[i + 1].into());
-                    let inner_sol_b = inner_tgt_b.try_achieve_dual(
-                        inner_sol_a.achieved_state,
-                        inner_sol_a.achieved_state.epoch(),
-                        self.targets[i + 1].epoch(),
-                    )?;
+                    let inner_sol_b = inner_tgt_b
+                        .try_achieve_dual(
+                            inner_sol_a.achieved_state,
+                            inner_sol_a.achieved_state.epoch(),
+                            self.targets[i + 1].epoch(),
+                        )
+                        .with_context(|_| TargetingSnafu { segment: i })?;
 
                     // Compute the partials wrt the next Δv
                     // ∂Δv_x / ∂r_x
@@ -245,11 +247,13 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
                 for (i, node) in self.targets.iter().enumerate() {
                     // Run the unpertubed targeter
                     let tgt = Optimizer::delta_v(self.prop, (*node).into());
-                    let sol = tgt.try_achieve_dual(
-                        initial_states[i],
-                        initial_states[i].epoch(),
-                        node.epoch(),
-                    )?;
+                    let sol = tgt
+                        .try_achieve_dual(
+                            initial_states[i],
+                            initial_states[i].epoch(),
+                            node.epoch(),
+                        )
+                        .with_context(|_| TargetingSnafu { segment: i })?;
                     initial_states.push(sol.achieved_state);
                     ms_sol.solutions.push(sol);
                 }
@@ -259,13 +263,8 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
 
             prev_cost = new_cost;
             // 2. Solve for the next position of the nodes using a pseudo inverse.
-            let inv_jac = match pseudo_inverse!(&outer_jacobian) {
-                Ok(inv_jac) => inv_jac,
-                Err(e) => {
-                    error!("Singular Jacobian {:.3}", outer_jacobian);
-                    return Err(e);
-                }
-            };
+            let inv_jac = pseudo_inverse!(&outer_jacobian)
+                .with_context(|_| TargetingSnafu { segment: 0_usize })?;
             let delta_r = inv_jac * cost_vec;
             // 3. Apply the correction to the node positions and iterator
             let node_vector = -delta_r;
@@ -276,7 +275,10 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
             }
             self.current_iteration += 1;
         }
-        Err(NyxError::MaxIterReached(format!("{}", self.max_iterations)))
+        Err(MultipleShootingError::TargetingError {
+            segment: 0_usize,
+            source: TargetingError::TooManyIterations,
+        })
     }
 }
 
@@ -353,12 +355,13 @@ impl<T: MultishootNode<O>, const O: usize> MultipleShootingSolution<T, O> {
     pub fn build_trajectories<'a, E: ErrorCtrl>(
         &self,
         prop: &'a Propagator<'a, SpacecraftDynamics, E>,
-    ) -> Result<Vec<ScTraj>, NyxError> {
+    ) -> Result<Vec<ScTraj>, MultipleShootingError> {
         let mut trajz = Vec::with_capacity(self.nodes.len());
 
         for (i, node) in self.nodes.iter().enumerate() {
-            let (_, traj) =
-                Optimizer::delta_v(prop, (*node).into()).apply_with_traj(&self.solutions[i])?;
+            let (_, traj) = Optimizer::delta_v(prop, (*node).into())
+                .apply_with_traj(&self.solutions[i])
+                .with_context(|_| TargetingSnafu { segment: i })?;
             trajz.push(traj);
         }
 

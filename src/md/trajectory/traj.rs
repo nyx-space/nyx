@@ -73,9 +73,9 @@ where
     }
 
     /// Evaluate the trajectory at this specific epoch.
-    pub fn at(&self, epoch: Epoch) -> Result<S, NyxError> {
+    pub fn at(&self, epoch: Epoch) -> Result<S, TrajError> {
         if self.states.is_empty() || self.first().epoch() > epoch || self.last().epoch() < epoch {
-            return Err(NyxError::Trajectory(TrajError::NoInterpolationData(epoch)));
+            return Err(TrajError::NoInterpolationData { epoch });
         }
         match self
             .states
@@ -89,7 +89,7 @@ where
                 if idx == 0 || idx >= self.states.len() {
                     // The binary search returns where we should insert the data, so if it's at either end of the list, then we're out of bounds.
                     // This condition should have been handled by the check at the start of this function.
-                    return Err(NyxError::Trajectory(TrajError::NoInterpolationData(epoch)));
+                    return Err(TrajError::NoInterpolationData { epoch });
                 }
                 // This is the closest index, so let's grab the items around it.
                 // NOTE: This is essentially the same code as in ANISE for the Hermite SPK type 13
@@ -111,7 +111,7 @@ where
                     states.push(self.states[idx]);
                 }
 
-                self.states[idx].interpolate(epoch, &states)
+                Ok(self.states[idx].interpolate(epoch, &states))
             }
         }
     }
@@ -306,9 +306,11 @@ where
     /// This may lead to aliasing due to the Nyquist–Shannon sampling theorem.
     pub fn resample(&self, step: Duration) -> Result<Self, NyxError> {
         if self.states.is_empty() {
-            return Err(NyxError::Trajectory(TrajError::CreationError(
-                "No trajectory to convert".to_string(),
-            )));
+            return Err(NyxError::Trajectory {
+                source: TrajError::CreationError {
+                    msg: "No trajectory to convert".to_string(),
+                },
+            });
         }
 
         let mut traj = Self::new();
@@ -325,9 +327,11 @@ where
     /// This may lead to aliasing due to the Nyquist–Shannon sampling theorem.
     pub fn rebuild(&self, epochs: &[Epoch]) -> Result<Self, NyxError> {
         if self.states.is_empty() {
-            return Err(NyxError::Trajectory(TrajError::CreationError(
-                "No trajectory to convert".to_string(),
-            )));
+            return Err(NyxError::Trajectory {
+                source: TrajError::CreationError {
+                    msg: "No trajectory to convert".to_string(),
+                },
+            });
         }
 
         let mut traj = Self::new();
@@ -595,11 +599,15 @@ where
     /// Add one trajectory to another, returns an error if the frames don't match
     fn add(self, other: &Traj<S>) -> Self::Output {
         if self.first().frame() != other.first().frame() {
-            Err(NyxError::Trajectory(TrajError::CreationError(format!(
-                "Frame mismatch in add operation: {} != {}",
-                self.first().frame(),
-                other.first().frame()
-            ))))
+            Err(NyxError::Trajectory {
+                source: TrajError::CreationError {
+                    msg: format!(
+                        "Frame mismatch in add operation: {} != {}",
+                        self.first().frame(),
+                        other.first().frame()
+                    ),
+                },
+            })
         } else {
             if self.last().epoch() < other.first().epoch() {
                 let gap = other.first().epoch() - self.last().epoch();

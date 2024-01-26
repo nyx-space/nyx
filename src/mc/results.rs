@@ -19,6 +19,7 @@ use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 use crate::md::trajectory::{Interpolatable, Traj};
 use crate::md::StateParameter;
+use crate::propagators::PropagationError;
 use crate::time::{Duration, Epoch};
 use crate::NyxError;
 pub use rstats::Stats;
@@ -39,7 +40,7 @@ where
     /// The original dispersed state
     pub dispersed_state: DispersedState<S>,
     /// The result from this run
-    pub result: Result<R, NyxError>,
+    pub result: Result<R, PropagationError>,
 }
 
 /// A structure of Monte Carlo results
@@ -225,10 +226,10 @@ where
                 }
             }
             // Oh, this parameter was not found!
-            return Err(NyxError::StateParameterUnavailable(
+            return Err(NyxError::StateParameterUnavailable {
                 param,
-                "not among dispersions of Monte Carlo setup".to_string(),
-            ));
+                msg: "not among dispersions of Monte Carlo setup".to_string(),
+            });
         }
         Ok(report)
     }

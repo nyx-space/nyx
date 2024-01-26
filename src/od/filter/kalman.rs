@@ -16,14 +16,14 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+pub use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector, U3};
-
-pub use crate::errors::NyxError;
 pub use crate::od::estimate::{Estimate, KfEstimate, Residual};
 pub use crate::od::snc::SNC;
-use crate::od::{Filter, State};
+use crate::od::{Filter, ODDynamicsSnafu, ODError, State};
 pub use crate::time::{Epoch, Unit};
+use snafu::prelude::*;
 
 /// Defines both a Classical and an Extended Kalman filter (CKF and EKF)
 /// T: Type of state
@@ -224,8 +224,8 @@ where
     /// Computes a time update/prediction (i.e. advances the filter estimate with the updated STM).
     ///
     /// May return a FilterError if the STM was not updated.
-    fn time_update(&mut self, nominal_state: T) -> Result<Self::Estimate, NyxError> {
-        let stm = nominal_state.stm()?;
+    fn time_update(&mut self, nominal_state: T) -> Result<Self::Estimate, ODError> {
+        let stm = nominal_state.stm().with_context(|_| ODDynamicsSnafu)?;
         let mut covar_bar = stm * self.prev_estimate.covar * stm.transpose();
 
         // Try to apply an SNC, if applicable
@@ -301,12 +301,12 @@ where
         real_obs: &OVector<f64, M>,
         computed_obs: &OVector<f64, M>,
         resid_ratio_check: Option<f64>,
-    ) -> Result<(Self::Estimate, Residual<M>), NyxError> {
+    ) -> Result<(Self::Estimate, Residual<M>), ODError> {
         if !self.h_tilde_updated {
-            return Err(NyxError::SensitivityNotUpdated);
+            return Err(ODError::SensitivityNotUpdated);
         }
 
-        let stm = nominal_state.stm()?;
+        let stm = nominal_state.stm().with_context(|_| ODDynamicsSnafu)?;
 
         let epoch = nominal_state.epoch();
 
@@ -384,7 +384,7 @@ where
         // Compute the Kalman gain but first adding the measurement noise to H⋅P⋅H^T
         let mut invertible_part = h_p_ht + &self.measurement_noise;
         if !invertible_part.try_inverse_mut() {
-            return Err(NyxError::SingularKalmanGain);
+            return Err(ODError::SingularKalmanGain);
         }
 
         let gain = covar_bar * h_tilde_t * &invertible_part;

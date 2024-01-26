@@ -16,6 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use snafu::Snafu;
+
+use crate::md::{trajectory::TrajError, TargetingError};
+
 pub mod altitude_heuristic;
 pub mod ctrlnodes;
 pub mod equidistant_heuristic;
@@ -28,4 +32,15 @@ pub enum CostFunction {
     MinimumEnergy,
     /// J = ∫ |\vec{u}| dt -- Warning, this may lead to loads to bang-coast-bang solutions
     MinimumFuel,
+}
+
+#[derive(Debug, PartialEq, Snafu)]
+pub enum MultipleShootingError {
+    #[snafu(display("segment #{segment} encountered {source}"))]
+    TargetingError {
+        segment: usize,
+        source: TargetingError,
+    },
+    #[snafu(display("during a multiple shooting,  encountered {source}"))]
+    MultiShootTrajError { source: TrajError },
 }

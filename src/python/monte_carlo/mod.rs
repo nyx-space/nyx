@@ -56,10 +56,12 @@ fn generate_orbits(
         "abs" => GaussianGenerator::from_3std_devs(orbit, &parameters)?,
         "prct" => GaussianGenerator::from_3std_dev_prcts(orbit, &parameters)?,
         _ => {
-            return Err(NyxError::CustomError(format!(
-                "Unknown kind of distribution: {} (should be 'abs' or 'prct')",
-                kind
-            )))
+            return Err(NyxError::CustomError {
+                msg: format!(
+                    "Unknown kind of distribution: {} (should be 'abs' or 'prct')",
+                    kind
+                ),
+            })
         }
     };
 
@@ -90,10 +92,12 @@ fn generate_spacecraft(
         "abs" => GaussianGenerator::from_3std_devs(spacecraft, &parameters)?,
         "prct" => GaussianGenerator::from_3std_dev_prcts(spacecraft, &parameters)?,
         _ => {
-            return Err(NyxError::CustomError(format!(
-                "Unknown kind of distribution: {} (should be 'abs' or 'prct')",
-                kind
-            )))
+            return Err(NyxError::CustomError {
+                msg: format!(
+                    "Unknown kind of distribution: {} (should be 'abs' or 'prct')",
+                    kind
+                ),
+            })
         }
     };
 

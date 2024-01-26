@@ -46,20 +46,21 @@ impl GroundTrackingArcSim {
         trajectory: TrajectoryLoader,
         configs: BTreeMap<String, TrkConfig>,
         seed: u64,
-    ) -> Result<Self, NyxError> {
+    ) -> Result<Self, ConfigError> {
         // Try to convert the dynamic trajectory into a trajectory
         let inner = if let Ok(sc_traj) = trajectory.to_traj::<Spacecraft>() {
-            let inner = TrackingArcSim::with_seed(devices, sc_traj, configs, seed)
-                .map_err(NyxError::ConfigError)?;
+            let inner = TrackingArcSim::with_seed(devices, sc_traj, configs, seed)?;
 
             Either::Left(inner)
         } else if let Ok(traj) = trajectory.to_traj::<Orbit>() {
-            let inner = TrackingArcSim::with_seed(devices, traj, configs, seed)
-                .map_err(NyxError::ConfigError)?;
+            let inner = TrackingArcSim::with_seed(devices, traj, configs, seed)?;
 
             Either::Right(inner)
         } else {
-            return Err(NyxError::CustomError("Provided trajectory could neither be parsed as an orbit trajectory or a spacecraft trajectory".to_string()));
+            return Err(ConfigError::InvalidConfig {
+                msg: "Trajectory could neither be parsed as an orbit nor spacecraft trajectory"
+                    .to_string(),
+            });
         };
 
         Ok(Self { inner })
@@ -83,7 +84,7 @@ impl GroundTrackingArcSim {
 
         match maybe {
             Ok(path) => Ok(format!("{}", path.to_str().unwrap())),
-            Err(e) => Err(NyxError::CustomError(e.to_string())),
+            Err(e) => Err(NyxError::CustomError { msg: e.to_string() }),
         }
     }
 

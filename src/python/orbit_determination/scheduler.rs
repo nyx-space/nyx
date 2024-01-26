@@ -17,7 +17,8 @@
 */
 pub use crate::io::ConfigError;
 pub use crate::od::simulator::{Cadence, Handoff, Scheduler, Strand};
-use crate::NyxError;
+use crate::python::PythonError;
+
 use hifitime::Duration;
 use pyo3::basic::CompareOp;
 use pyo3::prelude::*;
@@ -42,14 +43,18 @@ impl Scheduler {
         if cadence_on.is_some() || cadence_off.is_some() {
             me.cadence = Cadence::Intermittent {
                 on: Duration::from_str(cadence_on.unwrap().as_str()).map_err(|e| {
-                    ConfigError::InvalidConfig(format!(
+                    ConfigError::InvalidConfig {
+                        msg: format!(
                         "{e} invalid format for schedule on (must be specified if schedule off is)"
-                    ))
+                    ),
+                    }
                 })?,
                 off: Duration::from_str(cadence_off.unwrap().as_str()).map_err(|e| {
-                    ConfigError::InvalidConfig(format!(
+                    ConfigError::InvalidConfig {
+                        msg: format!(
                         "{e} invalid format for schedule off (must be specified if schedule on is)"
-                    ))
+                    ),
+                    }
                 })?,
             };
         }
@@ -65,11 +70,11 @@ impl Scheduler {
         format!("{self:?}")
     }
 
-    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, NyxError> {
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, PythonError> {
         match op {
             CompareOp::Eq => Ok(self == other),
             CompareOp::Ne => Ok(self != other),
-            _ => Err(NyxError::CustomError(format!("{op:?} not available"))),
+            _ => Err(PythonError::OperationError { op }),
         }
     }
 }

@@ -83,10 +83,10 @@ impl FrameTree {
         if f.name == name {
             Ok(cur_path.to_vec())
         } else if f.children.is_empty() {
-            Err(NyxError::ObjectNotFound(
-                name.to_string(),
-                f.children.iter().map(|c| c.name.clone()).collect(),
-            ))
+            Err(NyxError::ObjectNotFound {
+                needle: name.to_string(),
+                haystack: f.children.iter().map(|c| c.name.clone()).collect(),
+            })
         } else {
             for (cno, child) in f.children.iter().enumerate() {
                 let mut this_path = cur_path.to_owned();
@@ -97,10 +97,10 @@ impl FrameTree {
                 }
             }
             // Could not find name in iteration, fail
-            Err(NyxError::ObjectNotFound(
-                name.to_string(),
-                f.children.iter().map(|c| c.name.clone()).collect(),
-            ))
+            Err(NyxError::ObjectNotFound {
+                needle: name.to_string(),
+                haystack: f.children.iter().map(|c| c.name.clone()).collect(),
+            })
         }
     }
 }
@@ -244,10 +244,10 @@ impl Cosm {
         if f.name == frame_name {
             Ok(cur_path.to_vec())
         } else if f.children.is_empty() {
-            Err(NyxError::ObjectNotFound(
-                frame_name.to_string(),
-                f.children.iter().map(|c| c.name.clone()).collect(),
-            ))
+            Err(NyxError::ObjectNotFound {
+                needle: frame_name.to_string(),
+                haystack: f.children.iter().map(|c| c.name.clone()).collect(),
+            })
         } else {
             for child in &f.children {
                 let this_path = cur_path.to_owned();
@@ -257,10 +257,10 @@ impl Cosm {
                 }
             }
             // Could not find name in iteration, fail
-            Err(NyxError::ObjectNotFound(
-                frame_name.to_string(),
-                f.children.iter().map(|c| c.name.clone()).collect(),
-            ))
+            Err(NyxError::ObjectNotFound {
+                needle: frame_name.to_string(),
+                haystack: f.children.iter().map(|c| c.name.clone()).collect(),
+            })
         }
     }
 
@@ -410,7 +410,7 @@ impl Cosm {
                             let msg = format!("[frame.{}] - could not parse right_asc `{}` - are there any special characters? {}",
                             &name, &rot.right_asc, e);
                             error!("{}", msg);
-                            return Err(NyxError::LoadingError(msg));
+                            return Err(NyxError::LoadingError { msg });
                         }
                     };
                     let declin: Expr = match rot.declin.parse() {
@@ -419,7 +419,7 @@ impl Cosm {
                             let msg = format!("[frame.{}] - could not parse declin `{}` - are there any special characters? {}",
                             &name, &rot.declin, e);
                             error!("{}", msg);
-                            return Err(NyxError::LoadingError(msg));
+                            return Err(NyxError::LoadingError { msg });
                         }
                     };
                     let w_expr: Expr = match rot.w.parse() {
@@ -428,7 +428,7 @@ impl Cosm {
                             let msg = format!("[frame.{}] - could not parse w `{}` - are there any special characters? {}",
                             &name, &rot.w, e);
                             error!("{}", msg);
-                            return Err(NyxError::LoadingError(msg));
+                            return Err(NyxError::LoadingError { msg });
                         }
                     };
 
@@ -521,7 +521,9 @@ impl Cosm {
             }
             Err(e) => {
                 error!("{}", e);
-                Err(NyxError::LoadingError(format!("{e}")))
+                Err(NyxError::LoadingError {
+                    msg: format!("{e}"),
+                })
             }
         }
     }
@@ -660,24 +662,26 @@ impl Cosm {
         let interp = ephem
             .interpolator
             .as_ref()
-            .ok_or_else(|| NyxError::NoInterpolationData(ephem.name.clone()))?;
+            .ok_or_else(|| NyxError::NoInterpolationData {
+                msg: ephem.name.clone(),
+            })?;
 
         // the DE file epochs are all in ET mod julian
         let start_mod_julian_f64 = ephem.start_epoch.as_ref().unwrap().as_raw();
         let coefficient_count: usize = interp.position_degree as usize;
         if coefficient_count <= 2 {
             // Cf. https://gitlab.com/chrisrabotin/nyx/-/issues/131
-            return Err(NyxError::InvalidInterpolationData(format!(
-                "position_degree is less than 3 for XB {}",
-                ephem.name
-            )));
+            return Err(NyxError::InvalidInterpolationData {
+                msg: format!("position_degree is less than 3 for XB {}", ephem.name),
+            });
         }
 
         let exb_states = match interp
             .state_data
             .as_ref()
-            .ok_or_else(|| NyxError::NoStateData(ephem.name.clone()))?
-        {
+            .ok_or_else(|| NyxError::NoStateData {
+                msg: ephem.name.clone(),
+            })? {
             EqualStates(states) => states,
             VarwindowStates(_) => panic!("variable window not yet supported by Cosm"),
         };
@@ -694,9 +698,9 @@ impl Cosm {
             index -= 1;
             offset = interval_length;
         } else if index > exb_states.position.len() {
-            return Err(NyxError::NoInterpolationData(format!(
-                "No interpolation data for date {epoch}",
-            )));
+            return Err(NyxError::NoInterpolationData {
+                msg: format!("No interpolation data for date {epoch}",),
+            });
         }
         let pos_coeffs = &exb_states.position[index];
 

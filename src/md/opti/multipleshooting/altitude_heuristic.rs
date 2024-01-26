@@ -16,11 +16,14 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use snafu::ResultExt;
+
 use super::ctrlnodes::Node;
 use super::multishoot::MultipleShooting;
 pub use super::CostFunction;
+use super::{MultiShootTrajSnafu, MultipleShootingError, TargetingSnafu};
 use crate::errors::TargetingError;
-use crate::md::prelude::*;
+use crate::md::{prelude::*, PropSnafu};
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::{Orbit, Spacecraft};
 
@@ -37,18 +40,22 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
         body_frame: Frame,
         prop: &'a Propagator<'a, SpacecraftDynamics, E>,
         cosm: Arc<Cosm>,
-    ) -> Result<Self, NyxError> {
+    ) -> Result<Self, MultipleShootingError> {
         if node_count < 3 {
             error!("At least three nodes are needed for a multiple shooting optimization");
-            return Err(NyxError::Targeter(Box::new(
-                TargetingError::UnderdeterminedProblem,
-            )));
+            return Err(MultipleShootingError::TargetingError {
+                segment: 0_usize,
+                source: TargetingError::UnderdeterminedProblem,
+            });
         }
 
         if !body_frame.is_body_fixed() {
-            return Err(NyxError::Targeter(Box::new(TargetingError::FrameError(
-                "Body frame is not body fixed".to_string(),
-            ))));
+            return Err(MultipleShootingError::TargetingError {
+                segment: 0_usize,
+                source: TargetingError::FrameError {
+                    msg: "Body frame is not body fixed".to_string(),
+                },
+            });
         }
 
         let delta_t = xf.epoch() - x0.epoch();
@@ -56,7 +63,11 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
 
         let duration_increment = (xf.epoch() - x0.epoch()) / (node_count as f64);
 
-        let (_, traj) = prop.with(x0).for_duration_with_traj(delta_t)?;
+        let (_, traj) = prop
+            .with(x0)
+            .for_duration_with_traj(delta_t)
+            .with_context(|_| PropSnafu)
+            .with_context(|_| TargetingSnafu { segment: 0_usize })?;
 
         // Build each node successively (includes xf)
         let mut nodes = Vec::with_capacity(node_count + 1);
@@ -66,7 +77,10 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
         for i in 0..node_count {
             // Compute the position we want.
             let this_epoch = prev_node_epoch + duration_increment;
-            let orbit_point = traj.at(this_epoch)?.orbit;
+            let orbit_point = traj
+                .at(this_epoch)
+                .with_context(|_| MultiShootTrajSnafu)?
+                .orbit;
             // Convert this orbit into the body frame
             let orbit_point_bf = cosm.frame_chg(&orbit_point, body_frame);
             // Note that the altitude here might be different, so we scale the altitude change by the current altitude

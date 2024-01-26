@@ -15,6 +15,7 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
+use crate::python::PythonError;
 use crate::{
     cosmic::{DragConfig, SrpConfig},
     dynamics::guidance::Thruster,
@@ -50,9 +51,9 @@ impl Spacecraft {
         if orbit.is_none() && dry_mass_kg.is_none() && fuel_mass_kg.is_none() {
             Ok(Self::default())
         } else if orbit.is_none() || dry_mass_kg.is_none() || fuel_mass_kg.is_none() {
-            Err(NyxError::CustomError(format!(
-                "orbit and dry_mass_kg must be specified"
-            )))
+            Err(NyxError::CustomError {
+                msg: format!("orbit and dry_mass_kg must be specified"),
+            })
         } else {
             Ok(Self {
                 orbit: orbit.unwrap(),
@@ -90,16 +91,16 @@ impl Spacecraft {
         format!("{self}\n{self:x}")
     }
 
-    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, NyxError> {
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, PythonError> {
         match op {
             CompareOp::Eq => Ok(self == other),
             CompareOp::Ne => Ok(self != other),
-            _ => Err(NyxError::CustomError(format!("{op:?} not available"))),
+            _ => Err(PythonError::OperationError { op }),
         }
     }
 
     fn dumps(&self, py: Python) -> Result<PyObject, NyxError> {
-        pythonize(py, &self).map_err(|e| NyxError::CustomError(e.to_string()))
+        pythonize(py, &self).map_err(|e| NyxError::CustomError { msg: e.to_string() })
     }
 
     fn __getstate__(&self, py: Python) -> Result<PyObject, NyxError> {
@@ -109,11 +110,12 @@ impl Spacecraft {
     #[classmethod]
     /// Loads the SpacecraftDynamics from its YAML representation
     fn loads(_cls: &PyType, state: &PyAny) -> Result<Self, ConfigError> {
-        depythonize(state).map_err(|e| ConfigError::InvalidConfig(e.to_string()))
+        depythonize(state).map_err(|e| ConfigError::InvalidConfig { msg: e.to_string() })
     }
 
     fn __setstate__(&mut self, state: &PyAny) -> Result<(), ConfigError> {
-        *self = depythonize(state).map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
+        *self =
+            depythonize(state).map_err(|e| ConfigError::InvalidConfig { msg: e.to_string() })?;
         Ok(())
     }
 
@@ -164,16 +166,16 @@ impl SrpConfig {
         format!("{self:?}")
     }
 
-    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, NyxError> {
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, PythonError> {
         match op {
             CompareOp::Eq => Ok(self == other),
             CompareOp::Ne => Ok(self != other),
-            _ => Err(NyxError::CustomError(format!("{op:?} not available"))),
+            _ => Err(PythonError::OperationError { op }),
         }
     }
 
     fn dumps(&self, py: Python) -> Result<PyObject, NyxError> {
-        pythonize(py, &self).map_err(|e| NyxError::CustomError(e.to_string()))
+        pythonize(py, &self).map_err(|e| NyxError::CustomError { msg: e.to_string() })
     }
 
     fn __getstate__(&self, py: Python) -> Result<PyObject, NyxError> {
@@ -181,7 +183,8 @@ impl SrpConfig {
     }
 
     fn __setstate__(&mut self, state: &PyAny) -> Result<(), ConfigError> {
-        *self = depythonize(state).map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
+        *self =
+            depythonize(state).map_err(|e| ConfigError::InvalidConfig { msg: e.to_string() })?;
         Ok(())
     }
 
@@ -223,16 +226,16 @@ impl DragConfig {
         format!("{self:?}")
     }
 
-    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, NyxError> {
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, PythonError> {
         match op {
             CompareOp::Eq => Ok(self == other),
             CompareOp::Ne => Ok(self != other),
-            _ => Err(NyxError::CustomError(format!("{op:?} not available"))),
+            _ => Err(PythonError::OperationError { op }),
         }
     }
 
     fn dumps(&self, py: Python) -> Result<PyObject, NyxError> {
-        pythonize(py, &self).map_err(|e| NyxError::CustomError(e.to_string()))
+        pythonize(py, &self).map_err(|e| NyxError::CustomError { msg: e.to_string() })
     }
 
     fn __getstate__(&self, py: Python) -> Result<PyObject, NyxError> {
@@ -240,7 +243,8 @@ impl DragConfig {
     }
 
     fn __setstate__(&mut self, state: &PyAny) -> Result<(), ConfigError> {
-        *self = depythonize(state).map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
+        *self =
+            depythonize(state).map_err(|e| ConfigError::InvalidConfig { msg: e.to_string() })?;
         Ok(())
     }
 

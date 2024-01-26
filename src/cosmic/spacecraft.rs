@@ -22,6 +22,7 @@ use serde::{Deserialize, Serialize};
 use super::eclipse::Cosm;
 use super::{Orbit, State};
 use crate::dynamics::guidance::Thruster;
+use crate::dynamics::DynamicsError;
 use crate::errors::NyxError;
 use crate::io::{orbit_from_str, ConfigRepr, Configurable};
 use crate::linalg::{Const, DimName, Matrix6, OMatrix, OVector};
@@ -481,7 +482,7 @@ impl State for Spacecraft {
 
     /// The vector is organized as such:
     /// [X, Y, Z, Vx, Vy, Vz, Cr, Cd, Fuel mass, STM(9x9)]
-    fn as_vector(&self) -> Result<OVector<f64, Const<90>>, NyxError> {
+    fn as_vector(&self) -> OVector<f64, Const<90>> {
         let mut vector = OVector::<f64, Const<90>>::zeros();
         // Set the orbit state info
         for (i, val) in self.orbit.to_cartesian_vec().iter().enumerate() {
@@ -503,12 +504,12 @@ impl State for Spacecraft {
                 vector[idx + Self::Size::dim()] = *stm_val;
             }
         }
-        Ok(vector)
+        vector
     }
 
     /// Vector is expected to be organized as such:
     /// [X, Y, Z, Vx, Vy, Vz, Cr, Cd, Fuel mass, STM(9x9)]
-    fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Const<90>>) -> Result<(), NyxError> {
+    fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Const<90>>) {
         self.set_epoch(epoch);
         let sc_state =
             OVector::<f64, Self::Size>::from_column_slice(&vector.as_slice()[..Self::Size::dim()]);
@@ -535,19 +536,18 @@ impl State for Spacecraft {
             orbit_vec[idx + 6] = *stm_val;
         }
         // And set the orbit information
-        self.orbit.set(epoch, &orbit_vec)?;
+        self.orbit.set(epoch, &orbit_vec);
         self.srp.cr = sc_state[6];
         self.drag.cd = sc_state[7];
         self.fuel_mass_kg = sc_state[8];
-        Ok(())
     }
 
     /// diag(STM) = [X,Y,Z,Vx,Vy,Vz,Cr,Cd,Fuel]
     /// WARNING: Currently the STM assumes that the fuel mass is constant at ALL TIMES!
-    fn stm(&self) -> Result<OMatrix<f64, Self::Size, Self::Size>, NyxError> {
+    fn stm(&self) -> Result<OMatrix<f64, Self::Size, Self::Size>, DynamicsError> {
         match self.stm {
             Some(stm) => Ok(stm),
-            None => Err(NyxError::StateTransitionMatrixUnset),
+            None => Err(DynamicsError::StateTransitionMatrixUnset),
         }
     }
 

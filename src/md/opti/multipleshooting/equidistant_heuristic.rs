@@ -34,18 +34,16 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
         xf: Orbit,
         node_count: usize,
         prop: &'a Propagator<'a, SpacecraftDynamics, E>,
-    ) -> Result<Self, NyxError> {
+    ) -> Result<Self, TargetingError> {
         if node_count < 3 {
             error!("At least three nodes are needed for a multiple shooting optimization");
-            return Err(NyxError::Targeter(Box::new(
-                TargetingError::UnderdeterminedProblem,
-            )));
+            return Err(TargetingError::UnderdeterminedProblem);
         }
 
         // Compute the direction of the objective
         let mut direction = xf.radius() - x0.orbit.radius();
         if direction.norm() < 2e-16 {
-            return Err(NyxError::TargetsTooClose);
+            return Err(TargetingError::TargetsTooClose);
         }
         let distance_increment = direction.norm() / (node_count as f64);
         let duration_increment = (xf.epoch() - x0.epoch()) / (node_count as f64);

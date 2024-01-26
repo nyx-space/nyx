@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use snafu::prelude::*;
+
 mod interpolatable;
 mod orbit_traj;
 mod sc_traj;
@@ -31,42 +33,22 @@ pub use crate::io::ExportCfg;
 use super::StateParameter;
 use crate::time::{Duration, Epoch};
 
-use std::error::Error;
-use std::fmt;
-
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Snafu)]
 pub enum TrajError {
+    #[snafu(display("Event {event} not found between {start} and {end}"))]
     EventNotFound {
         start: Epoch,
         end: Epoch,
         event: String,
     },
-    NoInterpolationData(Epoch),
-    CreationError(String),
+    #[snafu(display("No interpolation data at {epoch}"))]
+    NoInterpolationData { epoch: Epoch },
+    #[snafu(display("Failed to create trajectory: {msg}"))]
+    CreationError { msg: String },
+    #[snafu(display("Probable bug: Requested epoch {req_epoch}, corresponding to an offset of {req_dur} in a spline of duration {spline_dur}"))]
     OutOfSpline {
         req_epoch: Epoch,
         req_dur: Duration,
         spline_dur: Duration,
     },
 }
-
-impl fmt::Display for TrajError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::EventNotFound { start, end, event } => {
-                write!(f, "Event {event} not found between {start} and {end}")
-            }
-            Self::CreationError(reason) => write!(f, "Failed to create trajectory: {reason}"),
-            Self::NoInterpolationData(e) => write!(f, "No interpolation data at {e}"),
-            Self::OutOfSpline {
-                req_epoch,
-                req_dur,
-                spline_dur,
-            } => {
-                write!(f, "Probable bug: Requested epoch {req_epoch}, corresponding to an offset of {req_dur} in a spline of duration {spline_dur}")
-            }
-        }
-    }
-}
-
-impl Error for TrajError {}

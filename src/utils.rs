@@ -660,17 +660,17 @@ pub(crate) fn dcm_assemble(r: Matrix3<f64>, drdt: Matrix3<f64>) -> Matrix6<f64> 
 #[macro_export]
 macro_rules! pseudo_inverse {
     ($mat:expr) => {{
-        use $crate::NyxError;
+        use $crate::md::TargetingError;
         let (rows, cols) = $mat.shape();
         if rows < cols {
             match ($mat * $mat.transpose()).try_inverse() {
                 Some(m1_inv) => Ok($mat.transpose() * m1_inv),
-                None => Err(NyxError::SingularJacobian),
+                None => Err(TargetingError::SingularJacobian),
             }
         } else {
             match ($mat.transpose() * $mat).try_inverse() {
                 Some(m2_inv) => Ok(m2_inv * $mat.transpose()),
-                None => Err(NyxError::SingularJacobian),
+                None => Err(TargetingError::SingularJacobian),
             }
         }
     }};

@@ -16,13 +16,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::{ra_dec_from_unit_vector, GuidanceLaw};
+use super::{ra_dec_from_unit_vector, GuidanceErrors, GuidanceLaw};
 use crate::cosmic::{Frame, GuidanceMode, Spacecraft};
 use crate::dynamics::guidance::unit_vector_from_ra_dec;
 use crate::linalg::Vector3;
 use crate::polyfit::CommonPolynomial;
 use crate::time::{Epoch, Unit};
-use crate::NyxError;
 use crate::State;
 use hifitime::{Duration, TimeUnits};
 use std::fmt;
@@ -135,7 +134,7 @@ impl Mnvr {
     }
 
     /// Set the time-invariant direction for this finite burn while keeping the other components as they are
-    pub fn set_direction(&mut self, vector: Vector3<f64>) -> Result<(), NyxError> {
+    pub fn set_direction(&mut self, vector: Vector3<f64>) -> Result<(), GuidanceErrors> {
         self.set_direction_and_rates(vector, self.rate(), self.accel())
     }
 
@@ -151,7 +150,7 @@ impl Mnvr {
     }
 
     /// Set the rate of direction for this finite burn while keeping the other components as they are
-    pub fn set_rate(&mut self, rate: Vector3<f64>) -> Result<(), NyxError> {
+    pub fn set_rate(&mut self, rate: Vector3<f64>) -> Result<(), GuidanceErrors> {
         self.set_direction_and_rates(self.direction(), rate, self.accel())
     }
 
@@ -167,7 +166,7 @@ impl Mnvr {
     }
 
     /// Set the acceleration of the direction of this finite burn while keeping the other components as they are
-    pub fn set_accel(&mut self, accel: Vector3<f64>) -> Result<(), NyxError> {
+    pub fn set_accel(&mut self, accel: Vector3<f64>) -> Result<(), GuidanceErrors> {
         self.set_direction_and_rates(self.direction(), self.rate(), accel)
     }
 
@@ -177,13 +176,16 @@ impl Mnvr {
         dir: Vector3<f64>,
         rate: Vector3<f64>,
         accel: Vector3<f64>,
-    ) -> Result<(), NyxError> {
+    ) -> Result<(), GuidanceErrors> {
         let (alpha, delta) = ra_dec_from_unit_vector(dir);
         if alpha.is_nan() || delta.is_nan() {
-            return Err(NyxError::MathDomain(format!(
-                "Invalid finite burn control direction u = [{}, {}, {}] => Alpha = {}, Delta = {}",
-                dir[0], dir[1], dir[2], alpha, delta,
-            )));
+            return Err(GuidanceErrors::InvalidDirection {
+                x: dir[0],
+                y: dir[1],
+                z: dir[2],
+                in_plane_deg: alpha.to_degrees(),
+                out_of_plane_deg: delta.to_degrees(),
+            });
         }
         if rate.norm() < 2e-16 && accel.norm() < 2e-16 {
             self.alpha_inplane_radians = CommonPolynomial::Constant(alpha);
@@ -191,10 +193,13 @@ impl Mnvr {
         } else {
             let (alpha_dt, delta_dt) = ra_dec_from_unit_vector(rate);
             if alpha_dt.is_nan() || delta_dt.is_nan() {
-                return Err(NyxError::MathDomain(format!(
-                    "Invalid finite burn control rate dot u = [{}, {}, {}] => DotAlpha = {}, DotDelta = {}",
-                    rate[0], rate[1], rate[2], alpha_dt, delta_dt,
-                )));
+                return Err(GuidanceErrors::InvalidRate {
+                    x: rate[0],
+                    y: rate[1],
+                    z: rate[2],
+                    in_plane_deg_s: alpha_dt.to_degrees(),
+                    out_of_plane_deg_s: delta_dt.to_degrees(),
+                });
             }
             if accel.norm() < 2e-16 {
                 self.alpha_inplane_radians = CommonPolynomial::Linear(alpha_dt, alpha);
@@ -202,10 +207,13 @@ impl Mnvr {
             } else {
                 let (alpha_ddt, delta_ddt) = ra_dec_from_unit_vector(accel);
                 if alpha_ddt.is_nan() || delta_ddt.is_nan() {
-                    return Err(NyxError::MathDomain(format!(
-                        "Invalid finite burn control acceleration ddot u = [{}, {}, {}] => DDotAlpha = {}, DDotDelta = {}",
-                        accel[0], accel[1], accel[2], alpha_ddt, delta_ddt,
-                    )));
+                    return Err(GuidanceErrors::InvalidAcceleration {
+                        x: accel[0],
+                        y: accel[1],
+                        z: accel[2],
+                        in_plane_deg_s2: alpha_ddt.to_degrees(),
+                        out_of_plane_deg_s2: delta_ddt.to_degrees(),
+                    });
                 }
                 self.alpha_inplane_radians =
                     CommonPolynomial::Quadratic(alpha_ddt, alpha_dt, alpha);

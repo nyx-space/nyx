@@ -153,7 +153,7 @@ where
             };
             Ok(h.to_polynomial())
         }
-        Err(e) => Err(NyxError::InvalidInterpolationData(e.to_string())),
+        Err(e) => Err(NyxError::InvalidInterpolationData { msg: e.to_string() }),
     }
 }
 
@@ -163,19 +163,19 @@ pub fn hermite<const DEGREE: usize>(
     derivs: &[f64],
 ) -> Result<Polynomial<DEGREE>, NyxError> {
     if xs.is_empty() {
-        return Err(NyxError::InvalidInterpolationData(
-            "No X data to interpolate".to_owned(),
-        ));
+        return Err(NyxError::InvalidInterpolationData {
+            msg: "No X data to interpolate".to_owned(),
+        });
     }
     if xs.len() != ys.len() {
-        return Err(NyxError::InvalidInterpolationData(
-            "Lengths of X and Y data differ".to_owned(),
-        ));
+        return Err(NyxError::InvalidInterpolationData {
+            msg: "Lengths of X and Y data differ".to_owned(),
+        });
     }
     if xs.len() != derivs.len() {
-        return Err(NyxError::InvalidInterpolationData(
-            "Lengths of X and its derivatives data differ".to_owned(),
-        ));
+        return Err(NyxError::InvalidInterpolationData {
+            msg: "Lengths of X and its derivatives data differ".to_owned(),
+        });
     }
 
     if DEGREE < 2 * xs.len() - 1 {
@@ -220,9 +220,9 @@ pub fn hermite<const DEGREE: usize>(
 
     if hermite.is_nan() {
         dbg!(xs, ys, derivs);
-        return Err(NyxError::InvalidInterpolationData(format!(
-            "Invalid interpolation {hermite:x}",
-        )));
+        return Err(NyxError::InvalidInterpolationData {
+            msg: format!("Invalid interpolation {hermite:x}",),
+        });
     }
 
     Ok(hermite)
@@ -236,13 +236,13 @@ pub fn hermite_eval(
 ) -> Result<(f64, f64), NyxError> {
     if xs.len() != ys.len() || xs.len() != ydots.len() {
         let msg = format!("Abscissas (xs), ordinates (ys), and first derivatives (ydots) must contain the same number of items, but they are of lengths {}, {}, and {}", xs.len(), ys.len(), ydots.len());
-        return Err(NyxError::MathDomain(msg));
+        return Err(NyxError::MathDomain { msg });
     } else if xs.is_empty() {
         let msg = "No interpolation data provided".to_string();
-        return Err(NyxError::MathDomain(msg));
+        return Err(NyxError::MathDomain { msg });
     } else if xs.len() > 3 * INTERPOLATION_SAMPLES {
         let msg = format!("More than {} samples provided, which is the maximum number of items allowed for a Hermite interpolation", 3 * INTERPOLATION_SAMPLES);
-        return Err(NyxError::MathDomain(msg));
+        return Err(NyxError::MathDomain { msg });
     }
 
     // At this point, we know that the lengths of items is correct, so we can directly address them without worry for overflowing the array.
@@ -275,7 +275,7 @@ pub fn hermite_eval(
         let denom = xs[i] - xs[i - 1];
         if denom.abs() < f64::EPSILON {
             let msg = format!("duplicate abscissa data: denominator near zero ({denom:e})");
-            return Err(NyxError::MathDomain(msg));
+            return Err(NyxError::MathDomain { msg });
         }
 
         /*        The second column of WORK contains interpolated derivative */
@@ -333,7 +333,7 @@ pub fn hermite_eval(
                 let msg = format!(
                     "duplicate abscissa data in interp table: denominator near zero ({denom:e})"
                 );
-                return Err(NyxError::MathDomain(msg));
+                return Err(NyxError::MathDomain { msg });
             }
 
             /*           Compute the interpolated derivative at X for the Ith */

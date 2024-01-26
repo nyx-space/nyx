@@ -16,11 +16,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::cosmic::Orbit;
+use crate::cosmic::{AstroError, Orbit};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, Matrix3, OMatrix, OVector, Vector3};
 use crate::State;
 use hyperdual::{OHyperdual, Owned};
+use snafu::Snafu;
 
 use std::fmt;
 
@@ -31,6 +32,7 @@ pub use crate::errors::NyxError;
 /// It is up to the engineer to ensure that the coordinate frames of the different dynamics borrowed
 /// from this module match, or perform the appropriate coordinate transformations.
 pub mod orbital;
+use self::guidance::GuidanceErrors;
 pub use self::orbital::*;
 
 /// The gravity module handles spherical harmonics only. It _must_ be combined with a OrbitalDynamics dynamics
@@ -90,7 +92,7 @@ where
         delta_t: f64,
         state_vec: &OVector<f64, <Self::StateType as State>::VecLength>,
         state_ctx: &Self::StateType,
-    ) -> Result<OVector<f64, <Self::StateType as State>::VecLength>, NyxError>
+    ) -> Result<OVector<f64, <Self::StateType as State>::VecLength>, DynamicsError>
     where
         DefaultAllocator: Allocator<f64, <Self::StateType as State>::VecLength>;
 
@@ -106,7 +108,7 @@ where
             OVector<f64, <Self::StateType as State>::Size>,
             OMatrix<f64, <Self::StateType as State>::Size, <Self::StateType as State>::Size>,
         ),
-        NyxError,
+        DynamicsError,
     >
     where
         DefaultAllocator: Allocator<f64, Self::HyperdualSize>
@@ -121,7 +123,7 @@ where
     /// Optionally performs some final changes after each successful integration of the equations of motion.
     /// For example, this can be used to update the Guidance mode.
     /// NOTE: This function is also called just prior to very first integration step in order to update the initial state if needed.
-    fn finally(&self, next_state: Self::StateType) -> Result<Self::StateType, NyxError> {
+    fn finally(&self, next_state: Self::StateType) -> Result<Self::StateType, DynamicsError> {
         Ok(next_state)
     }
 }
@@ -131,11 +133,12 @@ where
 /// Examples include Solar Radiation Pressure, drag, etc., i.e. forces which do not need to save the current state, only act on it.
 pub trait ForceModel: Send + Sync + fmt::Display {
     /// Defines the equations of motion for this force model from the provided osculating state.
-    fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, NyxError>;
+    fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, DynamicsError>;
 
     /// Force models must implement their partials, although those will only be called if the propagation requires the
     /// computation of the STM. The `osc_ctx` is the osculating context, i.e. it changes for each sub-step of the integrator.
-    fn dual_eom(&self, osc_ctx: &Spacecraft) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError>;
+    fn dual_eom(&self, osc_ctx: &Spacecraft)
+        -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError>;
 }
 
 /// The `AccelModel` trait handles immutable dynamics which return an acceleration. Those can be added directly to Orbital Dynamics for example.
@@ -143,9 +146,23 @@ pub trait ForceModel: Send + Sync + fmt::Display {
 /// Examples include spherical harmonics, i.e. accelerations which do not need to save the current state, only act on it.
 pub trait AccelModel: Send + Sync + fmt::Display {
     /// Defines the equations of motion for this force model from the provided osculating state in the integration frame.
-    fn eom(&self, osc: &Orbit) -> Result<Vector3<f64>, NyxError>;
+    fn eom(&self, osc: &Orbit) -> Result<Vector3<f64>, DynamicsError>;
 
     /// Acceleration models must implement their partials, although those will only be called if the propagation requires the
     /// computation of the STM.
-    fn dual_eom(&self, osc_ctx: &Orbit) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError>;
+    fn dual_eom(&self, osc_ctx: &Orbit) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError>;
+}
+
+/// Stores dynamical model errors
+#[derive(Clone, Debug, Snafu, PartialEq)]
+pub enum DynamicsError {
+    /// Fuel exhausted at the provided spacecraft state
+    #[snafu(display("fuel exhausted at {sc}"))]
+    FuelExhausted { sc: Box<Spacecraft> },
+    #[snafu(display("expected STM to be set"))]
+    StateTransitionMatrixUnset,
+    #[snafu(display("dynamical model encountered an astro error: {source}"))]
+    DynamicsAstro { source: AstroError },
+    #[snafu(display("dynamical model encountered an issue with the guidance: {source}"))]
+    DynamicsGuidance { source: GuidanceErrors },
 }

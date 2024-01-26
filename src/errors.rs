@@ -16,158 +16,99 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::thiserror::Error;
 use crate::io::ConfigError;
 use crate::md::trajectory::TrajError;
 use crate::md::StateParameter;
 pub use crate::md::TargetingError;
-pub use crate::time::Errors as TimeErrors;
-use crate::Spacecraft;
+use snafu::prelude::*;
 use std::convert::From;
 
-#[derive(Error, Debug, PartialEq)]
+#[derive(Debug, PartialEq, Snafu)]
+// #[derive(Error, Debug, PartialEq)]
 pub enum NyxError {
-    /// STM is singular, propagation or smoothing cannot proceed
-    #[error("STM is singular, propagation or smoothing cannot proceed")]
-    SingularStateTransitionMatrix,
-    /// Fuel exhausted at the provided spacecraft state
-    #[error("Fuel exhausted at {0}")]
-    FuelExhausted(Box<Spacecraft>),
-    /// Propagation event not triggered within the max propagation time
-    #[error("Propagation event not triggered within the max propagation time")]
-    ConditionNeverTriggered,
-    /// Propagation event not hit enough times (requested, found).
-    #[error("Propagation event not hit enough times (requested, found).")]
-    UnsufficientTriggers(usize, usize),
     /// Maximum iterations reached
-    #[error("Maximum iterations of {0} reached")]
-    MaxIterReached(String),
-    /// Event not found within the provided epochs
-    #[error("Event not in braket: {0} <=> {1}")]
-    EventNotInEpochBraket(String, String),
-    /// The operation was expecting the state to have an STM, but it isn't present.
-    #[error("The operation was expecting the state to have an STM, but it isn't present.")]
-    StateTransitionMatrixUnset,
-    /// The sensitivity matrix must be updated prior to a filter measurement update
-    #[error("The sensitivity matrix must be updated prior to a filter measurement update")]
-    SensitivityNotUpdated,
-    /// Kalman Gain could not be computed because H*P_bar*H + R is singular
-    #[error("Gain could not be computed because H*P_bar*H + R is singular")]
-    SingularKalmanGain,
-    /// Singular Covariance
-    #[error("Singular Covariance")]
-    SingularCovarianceMatrix,
+    #[snafu(display("Maximum iterations of {msg} reached"))]
+    MaxIterReached { msg: String },
     /// Covariance is not positive semi definite
-    #[error("Covariance is not positive semi definite")]
+    #[snafu(display("Covariance is not positive semi definite"))]
     CovarianceMatrixNotPsd,
-    /// Singular Jacobian
-    #[error("Singular Jacobian")]
-    SingularJacobian,
     /// Targets in Lambert solver too close: Δν ~=0 and A ~=0
-    #[error("Lambert too close: Δν ~=0 and A ~=0")]
+    #[snafu(display("Lambert too close: Δν ~=0 and A ~=0"))]
     TargetsTooClose,
     /// No reasonable phi found to connect both radii
-    #[error("No reasonable phi found to connect both radii")]
+    #[snafu(display("No reasonable phi found to connect both radii"))]
     LambertNotReasonablePhi,
     /// Multi revolution Lambert not supported, use the Izzo algorithm for multi-rev transfers
-    #[error("Use the Izzo algorithm for multi-rev transfers")]
+    #[snafu(display("Use the Izzo algorithm for multi-rev transfers"))]
     LambertMultiRevNotSupported,
-    /// Partials for this dynamical model are not defined
-    #[error("Partials for this model are not defined")]
-    PartialsUndefined,
     /// State parameter cannot be used in this function
-    #[error("Unavailable parameter {0:?}: {1}")]
-    StateParameterUnavailable(StateParameter, String),
+    #[snafu(display("Unavailable parameter {param:?}: {msg}"))]
+    StateParameterUnavailable { param: StateParameter, msg: String },
     /// Could not load file
-    #[error("Could not load file: {0}")]
-    LoadingError(String),
+    #[snafu(display("Could not load file: {msg}"))]
+    LoadingError { msg: String },
     /// Could not read file
-    #[error("Could not read file: {0}")]
-    FileUnreadable(String),
+    #[snafu(display("Could not read file: {msg}"))]
+    FileUnreadable { msg: String },
     /// Celestial object or spacecraft not found
-    #[error("Cosm object not found: `{0}` (available: {1:?})")]
-    ObjectNotFound(String, Vec<String>),
+    #[snafu(display("Cosm object not found: `{needle}` (available: {haystack:?})"))]
+    ObjectNotFound {
+        needle: String,
+        haystack: Vec<String>,
+    },
     /// No interpolation data
-    #[error("No interpolation data: {0}")]
-    NoInterpolationData(String),
+    #[snafu(display("No interpolation data: {msg}"))]
+    NoInterpolationData { msg: String },
     /// Invalid interpolation data
-    #[error("Invalid interpolation data: {0}")]
-    InvalidInterpolationData(String),
+    #[snafu(display("Invalid interpolation data: {msg}"))]
+    InvalidInterpolationData { msg: String },
     /// No state data
-    #[error("No state data: {0}")]
-    NoStateData(String),
-    /// Cannot convert the state to another frame as the frames are disjoint
-    #[error("Cannot convert between disjoint frames: {0} <-> {1}")]
-    DisjointFrameOrientations(String, String),
+    #[snafu(display("No state data: {msg}"))]
+    NoStateData { msg: String },
     /// No thruster attached to spacecraft
-    #[error("No thruster attached to spacecraft")]
+    #[snafu(display("No thruster attached to spacecraft"))]
     NoThrusterAvail,
-    /// Control vector is not a unit vector
-    #[error("Control vector is not a unit vector: {0}")]
-    CtrlNotAUnitVector(f64),
-    /// Throttle is not between 0.0 and 1.0
-    #[error("Throttle is not between 0.0 and 1.0: {0}")]
-    CtrlThrottleRangeErr(f64),
     /// Happens when trying to modify a polynomial's (error)-th error but the polynomial has less orders than that
-    #[error("Happens when trying to modify a polynomial's (error)-th error but the polynomial has less orders than that")]
-    PolynomialOrderError(usize),
+    #[snafu(display("Happens when trying to modify a polynomial's (error)-th error but the polynomial has less orders than that"))]
+    PolynomialOrderError { order: usize },
     /// An objective based analysis or control was attempted, but no objective was defined
-    #[error("An objective based analysis or control was attempted, but no objective was defined")]
+    #[snafu(display(
+        "An objective based analysis or control was attempted, but no objective was defined"
+    ))]
     NoObjectiveDefined,
-    /// Error when exporting data
-    #[error("Error when exporting data: {0}")]
-    ExportError(String),
     /// This computation requires the orbit to be hyperbolic
-    #[error("This computation requires the orbit to be hyperbolic: {0}")]
-    NotHyperbolic(String),
-    /// Control variables to not decrease targeting error in differential corrector
-    #[error("Control variables to not decrease targeting error in differential corrector: {0}")]
-    CorrectionIneffective(String),
+    #[snafu(display("This computation requires the orbit to be hyperbolic: {msg}"))]
+    NotHyperbolic { msg: String },
     /// Monte Carlo error
-    #[error("Monte Carlo error: {0}")]
-    MonteCarlo(String),
+    #[snafu(display("Monte Carlo error: {msg}"))]
+    MonteCarlo { msg: String },
     /// CCSDS error
-    #[error("CCSDS error: {0}")]
-    CCSDS(String),
-    /// Multiple shooting failed with the provided error at the provided node computation
-    #[error("Multiple shooting failed on node {0} with {1}")]
-    MultipleShootingTargeter(usize, Box<NyxError>),
-    #[error("Custom error: {0}")]
-    CustomError(String),
-    /// Time related error
-    #[error("Time related error: {0}")]
-    TimeError(TimeErrors),
-    /// Targeting error
-    #[error("Targeting error: {0}")]
-    Targeter(Box<TargetingError>),
+    #[snafu(display("CCSDS error: {msg}"))]
+    CCSDS { msg: String },
+    #[snafu(display("Error: {msg}"))]
+    CustomError { msg: String },
     /// Trajectory error
-    #[error("Trajectory error: {0}")]
-    Trajectory(TrajError),
+    #[snafu(display("Trajectory error: {source}"))]
+    Trajectory { source: TrajError },
     /// Math domain
-    #[error("Math domain error: {0}")]
-    MathDomain(String),
+    #[snafu(display("Math domain error: {msg}"))]
+    MathDomain { msg: String },
     /// Guidance law config error
-    #[error("Guidance law config error: {0}")]
-    GuidanceConfigError(String),
+    #[snafu(display("Guidance law config error: {msg}"))]
+    GuidanceConfigError { msg: String },
     /// Configuration file error
-    #[error("Config error: {0}")]
-    ConfigError(ConfigError),
-}
-
-impl From<TimeErrors> for NyxError {
-    fn from(e: TimeErrors) -> Self {
-        NyxError::TimeError(e)
-    }
+    #[snafu(display("Config error: {source}"))]
+    ConfigError { source: ConfigError },
 }
 
 impl From<TrajError> for NyxError {
-    fn from(e: TrajError) -> Self {
-        NyxError::Trajectory(e)
+    fn from(source: TrajError) -> Self {
+        NyxError::Trajectory { source }
     }
 }
 
 impl From<ConfigError> for NyxError {
-    fn from(e: ConfigError) -> Self {
-        NyxError::ConfigError(e)
+    fn from(source: ConfigError) -> Self {
+        NyxError::ConfigError { source }
     }
 }
