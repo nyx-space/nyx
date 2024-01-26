@@ -52,77 +52,77 @@ impl BPlane {
     /// Returns a newly define B-Plane if the orbit is hyperbolic and already in Dual form
     pub fn from_dual(orbit: OrbitDual) -> Result<Self, AstroError> {
         if orbit.ecc().real() <= 1.0 {
-            Err(AstroError::NotHyperbolic)
-        } else {
-            let one = OHyperdual::from(1.0);
-            let zero = OHyperdual::from(0.0);
-
-            let e_hat = orbit.evec() / orbit.ecc().dual;
-            let h_hat = orbit.hvec() / orbit.hmag().dual;
-            let n_hat = h_hat.cross(&e_hat);
-
-            // The reals implementation (which was initially validated) was:
-            // let s = e_hat / orbit.ecc() + (1.0 - (1.0 / orbit.ecc()).powi(2)).sqrt() * n_hat;
-            // let s_hat = s / s.norm();
-
-            let incoming_asymptote_fact = (one - (one / orbit.ecc().dual).powi(2)).sqrt();
-
-            let s = Vector3::new(
-                e_hat[0] / orbit.ecc().dual + incoming_asymptote_fact * n_hat[0],
-                e_hat[1] / orbit.ecc().dual + incoming_asymptote_fact * n_hat[1],
-                e_hat[2] / orbit.ecc().dual + incoming_asymptote_fact * n_hat[2],
-            );
-
-            let s_hat = s / norm(&s); // Just to make sure to renormalize everything
-
-            // The reals implementation (which was initially validated) was:
-            // let b_vec = orbit.semi_minor_axis()
-            //     * ((1.0 - (1.0 / orbit.ecc()).powi(2)).sqrt() * e_hat
-            //         - (1.0 / orbit.ecc() * n_hat));
-            let b_vec = Vector3::new(
-                orbit.semi_minor_axis().dual
-                    * (incoming_asymptote_fact * e_hat[0] - ((one / orbit.ecc().dual) * n_hat[0])),
-                orbit.semi_minor_axis().dual
-                    * (incoming_asymptote_fact * e_hat[1] - ((one / orbit.ecc().dual) * n_hat[1])),
-                orbit.semi_minor_axis().dual
-                    * (incoming_asymptote_fact * e_hat[2] - ((one / orbit.ecc().dual) * n_hat[2])),
-            );
-
-            let t = s_hat.cross(&Vector3::new(zero, zero, one));
-            let t_hat = t / norm(&t);
-            let r_hat = s_hat.cross(&t_hat);
-
-            // Build the rotation matrix from inertial to B Plane
-            let str_rot = Matrix3::new(
-                s_hat[0].real(),
-                s_hat[1].real(),
-                s_hat[2].real(),
-                t_hat[0].real(),
-                t_hat[1].real(),
-                t_hat[2].real(),
-                r_hat[0].real(),
-                r_hat[1].real(),
-                r_hat[2].real(),
-            );
-
-            Ok(BPlane {
-                b_r: OrbitPartial {
-                    dual: b_vec.dot(&r_hat),
-                    param: StateParameter::BdotR,
-                },
-                b_t: OrbitPartial {
-                    dual: b_vec.dot(&t_hat),
-                    param: StateParameter::BdotT,
-                },
-                ltof_s: OrbitPartial {
-                    dual: b_vec.dot(&s_hat) / orbit.vmag().dual,
-                    param: StateParameter::BLTOF,
-                },
-                str_dcm: str_rot,
-                frame: orbit.frame,
-                epoch: orbit.dt,
-            })
+            return Err(AstroError::NotHyperbolic);
         }
+
+        let one = OHyperdual::from(1.0);
+        let zero = OHyperdual::from(0.0);
+
+        let e_hat = orbit.evec() / orbit.ecc().dual;
+        let h_hat = orbit.hvec() / orbit.hmag().dual;
+        let n_hat = h_hat.cross(&e_hat);
+
+        // The reals implementation (which was initially validated) was:
+        // let s = e_hat / orbit.ecc() + (1.0 - (1.0 / orbit.ecc()).powi(2)).sqrt() * n_hat;
+        // let s_hat = s / s.norm();
+
+        let incoming_asymptote_fact = (one - (one / orbit.ecc().dual).powi(2)).sqrt();
+
+        let s = Vector3::new(
+            e_hat[0] / orbit.ecc().dual + incoming_asymptote_fact * n_hat[0],
+            e_hat[1] / orbit.ecc().dual + incoming_asymptote_fact * n_hat[1],
+            e_hat[2] / orbit.ecc().dual + incoming_asymptote_fact * n_hat[2],
+        );
+
+        let s_hat = s / norm(&s); // Just to make sure to renormalize everything
+
+        // The reals implementation (which was initially validated) was:
+        // let b_vec = orbit.semi_minor_axis()
+        //     * ((1.0 - (1.0 / orbit.ecc()).powi(2)).sqrt() * e_hat
+        //         - (1.0 / orbit.ecc() * n_hat));
+        let b_vec = Vector3::new(
+            orbit.semi_minor_axis().dual
+                * (incoming_asymptote_fact * e_hat[0] - ((one / orbit.ecc().dual) * n_hat[0])),
+            orbit.semi_minor_axis().dual
+                * (incoming_asymptote_fact * e_hat[1] - ((one / orbit.ecc().dual) * n_hat[1])),
+            orbit.semi_minor_axis().dual
+                * (incoming_asymptote_fact * e_hat[2] - ((one / orbit.ecc().dual) * n_hat[2])),
+        );
+
+        let t = s_hat.cross(&Vector3::new(zero, zero, one));
+        let t_hat = t / norm(&t);
+        let r_hat = s_hat.cross(&t_hat);
+
+        // Build the rotation matrix from inertial to B Plane
+        let str_rot = Matrix3::new(
+            s_hat[0].real(),
+            s_hat[1].real(),
+            s_hat[2].real(),
+            t_hat[0].real(),
+            t_hat[1].real(),
+            t_hat[2].real(),
+            r_hat[0].real(),
+            r_hat[1].real(),
+            r_hat[2].real(),
+        );
+
+        Ok(BPlane {
+            b_r: OrbitPartial {
+                dual: b_vec.dot(&r_hat),
+                param: StateParameter::BdotR,
+            },
+            b_t: OrbitPartial {
+                dual: b_vec.dot(&t_hat),
+                param: StateParameter::BdotT,
+            },
+            ltof_s: OrbitPartial {
+                dual: b_vec.dot(&s_hat) / orbit.vmag().dual,
+                param: StateParameter::BLTOF,
+            },
+            str_dcm: str_rot,
+            frame: orbit.frame,
+            epoch: orbit.dt,
+        })
     }
 
     /// Returns a newly defined B-Plane if the orbit is hyperbolic.
@@ -318,108 +318,81 @@ pub fn try_achieve_b_plane(
     orbit: Orbit,
     target: BPlaneTarget,
 ) -> Result<(Vector3<f64>, BPlane), TargetingError> {
+    const MAX_ITER: usize = 10;
+
     let mut total_dv = Vector3::zeros();
-    let mut attempt_no = 0;
-    let max_iter = 10;
 
     let mut real_orbit = orbit;
     let mut prev_b_plane_err = std::f64::INFINITY;
 
-    if !target.ltof_target_set() {
-        // If no LTOF is targeted, we'll solve this with a least squared approach.
-        loop {
-            if attempt_no > max_iter {
-                return Err(TargetingError::TooManyIterations);
-            }
+    for _ in 0..=MAX_ITER {
+        // Build current B Plane
+        let b_plane = BPlane::new(real_orbit).with_context(|_| AstroSnafu)?;
 
-            // Build current B Plane
-            let b_plane = BPlane::new(real_orbit).with_context(|_| AstroSnafu)?;
+        // Check convergence
+        let br_err = target.b_r_km - b_plane.b_dot_r();
+        let bt_err = target.b_t_km - b_plane.b_dot_t();
+        let ltof_err = target
+            .ltof_target_set()
+            .then_some(target.ltof_s - b_plane.ltof_s.real());
 
-            // Check convergence
-            let br_err = target.b_r_km - b_plane.b_dot_r();
-            let bt_err = target.b_t_km - b_plane.b_dot_t();
-
-            if br_err.abs() < target.tol_b_r_km && bt_err.abs() < target.tol_b_t_km {
-                return Ok((total_dv, b_plane));
-            }
-
-            // Build the error vector
-            let b_plane_err = Vector2::new(br_err, bt_err);
-
-            if b_plane_err.norm() >= prev_b_plane_err {
-                // If the error is not going down, we'll raise an error
-                return Err(TargetingError::CorrectionIneffective {
-                    prev_val: prev_b_plane_err,
-                    cur_val: b_plane_err.norm(),
-                    action: "Delta-V correction is ineffective at reducing the B-Plane error",
-                });
-            }
-            prev_b_plane_err = b_plane_err.norm();
-
-            // Grab the first two rows of the Jacobian (discard the rest).
-            let full_jac = b_plane.jacobian();
-            let jac = full_jac.fixed_rows::<2>(0);
-            // Solve the Least Squares / compute the delta-v
-            let dv = jac.transpose() * (jac * jac.transpose()).try_inverse().unwrap() * b_plane_err;
-
-            total_dv[0] += dv[0];
-            total_dv[1] += dv[1];
-            total_dv[2] += dv[2];
-
-            // Rebuild a new orbit
-            real_orbit.vx_km_s += dv[0];
-            real_orbit.vy_km_s += dv[1];
-            real_orbit.vz_km_s += dv[2];
-
-            attempt_no += 1;
+        if br_err.abs() < target.tol_b_r_km
+            && bt_err.abs() < target.tol_b_t_km
+            && !ltof_err.is_some_and(|err| err > target.tol_ltof_s)
+        {
+            return Ok((total_dv, b_plane));
         }
-    } else {
-        // The LTOF targeting seems to break often, but it's still implemented
-        loop {
-            if attempt_no > max_iter {
-                return Err(TargetingError::TooManyIterations);
+
+        let (norm, dv) = match ltof_err {
+            None => {
+                let v = Vector2::new(bt_err, br_err);
+                let norm = v.norm();
+                norm_check(norm, prev_b_plane_err, false)?;
+                let full_jac = b_plane.jacobian();
+                let jac = full_jac.fixed_rows::<2>(0);
+                // Solve the Least Squares / compute the delta-v
+                (
+                    norm,
+                    jac.transpose() * (jac * jac.transpose()).try_inverse().unwrap() * v,
+                )
             }
-
-            // Build current B Plane
-            let b_plane = BPlane::new(real_orbit).with_context(|_| AstroSnafu)?;
-
-            // Check convergence
-            let br_err = target.b_r_km - b_plane.b_dot_r();
-            let bt_err = target.b_t_km - b_plane.b_dot_t();
-            let ltof_err = target.ltof_s - b_plane.ltof_s.real();
-
-            if br_err.abs() < target.tol_b_r_km
-                && bt_err.abs() < target.tol_b_t_km
-                && ltof_err.abs() < target.tol_ltof_s
-            {
-                return Ok((total_dv, b_plane));
+            Some(err) => {
+                let v = Vector3::new(bt_err, br_err, err);
+                let norm = v.norm();
+                norm_check(norm, prev_b_plane_err, true)?;
+                (norm, b_plane.jacobian() * v)
             }
+        };
 
-            // Build the error vector
-            let b_plane_err = Vector3::new(bt_err, br_err, ltof_err);
+        prev_b_plane_err = norm;
 
-            if b_plane_err.norm() >= prev_b_plane_err {
-                return Err(TargetingError::CorrectionIneffective {
-                    prev_val: prev_b_plane_err,
-                    cur_val: b_plane_err.norm(),
-                    action: "LTOF enabled correction is failing. Try to not set an LTOF target. Delta-V correction is ineffective at reducing the B-Plane error",
-                });
-            }
-            prev_b_plane_err = b_plane_err.norm();
+        total_dv[0] += dv[0];
+        total_dv[1] += dv[1];
+        total_dv[2] += dv[2];
 
-            // Compute the delta-v
-            let dv = b_plane.jacobian() * b_plane_err;
-
-            total_dv[0] += dv[0];
-            total_dv[1] += dv[1];
-            total_dv[2] += dv[2];
-
-            // Rebuild a new orbit
-            real_orbit.vx_km_s += dv[0];
-            real_orbit.vy_km_s += dv[1];
-            real_orbit.vz_km_s += dv[2];
-
-            attempt_no += 1;
-        }
+        // Rebuild a new orbit
+        real_orbit.vx_km_s += dv[0];
+        real_orbit.vy_km_s += dv[1];
+        real_orbit.vz_km_s += dv[2];
     }
+
+    Err(TargetingError::TooManyIterations)
+}
+
+#[inline]
+fn norm_check(cur_val: f64, prev_val: f64, ltof_error: bool) -> Result<(), TargetingError> {
+    let action = match ltof_error {
+        true => "LTOF enabled correction is failing. Try to not set an LTOF target. Delta-V correction is ineffective at reducing the B-Plane error",
+        false => "Delta-V correction is ineffective at reducing the B-Plane error",
+    };
+
+    if cur_val >= prev_val {
+        return Err(TargetingError::CorrectionIneffective {
+            prev_val,
+            cur_val,
+            action,
+        });
+    }
+
+    Ok(())
 }
