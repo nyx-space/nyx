@@ -338,14 +338,14 @@ pub fn try_achieve_b_plane(
 
         if br_err.abs() < target.tol_b_r_km
             && bt_err.abs() < target.tol_b_t_km
-            && !ltof_err.is_some_and(|err| err.abs() > target.tol_ltof_s)
+            && !ltof_err.is_some_and(|err| err.abs() >= target.tol_ltof_s)
         {
             return Ok((total_dv, b_plane));
         }
 
         let (norm, dv) = match ltof_err {
             None => {
-                let v = Vector2::new(bt_err, br_err);
+                let v = Vector2::new(br_err, bt_err);
                 let norm = v.norm();
                 norm_check(norm, prev_b_plane_err, false)?;
                 let full_jac = b_plane.jacobian();
