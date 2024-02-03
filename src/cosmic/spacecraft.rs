@@ -16,11 +16,13 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+pub use anise::prelude::Orbit;
+
 use nalgebra::Vector3;
 use serde::{Deserialize, Serialize};
 
 use super::eclipse::Cosm;
-use super::{Orbit, State};
+use super::State;
 use crate::dynamics::guidance::Thruster;
 use crate::dynamics::DynamicsError;
 use crate::errors::NyxError;

@@ -102,7 +102,7 @@ impl Traj<Orbit> {
     }
 
     /// Convert this orbit trajectory into a spacecraft trajectory by copying the provided template and setting its orbit state to that of each state of the trajectory
-    pub fn upcast(&self, template: Spacecraft) -> Traj<Spacecraft> {
+    pub fn upcast(&self, template: Spacecraft) -> Traj {
         let mut out = Traj::new();
         for orbit in &self.states {
             out.states.push(template.with_orbit(*orbit));

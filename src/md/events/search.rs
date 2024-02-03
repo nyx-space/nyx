@@ -18,21 +18,16 @@
 
 use super::details::{EventArc, EventDetails, EventEdge};
 use crate::errors::NyxError;
-use crate::linalg::allocator::Allocator;
-use crate::linalg::DefaultAllocator;
-use crate::md::prelude::{Interpolatable, Traj};
+use crate::md::prelude::Traj;
 use crate::md::trajectory::TrajError;
 use crate::md::EventEvaluator;
 use crate::time::{Duration, Epoch, TimeSeries, Unit};
+use crate::Spacecraft;
 use rayon::prelude::*;
 use std::iter::Iterator;
 use std::sync::mpsc::channel;
 
-impl<S: Interpolatable> Traj<S>
-where
-    DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
-{
+impl Traj {
     /// Find the exact state where the request event happens. The event function is expected to be monotone in the provided interval because we find the event using a Brent solver.
     #[allow(clippy::identity_op)]
     pub fn find_bracketed<E>(
@@ -40,9 +35,9 @@ where
         start: Epoch,
         end: Epoch,
         event: &E,
-    ) -> Result<EventDetails<S>, NyxError>
+    ) -> Result<EventDetails, NyxError>
     where
-        E: EventEvaluator<S>,
+        E: EventEvaluator,
     {
         let max_iter = 50;
 
@@ -185,9 +180,9 @@ where
     /// If this heuristic fails to find any such events, then `find_minmax` is called on the event with a time precision of `Unit::Second`.
     /// Then we search only within the min and max bounds of the provided event.
     #[allow(clippy::identity_op)]
-    pub fn find<E>(&self, event: &E) -> Result<Vec<EventDetails<S>>, TrajError>
+    pub fn find<E>(&self, event: &E) -> Result<Vec<EventDetails>, TrajError>
     where
-        E: EventEvaluator<S>,
+        E: EventEvaluator,
     {
         let start_epoch = self.first().epoch();
         let end_epoch = self.last().epoch();
@@ -300,15 +295,19 @@ where
 
     /// Find the minimum and maximum of the provided event through the trajectory
     #[allow(clippy::identity_op)]
-    pub fn find_minmax<E>(&self, event: &E, precision: Unit) -> Result<(S, S), NyxError>
+    pub fn find_minmax<E>(
+        &self,
+        event: &E,
+        precision: Unit,
+    ) -> Result<(Spacecraft, Spacecraft), NyxError>
     where
-        E: EventEvaluator<S>,
+        E: EventEvaluator,
     {
         let step: Duration = 1 * precision;
         let mut min_val = std::f64::INFINITY;
         let mut max_val = std::f64::NEG_INFINITY;
-        let mut min_state = S::zeros();
-        let mut max_state = S::zeros();
+        let mut min_state = Spacecraft::zeros();
+        let mut max_state = Spacecraft::zeros();
 
         let (sender, receiver) = channel();
 
@@ -343,7 +342,7 @@ where
     /// Use this to analyze a trajectory's behavior when understanding the complete cycle of an event (from rising to falling) is essential, e.g. ground station passes.
     ///
     /// # Arguments
-    /// - `event`: A reference to an object implementing the `EventEvaluator<S>` trait, which is used to evaluate and classify events in the trajectory.
+    /// - `event`: A reference to an object implementing the `EventEvaluator` trait, which is used to evaluate and classify events in the trajectory.
     ///
     /// # Returns
     /// - `Result<Vec<EventArc>, NyxError>`: On success, returns a vector of EventArc, where each struct contains a pair of `EventDetails` (one for the rising edge and one for the falling edge). Returns an error if any issues occur during the event evaluation process.
@@ -360,9 +359,9 @@ where
     /// then this function checks whether the event is true at the start and end of the trajectory. If so, it means
     /// that there is a single arc that spans the whole trajectory.
     ///
-    pub fn find_arcs<E>(&self, event: &E) -> Result<Vec<EventArc<S>>, NyxError>
+    pub fn find_arcs<E>(&self, event: &E) -> Result<Vec<EventArc>, NyxError>
     where
-        E: EventEvaluator<S>,
+        E: EventEvaluator,
     {
         let mut events = match self.find(event) {
             Ok(events) => events,

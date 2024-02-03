@@ -21,12 +21,11 @@ use super::{ExportCfg, INTERPOLATION_SAMPLES};
 use super::{Interpolatable, TrajError};
 use crate::errors::NyxError;
 use crate::io::watermark::pq_writer;
-use crate::linalg::allocator::Allocator;
-use crate::linalg::DefaultAllocator;
 use crate::md::prelude::{Frame, GuidanceMode, StateParameter};
 use crate::md::EventEvaluator;
 use crate::time::{Duration, Epoch, TimeSeries, TimeUnits};
 use crate::utils::dcm_finite_differencing;
+use crate::Spacecraft;
 use arrow::array::{Array, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
@@ -42,22 +41,14 @@ use std::sync::Arc;
 
 /// Store a trajectory of any State.
 #[derive(Clone, PartialEq)]
-pub struct Traj<S: Interpolatable>
-where
-    DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
-{
+pub struct Traj {
     /// Optionally name this trajectory
     pub name: Option<String>,
     /// We use a vector because we know that the states are produced in a chronological manner (the direction does not matter).
-    pub states: Vec<S>,
+    pub states: Vec<Spacecraft>,
 }
 
-impl<S: Interpolatable> Traj<S>
-where
-    DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
-{
+impl Traj {
     pub fn new() -> Self {
         Self {
             name: None,
@@ -73,7 +64,7 @@ where
     }
 
     /// Evaluate the trajectory at this specific epoch.
-    pub fn at(&self, epoch: Epoch) -> Result<S, TrajError> {
+    pub fn at(&self, epoch: Epoch) -> Result<Spacecraft, TrajError> {
         if self.states.is_empty() || self.first().epoch() > epoch || self.last().epoch() < epoch {
             return Err(TrajError::NoInterpolationData { epoch });
         }
@@ -117,23 +108,23 @@ where
     }
 
     /// Returns the first state in this ephemeris
-    pub fn first(&self) -> &S {
+    pub fn first(&self) -> &Spacecraft {
         // This is done after we've ordered the states we received, so we can just return the first state.
         self.states.first().unwrap()
     }
 
     /// Returns the last state in this ephemeris
-    pub fn last(&self) -> &S {
+    pub fn last(&self) -> &Spacecraft {
         self.states.last().unwrap()
     }
 
     /// Creates an iterator through the trajectory by the provided step size
-    pub fn every(&self, step: Duration) -> TrajIterator<S> {
+    pub fn every(&self, step: Duration) -> TrajIterator {
         self.every_between(step, self.first().epoch(), self.last().epoch())
     }
 
     /// Creates an iterator through the trajectory by the provided step size between the provided bounds
-    pub fn every_between(&self, step: Duration, start: Epoch, end: Epoch) -> TrajIterator<S> {
+    pub fn every_between(&self, step: Duration, start: Epoch, end: Epoch) -> TrajIterator {
         TrajIterator {
             time_series: TimeSeries::inclusive(
                 start.max(self.first().epoch()),
@@ -162,7 +153,7 @@ where
     pub fn to_parquet<P: AsRef<Path>>(
         &self,
         path: P,
-        events: Option<Vec<&dyn EventEvaluator<S>>>,
+        events: Option<Vec<&dyn EventEvaluator>>,
         cfg: ExportCfg,
     ) -> Result<PathBuf, Box<dyn Error>> {
         let tick = Epoch::now().unwrap();
@@ -185,7 +176,7 @@ where
 
         let mut fields = match cfg.fields {
             Some(fields) => fields,
-            None => S::export_params(),
+            None => Spacecraft::export_params(),
         };
 
         // Check that we can retrieve this information
@@ -218,7 +209,8 @@ where
             let start = cfg.start_epoch.unwrap_or_else(|| self.first().epoch());
             let end = cfg.end_epoch.unwrap_or_else(|| self.last().epoch());
             let step = cfg.step.unwrap_or_else(|| 1.minutes());
-            self.every_between(step, start, end).collect::<Vec<S>>()
+            self.every_between(step, start, end)
+                .collect::<Vec<Spacecraft>>()
         } else {
             self.states.to_vec()
         };
@@ -401,7 +393,7 @@ where
 
         let mut fields = match cfg.fields {
             Some(fields) => fields,
-            None => S::export_params(),
+            None => Spacecraft::export_params(),
         };
 
         // Remove disallowed field and check that we can retrieve this information
@@ -434,7 +426,7 @@ where
         let step = cfg.step.unwrap_or_else(|| 1.minutes());
         let self_states = self
             .every_between(step, cfg.start_epoch.unwrap(), cfg.end_epoch.unwrap())
-            .collect::<Vec<S>>();
+            .collect::<Vec<Spacecraft>>();
 
         let self_states_pre = self
             .every_between(
@@ -442,7 +434,7 @@ where
                 cfg.start_epoch.unwrap() + step - 1.seconds(),
                 cfg.end_epoch.unwrap(),
             )
-            .collect::<Vec<S>>();
+            .collect::<Vec<Spacecraft>>();
 
         let self_states_post = self
             .every_between(
@@ -450,7 +442,7 @@ where
                 cfg.start_epoch.unwrap() + 1.seconds(),
                 cfg.end_epoch.unwrap(),
             )
-            .collect::<Vec<S>>();
+            .collect::<Vec<Spacecraft>>();
 
         // Build the list of 6x6 RIC DCM
         // Assuming identical rate just before and after the first DCM and for the last DCM
@@ -494,7 +486,7 @@ where
 
         let other_states = other
             .every_between(step, cfg.start_epoch.unwrap(), cfg.end_epoch.unwrap())
-            .collect::<Vec<S>>();
+            .collect::<Vec<Spacecraft>>();
 
         // Build all of the records
 
@@ -576,28 +568,20 @@ where
     }
 }
 
-impl<S: Interpolatable> ops::Add for Traj<S>
-where
-    DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
-{
-    type Output = Result<Traj<S>, NyxError>;
+impl<S: Interpolatable> ops::Add for Traj {
+    type Output = Result<Traj, NyxError>;
 
     /// Add one trajectory to another. If they do not overlap to within 10ms, a warning will be printed.
-    fn add(self, other: Traj<S>) -> Self::Output {
+    fn add(self, other: Traj) -> Self::Output {
         &self + &other
     }
 }
 
-impl<S: Interpolatable> ops::Add<&Traj<S>> for &Traj<S>
-where
-    DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
-{
-    type Output = Result<Traj<S>, NyxError>;
+impl<S: Interpolatable> ops::Add<&Traj> for &Traj {
+    type Output = Result<Traj, NyxError>;
 
     /// Add one trajectory to another, returns an error if the frames don't match
-    fn add(self, other: &Traj<S>) -> Self::Output {
+    fn add(self, other: &Traj) -> Self::Output {
         if self.first().frame() != other.first().frame() {
             Err(NyxError::Trajectory {
                 source: TrajError::CreationError {
@@ -635,11 +619,7 @@ where
     }
 }
 
-impl<S: Interpolatable> ops::AddAssign<&Traj<S>> for Traj<S>
-where
-    DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
-{
+impl<S: Interpolatable> ops::AddAssign<&Traj> for Traj {
     /// Attempt to add two trajectories together and assign it to `self`
     ///
     /// # Warnings
@@ -650,11 +630,7 @@ where
     }
 }
 
-impl<S: Interpolatable> fmt::Display for Traj<S>
-where
-    DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
-{
+impl<S: Interpolatable> fmt::Display for Traj {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.states.is_empty() {
             write!(f, "Empty Trajectory!")
@@ -678,21 +654,13 @@ where
     }
 }
 
-impl<S: Interpolatable> fmt::Debug for Traj<S>
-where
-    DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
-{
+impl<S: Interpolatable> fmt::Debug for Traj {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{self}",)
     }
 }
 
-impl<S: Interpolatable> Default for Traj<S>
-where
-    DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
-{
+impl<S: Interpolatable> Default for Traj {
     fn default() -> Self {
         Self::new()
     }

@@ -20,8 +20,6 @@ pub(crate) const INTERPOLATION_SAMPLES: usize = 13;
 
 use super::StateParameter;
 use crate::cosmic::Frame;
-use crate::linalg::allocator::Allocator;
-use crate::linalg::DefaultAllocator;
 use crate::polyfit::hermite::hermite_eval;
 use crate::time::Epoch;
 use crate::{Orbit, Spacecraft, State};
@@ -29,13 +27,13 @@ use crate::{Orbit, Spacecraft, State};
 use enum_iterator::all;
 
 /// States that can be interpolated should implement this trait.
-pub trait Interpolatable: State
-where
-    Self: Sized,
-    DefaultAllocator: Allocator<f64, Self::Size>
-        + Allocator<f64, Self::Size, Self::Size>
-        + Allocator<f64, Self::VecLength>,
-{
+// pub trait Interpolatable: State
+// where
+//     Self: Sized,
+//     DefaultAllocator: Allocator<f64, Self::Size>
+//         + Allocator<f64, Self::Size, Self::Size>
+//         + Allocator<f64, Self::VecLength>,
+pub trait Interpolatable {
     /// Interpolates a new state at the provided epochs given a slice of states.
     fn interpolate(self, epoch: Epoch, states: &[Self]) -> Self;
 

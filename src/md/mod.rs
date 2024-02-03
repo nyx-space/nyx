@@ -20,7 +20,7 @@ use crate::cosmic::AstroError;
 use crate::dynamics::guidance::GuidanceErrors;
 use crate::errors::NyxError;
 use crate::propagators::PropagationError;
-use crate::{Orbit, Spacecraft};
+use crate::Orbit;
 use snafu::prelude::*;
 
 pub mod prelude {
@@ -54,8 +54,8 @@ pub use events::{Event, EventEvaluator};
 pub mod objective;
 pub mod opti;
 pub use opti::optimizer;
-pub type ScTraj = trajectory::Traj<Spacecraft>;
-pub type Ephemeris = trajectory::Traj<Orbit>;
+pub type ScTraj = trajectory::Traj;
+pub type Ephemeris = trajectory::Traj;
 
 mod param;
 pub use param::StateParameter;

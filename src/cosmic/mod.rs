@@ -16,15 +16,19 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+pub use anise::prelude::{Frame, Orbit};
+
 pub use self::xb::Xb;
 use self::xb::{Ephemeris, Epoch as XbEpoch};
-pub use crate::cosmic::{Frame, GuidanceMode, Orbit, Spacecraft};
+// pub use crate::cosmic::{Frame, GuidanceMode, Orbit, Spacecraft};
+pub use crate::cosmic::{GuidanceMode, Spacecraft};
 use crate::dynamics::DynamicsError;
 pub use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
 use crate::md::StateParameter;
 use crate::time::{Duration, Epoch, Unit};
+use anise::errors::PhysicsError;
 use hifitime::SECONDS_PER_DAY;
 use snafu::Snafu;
 use std::fmt::{self, Write};
@@ -135,6 +139,8 @@ pub enum AstroError {
     PartialsUndefined,
     #[snafu(display("Orbit is not hyperbolic so there is no hyperbolic anomaly."))]
     NotHyperbolic,
+    #[snafu(display("physics error occured during astro computation: {source}"))]
+    AstroPhysics { source: PhysicsError },
 }
 
 impl XbEpoch {
@@ -350,7 +356,6 @@ pub use self::spacecraft::*;
 
 // Re-Export frames
 mod frames;
-pub use self::frames::*;
 
 mod rotations;
 pub use self::rotations::*;

@@ -357,7 +357,7 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
     fn measure(
         &mut self,
         epoch: Epoch,
-        traj: &Traj<Spacecraft>,
+        traj: &Traj,
         rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
     ) -> Result<Option<RangeDoppler>, ODError> {

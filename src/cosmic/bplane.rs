@@ -16,7 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::{AstroError, Frame, Orbit, OrbitDual, OrbitPartial};
+use anise::prelude::{Frame, Orbit};
+
+use super::{AstroError, AstroPhysicsSnafu, OrbitDual, OrbitPartial};
 use crate::linalg::{Matrix2, Matrix3, Vector2, Vector3};
 use crate::md::objective::Objective;
 use crate::md::{AstroSnafu, StateParameter, TargetingError};
@@ -51,13 +53,14 @@ pub struct BPlane {
 impl BPlane {
     /// Returns a newly define B-Plane if the orbit is hyperbolic and already in Dual form
     pub fn from_dual(orbit: OrbitDual) -> Result<Self, AstroError> {
-        if orbit.ecc().real() <= 1.0 {
+        if orbit.ecc().with_context(|_| AstroPhysicsSnafu)?.real() <= 1.0 {
             Err(AstroError::NotHyperbolic)
         } else {
             let one = OHyperdual::from(1.0);
             let zero = OHyperdual::from(0.0);
 
-            let e_hat = orbit.evec() / orbit.ecc().dual;
+            let e_hat = orbit.evec().with_context(|_| AstroPhysicsSnafu)?
+                / orbit.ecc().with_context(|_| AstroPhysicsSnafu)?.dual;
             let h_hat = orbit.hvec() / orbit.hmag().dual;
             let n_hat = h_hat.cross(&e_hat);
 
@@ -65,12 +68,14 @@ impl BPlane {
             // let s = e_hat / orbit.ecc() + (1.0 - (1.0 / orbit.ecc()).powi(2)).sqrt() * n_hat;
             // let s_hat = s / s.norm();
 
-            let incoming_asymptote_fact = (one - (one / orbit.ecc().dual).powi(2)).sqrt();
+            let ecc = orbit.ecc().with_context(|_| AstroPhysicsSnafu)?;
+
+            let incoming_asymptote_fact = (one - (one / ecc.dual).powi(2)).sqrt();
 
             let s = Vector3::new(
-                e_hat[0] / orbit.ecc().dual + incoming_asymptote_fact * n_hat[0],
-                e_hat[1] / orbit.ecc().dual + incoming_asymptote_fact * n_hat[1],
-                e_hat[2] / orbit.ecc().dual + incoming_asymptote_fact * n_hat[2],
+                e_hat[0] / ecc.dual + incoming_asymptote_fact * n_hat[0],
+                e_hat[1] / ecc.dual + incoming_asymptote_fact * n_hat[1],
+                e_hat[2] / ecc.dual + incoming_asymptote_fact * n_hat[2],
             );
 
             let s_hat = s / norm(&s); // Just to make sure to renormalize everything
@@ -79,13 +84,17 @@ impl BPlane {
             // let b_vec = orbit.semi_minor_axis()
             //     * ((1.0 - (1.0 / orbit.ecc()).powi(2)).sqrt() * e_hat
             //         - (1.0 / orbit.ecc() * n_hat));
+            let semi_minor_axis = orbit
+                .semi_minor_axis()
+                .with_context(|_| AstroPhysicsSnafu)?;
+
             let b_vec = Vector3::new(
-                orbit.semi_minor_axis().dual
-                    * (incoming_asymptote_fact * e_hat[0] - ((one / orbit.ecc().dual) * n_hat[0])),
-                orbit.semi_minor_axis().dual
-                    * (incoming_asymptote_fact * e_hat[1] - ((one / orbit.ecc().dual) * n_hat[1])),
-                orbit.semi_minor_axis().dual
-                    * (incoming_asymptote_fact * e_hat[2] - ((one / orbit.ecc().dual) * n_hat[2])),
+                semi_minor_axis.dual
+                    * (incoming_asymptote_fact * e_hat[0] - ((one / ecc.dual) * n_hat[0])),
+                semi_minor_axis.dual
+                    * (incoming_asymptote_fact * e_hat[1] - ((one / ecc.dual) * n_hat[1])),
+                semi_minor_axis.dual
+                    * (incoming_asymptote_fact * e_hat[2] - ((one / ecc.dual) * n_hat[2])),
             );
 
             let t = s_hat.cross(&Vector3::new(zero, zero, one));
@@ -367,9 +376,9 @@ pub fn try_achieve_b_plane(
             total_dv[2] += dv[2];
 
             // Rebuild a new orbit
-            real_orbit.vx_km_s += dv[0];
-            real_orbit.vy_km_s += dv[1];
-            real_orbit.vz_km_s += dv[2];
+            real_orbit.velocity_km_s.x += dv[0];
+            real_orbit.velocity_km_s.y += dv[1];
+            real_orbit.velocity_km_s.z += dv[2];
 
             attempt_no += 1;
         }
@@ -415,9 +424,9 @@ pub fn try_achieve_b_plane(
             total_dv[2] += dv[2];
 
             // Rebuild a new orbit
-            real_orbit.vx_km_s += dv[0];
-            real_orbit.vy_km_s += dv[1];
-            real_orbit.vz_km_s += dv[2];
+            real_orbit.velocity_km_s.x += dv[0];
+            real_orbit.velocity_km_s.y += dv[1];
+            real_orbit.velocity_km_s.z += dv[2];
 
             attempt_no += 1;
         }
