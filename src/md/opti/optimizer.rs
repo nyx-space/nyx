@@ -271,7 +271,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
     pub fn apply_with_traj(
         &self,
         solution: &TargeterSolution<V, O>,
-    ) -> Result<(Spacecraft, Traj), TargetingError> {
+    ) -> Result<(Spacecraft, Traj<Spacecraft>), TargetingError> {
         let (xf, traj) = match solution.to_mnvr() {
             Ok(mnvr) => {
                 println!("{mnvr}");

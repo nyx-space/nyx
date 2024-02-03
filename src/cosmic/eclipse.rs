@@ -181,7 +181,31 @@ impl fmt::Display for UmbraEvent {
     }
 }
 
-impl EventEvaluator for UmbraEvent {
+impl EventEvaluator<Orbit> for UmbraEvent {
+    // Evaluation of the event, returns 0.0 for umbra, 1.0 for visibility and some value in between for penumbra
+    fn eval(&self, observer: &Orbit) -> f64 {
+        match self.e_loc.compute(observer) {
+            EclipseState::Umbra => 0.0,
+            EclipseState::Visibilis => 1.0,
+            EclipseState::Penumbra(val) => val,
+        }
+    }
+
+    /// Stop searching when the time has converged to less than 0.1 seconds
+    fn epoch_precision(&self) -> Duration {
+        0.1 * Unit::Second
+    }
+    /// Finds the darkest part of an eclipse within 2% of penumbra (i.e. 98% in shadow)
+    fn value_precision(&self) -> f64 {
+        0.02
+    }
+
+    fn eval_string(&self, state: &Orbit) -> String {
+        format!("{}", self.e_loc.compute(state))
+    }
+}
+
+impl EventEvaluator<Spacecraft> for UmbraEvent {
     // Evaluation of the event, returns 0.0 for umbra, 1.0 for visibility and some value in between for penumbra
     fn eval(&self, sc: &Spacecraft) -> f64 {
         match self.e_loc.compute(&sc.orbit) {
@@ -215,7 +239,30 @@ impl fmt::Display for PenumbraEvent {
     }
 }
 
-impl EventEvaluator for PenumbraEvent {
+impl EventEvaluator<Orbit> for PenumbraEvent {
+    fn eval(&self, observer: &Orbit) -> f64 {
+        match self.e_loc.compute(observer) {
+            EclipseState::Umbra => 0.0,
+            EclipseState::Visibilis => 1.0,
+            EclipseState::Penumbra(val) => val - 1.0,
+        }
+    }
+
+    /// Stop searching when the time has converged to less than 0.1 seconds
+    fn epoch_precision(&self) -> Duration {
+        0.1 * Unit::Second
+    }
+    /// Finds the slightest penumbra within 2%(i.e. 98% in visibility)
+    fn value_precision(&self) -> f64 {
+        0.02
+    }
+
+    fn eval_string(&self, state: &Orbit) -> String {
+        format!("{}", self.e_loc.compute(state))
+    }
+}
+
+impl EventEvaluator<Spacecraft> for PenumbraEvent {
     fn eval(&self, sc: &Spacecraft) -> f64 {
         match self.e_loc.compute(&sc.orbit) {
             EclipseState::Umbra => 0.0,

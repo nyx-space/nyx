@@ -17,10 +17,11 @@
 */
 
 use crate::errors::NyxError;
-use crate::md::prelude::Traj;
+use crate::linalg::allocator::Allocator;
+use crate::linalg::DefaultAllocator;
+use crate::md::prelude::{Interpolatable, Traj};
 use crate::md::EventEvaluator;
 use crate::time::Duration;
-use crate::Spacecraft;
 use core::fmt;
 
 /// Enumerates the possible edges of an event in a trajectory.
@@ -43,9 +44,13 @@ pub enum EventEdge {
 /// # Generics
 /// S: Interpolatable - A type that represents the state of the trajectory. This type must implement the `Interpolatable` trait, ensuring that it can be interpolated and manipulated according to the trajectory's requirements.
 #[derive(Clone, Debug, PartialEq)]
-pub struct EventDetails {
+pub struct EventDetails<S: Interpolatable>
+where
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+{
     /// The state of the trajectory at the found event.
-    pub state: Spacecraft,
+    pub state: S,
     /// Indicates whether the event is a rising edge, falling edge, or unclear. This helps in understanding the direction of change at the event point.
     pub edge: EventEdge,
     /// Numerical evaluation of the event condition, e.g. if seeking the apoapsis, this returns the near zero
@@ -60,7 +65,11 @@ pub struct EventDetails {
     pub repr: String,
 }
 
-impl EventDetails {
+impl<S: Interpolatable> EventDetails<S>
+where
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+{
     /// Generates detailed information about an event at a specific epoch in a trajectory.
     ///
     /// This takes an `Epoch` as an input and returns a `Result<Self, NyxError>`.
@@ -72,11 +81,11 @@ impl EventDetails {
     /// - `Ok(EventDetails<S>)` if the state at the given epoch can be determined and the event details are successfully evaluated.
     /// - `Err(NyxError)` if there is an error in retrieving the state at the specified epoch.
     ///
-    pub fn new<E: EventEvaluator>(
-        state: Spacecraft,
+    pub fn new<E: EventEvaluator<S>>(
+        state: S,
         value: f64,
         event: &E,
-        traj: &Traj,
+        traj: &Traj<S>,
     ) -> Result<Self, NyxError> {
         let epoch = state.epoch();
         let prev_value = if let Ok(state) = traj.at(epoch - event.epoch_precision()) {
@@ -133,7 +142,11 @@ impl EventDetails {
     }
 }
 
-impl fmt::Display for EventDetails {
+impl<S: Interpolatable> fmt::Display for EventDetails<S>
+where
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let prev_fmt = match self.prev_value {
             Some(value) => format!("{value:.6}"),
@@ -154,12 +167,20 @@ impl fmt::Display for EventDetails {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct EventArc {
-    pub rise: EventDetails,
-    pub fall: EventDetails,
+pub struct EventArc<S: Interpolatable>
+where
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+{
+    pub rise: EventDetails<S>,
+    pub fall: EventDetails<S>,
 }
 
-impl fmt::Display for EventArc {
+impl<S: Interpolatable> fmt::Display for EventArc<S>
+where
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,

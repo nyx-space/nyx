@@ -21,8 +21,10 @@ pub mod evaluators;
 pub mod search;
 use super::StateParameter;
 use crate::cosmic::{Cosm, Frame};
+use crate::linalg::allocator::Allocator;
+use crate::linalg::DefaultAllocator;
 use crate::time::{Duration, Unit};
-use crate::Spacecraft;
+use crate::State;
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 use std::default::Default;
@@ -30,20 +32,20 @@ use std::fmt;
 use std::sync::Arc;
 
 /// A trait to specify how a specific event must be evaluated.
-// pub trait EventEvaluator<S: State>: fmt::Display + Send + Sync
-// where
-//     DefaultAllocator:
-//         Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size> + Allocator<f64, S::VecLength>,
-pub trait EventEvaluator: fmt::Display + Send + Sync {
+pub trait EventEvaluator<S: State>: fmt::Display + Send + Sync
+where
+    DefaultAllocator:
+        Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size> + Allocator<f64, S::VecLength>,
+{
     // Evaluation of event crossing, must return whether the condition happened between between both states.
-    fn eval_crossing(&self, prev_state: &Spacecraft, next_state: &Spacecraft) -> bool {
+    fn eval_crossing(&self, prev_state: &S, next_state: &S) -> bool {
         self.eval(prev_state) * self.eval(next_state) < 0.0
     }
 
     /// Evaluation of the event, must return a value corresponding to whether the state is before or after the event
-    fn eval(&self, state: &Spacecraft) -> f64;
+    fn eval(&self, state: &S) -> f64;
     /// Returns a string representation of the event evaluation for the given state
-    fn eval_string(&self, state: &Spacecraft) -> String;
+    fn eval_string(&self, state: &S) -> String;
     fn epoch_precision(&self) -> Duration;
     fn value_precision(&self) -> f64;
 }

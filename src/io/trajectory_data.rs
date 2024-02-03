@@ -17,8 +17,8 @@
 */
 use crate::{
     io::MissingDataSnafu,
+    linalg::{allocator::Allocator, DefaultAllocator},
     md::{prelude::Traj, trajectory::Interpolatable, StateParameter},
-    Spacecraft,
 };
 use arrow::{array::Float64Array, record_batch::RecordBatchReader};
 use hifitime::Epoch;
@@ -95,7 +95,13 @@ impl TrajectoryLoader {
     /// # Design limitations
     /// For Python compatibility, the file is actually re-read here, although it was read and closed during initialization.
     /// This is required because the parquet file reader is not clonable.
-    pub fn to_traj(&self) -> Result<Traj, InputOutputError> {
+    pub fn to_traj<S>(&self) -> Result<Traj<S>, InputOutputError>
+    where
+        S: Interpolatable,
+        DefaultAllocator: Allocator<f64, S::VecLength>
+            + Allocator<f64, S::Size>
+            + Allocator<f64, S::Size, S::Size>,
+    {
         // Check the schema
         let mut has_epoch = false; // Required
         let mut frame = None;
@@ -174,10 +180,7 @@ impl TrajectoryLoader {
 
         let sc_compat = found_fields.last().unwrap().1;
 
-        let expected_type = std::any::type_name::<Spacecraft>()
-            .split("::")
-            .last()
-            .unwrap();
+        let expected_type = std::any::type_name::<S>().split("::").last().unwrap();
 
         if expected_type == "Spacecraft" {
             ensure!(
@@ -245,7 +248,7 @@ impl TrajectoryLoader {
 
             // Build the states
             for i in 0..batch.num_rows() {
-                let mut state = Spacecraft::zeros();
+                let mut state = S::zeros();
                 state.set_epoch(Epoch::from_tai_seconds(epochs.value(i)));
                 state.set_frame(frame);
                 state.unset_stm(); // We don't have any STM data, so let's unset this.

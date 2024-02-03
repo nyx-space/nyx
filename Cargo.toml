@@ -11,7 +11,7 @@ repository = "https://gitlab.com/nyx-space/nyx"
 keywords = ["space", "mission", "design", "orbit", "estimation"]
 categories = ["science", "simulation", "aerospace", "science::robotics"]
 readme = "README.md"
-license = "MPL-2.0"
+license = "AGPL-3.0-or-later"
 exclude = [
     "tests/GMAT_scripts/*",
     "examples",
@@ -36,7 +36,6 @@ gitlab = { repository = "nyx-space/nyx", branch = "master" }
 nalgebra = "=0.32"
 log = "0.4"
 hifitime = { version = "3.9.0", features = ["std"] }
-anise = { path = "../anise/anise" }
 flate2 = { version = "1.0", features = [
     "rust_backend",
 ], default-features = false }
