@@ -534,8 +534,8 @@ fn test_rss_errors() {
 /// A tuple of f64 values representing the RSS orbit errors in radius and velocity.
 pub fn rss_orbit_errors(prop_err: &Orbit, cur_state: &Orbit) -> (f64, f64) {
     (
-        rss_errors(&prop_err.radius(), &cur_state.radius()),
-        rss_errors(&prop_err.velocity(), &cur_state.velocity()),
+        rss_errors(&prop_err.radius_km, &cur_state.radius_km),
+        rss_errors(&prop_err.velocity_km_s, &cur_state.velocity_km_s),
     )
 }
 

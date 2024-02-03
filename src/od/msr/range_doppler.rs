@@ -24,7 +24,6 @@ use crate::od::{EstimateFrom, Measurement};
 use crate::{Spacecraft, TimeTagged};
 use arrow::datatypes::{DataType, Field};
 use hifitime::{Epoch, Unit};
-use nalgebra::Matrix2x6;
 use std::collections::HashMap;
 
 /// A simultaneous range and Doppler measurement in units of km and km/s, available both in one way and two way measurement.
@@ -170,40 +169,22 @@ impl Measurement for RangeDoppler {
     }
 }
 
-impl EstimateFrom<Spacecraft, RangeDoppler> for Orbit {
+impl EstimateFrom<Spacecraft, RangeDoppler> for Spacecraft {
     fn extract(from: Spacecraft) -> Self {
-        from.orbit
-    }
-
-    fn sensitivity(
-        msr: &RangeDoppler,
-        receiver: Self,
-        transmitter: Self,
-    ) -> OMatrix<f64, <RangeDoppler as Measurement>::MeasurementSize, Self::Size>
-    where
-        DefaultAllocator:
-            Allocator<f64, <RangeDoppler as Measurement>::MeasurementSize, Self::Size>,
-    {
-        <Orbit as EstimateFrom<Orbit, RangeDoppler>>::sensitivity(msr, receiver, transmitter)
-    }
-}
-
-impl EstimateFrom<Orbit, RangeDoppler> for Orbit {
-    fn extract(from: Orbit) -> Self {
         from
     }
 
     fn sensitivity(
         msr: &RangeDoppler,
         receiver: Self,
-        transmitter: Self,
+        transmitter: Orbit,
     ) -> OMatrix<f64, <RangeDoppler as Measurement>::MeasurementSize, Self::Size>
     where
         DefaultAllocator:
             Allocator<f64, <RangeDoppler as Measurement>::MeasurementSize, Self::Size>,
     {
-        let delta_r = receiver.radius() - transmitter.radius();
-        let delta_v = receiver.velocity() - transmitter.velocity();
+        let delta_r = receiver.orbit.radius_km - transmitter.radius_km;
+        let delta_v = receiver.orbit.velocity_km_s - transmitter.velocity_km_s;
         let ρ = msr.observation()[0];
         let ρ_dot = msr.observation()[1];
         let m11 = delta_r.x / ρ;
@@ -213,24 +194,11 @@ impl EstimateFrom<Orbit, RangeDoppler> for Orbit {
         let m22 = delta_v.y / ρ - ρ_dot * delta_r.y / ρ.powi(2);
         let m23 = delta_v.z / ρ - ρ_dot * delta_r.z / ρ.powi(2);
 
-        Matrix2x6::new(m11, m12, m13, 0.0, 0.0, 0.0, m21, m22, m23, m11, m12, m13)
-    }
-}
+        let items = &[
+            m11, m12, m13, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, m21, m22, m23, m11, m12, m13, 0.0, 0.0,
+            0.0,
+        ];
 
-impl EstimateFrom<Spacecraft, RangeDoppler> for Spacecraft {
-    fn extract(from: Spacecraft) -> Self {
-        from
-    }
-
-    fn sensitivity(
-        _msr: &RangeDoppler,
-        _receiver: Self,
-        _transmitter: Orbit,
-    ) -> OMatrix<f64, <RangeDoppler as Measurement>::MeasurementSize, Self::Size>
-    where
-        DefaultAllocator:
-            Allocator<f64, <RangeDoppler as Measurement>::MeasurementSize, Self::Size>,
-    {
-        todo!("cannot yet estimate a full spacecraft state")
+        OMatrix::from_row_slice(items)
     }
 }
