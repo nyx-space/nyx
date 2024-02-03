@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anise::errors::PhysicsError;
 pub use anise::prelude::{Frame, Orbit};
 
 pub use self::xb::Xb;
@@ -28,7 +29,6 @@ use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
 use crate::md::StateParameter;
 use crate::time::{Duration, Epoch, Unit};
-use anise::errors::PhysicsError;
 use hifitime::SECONDS_PER_DAY;
 use snafu::Snafu;
 use std::fmt::{self, Write};

@@ -853,47 +853,47 @@ impl Orbit {
         Ok(rtn)
     }
 
-    /// Create a multivariate normal dispersion structure from this orbit with the provided mean and covariance,
-    /// specified as {X, Y, Z, VX, VY, VZ} in km and km/s
-    pub fn disperse(
-        &self,
-        mean: Vector6<f64>,
-        cov: Matrix6<f64>,
-    ) -> Result<MultivariateNormal<Orbit>, NyxError> {
-        MultivariateNormal::new(
-            *self,
-            vec![
-                StateParameter::X,
-                StateParameter::Y,
-                StateParameter::Z,
-                StateParameter::VX,
-                StateParameter::VY,
-                StateParameter::VZ,
-            ],
-            mean,
-            cov,
-        )
-    }
+    // Create a multivariate normal dispersion structure from this orbit with the provided mean and covariance,
+    // specified as {X, Y, Z, VX, VY, VZ} in km and km/s
+    // pub fn disperse(
+    //     &self,
+    //     mean: Vector6<f64>,
+    //     cov: Matrix6<f64>,
+    // ) -> Result<MultivariateNormal<Orbit>, NyxError> {
+    //     MultivariateNormal::new(
+    //         *self,
+    //         vec![
+    //             StateParameter::X,
+    //             StateParameter::Y,
+    //             StateParameter::Z,
+    //             StateParameter::VX,
+    //             StateParameter::VY,
+    //             StateParameter::VZ,
+    //         ],
+    //         mean,
+    //         cov,
+    //     )
+    // }
 
-    /// Create a multivariate normal dispersion structure from this orbit with the provided covariance,
-    /// specified as {X, Y, Z, VX, VY, VZ} in km and km/s
-    pub fn disperse_zero_mean(
-        &self,
-        cov: Matrix6<f64>,
-    ) -> Result<MultivariateNormal<Orbit>, NyxError> {
-        MultivariateNormal::zero_mean(
-            *self,
-            vec![
-                StateParameter::X,
-                StateParameter::Y,
-                StateParameter::Z,
-                StateParameter::VX,
-                StateParameter::VY,
-                StateParameter::VZ,
-            ],
-            cov,
-        )
-    }
+    // /// Create a multivariate normal dispersion structure from this orbit with the provided covariance,
+    // /// specified as {X, Y, Z, VX, VY, VZ} in km and km/s
+    // pub fn disperse_zero_mean(
+    //     &self,
+    //     cov: Matrix6<f64>,
+    // ) -> Result<MultivariateNormal<Orbit>, NyxError> {
+    //     MultivariateNormal::zero_mean(
+    //         *self,
+    //         vec![
+    //             StateParameter::X,
+    //             StateParameter::Y,
+    //             StateParameter::Z,
+    //             StateParameter::VX,
+    //             StateParameter::VY,
+    //             StateParameter::VZ,
+    //         ],
+    //         cov,
+    //     )
+    // }
 }
 
 #[cfg_attr(feature = "python", pymethods)]
@@ -2070,204 +2070,204 @@ impl fmt::UpperHex for Orbit {
     }
 }
 
-/// Implementation of Orbit as a State for orbital dynamics with STM
-impl State for Orbit {
-    type Size = Const<6>;
-    type VecLength = Const<42>;
+// /// Implementation of Orbit as a State for orbital dynamics with STM
+// impl State for Orbit {
+//     type Size = Const<6>;
+//     type VecLength = Const<42>;
 
-    fn reset_stm(&mut self) {
-        self.stm = Some(Matrix6::identity());
-    }
+//     fn reset_stm(&mut self) {
+//         self.stm = Some(Matrix6::identity());
+//     }
 
-    /// Returns a state whose position, velocity and frame are zero, and STM is I_{6x6}.
-    fn zeros() -> Self {
-        let frame = Frame::Celestial {
-            gm: 1.0,
-            ephem_path: [None, None, None],
-            frame_path: [None, None, None],
-        };
+//     /// Returns a state whose position, velocity and frame are zero, and STM is I_{6x6}.
+//     fn zeros() -> Self {
+//         let frame = Frame::Celestial {
+//             gm: 1.0,
+//             ephem_path: [None, None, None],
+//             frame_path: [None, None, None],
+//         };
 
-        Self {
-            x_km: 0.0,
-            y_km: 0.0,
-            z_km: 0.0,
-            vx_km_s: 0.0,
-            vy_km_s: 0.0,
-            vz_km_s: 0.0,
-            epoch: Epoch::from_tai_seconds(0.0),
-            frame,
-            stm: Some(Matrix6::identity()),
-        }
-    }
+//         Self {
+//             x_km: 0.0,
+//             y_km: 0.0,
+//             z_km: 0.0,
+//             vx_km_s: 0.0,
+//             vy_km_s: 0.0,
+//             vz_km_s: 0.0,
+//             epoch: Epoch::from_tai_seconds(0.0),
+//             frame,
+//             stm: Some(Matrix6::identity()),
+//         }
+//     }
 
-    fn as_vector(&self) -> OVector<f64, Const<42>> {
-        let mut as_vec = OVector::<f64, Const<42>>::zeros();
-        as_vec[0] = self.x_km;
-        as_vec[1] = self.y_km;
-        as_vec[2] = self.z_km;
-        as_vec[3] = self.vx_km_s;
-        as_vec[4] = self.vy_km_s;
-        as_vec[5] = self.vz_km_s;
-        if let Some(stm) = self.stm {
-            for (idx, stm_val) in stm.as_slice().iter().enumerate() {
-                as_vec[idx + 6] = *stm_val;
-            }
-        }
-        as_vec
-    }
+//     fn as_vector(&self) -> OVector<f64, Const<42>> {
+//         let mut as_vec = OVector::<f64, Const<42>>::zeros();
+//         as_vec[0] = self.x_km;
+//         as_vec[1] = self.y_km;
+//         as_vec[2] = self.z_km;
+//         as_vec[3] = self.vx_km_s;
+//         as_vec[4] = self.vy_km_s;
+//         as_vec[5] = self.vz_km_s;
+//         if let Some(stm) = self.stm {
+//             for (idx, stm_val) in stm.as_slice().iter().enumerate() {
+//                 as_vec[idx + 6] = *stm_val;
+//             }
+//         }
+//         as_vec
+//     }
 
-    fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Const<42>>) {
-        self.set_epoch(epoch);
-        self.x_km = vector[0];
-        self.y_km = vector[1];
-        self.z_km = vector[2];
-        self.vx_km_s = vector[3];
-        self.vy_km_s = vector[4];
-        self.vz_km_s = vector[5];
-        // And update the STM if applicable
-        if self.stm.is_some() {
-            let stm_k_to_0 = Matrix6::from_column_slice(&vector.as_slice()[6..]);
-            self.stm = Some(stm_k_to_0);
-        }
-    }
+//     fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Const<42>>) {
+//         self.set_epoch(epoch);
+//         self.x_km = vector[0];
+//         self.y_km = vector[1];
+//         self.z_km = vector[2];
+//         self.vx_km_s = vector[3];
+//         self.vy_km_s = vector[4];
+//         self.vz_km_s = vector[5];
+//         // And update the STM if applicable
+//         if self.stm.is_some() {
+//             let stm_k_to_0 = Matrix6::from_column_slice(&vector.as_slice()[6..]);
+//             self.stm = Some(stm_k_to_0);
+//         }
+//     }
 
-    fn stm(&self) -> Result<Matrix6<f64>, DynamicsError> {
-        match self.stm {
-            Some(stm) => Ok(stm),
-            None => Err(DynamicsError::StateTransitionMatrixUnset),
-        }
-    }
+//     fn stm(&self) -> Result<Matrix6<f64>, DynamicsError> {
+//         match self.stm {
+//             Some(stm) => Ok(stm),
+//             None => Err(DynamicsError::StateTransitionMatrixUnset),
+//         }
+//     }
 
-    fn epoch(&self) -> Epoch {
-        self.epoch
-    }
+//     fn epoch(&self) -> Epoch {
+//         self.epoch
+//     }
 
-    fn set_epoch(&mut self, epoch: Epoch) {
-        self.epoch = epoch
-    }
+//     fn set_epoch(&mut self, epoch: Epoch) {
+//         self.epoch = epoch
+//     }
 
-    fn add(self, other: OVector<f64, Self::Size>) -> Self {
-        self + other
-    }
+//     fn add(self, other: OVector<f64, Self::Size>) -> Self {
+//         self + other
+//     }
 
-    fn value(&self, param: StateParameter) -> Result<f64, NyxError> {
-        match param {
-            StateParameter::ApoapsisRadius => Ok(self.apoapsis_km()),
-            StateParameter::AoL => Ok(self.aol_deg()),
-            StateParameter::AoP => Ok(self.aop_deg()),
-            StateParameter::BdotR => Ok(BPlane::new(*self).unwrap().b_r.real()),
-            StateParameter::BdotT => Ok(BPlane::new(*self).unwrap().b_t.real()),
-            StateParameter::BLTOF => Ok(BPlane::new(*self).unwrap().ltof_s.real()),
-            StateParameter::C3 => Ok(self.c3_km2_s2()),
-            StateParameter::Declination => Ok(self.declination_deg()),
-            StateParameter::EccentricAnomaly => Ok(self.ea_deg()),
-            StateParameter::Eccentricity => Ok(self.ecc()),
-            StateParameter::Energy => Ok(self.energy_km2_s2()),
-            StateParameter::FlightPathAngle => Ok(self.fpa_deg()),
-            StateParameter::GeodeticHeight => Ok(self.geodetic_height_km()),
-            StateParameter::GeodeticLatitude => Ok(self.geodetic_latitude_deg()),
-            StateParameter::GeodeticLongitude => Ok(self.geodetic_longitude_deg()),
-            StateParameter::Hmag => Ok(self.hmag_km2_s()),
-            StateParameter::HX => Ok(self.hx_km2_s()),
-            StateParameter::HY => Ok(self.hy_km2_s()),
-            StateParameter::HZ => Ok(self.hz_km2_s()),
-            StateParameter::HyperbolicAnomaly => self.hyperbolic_anomaly_deg(),
-            StateParameter::Inclination => Ok(self.inc_deg()),
-            StateParameter::MeanAnomaly => Ok(self.ma_deg()),
-            StateParameter::PeriapsisRadius => Ok(self.periapsis_km()),
-            StateParameter::Period => Ok(self.period().to_seconds()),
-            StateParameter::RightAscension => Ok(self.right_ascension_deg()),
-            StateParameter::RAAN => Ok(self.raan_deg()),
-            StateParameter::Rmag => Ok(self.rmag_km()),
-            StateParameter::SemiMinorAxis => Ok(self.semi_minor_axis_km()),
-            StateParameter::SemiParameter => Ok(self.semi_parameter_km()),
-            StateParameter::SMA => Ok(self.sma_km()),
-            StateParameter::TrueAnomaly => Ok(self.ta_deg()),
-            StateParameter::TrueLongitude => Ok(self.tlong_deg()),
-            StateParameter::VelocityDeclination => Ok(self.velocity_declination_deg()),
-            StateParameter::Vmag => Ok(self.vmag_km_s()),
-            StateParameter::X => Ok(self.x_km),
-            StateParameter::Y => Ok(self.y_km),
-            StateParameter::Z => Ok(self.z_km),
-            StateParameter::VX => Ok(self.vx_km_s),
-            StateParameter::VY => Ok(self.vy_km_s),
-            StateParameter::VZ => Ok(self.vz_km_s),
-            _ => Err(NyxError::StateParameterUnavailable {
-                param,
-                msg: "no such parameter for orbit structure".to_string(),
-            }),
-        }
-    }
+//     fn value(&self, param: StateParameter) -> Result<f64, NyxError> {
+//         match param {
+//             StateParameter::ApoapsisRadius => Ok(self.apoapsis_km()),
+//             StateParameter::AoL => Ok(self.aol_deg()),
+//             StateParameter::AoP => Ok(self.aop_deg()),
+//             StateParameter::BdotR => Ok(BPlane::new(*self).unwrap().b_r.real()),
+//             StateParameter::BdotT => Ok(BPlane::new(*self).unwrap().b_t.real()),
+//             StateParameter::BLTOF => Ok(BPlane::new(*self).unwrap().ltof_s.real()),
+//             StateParameter::C3 => Ok(self.c3_km2_s2()),
+//             StateParameter::Declination => Ok(self.declination_deg()),
+//             StateParameter::EccentricAnomaly => Ok(self.ea_deg()),
+//             StateParameter::Eccentricity => Ok(self.ecc()),
+//             StateParameter::Energy => Ok(self.energy_km2_s2()),
+//             StateParameter::FlightPathAngle => Ok(self.fpa_deg()),
+//             StateParameter::GeodeticHeight => Ok(self.geodetic_height_km()),
+//             StateParameter::GeodeticLatitude => Ok(self.geodetic_latitude_deg()),
+//             StateParameter::GeodeticLongitude => Ok(self.geodetic_longitude_deg()),
+//             StateParameter::Hmag => Ok(self.hmag_km2_s()),
+//             StateParameter::HX => Ok(self.hx_km2_s()),
+//             StateParameter::HY => Ok(self.hy_km2_s()),
+//             StateParameter::HZ => Ok(self.hz_km2_s()),
+//             StateParameter::HyperbolicAnomaly => self.hyperbolic_anomaly_deg(),
+//             StateParameter::Inclination => Ok(self.inc_deg()),
+//             StateParameter::MeanAnomaly => Ok(self.ma_deg()),
+//             StateParameter::PeriapsisRadius => Ok(self.periapsis_km()),
+//             StateParameter::Period => Ok(self.period().to_seconds()),
+//             StateParameter::RightAscension => Ok(self.right_ascension_deg()),
+//             StateParameter::RAAN => Ok(self.raan_deg()),
+//             StateParameter::Rmag => Ok(self.rmag_km()),
+//             StateParameter::SemiMinorAxis => Ok(self.semi_minor_axis_km()),
+//             StateParameter::SemiParameter => Ok(self.semi_parameter_km()),
+//             StateParameter::SMA => Ok(self.sma_km()),
+//             StateParameter::TrueAnomaly => Ok(self.ta_deg()),
+//             StateParameter::TrueLongitude => Ok(self.tlong_deg()),
+//             StateParameter::VelocityDeclination => Ok(self.velocity_declination_deg()),
+//             StateParameter::Vmag => Ok(self.vmag_km_s()),
+//             StateParameter::X => Ok(self.x_km),
+//             StateParameter::Y => Ok(self.y_km),
+//             StateParameter::Z => Ok(self.z_km),
+//             StateParameter::VX => Ok(self.vx_km_s),
+//             StateParameter::VY => Ok(self.vy_km_s),
+//             StateParameter::VZ => Ok(self.vz_km_s),
+//             _ => Err(NyxError::StateParameterUnavailable {
+//                 param,
+//                 msg: "no such parameter for orbit structure".to_string(),
+//             }),
+//         }
+//     }
 
-    fn set_value(&mut self, param: StateParameter, val: f64) -> Result<(), NyxError> {
-        match param {
-            StateParameter::AoP => self.set_aop_deg(val),
-            StateParameter::Eccentricity => self.set_ecc(val),
-            StateParameter::Inclination => self.set_inc_deg(val),
-            StateParameter::RAAN => self.set_raan_deg(val),
-            StateParameter::SMA => self.set_sma_km(val),
-            StateParameter::TrueAnomaly => self.set_ta_deg(val),
-            StateParameter::X => self.x_km = val,
-            StateParameter::Y => self.y_km = val,
-            StateParameter::Z => self.z_km = val,
-            StateParameter::Rmag => {
-                // Convert the position to spherical coordinates
-                let (_, θ, φ) = cartesian_to_spherical(&self.radius());
-                // Convert back to cartesian after setting the new range value
-                let new_radius = spherical_to_cartesian(val, θ, φ);
-                self.x_km = new_radius.x;
-                self.y_km = new_radius.y;
-                self.z_km = new_radius.z;
-            }
-            StateParameter::VX => self.vx_km_s = val,
-            StateParameter::VY => self.vy_km_s = val,
-            StateParameter::VZ => self.vz_km_s = val,
-            StateParameter::Vmag => {
-                // Convert the velocity to spherical coordinates
-                let (_, θ, φ) = cartesian_to_spherical(&self.velocity());
-                // Convert back to cartesian after setting the new range value
-                let new_radius = spherical_to_cartesian(val, θ, φ);
-                self.vx_km_s = new_radius.x;
-                self.vy_km_s = new_radius.y;
-                self.vz_km_s = new_radius.z;
-            }
-            _ => {
-                return Err(NyxError::StateParameterUnavailable {
-                    param,
-                    msg: "not settable for orbit structure with set_value".to_string(),
-                })
-            }
-        }
-        Ok(())
-    }
+//     fn set_value(&mut self, param: StateParameter, val: f64) -> Result<(), NyxError> {
+//         match param {
+//             StateParameter::AoP => self.set_aop_deg(val),
+//             StateParameter::Eccentricity => self.set_ecc(val),
+//             StateParameter::Inclination => self.set_inc_deg(val),
+//             StateParameter::RAAN => self.set_raan_deg(val),
+//             StateParameter::SMA => self.set_sma_km(val),
+//             StateParameter::TrueAnomaly => self.set_ta_deg(val),
+//             StateParameter::X => self.x_km = val,
+//             StateParameter::Y => self.y_km = val,
+//             StateParameter::Z => self.z_km = val,
+//             StateParameter::Rmag => {
+//                 // Convert the position to spherical coordinates
+//                 let (_, θ, φ) = cartesian_to_spherical(&self.radius());
+//                 // Convert back to cartesian after setting the new range value
+//                 let new_radius = spherical_to_cartesian(val, θ, φ);
+//                 self.x_km = new_radius.x;
+//                 self.y_km = new_radius.y;
+//                 self.z_km = new_radius.z;
+//             }
+//             StateParameter::VX => self.vx_km_s = val,
+//             StateParameter::VY => self.vy_km_s = val,
+//             StateParameter::VZ => self.vz_km_s = val,
+//             StateParameter::Vmag => {
+//                 // Convert the velocity to spherical coordinates
+//                 let (_, θ, φ) = cartesian_to_spherical(&self.velocity());
+//                 // Convert back to cartesian after setting the new range value
+//                 let new_radius = spherical_to_cartesian(val, θ, φ);
+//                 self.vx_km_s = new_radius.x;
+//                 self.vy_km_s = new_radius.y;
+//                 self.vz_km_s = new_radius.z;
+//             }
+//             _ => {
+//                 return Err(NyxError::StateParameterUnavailable {
+//                     param,
+//                     msg: "not settable for orbit structure with set_value".to_string(),
+//                 })
+//             }
+//         }
+//         Ok(())
+//     }
 
-    fn unset_stm(&mut self) {
-        self.stm = None;
-    }
-}
+//     fn unset_stm(&mut self) {
+//         self.stm = None;
+//     }
+// }
 
-impl Add<OVector<f64, Const<6>>> for Orbit {
-    type Output = Self;
+// impl Add<OVector<f64, Const<6>>> for Orbit {
+//     type Output = Self;
 
-    /// Adds the provided state deviation to this orbit
-    fn add(self, other: OVector<f64, Const<6>>) -> Self {
-        let mut me = self;
-        me.x_km += other[0];
-        me.y_km += other[1];
-        me.z_km += other[2];
-        me.vx_km_s += other[3];
-        me.vy_km_s += other[4];
-        me.vz_km_s += other[5];
+//     /// Adds the provided state deviation to this orbit
+//     fn add(self, other: OVector<f64, Const<6>>) -> Self {
+//         let mut me = self;
+//         me.x_km += other[0];
+//         me.y_km += other[1];
+//         me.z_km += other[2];
+//         me.vx_km_s += other[3];
+//         me.vy_km_s += other[4];
+//         me.vz_km_s += other[5];
 
-        me
-    }
-}
+//         me
+//     }
+// }
 
-impl Default for Orbit {
-    fn default() -> Self {
-        Self::zeros()
-    }
-}
+// impl Default for Orbit {
+//     fn default() -> Self {
+//         Self::zeros()
+//     }
+// }
 
 impl ConfigRepr for OrbitSerde {}
 

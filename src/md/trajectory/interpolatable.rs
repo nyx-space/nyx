@@ -16,13 +16,14 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anise::math::interpolation::hermite_eval;
+
 pub(crate) const INTERPOLATION_SAMPLES: usize = 13;
 
 use super::StateParameter;
 use crate::cosmic::Frame;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
-use crate::polyfit::hermite::hermite_eval;
 use crate::time::Epoch;
 use crate::{Orbit, Spacecraft, State};
 
@@ -52,10 +53,9 @@ where
     fn orbit(&self) -> &Orbit;
 }
 
-impl Interpolatable for Orbit {
+impl Interpolatable for Spacecraft {
     fn interpolate(self, epoch: Epoch, states: &[Self]) -> Self {
-        // This is copied from ANISE
-
+        // Interpolate the Orbit first
         // Statically allocated arrays of the maximum number of samples
         let mut epochs_tdb = [0.0; INTERPOLATION_SAMPLES + 1];
         let mut xs = [0.0; INTERPOLATION_SAMPLES + 1];
@@ -100,84 +100,22 @@ impl Interpolatable for Orbit {
         )
         .unwrap();
 
-        // And build the result
-        let mut me = self;
-        me.x_km = x_km;
-        me.y_km = y_km;
-        me.z_km = z_km;
-        me.vx_km_s = vx_km_s;
-        me.vy_km_s = vy_km_s;
-        me.vz_km_s = vz_km_s;
-        me.set_epoch(epoch);
-
-        me
-    }
-
-    fn frame(&self) -> Frame {
-        self.frame
-    }
-
-    fn set_frame(&mut self, frame: Frame) {
-        self.frame = frame;
-    }
-
-    fn export_params() -> Vec<StateParameter> {
-        // Build all of the orbital parameters but keep the Cartesian state first
-        let orbit_params = all::<StateParameter>()
-            .filter(|p| {
-                p.is_orbital()
-                    && !p.is_b_plane()
-                    && !matches!(
-                        p,
-                        StateParameter::X
-                            | StateParameter::Y
-                            | StateParameter::Z
-                            | StateParameter::VX
-                            | StateParameter::VY
-                            | StateParameter::VZ
-                            | StateParameter::HyperbolicAnomaly
-                            | StateParameter::GeodeticHeight
-                            | StateParameter::GeodeticLatitude
-                            | StateParameter::GeodeticLongitude
-                    )
-            })
-            .collect::<Vec<StateParameter>>();
-
-        [
-            vec![
-                StateParameter::X,
-                StateParameter::Y,
-                StateParameter::Z,
-                StateParameter::VX,
-                StateParameter::VY,
-                StateParameter::VZ,
-            ],
-            orbit_params,
-        ]
-        .concat()
-    }
-
-    fn orbit(&self) -> &Orbit {
-        self
-    }
-}
-
-impl Interpolatable for Spacecraft {
-    fn interpolate(self, epoch: Epoch, states: &[Self]) -> Self {
-        // Use the Orbit interpolation first.
-        let orbit = Orbit::interpolate(
-            self.orbit,
-            epoch,
-            &states.iter().map(|sc| sc.orbit).collect::<Vec<_>>(),
-        );
-
         // Fuel is linearly interpolated -- should really be a Lagrange interpolation here
         let fuel_kg_dt = (states.last().unwrap().fuel_mass_kg
             - states.first().unwrap().fuel_mass_kg)
             / (states.last().unwrap().epoch().to_tdb_seconds()
                 - states.first().unwrap().epoch().to_tdb_seconds());
 
-        let mut me = self.with_orbit(orbit);
+        let mut me = self.with_orbit(Orbit::new(
+            x_km,
+            y_km,
+            z_km,
+            vx_km_s,
+            vy_km_s,
+            vz_km_s,
+            epoch,
+            self.orbit.frame,
+        ));
         me.fuel_mass_kg += fuel_kg_dt
             * (epoch.to_tdb_seconds() - states.first().unwrap().epoch().to_tdb_seconds());
 

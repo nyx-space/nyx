@@ -21,6 +21,7 @@ use crate::cosmic::Orbit;
 use crate::hifitime::Epoch;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, OMatrix, OVector};
+use crate::Spacecraft;
 use std::cmp::PartialEq;
 use std::fmt;
 
@@ -87,7 +88,7 @@ where
 }
 
 /// A trait to store a navigation solution, can be used in conjunction with KfEstimate
-pub trait NavSolution<T>: Estimate<Orbit>
+pub trait NavSolution<T>: Estimate<Spacecraft>
 where
     T: State,
     DefaultAllocator: Allocator<f64, <T as State>::Size>
@@ -99,9 +100,9 @@ where
     fn expected_state(&self) -> Orbit;
 }
 
-impl NavSolution<Orbit> for KfEstimate<Orbit> {
+impl NavSolution<Spacecraft> for KfEstimate<Spacecraft> {
     fn orbital_state(&self) -> Orbit {
-        self.state()
+        self.state().orbit
     }
     fn expected_state(&self) -> Orbit {
         self.nominal_state()

@@ -34,7 +34,7 @@ use std::sync::Arc;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
-impl Traj {
+impl Traj<Spacecraft> {
     /// Allows converting the source trajectory into the (almost) equivalent trajectory in another frame
     #[allow(clippy::map_clone)]
     pub fn to_frame(&self, new_frame: Frame, cosm: Arc<Cosm>) -> Result<Self, NyxError> {
@@ -97,7 +97,7 @@ impl Traj {
         &self,
         path: P,
         body_fixed_frame: Frame,
-        events: Option<Vec<&dyn EventEvaluator>>,
+        events: Option<Vec<&dyn EventEvaluator<Spacecraft>>>,
         metadata: Option<HashMap<String, String>>,
         cosm: Arc<Cosm>,
     ) -> Result<PathBuf, Box<dyn Error>> {
@@ -118,7 +118,7 @@ impl Traj {
     }
 
     /// Convert this spacecraft trajectory into an Orbit trajectory, loosing all references to the spacecraft
-    pub fn downcast(&self) -> Traj {
+    pub fn downcast(&self) -> Self {
         unimplemented!()
     }
 
@@ -126,10 +126,6 @@ impl Traj {
     ///
     /// CCSDS OEM only contains the orbit information, so you must provide a template spacecraft since we'll upcast the orbit trajectory into a spacecraft trajectory.
     pub fn from_oem_file<P: AsRef<Path>>(path: P, template: Spacecraft) -> Result<Self, NyxError> {
-        // let traj = Traj::<Orbit>::from_oem_file(path)?;
-
-        // Ok(traj.upcast(template))
-
         let cosm = Cosm::de438();
         // Open the file
         let file = File::open(path).map_err(|e| NyxError::CCSDS {

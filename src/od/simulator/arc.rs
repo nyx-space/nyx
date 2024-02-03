@@ -28,10 +28,10 @@ use crate::od::msr::{RangeDoppler, TrackingArc};
 use crate::od::prelude::Strand;
 use crate::od::simulator::Cadence;
 use crate::od::{GroundStation, Measurement};
+use crate::Spacecraft;
 use crate::{cosmic::Cosm, State};
 use crate::{linalg::allocator::Allocator, od::TrackingDeviceSim};
 use crate::{linalg::DefaultAllocator, md::prelude::Traj};
-use crate::{Orbit, Spacecraft};
 use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::marker::PhantomData;
@@ -280,7 +280,8 @@ where
     }
 }
 
-impl TrackingArcSim<Orbit, RangeDoppler, GroundStation> {
+// Literally the same as above, but can't make it generic =(
+impl TrackingArcSim<Spacecraft, RangeDoppler, GroundStation> {
     /// Builds the schedule provided the config. Requires the tracker to be a ground station.
     ///
     /// # Algorithm
@@ -376,150 +377,6 @@ impl TrackingArcSim<Orbit, RangeDoppler, GroundStation> {
                 }
             }
         }
-        // Build all of the strands, remembering which tracker they come from.
-        let mut cfg_as_vec = Vec::new();
-        for (name, cfg) in &built_cfg {
-            for (ii, strand) in cfg.strands.as_ref().unwrap().iter().enumerate() {
-                cfg_as_vec.push((name.clone(), ii, *strand));
-            }
-        }
-        // Iterate through the strands by chronological order. Cannot use maps because we change types.
-        cfg_as_vec.sort_by_key(|(_, _, strand)| strand.start);
-        for (ii, (this_name, this_pos, this_strand)) in
-            cfg_as_vec.iter().take(cfg_as_vec.len() - 1).enumerate()
-        {
-            // Grab the config
-            if let Some(config) = self.configs[this_name].scheduler.as_ref() {
-                // Grab the next strand, chronologically
-                if let Some((next_name, next_pos, next_strand)) = cfg_as_vec.get(ii + 1) {
-                    if config.handoff == Handoff::Greedy && this_strand.end >= next_strand.start {
-                        // Modify the built configurations to change the start time of the next strand because the current one is greedy.
-                        let next_config = built_cfg.get_mut(next_name).unwrap();
-                        let new_start = this_strand.end + next_config.sampling;
-                        next_config.strands.as_mut().unwrap()[*next_pos].start = new_start;
-                        info!(
-                            "{this_name} configured as {:?}, so {next_name} now starts on {new_start}",
-                            config.handoff
-                        );
-                    } else if config.handoff == Handoff::Eager
-                        && this_strand.end >= next_strand.start
-                    {
-                        let this_config = built_cfg.get_mut(this_name).unwrap();
-                        let new_end = next_strand.start - this_config.sampling;
-                        this_config.strands.as_mut().unwrap()[*this_pos].end = new_end;
-                        info!(
-                            "{this_name} now hands off to {next_name} on {new_end} because it's configured as {:?}",
-                            config.handoff
-                        );
-                    }
-                } else {
-                    // Reached the end
-                    break;
-                }
-            }
-        }
-
-        Ok(built_cfg)
-    }
-
-    /// Sets the schedule to that built in `generate_schedule`
-    pub fn build_schedule(&mut self, cosm: Arc<Cosm>) -> Result<(), NyxError> {
-        self.configs = self.generate_schedule(cosm)?;
-
-        Ok(())
-    }
-}
-
-// Literally the same as above, but can't make it generic =(
-impl TrackingArcSim<Spacecraft, RangeDoppler, GroundStation> {
-    /// Builds the schedule provided the config. Requires the tracker to be a ground station.
-    ///
-    /// # Algorithm
-    ///
-    /// 1. For each tracking device:
-    /// 2. Find when the vehicle trajectory has an elevation greater or equal to zero, and use that as the first start of the first tracking arc for this station
-    /// 3. Find when the vehicle trajectory has an elevation less than zero (i.e. disappears below the horizon), after that initial epoch
-    /// 4. Repeat 2, 3 until the end of the trajectory
-    /// 5. Build each of these as "tracking strands" for this tracking device.
-    /// 6. Organize all of the built tracking strands chronologically.
-    /// 7. Iterate through all of the strands:
-    /// 7.a. if that tracker is marked as `Greedy` and it ends after the start of the next strand, change the start date of the next strand.
-    /// 7.b. if that tracker is marked as `Eager` and it ends after the start of the next strand, change the end date of the current strand.
-    pub fn generate_schedule(
-        &self,
-        cosm: Arc<Cosm>,
-    ) -> Result<BTreeMap<String, TrkConfig>, NyxError> {
-        let mut built_cfg = self.configs.clone();
-        'devices: for (name, device) in self.devices.iter() {
-            let cfg = &self.configs[name];
-            if let Some(scheduler) = cfg.scheduler {
-                info!("Building schedule for {name}");
-                built_cfg.get_mut(name).unwrap().scheduler = None;
-                built_cfg.get_mut(name).unwrap().strands = Some(Vec::new());
-                // Convert the trajectory into the ground station frame.
-                let traj = self.trajectory.to_frame(device.frame, cosm.clone())?;
-                let mut start_at = traj.first().epoch();
-                let end_at = traj.last().epoch();
-
-                while start_at < end_at {
-                    if let Ok(visibility_event) = traj.find_bracketed(start_at, end_at, &device) {
-                        // We've found when the spacecraft is visible
-                        start_at = visibility_event.state.epoch();
-                        // Search for when the spacecraft is no longer visible.
-                        if let Ok(visibility_event) =
-                            traj.find_bracketed(start_at + 1.0_f64.seconds(), end_at, &device)
-                        {
-                            let strand_end = visibility_event.state.epoch();
-                            let mut strand_range = Strand {
-                                start: start_at,
-                                end: strand_end,
-                            };
-
-                            if let Cadence::Intermittent { on, off } = scheduler.cadence {
-                                // Check that the next start time is within the allocated time
-                                if let Some(prev_strand) =
-                                    built_cfg[name].strands.as_ref().unwrap().last()
-                                {
-                                    if prev_strand.end + off > strand_range.start {
-                                        // We're turning on the tracking sooner than the schedule allows, so let's fix that.
-                                        strand_range.start = prev_strand.end + off;
-                                        // Check that we didn't eat into the whole tracking opportunity
-                                        if strand_range.start > strand_end {
-                                            // Lost this whole opportunity.
-                                            info!("Discarding {name} opportunity from {} to {} due to cadence {:?}", start_at, strand_end, scheduler.cadence);
-                                        }
-                                    }
-                                }
-                                // Check that we aren't tracking for longer than configured
-                                if strand_range.end - strand_range.start > on {
-                                    strand_range.end = strand_range.start + on;
-                                }
-                            }
-
-                            // We've found when the spacecraft is below the horizon, so this is a new strand.
-                            built_cfg
-                                .get_mut(name)
-                                .unwrap()
-                                .strands
-                                .as_mut()
-                                .unwrap()
-                                .push(strand_range);
-                            // Set the new start time and continue searching
-                            start_at = strand_end;
-                        } else {
-                            continue 'devices;
-                        }
-                    } else {
-                        info!(
-                            "Built {} tracking strands for {name}",
-                            built_cfg[name].strands.as_ref().unwrap().len()
-                        );
-                        continue 'devices;
-                    }
-                }
-            }
-        }
-
         // Build all of the strands, remembering which tracker they come from.
         let mut cfg_as_vec = Vec::new();
         for (name, cfg) in &built_cfg {

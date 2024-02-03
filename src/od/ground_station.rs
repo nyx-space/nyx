@@ -267,14 +267,12 @@ impl Configurable for GroundStation {
     }
 }
 
-impl TrackingDeviceSim<Orbit, RangeDoppler> for GroundStation {
-    /// Perform a measurement from the ground station to the receiver. If there is no integration time of the measurement, then this is assumed to be an instantaneous measurement instead of a two way measurement.
-    ///
-    /// WARNING: For StdMeasurement, we just call the instantaneous measurement function.
+impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
+    /// Perform a measurement from the ground station to the receiver (rx).
     fn measure(
         &mut self,
         epoch: Epoch,
-        traj: &Traj<Orbit>,
+        traj: &Traj<Spacecraft>,
         rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
     ) -> Result<Option<RangeDoppler>, ODError> {
@@ -312,57 +310,6 @@ impl TrackingDeviceSim<Orbit, RangeDoppler> for GroundStation {
                 self.measure_instantaneous(traj.at(epoch).with_context(|_| ODTrajSnafu)?, rng, cosm)
             }
         }
-    }
-
-    fn name(&self) -> String {
-        self.name.clone()
-    }
-
-    fn location(&self, epoch: Epoch, frame: Frame, cosm: &Cosm) -> Orbit {
-        cosm.frame_chg(&self.to_orbit(epoch), frame)
-    }
-
-    fn measure_instantaneous(
-        &mut self,
-        rx: Orbit,
-        rng: Option<&mut Pcg64Mcg>,
-        cosm: Arc<Cosm>,
-    ) -> Result<Option<RangeDoppler>, ODError> {
-        let (_, elevation, rx, tx) = self.azimuth_elevation_of(rx, &cosm);
-
-        if elevation >= self.elevation_mask_deg {
-            // Only update the noises if the measurement is valid.
-            let (timestamp_noise_s, range_noise_km, doppler_noise_km_s) =
-                self.noises(rx.epoch, rng)?;
-
-            Ok(Some(RangeDoppler::one_way(
-                tx,
-                rx,
-                timestamp_noise_s,
-                range_noise_km,
-                doppler_noise_km_s,
-            )))
-        } else {
-            debug!(
-                "{} (el. mask {:.3} deg), object at {elevation:.3} deg -- no measurement",
-                self.name, self.elevation_mask_deg
-            );
-            Ok(None)
-        }
-    }
-}
-
-impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
-    /// Perform a measurement from the ground station to the receiver (rx).
-    fn measure(
-        &mut self,
-        epoch: Epoch,
-        traj: &Traj,
-        rng: Option<&mut Pcg64Mcg>,
-        cosm: Arc<Cosm>,
-    ) -> Result<Option<RangeDoppler>, ODError> {
-        let rx = traj.at(epoch).with_context(|_| ODTrajSnafu)?;
-        self.measure_instantaneous(rx, rng, cosm)
     }
 
     fn name(&self) -> String {

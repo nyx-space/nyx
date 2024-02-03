@@ -78,9 +78,10 @@ impl fmt::Display for OrbitalDynamics {
     }
 }
 
-impl Dynamics for OrbitalDynamics {
-    type HyperdualSize = Const<7>;
-    type StateType = Orbit;
+// impl Dynamics for OrbitalDynamics {
+impl OrbitalDynamics {
+    // type HyperdualSize = Const<7>;
+    // type StateType = Orbit;
 
     fn eom(
         &self,

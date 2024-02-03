@@ -16,18 +16,27 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::Traj;
+use super::{Interpolatable, Traj};
+use crate::linalg::allocator::Allocator;
+use crate::linalg::DefaultAllocator;
 use crate::time::TimeSeries;
-use crate::Spacecraft;
 
-pub struct TrajIterator<'a> {
+pub struct TrajIterator<'a, S: Interpolatable>
+where
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+{
     pub time_series: TimeSeries,
     /// A shared pointer to the original trajectory.
-    pub traj: &'a Traj,
+    pub traj: &'a Traj<S>,
 }
 
-impl Iterator for TrajIterator<'_> {
-    type Item = Spacecraft;
+impl<S: Interpolatable> Iterator for TrajIterator<'_, S>
+where
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+{
+    type Item = S;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.time_series.next() {

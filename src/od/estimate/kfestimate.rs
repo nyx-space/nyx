@@ -17,11 +17,11 @@
 */
 
 use super::{Estimate, State};
-use crate::cosmic::Orbit;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, Matrix, OMatrix, OVector, Vector6, U6};
 use crate::mc::GaussianGenerator;
 use crate::md::StateParameter;
+use crate::Spacecraft;
 use rand::SeedableRng;
 use rand_distr::Distribution;
 use rand_pcg::Pcg64Mcg;
@@ -93,13 +93,13 @@ where
     }
 }
 
-impl KfEstimate<Orbit> {
+impl KfEstimate<Spacecraft> {
     /// Generates an initial Kalman filter state estimate dispersed from the nominal state using the provided standard deviation parameters.
     ///
     /// The resulting estimate will have a diagonal covariance matrix constructed from the variances of each parameter.
     /// *Limitation:* This method incorrectly assumes all parameters are statistically independent.
     pub fn disperse_from_diag(
-        nominal_state: Orbit,
+        nominal_state: Spacecraft,
         params: &[(StateParameter, f64)],
         seed: Option<u128>,
     ) -> Self {
@@ -247,6 +247,7 @@ where
 fn test_estimate_from_disp() {
     use crate::cosmic::Cosm;
     use crate::utils::rss_orbit_errors;
+    use anise::prelude::Orbit;
     use hifitime::Epoch;
 
     let cosm = Cosm::de438();
