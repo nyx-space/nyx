@@ -16,20 +16,22 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::io::{epoch_from_str, epoch_to_str, frame_from_str, frame_to_str};
-use crate::{cosmic::Frame, Orbit};
 use either::Either;
 use hifitime::Epoch;
 use serde::{Deserialize, Serialize};
+use serde_dhall::StaticType;
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
+use crate::io::{epoch_from_str, epoch_to_str};
+use crate::{cosmic::Frame, Orbit};
+
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize, StaticType)]
 #[serde(transparent)]
 pub struct OrbitSerde {
     #[serde(with = "either::serde_untagged")]
     inner: Either<Orbit, KeplerianOrbit>,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize, StaticType)]
 pub struct KeplerianOrbit {
     sma_km: f64,
     ecc: f64,
@@ -40,7 +42,6 @@ pub struct KeplerianOrbit {
     #[serde(serialize_with = "epoch_to_str", deserialize_with = "epoch_from_str")]
     epoch: Epoch,
     /// Frame contains everything we need to compute state information
-    #[serde(serialize_with = "frame_to_str", deserialize_with = "frame_from_str")]
     frame: Frame,
 }
 
@@ -73,5 +74,34 @@ impl From<OrbitSerde> for Orbit {
             Either::Left(orbit) => orbit,
             Either::Right(kep) => kep.into(),
         }
+    }
+}
+
+#[cfg(test)]
+mod ut_serde_orbit {
+    use anise::constants::frames::EARTH_J2000;
+    use serde_dhall;
+
+    use super::{Epoch, Orbit, OrbitSerde};
+
+    #[test]
+    fn serde_cartesian() {
+        let orbit = Orbit::keplerian(
+            8159.0,
+            0.001,
+            38.6,
+            95.1,
+            82.3,
+            45.6,
+            Epoch::from_gregorian_utc_at_midnight(2022, 2, 29),
+            EARTH_J2000,
+        );
+        let as_serde: OrbitSerde = orbit.into();
+
+        let serialized = serde_dhall::serialize(&as_serde)
+            .static_type_annotation()
+            .to_string()
+            .unwrap();
+        println!("{serialized}");
     }
 }

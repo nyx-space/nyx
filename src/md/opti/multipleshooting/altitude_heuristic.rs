@@ -39,7 +39,7 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
         node_count: usize,
         body_frame: Frame,
         prop: &'a Propagator<'a, SpacecraftDynamics, E>,
-        cosm: Arc<Cosm>,
+        almanac: Arc<Almanac>,
     ) -> Result<Self, MultipleShootingError> {
         if node_count < 3 {
             error!("At least three nodes are needed for a multiple shooting optimization");

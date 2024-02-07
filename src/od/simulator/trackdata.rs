@@ -58,7 +58,7 @@ where
         epoch: Epoch,
         traj: &Traj<MsrIn>,
         rng: Option<&mut Pcg64Mcg>,
-        cosm: Arc<Cosm>,
+        almanac: Arc<Almanac>,
     ) -> Result<Option<Msr>, ODError>;
 
     /// Returns the device location at the given epoch and in the given frame.
@@ -69,6 +69,6 @@ where
         &mut self,
         rx: MsrIn,
         rng: Option<&mut Pcg64Mcg>,
-        cosm: Arc<Cosm>,
+        almanac: Arc<Almanac>,
     ) -> Result<Option<Msr>, ODError>;
 }

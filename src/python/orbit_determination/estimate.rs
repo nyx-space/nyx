@@ -42,7 +42,7 @@ pub(crate) struct OrbitEstimate(pub(crate) KfEstimate<Orbit>);
 impl Configurable for OrbitEstimate {
     type IntermediateRepr = OrbitEstimateSerde;
 
-    fn from_config(cfg: Self::IntermediateRepr, _cosm: Arc<Cosm>) -> Result<Self, ConfigError>
+    fn from_config(cfg: Self::IntermediateRepr, _almanac: Arc<Almanac>) -> Result<Self, ConfigError>
     where
         Self: Sized,
     {

@@ -254,7 +254,7 @@ impl Configurable for GroundStation {
 
     fn from_config(
         cfg: Self::IntermediateRepr,
-        _cosm: Arc<Cosm>,
+        _almanac: Arc<Almanac>,
     ) -> Result<Self, crate::io::ConfigError>
     where
         Self: Sized,
@@ -274,7 +274,7 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
         epoch: Epoch,
         traj: &Traj<Spacecraft>,
         rng: Option<&mut Pcg64Mcg>,
-        cosm: Arc<Cosm>,
+        almanac: Arc<Almanac>,
     ) -> Result<Option<RangeDoppler>, ODError> {
         match self.integration_time {
             Some(integration_time) => {
@@ -324,7 +324,7 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
         &mut self,
         rx: Spacecraft,
         rng: Option<&mut Pcg64Mcg>,
-        cosm: Arc<Cosm>,
+        almanac: Arc<Almanac>,
     ) -> Result<Option<RangeDoppler>, ODError> {
         let (_, elevation, rx, tx) = self.azimuth_elevation_of(rx.orbit, &cosm);
 

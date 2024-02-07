@@ -16,7 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::cosmic::{Cosm, Frame, Orbit};
+use anise::prelude::Almanac;
+use snafu::ResultExt;
+
+use crate::cosmic::{Frame, Orbit};
 use crate::dynamics::AccelModel;
 use crate::io::gravity::HarmonicsMem;
 use crate::linalg::{DMatrix, Matrix3, Vector3, U7};
@@ -26,11 +29,10 @@ use std::cmp::min;
 use std::fmt;
 use std::sync::Arc;
 
-use super::DynamicsError;
+use super::{DynamicsAlmanacSnafu, DynamicsError};
 
 #[derive(Clone)]
 pub struct Harmonics {
-    cosm: Arc<Cosm>,
     compute_frame: Frame,
     stor: HarmonicsMem,
     a_nm: DMatrix<f64>,
@@ -47,7 +49,7 @@ pub struct Harmonics {
 
 impl Harmonics {
     /// Create a new Harmonics dynamical model from the provided gravity potential storage instance.
-    pub fn from_stor(compute_frame: Frame, stor: HarmonicsMem, cosm: Arc<Cosm>) -> Arc<Self> {
+    pub fn from_stor(compute_frame: Frame, stor: HarmonicsMem) -> Arc<Self> {
         assert!(
             compute_frame.is_geoid(),
             "harmonics only work around geoids"
@@ -119,7 +121,6 @@ impl Harmonics {
         }
 
         Arc::new(Self {
-            cosm,
             compute_frame,
             stor,
             a_nm,
@@ -149,9 +150,13 @@ impl fmt::Display for Harmonics {
 }
 
 impl AccelModel for Harmonics {
-    fn eom(&self, osc: &Orbit) -> Result<Vector3<f64>, DynamicsError> {
+    fn eom(&self, osc: &Orbit, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
         // Convert the osculating orbit to the correct frame (needed for multiple harmonic fields)
-        let state = self.cosm.frame_chg(osc, self.compute_frame);
+        let state = almanac
+            .transform_to(osc, self.compute_frame, None)
+            .with_context(|_| DynamicsAlmanacSnafu {
+                action: "transforming into gravity field frame",
+            })?;
 
         // Using the GMAT notation, with extra character for ease of highlight
         let r_ = state.rmag_km();
@@ -242,9 +247,17 @@ impl AccelModel for Harmonics {
         Ok(dcm * accel)
     }
 
-    fn dual_eom(&self, osc: &Orbit) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
+    fn dual_eom(
+        &self,
+        osc: &Orbit,
+        almanac: Arc<Almanac>,
+    ) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
         // Convert the osculating orbit to the correct frame (needed for multiple harmonic fields)
-        let state = self.cosm.frame_chg(osc, self.compute_frame);
+        let state = almanac
+            .transform_to(osc, self.compute_frame, None)
+            .with_context(|_| DynamicsAlmanacSnafu {
+                action: "transforming into gravity field frame",
+            })?;
 
         let radius: Vector3<OHyperdual<f64, U7>> = hyperspace_from_vector(&state.radius());
 

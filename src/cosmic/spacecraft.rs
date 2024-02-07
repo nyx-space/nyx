@@ -16,30 +16,26 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub use anise::prelude::Orbit;
+pub use anise::prelude::{Almanac, Orbit};
 
 use nalgebra::Vector3;
 use serde::{Deserialize, Serialize};
 
-use super::eclipse::Cosm;
 use super::State;
 use crate::dynamics::guidance::Thruster;
 use crate::dynamics::DynamicsError;
 use crate::errors::NyxError;
-use crate::io::{orbit_from_str, ConfigRepr, Configurable};
+use crate::io::{orbit_from_str, ConfigRepr};
 use crate::linalg::{Const, DimName, Matrix6, OMatrix, OVector};
 use crate::md::StateParameter;
 use crate::time::Epoch;
 use crate::utils::rss_orbit_errors;
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
 use std::default::Default;
 use std::fmt;
 use std::ops::Add;
-use std::sync::Arc;
-
-use crate::io::ConfigError;
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "python", pyclass)]
@@ -646,28 +642,13 @@ impl Add<OVector<f64, Const<9>>> for Spacecraft {
 
 impl ConfigRepr for Spacecraft {}
 
-impl Configurable for Spacecraft {
-    type IntermediateRepr = Self;
-
-    fn from_config(cfg: Self::IntermediateRepr, _cosm: Arc<Cosm>) -> Result<Self, ConfigError>
-    where
-        Self: Sized,
-    {
-        Ok(cfg)
-    }
-
-    fn to_config(&self) -> Result<Self::IntermediateRepr, ConfigError> {
-        Ok(*self)
-    }
-}
-
 #[test]
 fn test_serde() {
-    use super::Cosm;
     use serde_yaml;
     use std::str::FromStr;
 
-    let cosm = Cosm::de438();
+    use anise::constants::frames::EARTH_J2000;
+
     let orbit = Orbit::cartesian(
         -9042.862234,
         18536.333069,
@@ -676,7 +657,7 @@ fn test_serde() {
         -2.226285,
         1.646738,
         Epoch::from_str("2018-09-15T00:15:53.098 UTC").unwrap(),
-        cosm.frame("EME2000"),
+        EARTH_J2000,
     );
 
     let sc = Spacecraft::new(orbit, 500.0, 159.0, 2.0, 2.0, 1.8, 2.2);

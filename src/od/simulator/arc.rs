@@ -176,7 +176,10 @@ where
     /// rate of the tracking device, adding a measurement whenever the spacecraft is visible.
     /// Build the measurements as a vector, ordered chronologically.
     ///
-    pub fn generate_measurements(&mut self, cosm: Arc<Cosm>) -> Result<TrackingArc<Msr>, NyxError> {
+    pub fn generate_measurements(
+        &mut self,
+        almanac: Arc<Almanac>,
+    ) -> Result<TrackingArc<Msr>, NyxError> {
         let mut measurements = Vec::new();
 
         for (name, device) in self.devices.iter_mut() {
@@ -297,7 +300,7 @@ impl TrackingArcSim<Spacecraft, RangeDoppler, GroundStation> {
     /// 7.b. if that tracker is marked as `Eager` and it ends after the start of the next strand, change the end date of the current strand.
     pub fn generate_schedule(
         &self,
-        cosm: Arc<Cosm>,
+        almanac: Arc<Almanac>,
     ) -> Result<BTreeMap<String, TrkConfig>, NyxError> {
         // Consider using find_all via the heuristic
         let mut built_cfg = self.configs.clone();
@@ -424,7 +427,7 @@ impl TrackingArcSim<Spacecraft, RangeDoppler, GroundStation> {
     }
 
     /// Sets the schedule to that built in `build_schedule`
-    pub fn build_schedule(&mut self, cosm: Arc<Cosm>) -> Result<(), NyxError> {
+    pub fn build_schedule(&mut self, almanac: Arc<Almanac>) -> Result<(), NyxError> {
         self.configs = self.generate_schedule(cosm)?;
 
         Ok(())

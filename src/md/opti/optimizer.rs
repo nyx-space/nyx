@@ -221,7 +221,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
         variables: [Variable; V],
         objectives: [Objective; O],
         objective_frame: Frame,
-        cosm: Arc<Cosm>,
+        almanac: Arc<Almanac>,
     ) -> Self {
         Self {
             prop,

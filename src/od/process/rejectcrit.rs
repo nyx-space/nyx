@@ -126,7 +126,7 @@ impl ConfigRepr for FltResid {}
 impl Configurable for FltResid {
     type IntermediateRepr = Self;
 
-    fn from_config(cfg: Self, _cosm: Arc<Cosm>) -> Result<Self, ConfigError>
+    fn from_config(cfg: Self, _almanac: Arc<Almanac>) -> Result<Self, ConfigError>
     where
         Self: Sized,
     {

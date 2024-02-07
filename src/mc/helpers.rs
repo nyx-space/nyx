@@ -82,10 +82,9 @@ pub fn dv_execution_error<R: Rng>(
 #[test]
 fn test_dv_mag_fixed() {
     use super::thread_rng;
-    use crate::cosmic::{Cosm, Orbit};
     use crate::time::Epoch;
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+    use anise::constants::frames::EARTH_J2000;
+    use anise::prelude::Orbit;
 
     let orbit = Orbit::cartesian(
         -2436.45,
@@ -95,7 +94,7 @@ fn test_dv_mag_fixed() {
         -5.088_611,
         0.0,
         Epoch::from_gregorian_tai_at_noon(2021, 3, 24),
-        eme2k,
+        EARTH_J2000,
     );
 
     let dv_mag_distr = Normal::new(5e-3, 5e-4).unwrap();

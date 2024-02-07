@@ -226,7 +226,7 @@ where
     /// then this function can be used to rebuild said measurement devices
     pub fn rebuild_devices<MsrIn, D>(
         &self,
-        cosm: Arc<Cosm>,
+        almanac: Arc<Almanac>,
     ) -> Result<BTreeMap<String, D>, ConfigError>
     where
         MsrIn: Interpolatable,

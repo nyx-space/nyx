@@ -151,7 +151,7 @@ impl Event {
         parameter: StateParameter,
         desired_value: f64,
         target_frame: Frame,
-        cosm: Arc<Cosm>,
+        almanac: Arc<Almanac>,
     ) -> Self {
         warn!("Searching for an event in another frame is slow: you should instead convert the trajectory into that other frame");
         Self {

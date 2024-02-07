@@ -16,11 +16,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anise::astro::orbit::ECC_EPSILON;
 use anise::astro::PhysicsResult;
 use anise::prelude::{Frame, Orbit};
 use snafu::ResultExt;
 
-use super::{AstroError, ECC_EPSILON};
+use super::AstroError;
 use crate::cosmic::AstroPhysicsSnafu;
 use crate::linalg::{Vector3, U7};
 use crate::md::StateParameter;

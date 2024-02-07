@@ -62,7 +62,7 @@ impl Configurable for TrkConfig {
 
     fn from_config(
         cfg: Self::IntermediateRepr,
-        _cosm: Arc<Cosm>,
+        _almanac: Arc<Almanac>,
     ) -> Result<Self, crate::io::ConfigError>
     where
         Self: Sized,

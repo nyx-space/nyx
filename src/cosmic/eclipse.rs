@@ -16,7 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub use super::{Bodies, Cosm, Frame, LightTimeCalc, Orbit, Spacecraft};
+use anise::almanac::Almanac;
+use anise::constants::frames::{EARTH_J2000, MOON_J2000, SUN_J2000};
+use anise::errors::AlmanacResult;
+
+pub use super::{Bodies, Frame, Orbit, Spacecraft};
 use crate::md::EventEvaluator;
 use crate::time::{Duration, Unit};
 use std::cmp::{Eq, Ord, Ordering, PartialOrd};
@@ -115,7 +119,7 @@ impl fmt::Display for EclipseState {
 pub struct EclipseLocator {
     pub light_source: Frame,
     pub shadow_bodies: Vec<Frame>,
-    pub cosm: Arc<Cosm>,
+    pub cosm: Arc<Almanac>,
 }
 
 impl fmt::Display for EclipseLocator {
@@ -134,10 +138,10 @@ impl fmt::Display for EclipseLocator {
 impl EclipseLocator {
     /// Creates a new typical eclipse locator.
     /// The light source is the Sun, and the shadow bodies are the Earth and the Moon.
-    pub fn cislunar(cosm: Arc<Cosm>) -> Self {
+    pub fn cislunar(cosm: Arc<Almanac>) -> Self {
         Self {
-            light_source: cosm.frame("Sun J2000"),
-            shadow_bodies: vec![cosm.frame("EME2000"), cosm.frame("Moon J2000")],
+            light_source: SUN_J2000,
+            shadow_bodies: vec![EARTH_J2000, MOON_J2000],
             cosm,
         }
     }
@@ -243,40 +247,43 @@ pub fn eclipse_state(
     observer: &Orbit,
     light_source: Frame,
     eclipsing_body: Frame,
-    cosm: &Cosm,
-) -> EclipseState {
+    almanac: &Almanac,
+) -> AlmanacResult<EclipseState> {
     // If the light source's radius is zero, just call the line of sight algorithm
 
     assert!(light_source.is_geoid() || light_source.is_celestial());
     assert!(eclipsing_body.is_geoid());
 
-    if light_source.equatorial_radius() < std::f64::EPSILON {
-        let observed = cosm.celestial_state(
-            &light_source.ephem_path(),
-            observer.epoch,
-            observer.frame,
-            LightTimeCalc::None,
-        );
-        return line_of_sight(observer, &observed, eclipsing_body, cosm);
+    if light_source.mean_equatorial_radius_km()? < std::f64::EPSILON {
+        // TODO(ANISE): I think I need the opposite data here!
+        let observed = almanac.transform_to(observer, light_source, None)?;
+
+        // let observed = almanac.celestial_state(
+        //     &light_source.ephem_path(),
+        //     observer.epoch,
+        //     observer.frame,
+        //     LightTimeCalc::None,
+        // );
+        return line_of_sight(observer, &observed, eclipsing_body, almanac);
     }
     // All of the computations happen with the observer as the center.
     // `eb` stands for eclipsing body; `ls` stands for light source.
     // Get the radius vector of the spacecraft to the eclipsing body
-    let r_eb = cosm.frame_chg(observer, eclipsing_body).radius();
+    let r_eb = almanac.frame_chg(observer, eclipsing_body).radius();
 
     // Get the radius vector of the light source to the spacecraft
-    let r_ls = -cosm.frame_chg(observer, light_source).radius();
+    let r_ls = -almanac.frame_chg(observer, light_source).radius();
 
     // Compute the apparent radii of the light source and eclipsing body (preventing any NaN)
-    let r_ls_prime = if light_source.equatorial_radius() >= r_ls.norm() {
-        light_source.equatorial_radius()
+    let r_ls_prime = if light_source.mean_equatorial_radius_km()? >= r_ls.norm() {
+        light_source.mean_equatorial_radius_km()
     } else {
-        (light_source.equatorial_radius() / r_ls.norm()).asin()
+        (light_source.mean_equatorial_radius_km()? / r_ls.norm()).asin()
     };
-    let r_eb_prime = if eclipsing_body.equatorial_radius() >= r_eb.norm() {
-        eclipsing_body.equatorial_radius()
+    let r_eb_prime = if eclipsing_body.mean_equatorial_radius_km()? >= r_eb.norm() {
+        eclipsing_body.mean_equatorial_radius_km()
     } else {
-        (eclipsing_body.equatorial_radius() / r_eb.norm()).asin()
+        (eclipsing_body.mean_equatorial_radius_km()? / r_eb.norm()).asin()
     };
 
     // Compute the apparent separation of both circles
@@ -286,10 +293,10 @@ pub fn eclipse_state(
         // If the closest point where the apparent radius of the light source _starts_ is further
         // away than the furthest point where the eclipsing body's shadow can reach, then the light
         // source is totally visible.
-        EclipseState::Visibilis
+        Ok(EclipseState::Visibilis)
     } else if r_eb_prime > d_prime + r_ls_prime {
         // The light source is fully hidden by the eclipsing body, hence we're in total eclipse.
-        EclipseState::Umbra
+        Ok(EclipseState::Umbra)
     } else if (r_ls_prime - r_eb_prime).abs() < d_prime && d_prime < r_ls_prime + r_eb_prime {
         // If we have reached this point, we're in penumbra.
         // Both circles, which represent the light source projected onto the plane and the eclipsing geoid,
@@ -307,16 +314,18 @@ pub fn eclipse_state(
             warn!(
                 "Shadow area is NaN! Please file a bug with initial states, eclipsing bodies, etc."
             );
-            return EclipseState::Umbra;
+            return Ok(EclipseState::Umbra);
         }
         // Compute the nominal area of the light source
         let nominal_area = std::f64::consts::PI * r_ls_prime.powi(2);
         // And return the percentage (between 0 and 1) of the eclipse.
-        EclipseState::Penumbra(1.0 - shadow_area / nominal_area)
+        Ok(EclipseState::Penumbra(1.0 - shadow_area / nominal_area))
     } else {
         // Annular eclipse.
         // If r_eb_prime is very small, then the fraction is very small: however, we note a penumbra close to 1.0 as near full light source visibility, so let's subtract one from this.
-        EclipseState::Penumbra(1.0 - r_eb_prime.powi(2) / r_ls_prime.powi(2))
+        Ok(EclipseState::Penumbra(
+            1.0 - r_eb_prime.powi(2) / r_ls_prime.powi(2),
+        ))
     }
 }
 
@@ -333,40 +342,45 @@ pub fn line_of_sight(
     observer: &Orbit,
     observed: &Orbit,
     eclipsing_body: Frame,
-    cosm: &Cosm,
-) -> EclipseState {
+    almanac: &Almanac,
+) -> AlmanacResult<EclipseState> {
     if observer == observed {
-        return EclipseState::Visibilis;
+        return Ok(EclipseState::Visibilis);
     }
 
     // Convert the states to the same frame as the eclipsing body (ensures we're in the same frame)
-    let r1 = &cosm.frame_chg(observed, eclipsing_body).radius();
-    let r2 = &cosm.frame_chg(observer, eclipsing_body).radius();
+    let r1 = almanac
+        .transform_to(observed, eclipsing_body, None)?
+        .radius_km;
+    let r2 = almanac
+        .transform_to(observer, eclipsing_body, None)?
+        .radius_km;
 
-    let r1sq = r1.dot(r1);
-    let r2sq = r2.dot(r2);
-    let r1dotr2 = r1.dot(r2);
+    let r1sq = r1.dot(&r1);
+    let r2sq = r2.dot(&r2);
+    let r1dotr2 = r1.dot(&r2);
 
     let tau = (r1sq - r1dotr2) / (r1sq + r2sq - 2.0 * r1dotr2);
     if !(0.0..=1.0).contains(&tau)
-        || (1.0 - tau) * r1sq + r1dotr2 * tau > eclipsing_body.equatorial_radius().powi(2)
+        || (1.0 - tau) * r1sq + r1dotr2 * tau > eclipsing_body.mean_equatorial_radius_km().powi(2)
     {
-        EclipseState::Visibilis
+        Ok(EclipseState::Visibilis)
     } else {
-        EclipseState::Umbra
+        Ok(EclipseState::Umbra)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anise::almanac::metaload::MetaAlmanac;
     use hifitime::Epoch;
 
     #[test]
     fn los_edge_case() {
-        let cosm = Cosm::de438();
-        let eme2k = cosm.frame("EME2000");
-        let luna = cosm.frame("Luna");
+        let almanac = MetaAlmanac::latest().unwrap();
+        let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+        let luna = almanac.frame_from_uid(MOON_J2000).unwrap();
 
         let dt1 = Epoch::from_gregorian_tai(2020, 1, 1, 6, 7, 40, 0);
         let dt2 = Epoch::from_gregorian_tai(2020, 1, 1, 6, 7, 50, 0);
@@ -434,58 +448,61 @@ mod tests {
         );
 
         assert_eq!(
-            line_of_sight(&xmtr1, &rcvr1, luna, &cosm),
+            line_of_sight(&xmtr1, &rcvr1, luna, &almanac),
             EclipseState::Umbra
         );
         assert_eq!(
-            line_of_sight(&xmtr2, &rcvr2, luna, &cosm),
+            line_of_sight(&xmtr2, &rcvr2, luna, &almanac),
             EclipseState::Umbra
         );
         assert_eq!(
-            line_of_sight(&xmtr3, &rcvr3, luna, &cosm),
+            line_of_sight(&xmtr3, &rcvr3, luna, &almanac),
             EclipseState::Umbra
         );
 
         // Test converse
 
         assert_eq!(
-            line_of_sight(&rcvr1, &xmtr1, luna, &cosm),
+            line_of_sight(&rcvr1, &xmtr1, luna, &almanac),
             EclipseState::Umbra
         );
         assert_eq!(
-            line_of_sight(&rcvr2, &xmtr2, luna, &cosm),
+            line_of_sight(&rcvr2, &xmtr2, luna, &almanac),
             EclipseState::Umbra
         );
         assert_eq!(
-            line_of_sight(&rcvr3, &xmtr3, luna, &cosm),
+            line_of_sight(&rcvr3, &xmtr3, luna, &almanac),
             EclipseState::Umbra
         );
     }
 
     #[test]
     fn los_earth_eclipse() {
-        let cosm = Cosm::de438();
-        let eme2k = cosm.frame("EME2000");
+        let almanac = MetaAlmanac::latest().unwrap();
+        let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
         let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-        let sma = eme2k.equatorial_radius() + 300.0;
+        let sma = eme2k.mean_equatorial_radius_km()? + 300.0;
 
         let sc1 = Orbit::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 0.0, dt, eme2k);
         let sc2 = Orbit::keplerian(sma + 1.0, 0.001, 0.1, 90.0, 75.0, 0.0, dt, eme2k);
         let sc3 = Orbit::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 180.0, dt, eme2k);
 
         // Out of phase by pi.
-        assert_eq!(line_of_sight(&sc1, &sc3, eme2k, &cosm), EclipseState::Umbra);
+        assert_eq!(
+            line_of_sight(&sc1, &sc3, eme2k, &almanac),
+            EclipseState::Umbra
+        );
 
         assert_eq!(
-            line_of_sight(&sc2, &sc1, eme2k, &cosm),
+            line_of_sight(&sc2, &sc1, eme2k, &almanac),
             EclipseState::Visibilis
         );
 
         // Nearly identical orbits in the same phasing
         assert_eq!(
-            line_of_sight(&sc1, &sc2, eme2k, &cosm),
+            line_of_sight(&sc1, &sc2, eme2k, &almanac),
             EclipseState::Visibilis
         );
     }

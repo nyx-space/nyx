@@ -37,7 +37,7 @@ use std::time::Instant;
 impl Traj<Spacecraft> {
     /// Allows converting the source trajectory into the (almost) equivalent trajectory in another frame
     #[allow(clippy::map_clone)]
-    pub fn to_frame(&self, new_frame: Frame, cosm: Arc<Cosm>) -> Result<Self, NyxError> {
+    pub fn to_frame(&self, new_frame: Frame, almanac: Arc<Almanac>) -> Result<Self, NyxError> {
         if self.states.is_empty() {
             return Err(NyxError::Trajectory {
                 source: TrajError::CreationError {
@@ -99,7 +99,7 @@ impl Traj<Spacecraft> {
         body_fixed_frame: Frame,
         events: Option<Vec<&dyn EventEvaluator<Spacecraft>>>,
         metadata: Option<HashMap<String, String>>,
-        cosm: Arc<Cosm>,
+        almanac: Arc<Almanac>,
     ) -> Result<PathBuf, Box<dyn Error>> {
         let traj = self.to_frame(body_fixed_frame, cosm)?;
 

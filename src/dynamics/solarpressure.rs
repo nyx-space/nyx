@@ -16,11 +16,14 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::{DynamicsError, ForceModel};
+use super::{DynamicsAlmanacSnafu, DynamicsError, ForceModel};
 use crate::cosmic::eclipse::EclipseLocator;
-use crate::cosmic::{Cosm, Frame, Spacecraft, AU, SPEED_OF_LIGHT};
+use crate::cosmic::{Frame, Spacecraft, AU, SPEED_OF_LIGHT};
 use crate::linalg::{Const, Matrix3, Vector3};
+use anise::almanac::Almanac;
+use anise::constants::frames::SUN_J2000;
 use hyperdual::{hyperspace_from_vector, linalg::norm, Float, OHyperdual};
+use snafu::ResultExt;
 use std::fmt;
 use std::sync::Arc;
 
@@ -34,37 +37,48 @@ pub struct SolarPressure {
 
 impl SolarPressure {
     /// Will set the solar flux at 1 AU to: Phi = 1367.0
-    pub fn default_raw(shadow_bodies: Vec<Frame>, cosm: Arc<Cosm>) -> Self {
+    pub fn default_raw(shadow_bodies: Vec<Frame>, almanac: Arc<Almanac>) -> Self {
         let e_loc = EclipseLocator {
-            light_source: cosm.frame("Sun J2000"),
+            light_source: SUN_J2000,
             shadow_bodies,
-            cosm,
+            cosm: almanac,
         };
         Self { phi: 1367.0, e_loc }
     }
 
     /// Accounts for the shadowing of only one body and will set the solar flux at 1 AU to: Phi = 1367.0
-    pub fn default(shadow_body: Frame, cosm: Arc<Cosm>) -> Arc<Self> {
-        Arc::new(Self::default_raw(vec![shadow_body], cosm))
+    pub fn default(shadow_body: Frame, almanac: Arc<Almanac>) -> Arc<Self> {
+        Arc::new(Self::default_raw(vec![shadow_body], almanac))
     }
 
     /// Must provide the flux in W/m^2
-    pub fn with_flux(flux_w_m2: f64, shadow_bodies: Vec<Frame>, cosm: Arc<Cosm>) -> Arc<Self> {
-        let mut me = Self::default_raw(shadow_bodies, cosm);
+    pub fn with_flux(
+        flux_w_m2: f64,
+        shadow_bodies: Vec<Frame>,
+        almanac: Arc<Almanac>,
+    ) -> Arc<Self> {
+        let mut me = Self::default_raw(shadow_bodies, almanac);
         me.phi = flux_w_m2;
         Arc::new(me)
     }
 }
 
 impl ForceModel for SolarPressure {
-    fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, DynamicsError> {
+    fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
         let osc = &ctx.orbit;
         // Compute the position of the Sun as seen from the spacecraft
-        let r_sun = self
-            .e_loc
-            .cosm
-            .frame_chg(osc, self.e_loc.light_source)
-            .radius();
+        // TODO(ANISE): I think this needs to be flipped as well!
+        let r_sun = almanac
+            .transform_to(ctx.orbit, self.e_loc.light_source, None)
+            .with_context(|_| DynamicsAlmanacSnafu {
+                action: "transforming state to vector seen from Sun",
+            })?
+            .radius_km;
+        // let r_sun = self
+        //     .e_loc
+        //     .cosm
+        //     .frame_chg(osc, self.e_loc.light_source)
+        //     .radius();
 
         let r_sun_unit = r_sun / r_sun.norm();
 
@@ -79,15 +93,27 @@ impl ForceModel for SolarPressure {
         Ok(1e-3 * ctx.srp.cr * ctx.srp.area_m2 * flux_pressure * r_sun_unit)
     }
 
-    fn dual_eom(&self, ctx: &Spacecraft) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
+    fn dual_eom(
+        &self,
+        ctx: &Spacecraft,
+        almanac: Arc<Almanac>,
+    ) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
         let osc = &ctx.orbit;
 
+        // TODO(ANISE): I think this needs to be flipped as well!
+        let r_sun = almanac
+            .transform_to(ctx.orbit, self.e_loc.light_source, None)
+            .with_context(|_| DynamicsAlmanacSnafu {
+                action: "transforming state to vector seen from Sun",
+            })?
+            .radius_km;
+
         // Compute the position of the Sun as seen from the spacecraft
-        let r_sun = self
-            .e_loc
-            .cosm
-            .frame_chg(osc, self.e_loc.light_source)
-            .radius();
+        // let r_sun = self
+        //     .e_loc
+        //     .cosm
+        //     .frame_chg(osc, self.e_loc.light_source)
+        //     .radius();
 
         let r_sun_d: Vector3<OHyperdual<f64, Const<9>>> = hyperspace_from_vector(&r_sun);
         let r_sun_unit = r_sun_d / norm(&r_sun_d);

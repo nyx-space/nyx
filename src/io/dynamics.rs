@@ -16,13 +16,17 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+// TODO(ANISE): Remove this file.
+
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use super::{frames_from_str, frames_to_str, ConfigRepr};
+use super::ConfigRepr;
 
-use crate::cosmic::{Bodies, Frame};
+use anise::prelude::Frame;
+
+use crate::cosmic::Bodies;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct HarmonicsSerde {
@@ -35,7 +39,6 @@ pub struct HarmonicsSerde {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SrpSerde {
     pub phi: Option<f64>,
-    #[serde(serialize_with = "frames_to_str", deserialize_with = "frames_from_str")]
     pub shadows: Vec<Frame>,
 }
 

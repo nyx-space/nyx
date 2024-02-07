@@ -176,16 +176,24 @@ where
 
 #[test]
 fn test_multivariate_state() {
-    use crate::cosmic::{Cosm, Orbit};
+    use anise::constants::frames::EARTH_J2000;
+    use anise::prelude::Orbit;
+
     use crate::linalg::{Matrix6, Vector6};
     use crate::time::Epoch;
     use rand_pcg::Pcg64Mcg;
 
-    let cosm = Cosm::de438();
-
-    let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);
-    let state = Orbit::keplerian(8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k);
+    let state = Orbit::keplerian(
+        8_191.93,
+        1e-6,
+        12.85,
+        306.614,
+        314.19,
+        99.887_7,
+        dt,
+        EARTH_J2000,
+    );
 
     let mean = Vector6::zeros();
     let std_dev = Vector6::new(10.0, 10.0, 10.0, 0.2, 0.2, 0.2);

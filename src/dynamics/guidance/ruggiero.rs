@@ -302,11 +302,10 @@ impl GuidanceLaw for Ruggiero {
 
 #[test]
 fn ruggiero_weight() {
-    use crate::cosmic::Cosm;
     use crate::time::Epoch;
-    let mut cosm = Cosm::de438_raw();
-    cosm.frame_mut_gm("EME2000", 398_600.433);
-    let eme2k = cosm.frame("EME2000");
+    use anise::constants::frames::EARTH_J2000;
+
+    let eme2k = EARTH_J2000.with_mu_km3_s2(398_600.433);
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let orbit = Orbit::keplerian(7378.1363, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, eme2k);
 

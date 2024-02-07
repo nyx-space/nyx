@@ -83,7 +83,7 @@ pub struct ODProcess<
     pub ekf_trigger: Option<EkfTrigger>,
     /// Residual rejection criteria allows preventing bad measurements from affecting the estimation.
     pub resid_crit: Option<FltResid>,
-    pub cosm: Arc<Cosm>,
+    pub almanac: Arc<Almanac>,
     init_state: D::StateType,
     _marker: PhantomData<A>,
 }
@@ -129,7 +129,7 @@ where
         kf: K,
         ekf_trigger: Option<EkfTrigger>,
         resid_crit: Option<FltResid>,
-        cosm: Arc<Cosm>,
+        almanac: Arc<Almanac>,
     ) -> Self {
         let init_state = prop.state;
         Self {
@@ -151,7 +151,7 @@ where
         kf: K,
         trigger: EkfTrigger,
         resid_crit: Option<FltResid>,
-        cosm: Arc<Cosm>,
+        almanac: Arc<Almanac>,
     ) -> Self {
         let init_state = prop.state;
         Self {
@@ -783,7 +783,7 @@ where
         prop: PropInstance<'a, D, E>,
         kf: K,
         resid_crit: Option<FltResid>,
-        cosm: Arc<Cosm>,
+        almanac: Arc<Almanac>,
     ) -> Self {
         let init_state = prop.state;
         Self {

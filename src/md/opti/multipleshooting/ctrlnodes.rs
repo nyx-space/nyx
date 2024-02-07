@@ -33,7 +33,7 @@ pub struct NodesSerde {
 }
 
 impl NodesSerde {
-    pub fn to_node_vec(&self, cosm: Arc<Cosm>) -> Result<Vec<Node>, NyxError> {
+    pub fn to_node_vec(&self, almanac: Arc<Almanac>) -> Result<Vec<Node>, NyxError> {
         let mut rtn = Vec::with_capacity(self.nodes.len());
         for n in &self.nodes {
             rtn.push(n.to_node(cosm.clone())?)
@@ -53,7 +53,7 @@ pub struct NodeSerde {
 }
 
 impl NodeSerde {
-    pub fn to_node(&self, cosm: Arc<Cosm>) -> Result<Node, NyxError> {
+    pub fn to_node(&self, almanac: Arc<Almanac>) -> Result<Node, NyxError> {
         let frame = cosm.try_frame(self.frame.as_str())?;
         let epoch = Epoch::from_str(&self.epoch).unwrap();
 

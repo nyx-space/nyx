@@ -16,8 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::{DynamicsError, ForceModel};
-use crate::cosmic::{AstroError, Cosm, Frame, Spacecraft};
+use anise::almanac::Almanac;
+use anise::constants::frames::IAU_EARTH_FRAME;
+
+use super::{DynamicsAlmanacSnafu, DynamicsError, ForceModel};
+use crate::cosmic::{AstroError, Frame, Spacecraft};
 use crate::linalg::{Matrix3, Vector3};
 use std::fmt;
 use std::sync::Arc;
@@ -41,8 +44,6 @@ pub struct ConstantDrag {
     pub rho: f64,
     /// Geoid causing the drag
     pub drag_frame: Frame,
-    /// a Cosm reference is needed to convert to the state around the correct planet
-    pub cosm: Arc<Cosm>,
 }
 
 impl fmt::Display for ConstantDrag {
@@ -56,8 +57,13 @@ impl fmt::Display for ConstantDrag {
 }
 
 impl ForceModel for ConstantDrag {
-    fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, DynamicsError> {
-        let osc = self.cosm.frame_chg(&ctx.orbit, self.drag_frame);
+    fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
+        let osc = almanac
+            .transform_to(ctx.orbit, self.drag_frame, None)
+            .with_context(|_| DynamicsAlmanacSnafu {
+                action: "transforming into drag frame",
+            })?;
+
         let velocity = osc.velocity();
         Ok(-0.5 * self.rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
     }
@@ -65,6 +71,7 @@ impl ForceModel for ConstantDrag {
     fn dual_eom(
         &self,
         _osc_ctx: &Spacecraft,
+        _almanac: Arc<Almanac>,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
         Err(DynamicsError::DynamicsAstro {
             source: AstroError::PartialsUndefined,
@@ -79,32 +86,28 @@ pub struct Drag {
     pub density: AtmDensity,
     /// Frame to compute the drag in
     pub drag_frame: Frame,
-    /// a Cosm reference is needed to convert to the state around the correct planet
-    pub cosm: Arc<Cosm>,
 }
 
 impl Drag {
     /// Common exponential drag model for the Earth
-    pub fn earth_exp(cosm: Arc<Cosm>) -> Arc<Self> {
+    pub fn earth_exp() -> Arc<Self> {
         Arc::new(Self {
             density: AtmDensity::Exponential {
                 rho0: 3.614e-13,
                 r0: 700_000.0,
                 ref_alt_m: 88_667.0,
             },
-            drag_frame: cosm.frame("IAU Earth"),
-            cosm,
+            drag_frame: IAU_EARTH_FRAME,
         })
     }
 
     /// Drag model which uses the standard atmosphere 1976 model for atmospheric density
-    pub fn std_atm1976(cosm: Arc<Cosm>) -> Arc<Self> {
+    pub fn std_atm1976(almanac: Arc<Almanac>) -> Arc<Self> {
         Arc::new(Self {
             density: AtmDensity::StdAtm {
                 max_alt_m: 1_000_000.0,
             },
-            drag_frame: cosm.frame("IAU Earth"),
-            cosm,
+            drag_frame: IAU_EARTH_FRAME,
         })
     }
 }
@@ -120,9 +123,15 @@ impl fmt::Display for Drag {
 }
 
 impl ForceModel for Drag {
-    fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, DynamicsError> {
+    fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
         let integration_frame = ctx.orbit.frame;
-        let osc = self.cosm.frame_chg(&ctx.orbit, self.drag_frame);
+
+        let osc = almanac
+            .transform_to(ctx.orbit, self.drag_frame, None)
+            .with_context(|_| DynamicsAlmanacSnafu {
+                action: "transforming into drag frame",
+            })?;
+
         match self.density {
             AtmDensity::Constant(rho) => {
                 let velocity = osc.velocity();
@@ -137,6 +146,8 @@ impl ForceModel for Drag {
                 let rho = rho0
                     * (-(osc.rmag_km() - (r0 + self.drag_frame.equatorial_radius())) / ref_alt_m)
                         .exp();
+
+                //TODO(ANISE): Looks like there is a frame issue here!
 
                 let velocity_integr_frame = self.cosm.frame_chg(&osc, integration_frame).velocity();
 
@@ -175,6 +186,7 @@ impl ForceModel for Drag {
     fn dual_eom(
         &self,
         _osc_ctx: &Spacecraft,
+        almanac: Arc<Almanac>,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
         Err(DynamicsError::DynamicsAstro {
             source: AstroError::PartialsUndefined,

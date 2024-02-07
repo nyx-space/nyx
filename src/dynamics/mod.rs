@@ -20,10 +20,13 @@ use crate::cosmic::{AstroError, Orbit};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, Matrix3, OMatrix, OVector, Vector3};
 use crate::State;
+use anise::almanac::Almanac;
+use anise::errors::AlmanacError;
 use hyperdual::{OHyperdual, Owned};
 use snafu::Snafu;
 
 use std::fmt;
+use std::sync::Arc;
 
 pub use crate::errors::NyxError;
 
@@ -92,6 +95,7 @@ where
         delta_t: f64,
         state_vec: &OVector<f64, <Self::StateType as State>::VecLength>,
         state_ctx: &Self::StateType,
+        almanac: Arc<Almanac>,
     ) -> Result<OVector<f64, <Self::StateType as State>::VecLength>, DynamicsError>
     where
         DefaultAllocator: Allocator<f64, <Self::StateType as State>::VecLength>;
@@ -103,6 +107,7 @@ where
         &self,
         _delta_t: f64,
         _osculating_state: &Self::StateType,
+        _almanac: Arc<Almanac>,
     ) -> Result<
         (
             OVector<f64, <Self::StateType as State>::Size>,
@@ -123,7 +128,11 @@ where
     /// Optionally performs some final changes after each successful integration of the equations of motion.
     /// For example, this can be used to update the Guidance mode.
     /// NOTE: This function is also called just prior to very first integration step in order to update the initial state if needed.
-    fn finally(&self, next_state: Self::StateType) -> Result<Self::StateType, DynamicsError> {
+    fn finally(
+        &self,
+        next_state: Self::StateType,
+        _almanac: Arc<Almanac>,
+    ) -> Result<Self::StateType, DynamicsError> {
         Ok(next_state)
     }
 }
@@ -133,12 +142,15 @@ where
 /// Examples include Solar Radiation Pressure, drag, etc., i.e. forces which do not need to save the current state, only act on it.
 pub trait ForceModel: Send + Sync + fmt::Display {
     /// Defines the equations of motion for this force model from the provided osculating state.
-    fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, DynamicsError>;
+    fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError>;
 
     /// Force models must implement their partials, although those will only be called if the propagation requires the
     /// computation of the STM. The `osc_ctx` is the osculating context, i.e. it changes for each sub-step of the integrator.
-    fn dual_eom(&self, osc_ctx: &Spacecraft)
-        -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError>;
+    fn dual_eom(
+        &self,
+        osc_ctx: &Spacecraft,
+        almanac: Arc<Almanac>,
+    ) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError>;
 }
 
 /// The `AccelModel` trait handles immutable dynamics which return an acceleration. Those can be added directly to Orbital Dynamics for example.
@@ -146,11 +158,15 @@ pub trait ForceModel: Send + Sync + fmt::Display {
 /// Examples include spherical harmonics, i.e. accelerations which do not need to save the current state, only act on it.
 pub trait AccelModel: Send + Sync + fmt::Display {
     /// Defines the equations of motion for this force model from the provided osculating state in the integration frame.
-    fn eom(&self, osc: &Orbit) -> Result<Vector3<f64>, DynamicsError>;
+    fn eom(&self, osc: &Orbit, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError>;
 
     /// Acceleration models must implement their partials, although those will only be called if the propagation requires the
     /// computation of the STM.
-    fn dual_eom(&self, osc_ctx: &Orbit) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError>;
+    fn dual_eom(
+        &self,
+        osc_ctx: &Orbit,
+        almanac: Arc<Almanac>,
+    ) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError>;
 }
 
 /// Stores dynamical model errors
@@ -165,4 +181,9 @@ pub enum DynamicsError {
     DynamicsAstro { source: AstroError },
     #[snafu(display("dynamical model encountered an issue with the guidance: {source}"))]
     DynamicsGuidance { source: GuidanceErrors },
+    #[snafu(display("dynamical model issue due to Almanac: {action} {source}"))]
+    DynamicsAlmanacError {
+        source: AlmanacError,
+        action: &'static str,
+    },
 }
