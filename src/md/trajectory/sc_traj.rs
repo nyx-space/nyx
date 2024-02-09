@@ -16,12 +16,14 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anise::prelude::{Almanac, Frame, Orbit};
 use hifitime::Epoch;
+use snafu::ResultExt;
 
 use super::TrajError;
 use super::{ExportCfg, Traj};
-use crate::cosmic::{Cosm, Frame, Orbit, Spacecraft};
-use crate::errors::NyxError;
+use crate::cosmic::Spacecraft;
+use crate::errors::{FromAlmanacSnafu, NyxError};
 use crate::md::prelude::StateParameter;
 use crate::md::EventEvaluator;
 use crate::time::{Duration, TimeUnits};
@@ -50,8 +52,13 @@ impl Traj<Spacecraft> {
         let start_instant = Instant::now();
         let mut traj = Self::new();
         for state in &self.states {
-            traj.states
-                .push(state.with_orbit(cosm.frame_chg(&state.orbit, new_frame)));
+            let transformed_state =
+                almanac
+                    .transform_to(state, new_frame, None)
+                    .with_context(|_| FromAlmanacSnafu {
+                        action: "transforming trajectory into new frame",
+                    })?;
+            traj.states.push(transformed_state);
         }
         traj.finalize();
 
@@ -101,7 +108,7 @@ impl Traj<Spacecraft> {
         metadata: Option<HashMap<String, String>>,
         almanac: Arc<Almanac>,
     ) -> Result<PathBuf, Box<dyn Error>> {
-        let traj = self.to_frame(body_fixed_frame, cosm)?;
+        let traj = self.to_frame(body_fixed_frame, almanac)?;
 
         let mut cfg = ExportCfg::builder()
             .step(1.minutes())
@@ -126,7 +133,6 @@ impl Traj<Spacecraft> {
     ///
     /// CCSDS OEM only contains the orbit information, so you must provide a template spacecraft since we'll upcast the orbit trajectory into a spacecraft trajectory.
     pub fn from_oem_file<P: AsRef<Path>>(path: P, template: Spacecraft) -> Result<Self, NyxError> {
-        let cosm = Cosm::de438();
         // Open the file
         let file = File::open(path).map_err(|e| NyxError::CCSDS {
             msg: format!("File opening error: {e}"),
@@ -134,7 +140,6 @@ impl Traj<Spacecraft> {
         let reader = BufReader::new(file);
 
         // Parse the Orbit Element messages
-        let mut frame: Option<Frame> = None;
         let mut time_system = String::new();
 
         let ignored_tokens: HashSet<_> = [
@@ -147,6 +152,9 @@ impl Traj<Spacecraft> {
         let mut traj = Self::default();
 
         let mut parse = false;
+
+        let mut center_name = None;
+        let mut orient_name = None;
 
         'lines: for (lno, line) in reader.lines().enumerate() {
             let line = line.map_err(|e| NyxError::CCSDS {
@@ -168,8 +176,10 @@ impl Traj<Spacecraft> {
                 traj.name = Some(name);
             } else if line.starts_with("CENTER_NAME") {
                 let parts: Vec<&str> = line.split('=').collect();
-                let center_name = parts[1].trim();
-                frame = Some(cosm.try_frame(&format!("{center_name} J2000"))?);
+                center_name = Some(parts[1].trim());
+            } else if line.starts_with("REF_FRAME") {
+                let parts: Vec<&str> = line.split('=').collect();
+                orient_name = Some(parts[1].trim());
             } else if line.starts_with("TIME_SYSTEM") {
                 let parts: Vec<&str> = line.split('=').collect();
                 time_system = parts[1].trim().to_string();
@@ -185,6 +195,7 @@ impl Traj<Spacecraft> {
                 warn!("[line: {}] Skipping covariance in OEM parsing", lno + 1);
                 parse = false;
             } else if parse {
+                let frame = Frame::from_names(center_name.unwrap(), orient_name.unwrap());
                 // Split the line into components
                 let parts: Vec<&str> = line.split_whitespace().collect();
 

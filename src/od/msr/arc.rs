@@ -24,7 +24,6 @@ use std::ops::RangeBounds;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::cosmic::Cosm;
 use crate::io::watermark::pq_writer;
 use crate::io::{ConfigError, ConfigRepr, ExportCfg};
 use crate::linalg::allocator::Allocator;
@@ -32,6 +31,7 @@ use crate::linalg::{DefaultAllocator, DimName};
 use crate::md::trajectory::Interpolatable;
 use crate::od::{Measurement, TrackingDeviceSim};
 use crate::State;
+use anise::almanac::Almanac;
 use arrow::array::{Array, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
@@ -240,7 +240,8 @@ where
         let mut devices = BTreeMap::new();
 
         for serde in devices_repr {
-            let device = D::from_config(serde, cosm.clone())?;
+            // TODO(ANISE): Support errors in serde of device!
+            let device = D::from_str(serde).unwrap();
             if !self.device_names().contains(&device.name()) {
                 warn!(
                     "{} from arc config does not appear in measurements -- ignored",

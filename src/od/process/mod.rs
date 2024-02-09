@@ -26,6 +26,7 @@ pub use crate::od::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::propagators::PropInstance;
 pub use crate::time::{Duration, Unit};
+use anise::prelude::Almanac;
 use snafu::prelude::*;
 mod conf;
 pub use conf::{IterationConf, SmoothingArc};
@@ -139,7 +140,7 @@ where
             residuals: Vec::with_capacity(10_000),
             ekf_trigger,
             resid_crit,
-            cosm,
+            almanac,
             init_state,
             _marker: PhantomData::<A>,
         }
@@ -161,7 +162,7 @@ where
             residuals: Vec::with_capacity(10_000),
             ekf_trigger: Some(trigger),
             resid_crit,
-            cosm,
+            almanac,
             init_state,
             _marker: PhantomData::<A>,
         }
@@ -794,7 +795,7 @@ where
             resid_crit,
             ekf_trigger: None,
             init_state,
-            cosm,
+            almanac,
             _marker: PhantomData::<A>,
         }
     }

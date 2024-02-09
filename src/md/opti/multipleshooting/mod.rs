@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anise::errors::AlmanacError;
 use snafu::Snafu;
 
 use crate::md::{trajectory::TrajError, TargetingError};
@@ -41,6 +42,11 @@ pub enum MultipleShootingError {
         segment: usize,
         source: TargetingError,
     },
-    #[snafu(display("during a multiple shooting,  encountered {source}"))]
+    #[snafu(display("during a multiple shooting, encountered {source}"))]
     MultiShootTrajError { source: TrajError },
+    #[snafu(display("duration a multiple shoot, issue due to Almanac: {action} {source}"))]
+    MultiShootAlmanacError {
+        source: AlmanacError,
+        action: &'static str,
+    },
 }

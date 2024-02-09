@@ -243,45 +243,49 @@ where
     }
 }
 
-#[test]
-fn test_estimate_from_disp() {
-    use crate::cosmic::Cosm;
-    use crate::utils::rss_orbit_errors;
-    use anise::prelude::Orbit;
+#[cfg(test)]
+mod ut_kfest {
+    use crate::{md::StateParameter, od::estimate::KfEstimate, utils::rss_orbit_errors};
+    use anise::{constants::frames::EARTH_J2000, prelude::Orbit};
     use hifitime::Epoch;
 
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
-    let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+    #[test]
+    fn test_estimate_from_disp() {
+        let eme2k = EARTH_J2000;
+        let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+        let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
-    let initial_estimate = KfEstimate::disperse_from_diag(
-        initial_state,
-        &[
-            (StateParameter::SMA, 1.1),
-            (StateParameter::Inclination, 0.0025),
-            (StateParameter::RAAN, 0.022),
-            (StateParameter::AoP, 0.02),
-        ],
-        Some(0),
-    );
+        let initial_estimate = KfEstimate::disperse_from_diag(
+            initial_state,
+            &[
+                (StateParameter::SMA, 1.1),
+                (StateParameter::Inclination, 0.0025),
+                (StateParameter::RAAN, 0.022),
+                (StateParameter::AoP, 0.02),
+            ],
+            Some(0),
+        );
 
-    let initial_state_dev = initial_estimate.nominal_state;
+        let initial_state_dev = initial_estimate.nominal_state;
 
-    let (init_rss_pos_km, init_rss_vel_km_s) = rss_orbit_errors(&initial_state, &initial_state_dev);
+        let (init_rss_pos_km, init_rss_vel_km_s) =
+            rss_orbit_errors(&initial_state, &initial_state_dev);
 
-    let delta = initial_state - initial_state_dev;
+        let delta = initial_state - initial_state_dev;
 
-    println!("Truth initial state:\n{initial_state}\n{initial_state:x}");
-    println!("Filter initial state:\n{initial_state_dev}\n{initial_state_dev:x}");
-    println!("Initial state dev:\t{init_rss_pos_km:.3} km\t{init_rss_vel_km_s:.3} km/s\n{delta}",);
-    println!("covariance: {}", initial_estimate.covar);
+        println!("Truth initial state:\n{initial_state}\n{initial_state:x}");
+        println!("Filter initial state:\n{initial_state_dev}\n{initial_state_dev:x}");
+        println!(
+            "Initial state dev:\t{init_rss_pos_km:.3} km\t{init_rss_vel_km_s:.3} km/s\n{delta}",
+        );
+        println!("covariance: {}", initial_estimate.covar);
 
-    // Check that the error is in the square root of the covariance
-    assert!(delta.x_km < initial_estimate.covar[(0, 0)].sqrt());
-    assert!(delta.y_km < initial_estimate.covar[(1, 1)].sqrt());
-    assert!(delta.z_km < initial_estimate.covar[(2, 2)].sqrt());
-    assert!(delta.vx_km_s < initial_estimate.covar[(3, 3)].sqrt());
-    assert!(delta.vy_km_s < initial_estimate.covar[(4, 4)].sqrt());
-    assert!(delta.vz_km_s < initial_estimate.covar[(5, 5)].sqrt());
+        // Check that the error is in the square root of the covariance
+        assert!(delta.x_km < initial_estimate.covar[(0, 0)].sqrt());
+        assert!(delta.y_km < initial_estimate.covar[(1, 1)].sqrt());
+        assert!(delta.z_km < initial_estimate.covar[(2, 2)].sqrt());
+        assert!(delta.vx_km_s < initial_estimate.covar[(3, 3)].sqrt());
+        assert!(delta.vy_km_s < initial_estimate.covar[(4, 4)].sqrt());
+        assert!(delta.vz_km_s < initial_estimate.covar[(5, 5)].sqrt());
+    }
 }

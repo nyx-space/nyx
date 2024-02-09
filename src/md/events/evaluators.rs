@@ -16,7 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anise::prelude::Almanac;
 use hifitime::Duration;
+use std::sync::Arc;
 
 use super::{Event, EventEvaluator};
 use crate::md::StateParameter;
@@ -32,12 +34,12 @@ pub(crate) fn angled_value(cur_angle: f64, desired_angle: f64) -> f64 {
 }
 
 impl EventEvaluator<Spacecraft> for Event {
-    fn eval(&self, state: &Spacecraft) -> f64 {
-        let state = if let Some((frame, cosm)) = &self.in_frame {
+    fn eval(&self, state: &Spacecraft, almanac: Arc<Almanac>) -> f64 {
+        let state = if let Some(frame) = &self.obs_frame {
             if state.frame == *frame {
                 *state
             } else {
-                cosm.frame_chg(state, *frame)
+                almanac.transform_to(state, frame, None)
             }
         } else {
             *state
@@ -61,7 +63,7 @@ impl EventEvaluator<Spacecraft> for Event {
         self.value_precision
     }
 
-    fn eval_string(&self, state: &Spacecraft) -> String {
+    fn eval_string(&self, state: &Spacecraft, almanac: Arc<Almanac>) -> String {
         match self.parameter {
             StateParameter::Apoapsis | StateParameter::Periapsis => {
                 format!("{}", self.parameter)

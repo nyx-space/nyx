@@ -16,14 +16,14 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::cosmic::{Cosm, Frame};
+use anise::prelude::Frame;
+
 use crate::md::prelude::{Objective, StateParameter};
 use crate::time::Epoch;
 use crate::NyxError;
 use serde_derive::{Deserialize, Serialize};
 use std::convert::Into;
 use std::str::FromStr;
-use std::sync::Arc;
 
 use super::multishoot::MultishootNode;
 
@@ -33,10 +33,10 @@ pub struct NodesSerde {
 }
 
 impl NodesSerde {
-    pub fn to_node_vec(&self, almanac: Arc<Almanac>) -> Result<Vec<Node>, NyxError> {
+    pub fn to_node_vec(&self) -> Result<Vec<Node>, NyxError> {
         let mut rtn = Vec::with_capacity(self.nodes.len());
         for n in &self.nodes {
-            rtn.push(n.to_node(cosm.clone())?)
+            rtn.push(n.to_node()?)
         }
         Ok(rtn)
     }
@@ -49,12 +49,11 @@ pub struct NodeSerde {
     pub z: f64,
     pub vmag: Option<f64>,
     pub epoch: String,
-    pub frame: String,
+    pub frame: Frame,
 }
 
 impl NodeSerde {
-    pub fn to_node(&self, almanac: Arc<Almanac>) -> Result<Node, NyxError> {
-        let frame = cosm.try_frame(self.frame.as_str())?;
+    pub fn to_node(&self) -> Result<Node, NyxError> {
         let epoch = Epoch::from_str(&self.epoch).unwrap();
 
         Ok(Node {
@@ -62,7 +61,7 @@ impl NodeSerde {
             y: self.y,
             z: self.z,
             vmag: self.vmag.unwrap_or(0.0),
-            frame,
+            frame: self.frame,
             epoch,
         })
     }
@@ -198,9 +197,7 @@ frame = "Moon J2000"
 
     let toml_nodes: NodesSerde = toml::from_str(str_nodes).unwrap();
 
-    let cosm = Cosm::de438();
-
-    let nodes = toml_nodes.to_node_vec(cosm).unwrap();
+    let nodes = toml_nodes.to_node_vec().unwrap();
 
     dbg!(&nodes);
 

@@ -25,7 +25,8 @@ use crate::md::trajectory::TrajError;
 use crate::propagators::PropagationError;
 use crate::time::Epoch;
 use crate::Orbit;
-pub use crate::{cosmic::Cosm, State, TimeTagged};
+pub use crate::{State, TimeTagged};
+use anise::errors::AlmanacError;
 use hifitime::Duration;
 use snafu::prelude::Snafu;
 use std::sync::Arc;
@@ -186,4 +187,9 @@ pub enum ODError {
     ODConfigError { source: ConfigError },
     #[snafu(display("OD failed because of an I/O error: {source}"))]
     ODIOError { source: InputOutputError },
+    #[snafu(display("OD failed due to Almanac: {action} {source}"))]
+    ODAlmanac {
+        source: AlmanacError,
+        action: &'static str,
+    },
 }

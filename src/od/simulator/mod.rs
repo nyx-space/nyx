@@ -17,7 +17,7 @@
 */
 
 pub use crate::dynamics::{Dynamics, NyxError};
-pub use crate::{cosmic::Cosm, State, TimeTagged};
+pub use crate::{State, TimeTagged};
 mod arc;
 pub use arc::TrackingArcSim;
 mod scheduler;

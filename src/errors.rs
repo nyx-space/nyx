@@ -20,11 +20,12 @@ use crate::io::ConfigError;
 use crate::md::trajectory::TrajError;
 use crate::md::StateParameter;
 pub use crate::md::TargetingError;
+use anise::errors::AlmanacError;
 use snafu::prelude::*;
 use std::convert::From;
 
 #[derive(Debug, PartialEq, Snafu)]
-// #[derive(Error, Debug, PartialEq)]
+#[snafu(visibility(pub(crate)))]
 pub enum NyxError {
     /// Maximum iterations reached
     #[snafu(display("Maximum iterations of {msg} reached"))]
@@ -99,6 +100,12 @@ pub enum NyxError {
     /// Configuration file error
     #[snafu(display("Config error: {source}"))]
     ConfigError { source: ConfigError },
+
+    #[snafu(display("issue due to Almanac: {action} {source}"))]
+    FromAlmanacError {
+        source: AlmanacError,
+        action: &'static str,
+    },
 }
 
 impl From<TrajError> for NyxError {

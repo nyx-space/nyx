@@ -39,7 +39,7 @@ pub struct Optimizer<'a, E: ErrorCtrl, const V: usize, const O: usize> {
     pub objectives: [Objective; O],
     /// An optional frame (and Cosm) to compute the objectives in.
     /// Needed if the propagation frame is separate from objectives frame (e.g. for B Plane targeting).
-    pub objective_frame: Option<(Frame, Arc<Cosm>)>,
+    pub objective_frame: Option<Frame>,
     /// The kind of correction to apply to achieve the objectives
     pub variables: [Variable; V],
     /// The frame in which the correction should be applied, must be either a local frame or inertial
@@ -221,14 +221,13 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
         variables: [Variable; V],
         objectives: [Objective; O],
         objective_frame: Frame,
-        almanac: Arc<Almanac>,
     ) -> Self {
         Self {
             prop,
             objectives,
             variables,
             iterations: 100,
-            objective_frame: Some((objective_frame, cosm)),
+            objective_frame: Some(objective_frame),
             correction_frame: None,
         }
     }

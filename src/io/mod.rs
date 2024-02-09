@@ -218,6 +218,7 @@ impl PartialEq for InputOutputError {
     }
 }
 
+// TOD(ANISE): This should use the Trait thing from PyO3
 pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {
     /// Builds the configuration representation from the path to a yaml
     fn load<P>(path: P) -> Result<Self, ConfigError>

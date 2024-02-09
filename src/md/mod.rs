@@ -30,8 +30,7 @@ pub mod prelude {
         Event, ScTraj, StateParameter,
     };
     pub use crate::cosmic::{
-        try_achieve_b_plane, BPlane, BPlaneTarget, Bodies, Cosm, Frame, GuidanceMode,
-        LightTimeCalc, Orbit, OrbitDual,
+        try_achieve_b_plane, BPlane, BPlaneTarget, Bodies, GuidanceMode, OrbitDual,
     };
     pub use crate::dynamics::{
         Drag, Harmonics, OrbitalDynamics, PointMasses, SolarPressure, SpacecraftDynamics,
@@ -43,6 +42,8 @@ pub mod prelude {
     pub use crate::time::{Duration, Epoch, TimeUnits, Unit};
     pub use crate::Spacecraft;
     pub use crate::{State, TimeTagged};
+
+    pub use anise::prelude::*;
     pub use std::sync::Arc;
 }
 

@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anise::almanac::Almanac;
 use hifitime::{Duration, Epoch, TimeSeries, TimeUnits};
 use num::integer::gcd;
 use rand::SeedableRng;
@@ -29,7 +30,7 @@ use crate::od::prelude::Strand;
 use crate::od::simulator::Cadence;
 use crate::od::{GroundStation, Measurement};
 use crate::Spacecraft;
-use crate::{cosmic::Cosm, State};
+use crate::State;
 use crate::{linalg::allocator::Allocator, od::TrackingDeviceSim};
 use crate::{linalg::DefaultAllocator, md::prelude::Traj};
 use std::collections::BTreeMap;
@@ -209,7 +210,7 @@ where
                                 epoch,
                                 &self.trajectory,
                                 Some(&mut self.rng),
-                                cosm.clone(),
+                                almanac.clone(),
                             ) {
                                 Ok(msr_opt) => {
                                     if let Some(msr) = msr_opt {
@@ -311,7 +312,7 @@ impl TrackingArcSim<Spacecraft, RangeDoppler, GroundStation> {
                 built_cfg.get_mut(name).unwrap().scheduler = None;
                 built_cfg.get_mut(name).unwrap().strands = Some(Vec::new());
                 // Convert the trajectory into the ground station frame.
-                let traj = self.trajectory.to_frame(device.frame, cosm.clone())?;
+                let traj = self.trajectory.to_frame(device.frame, almanac.clone())?;
 
                 match traj.find_arcs(&device) {
                     Err(_) => info!("No measurements from {name}"),
@@ -428,7 +429,7 @@ impl TrackingArcSim<Spacecraft, RangeDoppler, GroundStation> {
 
     /// Sets the schedule to that built in `build_schedule`
     pub fn build_schedule(&mut self, almanac: Arc<Almanac>) -> Result<(), NyxError> {
-        self.configs = self.generate_schedule(cosm)?;
+        self.configs = self.generate_schedule(almanac)?;
 
         Ok(())
     }

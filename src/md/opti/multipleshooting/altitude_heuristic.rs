@@ -21,7 +21,7 @@ use snafu::ResultExt;
 use super::ctrlnodes::Node;
 use super::multishoot::MultipleShooting;
 pub use super::CostFunction;
-use super::{MultiShootTrajSnafu, MultipleShootingError, TargetingSnafu};
+use super::{MultiShootAlmanacSnafu, MultiShootTrajSnafu, MultipleShootingError, TargetingSnafu};
 use crate::errors::TargetingError;
 use crate::md::{prelude::*, PropSnafu};
 use crate::propagators::error_ctrl::ErrorCtrl;
@@ -59,7 +59,11 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
         }
 
         let delta_t = xf.epoch() - x0.epoch();
-        let xf_bf = cosm.frame_chg(&xf, body_frame);
+        let xf_bf = almanac
+            .transform_to(xf, body_frame, None)
+            .with_context(|_| MultiShootAlmanacSnafu {
+                action: "converting node into the body frame",
+            })?;
 
         let duration_increment = (xf.epoch() - x0.epoch()) / (node_count as f64);
 
@@ -82,10 +86,15 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
                 .with_context(|_| MultiShootTrajSnafu)?
                 .orbit;
             // Convert this orbit into the body frame
-            let orbit_point_bf = cosm.frame_chg(&orbit_point, body_frame);
+            let orbit_point_bf = almanac
+                .transform_to(orbit_point, body_frame, None)
+                .with_context(|_| MultiShootAlmanacSnafu {
+                    action: "converting node into the body frame",
+                })?;
+
             // Note that the altitude here might be different, so we scale the altitude change by the current altitude
-            let desired_alt_i = (xf_bf.geodetic_height_km() - orbit_point_bf.geodetic_height_km())
-                / ((node_count - i) as f64).sqrt();
+            let desired_alt_i =
+                (xf_bf.height_km() - orbit_point_bf.height_km()) / ((node_count - i) as f64).sqrt();
             // Build the node in the body frame and convert that to the original frame
             let node_bf = Orbit::from_geodesic(
                 orbit_point_bf.geodetic_latitude_deg(),
@@ -94,8 +103,15 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
                 this_epoch,
                 body_frame,
             );
+
             // Convert that back into the inertial frame
-            let this_node = cosm.frame_chg(&node_bf, inertial_frame).radius();
+            let this_node = almanac
+                .transform_to(node_bf, inertial_frame, None)
+                .with_context(|_| MultiShootAlmanacSnafu {
+                    action: "converting node back into the inertial frame",
+                })?
+                .radius_km;
+
             nodes.push(Node {
                 x: this_node[0],
                 y: this_node[1],

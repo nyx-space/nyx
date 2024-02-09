@@ -18,8 +18,7 @@
 
 use crate::cosmic::SPEED_OF_LIGHT_KMS;
 use crate::io::watermark::pq_writer;
-use crate::io::{duration_from_str, duration_to_str, ConfigError, ConfigRepr, Configurable};
-use crate::md::prelude::Cosm;
+use crate::io::{duration_from_str, duration_to_str, ConfigError, ConfigRepr};
 #[cfg(feature = "python")]
 use crate::python::pyo3utils::pyany_to_value;
 use crate::NyxError;
@@ -533,25 +532,6 @@ impl GaussMarkov {
 }
 
 impl ConfigRepr for GaussMarkov {}
-
-impl Configurable for GaussMarkov {
-    type IntermediateRepr = Self;
-
-    fn from_config(
-        cfg: Self::IntermediateRepr,
-        _almanac: Arc<Almanac>,
-    ) -> Result<Self, crate::io::ConfigError>
-    where
-        Self: Sized,
-    {
-        Ok(cfg)
-    }
-
-    fn to_config(&self) -> Result<Self::IntermediateRepr, crate::io::ConfigError> {
-        let serded: Self::IntermediateRepr = *self;
-        Ok(serded)
-    }
-}
 
 #[test]
 fn fogm_test() {

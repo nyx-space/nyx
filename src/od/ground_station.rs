@@ -16,15 +16,17 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anise::astro::AzElRange;
+use anise::errors::AlmanacResult;
+use anise::prelude::{Almanac, Frame, Orbit};
+
 use super::msr::RangeDoppler;
 use super::noise::GaussMarkov;
-use super::{ODError, ODTrajSnafu, TrackingDeviceSim};
-use crate::cosmic::{Cosm, Frame, Orbit};
-use crate::io::{frame_from_str, frame_to_str, ConfigRepr, Configurable};
+use super::{ODAlmanacSnafu, ODError, ODTrajSnafu, TrackingDeviceSim};
+use crate::io::ConfigRepr;
 use crate::md::prelude::{Interpolatable, Traj};
 use crate::md::EventEvaluator;
 use crate::time::Epoch;
-use crate::utils::between_0_360;
 use crate::Spacecraft;
 use hifitime::{Duration, Unit};
 use nalgebra::{allocator::Allocator, DefaultAllocator};
@@ -51,8 +53,6 @@ pub struct GroundStation {
     pub longitude_deg: f64,
     /// in km
     pub height_km: f64,
-    /// Frame in which this station is defined
-    #[serde(serialize_with = "frame_to_str", deserialize_with = "frame_from_str")]
     pub frame: Frame,
     /// Duration needed to generate a measurement (if unset, it is assumed to be instantaneous)
     #[serde(skip)]
@@ -157,41 +157,8 @@ impl GroundStation {
 
     /// Computes the azimuth and elevation of the provided object seen from this ground station, both in degrees.
     /// Also returns the ground station's orbit in the frame of the receiver
-    pub fn azimuth_elevation_of(&self, rx: Orbit, cosm: &Cosm) -> (f64, f64, Orbit, Orbit) {
-        // Start by converting the receiver spacecraft into the ground station frame.
-        let rx_gs_frame = cosm.frame_chg(&rx, self.frame);
-
-        let dt = rx.epoch;
-        // Then, compute the rotation matrix from the body fixed frame of the ground station to its topocentric frame SEZ.
-        let tx_gs_frame = self.to_orbit(dt);
-        // Note: we're only looking at the radii so we don't need to apply the transport theorem here.
-        let dcm_topo2fixed = tx_gs_frame.dcm_from_traj_frame(Frame::SEZ).unwrap();
-
-        // Now, rotate the spacecraft in the SEZ frame to compute its elevation as seen from the ground station.
-        // We transpose the DCM so that it's the fixed to topocentric rotation.
-        let rx_sez = rx_gs_frame.with_position_rotated_by(dcm_topo2fixed.transpose());
-        let tx_sez = tx_gs_frame.with_position_rotated_by(dcm_topo2fixed.transpose());
-        // Now, let's compute the range ρ.
-        let rho_sez = rx_sez - tx_sez;
-
-        // Finally, compute the elevation (math is the same as declination)
-        // Source: Vallado, section 4.4.3
-        // Only the sine is needed as per Vallado, and the formula is the same as the declination
-        // because we're in the SEZ frame.
-        let elevation_deg = rho_sez.declination_deg();
-        if (elevation_deg - 90.0).abs() < 1e-6 {
-            warn!("object nearly overhead (el = {elevation_deg} deg), azimuth may be incorrect");
-        }
-        // For the elevation, we need to perform a quadrant check because it's measured from 0 to 360 degrees.
-        let azimuth_deg = between_0_360((-rho_sez.y_km.atan2(rho_sez.x_km)).to_degrees());
-
-        // Return elevation in degrees and rx/tx in the inertial frame of the spacecraft
-        (
-            azimuth_deg,
-            elevation_deg,
-            rx,
-            cosm.frame_chg(&tx_gs_frame, rx.frame),
-        )
+    pub fn azimuth_elevation_of(&self, rx: Orbit, almanac: &Almanac) -> AlmanacResult<AzElRange> {
+        almanac.azimuth_elevation_range_sez(rx, self.to_orbit(rx.epoch))
     }
 
     /// Return this ground station as an orbit in its current frame
@@ -249,24 +216,6 @@ impl GroundStation {
 
 impl ConfigRepr for GroundStation {}
 
-impl Configurable for GroundStation {
-    type IntermediateRepr = GroundStation;
-
-    fn from_config(
-        cfg: Self::IntermediateRepr,
-        _almanac: Arc<Almanac>,
-    ) -> Result<Self, crate::io::ConfigError>
-    where
-        Self: Sized,
-    {
-        Ok(cfg)
-    }
-
-    fn to_config(&self) -> Result<Self::IntermediateRepr, crate::io::ConfigError> {
-        Ok(self.clone())
-    }
-}
-
 impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
     fn measure(
@@ -283,16 +232,33 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
                     .with_context(|_| ODTrajSnafu)?;
                 let rx_1 = traj.at(epoch).with_context(|_| ODTrajSnafu)?;
 
-                let (_, elevation_0, rx_0, tx_0) = self.azimuth_elevation_of(rx_0, &cosm);
-                let (_, elevation_1, rx_1, tx_1) = self.azimuth_elevation_of(rx_1, &cosm);
+                let aer0 = self
+                    .azimuth_elevation_of(rx_0, &almanac)
+                    .with_context(|_| ODAlmanacSnafu {
+                        action: "computing AER",
+                    })?;
+                let aer1 = self
+                    .azimuth_elevation_of(rx_1, &almanac)
+                    .with_context(|_| ODAlmanacSnafu {
+                        action: "computing AER",
+                    })?;
 
-                if elevation_0 < self.elevation_mask_deg || elevation_1 < self.elevation_mask_deg {
+                if aer0.elevation < self.elevation_mask_deg
+                    || aer1.elevation < self.elevation_mask_deg
+                {
                     debug!(
-                        "{} (el. mask {:.3} deg) but object moves from {elevation_0:.3} to {elevation_1:.3} deg -- no measurement",
-                        self.name, self.elevation_mask_deg
+                        "{} (el. mask {:.3} deg) but object moves from {:.3} to {:.3} deg -- no measurement",
+                        self.name, self.elevation_mask_deg, aer0.elevation, aer1.elevation
                     );
                     return Ok(None);
                 }
+
+                // Compute the transmitter at both times.
+                // TODO(ANISE): Check that both being in the transmitter frame is OK
+                let tx_0 = self
+                    .to_orbit(epoch - integration_time)
+                    .with_context(|_| ODTrajSnafu)?;
+                let tx_1 = self.to_orbit(epoch).with_context(|_| ODTrajSnafu)?;
 
                 // Noises are computed at the midpoint of the integration time.
                 let (timestamp_noise_s, range_noise_km, doppler_noise_km_s) =
@@ -306,9 +272,11 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
                     doppler_noise_km_s,
                 )))
             }
-            None => {
-                self.measure_instantaneous(traj.at(epoch).with_context(|_| ODTrajSnafu)?, rng, cosm)
-            }
+            None => self.measure_instantaneous(
+                traj.at(epoch).with_context(|_| ODTrajSnafu)?,
+                rng,
+                almanac,
+            ),
         }
     }
 
@@ -316,8 +284,8 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
         self.name.clone()
     }
 
-    fn location(&self, epoch: Epoch, frame: Frame, cosm: &Cosm) -> Orbit {
-        cosm.frame_chg(&self.to_orbit(epoch), frame)
+    fn location(&self, epoch: Epoch, frame: Frame, almanac: Arc<Almanac>) -> AlmanacResult<Orbit> {
+        almanac.transform_to(self.to_orbit(epoch), frame, None)
     }
 
     fn measure_instantaneous(
@@ -326,12 +294,18 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
         rng: Option<&mut Pcg64Mcg>,
         almanac: Arc<Almanac>,
     ) -> Result<Option<RangeDoppler>, ODError> {
-        let (_, elevation, rx, tx) = self.azimuth_elevation_of(rx.orbit, &cosm);
+        let aer = self
+            .azimuth_elevation_of(rx.orbit, &almanac)
+            .with_context(|_| ODAlmanacSnafu {
+                action: "computing AER",
+            })?;
 
-        if elevation >= self.elevation_mask_deg {
+        if aer.elevation >= self.elevation_mask_deg {
             // Only update the noises if the measurement is valid.
             let (timestamp_noise_s, range_noise_km, doppler_noise_km_s) =
                 self.noises(rx.epoch, rng)?;
+
+            let tx = self.to_orbit(rx.epoch).with_context(|_| ODTrajSnafu)?;
 
             Ok(Some(RangeDoppler::one_way(
                 tx,
@@ -342,8 +316,8 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
             )))
         } else {
             debug!(
-                "{} (el. mask {:.3} deg), object at {elevation:.3} deg -- no measurement",
-                self.name, self.elevation_mask_deg
+                "{} (el. mask {:.3} deg), object at {:.3} deg -- no measurement",
+                self.name, self.elevation_mask_deg, aer.elevation
             );
             Ok(None)
         }
@@ -371,7 +345,7 @@ where
         Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size> + Allocator<f64, S::VecLength>,
 {
     /// Compute the elevation in the SEZ frame. This call will panic if the frame of the input state does not match that of the ground station.
-    fn eval(&self, rx_gs_frame: &S) -> f64 {
+    fn eval(&self, rx_gs_frame: &S, _almanac: Arc<Almanac>) -> f64 {
         let dt = rx_gs_frame.epoch();
         // Then, compute the rotation matrix from the body fixed frame of the ground station to its topocentric frame SEZ.
         let tx_gs_frame = self.to_orbit(dt);
@@ -394,11 +368,11 @@ where
         rho_sez.declination_deg() - self.elevation_mask_deg
     }
 
-    fn eval_string(&self, state: &S) -> String {
+    fn eval_string(&self, state: &S, almanac: Arc<Almanac>) -> String {
         format!(
             "Elevation from {} is {:.6} deg on {}",
             self.name,
-            self.eval(state) + self.elevation_mask_deg,
+            self.eval(state, almanac) + self.elevation_mask_deg,
             state.epoch()
         )
     }
@@ -416,6 +390,8 @@ where
 
 #[cfg(test)]
 mod gs_ut {
+    use anise::constants::frames::IAU_EARTH_FRAME;
+
     use crate::io::ConfigRepr;
     use crate::od::prelude::*;
 
@@ -425,8 +401,6 @@ mod gs_ut {
         use std::path::PathBuf;
 
         use hifitime::TimeUnits;
-
-        let cosm = Cosm::de438();
 
         // Get the path to the root directory of the current Cargo project
         let test_data: PathBuf = [
@@ -447,7 +421,7 @@ mod gs_ut {
 
         let expected_gs = GroundStation {
             name: "Demo ground station".to_string(),
-            frame: cosm.frame("IAU Earth"),
+            frame: IAU_EARTH_FRAME,
             elevation_mask_deg: 5.0,
             range_noise_km: Some(GaussMarkov::new(1.days(), 5e-3, 1e-4).unwrap()),
             doppler_noise_km_s: Some(GaussMarkov::new(1.days(), 5e-5, 1.5e-6).unwrap()),
@@ -464,7 +438,6 @@ mod gs_ut {
 
     #[test]
     fn test_load_many() {
-        use crate::cosmic::Cosm;
         use hifitime::TimeUnits;
         use std::env;
         use std::path::PathBuf;
@@ -485,12 +458,10 @@ mod gs_ut {
 
         dbg!(&stations);
 
-        let cosm = Cosm::de438();
-
         let expected = vec![
             GroundStation {
                 name: "Demo ground station".to_string(),
-                frame: cosm.frame("IAU Earth"),
+                frame: IAU_EARTH_FRAME,
                 elevation_mask_deg: 5.0,
                 range_noise_km: Some(GaussMarkov::new(1.days(), 5e-3, 1e-4).unwrap()),
                 doppler_noise_km_s: Some(GaussMarkov::new(1.days(), 5e-5, 1.5e-6).unwrap()),
@@ -503,7 +474,7 @@ mod gs_ut {
             },
             GroundStation {
                 name: "Canberra".to_string(),
-                frame: cosm.frame("IAU Earth"),
+                frame: IAU_EARTH_FRAME,
                 elevation_mask_deg: 5.0,
                 range_noise_km: Some(GaussMarkov::new(1.days(), 5e-3, 1e-4).unwrap()),
                 doppler_noise_km_s: Some(GaussMarkov::new(1.days(), 5e-5, 1.5e-6).unwrap()),

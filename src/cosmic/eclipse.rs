@@ -119,7 +119,6 @@ impl fmt::Display for EclipseState {
 pub struct EclipseLocator {
     pub light_source: Frame,
     pub shadow_bodies: Vec<Frame>,
-    pub cosm: Arc<Almanac>,
 }
 
 impl fmt::Display for EclipseLocator {
@@ -138,20 +137,18 @@ impl fmt::Display for EclipseLocator {
 impl EclipseLocator {
     /// Creates a new typical eclipse locator.
     /// The light source is the Sun, and the shadow bodies are the Earth and the Moon.
-    pub fn cislunar(cosm: Arc<Almanac>) -> Self {
+    pub fn cislunar() -> Self {
         Self {
             light_source: SUN_J2000,
             shadow_bodies: vec![EARTH_J2000, MOON_J2000],
-            cosm,
         }
     }
 
     /// Compute the visibility/eclipse between an observer and an observed state
-    pub fn compute(&self, observer: &Orbit) -> EclipseState {
+    pub fn compute(&self, observer: &Orbit, almanac: Arc<Almanac>) -> EclipseState {
         let mut state = EclipseState::Visibilis;
         for eclipsing_body in &self.shadow_bodies {
-            let this_state =
-                eclipse_state(observer, self.light_source, *eclipsing_body, &self.cosm);
+            let this_state = eclipse_state(observer, self.light_source, *eclipsing_body, &almanac);
             if this_state > state {
                 state = this_state;
             }
@@ -187,8 +184,8 @@ impl fmt::Display for UmbraEvent {
 
 impl EventEvaluator<Spacecraft> for UmbraEvent {
     // Evaluation of the event, returns 0.0 for umbra, 1.0 for visibility and some value in between for penumbra
-    fn eval(&self, sc: &Spacecraft) -> f64 {
-        match self.e_loc.compute(&sc.orbit) {
+    fn eval(&self, sc: &Spacecraft, almanac: Arc<Almanac>) -> f64 {
+        match self.e_loc.compute(&sc.orbit, &almanac) {
             EclipseState::Umbra => 0.0,
             EclipseState::Visibilis => 1.0,
             EclipseState::Penumbra(val) => val,
@@ -203,8 +200,8 @@ impl EventEvaluator<Spacecraft> for UmbraEvent {
     fn value_precision(&self) -> f64 {
         0.02
     }
-    fn eval_string(&self, state: &Spacecraft) -> String {
-        format!("{}", self.e_loc.compute(&state.orbit))
+    fn eval_string(&self, state: &Spacecraft, almanac: Arc<Almanac>) -> String {
+        format!("{}", self.e_loc.compute(&state.orbitm, &almanac))
     }
 }
 
@@ -220,8 +217,8 @@ impl fmt::Display for PenumbraEvent {
 }
 
 impl EventEvaluator<Spacecraft> for PenumbraEvent {
-    fn eval(&self, sc: &Spacecraft) -> f64 {
-        match self.e_loc.compute(&sc.orbit) {
+    fn eval(&self, sc: &Spacecraft, almanac: Arc<Almanac>) -> f64 {
+        match self.e_loc.compute(&sc.orbit, &almanac) {
             EclipseState::Umbra => 0.0,
             EclipseState::Visibilis => 1.0,
             EclipseState::Penumbra(val) => val - 1.0,
@@ -237,8 +234,8 @@ impl EventEvaluator<Spacecraft> for PenumbraEvent {
         0.02
     }
 
-    fn eval_string(&self, state: &Spacecraft) -> String {
-        format!("{}", self.e_loc.compute(&state.orbit))
+    fn eval_string(&self, state: &Spacecraft, almanac: Arc<Almanac>) -> String {
+        format!("{}", self.e_loc.compute(&state.orbit, &almanac))
     }
 }
 

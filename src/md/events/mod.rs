@@ -20,11 +20,11 @@ pub mod details;
 pub mod evaluators;
 pub mod search;
 use super::StateParameter;
-use crate::cosmic::{Cosm, Frame};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 use crate::time::{Duration, Unit};
 use crate::State;
+use anise::prelude::{Almanac, Frame};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 use std::default::Default;
@@ -43,9 +43,9 @@ where
     }
 
     /// Evaluation of the event, must return a value corresponding to whether the state is before or after the event
-    fn eval(&self, state: &S) -> f64;
+    fn eval(&self, state: &S, almanac: Arc<Almanac>) -> f64;
     /// Returns a string representation of the event evaluation for the given state
-    fn eval_string(&self, state: &S) -> String;
+    fn eval_string(&self, state: &S, almanac: Arc<Almanac>) -> String;
     fn epoch_precision(&self) -> Duration;
     fn value_precision(&self) -> f64;
 }
@@ -63,7 +63,7 @@ pub struct Event {
     /// The precision on the desired value
     pub value_precision: f64,
     /// An optional frame in which to search this -- it IS recommended to convert the whole trajectory instead of searching in a given frame!
-    pub in_frame: Option<(Frame, Arc<Cosm>)>,
+    pub obs_frame: Option<Frame>,
 }
 
 impl fmt::Display for Event {
@@ -91,7 +91,7 @@ impl fmt::Display for Event {
                 )?;
             }
         }
-        if let Some((frame, _)) = self.in_frame {
+        if let Some((frame, _)) = self.obs_frame {
             write!(f, "in frame {frame}")?;
         }
         fmt::Result::Ok(())
@@ -132,7 +132,7 @@ impl Event {
             desired_value,
             epoch_precision,
             value_precision,
-            in_frame: None,
+            obs_frame: None,
         }
     }
 
@@ -147,19 +147,14 @@ impl Event {
     }
 
     /// Match a specific event in another frame, using the default epoch precision and value.
-    pub fn in_frame(
-        parameter: StateParameter,
-        desired_value: f64,
-        target_frame: Frame,
-        almanac: Arc<Almanac>,
-    ) -> Self {
+    pub fn in_frame(parameter: StateParameter, desired_value: f64, target_frame: Frame) -> Self {
         warn!("Searching for an event in another frame is slow: you should instead convert the trajectory into that other frame");
         Self {
             parameter,
             desired_value,
             epoch_precision: Unit::Millisecond,
             value_precision: 1e-3,
-            in_frame: Some((target_frame, cosm)),
+            obs_frame: Some(target_frame),
         }
     }
 }
@@ -171,7 +166,7 @@ impl Default for Event {
             desired_value: 0.0,
             value_precision: 1e-3,
             epoch_precision: Unit::Second,
-            in_frame: None,
+            obs_frame: None,
         }
     }
 }
