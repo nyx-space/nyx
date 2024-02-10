@@ -89,6 +89,7 @@ impl OrbitalDynamics {
         ctx: &Orbit,
         almanac: Arc<Almanac>,
     ) -> Result<OVector<f64, Const<42>>, DynamicsError> {
+        // TODO(ANISE): Consider passing a mut Matrix3 to put the STM data into
         let osc = ctx.set_with_delta_seconds(delta_t_s, state);
         let (new_state, new_stm) = if ctx.stm.is_some() {
             let (state, grad) = self.dual_eom(delta_t_s, &osc, almanac)?;

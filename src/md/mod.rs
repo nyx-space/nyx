@@ -66,7 +66,7 @@ pub use opti::target_variable::{Variable, Vary};
 use self::trajectory::TrajError;
 
 #[allow(clippy::result_large_err)]
-#[derive(PartialEq, Debug, Snafu)]
+#[derive(Debug, Snafu)]
 #[snafu(visibility(pub(crate)))]
 pub enum TargetingError {
     #[snafu(display(

@@ -131,6 +131,7 @@ pub fn assert_orbit_eq_or_abs(left: &Orbit, right: &Orbit, epsilon: f64, msg: &s
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Snafu)]
+#[snafu(visibility(pub(crate)))]
 pub enum AstroError {
     #[snafu(display("B Plane jacobian invariant must be either VX, VY or VZ"))]
     BPlaneInvariant,

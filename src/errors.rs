@@ -20,7 +20,7 @@ use crate::md::trajectory::TrajError;
 use crate::md::StateParameter;
 pub use crate::md::TargetingError;
 use crate::{cosmic::AstroError, io::ConfigError};
-use anise::errors::AlmanacError;
+use anise::errors::{AlmanacError, PhysicsError};
 use snafu::prelude::*;
 use std::convert::From;
 
@@ -114,6 +114,13 @@ pub enum StateError {
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub(crate)))]
 pub enum EventError {
-    #[snafu(display("Almanac error during event computation: {source}"))]
+    #[snafu(display("during event computation: {source}"))]
     EventAlmanacError { source: AlmanacError },
+    #[snafu(display("during event computation: {source}"))]
+    EventStateError {
+        param: StateParameter,
+        source: StateError,
+    },
+    #[snafu(display("during event computation: {source}"))]
+    EventPhysicsError { source: PhysicsError },
 }

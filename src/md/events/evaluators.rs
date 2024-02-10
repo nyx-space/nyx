@@ -18,9 +18,11 @@
 
 use anise::prelude::Almanac;
 use hifitime::Duration;
+use snafu::ResultExt;
 use std::sync::Arc;
 
 use super::{Event, EventEvaluator};
+use crate::errors::{EventAlmanacSnafu, EventError, EventPhysicsSnafu, EventStateSnafu};
 use crate::md::StateParameter;
 use crate::utils::between_pm_x;
 use crate::{Spacecraft, State};
@@ -34,12 +36,16 @@ pub(crate) fn angled_value(cur_angle: f64, desired_angle: f64) -> f64 {
 }
 
 impl EventEvaluator<Spacecraft> for Event {
-    fn eval(&self, state: &Spacecraft, almanac: Arc<Almanac>) -> f64 {
-        let state = if let Some(frame) = &self.obs_frame {
-            if state.frame == *frame {
+    fn eval(&self, state: &Spacecraft, almanac: Arc<Almanac>) -> Result<f64, EventError> {
+        let state = if let Some(frame) = self.obs_frame {
+            if state.orbit.frame == frame {
                 *state
             } else {
-                almanac.transform_to(state, frame, None)
+                state.with_orbit(
+                    almanac
+                        .transform_to(state.orbit, frame, None)
+                        .with_context(|_| EventAlmanacSnafu)?,
+                )
             }
         } else {
             *state
@@ -47,10 +53,21 @@ impl EventEvaluator<Spacecraft> for Event {
 
         // Return the parameter centered around the desired value
         match self.parameter {
-            StateParameter::Apoapsis => angled_value(state.ta_deg(), 180.0),
-            StateParameter::Periapsis => between_pm_x(state.ta_deg(), 180.0),
-            StateParameter::FuelMass => state.fuel_mass_kg - self.desired_value,
-            _ => state.value(self.parameter).unwrap() - self.desired_value,
+            StateParameter::Apoapsis => Ok(angled_value(
+                state.orbit.ta_deg().with_context(|_| EventPhysicsSnafu)?,
+                180.0,
+            )),
+            StateParameter::Periapsis => Ok(between_pm_x(
+                state.orbit.ta_deg().with_context(|_| EventPhysicsSnafu)?,
+                180.0,
+            )),
+            StateParameter::FuelMass => Ok(state.fuel_mass_kg - self.desired_value),
+            _ => Ok(state
+                .value(self.parameter)
+                .with_context(|_| EventStateSnafu {
+                    param: self.parameter,
+                })?
+                - self.desired_value),
         }
     }
 
@@ -63,10 +80,10 @@ impl EventEvaluator<Spacecraft> for Event {
         self.value_precision
     }
 
-    fn eval_string(&self, state: &Spacecraft, almanac: Arc<Almanac>) -> String {
+    fn eval_string(&self, state: &Spacecraft, almanac: Arc<Almanac>) -> Result<String, EventError> {
         match self.parameter {
             StateParameter::Apoapsis | StateParameter::Periapsis => {
-                format!("{}", self.parameter)
+                Ok(format!("{}", self.parameter))
             }
             _ => {
                 let unit = if self.parameter.unit().is_empty() {
@@ -74,8 +91,13 @@ impl EventEvaluator<Spacecraft> for Event {
                 } else {
                     format!(" ({})", self.parameter.unit())
                 };
-                let val = state.value(self.parameter).unwrap();
-                format!("{}{} = {:.3}{}", self.parameter, unit, val, unit)
+                let val = state
+                    .value(self.parameter)
+                    .with_context(|_| EventStateSnafu {
+                        param: self.parameter,
+                    })?;
+
+                Ok(format!("{}{} = {:.3}{}", self.parameter, unit, val, unit))
             }
         }
     }

@@ -37,11 +37,10 @@ pub struct SolarPressure {
 
 impl SolarPressure {
     /// Will set the solar flux at 1 AU to: Phi = 1367.0
-    pub fn default_raw(shadow_bodies: Vec<Frame>, almanac: Arc<Almanac>) -> Self {
+    pub fn default_raw(shadow_bodies: Vec<Frame>, _almanac: Arc<Almanac>) -> Self {
         let e_loc = EclipseLocator {
             light_source: SUN_J2000,
             shadow_bodies,
-            cosm: almanac,
         };
         Self { phi: 1367.0, e_loc }
     }
@@ -65,7 +64,7 @@ impl SolarPressure {
 
 impl ForceModel for SolarPressure {
     fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
-        let osc = &ctx.orbit;
+        let osc = ctx.orbit;
         // Compute the position of the Sun as seen from the spacecraft
         // TODO(ANISE): I think this needs to be flipped as well!
         let r_sun = almanac
@@ -83,7 +82,13 @@ impl ForceModel for SolarPressure {
         let r_sun_unit = r_sun / r_sun.norm();
 
         // Compute the shaddowing factor.
-        let k: f64 = self.e_loc.compute(osc).into();
+        let k: f64 = self
+            .e_loc
+            .compute(osc, almanac)
+            .with_context(|_| DynamicsAlmanacSnafu {
+                action: "solar radiation pressure computation",
+            })?
+            .into();
 
         let r_sun_au = r_sun.norm() / AU;
         // in N/(m^2)
@@ -98,7 +103,7 @@ impl ForceModel for SolarPressure {
         ctx: &Spacecraft,
         almanac: Arc<Almanac>,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
-        let osc = &ctx.orbit;
+        let osc = ctx.orbit;
 
         // TODO(ANISE): I think this needs to be flipped as well!
         let r_sun = almanac
@@ -119,7 +124,13 @@ impl ForceModel for SolarPressure {
         let r_sun_unit = r_sun_d / norm(&r_sun_d);
 
         // Compute the shadowing factor.
-        let k: f64 = self.e_loc.compute(osc).into();
+        let k: f64 = self
+            .e_loc
+            .compute(osc, almanac)
+            .with_context(|_| DynamicsAlmanacSnafu {
+                action: "solar radiation pressure computation",
+            })?
+            .into();
 
         let r_sun_au = norm(&r_sun_d) / AU;
         let inv_r_sun_au = OHyperdual::<f64, Const<9>>::from_real(1.0) / (r_sun_au);

@@ -17,13 +17,13 @@
 */
 
 use anise::prelude::Almanac;
+use snafu::ResultExt;
 
 use super::guidance::{ra_dec_from_unit_vector, GuidanceError, GuidanceLaw};
 use super::orbital::OrbitalDynamics;
-use super::{Dynamics, ForceModel};
+use super::{Dynamics, DynamicsGuidanceSnafu, ForceModel};
 pub use crate::cosmic::{GuidanceMode, Spacecraft, STD_GRAVITY};
 use crate::dynamics::DynamicsError;
-use crate::errors::NyxError;
 
 use crate::linalg::{Const, DimName, OMatrix, OVector, Vector3};
 pub use crate::md::prelude::SolarPressure;
@@ -133,10 +133,10 @@ impl SpacecraftDynamics {
     }
 
     /// A shortcut to spacecraft.guid_law if a guidance law is defined for these dynamics
-    pub fn guidance_achieved(&self, state: &Spacecraft) -> Result<bool, NyxError> {
+    pub fn guidance_achieved(&self, state: &Spacecraft) -> Result<bool, GuidanceError> {
         match &self.guid_law {
             Some(guid_law) => guid_law.achieved(state),
-            None => Err(NyxError::NoObjectiveDefined),
+            None => Err(GuidanceError::NoGuidanceObjectiveDefined),
         }
     }
 
@@ -345,7 +345,9 @@ impl Dynamics for SpacecraftDynamics {
                     });
                 }
                 let thruster = osc_sc.thruster.unwrap();
-                let thrust_throttle_lvl = guid_law.throttle(&osc_sc);
+                let thrust_throttle_lvl = guid_law
+                    .throttle(&osc_sc)
+                    .with_context(|_| DynamicsGuidanceSnafu)?;
                 if !(0.0..=1.0).contains(&thrust_throttle_lvl) {
                     return Err(DynamicsError::DynamicsGuidance {
                         source: GuidanceError::ThrottleRatio {
@@ -354,7 +356,9 @@ impl Dynamics for SpacecraftDynamics {
                     });
                 } else if thrust_throttle_lvl > 0.0 {
                     // Thrust arc
-                    let thrust_inertial = guid_law.direction(&osc_sc);
+                    let thrust_inertial = guid_law
+                        .direction(&osc_sc)
+                        .with_context(|_| DynamicsGuidanceSnafu)?;
                     if (thrust_inertial.norm() - 1.0).abs() > NORM_ERR {
                         let (alpha, delta) = ra_dec_from_unit_vector(thrust_inertial);
                         return Err(DynamicsError::DynamicsGuidance {

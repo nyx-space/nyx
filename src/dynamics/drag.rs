@@ -18,9 +18,10 @@
 
 use anise::almanac::Almanac;
 use anise::constants::frames::IAU_EARTH_FRAME;
+use snafu::ResultExt;
 
-use super::{DynamicsAlmanacSnafu, DynamicsError, ForceModel};
-use crate::cosmic::{AstroError, Frame, Spacecraft};
+use super::{DynamicsAlmanacSnafu, DynamicsAstroSnafu, DynamicsError, ForceModel};
+use crate::cosmic::{AstroError, AstroPhysicsSnafu, Frame, Spacecraft};
 use crate::linalg::{Matrix3, Vector3};
 use std::fmt;
 use std::sync::Arc;
@@ -64,7 +65,7 @@ impl ForceModel for ConstantDrag {
                 action: "transforming into drag frame",
             })?;
 
-        let velocity = osc.velocity();
+        let velocity = osc.velocity_km_s;
         Ok(-0.5 * self.rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
     }
 
@@ -134,7 +135,7 @@ impl ForceModel for Drag {
 
         match self.density {
             AtmDensity::Constant(rho) => {
-                let velocity = osc.velocity();
+                let velocity = osc.velocity_km_s;
                 Ok(-0.5 * rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
             }
 
@@ -144,19 +145,36 @@ impl ForceModel for Drag {
                 ref_alt_m,
             } => {
                 let rho = rho0
-                    * (-(osc.rmag_km() - (r0 + self.drag_frame.equatorial_radius())) / ref_alt_m)
+                    * (-(osc.rmag_km()
+                        - (r0
+                            + self
+                                .drag_frame
+                                .mean_equatorial_radius_km()
+                                .with_context(|_| AstroPhysicsSnafu)
+                                .with_context(|_| DynamicsAstroSnafu)?))
+                        / ref_alt_m)
                         .exp();
 
-                //TODO(ANISE): Looks like there is a frame issue here!
+                //TODO(ANISE): Looks like there is a frame issue here abnd we're transforming into the original frame!
+                // let velocity_integr_frame = self.cosm.frame_chg(&osc, integration_frame).velocity();
+                let velocity_integr_frame = almanac
+                    .transform_to(osc, integration_frame, None)
+                    .with_context(|_| DynamicsAlmanacSnafu {
+                        action: "rotating into the integration frame",
+                    })?
+                    .velocity_km_s;
 
-                let velocity_integr_frame = self.cosm.frame_chg(&osc, integration_frame).velocity();
-
-                let velocity = velocity_integr_frame - osc.velocity();
+                let velocity = velocity_integr_frame - osc.velocity_km_s;
                 Ok(-0.5 * rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
             }
 
             AtmDensity::StdAtm { max_alt_m } => {
-                let altitude_km = osc.rmag_km() - self.drag_frame.equatorial_radius();
+                let altitude_km = osc.rmag_km()
+                    - self
+                        .drag_frame
+                        .mean_equatorial_radius_km()
+                        .with_context(|_| AstroPhysicsSnafu)
+                        .with_context(|_| DynamicsAstroSnafu)?;
                 let rho = if altitude_km > max_alt_m / 1_000.0 {
                     // Use a constant density
                     10.0_f64.powf((-7e-5) * altitude_km - 14.464)
@@ -175,9 +193,15 @@ impl ForceModel for Drag {
                     10.0_f64.powf(logdensity)
                 };
 
-                let velocity_integr_frame = self.cosm.frame_chg(&osc, integration_frame).velocity();
+                // let velocity_integr_frame = self.cosm.frame_chg(&osc, integration_frame).velocity();
+                let velocity_integr_frame = almanac
+                    .transform_to(osc, integration_frame, None)
+                    .with_context(|_| DynamicsAlmanacSnafu {
+                        action: "rotating into the integration frame",
+                    })?
+                    .velocity_km_s;
 
-                let velocity = velocity_integr_frame - osc.velocity();
+                let velocity = velocity_integr_frame - osc.velocity_km_s;
                 Ok(-0.5 * rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
             }
         }
