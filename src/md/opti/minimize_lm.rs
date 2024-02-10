@@ -180,7 +180,7 @@ where
                     let dcm_vnc2inertial = xi.orbit.dcm_from_traj_frame(frame).unwrap();
                     let velocity_correction =
                         dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
-                    xi.orbit.apply_dv(velocity_correction);
+                    xi.orbit.apply_dv_km_s(velocity_correction);
                 } else {
                     xi.orbit.x += state_correction[0];
                     xi.orbit.y += state_correction[1];
@@ -355,7 +355,7 @@ where
                         let dcm_vnc2inertial = this_xi.orbit.dcm_from_traj_frame(frame).unwrap();
                         let velocity_correction =
                             dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
-                        this_xi.orbit.apply_dv(velocity_correction);
+                        this_xi.orbit.apply_dv_km_s(velocity_correction);
                     } else {
                         this_xi = xi + state_correction;
                     }

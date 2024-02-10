@@ -86,7 +86,7 @@ fn test_dv_mag_fixed() {
     use anise::constants::frames::EARTH_J2000;
     use anise::prelude::Orbit;
 
-    let orbit = Orbit::cartesian(
+    let orbit = Orbit::new(
         -2436.45,
         -2436.45,
         6891.037,
@@ -103,7 +103,7 @@ fn test_dv_mag_fixed() {
         let dv_mag = dv_mag_distr.sample(&mut thread_rng());
         let dv_point = unit_vector_from_seed(&mut thread_rng());
         let dv = dv_point * dv_mag;
-        let dv_w_err = dv_pointing_error(&orbit.velocity(), dv, 0.1, &mut thread_rng()).unwrap();
+        let dv_w_err = dv_pointing_error(&orbit.velocity_km_s, dv, 0.1, &mut thread_rng()).unwrap();
         assert!(
             (dv_w_err.norm() - dv_mag) < std::f64::EPSILON,
             "{:.1e}",

@@ -17,7 +17,7 @@
 */
 
 use crate::cosmic::AstroError;
-use crate::dynamics::guidance::GuidanceErrors;
+use crate::dynamics::guidance::GuidanceError;
 use crate::errors::NyxError;
 use crate::propagators::PropagationError;
 use crate::Spacecraft;
@@ -95,7 +95,7 @@ pub enum TargetingError {
         action: &'static str,
     },
     #[snafu(display("encountered a guidance error: {source}"))]
-    GuidanceError { source: GuidanceErrors },
+    GuidanceError { source: GuidanceError },
     #[snafu(display("not a finite burn"))]
     NotFinite,
     #[snafu(display("Jacobian is signular"))]

@@ -35,7 +35,7 @@ pub use crate::errors::NyxError;
 /// It is up to the engineer to ensure that the coordinate frames of the different dynamics borrowed
 /// from this module match, or perform the appropriate coordinate transformations.
 pub mod orbital;
-use self::guidance::GuidanceErrors;
+use self::guidance::GuidanceError;
 pub use self::orbital::*;
 
 /// The gravity module handles spherical harmonics only. It _must_ be combined with a OrbitalDynamics dynamics
@@ -170,7 +170,7 @@ pub trait AccelModel: Send + Sync + fmt::Display {
 }
 
 /// Stores dynamical model errors
-#[derive(Clone, Debug, Snafu, PartialEq)]
+#[derive(Debug, Snafu)]
 pub enum DynamicsError {
     /// Fuel exhausted at the provided spacecraft state
     #[snafu(display("fuel exhausted at {sc}"))]
@@ -180,7 +180,7 @@ pub enum DynamicsError {
     #[snafu(display("dynamical model encountered an astro error: {source}"))]
     DynamicsAstro { source: AstroError },
     #[snafu(display("dynamical model encountered an issue with the guidance: {source}"))]
-    DynamicsGuidance { source: GuidanceErrors },
+    DynamicsGuidance { source: GuidanceError },
     #[snafu(display("dynamical model issue due to Almanac: {action} {source}"))]
     DynamicsAlmanacError {
         source: AlmanacError,

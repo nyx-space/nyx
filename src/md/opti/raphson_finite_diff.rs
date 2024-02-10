@@ -18,7 +18,7 @@
 
 use super::optimizer::Optimizer;
 use super::solution::TargeterSolution;
-use crate::dynamics::guidance::{GuidanceErrors, Mnvr};
+use crate::dynamics::guidance::{GuidanceError, Mnvr};
 use crate::errors::TargetingError;
 use crate::linalg::{SMatrix, SVector, Vector6};
 use crate::md::{prelude::*, AstroSnafu, GuidanceSnafu, UnderdeterminedProblemSnafu};
@@ -101,7 +101,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             if var.component.is_finite_burn() {
                 if xi_start.thruster.is_none() {
                     return Err(TargetingError::GuidanceError {
-                        source: GuidanceErrors::NoThrustersDefined,
+                        source: GuidanceError::NoThrustersDefined,
                     });
                 }
 
@@ -160,7 +160,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                         .with_context(|_| AstroSnafu)?;
                     let velocity_correction =
                         dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
-                    xi.orbit.apply_dv(velocity_correction);
+                    xi.orbit.apply_dv_km_s(velocity_correction);
                 } else {
                     xi.orbit.x_km += state_correction[0];
                     xi.orbit.y_km += state_correction[1];
@@ -395,7 +395,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                                 this_xi.orbit.dcm_from_traj_frame(frame).unwrap();
                             let velocity_correction =
                                 dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
-                            this_xi.orbit.apply_dv(velocity_correction);
+                            this_xi.orbit.apply_dv_km_s(velocity_correction);
                         } else {
                             this_xi = xi + state_correction;
                         }
@@ -494,7 +494,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                         .transpose();
                     let velocity_correction =
                         dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
-                    corrected_state.orbit.apply_dv(velocity_correction);
+                    corrected_state.orbit.apply_dv_km_s(velocity_correction);
                 } else {
                     corrected_state.orbit = corrected_state.orbit + state_correction;
                 }
@@ -653,7 +653,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                     .dcm_from_traj_frame(frame)
                     .with_context(|_| AstroSnafu)?;
                 let velocity_correction = dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
-                xi.orbit.apply_dv(velocity_correction);
+                xi.orbit.apply_dv_km_s(velocity_correction);
             } else {
                 xi = xi + state_correction;
             }

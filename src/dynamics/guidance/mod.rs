@@ -16,9 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::cosmic::{Frame, GuidanceMode, Orbit, Spacecraft, STD_GRAVITY};
-use crate::errors::NyxError;
+use crate::cosmic::{GuidanceMode, Orbit, Spacecraft, STD_GRAVITY};
+use crate::errors::{NyxError, StateError};
 use crate::linalg::Vector3;
+use anise::errors::PhysicsError;
 use serde::{Deserialize, Serialize};
 
 mod finiteburns;
@@ -68,18 +69,18 @@ impl Thruster {
 /// tie the DeltaVctrl to a MissionArc.
 pub trait GuidanceLaw: fmt::Display + Send + Sync {
     /// Returns a unit vector corresponding to the thrust direction in the inertial frame.
-    fn direction(&self, osc_state: &Spacecraft) -> Vector3<f64>;
+    fn direction(&self, osc_state: &Spacecraft) -> Result<Vector3<f64>, GuidanceError>;
 
     /// Returns a number between [0;1] corresponding to the engine throttle level.
     /// For example, 0 means coasting, i.e. no thrusting, and 1 means maximum thrusting.
-    fn throttle(&self, osc_state: &Spacecraft) -> f64;
+    fn throttle(&self, osc_state: &Spacecraft) -> Result<f64, GuidanceError>;
 
     /// Updates the state of the BaseSpacecraft for the next maneuver, e.g. prepares the controller for the next maneuver
     fn next(&self, next_state: &mut Spacecraft);
 
     /// Returns whether this thrust control has been achieved, if it has an objective
-    fn achieved(&self, _osc_state: &Spacecraft) -> Result<bool, NyxError> {
-        Err(NyxError::NoObjectiveDefined)
+    fn achieved(&self, _osc_state: &Spacecraft) -> Result<bool, GuidanceError> {
+        Err(GuidanceError::NoGuidanceObjectiveDefined)
     }
 }
 
@@ -113,8 +114,8 @@ pub(crate) fn ra_dec_from_unit_vector(vhat: Vector3<f64>) -> (f64, f64) {
     (alpha, delta)
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Snafu)]
-pub enum GuidanceErrors {
+#[derive(Copy, Clone, Debug, Snafu)]
+pub enum GuidanceError {
     #[snafu(display("No thruster attached to spacecraft"))]
     NoThrustersDefined,
     #[snafu(display("Throttle is not between 0.0 and 1.0: {ratio}"))]
@@ -143,6 +144,28 @@ pub enum GuidanceErrors {
         in_plane_deg_s2: f64,
         out_of_plane_deg_s2: f64,
     },
+    #[snafu(display("when {action} encountered {source}"))]
+    GuidancePhysicsError {
+        action: &'static str,
+        source: PhysicsError,
+    },
+    #[snafu(display(
+        "An objective based analysis or control was attempted, but no objective was defined"
+    ))]
+    NoGuidanceObjectiveDefined,
+    #[snafu(display("{param} is not a control variable in this guidance law"))]
+    InvalidControl { param: StateParameter },
+    #[snafu(display("guidance encountered {source}"))]
+    GuidState { source: StateError },
+}
+
+/// Local frame options, used notably for guidance laws.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum LocalFrame {
+    Inertial,
+    RIC,
+    VNC,
+    RCN,
 }
 
 #[test]

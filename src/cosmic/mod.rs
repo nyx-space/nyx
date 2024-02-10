@@ -25,13 +25,13 @@ pub use anise::prelude::{Frame, Orbit};
 pub use crate::cosmic::{GuidanceMode, Spacecraft};
 use crate::dynamics::DynamicsError;
 pub use crate::errors::NyxError;
+use crate::errors::StateError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
 use crate::md::StateParameter;
 use crate::time::{Duration, Epoch};
-use approx::{abs_diff_eq, relative_eq};
 use snafu::Snafu;
-use std::fmt::{self, Write};
+use std::fmt;
 
 /// A trait allowing for something to have an epoch
 pub trait TimeTagged {
@@ -108,59 +108,24 @@ where
     }
 
     /// Return the value of the parameter, returns an error by default
-    fn value(&self, param: StateParameter) -> Result<f64, NyxError> {
-        Err(NyxError::StateParameterUnavailable {
-            param,
-            msg: "unimplemented in State trait".to_string(),
-        })
+    fn value(&self, param: StateParameter) -> Result<f64, StateError> {
+        Err(StateError::Unavailable { param })
     }
 
     /// Allows setting the value of the given parameter.
     /// NOTE: Most parameters where the `value` is available CANNOT be also set for that parameter (it's a much harder problem!)
-    fn set_value(&mut self, param: StateParameter, _val: f64) -> Result<(), NyxError> {
-        Err(NyxError::StateParameterUnavailable {
-            param,
-            msg: "unimplemented in State trait".to_string(),
-        })
+    fn set_value(&mut self, param: StateParameter, _val: f64) -> Result<(), StateError> {
+        Err(StateError::Unavailable { param })
     }
 }
 
 pub fn assert_orbit_eq_or_abs(left: &Orbit, right: &Orbit, epsilon: f64, msg: &str) {
-    if !(left.to_cartesian_vec() == right.to_cartesian_vec())
-        && !abs_diff_eq!(
-            left.to_cartesian_vec(),
-            right.to_cartesian_vec(),
-            epsilon = epsilon
-        )
-        && left.epoch != right.epoch
-    {
+    if !left.eq_within(right, epsilon, epsilon) {
         panic!(
             r#"assertion failed: `(left == right)`
   left: `{:?}`,
  right: `{:?}`: {}"#,
-            left.to_cartesian_vec(),
-            right.to_cartesian_vec(),
-            msg
-        )
-    }
-}
-
-pub fn assert_orbit_eq_or_rel(left: &Orbit, right: &Orbit, epsilon: f64, msg: &str) {
-    if !(left.to_cartesian_vec() == right.to_cartesian_vec())
-        && !relative_eq!(
-            left.to_cartesian_vec(),
-            right.to_cartesian_vec(),
-            max_relative = epsilon
-        )
-        && left.epoch != right.epoch
-    {
-        panic!(
-            r#"assertion failed: `(left == right)`
-  left: `{:?}`,
- right: `{:?}`: {}"#,
-            left.to_cartesian_vec(),
-            right.to_cartesian_vec(),
-            msg
+            left, right, msg
         )
     }
 }

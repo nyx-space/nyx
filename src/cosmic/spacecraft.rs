@@ -16,20 +16,23 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anise::astro::PhysicsResult;
+use anise::constants::frames::EARTH_J2000;
 pub use anise::prelude::{Almanac, Orbit};
 
 use nalgebra::Vector3;
 use serde::{Deserialize, Serialize};
+use snafu::ResultExt;
 
-use super::State;
+use super::{AstroPhysicsSnafu, BPlane, State};
 use crate::dynamics::guidance::Thruster;
 use crate::dynamics::DynamicsError;
-use crate::errors::NyxError;
+use crate::errors::{StateAstroSnafu, StateError};
 use crate::io::{orbit_from_str, ConfigRepr};
-use crate::linalg::{Const, DimName, Matrix6, OMatrix, OVector};
+use crate::linalg::{Const, DimName, OMatrix, OVector};
 use crate::md::StateParameter;
 use crate::time::Epoch;
-use crate::utils::rss_orbit_errors;
+use crate::utils::{cartesian_to_spherical, spherical_to_cartesian};
 
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
@@ -100,6 +103,7 @@ pub struct Spacecraft {
     #[serde(default)]
     pub mode: GuidanceMode,
     /// Optionally stores the state transition matrix from the start of the propagation until the current time (i.e. trajectory STM, not step-size STM)
+    /// STM is contains position and velocity, Cr, Cd, fuel mass
     #[serde(skip)]
     pub stm: Option<OMatrix<f64, Const<9>, Const<9>>>,
 }
@@ -107,7 +111,7 @@ pub struct Spacecraft {
 impl Default for Spacecraft {
     fn default() -> Self {
         Self {
-            orbit: Orbit::zeros(),
+            orbit: Orbit::zero(EARTH_J2000),
             dry_mass_kg: 0.0,
             fuel_mass_kg: 0.0,
             srp: SrpConfig::default(),
@@ -202,9 +206,7 @@ impl Spacecraft {
                 area_m2: drag_area_m2,
                 cd,
             },
-            stm: orbit
-                .stm
-                .map(|_| OMatrix::<f64, Const<9>, Const<9>>::identity()),
+            stm: Some(OMatrix::<f64, Const<9>, Const<9>>::identity()),
             ..Default::default()
         }
     }
@@ -223,9 +225,7 @@ impl Spacecraft {
             fuel_mass_kg,
             thruster: Some(thruster),
             mode,
-            stm: orbit
-                .stm
-                .map(|_| OMatrix::<f64, Const<9>, Const<9>>::identity()),
+            stm: Some(OMatrix::<f64, Const<9>, Const<9>>::identity()),
             ..Default::default()
         }
     }
@@ -236,9 +236,7 @@ impl Spacecraft {
             orbit,
             dry_mass_kg,
             srp: SrpConfig::from_area(srp_area_m2),
-            stm: orbit
-                .stm
-                .map(|_| OMatrix::<f64, Const<9>, Const<9>>::identity()),
+            stm: Some(OMatrix::<f64, Const<9>, Const<9>>::identity()),
             ..Default::default()
         }
     }
@@ -249,16 +247,14 @@ impl Spacecraft {
             orbit,
             dry_mass_kg,
             drag: DragConfig::from_area(drag_area_m2),
-            stm: orbit
-                .stm
-                .map(|_| OMatrix::<f64, Const<9>, Const<9>>::identity()),
+            stm: Some(OMatrix::<f64, Const<9>, Const<9>>::identity()),
             ..Default::default()
         }
     }
 
-    pub fn with_dv(self, dv: Vector3<f64>) -> Self {
+    pub fn with_dv_km_s(self, dv_km_s: Vector3<f64>) -> Self {
         let mut me = self;
-        me.orbit.apply_dv(dv);
+        me.orbit.apply_dv_km_s(dv_km_s);
         me
     }
 
@@ -329,25 +325,21 @@ impl Spacecraft {
     pub fn with_orbit(self, orbit: Orbit) -> Self {
         let mut me = self;
         me.orbit = orbit;
-        me.stm = orbit
-            .stm
-            .map(|_| OMatrix::<f64, Const<9>, Const<9>>::identity());
+        me.stm = Some(OMatrix::<f64, Const<9>, Const<9>>::identity());
         me
     }
 
     /// Returns the root sum square error between this spacecraft and the other, in kilometers for the position, kilometers per second in velocity, and kilograms in fuel
-    pub fn rss(&self, other: &Self) -> (f64, f64, f64) {
-        let (p, v) = rss_orbit_errors(&self.orbit, &other.orbit);
-        (
-            p,
-            v,
-            (self.fuel_mass_kg - other.fuel_mass_kg).powi(2).sqrt(),
-        )
+    pub fn rss(&self, other: &Self) -> PhysicsResult<(f64, f64, f64)> {
+        let rss_p_km = self.orbit.rss_radius_km(&other.orbit)?;
+        let rss_v_km_s = self.orbit.rss_velocity_km_s(&other.orbit)?;
+        let rss_fuel_kg = (self.fuel_mass_kg - other.fuel_mass_kg).powi(2).sqrt();
+
+        Ok((rss_p_km, rss_v_km_s, rss_fuel_kg))
     }
 
     /// Sets the STM of this state of identity, which also enables computation of the STM for spacecraft navigation
     pub fn enable_stm(&mut self) {
-        self.orbit.stm = Some(Matrix6::identity());
         self.stm = Some(OMatrix::<f64, Const<9>, Const<9>>::identity());
     }
 
@@ -421,21 +413,6 @@ impl fmt::LowerExp for Spacecraft {
 }
 
 #[allow(clippy::format_in_format_args)]
-impl fmt::UpperExp for Spacecraft {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mass_prec = f.precision().unwrap_or(3);
-        let orbit_prec = f.precision().unwrap_or(6);
-        write!(
-            f,
-            "total mass = {} kg @  {}  {:?}",
-            format!("{:.*E}", mass_prec, self.dry_mass_kg + self.fuel_mass_kg),
-            format!("{:.*E}", orbit_prec, self.orbit),
-            self.mode,
-        )
-    }
-}
-
-#[allow(clippy::format_in_format_args)]
 impl fmt::LowerHex for Spacecraft {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mass_prec = f.precision().unwrap_or(3);
@@ -470,7 +447,6 @@ impl State for Spacecraft {
     type VecLength = Const<90>;
 
     fn reset_stm(&mut self) {
-        self.orbit.reset_stm();
         self.stm = Some(OMatrix::<f64, Const<9>, Const<9>>::identity());
     }
 
@@ -483,21 +459,27 @@ impl State for Spacecraft {
     fn as_vector(&self) -> OVector<f64, Const<90>> {
         let mut vector = OVector::<f64, Const<90>>::zeros();
         // Set the orbit state info
-        for (i, val) in self.orbit.to_cartesian_vec().iter().enumerate() {
+        for (i, val) in self.orbit.radius_km.iter().enumerate() {
             // Place the orbit state first, then skip three (Cr, Cd, Fuel), then copy orbit STM
-            vector[if i < 6 { i } else { i + 3 }] = *val;
+            vector[i] = *val;
+        }
+        for (i, val) in self.orbit.velocity_km_s.iter().enumerate() {
+            // Place the orbit state first, then skip three (Cr, Cd, Fuel), then copy orbit STM
+            vector[i + 3] = *val;
         }
         // Set the spacecraft parameters
         vector[6] = self.srp.cr;
         vector[7] = self.drag.cd;
         vector[8] = self.fuel_mass_kg;
+        // Add the STM to the vector
         if let Some(mut stm) = self.stm {
+            // TODO(ANISE): Remove commented code
             // Set the 6x6 of the orbit STM first
-            for i in 0..6 {
-                for j in 0..6 {
-                    stm[(i, j)] = self.orbit.stm().unwrap()[(i, j)];
-                }
-            }
+            // for i in 0..6 {
+            //     for j in 0..6 {
+            //         stm[(i, j)] = self.orbit.stm().unwrap()[(i, j)];
+            //     }
+            // }
             for (idx, stm_val) in stm.as_slice().iter().enumerate() {
                 vector[idx + Self::Size::dim()] = *stm_val;
             }
@@ -520,21 +502,10 @@ impl State for Spacecraft {
         }
 
         // Extract the orbit information
-        let orbit_state = sc_state.fixed_rows::<6>(0).into_owned();
-        let orbit_stm = sc_full_stm.fixed_view::<6, 6>(0, 0).into_owned();
-        // Rebuild the orbit vector
-        let mut orbit_vec = OVector::<f64, Const<42>>::zeros();
-        orbit_vec[0] = orbit_state[0];
-        orbit_vec[1] = orbit_state[1];
-        orbit_vec[2] = orbit_state[2];
-        orbit_vec[3] = orbit_state[3];
-        orbit_vec[4] = orbit_state[4];
-        orbit_vec[5] = orbit_state[5];
-        for (idx, stm_val) in orbit_stm.as_slice().iter().enumerate() {
-            orbit_vec[idx + 6] = *stm_val;
-        }
-        // And set the orbit information
-        self.orbit.set(epoch, &orbit_vec);
+        let radius_km = sc_state.fixed_rows::<3>(0).into_owned();
+        let vel_km_s = sc_state.fixed_rows::<3>(3).into_owned();
+        self.orbit.radius_km = radius_km;
+        self.orbit.velocity_km_s = vel_km_s;
         self.srp.cr = sc_state[6];
         self.drag.cd = sc_state[7];
         self.fuel_mass_kg = sc_state[8];
@@ -561,7 +532,7 @@ impl State for Spacecraft {
         self + other
     }
 
-    fn value(&self, param: StateParameter) -> Result<f64, NyxError> {
+    fn value(&self, param: StateParameter) -> Result<f64, StateError> {
         match param {
             StateParameter::Cd => Ok(self.drag.cd),
             StateParameter::Cr => Ok(self.srp.cr),
@@ -569,31 +540,229 @@ impl State for Spacecraft {
             StateParameter::FuelMass => Ok(self.fuel_mass_kg),
             StateParameter::Isp => match self.thruster {
                 Some(thruster) => Ok(thruster.isp_s),
-                None => Err(NyxError::NoThrusterAvail),
+                None => Err(StateError::NoThrusterAvail),
             },
             StateParameter::Thrust => match self.thruster {
                 Some(thruster) => Ok(thruster.thrust_N),
-                None => Err(NyxError::NoThrusterAvail),
+                None => Err(StateError::NoThrusterAvail),
             },
             StateParameter::GuidanceMode => Ok(self.mode.into()),
-            _ => self.orbit.value(param),
+            StateParameter::ApoapsisRadius => self
+                .orbit
+                .apoapsis_km()
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param }),
+            StateParameter::AoL => self
+                .orbit
+                .aol_deg()
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param }),
+            StateParameter::AoP => self
+                .orbit
+                .aop_deg()
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param }),
+            StateParameter::BdotR => Ok(BPlane::new(self.orbit)
+                .with_context(|_| StateAstroSnafu { param })?
+                .b_r
+                .real()),
+            StateParameter::BdotT => Ok(BPlane::new(self.orbit)
+                .with_context(|_| StateAstroSnafu { param })?
+                .b_t
+                .real()),
+            StateParameter::BLTOF => Ok(BPlane::new(self.orbit)
+                .with_context(|_| StateAstroSnafu { param })?
+                .ltof_s
+                .real()),
+            StateParameter::C3 => self
+                .orbit
+                .c3_km2_s2()
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param }),
+            StateParameter::Declination => Ok(self.orbit.declination_deg()),
+            StateParameter::EccentricAnomaly => self
+                .orbit
+                .ea_deg()
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param }),
+            StateParameter::Eccentricity => self
+                .orbit
+                .ecc()
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param }),
+            StateParameter::Energy => self
+                .orbit
+                .energy_km2_s2()
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param }),
+            StateParameter::FlightPathAngle => self
+                .orbit
+                .fpa_deg()
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param }),
+            StateParameter::GeodeticHeight => self
+                .orbit
+                .height_km()
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param }),
+            StateParameter::GeodeticLatitude => self
+                .orbit
+                .latitude_deg()
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param }),
+            StateParameter::GeodeticLongitude => Ok(self.orbit.longitude_deg()),
+            StateParameter::Hmag => self
+                .orbit
+                .hmag()
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param }),
+            StateParameter::HX => self
+                .orbit
+                .hx()
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param }),
+            StateParameter::HY => self
+                .orbit
+                .hy()
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param }),
+            StateParameter::HZ => self
+                .orbit
+                .hz()
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param }),
+            StateParameter::HyperbolicAnomaly => self
+                .orbit
+                .hyperbolic_anomaly_deg()
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param }),
+            StateParameter::Inclination => self
+                .orbit
+                .inc_deg()
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param }),
+            StateParameter::MeanAnomaly => self
+                .orbit
+                .ma_deg()
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param }),
+            StateParameter::PeriapsisRadius => self
+                .orbit
+                .periapsis_km()
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param }),
+            StateParameter::Period => Ok(self
+                .orbit
+                .period()
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param })?
+                .to_seconds()),
+            StateParameter::RightAscension => Ok(self.orbit.right_ascension_deg()),
+            StateParameter::RAAN => self
+                .orbit
+                .raan_deg()
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param }),
+            StateParameter::Rmag => Ok(self.orbit.rmag_km()),
+            StateParameter::SemiMinorAxis => self
+                .orbit
+                .semi_minor_axis_km()
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param }),
+            StateParameter::SemiParameter => self
+                .orbit
+                .semi_parameter_km()
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param }),
+            StateParameter::SMA => self
+                .orbit
+                .sma_km()
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param }),
+            StateParameter::TrueAnomaly => self
+                .orbit
+                .ta_deg()
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param }),
+            StateParameter::TrueLongitude => self
+                .orbit
+                .tlong_deg()
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param }),
+            StateParameter::VelocityDeclination => Ok(self.orbit.velocity_declination_deg()),
+            StateParameter::Vmag => Ok(self.orbit.vmag_km_s()),
+            StateParameter::X => Ok(self.orbit.radius_km.x),
+            StateParameter::Y => Ok(self.orbit.radius_km.y),
+            StateParameter::Z => Ok(self.orbit.radius_km.z),
+            StateParameter::VX => Ok(self.orbit.velocity_km_s.x),
+            StateParameter::VY => Ok(self.orbit.velocity_km_s.y),
+            StateParameter::VZ => Ok(self.orbit.velocity_km_s.z),
+            _ => Err(StateError::Unavailable { param }),
         }
     }
 
-    fn set_value(&mut self, param: StateParameter, val: f64) -> Result<(), NyxError> {
+    fn set_value(&mut self, param: StateParameter, val: f64) -> Result<(), StateError> {
         match param {
             StateParameter::Cd => self.drag.cd = val,
             StateParameter::Cr => self.srp.cr = val,
             StateParameter::FuelMass => self.fuel_mass_kg = val,
             StateParameter::Isp => match self.thruster {
                 Some(ref mut thruster) => thruster.isp_s = val,
-                None => return Err(NyxError::NoThrusterAvail),
+                None => return Err(StateError::NoThrusterAvail),
             },
             StateParameter::Thrust => match self.thruster {
                 Some(ref mut thruster) => thruster.thrust_N = val,
-                None => return Err(NyxError::NoThrusterAvail),
+                None => return Err(StateError::NoThrusterAvail),
             },
-            _ => return self.orbit.set_value(param, val),
+            StateParameter::AoP => self
+                .orbit
+                .set_aop_deg(val)
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param })?,
+            StateParameter::Eccentricity => self
+                .orbit
+                .set_ecc(val)
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param })?,
+            StateParameter::Inclination => self
+                .orbit
+                .set_inc_deg(val)
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param })?,
+            StateParameter::RAAN => self
+                .orbit
+                .set_raan_deg(val)
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param })?,
+            StateParameter::SMA => self
+                .orbit
+                .set_sma_km(val)
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param })?,
+            StateParameter::TrueAnomaly => self
+                .orbit
+                .set_ta_deg(val)
+                .with_context(|_| AstroPhysicsSnafu)
+                .with_context(|_| StateAstroSnafu { param })?,
+            StateParameter::X => self.orbit.radius_km.x = val,
+            StateParameter::Y => self.orbit.radius_km.y = val,
+            StateParameter::Z => self.orbit.radius_km.z = val,
+            StateParameter::Rmag => {
+                // Convert the position to spherical coordinates
+                let (_, θ, φ) = cartesian_to_spherical(&self.orbit.radius_km);
+                // Convert back to cartesian after setting the new range value
+                self.orbit.radius_km = spherical_to_cartesian(val, θ, φ);
+            }
+            StateParameter::VX => self.orbit.velocity_km_s.x = val,
+            StateParameter::VY => self.orbit.velocity_km_s.y = val,
+            StateParameter::VZ => self.orbit.velocity_km_s.z = val,
+            StateParameter::Vmag => {
+                // Convert the velocity to spherical coordinates
+                let (_, θ, φ) = cartesian_to_spherical(&self.orbit.velocity_km_s);
+                // Convert back to cartesian after setting the new range value
+                self.orbit.velocity_km_s = spherical_to_cartesian(val, θ, φ);
+            }
+            _ => return Err(StateError::ReadOnly { param }),
         }
         Ok(())
     }
@@ -608,13 +777,12 @@ impl Add<OVector<f64, Const<6>>> for Spacecraft {
 
     /// Adds the provided state deviation to this orbit
     fn add(self, other: OVector<f64, Const<6>>) -> Self {
+        let radius_km = other.fixed_rows::<3>(0).into_owned();
+        let vel_km_s = other.fixed_rows::<3>(3).into_owned();
+
         let mut me = self;
-        me.orbit.x_km += other[0];
-        me.orbit.y_km += other[1];
-        me.orbit.z_km += other[2];
-        me.orbit.vx_km_s += other[3];
-        me.orbit.vy_km_s += other[4];
-        me.orbit.vz_km_s += other[5];
+        me.orbit.radius_km += radius_km;
+        me.orbit.velocity_km_s += vel_km_s;
 
         me
     }
@@ -625,13 +793,12 @@ impl Add<OVector<f64, Const<9>>> for Spacecraft {
 
     /// Adds the provided state deviation to this orbit
     fn add(self, other: OVector<f64, Const<9>>) -> Self {
+        let radius_km = other.fixed_rows::<3>(0).into_owned();
+        let vel_km_s = other.fixed_rows::<3>(3).into_owned();
+
         let mut me = self;
-        me.orbit.x_km += other[0];
-        me.orbit.y_km += other[1];
-        me.orbit.z_km += other[2];
-        me.orbit.vx_km_s += other[3];
-        me.orbit.vy_km_s += other[4];
-        me.orbit.vz_km_s += other[5];
+        me.orbit.radius_km += radius_km;
+        me.orbit.velocity_km_s += vel_km_s;
         me.srp.cr += other[6];
         me.drag.cd += other[7];
         me.fuel_mass_kg += other[8];
@@ -649,7 +816,7 @@ fn test_serde() {
 
     use anise::constants::frames::EARTH_J2000;
 
-    let orbit = Orbit::cartesian(
+    let orbit = Orbit::new(
         -9042.862234,
         18536.333069,
         6999.957069,

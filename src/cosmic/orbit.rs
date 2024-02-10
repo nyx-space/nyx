@@ -765,7 +765,7 @@ impl Orbit {
     }
 
     /// Apply the provided delta-v (in km/s)
-    pub fn apply_dv(&mut self, dv: Vector3<f64>) {
+    pub fn apply_dv_km_s(&mut self, dv: Vector3<f64>) {
         self.vx_km_s += dv[0];
         self.vy_km_s += dv[1];
         self.vz_km_s += dv[2];
@@ -774,7 +774,7 @@ impl Orbit {
     /// Copies this orbit after applying the provided delta-v (in km/s)
     pub fn with_dv(self, dv: Vector3<f64>) -> Self {
         let mut me = self;
-        me.apply_dv(dv);
+        me.apply_dv_km_s(dv);
         me
     }
 

@@ -18,9 +18,9 @@
 
 use anise::prelude::Almanac;
 
-use super::guidance::{ra_dec_from_unit_vector, GuidanceErrors, GuidanceLaw};
+use super::guidance::{ra_dec_from_unit_vector, GuidanceError, GuidanceLaw};
 use super::orbital::OrbitalDynamics;
-use super::{AccelModel, Dynamics, ForceModel};
+use super::{Dynamics, ForceModel};
 pub use crate::cosmic::{GuidanceMode, Spacecraft, STD_GRAVITY};
 use crate::dynamics::DynamicsError;
 use crate::errors::NyxError;
@@ -299,7 +299,7 @@ impl Dynamics for SpacecraftDynamics {
         let osc_sc = ctx.set_with_delta_seconds(delta_t, state);
         let mut d_x = OVector::<f64, Const<90>>::zeros();
 
-        if ctx.orbit.stm.is_some() {
+        if ctx.stm.is_some() {
             // Call the gradient (also called the dual EOM function of the force models)
             let (state, grad) = self.dual_eom(delta_t, &osc_sc, almanac)?;
 
@@ -341,14 +341,14 @@ impl Dynamics for SpacecraftDynamics {
             let (thrust_force, fuel_rate) = {
                 if osc_sc.thruster.is_none() {
                     return Err(DynamicsError::DynamicsGuidance {
-                        source: GuidanceErrors::NoThrustersDefined,
+                        source: GuidanceError::NoThrustersDefined,
                     });
                 }
                 let thruster = osc_sc.thruster.unwrap();
                 let thrust_throttle_lvl = guid_law.throttle(&osc_sc);
                 if !(0.0..=1.0).contains(&thrust_throttle_lvl) {
                     return Err(DynamicsError::DynamicsGuidance {
-                        source: GuidanceErrors::ThrottleRatio {
+                        source: GuidanceError::ThrottleRatio {
                             ratio: thrust_throttle_lvl,
                         },
                     });
@@ -358,7 +358,7 @@ impl Dynamics for SpacecraftDynamics {
                     if (thrust_inertial.norm() - 1.0).abs() > NORM_ERR {
                         let (alpha, delta) = ra_dec_from_unit_vector(thrust_inertial);
                         return Err(DynamicsError::DynamicsGuidance {
-                            source: GuidanceErrors::InvalidDirection {
+                            source: GuidanceError::InvalidDirection {
                                 x: thrust_inertial[0],
                                 y: thrust_inertial[1],
                                 z: thrust_inertial[2],

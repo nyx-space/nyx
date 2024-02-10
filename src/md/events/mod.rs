@@ -20,6 +20,7 @@ pub mod details;
 pub mod evaluators;
 pub mod search;
 use super::StateParameter;
+use crate::errors::EventError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 use crate::time::{Duration, Unit};
@@ -31,6 +32,7 @@ use std::default::Default;
 use std::fmt;
 use std::sync::Arc;
 
+//TODO(ANISE): Add an EventError that can be sourced from an almanac
 /// A trait to specify how a specific event must be evaluated.
 pub trait EventEvaluator<S: State>: fmt::Display + Send + Sync
 where
@@ -38,14 +40,22 @@ where
         Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size> + Allocator<f64, S::VecLength>,
 {
     // Evaluation of event crossing, must return whether the condition happened between between both states.
-    fn eval_crossing(&self, prev_state: &S, next_state: &S) -> bool {
-        self.eval(prev_state) * self.eval(next_state) < 0.0
+    fn eval_crossing(
+        &self,
+        prev_state: &S,
+        next_state: &S,
+        almanac: Arc<Almanac>,
+    ) -> Result<bool, EventError> {
+        let prev = self.eval(prev_state, almanac)?;
+        let next = self.eval(next_state, almanac)?;
+
+        Ok(prev * next < 0.0)
     }
 
     /// Evaluation of the event, must return a value corresponding to whether the state is before or after the event
-    fn eval(&self, state: &S, almanac: Arc<Almanac>) -> f64;
+    fn eval(&self, state: &S, almanac: Arc<Almanac>) -> Result<f64, EventError>;
     /// Returns a string representation of the event evaluation for the given state
-    fn eval_string(&self, state: &S, almanac: Arc<Almanac>) -> String;
+    fn eval_string(&self, state: &S, almanac: Arc<Almanac>) -> Result<String, EventError>;
     fn epoch_precision(&self) -> Duration;
     fn value_precision(&self) -> f64;
 }
@@ -91,7 +101,7 @@ impl fmt::Display for Event {
                 )?;
             }
         }
-        if let Some((frame, _)) = self.obs_frame {
+        if let Some(frame) = self.obs_frame {
             write!(f, "in frame {frame}")?;
         }
         fmt::Result::Ok(())

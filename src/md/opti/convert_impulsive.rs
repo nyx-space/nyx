@@ -19,7 +19,7 @@
 use rayon::prelude::*;
 use snafu::ResultExt;
 
-use crate::dynamics::guidance::{ra_dec_from_unit_vector, GuidanceErrors, Mnvr};
+use crate::dynamics::guidance::{ra_dec_from_unit_vector, GuidanceError, Mnvr};
 use crate::linalg::{SMatrix, SVector, Vector3};
 use crate::md::objective::Objective;
 use crate::md::{prelude::*, PropSnafu, TargetingError};
@@ -41,7 +41,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
     ) -> Result<Mnvr, TargetingError> {
         if spacecraft.thruster.is_none() {
             return Err(TargetingError::GuidanceError {
-                source: GuidanceErrors::NoThrustersDefined,
+                source: GuidanceError::NoThrustersDefined,
             });
         }
 
@@ -303,7 +303,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
                 //         .transpose();
                 //     let velocity_correction =
                 //         dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
-                //     corrected_state.orbit.apply_dv(velocity_correction);
+                //     corrected_state.orbit.apply_dv_km_s(velocity_correction);
                 // } else {
                 //     corrected_state.orbit = corrected_state.orbit + state_correction;
                 // }
