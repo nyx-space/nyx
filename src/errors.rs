@@ -21,6 +21,7 @@ use crate::md::StateParameter;
 pub use crate::md::TargetingError;
 use crate::{cosmic::AstroError, io::ConfigError};
 use anise::errors::{AlmanacError, PhysicsError};
+use hifitime::Epoch;
 use snafu::prelude::*;
 use std::convert::From;
 
@@ -123,4 +124,12 @@ pub enum EventError {
     },
     #[snafu(display("during event computation: {source}"))]
     EventPhysicsError { source: PhysicsError },
+    #[snafu(display("when computing an event in a trajectory {source}"))]
+    EventTrajError { source: TrajError },
+    #[snafu(display("Event {event} not found between {start} and {end}"))]
+    EventNotFound {
+        start: Epoch,
+        end: Epoch,
+        event: String,
+    },
 }

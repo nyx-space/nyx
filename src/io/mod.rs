@@ -48,8 +48,6 @@ use self::orbit::OrbitSerde;
 /// Handles writing to an XYZV file
 pub mod cosmo;
 pub mod estimate;
-/// Handles reading from frames defined in input files
-pub mod frame_serde;
 /// Handles loading of gravity models using files of NASA PDS and GMAT COF. Several gunzipped files are provided with nyx.
 pub mod gravity;
 pub mod matrices;
