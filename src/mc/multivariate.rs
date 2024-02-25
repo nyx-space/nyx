@@ -179,8 +179,9 @@ fn test_multivariate_state() {
     use anise::constants::frames::EARTH_J2000;
     use anise::prelude::Orbit;
 
-    use crate::linalg::{Matrix6, Vector6};
     use crate::time::Epoch;
+    use crate::Spacecraft;
+    use nalgebra::{SMatrix, SVector};
     use rand_pcg::Pcg64Mcg;
 
     let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);
@@ -195,11 +196,28 @@ fn test_multivariate_state() {
         EARTH_J2000,
     );
 
-    let mean = Vector6::zeros();
-    let std_dev = Vector6::new(10.0, 10.0, 10.0, 0.2, 0.2, 0.2);
-    let cov = Matrix6::from_diagonal(&std_dev);
+    let mean = SVector::<f64, 9>::zeros();
+    let std_dev =
+        SVector::<f64, 9>::from_iterator([10.0, 10.0, 10.0, 0.2, 0.2, 0.2, 0.0, 0.0, 0.0]);
+    let cov = SMatrix::<f64, 9, 9>::from_diagonal(&std_dev);
 
-    let orbit_generator = state.disperse(mean, cov).unwrap();
+    let orbit_generator = MultivariateNormal::new(
+        Spacecraft {
+            orbit: state,
+            ..Default::default()
+        },
+        vec![
+            StateParameter::X,
+            StateParameter::Y,
+            StateParameter::Z,
+            StateParameter::VX,
+            StateParameter::VY,
+            StateParameter::VZ,
+        ],
+        mean,
+        cov,
+    )
+    .unwrap();
 
     // Ensure that this worked: a 3 sigma deviation around 1 km means we shouldn't have 99.7% of samples within those bounds.
     // Create a reproducible fast seed
@@ -214,7 +232,7 @@ fn test_multivariate_state() {
             for idx in 0..6 {
                 let val_std_dev = std_dev[idx];
                 let cur_val = dispersed_state.state.as_vector()[idx];
-                let nom_val = state.as_vector()[idx];
+                let nom_val = state.to_cartesian_pos_vel()[idx];
                 if (cur_val - nom_val).abs() > val_std_dev {
                     cnt += 1;
                 }
