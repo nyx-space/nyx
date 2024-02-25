@@ -17,12 +17,10 @@
 */
 
 use super::{
-    AccelModel, Dynamics, DynamicsAlmanacSnafu, DynamicsAstroSnafu, DynamicsError,
-    DynamicsPlanetarySnafu,
+    AccelModel, DynamicsAlmanacSnafu, DynamicsAstroSnafu, DynamicsError, DynamicsPlanetarySnafu,
 };
 use crate::cosmic::{AstroPhysicsSnafu, Frame, Orbit};
 use crate::linalg::{Const, Matrix3, Matrix6, OVector, Vector3, Vector6};
-use crate::State;
 
 use anise::almanac::Almanac;
 use anise::astro::Aberration;

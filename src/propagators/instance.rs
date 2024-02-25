@@ -26,18 +26,19 @@ use crate::md::EventEvaluator;
 use crate::propagators::TrajectoryEventSnafu;
 use crate::time::{Duration, Epoch, Unit};
 use crate::State;
+use anise::almanac::Almanac;
 use rayon::iter::ParallelBridge;
 use rayon::prelude::ParallelIterator;
 use snafu::ResultExt;
 use std::f64;
 use std::sync::mpsc::{channel, Sender};
+use std::sync::Arc;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
 /// A Propagator allows propagating a set of dynamics forward or backward in time.
 /// It is an EventTracker, without any event tracking. It includes the options, the integrator
 /// details of the previous step, and the set of coefficients used for the monomorphic instance.
-#[derive(Debug)]
 pub struct PropInstance<'a, D: Dynamics, E: ErrorCtrl>
 where
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
@@ -51,6 +52,7 @@ where
     pub prop: &'a Propagator<'a, D, E>,
     /// Stores the details of the previous integration step
     pub details: IntegrationDetails,
+    pub(crate) almanac: Arc<Almanac>,
     pub(crate) step_size: Duration, // Stores the adapted step for the _next_ call
     pub(crate) fixed_step: bool,
     // Allows us to do pre-allocation of the ki vectors
@@ -93,7 +95,7 @@ where
         self.state = self
             .prop
             .dynamics
-            .finally(self.state)
+            .finally(self.state, self.almanac.clone())
             .with_context(|_| DynamicsSnafu)?;
 
         let backprop = duration.is_negative();
@@ -267,7 +269,9 @@ where
 
         let (_, traj) = self.for_duration_with_traj(max_duration)?;
         // Now, find the requested event
-        let events = traj.find(event).with_context(|_| TrajectoryEventSnafu)?;
+        let events = traj
+            .find(event, self.almanac.clone())
+            .with_context(|_| TrajectoryEventSnafu)?;
         match events.get(trigger) {
             Some(event_state) => Ok((event_state.state, traj)),
             None => Err(PropagationError::NthEventError {
@@ -284,7 +288,7 @@ where
         self.state = self
             .prop
             .dynamics
-            .finally(self.state)
+            .finally(self.state, self.almanac.clone())
             .with_context(|_| DynamicsSnafu)?;
 
         Ok(())
@@ -308,7 +312,7 @@ where
             let ki = self
                 .prop
                 .dynamics
-                .eom(0.0, state_vec, state_ctx)
+                .eom(0.0, state_vec, state_ctx, self.almanac.clone())
                 .with_context(|_| DynamicsSnafu)?;
             self.k[0] = ki;
             let mut a_idx: usize = 0;
@@ -328,7 +332,12 @@ where
                 let ki = self
                     .prop
                     .dynamics
-                    .eom(ci * step_size, &(state_vec + step_size * wi), state_ctx)
+                    .eom(
+                        ci * step_size,
+                        &(state_vec + step_size * wi),
+                        state_ctx,
+                        self.almanac.clone(),
+                    )
                     .with_context(|_| DynamicsSnafu)?;
                 self.k[i + 1] = ki;
             }
