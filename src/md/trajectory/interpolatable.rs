@@ -66,16 +66,15 @@ impl Interpolatable for Spacecraft {
         let mut vzs = [0.0; INTERPOLATION_SAMPLES + 1];
 
         for (cno, state) in states.iter().enumerate() {
-            xs[cno] = state.x_km;
-            ys[cno] = state.y_km;
-            zs[cno] = state.z_km;
-            vxs[cno] = state.vx_km_s;
-            vys[cno] = state.vy_km_s;
-            vzs[cno] = state.vz_km_s;
+            xs[cno] = state.orbit.radius_km.x;
+            ys[cno] = state.orbit.radius_km.y;
+            zs[cno] = state.orbit.radius_km.z;
+            vxs[cno] = state.orbit.velocity_km_s.x;
+            vys[cno] = state.orbit.velocity_km_s.y;
+            vzs[cno] = state.orbit.velocity_km_s.z;
             epochs_tdb[cno] = state.epoch().to_tdb_seconds();
         }
 
-        // TODO: Once I switch to using ANISE, this should use the same function as ANISE and not a clone. -- https://github.com/nyx-space/nyx/issues/86
         let (x_km, vx_km_s) = hermite_eval(
             &epochs_tdb[..states.len()],
             &xs[..states.len()],

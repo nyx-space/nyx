@@ -23,10 +23,9 @@ use crate::errors::NyxError;
 use crate::io::watermark::pq_writer;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
-use crate::md::prelude::{Frame, GuidanceMode, StateParameter};
+use crate::md::prelude::{GuidanceMode, StateParameter};
 use crate::md::EventEvaluator;
 use crate::time::{Duration, Epoch, TimeSeries, TimeUnits};
-use crate::utils::dcm_finite_differencing;
 use arrow::array::{Array, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
@@ -265,14 +264,7 @@ where
 
         // Add all of the evaluated events
         if let Some(events) = events {
-            info!("Evaluating {} event(s)", events.len());
-            for event in events {
-                let mut data = Float64Builder::new();
-                for s in &states {
-                    data.append_value(event.eval(s));
-                }
-                record.push(Arc::new(data.finish()));
-            }
+            unimplemented!("Removed in ANISE updated");
         }
 
         // Serialize all of the devices and add that to the parquet file too.
@@ -452,49 +444,22 @@ where
             )
             .collect::<Vec<S>>();
 
-        // Build the list of 6x6 RIC DCM
-        // Assuming identical rate just before and after the first DCM and for the last DCM
-        let mut inertial2ric_dcms = Vec::with_capacity(self_states.len());
-        for (ii, self_state) in self_states.iter().enumerate() {
-            let dcm_cur = self_state
-                .orbit()
-                .dcm_from_traj_frame(Frame::RIC)
-                .unwrap()
-                .transpose();
-
-            let dcm_pre = if ii == 0 {
-                dcm_cur
-            } else {
-                match self_states_pre.get(ii - 1) {
-                    Some(state) => state
-                        .orbit()
-                        .dcm_from_traj_frame(Frame::RIC)
-                        .unwrap()
-                        .transpose(),
-                    None => dcm_cur,
-                }
-            };
-
-            let dcm_post = if ii == self_states_post.len() {
-                dcm_cur
-            } else {
-                match self_states_post.get(ii) {
-                    Some(state) => state
-                        .orbit()
-                        .dcm_from_traj_frame(Frame::RIC)
-                        .unwrap()
-                        .transpose(),
-                    None => dcm_cur,
-                }
-            };
-
-            let dcm6x6 = dcm_finite_differencing(dcm_pre, dcm_cur, dcm_post);
-            inertial2ric_dcms.push(dcm6x6);
-        }
-
         let other_states = other
             .every_between(step, cfg.start_epoch.unwrap(), cfg.end_epoch.unwrap())
             .collect::<Vec<S>>();
+
+        // Build an array of all the RIC differences
+        let mut ric_diff = Vec::with_capacity(other_states.len());
+        for (ii, other_state) in other_states.iter().enumerate() {
+            let mut self_orbit = *self_states[ii].orbit();
+            let mut other_orbit = *other_state.orbit();
+
+            let this_ric_diff = self_orbit
+                .ric_difference(&other_orbit)
+                .map_err(|e| Box::new(e))?;
+
+            ric_diff.push(this_ric_diff);
+        }
 
         // Build all of the records
 
@@ -514,20 +479,8 @@ where
         // Add the RIC data
         for coord_no in 0..6 {
             let mut data = Float64Builder::new();
-            for (ii, other_state) in other_states.iter().enumerate() {
-                let mut self_orbit = *self_states[ii].orbit();
-                let mut other_orbit = *other_state.orbit();
-
-                // Grab the DCM
-                let dcm_inertial2ric = inertial2ric_dcms[ii];
-
-                // Rotate both into the "self" RIC
-                self_orbit.rotate_by(dcm_inertial2ric);
-                other_orbit.rotate_by(dcm_inertial2ric);
-
-                data.append_value(
-                    (self_orbit.to_cartesian_vec() - other_orbit.to_cartesian_vec())[coord_no],
-                );
+            for this_ric_dff in &ric_diff {
+                data.append_value(this_ric_dff.to_cartesian_pos_vel()[coord_no]);
             }
             record.push(Arc::new(data.finish()));
         }

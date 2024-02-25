@@ -139,7 +139,7 @@ impl TrajectoryLoader {
                                 match serde_dhall::from_str(&frame_info).parse::<Frame>() {
                                     Err(e) => {
                                         return Err(InputOutputError::ParseDhall {
-                                            data: frame_info,
+                                            data: frame_info.to_string(),
                                             err: format!("{e}"),
                                         })
                                     }
@@ -244,7 +244,7 @@ impl TrajectoryLoader {
             for i in 0..batch.num_rows() {
                 let mut state = S::zeros();
                 state.set_epoch(Epoch::from_tai_seconds(epochs.value(i)));
-                state.set_frame(frame);
+                state.set_frame(frame.unwrap()); // We checked it was set above with an ensure! call
                 state.unset_stm(); // We don't have any STM data, so let's unset this.
 
                 for (j, (param, exists)) in found_fields.iter().enumerate() {

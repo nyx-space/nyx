@@ -30,8 +30,9 @@ use crate::time::{Duration, TimeUnits};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::Arc;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
@@ -52,13 +53,12 @@ impl Traj<Spacecraft> {
         let start_instant = Instant::now();
         let mut traj = Self::new();
         for state in &self.states {
-            let transformed_state =
-                almanac
-                    .transform_to(state, new_frame, None)
-                    .with_context(|_| FromAlmanacSnafu {
-                        action: "transforming trajectory into new frame",
-                    })?;
-            traj.states.push(transformed_state);
+            let new_orbit = almanac
+                .transform_to(state.orbit, new_frame, None)
+                .with_context(|_| FromAlmanacSnafu {
+                    action: "transforming trajectory into new frame",
+                })?;
+            traj.states.push(state.with_orbit(new_orbit));
         }
         traj.finalize();
 
@@ -195,7 +195,8 @@ impl Traj<Spacecraft> {
                 warn!("[line: {}] Skipping covariance in OEM parsing", lno + 1);
                 parse = false;
             } else if parse {
-                let frame = Frame::from_names(center_name.unwrap(), orient_name.unwrap());
+                // TODO(ANISE): Add error handling
+                let frame = Frame::from_name(center_name.unwrap(), orient_name.unwrap()).unwrap();
                 // Split the line into components
                 let parts: Vec<&str> = line.split_whitespace().collect();
 

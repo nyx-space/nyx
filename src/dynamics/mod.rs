@@ -20,6 +20,7 @@ use crate::cosmic::{AstroError, Orbit};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, Matrix3, OMatrix, OVector, Vector3};
 use crate::State;
+use anise::almanac::planetary::PlanetaryDataError;
 use anise::almanac::Almanac;
 use anise::errors::AlmanacError;
 use hyperdual::{OHyperdual, Owned};
@@ -183,7 +184,12 @@ pub enum DynamicsError {
     DynamicsGuidance { source: GuidanceError },
     #[snafu(display("dynamical model issue due to Almanac: {action} {source}"))]
     DynamicsAlmanacError {
-        source: AlmanacError,
         action: &'static str,
+        source: AlmanacError,
+    },
+    #[snafu(display("dynamical model issue due to planetary data: {action} {source}"))]
+    DynamicsPlanetaryError {
+        action: &'static str,
+        source: PlanetaryDataError,
     },
 }
