@@ -118,7 +118,7 @@ impl<'a, E: ErrorCtrl, const O: usize> Optimizer<'a, E, 3, O> {
             ],
             iterations: 100,
             objective_frame: None,
-            correction_frame: Some(Frame::VNC),
+            correction_frame: Some(LocalFrame::VNC),
         }
     }
 }
@@ -244,7 +244,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             variables,
             iterations: 100,
             objective_frame: None,
-            correction_frame: Some(Frame::VNC),
+            correction_frame: Some(LocalFrame::VNC),
         }
     }
 

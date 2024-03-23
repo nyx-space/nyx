@@ -48,7 +48,7 @@ fn val_transfer_schedule_no_depl() {
         end_time,
         1.0, // Full thrust
         Vector3::new(1.0, 0.0, 0.0),
-        Frame::VNC,
+        LocalFrame::VNC,
     );
 
     let schedule = FiniteBurns::from_mnvrs(vec![mnvr0]);
@@ -138,7 +138,7 @@ fn val_transfer_schedule_depl() {
         end_time,
         1.0, // Full thrust
         Vector3::new(1.0, 0.0, 0.0),
-        Frame::VNC,
+        LocalFrame::VNC,
     );
 
     let schedule = FiniteBurns::from_mnvrs(vec![mnvr0]);
@@ -263,7 +263,7 @@ fn val_transfer_single_maneuver_depl() {
         end_time,
         1.0, // Full thrust
         Vector3::new(1.0, 0.0, 0.0),
-        Frame::VNC,
+        LocalFrame::VNC,
     );
 
     // And create the spacecraft with that controller

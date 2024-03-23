@@ -305,7 +305,7 @@ fn event_and_combination() {
         epoch + 15.minutes(),
         1.0,
         Vector3::x(),
-        Frame::VNC,
+        LocalFrame::VNC,
     )]);
 
     let orbital_dyn = OrbitalDynamics::two_body();

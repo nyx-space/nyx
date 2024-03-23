@@ -115,7 +115,7 @@ where
             thrust_lvl: 1.0,
             alpha_inplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
             delta_outofplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
-            frame: Frame::RCN,
+            frame: LocalFrame::RCN,
         };
 
         let mut finite_burn_target = false;

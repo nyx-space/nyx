@@ -18,7 +18,7 @@
 
 use super::optimizer::Optimizer;
 use super::solution::TargeterSolution;
-use crate::dynamics::guidance::{GuidanceError, Mnvr};
+use crate::dynamics::guidance::{GuidanceError, LocalFrame, Mnvr};
 use crate::errors::TargetingError;
 use crate::linalg::{SMatrix, SVector, Vector6};
 use crate::md::{prelude::*, AstroSnafu, GuidanceSnafu, UnderdeterminedProblemSnafu};
@@ -76,7 +76,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             thrust_prct: 1.0,
             alpha_inplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
             delta_outofplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
-            frame: Frame::RCN,
+            frame: LocalFrame::RCN,
         };
 
         let mut finite_burn_target = false;

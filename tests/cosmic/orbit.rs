@@ -112,11 +112,11 @@ fn state_def_circ_inc() {
     f64_eq!(kep.ta_deg(), 260.1123, "ta");
 
     // Test that DCMs are valid
-    let dcm = kep.dcm_from_traj_frame(Frame::VNC).unwrap();
+    let dcm = kep.dcm_from_traj_frame(LocalFrame::VNC).unwrap();
     assert!(((dcm * dcm.transpose()).determinant() - 1.0).abs() < 1e-12);
     assert!(((dcm.transpose() * dcm).determinant() - 1.0).abs() < 1e-12);
 
-    let dcm = kep.dcm_from_traj_frame(Frame::RCN).unwrap();
+    let dcm = kep.dcm_from_traj_frame(LocalFrame::RCN).unwrap();
     assert!(((dcm * dcm.transpose()).determinant() - 1.0).abs() < 1e-12);
     assert!(((dcm.transpose() * dcm).determinant() - 1.0).abs() < 1e-12);
 
@@ -210,11 +210,11 @@ fn state_def_elliptical() {
     );
 
     // Test that DCMs are valid
-    let dcm = kep.dcm_from_traj_frame(Frame::VNC).unwrap();
+    let dcm = kep.dcm_from_traj_frame(LocalFrame::VNC).unwrap();
     assert!(((dcm * dcm.transpose()).determinant() - 1.0).abs() < 1e-12);
     assert!(((dcm.transpose() * dcm).determinant() - 1.0).abs() < 1e-12);
 
-    let dcm = kep.dcm_from_traj_frame(Frame::RCN).unwrap();
+    let dcm = kep.dcm_from_traj_frame(LocalFrame::RCN).unwrap();
     assert!(((dcm * dcm.transpose()).determinant() - 1.0).abs() < 1e-12);
     assert!(((dcm.transpose() * dcm).determinant() - 1.0).abs() < 1e-12);
 
@@ -295,11 +295,11 @@ fn state_def_circ_eq() {
     );
 
     // Test that DCMs are valid
-    let dcm = kep.dcm_from_traj_frame(Frame::VNC).unwrap();
+    let dcm = kep.dcm_from_traj_frame(LocalFrame::VNC).unwrap();
     assert!(((dcm * dcm.transpose()).determinant() - 1.0).abs() < 1e-12);
     assert!(((dcm.transpose() * dcm).determinant() - 1.0).abs() < 1e-12);
 
-    let dcm = kep.dcm_from_traj_frame(Frame::RCN).unwrap();
+    let dcm = kep.dcm_from_traj_frame(LocalFrame::RCN).unwrap();
     assert!(((dcm * dcm.transpose()).determinant() - 1.0).abs() < 1e-12);
     assert!(((dcm.transpose() * dcm).determinant() - 1.0).abs() < 1e-12);
 

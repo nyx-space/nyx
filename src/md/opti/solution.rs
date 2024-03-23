@@ -19,7 +19,7 @@
 use hifitime::TimeUnits;
 use snafu::{ensure, ResultExt};
 
-use crate::dynamics::guidance::Mnvr;
+use crate::dynamics::guidance::{LocalFrame, Mnvr};
 use crate::linalg::SVector;
 use crate::md::objective::Objective;
 use crate::md::{prelude::*, GuidanceSnafu, NotFiniteSnafu, TargetingError};
@@ -72,7 +72,7 @@ impl<const V: usize, const O: usize> TargeterSolution<V, O> {
             thrust_prct: 1.0,
             alpha_inplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
             delta_outofplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
-            frame: Frame::RCN,
+            frame: LocalFrame::RCN,
         };
 
         for (i, var) in self.variables.iter().enumerate() {

@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anise::errors::OrientationSnafu;
 use anise::prelude::Almanac;
 use snafu::ResultExt;
 
@@ -248,11 +249,16 @@ impl AccelModel for Harmonics {
         // Rotate this acceleration vector back into the integration frame (no center change needed, it's just a vector)
         // As discussed with Sai, if the Earth was spinning faster, would the acceleration due to the harmonics be any different?
         // No. Therefore, we do not need to account for the transport theorem here.
-        let dcm = self
-            .cosm
-            .try_position_dcm_from_to(&self.compute_frame, &osc.frame, osc.epoch)
-            .unwrap();
-        Ok(dcm * accel)
+        let dcm = almanac
+            .rotate_from_to(self.compute_frame, osc.frame, osc.epoch)
+            .with_context(|_| OrientationSnafu {
+                action: "transform state dcm",
+            })
+            .with_context(|_| DynamicsAlmanacSnafu {
+                action: "transforming into gravity field frame",
+            })?;
+
+        Ok(dcm.rot_mat * accel)
     }
 
     fn dual_eom(
@@ -366,10 +372,15 @@ impl AccelModel for Harmonics {
             a3 -= rr * sum3;
         }
 
-        let dcm = self
-            .cosm
-            .try_position_dcm_from_to(&self.compute_frame, &osc.frame, osc.epoch)
-            .unwrap();
+        let dcm = almanac
+            .rotate_from_to(self.compute_frame, osc.frame, osc.epoch)
+            .with_context(|_| OrientationSnafu {
+                action: "transform state dcm",
+            })
+            .with_context(|_| DynamicsAlmanacSnafu {
+                action: "transforming into gravity field frame",
+            })?
+            .rot_mat;
 
         // Convert DCM to OHyperdual DCMs
         let mut dcm_d = Matrix3::<OHyperdual<f64, U7>>::zeros();
