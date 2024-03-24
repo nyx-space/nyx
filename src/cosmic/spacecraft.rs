@@ -23,6 +23,7 @@ pub use anise::prelude::{Almanac, Orbit};
 use nalgebra::Vector3;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
+use typed_builder::TypedBuilder;
 
 use super::{AstroPhysicsSnafu, BPlane, State};
 use crate::dynamics::guidance::Thruster;
@@ -82,7 +83,7 @@ impl From<GuidanceMode> for f64 {
 /// A spacecraft state, composed of its orbit, its dry and fuel (wet) masses (in kg), its SRP configuration, its drag configuration, its thruster configuration, and its guidance mode.
 ///
 /// Optionally, the spacecraft state can also store the state transition matrix from the start of the propagation until the current time (i.e. trajectory STM, not step-size STM).
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, TypedBuilder)]
 #[cfg_attr(feature = "python", pyclass)]
 #[cfg_attr(feature = "python", pyo3(module = "nyx_space.cosmic"))]
 pub struct Spacecraft {
@@ -90,20 +91,29 @@ pub struct Spacecraft {
     #[serde(deserialize_with = "orbit_from_str")]
     pub orbit: Orbit,
     /// Dry mass, i.e. mass without fuel, in kg
+    #[builder(default)]
     pub dry_mass_kg: f64,
     /// Fuel mass (if fuel mass is negative, thrusting will fail, unless configured to break laws of physics)
+    #[builder(default)]
     pub fuel_mass_kg: f64,
     /// Solar Radiation Pressure configuration for this spacecraft
+    #[builder(default)]
     #[serde(default)]
     pub srp: SrpConfig,
+
+    #[builder(default)]
     #[serde(default)]
     pub drag: DragConfig,
+
+    #[builder(default, setter(strip_option))]
     pub thruster: Option<Thruster>,
     /// Any extra information or extension that is needed for specific guidance laws
+    #[builder(default)]
     #[serde(default)]
     pub mode: GuidanceMode,
     /// Optionally stores the state transition matrix from the start of the propagation until the current time (i.e. trajectory STM, not step-size STM)
     /// STM is contains position and velocity, Cr, Cd, fuel mass
+    #[builder(default, setter(strip_option))]
     #[serde(skip)]
     pub stm: Option<OMatrix<f64, Const<9>, Const<9>>>,
 }

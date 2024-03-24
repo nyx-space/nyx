@@ -133,3 +133,12 @@ pub enum EventError {
         event: String,
     },
 }
+
+#[derive(Copy, Clone, Debug, Snafu)]
+#[snafu(visibility(pub(crate)))]
+pub enum MonteCarloError {
+    #[snafu(display("Monte Carlo caused {source}"))]
+    StateError { source: StateError },
+    #[snafu(display("for {param}, expected percentage between 0.0 and 1.0 but got {prct}"))]
+    ParamPercentage { param: StateParameter, prct: f64 },
+}
