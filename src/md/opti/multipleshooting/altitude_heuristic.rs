@@ -21,7 +21,10 @@ use snafu::ResultExt;
 use super::ctrlnodes::Node;
 use super::multishoot::MultipleShooting;
 pub use super::CostFunction;
-use super::{MultiShootAlmanacSnafu, MultiShootTrajSnafu, MultipleShootingError, TargetingSnafu};
+use super::{
+    MultiShootAlmanacSnafu, MultiShootPhysicsSnafu, MultiShootTrajSnafu, MultipleShootingError,
+    TargetingSnafu,
+};
 use crate::errors::TargetingError;
 use crate::md::{prelude::*, PropSnafu};
 use crate::propagators::error_ctrl::ErrorCtrl;
@@ -37,6 +40,7 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
         x0: Spacecraft,
         xf: Orbit,
         node_count: usize,
+        angular_velocity_deg_s: f64,
         body_frame: Frame,
         prop: &'a Propagator<'a, SpacecraftDynamics, E>,
         almanac: Arc<Almanac>,
@@ -49,26 +53,17 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
             });
         }
 
-        if !body_frame.is_body_fixed() {
-            return Err(MultipleShootingError::TargetingError {
-                segment: 0_usize,
-                source: TargetingError::FrameError {
-                    msg: "Body frame is not body fixed".to_string(),
-                },
-            });
-        }
-
-        let delta_t = xf.epoch() - x0.epoch();
+        let delta_t = xf.epoch - x0.epoch();
         let xf_bf = almanac
             .transform_to(xf, body_frame, None)
             .with_context(|_| MultiShootAlmanacSnafu {
                 action: "converting node into the body frame",
             })?;
 
-        let duration_increment = (xf.epoch() - x0.epoch()) / (node_count as f64);
+        let duration_increment = (xf.epoch - x0.epoch()) / (node_count as f64);
 
         let (_, traj) = prop
-            .with(x0)
+            .with(x0, almanac)
             .for_duration_with_traj(delta_t)
             .with_context(|_| PropSnafu)
             .with_context(|_| TargetingSnafu { segment: 0_usize })?;
@@ -93,16 +88,26 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
                 })?;
 
             // Note that the altitude here might be different, so we scale the altitude change by the current altitude
-            let desired_alt_i =
-                (xf_bf.height_km() - orbit_point_bf.height_km()) / ((node_count - i) as f64).sqrt();
+            let desired_alt_i = (xf_bf.height_km().with_context(|_| MultiShootPhysicsSnafu)?
+                - orbit_point_bf
+                    .height_km()
+                    .with_context(|_| MultiShootPhysicsSnafu)?)
+                / ((node_count - i) as f64).sqrt();
             // Build the node in the body frame and convert that to the original frame
-            let node_bf = Orbit::from_geodesic(
-                orbit_point_bf.geodetic_latitude_deg(),
-                orbit_point_bf.geodetic_longitude_deg(),
-                orbit_point_bf.geodetic_height_km() + desired_alt_i,
+            let node_bf = Orbit::try_latlongalt(
+                orbit_point_bf
+                    .latitude_deg()
+                    .with_context(|_| MultiShootPhysicsSnafu)?,
+                orbit_point_bf.longitude_deg(),
+                orbit_point_bf
+                    .height_km()
+                    .with_context(|_| MultiShootPhysicsSnafu)?
+                    + desired_alt_i,
+                angular_velocity_deg_s,
                 this_epoch,
                 body_frame,
-            );
+            )
+            .with_context(|_| MultiShootPhysicsSnafu)?;
 
             // Convert that back into the inertial frame
             let this_node = almanac

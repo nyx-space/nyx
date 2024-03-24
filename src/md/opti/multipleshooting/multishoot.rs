@@ -291,9 +291,9 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize> 
         // Add the starting point too
         nodemsg.push_str(&format!(
             "[{:.3}, {:.3}, {:.3}, {}, {}, {}, {}, {}, {}],\n",
-            self.x0.orbit.x_km,
-            self.x0.orbit.y_km,
-            self.x0.orbit.z_km,
+            self.x0.orbit.radius_km.x,
+            self.x0.orbit.radius_km.y,
+            self.x0.orbit.radius_km.z,
             self.current_iteration,
             0.0,
             0.0,
@@ -355,12 +355,13 @@ impl<T: MultishootNode<O>, const O: usize> MultipleShootingSolution<T, O> {
     pub fn build_trajectories<'a, E: ErrorCtrl>(
         &self,
         prop: &'a Propagator<'a, SpacecraftDynamics, E>,
+        almanac: Arc<Almanac>,
     ) -> Result<Vec<ScTraj>, MultipleShootingError> {
         let mut trajz = Vec::with_capacity(self.nodes.len());
 
         for (i, node) in self.nodes.iter().enumerate() {
             let (_, traj) = Optimizer::delta_v(prop, (*node).into())
-                .apply_with_traj(&self.solutions[i])
+                .apply_with_traj(&self.solutions[i], almanac.clone())
                 .with_context(|_| TargetingSnafu { segment: i })?;
             trajz.push(traj);
         }

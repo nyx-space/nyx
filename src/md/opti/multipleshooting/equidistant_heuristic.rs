@@ -46,7 +46,7 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
             return Err(TargetingError::TargetsTooClose);
         }
         let distance_increment = direction.norm() / (node_count as f64);
-        let duration_increment = (xf.epoch() - x0.epoch()) / (node_count as f64);
+        let duration_increment = (xf.epoch - x0.epoch()) / (node_count as f64);
         direction /= direction.norm();
 
         // Build each node successively (includes xf)

@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use anise::errors::AlmanacError;
+use anise::errors::{AlmanacError, PhysicsError};
 use snafu::Snafu;
 
 use crate::md::{trajectory::TrajError, TargetingError};
@@ -49,4 +49,6 @@ pub enum MultipleShootingError {
         source: AlmanacError,
         action: &'static str,
     },
+    #[snafu(display("duration a multiple shoot, physics issue:  {source}"))]
+    MultiShootPhysicsError { source: PhysicsError },
 }
