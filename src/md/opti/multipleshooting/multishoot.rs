@@ -184,8 +184,8 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
                      ** 2.D. Compute the difference between the arrival and departure velocities and node i+1
                      ** *** */
                     if i < self.targets.len() - 3 {
-                        let dv_ip1 = inner_sol_b.achieved_state.orbit.velocity()
-                            - initial_states[i + 2].orbit.velocity();
+                        let dv_ip1 = inner_sol_b.achieved_state.orbit.velocity_km_s
+                            - initial_states[i + 2].orbit.velocity_km_s;
                         // ∂Δv_x / ∂r_x
                         outer_jacobian[(3 * (i + 2), OT * i + axis)] =
                             dv_ip1[0] / next_node[axis].tolerance;

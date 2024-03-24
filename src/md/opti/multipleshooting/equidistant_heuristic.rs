@@ -41,7 +41,7 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
         }
 
         // Compute the direction of the objective
-        let mut direction = xf.radius() - x0.orbit.radius();
+        let mut direction = xf.radius_km - x0.orbit.radius_km;
         if direction.norm() < 2e-16 {
             return Err(TargetingError::TargetsTooClose);
         }
@@ -51,7 +51,7 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
 
         // Build each node successively (includes xf)
         let mut nodes = Vec::with_capacity(node_count + 1);
-        let mut prev_node_radius = x0.orbit.radius();
+        let mut prev_node_radius = x0.orbit.radius_km;
         let mut prev_node_epoch = x0.epoch();
 
         for _ in 0..node_count {

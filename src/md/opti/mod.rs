@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub mod convert_impulsive;
+// pub mod convert_impulsive;
 pub mod multipleshooting;
 pub use multipleshooting::{ctrlnodes, multishoot};
 /// Uses a Levenberg Marquardt minimizer to solve the damped least squares problem.

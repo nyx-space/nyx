@@ -51,8 +51,9 @@ impl RangeDoppler {
         assert_eq!(tx.frame, rx.frame, "tx & rx in different frames");
         assert_eq!(tx.epoch, rx.epoch, "tx & rx states have different times");
 
-        let range_vec_km = tx.radius() - rx.radius();
-        let doppler_km_s = range_vec_km.dot(&(tx.velocity() - rx.velocity())) / range_vec_km.norm();
+        let range_vec_km = tx.radius_km - rx.radius_km;
+        let doppler_km_s =
+            range_vec_km.dot(&(tx.velocity_km_s - rx.velocity_km_s)) / range_vec_km.norm();
 
         Self {
             epoch: tx.epoch + timestamp_noise_s * Unit::Second,
@@ -108,14 +109,14 @@ impl RangeDoppler {
 
          */
 
-        let range_1_km = (rx.0.radius() - tx.0.radius()) * 0.5;
-        let range_12_km = rx.1.radius() - tx.0.radius();
+        let range_1_km = (rx.0.radius_km - tx.0.radius_km) * 0.5;
+        let range_12_km = rx.1.radius_km - tx.0.radius_km;
         let range_2_km = range_12_km * 0.5;
         let range_km = range_1_km + range_2_km;
 
         // Compute the average velocity of the receiver over the integration time.
-        let v_rx = (rx.1.velocity() + rx.0.velocity()) * 0.5;
-        let doppler_km_s = range_km.dot(&(v_rx - tx.0.velocity())) / range_km.norm();
+        let v_rx = (rx.1.velocity_km_s + rx.0.velocity_km_s) * 0.5;
+        let doppler_km_s = range_km.dot(&(v_rx - tx.0.velocity_km_s)) / range_km.norm();
 
         // Time tagged at the realization of this measurement, i.e. at the end of the integration time.
         let epoch = rx.1.epoch + timestamp_noise_s * Unit::Second;

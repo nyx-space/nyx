@@ -19,7 +19,7 @@
 use rayon::prelude::*;
 use snafu::ResultExt;
 
-use crate::dynamics::guidance::{ra_dec_from_unit_vector, GuidanceError, Mnvr};
+use crate::dynamics::guidance::{ra_dec_from_unit_vector, GuidanceError, LocalFrame, Mnvr};
 use crate::linalg::{SMatrix, SVector, Vector3};
 use crate::md::objective::Objective;
 use crate::md::{prelude::*, PropSnafu, TargetingError};
@@ -50,7 +50,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
         /* ************************* */
         // Calculate the u, dot u (=0) and ddot u from this state
         let u = dv / dv.norm();
-        let r = spacecraft.orbit.radius();
+        let r = spacecraft.orbit.radius_km;
         let rmag = spacecraft.orbit.rmag_km();
         let u_ddot = (3.0 * spacecraft.orbit.frame.gm() / rmag.powi(5))
             * (r.dot(&u) * r - (r.dot(&u).powi(2) * u));
@@ -76,7 +76,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
             thrust_prct: 1.0,
             alpha_inplane_radians,
             delta_outofplane_radians: beta_outofplane_radians,
-            frame: Frame::Inertial,
+            frame: LocalFrame::Inertial,
         };
 
         println!("INITIAL GUESS\n{mnvr}\n\n");

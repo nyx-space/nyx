@@ -146,7 +146,7 @@ impl Into<NodeSerde> for Node {
             y: self.y,
             z: self.z,
             vmag: Some(self.vmag),
-            frame: self.frame.to_string(),
+            frame: self.frame,
             epoch: self.epoch.to_string(),
         }
     }
@@ -160,7 +160,7 @@ impl Into<NodeSerde> for &Node {
             y: self.y,
             z: self.z,
             vmag: Some(self.vmag),
-            frame: self.frame.to_string(),
+            frame: self.frame,
             epoch: self.epoch.to_string(),
         }
     }

@@ -35,7 +35,7 @@ pub enum CostFunction {
     MinimumFuel,
 }
 
-#[derive(Debug, PartialEq, Snafu)]
+#[derive(Debug, Snafu)]
 pub enum MultipleShootingError {
     #[snafu(display("segment #{segment} encountered {source}"))]
     TargetingError {
