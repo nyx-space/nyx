@@ -18,6 +18,7 @@
 
 use super::optimizer::Optimizer;
 use super::solution::TargeterSolution;
+use crate::cosmic::{AstroAlmanacSnafu, AstroPhysicsSnafu};
 use crate::dynamics::guidance::{GuidanceError, LocalFrame, Mnvr};
 use crate::errors::TargetingError;
 use crate::linalg::{SMatrix, SVector, Vector6};
@@ -41,6 +42,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
         initial_state: Spacecraft,
         correction_epoch: Epoch,
         achievement_epoch: Epoch,
+        almanac: Arc<Almanac>,
     ) -> Result<TargeterSolution<V, O>, TargetingError> {
         ensure!(!self.objectives.is_empty(), UnderdeterminedProblemSnafu);
 
@@ -56,7 +58,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
         // where the correction should be applied.
         let xi_start = self
             .prop
-            .with(initial_state)
+            .with(initial_state, almanac.clone())
             .until_epoch(correction_epoch)
             .with_context(|_| PropSnafu)?;
 
@@ -89,7 +91,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             if self.correction_frame.is_some() && var.component.vec_index() < 3 {
                 // Then this is a position correction, which is not allowed if a frame is provided!
                 let msg = format!(
-                    "Variable is in frame {} but that frame cannot be used for a {:?} correction",
+                    "Variable is in frame {:?} but that frame cannot be used for a {:?} correction",
                     self.correction_frame.unwrap(),
                     var.component
                 );
@@ -154,20 +156,18 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                 // Now, let's apply the correction to the initial state
                 if let Some(frame) = self.correction_frame {
                     // The following will error if the frame is not local
-                    let dcm_vnc2inertial = xi
-                        .orbit
-                        .dcm_from_traj_frame(frame)
-                        .with_context(|_| AstroSnafu)?;
+                    let dcm_vnc2inertial = frame
+                        .dcm_to_inertial(xi.orbit)
+                        .with_context(|_| AstroPhysicsSnafu)
+                        .with_context(|_| AstroSnafu)?
+                        .rot_mat;
+
                     let velocity_correction =
                         dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
                     xi.orbit.apply_dv_km_s(velocity_correction);
                 } else {
-                    xi.orbit.x_km += state_correction[0];
-                    xi.orbit.y_km += state_correction[1];
-                    xi.orbit.z_km += state_correction[2];
-                    xi.orbit.vx_km_s += state_correction[3];
-                    xi.orbit.vy_km_s += state_correction[4];
-                    xi.orbit.vz_km_s += state_correction[5];
+                    xi.orbit.radius_km += state_correction.fixed_rows::<3>(0).to_owned();
+                    xi.orbit.velocity_km_s += state_correction.fixed_rows::<3>(3).to_owned();
                 }
             }
 
@@ -210,33 +210,40 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                 let mut prop = self.prop.clone();
                 let prop_opts = prop.opts;
                 let pre_mnvr = prop
-                    .with(cur_xi)
+                    .with(cur_xi, almanac.clone())
                     .until_epoch(mnvr.start)
                     .with_context(|_| PropSnafu)?;
                 prop.dynamics = prop.dynamics.with_guidance_law(Arc::new(mnvr));
                 prop.set_max_step(mnvr.duration());
                 let post_mnvr = prop
-                    .with(pre_mnvr.with_guidance_mode(GuidanceMode::Thrust))
+                    .with(
+                        pre_mnvr.with_guidance_mode(GuidanceMode::Thrust),
+                        almanac.clone(),
+                    )
                     .until_epoch(mnvr.end)
                     .with_context(|_| PropSnafu)?;
                 // Reset the propagator options to their previous configuration
                 prop.opts = prop_opts;
                 // And propagate until the achievement epoch
-                prop.with(post_mnvr)
+                prop.with(post_mnvr, almanac.clone())
                     .until_epoch(achievement_epoch)
                     .with_context(|_| PropSnafu)?
                     .orbit
             } else {
                 self.prop
-                    .with(cur_xi)
+                    .with(cur_xi, almanac.clone())
                     .until_epoch(achievement_epoch)
                     .with_context(|_| PropSnafu)?
                     .orbit
             };
 
             let xf_dual_obj_frame = match &self.objective_frame {
-                Some((frame, cosm)) => {
-                    let orbit_obj_frame = cosm.frame_chg(&xf, *frame);
+                Some(frame) => {
+                    let orbit_obj_frame = almanac
+                        .transform_to(xf, *frame, None)
+                        .with_context(|_| AstroAlmanacSnafu)
+                        .with_context(|_| AstroSnafu)?;
+
                     OrbitDual::from(orbit_obj_frame)
                 }
                 None => OrbitDual::from(xf),
@@ -391,8 +398,13 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                         // Now, let's apply the correction to the initial state
                         if let Some(frame) = self.correction_frame {
                             // The following will error if the frame is not local
-                            let dcm_vnc2inertial =
-                                this_xi.orbit.dcm_from_traj_frame(frame).unwrap();
+                            let dcm_vnc2inertial = frame
+                                .dcm_to_inertial(this_xi.orbit)
+                                .with_context(|_| AstroPhysicsSnafu)
+                                .with_context(|_| AstroSnafu)
+                                .unwrap()
+                                .rot_mat;
+
                             let velocity_correction =
                                 dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
                             this_xi.orbit.apply_dv_km_s(velocity_correction);
@@ -403,35 +415,46 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
                     let this_xf = if finite_burn_target {
                         // Propagate normally until start of maneuver
-                        let pre_mnvr = this_prop.with(cur_xi).until_epoch(this_mnvr.start).unwrap();
+                        let pre_mnvr = this_prop
+                            .with(cur_xi, almanac.clone())
+                            .until_epoch(this_mnvr.start)
+                            .unwrap();
                         // Add this maneuver to the dynamics, make sure that we don't over-step this maneuver
                         let prop_opts = this_prop.opts;
                         this_prop.set_max_step(this_mnvr.duration());
                         this_prop.dynamics =
                             this_prop.dynamics.with_guidance_law(Arc::new(this_mnvr));
                         let post_mnvr = this_prop
-                            .with(pre_mnvr.with_guidance_mode(GuidanceMode::Thrust))
+                            .with(
+                                pre_mnvr.with_guidance_mode(GuidanceMode::Thrust),
+                                almanac.clone(),
+                            )
                             .until_epoch(this_mnvr.end)
                             .unwrap();
                         // Reset the propagator options to their previous configuration
                         this_prop.opts = prop_opts;
                         // And propagate until the achievement epoch
                         this_prop
-                            .with(post_mnvr)
+                            .with(post_mnvr, almanac.clone())
                             .until_epoch(achievement_epoch)
                             .unwrap()
                             .orbit
                     } else {
                         this_prop
-                            .with(this_xi)
+                            .with(this_xi, almanac.clone())
                             .until_epoch(achievement_epoch)
                             .unwrap()
                             .orbit
                     };
 
                     let xf_dual_obj_frame = match &self.objective_frame {
-                        Some((frame, cosm)) => {
-                            let orbit_obj_frame = cosm.frame_chg(&this_xf, *frame);
+                        Some(frame) => {
+                            let orbit_obj_frame = almanac
+                                .transform_to(this_xf, *frame, None)
+                                .with_context(|_| AstroAlmanacSnafu)
+                                .with_context(|_| AstroSnafu)
+                                .unwrap();
+
                             OrbitDual::from(orbit_obj_frame)
                         }
                         None => OrbitDual::from(this_xf),
@@ -487,16 +510,21 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                 }
                 // Now, let's apply the correction to the initial state
                 if let Some(frame) = self.correction_frame {
-                    let dcm_vnc2inertial = corrected_state
-                        .orbit
-                        .dcm_from_traj_frame(frame)
-                        .unwrap()
+                    let dcm_vnc2inertial = frame
+                        .dcm_to_inertial(corrected_state.orbit)
+                        .with_context(|_| AstroPhysicsSnafu)
+                        .with_context(|_| AstroSnafu)?
+                        .rot_mat
                         .transpose();
+
                     let velocity_correction =
                         dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
                     corrected_state.orbit.apply_dv_km_s(velocity_correction);
                 } else {
-                    corrected_state.orbit = corrected_state.orbit + state_correction;
+                    corrected_state.orbit.radius_km +=
+                        state_correction.fixed_rows::<3>(0).to_owned();
+                    corrected_state.orbit.velocity_km_s +=
+                        state_correction.fixed_rows::<3>(3).to_owned();
                 }
 
                 let sol = TargeterSolution {
@@ -648,10 +676,12 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
             // Now, let's apply the correction to the initial state
             if let Some(frame) = self.correction_frame {
-                let dcm_vnc2inertial = xi
-                    .orbit
-                    .dcm_from_traj_frame(frame)
-                    .with_context(|_| AstroSnafu)?;
+                let dcm_vnc2inertial = frame
+                    .dcm_to_inertial(xi.orbit)
+                    .with_context(|_| AstroPhysicsSnafu)
+                    .with_context(|_| AstroSnafu)?
+                    .rot_mat;
+
                 let velocity_correction = dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
                 xi.orbit.apply_dv_km_s(velocity_correction);
             } else {

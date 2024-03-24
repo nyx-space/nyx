@@ -233,19 +233,9 @@ impl GuidanceLaw for Mnvr {
         match osc.mode() {
             GuidanceMode::Thrust => match self.frame {
                 LocalFrame::Inertial => Ok(self.vector(osc.epoch())),
-                LocalFrame::RCN => Ok(osc.orbit.dcm_from_rcn_to_inertial().with_context(|_| {
+                _ => Ok(self.frame.dcm_to_inertial(osc.orbit).with_context(|_| {
                     GuidancePhysicsSnafu {
                         action: "computing RCN frame",
-                    }
-                })? * self.vector(osc.epoch())),
-                LocalFrame::RIC => Ok(osc.orbit.dcm_from_ric_to_inertial().with_context(|_| {
-                    GuidancePhysicsSnafu {
-                        action: "computing RIC frame",
-                    }
-                })? * self.vector(osc.epoch())),
-                LocalFrame::VNC => Ok(osc.orbit.dcm_from_vnc_to_inertial().with_context(|_| {
-                    GuidancePhysicsSnafu {
-                        action: "computing VNC frame",
                     }
                 })? * self.vector(osc.epoch())),
             },

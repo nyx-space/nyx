@@ -19,7 +19,9 @@
 use crate::cosmic::{GuidanceMode, Orbit, Spacecraft, STD_GRAVITY};
 use crate::errors::{NyxError, StateError};
 use crate::linalg::Vector3;
+use anise::astro::PhysicsResult;
 use anise::errors::PhysicsError;
+use anise::math::rotation::DCM;
 use serde::{Deserialize, Serialize};
 
 mod finiteburns;
@@ -114,7 +116,7 @@ pub(crate) fn ra_dec_from_unit_vector(vhat: Vector3<f64>) -> (f64, f64) {
     (alpha, delta)
 }
 
-#[derive(Copy, Clone, Debug, Snafu)]
+#[derive(Debug, Snafu)]
 pub enum GuidanceError {
     #[snafu(display("No thruster attached to spacecraft"))]
     NoThrustersDefined,
@@ -166,6 +168,20 @@ pub enum LocalFrame {
     RIC,
     VNC,
     RCN,
+}
+
+impl LocalFrame {
+    pub fn dcm_to_inertial(&self, state: Orbit) -> PhysicsResult<DCM> {
+        match self {
+            LocalFrame::Inertial => Ok(DCM::identity(
+                state.frame.orientation_id,
+                state.frame.orientation_id,
+            )),
+            LocalFrame::RIC => state.dcm_from_ric_to_inertial(),
+            LocalFrame::VNC => state.dcm_from_vnc_to_inertial(),
+            LocalFrame::RCN => state.dcm_from_rcn_to_inertial(),
+        }
+    }
 }
 
 #[test]

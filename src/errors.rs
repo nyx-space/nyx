@@ -96,7 +96,7 @@ impl From<ConfigError> for NyxError {
     }
 }
 
-#[derive(Copy, Clone, Debug, Snafu)]
+#[derive(Debug, Snafu)]
 #[snafu(visibility(pub(crate)))]
 pub enum StateError {
     #[snafu(display("{param} is unavailable for this kind of state"))]
@@ -134,7 +134,7 @@ pub enum EventError {
     },
 }
 
-#[derive(Copy, Clone, Debug, Snafu)]
+#[derive(Debug, Snafu)]
 #[snafu(visibility(pub(crate)))]
 pub enum MonteCarloError {
     #[snafu(display("Monte Carlo caused {source}"))]

@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use anise::errors::PhysicsError;
+use anise::errors::{AlmanacError, PhysicsError};
 pub use anise::prelude::{Frame, Orbit};
 
 // pub use self::xb::Xb;
@@ -130,7 +130,7 @@ pub fn assert_orbit_eq_or_abs(left: &Orbit, right: &Orbit, epsilon: f64, msg: &s
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Snafu)]
+#[derive(Debug, Snafu)]
 #[snafu(visibility(pub(crate)))]
 pub enum AstroError {
     #[snafu(display("B Plane jacobian invariant must be either VX, VY or VZ"))]
@@ -143,6 +143,8 @@ pub enum AstroError {
     NotHyperbolic,
     #[snafu(display("physics error occured during astro computation: {source}"))]
     AstroPhysics { source: PhysicsError },
+    #[snafu(display("ANISE Almanac error occured during astro computation: {source}"))]
+    AstroAlmanac { source: AlmanacError },
 }
 
 // Re-Export bodies

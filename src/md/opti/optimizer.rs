@@ -18,6 +18,7 @@
 
 use snafu::ResultExt;
 
+use crate::dynamics::guidance::LocalFrame;
 use crate::errors::TargetingError;
 use crate::md::objective::Objective;
 use crate::md::prelude::*;
@@ -43,7 +44,7 @@ pub struct Optimizer<'a, E: ErrorCtrl, const V: usize, const O: usize> {
     /// The kind of correction to apply to achieve the objectives
     pub variables: [Variable; V],
     /// The frame in which the correction should be applied, must be either a local frame or inertial
-    pub correction_frame: Option<Frame>,
+    pub correction_frame: Option<LocalFrame>,
     /// Maximum number of iterations
     pub iterations: usize,
 }
@@ -255,13 +256,18 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
         initial_state: Spacecraft,
         correction_epoch: Epoch,
         achievement_epoch: Epoch,
+        almanac: Arc<Almanac>,
     ) -> Result<TargeterSolution<V, O>, TargetingError> {
-        self.try_achieve_fd(initial_state, correction_epoch, achievement_epoch)
+        self.try_achieve_fd(initial_state, correction_epoch, achievement_epoch, almanac)
     }
 
     /// Apply a correction and propagate to achievement epoch. Also checks that the objectives are indeed matched
-    pub fn apply(&self, solution: &TargeterSolution<V, O>) -> Result<Spacecraft, TargetingError> {
-        let (xf, _) = self.apply_with_traj(solution)?;
+    pub fn apply(
+        &self,
+        solution: &TargeterSolution<V, O>,
+        almanac: Arc<Almanac>,
+    ) -> Result<Spacecraft, TargetingError> {
+        let (xf, _) = self.apply_with_traj(solution, almanac)?;
         Ok(xf)
     }
 
@@ -270,13 +276,14 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
     pub fn apply_with_traj(
         &self,
         solution: &TargeterSolution<V, O>,
+        almanac: Arc<Almanac>,
     ) -> Result<(Spacecraft, Traj<Spacecraft>), TargetingError> {
         let (xf, traj) = match solution.to_mnvr() {
             Ok(mnvr) => {
                 println!("{mnvr}");
                 let mut prop = self.prop.clone();
                 prop.dynamics = prop.dynamics.with_guidance_law(Arc::new(mnvr));
-                prop.with(solution.corrected_state)
+                prop.with(solution.corrected_state, almanac)
                     .until_epoch_with_traj(solution.achieved_state.epoch())
                     .with_context(|_| PropSnafu)?
             }
@@ -284,7 +291,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                 // This isn't a finite burn maneuver, let's just apply the correction
                 // Propagate until achievement epoch
                 self.prop
-                    .with(solution.corrected_state)
+                    .with(solution.corrected_state, almanac)
                     .until_epoch_with_traj(solution.achieved_state.epoch())
                     .with_context(|_| PropSnafu)?
             }
