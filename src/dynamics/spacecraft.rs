@@ -299,42 +299,55 @@ impl Dynamics for SpacecraftDynamics {
         let osc_sc = ctx.set_with_delta_seconds(delta_t, state);
         let mut d_x = OVector::<f64, Const<90>>::zeros();
 
-        if ctx.stm.is_some() {
-            // Call the gradient (also called the dual EOM function of the force models)
-            let (state, grad) = self.dual_eom(delta_t, &osc_sc, almanac)?;
+        // TODO(ANISE): Can I just always compute the STM from dual_eom if it's set?
+        // Maybe I use this only when estimating the orbit state from a spacecraft, but that functionality will soon disappear.
+        match ctx.stm {
+            Some(stm) => {
+                // Call the gradient (also called the dual EOM function of the force models)
+                let (state, grad) = self.dual_eom(delta_t, &osc_sc, almanac)?;
 
-            // Apply the gradient to the STM
-            let stm_dt = ctx.stm()? * grad;
+                // Apply the gradient to the STM
+                let stm_dt = ctx.stm()? * grad;
 
-            // Rebuild the state vectors
-            for (i, val) in state.iter().enumerate() {
-                d_x[i] = *val;
-            }
+                // Rebuild the state vectors
+                for (i, val) in state.iter().enumerate() {
+                    d_x[i] = *val;
+                }
 
-            for (i, val) in stm_dt.iter().enumerate() {
-                d_x[i + <Spacecraft as State>::Size::dim()] = *val;
-            }
-        } else {
-            // Compute the orbital dynamics
-            let orbital_dyn_vec = state.fixed_rows::<42>(0).into_owned();
-            // Copy the d orbit dt data
-            for (i, val) in self
-                .orbital_dyn
-                .eom(delta_t, &orbital_dyn_vec, &ctx.orbit, almanac)?
-                .iter()
-                .enumerate()
-            {
-                d_x[i] = *val;
-            }
-
-            // Apply the force models for non STM propagation
-            for model in &self.force_models {
-                let model_frc = model.eom(&osc_sc, almanac)? / osc_sc.mass_kg();
-                for i in 0..3 {
-                    d_x[i + 3] += model_frc[i];
+                for (i, val) in stm_dt.iter().enumerate() {
+                    d_x[i + <Spacecraft as State>::Size::dim()] = *val;
                 }
             }
-        }
+            None => {
+                // Compute the orbital dynamics
+                let orbital_dyn_vec = state.fixed_rows::<42>(0).into_owned();
+                // TODO(ANISE): The STM is ALWAYS set to identity and that's probably wrong.
+                let ctx_stm = OMatrix::<f64, Const<6>, Const<6>>::identity();
+                // Copy the d orbit dt data
+                for (i, val) in self
+                    .orbital_dyn
+                    .eom(
+                        delta_t,
+                        &orbital_dyn_vec,
+                        &ctx.orbit,
+                        Some(&ctx_stm),
+                        almanac,
+                    )?
+                    .iter()
+                    .enumerate()
+                {
+                    d_x[i] = *val;
+                }
+
+                // Apply the force models for non STM propagation
+                for model in &self.force_models {
+                    let model_frc = model.eom(&osc_sc, almanac)? / osc_sc.mass_kg();
+                    for i in 0..3 {
+                        d_x[i + 3] += model_frc[i];
+                    }
+                }
+            }
+        };
 
         // Now include the control as needed.
         if let Some(guid_law) = &self.guid_law {
