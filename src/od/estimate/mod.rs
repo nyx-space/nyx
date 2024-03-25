@@ -105,6 +105,6 @@ impl NavSolution<Spacecraft> for KfEstimate<Spacecraft> {
         self.state().orbit
     }
     fn expected_state(&self) -> Orbit {
-        self.nominal_state()
+        self.nominal_state().orbit
     }
 }

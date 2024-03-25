@@ -158,7 +158,7 @@ where
     }
 }
 
-#[derive(Debug, PartialEq, Snafu)]
+#[derive(Debug, Snafu)]
 #[snafu(visibility(pub(crate)))]
 pub enum ODError {
     #[snafu(display("during an orbit determination, encountered {source}"))]
