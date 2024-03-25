@@ -73,6 +73,7 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
     pub fn solve(
         &mut self,
         cost: CostFunction,
+        almanac: Arc<Almanac>,
     ) -> Result<MultipleShootingSolution<T, OT>, MultipleShootingError> {
         let mut prev_cost = 1e12; // We don't use infinity because we compare a ratio of cost
         for it in 0..self.max_iterations {
@@ -102,6 +103,7 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
                         initial_states[i],
                         initial_states[i].epoch(),
                         self.targets[i].epoch(),
+                        almanac.clone(),
                     )
                     .with_context(|_| TargetingSnafu { segment: i })?;
 
@@ -138,6 +140,7 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
                             initial_states[i],
                             initial_states[i].epoch(),
                             self.targets[i].epoch(),
+                            almanac.clone(),
                         )
                         .with_context(|_| TargetingSnafu { segment: i })?;
 
@@ -163,6 +166,7 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
                             inner_sol_a.achieved_state,
                             inner_sol_a.achieved_state.epoch(),
                             self.targets[i + 1].epoch(),
+                            almanac.clone(),
                         )
                         .with_context(|_| TargetingSnafu { segment: i })?;
 
@@ -252,6 +256,7 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
                             initial_states[i],
                             initial_states[i].epoch(),
                             node.epoch(),
+                            almanac.clone(),
                         )
                         .with_context(|_| TargetingSnafu { segment: i })?;
                     initial_states.push(sol.achieved_state);

@@ -19,6 +19,7 @@
 use snafu::{ensure, ResultExt};
 
 use super::solution::TargeterSolution;
+use crate::cosmic::AstroAlmanacSnafu;
 use crate::errors::TargetingError;
 use crate::linalg::{DMatrix, SVector};
 use crate::md::{prelude::*, PropSnafu, UnderdeterminedProblemSnafu};
@@ -38,6 +39,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
         initial_state: Spacecraft,
         correction_epoch: Epoch,
         achievement_epoch: Epoch,
+        almanac: Arc<Almanac>,
     ) -> Result<TargeterSolution<V, O>, TargetingError> {
         ensure!(!self.objectives.is_empty(), UnderdeterminedProblemSnafu);
 
@@ -53,7 +55,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
         // where the correction should be applied.
         let xi_start = self
             .prop
-            .with(initial_state)
+            .with(initial_state, almanac.clone())
             .until_epoch(correction_epoch)
             .with_context(|_| PropSnafu)?;
 
@@ -69,22 +71,22 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
         for (i, var) in self.variables.iter().enumerate() {
             match var.component {
                 Vary::PositionX => {
-                    xi.orbit.x_km += var.init_guess;
+                    xi.orbit.radius_km.x += var.init_guess;
                 }
                 Vary::PositionY => {
-                    xi.orbit.y_km += var.init_guess;
+                    xi.orbit.radius_km.y += var.init_guess;
                 }
                 Vary::PositionZ => {
-                    xi.orbit.z_km += var.init_guess;
+                    xi.orbit.radius_km.z += var.init_guess;
                 }
                 Vary::VelocityX => {
-                    xi.orbit.vx_km_s += var.init_guess;
+                    xi.orbit.velocity_km_s.x += var.init_guess;
                 }
                 Vary::VelocityY => {
-                    xi.orbit.vy_km_s += var.init_guess;
+                    xi.orbit.velocity_km_s.y += var.init_guess;
                 }
                 Vary::VelocityZ => {
-                    xi.orbit.vz_km_s += var.init_guess;
+                    xi.orbit.velocity_km_s.z += var.init_guess;
                 }
                 _ => {
                     return Err(TargetingError::UnsupportedVariable {
@@ -128,13 +130,13 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             // Full propagation for a half period duration is slightly more precise than a step by step one with multiplications in between.
             let xf = self
                 .prop
-                .with(xi)
+                .with(xi, almanac.clone())
                 .until_epoch(achievement_epoch)
                 .with_context(|_| PropSnafu)?
                 .orbit;
 
             // Check linearization
-            if !are_eigenvalues_stable(xf.stm().unwrap().complex_eigenvalues()) {
+            if !are_eigenvalues_stable(xi.with_orbit(xf).stm().unwrap().complex_eigenvalues()) {
                 warn!(
                     "STM linearization is broken for the requested time step of {}",
                     achievement_epoch - correction_epoch
@@ -142,8 +144,12 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             }
 
             let xf_dual_obj_frame = match &self.objective_frame {
-                Some((frame, cosm)) => {
-                    let orbit_obj_frame = cosm.frame_chg(&xf, *frame);
+                Some(frame) => {
+                    let orbit_obj_frame = almanac
+                        .transform_to(xf, *frame, None)
+                        .with_context(|_| AstroAlmanacSnafu)
+                        .with_context(|_| AstroSnafu)?;
+
                     OrbitDual::from(orbit_obj_frame)
                 }
                 None => OrbitDual::from(xf),
@@ -218,7 +224,8 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                 for (j, var) in self.variables.iter().enumerate() {
                     let idx = var.component.vec_index();
                     // Compute the partial of the objective over all components wrt to all of the components in the STM of the control variable.
-                    let rslt = &partial_vec * xf.stm().unwrap().fixed_columns::<1>(idx);
+                    let rslt =
+                        &partial_vec * xi.with_orbit(xf).stm().unwrap().fixed_columns::<1>(idx);
                     jac[(i, j)] = rslt[(0, 0)];
                 }
             }
@@ -232,12 +239,12 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                 // Convert the total correction from VNC back to integration frame in case that's needed.
                 for (i, var) in self.variables.iter().enumerate() {
                     match var.component {
-                        Vary::PositionX => state.orbit.x_km += total_correction[i],
-                        Vary::PositionY => state.orbit.y_km += total_correction[i],
-                        Vary::PositionZ => state.orbit.z_km += total_correction[i],
-                        Vary::VelocityX => state.orbit.vx_km_s += total_correction[i],
-                        Vary::VelocityY => state.orbit.vy_km_s += total_correction[i],
-                        Vary::VelocityZ => state.orbit.vz_km_s += total_correction[i],
+                        Vary::PositionX => state.orbit.radius_km.x += total_correction[i],
+                        Vary::PositionY => state.orbit.radius_km.y += total_correction[i],
+                        Vary::PositionZ => state.orbit.radius_km.z += total_correction[i],
+                        Vary::VelocityX => state.orbit.velocity_km_s.x += total_correction[i],
+                        Vary::VelocityY => state.orbit.velocity_km_s.y += total_correction[i],
+                        Vary::VelocityZ => state.orbit.velocity_km_s.z += total_correction[i],
                         _ => {
                             return Err(TargetingError::UnsupportedVariable {
                                 var: var.to_string(),
@@ -302,22 +309,22 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
                 match var.component {
                     Vary::PositionX => {
-                        xi.orbit.x_km += delta[i];
+                        xi.orbit.radius_km.x += delta[i];
                     }
                     Vary::PositionY => {
-                        xi.orbit.y_km += delta[i];
+                        xi.orbit.radius_km.y += delta[i];
                     }
                     Vary::PositionZ => {
-                        xi.orbit.z_km += delta[i];
+                        xi.orbit.radius_km.z += delta[i];
                     }
                     Vary::VelocityX => {
-                        xi.orbit.vx_km_s += delta[i];
+                        xi.orbit.velocity_km_s.x += delta[i];
                     }
                     Vary::VelocityY => {
-                        xi.orbit.vy_km_s += delta[i];
+                        xi.orbit.velocity_km_s.y += delta[i];
                     }
                     Vary::VelocityZ => {
-                        xi.orbit.vz_km_s += delta[i];
+                        xi.orbit.velocity_km_s.z += delta[i];
                     }
                     _ => {
                         return Err(TargetingError::UnsupportedVariable {
