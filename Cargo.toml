@@ -79,7 +79,7 @@ snafu = { version = "0.8.0", features = ["backtrace"] }
 
 [dev-dependencies]
 polars = { version = "0.38.0", features = ["parquet"] }
-rstest = "0.18.1"
+rstest = "0.19.0"
 pretty_env_logger = "0.5"
 
 [build-dependencies]
