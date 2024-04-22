@@ -26,7 +26,7 @@ use crate::{
     NyxError, Orbit,
 };
 use nalgebra::Matrix6;
-use numpy::PyReadonlyArrayDyn;
+use numpy::{PyReadonlyArrayDyn, PyUntypedArrayMethods} ;
 use pyo3::class::basic::CompareOp;
 use pyo3::prelude::*;
 use pyo3::types::PyType;
