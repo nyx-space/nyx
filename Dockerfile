@@ -3,7 +3,7 @@ FROM opensuse/tumbleweed
 
 # Install Python 3.10 and other necessary packages
 RUN zypper ref && \
-    zypper -n in python310 python310-pip zsh uuid-runtime shadow git git-lfs && \
+    zypper -n in python310 python310-pip zsh uuid-runtime shadow git git-lfs gawk && \
     zypper clean
 
 WORKDIR /app
