@@ -59,7 +59,8 @@ impl ForceModel for ConstantDrag {
     fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, DynamicsError> {
         let osc = self.cosm.frame_chg(&ctx.orbit, self.drag_frame);
         let velocity = osc.velocity();
-        Ok(-0.5 * self.rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
+        // Note the 1e3 factor to convert drag units from ((kg * km^2 * s^-2) / m^1) to (kg * km * s^-2)
+        Ok(-0.5 * 1e3 * self.rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
     }
 
     fn dual_eom(
@@ -126,7 +127,8 @@ impl ForceModel for Drag {
         match self.density {
             AtmDensity::Constant(rho) => {
                 let velocity = osc.velocity();
-                Ok(-0.5 * rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
+                // Note the 1e3 factor to convert drag units from ((kg * km^2 * s^-2) / m^1) to (kg * km * s^-2)
+                Ok(-0.5 * 1e3 * rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
             }
 
             AtmDensity::Exponential {
@@ -141,7 +143,8 @@ impl ForceModel for Drag {
                 let velocity_integr_frame = self.cosm.frame_chg(&osc, integration_frame).velocity();
 
                 let velocity = velocity_integr_frame - osc.velocity();
-                Ok(-0.5 * rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
+                // Note the 1e3 factor to convert drag units from ((kg * km^2 * s^-2) / m^1) to (kg * km * s^-2)
+                Ok(-0.5 * 1e3 * rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
             }
 
             AtmDensity::StdAtm { max_alt_m } => {
@@ -167,7 +170,8 @@ impl ForceModel for Drag {
                 let velocity_integr_frame = self.cosm.frame_chg(&osc, integration_frame).velocity();
 
                 let velocity = velocity_integr_frame - osc.velocity();
-                Ok(-0.5 * rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
+                // Note the 1e3 factor to convert drag units from ((kg * km^2 * s^-2) / m^1) to (kg * km * s^-2)
+                Ok(-0.5 * 1e3 * rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
             }
         }
     }
