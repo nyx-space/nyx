@@ -68,7 +68,8 @@ impl RangeRate {
         assert_eq!(tx.epoch, rx.epoch, "tx and rx states have different times");
 
         let dt = tx.epoch;
-        let hyperstate = hyperspace_from_vector(&(rx - tx).to_cartesian_vec());
+        let hyperstate =
+            hyperspace_from_vector(&(rx.to_cartesian_pos_vel() - tx.to_cartesian_pos_vel()));
         let (obs, h_tilde) = Self::compute_sensitivity(&hyperstate);
 
         RangeRate {

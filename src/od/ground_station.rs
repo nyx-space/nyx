@@ -16,13 +16,14 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use anise::astro::AzElRange;
+use anise::astro::{AzElRange, PhysicsResult};
 use anise::errors::AlmanacResult;
 use anise::prelude::{Almanac, Frame, Orbit};
 
 use super::msr::RangeDoppler;
 use super::noise::GaussMarkov;
 use super::{ODAlmanacSnafu, ODError, ODTrajSnafu, TrackingDeviceSim};
+use crate::errors::EventError;
 use crate::io::ConfigRepr;
 use crate::md::prelude::{Interpolatable, Traj};
 use crate::md::EventEvaluator;
@@ -158,15 +159,17 @@ impl GroundStation {
     /// Computes the azimuth and elevation of the provided object seen from this ground station, both in degrees.
     /// Also returns the ground station's orbit in the frame of the receiver
     pub fn azimuth_elevation_of(&self, rx: Orbit, almanac: &Almanac) -> AlmanacResult<AzElRange> {
-        almanac.azimuth_elevation_range_sez(rx, self.to_orbit(rx.epoch))
+        almanac.azimuth_elevation_range_sez(rx, self.to_orbit(rx.epoch).unwrap())
     }
 
     /// Return this ground station as an orbit in its current frame
-    pub fn to_orbit(&self, epoch: Epoch) -> Orbit {
-        Orbit::from_geodesic(
+    pub fn to_orbit(&self, epoch: Epoch) -> PhysicsResult<Orbit> {
+        use anise::constants::usual_planetary_constants::MEAN_EARTH_ANGULAR_VELOCITY_DEG_S;
+        Orbit::try_latlongalt(
             self.latitude_deg,
             self.longitude_deg,
             self.height_km,
+            MEAN_EARTH_ANGULAR_VELOCITY_DEG_S,
             epoch,
             self.frame,
         )
@@ -233,32 +236,30 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
                 let rx_1 = traj.at(epoch).with_context(|_| ODTrajSnafu)?;
 
                 let aer0 = self
-                    .azimuth_elevation_of(rx_0, &almanac)
+                    .azimuth_elevation_of(rx_0.orbit, &almanac)
                     .with_context(|_| ODAlmanacSnafu {
                         action: "computing AER",
                     })?;
                 let aer1 = self
-                    .azimuth_elevation_of(rx_1, &almanac)
+                    .azimuth_elevation_of(rx_1.orbit, &almanac)
                     .with_context(|_| ODAlmanacSnafu {
                         action: "computing AER",
                     })?;
 
-                if aer0.elevation < self.elevation_mask_deg
-                    || aer1.elevation < self.elevation_mask_deg
+                if aer0.elevation_deg < self.elevation_mask_deg
+                    || aer1.elevation_deg < self.elevation_mask_deg
                 {
                     debug!(
                         "{} (el. mask {:.3} deg) but object moves from {:.3} to {:.3} deg -- no measurement",
-                        self.name, self.elevation_mask_deg, aer0.elevation, aer1.elevation
+                        self.name, self.elevation_mask_deg, aer0.elevation_deg, aer1.elevation_deg
                     );
                     return Ok(None);
                 }
 
                 // Compute the transmitter at both times.
                 // TODO(ANISE): Check that both being in the transmitter frame is OK
-                let tx_0 = self
-                    .to_orbit(epoch - integration_time)
-                    .with_context(|_| ODTrajSnafu)?;
-                let tx_1 = self.to_orbit(epoch).with_context(|_| ODTrajSnafu)?;
+                let tx_0 = self.to_orbit(epoch - integration_time).unwrap();
+                let tx_1 = self.to_orbit(epoch).unwrap();
 
                 // Noises are computed at the midpoint of the integration time.
                 let (timestamp_noise_s, range_noise_km, doppler_noise_km_s) =
@@ -266,7 +267,7 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
 
                 Ok(Some(RangeDoppler::two_way(
                     (tx_0, tx_1),
-                    (rx_0, rx_1),
+                    (rx_0.orbit, rx_1.orbit),
                     timestamp_noise_s,
                     range_noise_km,
                     doppler_noise_km_s,
@@ -285,7 +286,7 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
     }
 
     fn location(&self, epoch: Epoch, frame: Frame, almanac: Arc<Almanac>) -> AlmanacResult<Orbit> {
-        almanac.transform_to(self.to_orbit(epoch), frame, None)
+        almanac.transform_to(self.to_orbit(epoch).unwrap(), frame, None)
     }
 
     fn measure_instantaneous(
@@ -300,16 +301,16 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
                 action: "computing AER",
             })?;
 
-        if aer.elevation >= self.elevation_mask_deg {
+        if aer.elevation_deg >= self.elevation_mask_deg {
             // Only update the noises if the measurement is valid.
             let (timestamp_noise_s, range_noise_km, doppler_noise_km_s) =
-                self.noises(rx.epoch, rng)?;
+                self.noises(rx.orbit.epoch, rng)?;
 
-            let tx = self.to_orbit(rx.epoch).with_context(|_| ODTrajSnafu)?;
+            let tx = self.to_orbit(rx.orbit.epoch).unwrap();
 
             Ok(Some(RangeDoppler::one_way(
                 tx,
-                rx,
+                rx.orbit,
                 timestamp_noise_s,
                 range_noise_km,
                 doppler_noise_km_s,
@@ -317,7 +318,7 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
         } else {
             debug!(
                 "{} (el. mask {:.3} deg), object at {:.3} deg -- no measurement",
-                self.name, self.elevation_mask_deg, aer.elevation
+                self.name, self.elevation_mask_deg, aer.elevation_deg
             );
             Ok(None)
         }
@@ -345,36 +346,37 @@ where
         Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size> + Allocator<f64, S::VecLength>,
 {
     /// Compute the elevation in the SEZ frame. This call will panic if the frame of the input state does not match that of the ground station.
-    fn eval(&self, rx_gs_frame: &S, _almanac: Arc<Almanac>) -> f64 {
+    fn eval(&self, rx_gs_frame: &S, _almanac: Arc<Almanac>) -> Result<f64, EventError> {
         let dt = rx_gs_frame.epoch();
         // Then, compute the rotation matrix from the body fixed frame of the ground station to its topocentric frame SEZ.
-        let tx_gs_frame = self.to_orbit(dt);
+        let tx_gs_frame = self.to_orbit(dt).unwrap();
         // Note: we're only looking at the radii so we don't need to apply the transport theorem here.
-        let dcm_topo2fixed = tx_gs_frame.dcm_from_traj_frame(Frame::SEZ).unwrap();
+        let from = tx_gs_frame.frame.orientation_id * 1_000 + 1;
+        let dcm_topo2fixed = tx_gs_frame
+            .dcm_from_topocentric_to_body_fixed(from)
+            .unwrap();
 
         // Now, rotate the spacecraft in the SEZ frame to compute its elevation as seen from the ground station.
         // We transpose the DCM so that it's the fixed to topocentric rotation.
-        let rx_sez = rx_gs_frame
-            .orbit()
-            .with_position_rotated_by(dcm_topo2fixed.transpose());
-        let tx_sez = tx_gs_frame.with_position_rotated_by(dcm_topo2fixed.transpose());
+        let rx_sez = (dcm_topo2fixed * rx_gs_frame.orbit()).unwrap();
+        let tx_sez = (dcm_topo2fixed * tx_gs_frame).unwrap();
         // Now, let's compute the range ρ.
-        let rho_sez = rx_sez - tx_sez;
+        let rho_sez = (rx_sez - tx_sez).unwrap();
 
         // Finally, compute the elevation (math is the same as declination)
         // Source: Vallado, section 4.4.3
         // Only the sine is needed as per Vallado, and the formula is the same as the declination
         // because we're in the SEZ frame.
-        rho_sez.declination_deg() - self.elevation_mask_deg
+        Ok(rho_sez.declination_deg() - self.elevation_mask_deg)
     }
 
-    fn eval_string(&self, state: &S, almanac: Arc<Almanac>) -> String {
-        format!(
+    fn eval_string(&self, state: &S, almanac: Arc<Almanac>) -> Result<String, EventError> {
+        Ok(format!(
             "Elevation from {} is {:.6} deg on {}",
             self.name,
-            self.eval(state, almanac) + self.elevation_mask_deg,
+            self.eval(state, almanac)? + self.elevation_mask_deg,
             state.epoch()
-        )
+        ))
     }
 
     /// Epoch precision of the election evaluator is 1 ms

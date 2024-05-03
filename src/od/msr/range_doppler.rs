@@ -200,6 +200,8 @@ impl EstimateFrom<Spacecraft, RangeDoppler> for Spacecraft {
             0.0,
         ];
 
-        OMatrix::from_row_slice(items)
+        OMatrix::<f64, <RangeDoppler as Measurement>::MeasurementSize, Self::Size>::from_row_slice(
+            items,
+        )
     }
 }

@@ -266,11 +266,7 @@ where
         let mut ric_covariances = Vec::new();
 
         for s in &estimates {
-            let dcm6x6 = s
-                .state()
-                .orbit()
-                .dcm6x6_from_traj_frame(Frame::RIC)
-                .unwrap();
+            let dcm6x6 = s.state().orbit().dcm_from_ric_to_inertial().unwrap();
             // Create a full DCM and only rotate the orbit part of it.
             let mut dcm = OMatrix::<f64, S::Size, S::Size>::identity();
             for i in 0..6 {
