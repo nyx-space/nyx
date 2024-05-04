@@ -25,7 +25,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::io::watermark::pq_writer;
-use crate::io::{ConfigError, ConfigRepr, ExportCfg};
+use crate::io::{ConfigError, ExportCfg};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName};
 use crate::md::trajectory::Interpolatable;
@@ -235,13 +235,12 @@ where
             + Allocator<f64, <MsrIn as State>::Size, <MsrIn as State>::Size>
             + Allocator<f64, <MsrIn as State>::VecLength>,
     {
-        let devices_repr = D::IntermediateRepr::loads_many(&self.device_cfg)?;
+        // TODO(ANISE): Support errors in serde of device!
+        let devices_repr = D::loads_many(&self.device_cfg)?;
 
         let mut devices = BTreeMap::new();
 
-        for serde in devices_repr {
-            // TODO(ANISE): Support errors in serde of device!
-            let device = D::from_str(serde).unwrap();
+        for device in devices_repr {
             if !self.device_names().contains(&device.name()) {
                 warn!(
                     "{} from arc config does not appear in measurements -- ignored",

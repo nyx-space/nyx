@@ -20,7 +20,6 @@ use crate::io::watermark::pq_writer;
 use crate::io::{ArrowSnafu, ExportCfg, ParquetSnafu, StdIOSnafu};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName};
-use crate::md::prelude::Frame;
 use crate::md::trajectory::Interpolatable;
 use crate::od::estimate::*;
 use crate::od::*;
@@ -265,8 +264,15 @@ where
         // Add the 1-sigma covariance in the RIC frame
         let mut ric_covariances = Vec::new();
 
+        // TODO(ANISE): Replace this with all of ANISE's stuff.
+
         for s in &estimates {
-            let dcm6x6 = s.state().orbit().dcm_from_ric_to_inertial().unwrap();
+            let dcm6x6 = s
+                .state()
+                .orbit()
+                .dcm_from_ric_to_inertial()
+                .unwrap()
+                .state_dcm();
             // Create a full DCM and only rotate the orbit part of it.
             let mut dcm = OMatrix::<f64, S::Size, S::Size>::identity();
             for i in 0..6 {

@@ -60,7 +60,7 @@ impl FromStr for TrkConfig {
     type Err = ConfigError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        serde_dhall::from_str(&s)
+        serde_yaml::from_str(s).map_err(|source| ConfigError::ParseError { source })
     }
 }
 

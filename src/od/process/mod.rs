@@ -419,7 +419,7 @@ where
     where
         Dev: TrackingDeviceSim<S, Msr>,
     {
-        let mut devices = arc.rebuild_devices::<S, Dev>(self.cosm.clone()).unwrap();
+        let mut devices = arc.rebuild_devices::<S, Dev>(self.almanac.clone()).unwrap();
 
         let measurements = &arc.measurements;
         let step_size = match arc.min_duration_sep() {
@@ -441,7 +441,7 @@ where
     where
         Dev: TrackingDeviceSim<S, Msr>,
     {
-        let mut devices = arc.rebuild_devices::<S, Dev>(self.cosm.clone()).unwrap();
+        let mut devices = arc.rebuild_devices::<S, Dev>(self.almanac.clone()).unwrap();
 
         let measurements = &arc.measurements;
         let step_size = match arc.min_duration_sep() {
@@ -562,11 +562,12 @@ where
                     match devices.get_mut(device_name) {
                         Some(device) => {
                             if let Some(computed_meas) =
-                                device.measure(epoch, &traj, None, self.cosm.clone())?
+                                device.measure(epoch, &traj, None, self.almanac.clone())?
                             {
                                 // Grab the device location
-                                let device_loc =
-                                    device.location(epoch, nominal_state.frame(), &self.cosm);
+                                let device_loc = device
+                                    .location(epoch, nominal_state.frame(), self.almanac)
+                                    .unwrap();
 
                                 // Switch back from extended if necessary
                                 if let Some(trigger) = &mut self.ekf_trigger {

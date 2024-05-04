@@ -245,7 +245,7 @@ where
 
         let mut devices = Vec::new();
         for device in self.devices.values() {
-            let repr = device.to_config().unwrap();
+            let repr = serde_yaml::to_string(device).unwrap();
             devices.push(repr);
         }
 
@@ -314,7 +314,7 @@ impl TrackingArcSim<Spacecraft, RangeDoppler, GroundStation> {
                 // Convert the trajectory into the ground station frame.
                 let traj = self.trajectory.to_frame(device.frame, almanac.clone())?;
 
-                match traj.find_arcs(&device) {
+                match traj.find_arcs(&device, almanac) {
                     Err(_) => info!("No measurements from {name}"),
                     Ok(elevation_arcs) => {
                         for arc in elevation_arcs {
