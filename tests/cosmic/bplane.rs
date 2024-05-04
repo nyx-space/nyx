@@ -1,6 +1,6 @@
 extern crate nyx_space as nyx;
 
-use nyx::cosmic::{try_achieve_b_plane, BPlaneTarget, Bodies, Cosm, Orbit};
+use nyx::cosmic::{try_achieve_b_plane, BPlaneTarget, Bodies, Orbit};
 use nyx::dynamics::OrbitalDynamics;
 use nyx::md::Event;
 use nyx::propagators::Propagator;

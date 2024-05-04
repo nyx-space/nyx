@@ -6,7 +6,7 @@ from timeit import timeit
 
 import pandas as pd
 import yaml
-from nyx_space.cosmic import Cosm, Orbit, Spacecraft, SrpConfig
+from nyx_space.cosmic import Orbit, Spacecraft, SrpConfig
 from nyx_space.mission_design import (
     Event,
     SpacecraftDynamics,

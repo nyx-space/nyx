@@ -1,7 +1,7 @@
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
-use nyx::cosmic::{Cosm, Orbit};
+use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::sph_harmonics::Harmonics;
 use nyx::io::ConfigRepr;

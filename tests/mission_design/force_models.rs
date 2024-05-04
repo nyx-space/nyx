@@ -1,6 +1,6 @@
 extern crate nyx_space as nyx;
 
-use nyx::cosmic::{Cosm, Orbit, Spacecraft};
+use nyx::cosmic::{Orbit, Spacecraft};
 use nyx::dynamics::{Drag, OrbitalDynamics, SolarPressure, SpacecraftDynamics};
 use nyx::linalg::Vector6;
 use nyx::propagators::Propagator;

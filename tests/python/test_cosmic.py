@@ -1,4 +1,4 @@
-from nyx_space.cosmic import Cosm, Orbit, Spacecraft, SrpConfig, DragConfig
+from nyx_space.cosmic import Orbit, Spacecraft, SrpConfig, DragConfig
 from nyx_space.time import Epoch, Unit, Duration
 from nyx_space.monte_carlo import generate_orbits, generate_spacecraft, StateParameter
 import pickle

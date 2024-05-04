@@ -1,6 +1,6 @@
 extern crate nyx_space as nyx;
 use hifitime::J2000_OFFSET;
-use nyx::cosmic::{assert_orbit_eq_or_abs, assert_orbit_eq_or_rel, Cosm, Orbit};
+use nyx::cosmic::{assert_orbit_eq_or_abs, assert_orbit_eq_or_rel, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::propagators::error_ctrl::RSSCartesianState;
 use nyx::propagators::*;

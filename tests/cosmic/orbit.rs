@@ -2,7 +2,7 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger as pel;
 
 use approx::relative_eq;
-use nyx::cosmic::{Cosm, Frame, Orbit};
+use nyx::cosmic::{Frame, Orbit};
 use nyx::time::{Epoch, Unit};
 use nyx::utils::rss_orbit_errors;
 

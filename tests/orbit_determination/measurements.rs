@@ -1,6 +1,6 @@
 extern crate nyx_space as nyx;
 
-use nyx::cosmic::{Cosm, Orbit};
+use nyx::cosmic::Orbit;
 use nyx::od::noise::GaussMarkov;
 use nyx::od::prelude::*;
 use nyx::time::Epoch;
@@ -51,7 +51,7 @@ fn nil_measurement() {
 #[allow(clippy::identity_op)]
 #[test]
 fn val_measurements_topo() {
-    use self::nyx::cosmic::{Cosm, Orbit};
+    use self::nyx::cosmic::Orbit;
     use self::nyx::md::prelude::*;
     use self::nyx::od::prelude::*;
     use self::nyx::propagators::RK4Fixed;

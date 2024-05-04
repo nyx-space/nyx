@@ -1,7 +1,7 @@
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
-use self::nyx::cosmic::{Cosm, GuidanceMode, Orbit, Spacecraft};
+use self::nyx::cosmic::{GuidanceMode, Orbit, Spacecraft};
 use self::nyx::dynamics::guidance::{Objective, Ruggiero, StateParameter, Thruster};
 use self::nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};

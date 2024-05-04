@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import yaml
 from nyx_space.analysis import diff_traj_parquet
-from nyx_space.cosmic import Cosm, Spacecraft
+from nyx_space.cosmic import Spacecraft
 from nyx_space.mission_design import SpacecraftDynamics, TrajectoryLoader, propagate
 from nyx_space.orbit_determination import (
     DynamicTrackingArc,

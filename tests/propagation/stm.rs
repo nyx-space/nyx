@@ -1,5 +1,5 @@
 extern crate nyx_space as nyx;
-use nyx::cosmic::{Bodies, Cosm, Orbit, Spacecraft};
+use nyx::cosmic::{Bodies, Orbit, Spacecraft};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::linalg::{Const, Matrix6, OVector};
 use nyx::propagators::*;

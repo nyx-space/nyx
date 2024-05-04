@@ -1,7 +1,7 @@
 extern crate nyx_space as nyx;
 
 use nyx::cosmic::eclipse::{EclipseLocator, EclipseState};
-use nyx::cosmic::{Bodies, Cosm, Orbit};
+use nyx::cosmic::{Bodies, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, Unit};

@@ -1,9 +1,10 @@
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
+use anise::constants::frames::{EARTH_J2000, MOON_J2000};
 use hifitime::TimeUnits;
 use nyx::cosmic::eclipse::EclipseLocator;
-use nyx::cosmic::{Cosm, GuidanceMode, Orbit, Spacecraft};
+use nyx::cosmic::{GuidanceMode, Orbit, Spacecraft};
 use nyx::dynamics::guidance::{GuidanceLaw, Ruggiero, Thruster};
 use nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
 use nyx::io::trajectory_data::TrajectoryLoader;
@@ -15,13 +16,22 @@ use nyx::State;
 use std::path::PathBuf;
 use std::sync::mpsc::channel;
 
+use anise::prelude::Almanac;
+use rstest::*;
+
+#[fixture]
+fn almanac() -> Almanac {
+    use crate::test_almanac;
+    test_almanac()
+}
+
 #[allow(clippy::identity_op)]
-#[test]
-fn traj_ephem_forward() {
+#[rstest]
+fn traj_ephem_forward(almanac: Almanac) {
     let _ = pretty_env_logger::try_init();
     // Test that we can correctly interpolate a spacecraft orbit
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_dt = Epoch::from_gregorian_utc_at_noon(2021, 1, 1);
     let start_state = Orbit::cartesian(
@@ -121,9 +131,7 @@ fn traj_ephem_forward() {
     let exported_path = ephem
         .to_parquet(
             path,
-            Some(vec![
-                &EclipseLocator::cislunar(cosm.clone()).to_penumbra_event()
-            ]),
+            Some(vec![&EclipseLocator::cislunar().to_penumbra_event()]),
             ExportCfg::timestamped(),
         )
         .unwrap();
@@ -172,7 +180,7 @@ fn traj_ephem_forward() {
     }
 
     // And let's convert into another frame and back to check the error
-    let ephem_luna = ephem.to_frame(cosm.frame("Luna"), cosm.clone()).unwrap();
+    let ephem_luna = ephem.to_frame(MOON_J2000, almanac.clone()).unwrap();
     println!("ephem_luna {}", ephem_luna);
     assert!(
         (ephem.first().epoch() - ephem_luna.first().epoch()).abs() < 1.microseconds(),
@@ -183,7 +191,7 @@ fn traj_ephem_forward() {
         "End time differ!"
     );
     // And convert back, to see the error this leads to
-    let ephem_back_to_earth = ephem_luna.to_frame(eme2k, cosm).unwrap();
+    let ephem_back_to_earth = ephem_luna.to_frame(eme2k, almanac.clone()).unwrap();
     println!("Ephem back: {}", ephem_back_to_earth);
     assert!(
         (ephem.first().epoch() - ephem_back_to_earth.first().epoch()).abs() < 1.microseconds(),
@@ -236,14 +244,14 @@ fn traj_ephem_forward() {
 }
 
 #[allow(clippy::identity_op)]
-#[test]
-fn traj_spacecraft() {
+#[rstest]
+fn traj_spacecraft(almanac: Almanac) {
     let _ = pretty_env_logger::try_init();
     // Test the interpolation of a spaceraft trajectory and of its fuel. Includes a demo of checking what the guidance mode _should_ be provided the state.
     // Note that we _do not_ attempt to interpolate the Guidance Mode.
     // This is based on the Ruggiero AOP correction
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     // Build the initial orbit
     let start_dt = Epoch::from_gregorian_utc_at_noon(2021, 1, 1);
@@ -275,7 +283,7 @@ fn traj_spacecraft() {
 
     let setup = Propagator::default(sc_dynamics);
     let prop_time = 44 * Unit::Minute + 10 * Unit::Second;
-    let mut prop = setup.with(start_state);
+    let mut prop = setup.with(start_state, almanac.clone());
     let (end_state, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
     // Example of iterating through the spaceraft trajectory and checking what the guidance mode is at each time.
@@ -330,7 +338,7 @@ fn traj_spacecraft() {
     let (tx, rx) = channel();
     std::thread::spawn(move || {
         setup
-            .with(start_state)
+            .with(start_state, almanac.clone())
             .until_epoch_with_channel(end_state.epoch(), tx)
             .unwrap();
     });
@@ -402,9 +410,9 @@ fn traj_spacecraft() {
     );
 
     // And let's convert into another frame and back to check the error
-    let ephem_luna = traj.to_frame(cosm.frame("Luna"), cosm.clone()).unwrap();
+    let ephem_luna = traj.to_frame(MOON_J2000, almanac.clone()).unwrap();
     // And convert back, to see the error this leads to
-    let ephem_back_to_earth = ephem_luna.to_frame(eme2k, cosm).unwrap();
+    let ephem_back_to_earth = ephem_luna.to_frame(eme2k, almanac.clone()).unwrap();
 
     // This checks that we have exactly the same states after a conversion back to the original frame.
     assert_eq!(
@@ -458,11 +466,11 @@ fn traj_spacecraft() {
 }
 
 #[allow(clippy::identity_op)]
-#[test]
-fn traj_ephem_backward() {
+#[rstest]
+fn traj_ephem_backward(almanac: Almanac) {
     // Test that we can correctly interpolate a spacecraft orbit
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_dt = Epoch::from_gregorian_utc_at_noon(2021, 1, 1);
     let start_state = Orbit::cartesian(

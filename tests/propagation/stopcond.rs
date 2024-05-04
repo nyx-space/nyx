@@ -2,10 +2,12 @@ extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
+use anise::constants::frames::{EARTH_J2000, MOON_J2000};
+use anise::prelude::Almanac;
 use hifitime::J2000_OFFSET;
 use na::Vector3;
-use nyx::cosmic::{Bodies, Cosm, Orbit};
-use nyx::dynamics::guidance::{FiniteBurns, Mnvr, Thruster};
+use nyx::cosmic::{Bodies, Orbit};
+use nyx::dynamics::guidance::{FiniteBurns, LocalFrame, Mnvr, Thruster};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::SpacecraftDynamics;
 use nyx::md::{Event, StateParameter};
@@ -14,10 +16,17 @@ use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, TimeUnits, Unit};
 use nyx::{Spacecraft, State};
 
-#[test]
-fn stop_cond_3rd_apo() {
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+use rstest::*;
+
+#[fixture]
+fn almanac() -> Almanac {
+    use crate::test_almanac;
+    test_almanac()
+}
+
+#[rstest]
+fn stop_cond_3rd_apo(almanac: Almanac) {
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let state = Orbit::cartesian(
@@ -66,10 +75,9 @@ fn stop_cond_3rd_apo() {
     );
 }
 
-#[test]
-fn stop_cond_3rd_peri() {
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn stop_cond_3rd_peri(almanac: Almanac) {
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let state = Orbit::cartesian(
@@ -119,15 +127,14 @@ fn stop_cond_3rd_peri() {
     );
 }
 
-#[test]
-fn stop_cond_nrho_apo() {
+#[rstest]
+fn stop_cond_nrho_apo(almanac: Almanac) {
     let _ = pretty_env_logger::try_init();
     use std::time::Instant;
     // The following test technically works, but the transformation of thousands of states
     // into another frame is quite slow...
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
-    let luna = cosm.frame("Luna");
+
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let dt = Epoch::from_gregorian_tai(2021, 5, 29, 19, 51, 16, 852_000);
     let state = Orbit::cartesian(
@@ -141,14 +148,14 @@ fn stop_cond_nrho_apo() {
         eme2k,
     );
 
-    let state_luna = cosm.frame_chg(&state, luna);
+    let state_luna = almanac.transform_to(state, MOON_J2000, None).unwrap();
     println!(
         "Start state (dynamics: Earth, Moon, Sun gravity):\n{}",
         state_luna
     );
 
     let bodies = vec![Bodies::Earth, Bodies::Sun];
-    let dynamics = OrbitalDynamics::point_masses(&bodies, cosm.clone());
+    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(&bodies));
 
     let setup = Propagator::rk89(
         dynamics,
@@ -160,7 +167,10 @@ fn stop_cond_nrho_apo() {
     // We can only do that for spacecraft and orbit trajectories since those have a frame.
     let prop_time = 0.5 * state_luna.period();
     let start = Instant::now();
-    let (orbit, traj) = setup.with(state).for_duration_with_traj(prop_time).unwrap();
+    let (orbit, traj) = setup
+        .with(Spacecraft::builder().orbit(state).build(), almanac.clone())
+        .for_duration_with_traj(prop_time)
+        .unwrap();
 
     let end_prop = Instant::now();
     println!(
@@ -175,7 +185,7 @@ fn stop_cond_nrho_apo() {
     let near_apo_event = Event::new(StateParameter::TrueAnomaly, 172.0);
 
     // Convert this trajectory into the Luna frame
-    let traj_luna = traj.to_frame(luna, cosm).unwrap();
+    let traj_luna = traj.to_frame(MOON_J2000, almanac.clone()).unwrap();
     let end_conv = Instant::now();
     println!(
         "Converted EME2000 trajectory into Moon J2000 in {} ms\nFrom: {}\nTo  : {}",
@@ -193,7 +203,7 @@ fn stop_cond_nrho_apo() {
     );
 
     // Now, find all of the requested events
-    let events = traj_luna.find(&near_apo_event).unwrap();
+    let events = traj_luna.find(&near_apo_event, almanac).unwrap();
     println!(
         "Found all {} events in {} ms",
         near_apo_event,
@@ -207,10 +217,9 @@ fn stop_cond_nrho_apo() {
     }
 }
 
-#[test]
-fn line_of_nodes() {
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn line_of_nodes(almanac: Almanac) {
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let state = Orbit::cartesian(
@@ -236,10 +245,9 @@ fn line_of_nodes() {
     );
 }
 
-#[test]
-fn latitude() {
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn latitude(almanac: Almanac) {
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let state = Orbit::cartesian(
@@ -265,8 +273,8 @@ fn latitude() {
     );
 }
 
-#[test]
-fn event_and_combination() {
+#[rstest]
+fn event_and_combination(almanac: Almanac) {
     /// Event combinations cannot be implemented with a brent solver (the approache used by Nyx to find events).
     /// Instead, two events must be sought for, one after another.
     use nyx::dynamics::GuidanceMode;
@@ -274,9 +282,8 @@ fn event_and_combination() {
     let _ = pretty_env_logger::try_init();
 
     // Setup a scenario
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
-    let moonj2k = cosm.frame("Moon J2000");
+
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let epoch = Epoch::now().unwrap();
     // We're at periapse of a GTO
@@ -311,7 +318,7 @@ fn event_and_combination() {
     let dynamics = SpacecraftDynamics::from_guidance_law(orbital_dyn, burn);
 
     let setup = Propagator::default(dynamics);
-    let mut prop = setup.with(sc);
+    let mut prop = setup.with(sc, almanac.clone());
 
     // First, propagate until apoapsis
     let (sc_apo, traj) = prop
@@ -330,7 +337,7 @@ fn event_and_combination() {
     }
 
     // Convert the trajectory to the Moon frame
-    let traj_moon = traj.to_frame(moonj2k, cosm).unwrap();
+    let traj_moon = traj.to_frame(MOON_J2000, almanac.clone()).unwrap();
 
     let sc_moon_apo = traj_moon.at(sc_apo.epoch()).unwrap();
 
@@ -355,7 +362,7 @@ fn event_and_combination() {
     // NOTE: We're unwrapping here, so if the event isn't found, this will cause the test to fail.
     let event = Event::specific(StateParameter::Declination, 6.0, 3.0, Unit::Minute);
     let mut decl_deg = 0.0;
-    if let Ok(matching_states) = traj_moon.find(&event) {
+    if let Ok(matching_states) = traj_moon.find(&event, almanac.clone()) {
         for sc_decl_zero in matching_states {
             decl_deg = sc_decl_zero
                 .state
@@ -366,12 +373,10 @@ fn event_and_combination() {
         }
 
         // We should be able to find a similar event with a tighter bound too.
-        if let Ok(tighter_states) = traj_moon.find(&Event::specific(
-            StateParameter::Declination,
-            decl_deg,
-            1.0,
-            Unit::Minute,
-        )) {
+        if let Ok(tighter_states) = traj_moon.find(
+            &Event::specific(StateParameter::Declination, decl_deg, 1.0, Unit::Minute),
+            almanac,
+        ) {
             for sc_decl_zero in tighter_states {
                 let found_decl_deg = sc_decl_zero
                     .state
