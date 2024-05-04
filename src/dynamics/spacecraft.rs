@@ -307,7 +307,7 @@ impl Dynamics for SpacecraftDynamics {
                 let (state, grad) = self.dual_eom(delta_t, &osc_sc, almanac)?;
 
                 // Apply the gradient to the STM
-                let stm_dt = ctx.stm()? * grad;
+                let stm_dt = stm * grad;
 
                 // Rebuild the state vectors
                 for (i, val) in state.iter().enumerate() {

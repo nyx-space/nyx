@@ -21,8 +21,6 @@ use crate::md::StateParameter;
 use crate::time::Epoch;
 use crate::Orbit;
 
-use anise::prelude::Frame;
-
 use arrow::error::ArrowError;
 use parquet::errors::ParquetError;
 use snafu::prelude::*;
@@ -290,13 +288,6 @@ where
     // implementation of the custom deserialization function
     let s = String::deserialize(deserializer)?;
     Duration::from_str(&s).map_err(serde::de::Error::custom)
-}
-
-pub(crate) fn frame_to_str<S>(frame: &Frame, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    serializer.serialize_str(&format!("{frame}"))
 }
 
 // //TODO(ANISE): Add frame from str to ANISE?

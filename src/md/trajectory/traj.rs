@@ -263,7 +263,7 @@ where
         );
 
         // Add all of the evaluated events
-        if let Some(events) = events {
+        if let Some(_events) = events {
             unimplemented!("Removed in ANISE updated");
         }
 
@@ -428,22 +428,6 @@ where
             .every_between(step, cfg.start_epoch.unwrap(), cfg.end_epoch.unwrap())
             .collect::<Vec<S>>();
 
-        let self_states_pre = self
-            .every_between(
-                step,
-                cfg.start_epoch.unwrap() + step - 1.seconds(),
-                cfg.end_epoch.unwrap(),
-            )
-            .collect::<Vec<S>>();
-
-        let self_states_post = self
-            .every_between(
-                step,
-                cfg.start_epoch.unwrap() + 1.seconds(),
-                cfg.end_epoch.unwrap(),
-            )
-            .collect::<Vec<S>>();
-
         let other_states = other
             .every_between(step, cfg.start_epoch.unwrap(), cfg.end_epoch.unwrap())
             .collect::<Vec<S>>();
@@ -451,12 +435,10 @@ where
         // Build an array of all the RIC differences
         let mut ric_diff = Vec::with_capacity(other_states.len());
         for (ii, other_state) in other_states.iter().enumerate() {
-            let mut self_orbit = *self_states[ii].orbit();
-            let mut other_orbit = *other_state.orbit();
+            let self_orbit = *self_states[ii].orbit();
+            let other_orbit = *other_state.orbit();
 
-            let this_ric_diff = self_orbit
-                .ric_difference(&other_orbit)
-                .map_err(|e| Box::new(e))?;
+            let this_ric_diff = self_orbit.ric_difference(&other_orbit).map_err(Box::new)?;
 
             ric_diff.push(this_ric_diff);
         }

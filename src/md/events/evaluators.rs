@@ -80,7 +80,11 @@ impl EventEvaluator<Spacecraft> for Event {
         self.value_precision
     }
 
-    fn eval_string(&self, state: &Spacecraft, almanac: Arc<Almanac>) -> Result<String, EventError> {
+    fn eval_string(
+        &self,
+        state: &Spacecraft,
+        _almanac: Arc<Almanac>,
+    ) -> Result<String, EventError> {
         match self.parameter {
             StateParameter::Apoapsis | StateParameter::Periapsis => {
                 Ok(format!("{}", self.parameter))

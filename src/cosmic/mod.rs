@@ -168,7 +168,7 @@ mod spacecraft;
 pub use self::spacecraft::*;
 
 // Re-Export frames
-mod frames;
+// mod frames;
 
 mod rotations;
 pub use self::rotations::*;

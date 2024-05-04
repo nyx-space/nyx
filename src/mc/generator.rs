@@ -217,7 +217,7 @@ where
     ) -> Result<Self, MonteCarloError> {
         let mut me: Self = template.into();
 
-        for (param, prct) in prcts.to_owned() {
+        for (param, prct) in prcts.iter().copied() {
             ensure!(
                 (0.0..=1.0).contains(&prct),
                 ParamPercentageSnafu { param, prct }
@@ -251,7 +251,7 @@ where
     ) -> Result<Self, MonteCarloError> {
         let mut me: Self = template.into();
 
-        for (param, prct) in prcts.to_owned() {
+        for (param, prct) in prcts.iter().copied() {
             ensure!(
                 (0.0..=1.0).contains(&prct),
                 ParamPercentageSnafu { param, prct }

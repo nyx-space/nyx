@@ -482,7 +482,7 @@ impl State for Spacecraft {
         vector[7] = self.drag.cd;
         vector[8] = self.fuel_mass_kg;
         // Add the STM to the vector
-        if let Some(mut stm) = self.stm {
+        if let Some(stm) = self.stm {
             // TODO(ANISE): Remove commented code
             // Set the 6x6 of the orbit STM first
             // for i in 0..6 {

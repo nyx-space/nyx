@@ -136,7 +136,7 @@ impl TrajectoryLoader {
                         if potential_field.0 != StateParameter::FuelMass {
                             if let Some(frame_info) = field.metadata().get("Frame") {
                                 // Frame is expected to be serialized as Dhall.
-                                match serde_dhall::from_str(&frame_info).parse::<Frame>() {
+                                match serde_dhall::from_str(frame_info).parse::<Frame>() {
                                     Err(e) => {
                                         return Err(InputOutputError::ParseDhall {
                                             data: frame_info.to_string(),

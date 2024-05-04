@@ -44,7 +44,7 @@ pub struct OrbitalDynamics {
 
 impl OrbitalDynamics {
     /// Initialize point mass dynamics given the EXB IDs and a Cosm
-    pub fn point_masses(celestial_objects: Vec<i32>, almanac: Arc<Almanac>) -> Self {
+    pub fn point_masses(celestial_objects: Vec<i32>) -> Self {
         // Create the point masses
         Self::new(vec![PointMasses::new(celestial_objects)])
     }
@@ -223,11 +223,6 @@ impl PointMasses {
             celestial_objects,
             correction: Some(correction),
         }
-    }
-
-    /// Allows using bodies by name, defined in the non-default XB
-    pub fn specific(body_names: &[String], correction: Aberration) -> Self {
-        unimplemented!("removed");
     }
 }
 

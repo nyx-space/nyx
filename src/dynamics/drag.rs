@@ -103,7 +103,7 @@ impl Drag {
     }
 
     /// Drag model which uses the standard atmosphere 1976 model for atmospheric density
-    pub fn std_atm1976(almanac: Arc<Almanac>) -> Arc<Self> {
+    pub fn std_atm1976() -> Arc<Self> {
         Arc::new(Self {
             density: AtmDensity::StdAtm {
                 max_alt_m: 1_000_000.0,
@@ -210,7 +210,7 @@ impl ForceModel for Drag {
     fn dual_eom(
         &self,
         _osc_ctx: &Spacecraft,
-        almanac: Arc<Almanac>,
+        _almanac: Arc<Almanac>,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
         Err(DynamicsError::DynamicsAstro {
             source: AstroError::PartialsUndefined,

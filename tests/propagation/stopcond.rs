@@ -269,7 +269,6 @@ fn latitude() {
 fn event_and_combination() {
     /// Event combinations cannot be implemented with a brent solver (the approache used by Nyx to find events).
     /// Instead, two events must be sought for, one after another.
-    use nyx::cosmic::Frame;
     use nyx::dynamics::GuidanceMode;
 
     let _ = pretty_env_logger::try_init();

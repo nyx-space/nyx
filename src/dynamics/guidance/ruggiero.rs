@@ -217,7 +217,7 @@ impl GuidanceLaw for Ruggiero {
             let osc = sc.orbit;
             let mut steering = Vector3::zeros();
             for (i, obj) in self.objectives.iter().flatten().enumerate() {
-                let weight = self.weighting(obj, &sc, self.ηthresholds[i]);
+                let weight = self.weighting(obj, sc, self.ηthresholds[i]);
                 if weight.abs() <= 0.0 {
                     continue;
                 }
@@ -229,13 +229,6 @@ impl GuidanceLaw for Ruggiero {
 
                 let ta_rad = osc
                     .ta_deg()
-                    .with_context(|_| GuidancePhysicsSnafu {
-                        action: "computing Ruggiero guidance",
-                    })?
-                    .to_radians();
-
-                let raan_rad = osc
-                    .raan_deg()
                     .with_context(|_| GuidancePhysicsSnafu {
                         action: "computing Ruggiero guidance",
                     })?
@@ -338,7 +331,7 @@ impl GuidanceLaw for Ruggiero {
     fn throttle(&self, sc: &Spacecraft) -> Result<f64, GuidanceError> {
         if sc.mode() == GuidanceMode::Thrust {
             for (i, obj) in self.objectives.iter().flatten().enumerate() {
-                let weight = self.weighting(obj, &sc, self.ηthresholds[i]);
+                let weight = self.weighting(obj, sc, self.ηthresholds[i]);
                 if weight.abs() > 0.0 {
                     return Ok(1.0);
                 }
