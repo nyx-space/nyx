@@ -419,7 +419,7 @@ where
     where
         Dev: TrackingDeviceSim<S, Msr>,
     {
-        let mut devices = arc.rebuild_devices::<S, Dev>(self.almanac.clone()).unwrap();
+        let mut devices = arc.rebuild_devices::<S, Dev>().unwrap();
 
         let measurements = &arc.measurements;
         let step_size = match arc.min_duration_sep() {
@@ -441,7 +441,7 @@ where
     where
         Dev: TrackingDeviceSim<S, Msr>,
     {
-        let mut devices = arc.rebuild_devices::<S, Dev>(self.almanac.clone()).unwrap();
+        let mut devices = arc.rebuild_devices::<S, Dev>().unwrap();
 
         let measurements = &arc.measurements;
         let step_size = match arc.min_duration_sep() {
@@ -566,7 +566,7 @@ where
                             {
                                 // Grab the device location
                                 let device_loc = device
-                                    .location(epoch, nominal_state.frame(), self.almanac)
+                                    .location(epoch, nominal_state.frame(), self.almanac.clone())
                                     .unwrap();
 
                                 // Switch back from extended if necessary

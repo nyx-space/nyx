@@ -31,7 +31,6 @@ use crate::linalg::{DefaultAllocator, DimName};
 use crate::md::trajectory::Interpolatable;
 use crate::od::{Measurement, TrackingDeviceSim};
 use crate::State;
-use anise::almanac::Almanac;
 use arrow::array::{Array, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
@@ -224,10 +223,7 @@ where
 
     /// If this tracking arc has devices that can be used to generate simulated measurements,
     /// then this function can be used to rebuild said measurement devices
-    pub fn rebuild_devices<MsrIn, D>(
-        &self,
-        almanac: Arc<Almanac>,
-    ) -> Result<BTreeMap<String, D>, ConfigError>
+    pub fn rebuild_devices<MsrIn, D>(&self) -> Result<BTreeMap<String, D>, ConfigError>
     where
         MsrIn: Interpolatable,
         D: TrackingDeviceSim<MsrIn, Msr>,

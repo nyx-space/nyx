@@ -126,7 +126,7 @@ impl OrbitalDynamics {
 
                 // Apply the acceleration models
                 for model in &self.accel_models {
-                    let model_acc = model.eom(&osc, almanac)?;
+                    let model_acc = model.eom(&osc, almanac.clone())?;
                     for i in 0..3 {
                         d_x[i + 3] += model_acc[i];
                     }
@@ -185,7 +185,7 @@ impl OrbitalDynamics {
         // Apply the acceleration models
         for model in &self.accel_models {
             // let (model_acc, model_grad) = model.dual_eom(&radius, osc)?;
-            let (model_acc, model_grad) = model.dual_eom(osc, almanac)?;
+            let (model_acc, model_grad) = model.dual_eom(osc, almanac.clone())?;
             for i in 0..3 {
                 dx[i + 3] += model_acc[i];
                 for j in 1..4 {

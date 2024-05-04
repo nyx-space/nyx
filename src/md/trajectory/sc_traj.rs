@@ -176,10 +176,10 @@ impl Traj<Spacecraft> {
                 traj.name = Some(name);
             } else if line.starts_with("CENTER_NAME") {
                 let parts: Vec<&str> = line.split('=').collect();
-                center_name = Some(parts[1].trim());
+                center_name = Some(parts[1].trim().to_owned());
             } else if line.starts_with("REF_FRAME") {
                 let parts: Vec<&str> = line.split('=').collect();
-                orient_name = Some(parts[1].trim());
+                orient_name = Some(parts[1].trim().to_owned());
             } else if line.starts_with("TIME_SYSTEM") {
                 let parts: Vec<&str> = line.split('=').collect();
                 time_system = parts[1].trim().to_string();
@@ -196,7 +196,11 @@ impl Traj<Spacecraft> {
                 parse = false;
             } else if parse {
                 // TODO(ANISE): Add error handling
-                let frame = Frame::from_name(center_name.unwrap(), orient_name.unwrap()).unwrap();
+                let frame = Frame::from_name(
+                    center_name.clone().unwrap().as_str(),
+                    orient_name.clone().unwrap().as_str(),
+                )
+                .unwrap();
                 // Split the line into components
                 let parts: Vec<&str> = line.split_whitespace().collect();
 

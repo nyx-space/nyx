@@ -93,13 +93,13 @@ where
     ) -> Result<Self, EventError> {
         let epoch = state.epoch();
         let prev_value = if let Ok(state) = traj.at(epoch - event.epoch_precision()) {
-            Some(event.eval(&state, almanac)?)
+            Some(event.eval(&state, almanac.clone())?)
         } else {
             None
         };
 
         let next_value = if let Ok(state) = traj.at(epoch + event.epoch_precision()) {
-            Some(event.eval(&state, almanac)?)
+            Some(event.eval(&state, almanac.clone())?)
         } else {
             None
         };

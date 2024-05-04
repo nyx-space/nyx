@@ -331,7 +331,7 @@ impl Dynamics for SpacecraftDynamics {
                         &orbital_dyn_vec,
                         &ctx.orbit,
                         Some(&ctx_stm),
-                        almanac,
+                        almanac.clone(),
                     )?
                     .iter()
                     .enumerate()
@@ -341,7 +341,7 @@ impl Dynamics for SpacecraftDynamics {
 
                 // Apply the force models for non STM propagation
                 for model in &self.force_models {
-                    let model_frc = model.eom(&osc_sc, almanac)? / osc_sc.mass_kg();
+                    let model_frc = model.eom(&osc_sc, almanac.clone())? / osc_sc.mass_kg();
                     for i in 0..3 {
                         d_x[i + 3] += model_frc[i];
                     }
@@ -427,7 +427,9 @@ impl Dynamics for SpacecraftDynamics {
         let mut d_x = OVector::<f64, Const<9>>::zeros();
         let mut grad = OMatrix::<f64, Const<9>, Const<9>>::zeros();
 
-        let (orb_state, orb_grad) = self.orbital_dyn.dual_eom(delta_t_s, &ctx.orbit, almanac)?;
+        let (orb_state, orb_grad) =
+            self.orbital_dyn
+                .dual_eom(delta_t_s, &ctx.orbit, almanac.clone())?;
 
         // Copy the d orbit dt data
         for (i, val) in orb_state.iter().enumerate() {
@@ -449,7 +451,7 @@ impl Dynamics for SpacecraftDynamics {
         // Call the EOMs
         let total_mass = ctx.mass_kg();
         for model in &self.force_models {
-            let (model_frc, model_grad) = model.dual_eom(ctx, almanac)?;
+            let (model_frc, model_grad) = model.dual_eom(ctx, almanac.clone())?;
             for i in 0..3 {
                 // Add the velocity changes
                 d_x[i + 3] += model_frc[i] / total_mass;

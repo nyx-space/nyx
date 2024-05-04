@@ -63,7 +63,7 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
         let duration_increment = (xf.epoch - x0.epoch()) / (node_count as f64);
 
         let (_, traj) = prop
-            .with(x0, almanac)
+            .with(x0, almanac.clone())
             .for_duration_with_traj(delta_t)
             .with_context(|_| PropSnafu)
             .with_context(|_| TargetingSnafu { segment: 0_usize })?;
@@ -82,6 +82,7 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
                 .orbit;
             // Convert this orbit into the body frame
             let orbit_point_bf = almanac
+                .clone()
                 .transform_to(orbit_point, body_frame, None)
                 .with_context(|_| MultiShootAlmanacSnafu {
                     action: "converting node into the body frame",

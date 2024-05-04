@@ -46,7 +46,7 @@ where
         next_state: &S,
         almanac: Arc<Almanac>,
     ) -> Result<bool, EventError> {
-        let prev = self.eval(prev_state, almanac)?;
+        let prev = self.eval(prev_state, almanac.clone())?;
         let next = self.eval(next_state, almanac)?;
 
         Ok(prev * next < 0.0)

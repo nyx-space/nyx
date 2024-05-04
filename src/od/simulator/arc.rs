@@ -314,7 +314,7 @@ impl TrackingArcSim<Spacecraft, RangeDoppler, GroundStation> {
                 // Convert the trajectory into the ground station frame.
                 let traj = self.trajectory.to_frame(device.frame, almanac.clone())?;
 
-                match traj.find_arcs(&device, almanac) {
+                match traj.find_arcs(&device, almanac.clone()) {
                     Err(_) => info!("No measurements from {name}"),
                     Ok(elevation_arcs) => {
                         for arc in elevation_arcs {
