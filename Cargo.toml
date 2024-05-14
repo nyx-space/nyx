@@ -35,7 +35,8 @@ gitlab = { repository = "nyx-space/nyx", branch = "master" }
 [dependencies]
 nalgebra = "=0.32"
 log = "0.4"
-hifitime = { version = "4.0.0-dev", features = ["std"] }
+#hifitime = { version = "4.0.0-dev", features = ["std"] }
+hifitime = { git = "https://github.com/nyx-space/hifitime.git", features = ["std"] }
 flate2 = { version = "1.0", features = [
     "rust_backend",
 ], default-features = false }
