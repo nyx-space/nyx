@@ -3,16 +3,29 @@ extern crate nyx_space as nyx;
 use nyx::mc::*;
 use nyx::md::prelude::*;
 
-#[test]
-fn test_monte_carlo_epoch() {
+use anise::{
+    constants::{
+        celestial_objects::{JUPITER, MOON, SUN},
+        frames::EARTH_J2000,
+    },
+    prelude::Almanac,
+};
+use rstest::*;
+
+#[fixture]
+fn almanac() -> Almanac {
+    use crate::test_almanac;
+    test_almanac()
+}
+
+#[rstest]
+fn test_monte_carlo_epoch(almanac: Almanac) {
     extern crate pretty_env_logger;
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-
     // Build the initial state
 
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);
     let state = Orbit::keplerian(8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k);
 
@@ -28,10 +41,7 @@ fn test_monte_carlo_epoch() {
     .unwrap();
 
     // Set up the dynamics
-    let orbital_dyn = OrbitalDynamics::new(vec![PointMasses::new(
-        &[Bodies::Sun, Bodies::Luna, Bodies::JupiterBarycenter],
-        cosm,
-    )]);
+    let orbital_dyn = OrbitalDynamics::new(vec![PointMasses::new(&[SUN, MOON, JUPITER])]);
 
     let prop = Propagator::default_dp78(orbital_dyn);
 

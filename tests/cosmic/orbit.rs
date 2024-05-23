@@ -3,8 +3,19 @@ extern crate pretty_env_logger as pel;
 
 use approx::relative_eq;
 use nyx::cosmic::{Frame, Orbit};
+use nyx::dynamics::guidance::LocalFrame;
 use nyx::time::{Epoch, Unit};
 use nyx::utils::rss_orbit_errors;
+
+use crate::propagation::GMAT_EARTH_GM;
+use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use rstest::*;
+
+#[fixture]
+fn almanac() -> Almanac {
+    use crate::test_almanac;
+    test_almanac()
+}
 
 macro_rules! f64_eq {
     ($x:expr, $val:expr, $msg:expr) => {
@@ -17,10 +28,12 @@ macro_rules! f64_eq {
     };
 }
 
-#[test]
-fn state_def_circ_inc() {
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn state_def_circ_inc(almanac: Almanac) {
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
 
     let dt = Epoch::from_mjd_tai(21_545.0);
     let cart = Orbit::cartesian(
@@ -136,10 +149,12 @@ fn state_def_circ_inc() {
     assert!(dbg!(vel_rss_km_s) < 1e-14);
 }
 
-#[test]
-fn state_def_elliptical() {
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn state_def_elliptical(almanac: Almanac) {
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
 
     let dt = Epoch::from_mjd_tai(21_545.0);
     let cart = Orbit::cartesian(
@@ -223,10 +238,12 @@ fn state_def_elliptical() {
     assert!(((dcm.transpose() * dcm).determinant() - 1.0).abs() < 1e-12);
 }
 
-#[test]
-fn state_def_circ_eq() {
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn state_def_circ_eq(almanac: Almanac) {
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
 
     let dt = Epoch::from_mjd_tai(21_545.0);
     let cart = Orbit::cartesian(
@@ -308,10 +325,12 @@ fn state_def_circ_eq() {
     assert!(((dcm.transpose() * dcm).determinant() - 1.0).abs() < 1e-12);
 }
 
-#[test]
-fn state_def_equatorial() {
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn state_def_equatorial(almanac: Almanac) {
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
 
     let dt = Epoch::from_mjd_tai(21_545.0);
     let cart = Orbit::cartesian(
@@ -333,10 +352,12 @@ fn state_def_equatorial() {
     f64_eq!(cart.ta_deg(), 2.650_826_247_094_554e-5, "ta");
 }
 
-#[test]
-fn state_def_reciprocity() {
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn state_def_reciprocity(almanac: Almanac) {
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
 
     let dt = Epoch::from_mjd_tai(21_545.0);
 
@@ -404,10 +425,12 @@ fn state_def_reciprocity() {
     );
 }
 
-#[test]
-fn geodetic_vallado() {
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn geodetic_vallado(almanac: Almanac) {
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
 
     dbg!(eme2k.semi_major_radius());
     let dt = Epoch::from_mjd_tai(51_545.0);
@@ -448,11 +471,14 @@ fn geodetic_vallado() {
     f64_eq!(r.geodetic_height_km(), height_val, "height");
 }
 
-#[test]
-fn with_init() {
+#[rstest]
+fn with_init(almanac: Almanac) {
     use nyx::utils::{between_0_360, between_pm_180};
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
     let dt = Epoch::from_gregorian_tai_at_midnight(2021, 3, 4);
     let kep = Orbit::keplerian(
         8_191.93, 0.024_5, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k,
@@ -520,12 +546,15 @@ fn with_init() {
     }
 }
 
-#[test]
-fn orbit_dual_test() {
+#[rstest]
+fn orbit_dual_test(almanac: Almanac) {
     use nyx::cosmic::OrbitDual;
     use nyx::md::StateParameter;
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
 
     let dt = Epoch::from_mjd_tai(21_545.0);
     let cart = Orbit::cartesian(

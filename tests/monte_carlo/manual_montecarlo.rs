@@ -3,7 +3,9 @@ extern crate rand;
 extern crate rand_distr;
 extern crate rayon;
 
-use nyx::cosmic::{Bodies, Orbit};
+use anise::constants::celestial_objects::{JUPITER, MOON, SUN};
+use anise::constants::orientations::IAU_EARTH;
+use nyx::cosmic::Orbit;
 use nyx::dynamics::Harmonics;
 use nyx::dynamics::{OrbitalDynamics, PointMasses};
 use nyx::io::gravity::*;
@@ -16,32 +18,35 @@ use rayon::prelude::*;
 use std::sync::Arc;
 use std::time::Instant as StdInstant;
 
+use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use rstest::*;
+
+#[fixture]
+fn almanac() -> Almanac {
+    use crate::test_almanac;
+    test_almanac()
+}
+
 #[allow(clippy::identity_op)]
-#[test]
-fn multi_thread_monte_carlo_demo() {
+#[rstest]
+fn multi_thread_monte_carlo_demo(almanac: Almanac) {
     /*
     In this demo, we'll be running a 100 runs with the same dynamics and end state, but with a slightly variation in eccentricity.
     */
     extern crate pretty_env_logger;
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
-    let iau_earth = cosm.frame("IAU Earth");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH).unwrap();
 
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
-    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, cosm.clone());
+    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm);
 
     let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);
     let state = Orbit::keplerian(8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k);
 
-    let orbital_dyn = OrbitalDynamics::new(vec![
-        PointMasses::new(
-            &[Bodies::Sun, Bodies::Luna, Bodies::JupiterBarycenter],
-            cosm,
-        ),
-        harmonics,
-    ]);
+    let orbital_dyn =
+        OrbitalDynamics::new(vec![PointMasses::new(&[SUN, MOON, JUPITER]), harmonics]);
 
     // We need to wrap the propagator setup in an Arc to enable multithreading.
     let setup = Arc::new(Propagator::default_dp78(orbital_dyn));
