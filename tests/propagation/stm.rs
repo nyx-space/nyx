@@ -1,5 +1,8 @@
 extern crate nyx_space as nyx;
-use nyx::cosmic::{Bodies, Orbit, Spacecraft};
+use std::sync::Arc;
+
+use anise::constants::celestial_objects::{MOON, SUN};
+use nyx::cosmic::{Orbit, Spacecraft};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::linalg::{Const, Matrix6, OVector};
 use nyx::propagators::*;
@@ -10,10 +13,23 @@ use nyx_space::md::prelude::SpacecraftDynamics;
 // These tests compare the computation of the state transition matrix between the finite differencing methoid (common) and hyperdual numbers.
 // Conclusion: hyperdual numbers lead to less error than finite differencing.
 
-#[test]
-fn stm_fixed_step() {
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use rstest::*;
+
+use crate::propagation::GMAT_EARTH_GM;
+
+#[fixture]
+fn almanac() -> Almanac {
+    use crate::test_almanac;
+    test_almanac()
+}
+
+#[rstest]
+fn stm_fixed_step(almanac: Almanac) {
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
     let prop = Propagator::new::<RK4Fixed>(
@@ -88,10 +104,12 @@ fn stm_fixed_step() {
     }
 }
 
-#[test]
-fn stm_variable_step() {
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn stm_variable_step(almanac: Almanac) {
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
     let prop = Propagator::default_dp78(OrbitalDynamics::two_body());
@@ -163,12 +181,14 @@ fn stm_variable_step() {
     }
 }
 
-#[test]
-fn stm_between_steps() {
+#[rstest]
+fn stm_between_steps(almanac: Almanac) {
     // Check that \Phi(t_2, t_1) = \Phi(t_2, t_0) * \Phi^{-1}(t_1, t_0)
 
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
     let prop = Propagator::default_dp78(OrbitalDynamics::two_body());
@@ -207,17 +227,17 @@ fn stm_between_steps() {
     }
 }
 
-#[test]
-fn stm_hifi_variable_step() {
+#[rstest]
+fn stm_hifi_variable_step(almanac: Almanac) {
     // Using higher fidelity dynamics for STM testing
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let prop = Propagator::default_dp78(OrbitalDynamics::point_masses(
-        &[Bodies::Luna, Bodies::Sun],
-        cosm,
-    ));
+    let prop = Propagator::default_dp78(OrbitalDynamics::point_masses(&[MOON, SUN]));
 
     let eccs = vec![1e-5, 0.2];
 
@@ -286,10 +306,12 @@ fn stm_hifi_variable_step() {
     }
 }
 
-#[test]
-fn orbit_set_unset_static() {
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn orbit_set_unset_static(almanac: Almanac) {
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
     let mut init = Orbit::keplerian(8000.0, 0.5, 10.0, 5.0, 25.0, 0.0, epoch, eme2k).with_stm();
@@ -306,18 +328,17 @@ fn orbit_set_unset_static() {
     assert_eq!(init, init2);
 }
 
-#[test]
-fn orbit_set_unset() {
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn orbit_set_unset(almanac: Almanac) {
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
     let init = Orbit::keplerian(8000.0, 0.5, 10.0, 5.0, 25.0, 0.0, epoch, eme2k).with_stm();
 
-    let prop = Propagator::default_dp78(OrbitalDynamics::point_masses(
-        &[Bodies::Luna, Bodies::Sun],
-        cosm,
-    ));
+    let prop = Propagator::default_dp78(OrbitalDynamics::point_masses(&[MOON, SUN]));
 
     let orbit = prop.with(init).for_duration(2 * Unit::Hour).unwrap();
 
@@ -329,10 +350,12 @@ fn orbit_set_unset() {
     assert_eq!(orbit, init2);
 }
 
-#[test]
-fn sc_set_unset_static() {
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn sc_set_unset_static(almanac: Almanac) {
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
     let init = Orbit::keplerian(8000.0, 0.5, 10.0, 5.0, 25.0, 0.0, epoch, eme2k).with_stm();
@@ -353,30 +376,32 @@ fn sc_set_unset_static() {
     assert_eq!(init_sc, init2);
 }
 
-#[test]
-fn sc_and_orbit_stm_chk() {
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn sc_and_orbit_stm_chk(almanac: Almanac) {
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
     let init_orbit = Orbit::keplerian(8000.0, 0.5, 10.0, 5.0, 25.0, 0.0, epoch, eme2k).with_stm();
     let init_sc = Spacecraft::from_srp_defaults(init_orbit, 0.0, 0.0);
 
-    let prop_orbit = Propagator::default_dp78(OrbitalDynamics::point_masses(
-        &[Bodies::Luna, Bodies::Sun],
-        cosm.clone(),
-    ));
+    let prop_orbit = Propagator::default_dp78(OrbitalDynamics::point_masses(&[MOON, SUN]));
 
-    let prop_sc = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
-        &[Bodies::Luna, Bodies::Sun],
-        cosm,
-    )));
+    let prop_sc =
+        Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::point_masses(&[
+            MOON, SUN,
+        ])));
 
     let final_orbit = prop_orbit
         .with(init_orbit)
         .for_duration(2 * Unit::Hour)
         .unwrap();
-    let final_sc = prop_sc.with(init_sc).for_duration(2 * Unit::Hour).unwrap();
+    let final_sc = prop_sc
+        .with(init_sc, Arc::new(almanac))
+        .for_duration(2 * Unit::Hour)
+        .unwrap();
 
     assert_eq!(
         final_orbit, final_sc.orbit,

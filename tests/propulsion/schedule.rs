@@ -1,22 +1,36 @@
 extern crate nyx_space as nyx;
-
-use self::nyx::cosmic::{Bodies, Frame, GuidanceMode, Orbit, Spacecraft};
+use self::nyx::cosmic::{GuidanceMode, Orbit, Spacecraft};
 use self::nyx::dynamics::guidance::{FiniteBurns, Mnvr, Thruster};
 use self::nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
 use self::nyx::linalg::Vector3;
 use self::nyx::propagators::{PropOpts, Propagator};
 use self::nyx::time::{Epoch, Unit};
 use self::nyx::utils::rss_orbit_vec_errors;
+use crate::propagation::GMAT_EARTH_GM;
+use nyx::dynamics::guidance::LocalFrame;
+use std::sync::Arc;
 
-#[test]
-fn val_transfer_schedule_no_depl() {
+use anise::constants::celestial_objects::{JUPITER, MOON, SUN};
+use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use rstest::*;
+
+#[fixture]
+fn almanac() -> Almanac {
+    use crate::test_almanac;
+    test_almanac()
+}
+
+#[rstest]
+fn val_transfer_schedule_no_depl(almanac: Almanac) {
     /*
         NOTE: Due to how lifetime of variables work in Rust, we need to define all of the
         components of a spacecraft before defining the spacecraft itself.
     */
 
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
 
     // Build the initial spacecraft state
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 1, 1);
@@ -39,8 +53,8 @@ fn val_transfer_schedule_no_depl() {
     let end_time = start_time + prop_time;
 
     // Define the dynamics
-    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm);
+    let bodies = vec![MOON, SUN, JUPITER];
+    let orbital_dyn = OrbitalDynamics::point_masses(&bodies);
 
     // Define the maneuver and its schedule
     let mnvr0 = Mnvr::from_time_invariant(
@@ -59,7 +73,7 @@ fn val_transfer_schedule_no_depl() {
     // Setup a propagator, and propagate for that duration
     // NOTE: We specify the use an RK89 to match the GMAT setup.
     let final_state = Propagator::rk89(sc, PropOpts::with_fixed_step(10.0 * Unit::Second))
-        .with(sc_state)
+        .with(sc_state, Arc::new(almanac))
         .for_duration(prop_time)
         .unwrap();
 
@@ -101,10 +115,12 @@ fn val_transfer_schedule_no_depl() {
     );
 }
 
-#[test]
-fn val_transfer_schedule_depl() {
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn val_transfer_schedule_depl(almanac: Almanac) {
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
 
     // Build the initial spacecraft state
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 1, 1);
@@ -127,8 +143,8 @@ fn val_transfer_schedule_depl() {
     let end_time = start_time + prop_time;
 
     // Define the dynamics
-    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm);
+    let bodies = vec![MOON, SUN, JUPITER];
+    let orbital_dyn = OrbitalDynamics::point_masses(&bodies);
 
     // With 100% thrust: RSS errors:     pos = 3.14651e1 km      vel = 3.75245e-2 km/s
 
@@ -148,7 +164,10 @@ fn val_transfer_schedule_depl() {
     // Setup a propagator, and propagate for that duration
     // NOTE: We specify the use an RK89 to match the GMAT setup.
     let setup = Propagator::rk89(sc, PropOpts::with_fixed_step(10.0 * Unit::Second));
-    let final_state = setup.with(sc_state).for_duration(prop_time).unwrap();
+    let final_state = setup
+        .with(sc_state, Arc::new(almanac))
+        .for_duration(prop_time)
+        .unwrap();
 
     // Compute the errors
     let rslt = Orbit::cartesian(
@@ -188,7 +207,10 @@ fn val_transfer_schedule_depl() {
     assert!(delta_fuel_mass < 2e-10, "incorrect fuel mass");
 
     // Now, test that backward propagation of maneuvers also works.
-    let backward_state = setup.with(final_state).for_duration(-prop_time).unwrap();
+    let backward_state = setup
+        .with(final_state, Arc::new(almanac))
+        .for_duration(-prop_time)
+        .unwrap();
     println!("Reached: {}\nWanted:  {}", backward_state, sc_state);
 
     let (err_r, err_v) = rss_orbit_vec_errors(
@@ -222,9 +244,11 @@ fn val_transfer_schedule_depl() {
 #[test]
 fn val_transfer_single_maneuver_depl() {
     /* This is the same test as val_transfer_schedule_depl but uses the maneuver directly as the guidance law. It should work in the same way. */
-    use std::sync::Arc;
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
 
     // Build the initial spacecraft state
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 1, 1);
@@ -252,8 +276,8 @@ fn val_transfer_single_maneuver_depl() {
     let end_time = start_time + prop_time;
 
     // Define the dynamics
-    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm);
+    let bodies = vec![MOON, SUN, JUPITER];
+    let orbital_dyn = OrbitalDynamics::point_masses(&bodies);
 
     // With 100% thrust: RSS errors:     pos = 3.14651e1 km      vel = 3.75245e-2 km/s
 
@@ -271,7 +295,10 @@ fn val_transfer_single_maneuver_depl() {
     // Setup a propagator, and propagate for that duration
     // NOTE: We specify the use an RK89 to match the GMAT setup.
     let setup = Propagator::rk89(sc, PropOpts::with_fixed_step(10.0 * Unit::Second));
-    let final_state = setup.with(sc_state).for_duration(prop_time).unwrap();
+    let final_state = setup
+        .with(sc_state, Arc::new(almanac))
+        .for_duration(prop_time)
+        .unwrap();
 
     // Compute the errors
     let rslt = Orbit::cartesian(
@@ -311,7 +338,10 @@ fn val_transfer_single_maneuver_depl() {
     assert!(delta_fuel_mass < 2e-10, "incorrect fuel mass");
 
     // Now, test that backward propagation of maneuvers also works.
-    let backward_state = setup.with(final_state).for_duration(-prop_time).unwrap();
+    let backward_state = setup
+        .with(final_state, Arc::new(almanac))
+        .for_duration(-prop_time)
+        .unwrap();
     println!("Reached: {}\nWanted:  {}", backward_state, sc_state);
 
     let (err_r, err_v) = rss_orbit_vec_errors(

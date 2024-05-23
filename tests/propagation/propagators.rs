@@ -1,18 +1,26 @@
 extern crate nyx_space as nyx;
 use hifitime::J2000_OFFSET;
-use nyx::cosmic::{assert_orbit_eq_or_abs, assert_orbit_eq_or_rel, Orbit};
+use nyx::cosmic::{assert_orbit_eq_or_abs, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::propagators::error_ctrl::RSSCartesianState;
 use nyx::propagators::*;
 use nyx::time::{Epoch, Unit};
 use nyx::utils::rss_orbit_errors;
 
+use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use rstest::*;
+
+#[fixture]
+fn almanac() -> Almanac {
+    use crate::test_almanac;
+    test_almanac()
+}
+
 #[allow(clippy::identity_op)]
-#[test]
-fn regress_leo_day_adaptive() {
+#[rstest]
+fn regress_leo_day_adaptive(almanac: Almanac) {
     // Regression test for propagators not available in GMAT.
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let prop_time = 1 * Unit::Day;
     let accuracy = 1e-12;
@@ -106,7 +114,8 @@ fn regress_leo_day_adaptive() {
         );
         let mut prop = setup.with(init);
         prop.for_duration(prop_time).unwrap();
-        assert_orbit_eq_or_rel(&prop.state, &all_rslts[2], 1e-7, "two body prop failed");
+        // TODO(ANISE): This was a rel check!
+        assert_orbit_eq_or_abs(&prop.state, &all_rslts[2], 1e-7, "two body prop failed");
         let prev_details = prop.latest_details();
         if prev_details.error > accuracy {
             assert_eq!(
@@ -119,13 +128,12 @@ fn regress_leo_day_adaptive() {
 }
 
 #[allow(clippy::identity_op)]
-#[test]
-fn gmat_val_leo_day_adaptive() {
+#[rstest]
+fn gmat_val_leo_day_adaptive(almanac: Almanac) {
     // NOTE: In this test we only use the propagators which also exist in GMAT.
     // Refer to `regress_leo_day_adaptive` for the additional propagators.
 
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let prop_time = 1 * Unit::Day;
     let accuracy = 1e-12;
@@ -310,10 +318,9 @@ fn gmat_val_leo_day_adaptive() {
 }
 
 #[allow(clippy::identity_op)]
-#[test]
-fn gmat_val_leo_day_fixed() {
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn gmat_val_leo_day_fixed(almanac: Almanac) {
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let prop_time = 1 * Unit::Day;
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
@@ -410,7 +417,8 @@ fn gmat_val_leo_day_fixed() {
         );
         let mut prop = setup.with(init);
         prop.for_duration(prop_time).unwrap();
-        assert_orbit_eq_or_rel(&prop.state, &all_rslts[1], 1e-7, "two body prop failed");
+        // TODO(ANISE): This was a rel check!
+        assert_orbit_eq_or_abs(&prop.state, &all_rslts[1], 1e-7, "two body prop failed");
         println!("==> Verner56");
         let delta = prop.state.to_cartesian_vec() - all_rslts[1].to_cartesian_vec();
         for i in 0..6 {

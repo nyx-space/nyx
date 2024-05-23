@@ -7,10 +7,19 @@ use self::nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use self::nyx::time::{Epoch, Unit};
 
-#[test]
-fn rugg_sma() {
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use rstest::*;
+use std::sync::Arc;
+
+#[fixture]
+fn almanac() -> Almanac {
+    use crate::test_almanac;
+    test_almanac()
+}
+
+#[rstest]
+fn rugg_sma(almanac: Almanac) {
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -46,7 +55,7 @@ fn rugg_sma() {
 
     let final_state =
         Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state)
+            .with(sc_state, Arc::new(almanac))
             .for_duration(prop_time)
             .unwrap();
 
@@ -61,10 +70,9 @@ fn rugg_sma() {
     assert!((fuel_usage - 21.0).abs() < 1.0);
 }
 
-#[test]
-fn rugg_sma_regress_threshold() {
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn rugg_sma_regress_threshold(almanac: Almanac) {
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -97,7 +105,7 @@ fn rugg_sma_regress_threshold() {
 
         let final_state =
             Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-                .with(sc_state)
+                .with(sc_state, Arc::new(almanac))
                 .for_duration(prop_time)
                 .unwrap();
 
@@ -113,10 +121,9 @@ fn rugg_sma_regress_threshold() {
     }
 }
 
-#[test]
-fn rugg_sma_decr() {
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn rugg_sma_decr(almanac: Almanac) {
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -152,7 +159,7 @@ fn rugg_sma_decr() {
 
     let final_state =
         Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state)
+            .with(sc_state, Arc::new(almanac))
             .for_duration(prop_time)
             .unwrap();
 
@@ -167,10 +174,9 @@ fn rugg_sma_decr() {
     assert!((fuel_usage - 21.0).abs() < 1.0);
 }
 
-#[test]
-fn rugg_inc() {
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn rugg_inc(almanac: Almanac) {
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -208,7 +214,7 @@ fn rugg_inc() {
 
     let final_state =
         Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state)
+            .with(sc_state, Arc::new(almanac))
             .for_duration(prop_time)
             .unwrap();
 
@@ -223,11 +229,11 @@ fn rugg_inc() {
     assert!((fuel_usage - 25.0).abs() < 1.0);
 }
 
-#[test]
-fn rugg_inc_threshold() {
+#[rstest]
+fn rugg_inc_threshold(almanac: Almanac) {
     // Same inclination test as above, but with an efficiency threshold. Data comes from Figure 7 of IEPC-2011-102.
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -263,7 +269,7 @@ fn rugg_inc_threshold() {
 
     let final_state =
         Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state)
+            .with(sc_state, Arc::new(almanac))
             .for_duration(prop_time)
             .unwrap();
 
@@ -278,10 +284,9 @@ fn rugg_inc_threshold() {
     assert!((fuel_usage - 17.0).abs() < 1.0);
 }
 
-#[test]
-fn rugg_inc_decr() {
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn rugg_inc_decr(almanac: Almanac) {
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -319,7 +324,7 @@ fn rugg_inc_decr() {
 
     let final_state =
         Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state)
+            .with(sc_state, Arc::new(almanac))
             .for_duration(prop_time)
             .unwrap();
 
@@ -334,10 +339,9 @@ fn rugg_inc_decr() {
     assert!((fuel_usage - 25.0).abs() < 1.0);
 }
 
-#[test]
-fn rugg_ecc() {
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn rugg_ecc(almanac: Almanac) {
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -375,7 +379,7 @@ fn rugg_ecc() {
 
     let final_state =
         Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state)
+            .with(sc_state, Arc::new(almanac))
             .for_duration(prop_time)
             .unwrap();
 
@@ -390,10 +394,9 @@ fn rugg_ecc() {
     assert!((fuel_usage - 10.37).abs() < 1.0);
 }
 
-#[test]
-fn rugg_ecc_regress_threshold() {
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn rugg_ecc_regress_threshold(almanac: Almanac) {
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -430,7 +433,7 @@ fn rugg_ecc_regress_threshold() {
 
         let final_state =
             Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-                .with(sc_state)
+                .with(sc_state, Arc::new(almanac))
                 .for_duration(prop_time)
                 .unwrap();
 
@@ -446,10 +449,9 @@ fn rugg_ecc_regress_threshold() {
     }
 }
 
-#[test]
-fn rugg_ecc_decr() {
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn rugg_ecc_decr(almanac: Almanac) {
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -487,7 +489,7 @@ fn rugg_ecc_decr() {
 
     let final_state =
         Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state)
+            .with(sc_state, Arc::new(almanac))
             .for_duration(prop_time)
             .unwrap();
 
@@ -502,10 +504,9 @@ fn rugg_ecc_decr() {
     assert!((fuel_usage - 10.37).abs() < 1.0);
 }
 
-#[test]
-fn rugg_aop() {
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn rugg_aop(almanac: Almanac) {
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -545,7 +546,7 @@ fn rugg_aop() {
 
     let final_state =
         Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state)
+            .with(sc_state, Arc::new(almanac))
             .for_duration(prop_time)
             .unwrap();
 
@@ -560,10 +561,9 @@ fn rugg_aop() {
     assert!((fuel_usage - 0.014).abs() < 1e-2);
 }
 
-#[test]
-fn rugg_aop_decr() {
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn rugg_aop_decr(almanac: Almanac) {
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -602,7 +602,7 @@ fn rugg_aop_decr() {
 
     let final_state =
         Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state)
+            .with(sc_state, Arc::new(almanac))
             .for_duration(prop_time)
             .unwrap();
 
@@ -617,11 +617,11 @@ fn rugg_aop_decr() {
     assert!((fuel_usage - 0.014).abs() < 1e-2);
 }
 
-#[test]
-fn rugg_raan() {
+#[rstest]
+fn rugg_raan(almanac: Almanac) {
     use self::nyx::md::{Event, StateParameter};
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2017, 1, 1);
 
@@ -655,12 +655,16 @@ fn rugg_raan() {
 
     let setup =
         Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second));
-    let mut prop = setup.with(sc_state);
+    let mut prop = setup.with(sc_state, Arc::new(almanac));
     let (final_state, traj) = prop.for_duration_with_traj(prop_time).unwrap();
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_raan] {:x}", final_state.orbit);
     let event = Event::new(StateParameter::RAAN, 5.0);
-    println!("[rugg_raan] {} => {:?}", event, traj.find(&event));
+    println!(
+        "[rugg_raan] {} => {:?}",
+        event,
+        traj.find(&event, Arc::new(almanac))
+    );
     println!("[rugg_raan] fuel usage: {:.3} kg", fuel_usage);
 
     assert!(
@@ -670,10 +674,9 @@ fn rugg_raan() {
     assert!((fuel_usage - 22.189).abs() < 1.0);
 }
 
-#[test]
-fn rugg_raan_regress_threshold() {
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn rugg_raan_regress_threshold(almanac: Almanac) {
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -706,7 +709,7 @@ fn rugg_raan_regress_threshold() {
 
         let final_state =
             Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-                .with(sc_state)
+                .with(sc_state, Arc::new(almanac))
                 .for_duration(prop_time)
                 .unwrap();
 

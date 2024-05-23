@@ -1,14 +1,25 @@
 extern crate nyx_space as nyx;
 use std::fmt::Write;
 
-#[test]
-fn event_tracker_true_anomaly() {
+use anise::{
+    constants::frames::{EARTH_J2000, IAU_EARTH_FRAME, SUN_J2000},
+    prelude::Almanac,
+};
+use rstest::*;
+
+#[fixture]
+fn almanac() -> Almanac {
+    use crate::test_almanac;
+    test_almanac()
+}
+
+#[rstest]
+fn event_tracker_true_anomaly(almanac: Almanac) {
     use nyx::cosmic::eclipse::{EclipseLocator, EclipseState};
     use nyx::md::prelude::*;
     use nyx::od::GroundStation;
 
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let dt = Epoch::from_gregorian_tai_at_noon(2020, 1, 1);
     let state = Orbit::cartesian(
@@ -48,9 +59,8 @@ fn event_tracker_true_anomaly() {
 
     // Find all eclipses!
     let e_loc = EclipseLocator {
-        light_source: cosm.frame("Sun J2000"),
-        shadow_bodies: vec![cosm.frame("EME2000")],
-        cosm: cosm.clone(),
+        light_source: SUN_J2000,
+        shadow_bodies: vec![EARTH_J2000],
     };
 
     // Adding this print to confirm that the penumbra calculation continuously increases and then decreases.
@@ -61,21 +71,21 @@ fn event_tracker_true_anomaly() {
         36.0544,
         112.1402,
         0.0,
-        cosm.frame("IAU Earth"),
+        IAU_EARTH_FRAME,
     );
     let mut min_el = std::f64::INFINITY;
     let mut max_el = std::f64::NEG_INFINITY;
     let mut min_dt = dt;
     let mut max_dt = dt;
     for state in traj.every(10 * Unit::Second) {
-        let new_e_state = e_loc.compute(&state);
+        let new_e_state = e_loc.compute(&state, almanac.clone());
         if e_state != new_e_state {
             println!("{:x}\t{}", state, new_e_state);
             e_state = new_e_state;
         }
 
         // Compute the elevation
-        let (elevation, _, _, _) = gc.azimuth_elevation_of(state, &cosm);
+        let (elevation, _, _, _) = gc.azimuth_elevation_of(state, &almanac).unwrap();
         if elevation > max_el {
             max_el = elevation;
             max_dt = state.epoch();
@@ -101,9 +111,15 @@ fn event_tracker_true_anomaly() {
                 output,
                 "{:x}\tevent value: {}\t(-10s: {}\t+10s: {})",
                 orbit,
-                &e_loc.compute(&orbit),
-                &e_loc.compute(&traj.at(orbit.epoch() - 10 * Unit::Second).unwrap()),
-                &e_loc.compute(&traj.at(orbit.epoch() + 10 * Unit::Second).unwrap())
+                &e_loc.compute(&orbit, almanac.clone()),
+                &e_loc.compute(
+                    &traj.at(orbit.epoch() - 10 * Unit::Second).unwrap(),
+                    almanac.clone()
+                ),
+                &e_loc.compute(
+                    &traj.at(orbit.epoch() + 10 * Unit::Second).unwrap(),
+                    almanac.clone()
+                )
             );
             output
         });
@@ -120,9 +136,15 @@ fn event_tracker_true_anomaly() {
                 output,
                 "{:x}\tevent value: {}\t(-10s: {}\t+10s: {})",
                 orbit,
-                &e_loc.compute(&orbit),
-                &e_loc.compute(&traj.at(orbit.epoch() - 10 * Unit::Second).unwrap()),
-                &e_loc.compute(&traj.at(orbit.epoch() + 10 * Unit::Second).unwrap())
+                &e_loc.compute(&orbit, almanac.clone()),
+                &e_loc.compute(
+                    &traj.at(orbit.epoch() - 10 * Unit::Second).unwrap(),
+                    almanac.clone()
+                ),
+                &e_loc.compute(
+                    &traj.at(orbit.epoch() + 10 * Unit::Second).unwrap(),
+                    almanac.clone()
+                )
             );
             output
         });
