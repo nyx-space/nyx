@@ -1,5 +1,9 @@
 extern crate nyx_space as nyx;
 
+use anise::constants::celestial_objects::JUPITER;
+use anise::constants::celestial_objects::MOON;
+use anise::constants::celestial_objects::SUN;
+use anise::constants::frames::IAU_EARTH_FRAME;
 use nyx::od::noise::GaussMarkov;
 use nyx::od::simulator::TrackingArcSim;
 use nyx::od::simulator::TrkConfig;
@@ -12,14 +16,22 @@ use self::nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
 use self::nyx::propagators::RK4Fixed;
 use std::collections::BTreeMap;
 
+use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use rstest::*;
+use std::sync::Arc;
+
+#[fixture]
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
+}
+
 #[allow(clippy::identity_op)]
-#[test]
-fn od_val_multi_body_ckf_perfect_stations() {
+#[rstest]
+fn od_val_multi_body_ckf_perfect_stations(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-
-    let iau_earth = cosm.frame("IAU Earth");
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     // Define the ground stations.
     let elevation_mask = 0.0;
@@ -65,12 +77,12 @@ fn od_val_multi_body_ckf_perfect_stations() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
-    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm.clone());
+    let bodies = vec![MOON, SUN, JUPITER];
+    let orbital_dyn = OrbitalDynamics::point_masses(&bodies);
     // Generate the truth data.
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
@@ -78,9 +90,9 @@ fn od_val_multi_body_ckf_perfect_stations() {
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
-    arc_sim.build_schedule(cosm.clone()).unwrap();
+    arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -106,7 +118,7 @@ fn od_val_multi_body_ckf_perfect_stations() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::<_, _, RangeDoppler, _, _, _>::ckf(prop_est, ckf, None, cosm);
+    let mut odp = ODProcess::<_, _, RangeDoppler, _, _, _>::ckf(prop_est, ckf, None, almanac);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -158,14 +170,12 @@ fn od_val_multi_body_ckf_perfect_stations() {
 }
 
 #[allow(clippy::identity_op)]
-#[test]
-fn multi_body_ckf_covar_map() {
+#[rstest]
+fn multi_body_ckf_covar_map(almanac: Arc<Almanac>) {
     // For this test, we're only enabling one station so we can check that the covariance inflates between visibility passes.
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-
-    let iau_earth = cosm.frame("IAU Earth");
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
     // Define the ground stations.
     let elevation_mask = 0.0;
     let dss13_goldstone = GroundStation::dss13_goldstone(
@@ -192,13 +202,13 @@ fn multi_body_ckf_covar_map() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     // Generate the truth data on one thread.
-    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm.clone());
+    let bodies = vec![MOON, SUN, JUPITER];
+    let orbital_dyn = OrbitalDynamics::point_masses(&bodies);
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
 
@@ -206,9 +216,9 @@ fn multi_body_ckf_covar_map() {
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
-    arc_sim.build_schedule(cosm.clone()).unwrap();
+    arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -234,7 +244,7 @@ fn multi_body_ckf_covar_map() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, None, cosm);
+    let mut odp = ODProcess::ckf(prop_est, ckf, None, almanac);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 

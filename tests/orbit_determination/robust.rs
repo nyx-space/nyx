@@ -1,6 +1,8 @@
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
+use anise::constants::celestial_objects::{JUPITER, MOON, SATURN, SUN};
+use anise::constants::frames::IAU_EARTH_FRAME;
 use nyx::cosmic::{Bodies, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::io::ExportCfg;
@@ -17,6 +19,16 @@ use std::env;
 use std::fs::File;
 use std::path::PathBuf;
 
+use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use rstest::*;
+use std::sync::Arc;
+
+#[fixture]
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
+}
+
 /*
  * These tests check that if we start with a state deviation in the estimate, the filter will eventually converge back.
  * These tests do NOT check that the filter will converge if the initial state in the propagator has that state deviation.
@@ -24,13 +36,11 @@ use std::path::PathBuf;
 **/
 
 #[allow(clippy::identity_op)]
-#[test]
-fn od_robust_test_ekf_realistic_one_way() {
+#[rstest]
+fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-
-    let iau_earth = cosm.frame("IAU Earth");
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
     // Define the ground stations.
     let ekf_num_meas = 300;
     // Set the disable time to be very low to test enable/disable sequence
@@ -71,7 +81,7 @@ fn od_robust_test_ekf_realistic_one_way() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
@@ -101,13 +111,8 @@ fn od_robust_test_ekf_realistic_one_way() {
         initial_state - initial_state_dev
     );
 
-    let bodies = vec![
-        Bodies::Luna,
-        Bodies::Sun,
-        Bodies::JupiterBarycenter,
-        Bodies::SaturnBarycenter,
-    ];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm.clone());
+    let bodies = vec![MOON, SUN, JUPITER, SATURN];
+    let orbital_dyn = OrbitalDynamics::point_masses(&bodies);
     let truth_setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let (_, traj) = truth_setup
         .with(initial_state)
@@ -116,9 +121,9 @@ fn od_robust_test_ekf_realistic_one_way() {
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
-    arc_sim.build_schedule(cosm.clone()).unwrap();
+    arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // And serialize to disk
     let path: PathBuf = [
@@ -134,7 +139,7 @@ fn od_robust_test_ekf_realistic_one_way() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be _nearly_ perfect because we've removed Saturn from the estimated trajectory
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let estimator = OrbitalDynamics::point_masses(&bodies, cosm.clone());
+    let estimator = OrbitalDynamics::point_masses(&bodies);
     let setup = Propagator::new::<RK4Fixed>(estimator, opts);
     let prop_est = setup.with(initial_state_dev.with_stm());
 
@@ -149,7 +154,7 @@ fn od_robust_test_ekf_realistic_one_way() {
 
     let trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
 
-    let mut odp = ODProcess::ekf(prop_est, kf, trig, None, cosm);
+    let mut odp = ODProcess::ekf(prop_est, kf, trig, None, almanac);
 
     // Let's filter and iterate on the initial subset of the arc to refine the initial estimate
     let subset = arc.filter_by_offset(..3.hours());
@@ -229,13 +234,11 @@ fn od_robust_test_ekf_realistic_one_way() {
 }
 
 #[allow(clippy::identity_op)]
-#[test]
-fn od_robust_test_ekf_realistic_two_way() {
+#[rstest]
+fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-
-    let iau_earth = cosm.frame("IAU Earth");
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
     // Define the ground stations.
     let ekf_num_meas = 300;
     // Set the disable time to be very low to test enable/disable sequence
@@ -246,7 +249,7 @@ fn od_robust_test_ekf_realistic_two_way() {
     let prop_time = 1 * Unit::Day;
 
     // Define state information.
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
@@ -307,7 +310,7 @@ fn od_robust_test_ekf_realistic_two_way() {
         Bodies::JupiterBarycenter,
         Bodies::SaturnBarycenter,
     ];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm.clone());
+    let orbital_dyn = OrbitalDynamics::point_masses(&bodies);
     let truth_setup = Propagator::default(orbital_dyn);
     let (_, traj) = truth_setup
         .with(initial_state)
@@ -316,9 +319,9 @@ fn od_robust_test_ekf_realistic_two_way() {
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(devices.clone(), traj.clone(), configs, 0).unwrap();
-    arc_sim.build_schedule(cosm.clone()).unwrap();
+    arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // And serialize to disk
     let path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "output_data"].iter().collect();
@@ -333,7 +336,7 @@ fn od_robust_test_ekf_realistic_two_way() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be _nearly_ perfect because we've removed Saturn from the estimated trajectory
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let estimator = OrbitalDynamics::point_masses(&bodies, cosm.clone());
+    let estimator = OrbitalDynamics::point_masses(&bodies);
     let setup = Propagator::default(estimator);
     let prop_est = setup.with(initial_state_dev.with_stm());
 
@@ -348,7 +351,7 @@ fn od_robust_test_ekf_realistic_two_way() {
 
     let trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
 
-    let mut odp = ODProcess::ekf(prop_est, kf, trig, None, cosm);
+    let mut odp = ODProcess::ekf(prop_est, kf, trig, None, almanac);
 
     // TODO: Fix the deserialization of the measurements such that they also deserialize the integration time.
     // Without it, we're stuck having to rebuild them from scratch.

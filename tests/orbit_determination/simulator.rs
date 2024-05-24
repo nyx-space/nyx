@@ -11,13 +11,20 @@ use std::env;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-#[test]
-fn continuous_tracking() {
+use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use rstest::*;
+use std::sync::Arc;
+
+#[fixture]
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
+}
+
+#[rstest]
+fn continuous_tracking(almanac: Arc<Almanac>) {
     // Test that continuous tracking
     let _ = pretty_env_logger::try_init();
-
-    // Load cosm
-    let cosm = Cosm::de438();
 
     // Dummy state
     let orbit = Orbit::keplerian_altitude(
@@ -28,7 +35,7 @@ fn continuous_tracking() {
         75.0,
         23.4,
         Epoch::from_str("2023-02-22T19:18:17.16 UTC").unwrap(),
-        cosm.frame("EME2000"),
+        almanac.frame_from_uid(EARTH_J2000).unwrap(),
     );
 
     // Generate a trajectory
@@ -93,8 +100,8 @@ fn continuous_tracking() {
         TrackingArcSim::<Orbit, RangeDoppler, _>::with_seed(devices, trajectory, configs, 12345)
             .unwrap();
 
-    trk.build_schedule(cosm.clone()).unwrap();
-    let arc = trk.generate_measurements(cosm).unwrap();
+    trk.build_schedule(almanac.clone()).unwrap();
+    let arc = trk.generate_measurements(almanac).unwrap();
 
     // And serialize to disk
     let path: PathBuf = [

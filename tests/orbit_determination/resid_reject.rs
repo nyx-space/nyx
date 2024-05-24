@@ -1,3 +1,5 @@
+use anise::constants::celestial_objects::{JUPITER, MOON, SATURN, SUN};
+use anise::constants::frames::{EARTH_J2000, IAU_EARTH_FRAME};
 use pretty_env_logger::try_init;
 
 use rstest::*;
@@ -20,30 +22,32 @@ fn epoch() -> Epoch {
 }
 
 #[fixture]
-fn traj(epoch: Epoch) -> Traj<Orbit> {
-    let _ = try_init().is_err();
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
+}
 
-    // Load cosm
-    let cosm = Cosm::de438();
+#[fixture]
+fn traj(epoch: Epoch, almanac: Arc<Almanac>) -> Traj<Spacecraft> {
+    let _ = try_init().is_err();
 
     // Define the propagator information.
     let prop_time = 2.hours();
     let step_size = 10.0.seconds();
 
     // Define state information.
-    let eme2k = cosm.frame("EME2000");
-    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, epoch, eme2k);
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let initial_state = Spacecraft::builder()
+        .orbit(Orbit::keplerian(
+            22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, epoch, eme2k,
+        ))
+        .build();
 
-    let bodies = vec![
-        Bodies::Luna,
-        Bodies::Sun,
-        Bodies::JupiterBarycenter,
-        Bodies::SaturnBarycenter,
-    ];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm);
+    let bodies = vec![MOON, SUN, JUPITER, SATURN];
+    let orbital_dyn = OrbitalDynamics::point_masses(&bodies);
     let truth_setup = Propagator::dp78(orbital_dyn, PropOpts::with_max_step(step_size));
     let (_, traj) = truth_setup
-        .with(initial_state)
+        .with(initial_state, almanac)
         .for_duration_with_traj(prop_time)
         .unwrap();
 
@@ -51,11 +55,11 @@ fn traj(epoch: Epoch) -> Traj<Orbit> {
 }
 
 #[fixture]
-fn devices_n_configs(epoch: Epoch) -> (Vec<GroundStation>, BTreeMap<String, TrkConfig>) {
-    // Load cosm
-    let cosm = Cosm::de438();
-
-    let iau_earth = cosm.frame("IAU Earth");
+fn devices_n_configs(
+    epoch: Epoch,
+    almanac: Arc<Almanac>,
+) -> (Vec<GroundStation>, BTreeMap<String, TrkConfig>) {
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     let elevation_mask = 0.0;
 
@@ -92,19 +96,17 @@ fn devices_n_configs(epoch: Epoch) -> (Vec<GroundStation>, BTreeMap<String, TrkC
 
 #[fixture]
 fn tracking_arc(
-    traj: Traj<Orbit>,
+    traj: Traj<Spacecraft>,
     devices_n_configs: (Vec<GroundStation>, BTreeMap<String, TrkConfig>),
+    almanac: Arc<Almanac>,
 ) -> TrackingArc<RangeDoppler> {
-    // Load cosm
-    let cosm = Cosm::de438();
-
     let (devices, configs) = devices_n_configs;
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(devices, traj, configs, 0).unwrap();
-    arc_sim.build_schedule(cosm.clone()).unwrap();
+    arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(cosm).unwrap();
+    let arc = arc_sim.generate_measurements(almanac).unwrap();
 
     println!("{arc}");
 
@@ -112,7 +114,7 @@ fn tracking_arc(
 }
 
 #[fixture]
-fn initial_estimate(traj: Traj<Orbit>) -> KfEstimate<Orbit> {
+fn initial_estimate(traj: Traj<Spacecraft>) -> KfEstimate<Spacecraft> {
     let initial_state = *(traj.first());
 
     let initial_estimate = KfEstimate::disperse_from_diag(
@@ -144,20 +146,18 @@ fn initial_estimate(traj: Traj<Orbit>) -> KfEstimate<Orbit> {
 #[rstest]
 fn od_resid_reject_all_ckf_two_way(
     tracking_arc: TrackingArc<RangeDoppler>,
-    initial_estimate: KfEstimate<Orbit>,
+    initial_estimate: KfEstimate<Spacecraft>,
     devices_n_configs: (Vec<GroundStation>, BTreeMap<String, TrkConfig>),
+    almanac: Arc<Almanac>,
 ) {
-    // Load cosm
-    let cosm = Cosm::de438();
-
     let (devices, _configs) = devices_n_configs;
 
     let initial_state_dev = initial_estimate.nominal_state;
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be _nearly_ perfect because we've removed Saturn from the estimated trajectory
-    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let estimator = OrbitalDynamics::point_masses(&bodies, cosm.clone());
+    let bodies = vec![MOON, SUN, JUPITER];
+    let estimator = OrbitalDynamics::point_masses(&bodies);
     let setup = Propagator::new::<RK4Fixed>(estimator, PropOpts::with_fixed_step(10.seconds()));
     let prop_est = setup.with(initial_state_dev.with_stm());
 
@@ -182,7 +182,7 @@ fn od_resid_reject_all_ckf_two_way(
             min_accepted: 0, // Start the preprocessing filter at the first measurement because we try to filter everything out in this test
             num_sigmas: 3.0,
         }),
-        cosm,
+        almanac,
     );
 
     // TODO: Fix the deserialization of the measurements such that they also deserialize the integration time.
@@ -219,14 +219,12 @@ fn od_resid_reject_all_ckf_two_way(
 
 #[rstest]
 fn od_resid_reject_default_ckf_two_way(
-    traj: Traj<Orbit>,
+    traj: Traj<Spacecraft>,
     tracking_arc: TrackingArc<RangeDoppler>,
-    initial_estimate: KfEstimate<Orbit>,
+    initial_estimate: KfEstimate<Spacecraft>,
     devices_n_configs: (Vec<GroundStation>, BTreeMap<String, TrkConfig>),
+    almanac: Arc<Almanac>,
 ) {
-    // Load cosm
-    let cosm = Cosm::de438();
-
     let (devices, _configs) = devices_n_configs;
 
     let initial_state_dev = initial_estimate.nominal_state;
@@ -234,7 +232,7 @@ fn od_resid_reject_default_ckf_two_way(
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be _nearly_ perfect because we've removed Saturn from the estimated trajectory
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let estimator = OrbitalDynamics::point_masses(&bodies, cosm.clone());
+    let estimator = OrbitalDynamics::point_masses(&bodies);
     let setup = Propagator::new::<RK4Fixed>(estimator, PropOpts::with_fixed_step(10.seconds()));
     let prop_est = setup.with(initial_state_dev.with_stm());
 
@@ -247,7 +245,7 @@ fn od_resid_reject_default_ckf_two_way(
 
     let kf = KF::new(initial_estimate, process_noise, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, kf, Some(FltResid::default()), cosm);
+    let mut odp = ODProcess::ckf(prop_est, kf, Some(FltResid::default()), almanac);
 
     // TODO: Fix the deserialization of the measurements such that they also deserialize the integration time.
     // Without it, we're stuck having to rebuild them from scratch.

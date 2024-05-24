@@ -1,6 +1,7 @@
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
+use anise::constants::frames::IAU_EARTH_FRAME;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::sph_harmonics::Harmonics;
@@ -14,13 +15,22 @@ use std::collections::BTreeMap;
 use std::env;
 use std::path::PathBuf;
 
+use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use rstest::*;
+use std::sync::Arc;
+
+#[fixture]
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
+}
+
 #[allow(clippy::identity_op)]
-#[test]
-fn od_tb_val_ekf_fixed_step_perfect_stations() {
+#[rstest]
+fn od_tb_val_ekf_fixed_step_perfect_stations(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-    let iau_earth = cosm.frame("IAU Earth");
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     // Define the ground stations.
     let ekf_num_meas = 100;
@@ -72,7 +82,7 @@ fn od_tb_val_ekf_fixed_step_perfect_stations() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
@@ -85,9 +95,9 @@ fn od_tb_val_ekf_fixed_step_perfect_stations() {
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
-    arc_sim.build_schedule(cosm.clone()).unwrap();
+    arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     println!("{}", final_truth);
 
@@ -120,7 +130,7 @@ fn od_tb_val_ekf_fixed_step_perfect_stations() {
         kf,
         EkfTrigger::new(ekf_num_meas, ekf_disable_time),
         None,
-        cosm,
+        almanac,
     );
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
@@ -170,12 +180,11 @@ fn od_tb_val_ekf_fixed_step_perfect_stations() {
 }
 
 #[allow(clippy::identity_op)]
-#[test]
-fn od_tb_val_with_arc() {
+#[rstest]
+fn od_tb_val_with_arc(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-    let iau_earth = cosm.frame("IAU Earth");
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     // Define the ground stations.
     // Set the disable time to be very low to test enable/disable sequence
@@ -209,7 +218,7 @@ fn od_tb_val_with_arc() {
     // Define the storages (channels for the states and a map for the measurements).
 
     // Define state information.
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
@@ -246,9 +255,9 @@ fn od_tb_val_with_arc() {
 
     // Simulate tracking data of range and range rate
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 1).unwrap();
-    arc_sim.build_schedule(cosm.clone()).unwrap();
+    arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // And serialize to disk
     let path: PathBuf = [
@@ -290,7 +299,7 @@ fn od_tb_val_with_arc() {
         kf,
         EkfTrigger::new(ekf_num_meas, ekf_disable_time),
         Some(FltResid::default()),
-        cosm,
+        almanac,
     );
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
@@ -340,8 +349,8 @@ fn od_tb_val_with_arc() {
 }
 
 #[allow(clippy::identity_op)]
-#[test]
-fn od_tb_val_ckf_fixed_step_perfect_stations() {
+#[rstest]
+fn od_tb_val_ckf_fixed_step_perfect_stations(almanac: Arc<Almanac>) {
     /*
      * This tests that the state transition matrix computation is correct with two body dynamics.
      *
@@ -357,8 +366,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations() {
      **/
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-    let iau_earth = cosm.frame("IAU Earth");
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     // Define the ground stations.
     let elevation_mask = 0.0;
@@ -400,7 +408,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
@@ -414,9 +422,9 @@ fn od_tb_val_ckf_fixed_step_perfect_stations() {
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
-    arc_sim.build_schedule(cosm.clone()).unwrap();
+    arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // And serialize to disk
     let path: PathBuf = [
@@ -454,7 +462,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, None, cosm);
+    let mut odp = ODProcess::ckf(prop_est, ckf, None, almanac);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -582,12 +590,11 @@ fn od_tb_val_ckf_fixed_step_perfect_stations() {
 }
 
 #[allow(clippy::identity_op)]
-#[test]
-fn od_tb_ckf_fixed_step_iteration_test() {
+#[rstest]
+fn od_tb_ckf_fixed_step_iteration_test(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-    let iau_earth = cosm.frame("IAU Earth");
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     // Define the ground stations.
     let elevation_mask = 0.0;
@@ -628,7 +635,7 @@ fn od_tb_ckf_fixed_step_iteration_test() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
@@ -640,9 +647,9 @@ fn od_tb_ckf_fixed_step_iteration_test() {
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
-    arc_sim.build_schedule(cosm.clone()).unwrap();
+    arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -671,7 +678,7 @@ fn od_tb_ckf_fixed_step_iteration_test() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, None, cosm);
+    let mut odp = ODProcess::ckf(prop_est, ckf, None, almanac);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -741,13 +748,12 @@ fn od_tb_ckf_fixed_step_iteration_test() {
 }
 
 #[allow(clippy::identity_op)]
-#[test]
-fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
+#[rstest]
+fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map(almanac: Arc<Almanac>) {
     // Tests state noise compensation with covariance mapping
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-    let iau_earth = cosm.frame("IAU Earth");
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     // Define the ground stations.
     let elevation_mask = 0.0;
@@ -785,7 +791,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
@@ -797,9 +803,9 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
-    arc_sim.build_schedule(cosm.clone()).unwrap();
+    arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -830,7 +836,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
 
     let ckf = KF::new(initial_estimate, process_noise, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, None, cosm);
+    let mut odp = ODProcess::ckf(prop_est, ckf, None, almanac);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -879,18 +885,16 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
 }
 
 #[allow(clippy::identity_op)]
-#[test]
-fn od_tb_ckf_map_covar() {
+#[rstest]
+fn od_tb_ckf_map_covar(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
-
-    let cosm = Cosm::de438();
 
     // Define the propagator information.
     let duration = 2 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
 
     // Define state information.
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
@@ -926,7 +930,7 @@ fn od_tb_ckf_map_covar() {
         nalgebra::Const<3>,
         Orbit,
         KF<Orbit, nalgebra::Const<3>, nalgebra::Const<2>>,
-    > = ODProcess::ckf(prop_est, ckf, None, cosm);
+    > = ODProcess::ckf(prop_est, ckf, None, almanac);
 
     odp.predict_for(30.seconds(), duration).unwrap();
 
@@ -957,13 +961,12 @@ fn od_tb_ckf_map_covar() {
 }
 
 #[allow(clippy::identity_op)]
-#[test]
-fn od_tb_val_harmonics_ckf_fixed_step_perfect() {
+#[rstest]
+fn od_tb_val_harmonics_ckf_fixed_step_perfect(almanac: Arc<Almanac>) {
     // Tests state noise compensation with covariance mapping
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-    let iau_earth = cosm.frame("IAU Earth");
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     // Define the ground stations.
     let elevation_mask = 0.0;
@@ -1001,13 +1004,13 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = cosm.frame("EME2000");
-    let iau_earth = cosm.frame("IAU Earth");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
-    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, cosm.clone());
+    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm);
     let orbital_dyn = OrbitalDynamics::from_model(harmonics);
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
@@ -1016,9 +1019,9 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect() {
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
-    arc_sim.build_schedule(cosm.clone()).unwrap();
+    arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -1045,7 +1048,7 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, None, cosm);
+    let mut odp = ODProcess::ckf(prop_est, ckf, None, almanac);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -1084,13 +1087,12 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect() {
 }
 
 #[allow(clippy::identity_op)]
-#[test]
-fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
+#[rstest]
+fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map(almanac: Arc<Almanac>) {
     // Tests state noise compensation with covariance mapping
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-    let iau_earth = cosm.frame("IAU Earth");
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     // Define the ground stations.
     let elevation_mask = 0.0;
@@ -1128,7 +1130,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
@@ -1139,9 +1141,9 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
-    arc_sim.build_schedule(cosm.clone()).unwrap();
+    arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -1185,7 +1187,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
         measurement_noise,
     );
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, None, cosm);
+    let mut odp = ODProcess::ckf(prop_est, ckf, None, almanac);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
