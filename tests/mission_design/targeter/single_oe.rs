@@ -1,16 +1,28 @@
 extern crate nyx_space as nyx;
 
+use anise::constants::celestial_objects::JUPITER;
+use anise::constants::celestial_objects::MOON;
+use anise::constants::celestial_objects::SUN;
 use nyx::md::optimizer::*;
 use nyx::md::prelude::*;
 
+use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use rstest::*;
+use std::sync::Arc;
+
+#[fixture]
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
+}
+
 // Semi major axis
 
-#[test]
-fn tgt_sma_from_apo() {
+#[rstest]
+fn tgt_sma_from_apo(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
@@ -36,7 +48,12 @@ fn tgt_sma_from_apo() {
     println!("{}", tgt);
 
     let solution_fd = tgt
-        .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t)
+        .try_achieve_from(
+            spacecraft,
+            orig_dt,
+            orig_dt + target_delta_t,
+            almanac.clone(),
+        )
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);
@@ -57,12 +74,11 @@ fn tgt_sma_from_apo() {
     );
 }
 
-#[test]
-fn tgt_sma_from_peri_fd() {
+#[rstest]
+fn tgt_sma_from_peri_fd(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
@@ -74,10 +90,7 @@ fn tgt_sma_from_peri_fd() {
 
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
-    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(
-        &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
-        cosm,
-    ));
+    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(&[MOON, SUN, JUPITER]));
     let setup = Propagator::default_dp78(dynamics);
 
     // Try to increase SMA
@@ -91,7 +104,12 @@ fn tgt_sma_from_peri_fd() {
     println!("{}", tgt);
 
     let solution_fd = tgt
-        .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t)
+        .try_achieve_from(
+            spacecraft,
+            orig_dt,
+            orig_dt + target_delta_t,
+            almanac.clone(),
+        )
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);
@@ -110,12 +128,11 @@ fn tgt_sma_from_peri_fd() {
     );
 }
 
-#[test]
-fn tgt_hd_sma_from_peri() {
+#[rstest]
+fn tgt_hd_sma_from_peri(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
@@ -127,10 +144,7 @@ fn tgt_hd_sma_from_peri() {
 
     let spacecraft = Spacecraft::new(xi_orig, 100.0, 0.0, 0.0, 0.0, 0.0, 0.0);
 
-    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(
-        &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
-        cosm,
-    ));
+    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(&[MOON, SUN, JUPITER]));
     let setup = Propagator::default_dp78(dynamics);
 
     // Try to increase SMA
@@ -145,7 +159,12 @@ fn tgt_hd_sma_from_peri() {
     println!("{}", tgt);
 
     let solution_fd = tgt
-        .try_achieve_dual(spacecraft, orig_dt, orig_dt + target_delta_t)
+        .try_achieve_dual(
+            spacecraft,
+            orig_dt,
+            orig_dt + target_delta_t,
+            almanac.clone(),
+        )
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);
@@ -164,12 +183,11 @@ fn tgt_hd_sma_from_peri() {
     );
 }
 
-#[test]
-fn orbit_stm_chk() {
+#[rstest]
+fn orbit_stm_chk(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
@@ -182,10 +200,7 @@ fn orbit_stm_chk() {
 
     // let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
-    let dynamics = OrbitalDynamics::point_masses(
-        &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
-        cosm,
-    );
+    let dynamics = OrbitalDynamics::point_masses(&[MOON, SUN, JUPITER]);
     let setup = Propagator::default_dp78(dynamics);
     let mut prop_instance = setup.with(xi_orig.with_stm());
 
@@ -214,12 +229,11 @@ fn orbit_stm_chk() {
 }
 
 // Eccentricity
-#[test]
-fn tgt_ecc_from_apo() {
+#[rstest]
+fn tgt_ecc_from_apo(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
@@ -261,7 +275,12 @@ fn tgt_ecc_from_apo() {
     println!("{}", tgt);
 
     let solution_fd = tgt
-        .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t)
+        .try_achieve_from(
+            spacecraft,
+            orig_dt,
+            orig_dt + target_delta_t,
+            almanac.clone(),
+        )
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);
@@ -280,12 +299,11 @@ fn tgt_ecc_from_apo() {
     );
 }
 
-#[test]
-fn tgt_ecc_from_peri() {
+#[rstest]
+fn tgt_ecc_from_peri(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
@@ -297,10 +315,7 @@ fn tgt_ecc_from_peri() {
 
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
-    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(
-        &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
-        cosm,
-    ));
+    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(&[MOON, SUN, JUPITER]));
     let setup = Propagator::default_dp78(dynamics);
 
     let xf_desired_ecc = 0.4;
@@ -330,7 +345,12 @@ fn tgt_ecc_from_peri() {
     println!("{}", tgt);
 
     let solution_fd = tgt
-        .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t)
+        .try_achieve_from(
+            spacecraft,
+            orig_dt,
+            orig_dt + target_delta_t,
+            almanac.clone(),
+        )
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);
@@ -350,12 +370,11 @@ fn tgt_ecc_from_peri() {
 }
 
 // RAAN
-#[test]
-fn tgt_raan_from_apo() {
+#[rstest]
+fn tgt_raan_from_apo(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
@@ -380,7 +399,12 @@ fn tgt_raan_from_apo() {
     println!("{}", tgt);
 
     let solution_fd = tgt
-        .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t)
+        .try_achieve_from(
+            spacecraft,
+            orig_dt,
+            orig_dt + target_delta_t,
+            almanac.clone(),
+        )
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);
@@ -399,12 +423,11 @@ fn tgt_raan_from_apo() {
     );
 }
 
-#[test]
-fn tgt_raan_from_peri() {
+#[rstest]
+fn tgt_raan_from_peri(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
@@ -449,7 +472,12 @@ fn tgt_raan_from_peri() {
     println!("{}", tgt);
 
     let solution_fd = tgt
-        .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t)
+        .try_achieve_from(
+            spacecraft,
+            orig_dt,
+            orig_dt + target_delta_t,
+            almanac.clone(),
+        )
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);
@@ -469,12 +497,11 @@ fn tgt_raan_from_peri() {
 }
 
 // AoP
-#[test]
-fn tgt_aop_from_apo() {
+#[rstest]
+fn tgt_aop_from_apo(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
@@ -499,7 +526,12 @@ fn tgt_aop_from_apo() {
     println!("{}", tgt);
 
     let solution_fd = tgt
-        .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t)
+        .try_achieve_from(
+            spacecraft,
+            orig_dt,
+            orig_dt + target_delta_t,
+            almanac.clone(),
+        )
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);
@@ -518,12 +550,11 @@ fn tgt_aop_from_apo() {
     );
 }
 
-#[test]
-fn tgt_aop_from_peri() {
+#[rstest]
+fn tgt_aop_from_peri(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
@@ -548,7 +579,12 @@ fn tgt_aop_from_peri() {
     println!("{}", tgt);
 
     let solution_fd = tgt
-        .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t)
+        .try_achieve_from(
+            spacecraft,
+            orig_dt,
+            orig_dt + target_delta_t,
+            almanac.clone(),
+        )
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);

@@ -5,6 +5,8 @@ mod orbit_determination;
 mod propagation;
 mod propulsion;
 
+use std::sync::Arc;
+
 use anise::prelude::{Almanac, MetaAlmanac};
 
 pub fn test_almanac() -> Almanac {
@@ -21,4 +23,8 @@ pub fn test_almanac() -> Almanac {
     )
     .process()
     .unwrap()
+}
+
+pub fn test_almanac_arcd() -> Arc<Almanac> {
+    Arc::new(test_almanac())
 }

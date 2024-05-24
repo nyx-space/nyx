@@ -140,7 +140,7 @@ impl OrbitalDynamics {
         ))
     }
 
-    pub(crate) fn dual_eom(
+    pub fn dual_eom(
         &self,
         _delta_t_s: f64,
         osc: &Orbit,

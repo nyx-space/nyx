@@ -7,10 +7,24 @@ use nyx::propagators::Propagator;
 use nyx::time::{Epoch, Unit};
 use nyx::utils::rss_orbit_vec_errors;
 
-#[test]
-fn srp_earth_full_vis() {
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use rstest::*;
+use std::sync::Arc;
+
+use crate::propagation::GMAT_EARTH_GM;
+
+#[fixture]
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
+}
+
+#[rstest]
+fn srp_earth_full_vis(almanac: Arc<Almanac>) {
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
 
@@ -20,7 +34,7 @@ fn srp_earth_full_vis() {
 
     // Define the dynamics
 
-    let srp = SolarPressure::default(eme2k, cosm);
+    let srp = SolarPressure::default(eme2k, almanac);
 
     let dry_mass = 300.0;
 
@@ -31,7 +45,7 @@ fn srp_earth_full_vis() {
     let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 16.0);
 
     let setup = Propagator::default(sc_dyn);
-    let mut prop = setup.with(sc);
+    let mut prop = setup.with(sc, almanac);
     let final_state = prop.for_duration(prop_time).unwrap();
 
     println!("{}", final_state);
@@ -57,10 +71,12 @@ fn srp_earth_full_vis() {
     assert!(err_v < 1e-7, "velocity error too large for SRP");
 }
 
-#[test]
-fn srp_earth_leo() {
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn srp_earth_leo(almanac: Arc<Almanac>) {
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
 
@@ -70,7 +86,7 @@ fn srp_earth_leo() {
 
     // Define the dynamics
 
-    let srp = SolarPressure::default(eme2k, cosm);
+    let srp = SolarPressure::default(eme2k, almanac.clone());
 
     let dry_mass = 300.0;
 
@@ -81,7 +97,7 @@ fn srp_earth_leo() {
     let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 16.0);
 
     let setup = Propagator::default(sc_dyn);
-    let mut prop = setup.with(sc);
+    let mut prop = setup.with(sc, almanac);
     let final_state = prop.for_duration(prop_time).unwrap();
 
     println!("{}", final_state);
@@ -107,11 +123,14 @@ fn srp_earth_leo() {
     assert!(err_v < 5e-4, "velocity error too large for SRP");
 }
 
-#[test]
-fn srp_earth_meo_ecc_inc() {
+#[rstest]
+fn srp_earth_meo_ecc_inc(almanac: Arc<Almanac>) {
     use std::env::var as envvar;
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
 
@@ -121,7 +140,7 @@ fn srp_earth_meo_ecc_inc() {
 
     // Define the dynamics
 
-    let srp = SolarPressure::default(eme2k, cosm);
+    let srp = SolarPressure::default(eme2k, almanac.clone());
 
     let dry_mass = 300.0;
 
@@ -132,7 +151,7 @@ fn srp_earth_meo_ecc_inc() {
     let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 16.0);
 
     let setup = Propagator::default(sc_dyn);
-    let mut prop = setup.with(sc);
+    let mut prop = setup.with(sc, almanac.clone());
     let final_state = prop.for_duration(prop_time).unwrap();
 
     println!("{}", final_state);
@@ -158,7 +177,7 @@ fn srp_earth_meo_ecc_inc() {
     assert!(err_v < 2e-5, "velocity error too large for SRP");
 
     // Compare the case with the hyperdual EOMs (computation uses another part of the code)
-    let mut prop = setup.with(sc.with_stm());
+    let mut prop = setup.with(sc.with_stm(), almanac);
     let final_state_dual = prop.for_duration(prop_time).unwrap();
 
     let (err_r, err_v) = rss_orbit_vec_errors(
@@ -199,10 +218,12 @@ fn srp_earth_meo_ecc_inc() {
     }
 }
 
-#[test]
-fn exp_drag_earth() {
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn exp_drag_earth(almanac: Arc<Almanac>) {
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
 
@@ -212,8 +233,8 @@ fn exp_drag_earth() {
 
     // Define the dynamics
 
-    let srp = SolarPressure::default(eme2k, cosm.clone());
-    let drag = Drag::earth_exp(cosm);
+    let srp = SolarPressure::default(eme2k, almanac.clone());
+    let drag = Drag::earth_exp();
 
     let dry_mass = 300.0;
 
@@ -224,7 +245,7 @@ fn exp_drag_earth() {
     let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 1.0).with_drag(1.0, 2.0);
 
     let setup = Propagator::default_dp78(sc_dyn);
-    let mut prop = setup.with(sc);
+    let mut prop = setup.with(sc, almanac);
     prop.for_duration(prop_time).unwrap();
 
     let final_state = prop.state;
@@ -232,10 +253,12 @@ fn exp_drag_earth() {
     println!("{}", final_state.orbit);
 }
 
-#[test]
-fn std_atm_drag_earth() {
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn std_atm_drag_earth(almanac: Arc<Almanac>) {
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
 
@@ -245,8 +268,8 @@ fn std_atm_drag_earth() {
 
     // Define the dynamics
 
-    let srp = SolarPressure::default(eme2k, cosm.clone());
-    let drag = Drag::std_atm1976(cosm);
+    let srp = SolarPressure::default(eme2k, almanac.clone());
+    let drag = Drag::std_atm1976();
 
     let dry_mass = 300.0;
 
@@ -257,7 +280,7 @@ fn std_atm_drag_earth() {
     let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 1.0).with_drag(1.0, 2.0);
 
     let setup = Propagator::default_dp78(sc_dyn);
-    let mut prop = setup.with(sc);
+    let mut prop = setup.with(sc, almanac);
     prop.for_duration(prop_time).unwrap();
 
     let final_state = prop.state;
@@ -278,10 +301,12 @@ fn std_atm_drag_earth() {
     */
 }
 
-#[test]
-fn std_atm_drag_earth_low() {
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn std_atm_drag_earth_low(almanac: Arc<Almanac>) {
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
 
@@ -300,8 +325,8 @@ fn std_atm_drag_earth_low() {
 
     // Define the dynamics
 
-    let srp = SolarPressure::default(eme2k, cosm.clone());
-    let drag = Drag::std_atm1976(cosm);
+    let srp = SolarPressure::default(eme2k, almanac.clone());
+    let drag = Drag::std_atm1976();
 
     let dry_mass = 300.0;
 
@@ -312,7 +337,7 @@ fn std_atm_drag_earth_low() {
     let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 1.0).with_drag(1.0, 2.0);
 
     let setup = Propagator::default_dp78(sc_dyn);
-    let mut prop = setup.with(sc);
+    let mut prop = setup.with(sc, almanac);
     prop.for_duration(prop_time).unwrap();
 
     let final_state = prop.state;
