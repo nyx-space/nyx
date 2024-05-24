@@ -8,7 +8,7 @@ use hifitime::J2000_OFFSET;
 use na::{Const, OMatrix};
 use nyx::cosmic::{assert_orbit_eq_or_abs, Orbit};
 use nyx::dynamics::{Dynamics, OrbitalDynamics, PointMasses, SpacecraftDynamics};
-use nyx::linalg::{Matrix6, Vector6};
+use nyx::linalg::Vector6;
 use nyx::propagators::error_ctrl::RSSCartesianStep;
 use nyx::time::{Epoch, Unit};
 use nyx::utils::{rss_orbit_errors, rss_orbit_vec_errors};

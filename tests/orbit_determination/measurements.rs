@@ -2,7 +2,9 @@ extern crate nyx_space as nyx;
 
 use anise::constants::celestial_objects::{EARTH, MOON, SUN};
 use anise::constants::frames::IAU_EARTH_FRAME;
+use anise::constants::usual_planetary_constants::MEAN_EARTH_ANGULAR_VELOCITY_DEG_S;
 use nyx::cosmic::Orbit;
+use nyx::dynamics::SpacecraftDynamics;
 use nyx::od::noise::GaussMarkov;
 use nyx::od::prelude::*;
 use nyx::time::Epoch;
@@ -46,10 +48,18 @@ fn nil_measurement(almanac: Arc<Almanac>) {
         light_time_correction: false,
     };
 
-    let at_station = Orbit::from_geodesic(lat, long, height, epoch, eme2k);
+    let at_station = Orbit::try_latlongalt(
+        lat,
+        long,
+        height,
+        MEAN_EARTH_ANGULAR_VELOCITY_DEG_S,
+        epoch,
+        eme2k,
+    )
+    .unwrap();
 
     let (_, traj) = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()))
-        .with(at_station, almanac.clone())
+        .with(at_station.into(), almanac.clone())
         .for_duration_with_traj(1.seconds())
         .unwrap();
 
@@ -112,8 +122,10 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
     let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
-    let setup =
-        Propagator::new::<RK4Fixed>(OrbitalDynamics::point_masses(vec![EARTH, MOON, SUN]), opts);
+    let setup = Propagator::new::<RK4Fixed>(
+        SpacecraftDynamics::new(OrbitalDynamics::point_masses(vec![EARTH, MOON, SUN])),
+        opts,
+    );
 
     struct GmatMsrData {
         offset: Duration,
@@ -122,7 +134,7 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
     }
 
     let (_, traj1) = setup
-        .with(cislunar1, almanac.clone())
+        .with(cislunar1.into(), almanac.clone())
         .for_duration_with_traj(prop_time)
         .unwrap();
 
@@ -174,7 +186,7 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
     );
     // Now, let's check specific arbitrarily selected observations
     for truth in &traj1_val_data {
-        let now = cislunar1.epoch() + truth.offset;
+        let now = cislunar1.epoch + truth.offset;
         let state = traj1.at(now).unwrap();
         // Will panic if the measurement is not visible
         let meas = dss65_madrid
@@ -220,7 +232,7 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
     ];
     let mut traj2_msr_cnt = 0;
     let (_, traj2) = setup
-        .with(cislunar2)
+        .with(cislunar2.into(), almanac.clone())
         .for_duration_with_traj(prop_time)
         .unwrap();
 
@@ -242,7 +254,7 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
     );
     // Now, let's check specific arbitrarily selected observations
     for truth in &traj2_val_data {
-        let now = cislunar2.epoch() + truth.offset;
+        let now = cislunar2.epoch + truth.offset;
         let state = traj2.at(now).unwrap();
         // Will panic if the measurement is not visible
         let meas = dss65_madrid

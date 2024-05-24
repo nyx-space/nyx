@@ -36,7 +36,7 @@ fn stop_cond_3rd_apo(almanac: Arc<Almanac>) {
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.01, start_dt, eme2k,
     );
 
-    let period = state.period();
+    let period = state.period().unwrap();
 
     // Track how many times we've passed by that TA again
     let apo_event = Event::apoapsis(); // Special event shortcut!
@@ -62,18 +62,18 @@ fn stop_cond_3rd_apo(almanac: Arc<Almanac>) {
     // Confirm that this is the third apoapse event which is found
     // We use a weird check because it actually converged on a time that's 0.00042 nanoseconds _after_ the max time
     assert!(
-        (third_apo.epoch - min_epoch) >= 1.nanoseconds(),
+        (third_apo.orbit.epoch - min_epoch) >= 1.nanoseconds(),
         "Found apoapse is {} before min epoch",
-        third_apo.epoch - min_epoch
+        third_apo.orbit.epoch - min_epoch
     );
     assert!(
-        (third_apo.epoch - max_epoch) <= 1.nanoseconds(),
+        (third_apo.orbit.epoch - max_epoch) <= 1.nanoseconds(),
         "Found apoapse is {} after max epoch",
-        third_apo.epoch - max_epoch
+        third_apo.orbit.epoch - max_epoch
     );
 
     assert!(
-        (180.0 - third_apo.ta_deg()).abs() < 1e-3,
+        (180.0 - third_apo.orbit.ta_deg().unwrap()).abs() < 1e-3,
         "converged, yet convergence criteria not met"
     );
 }
@@ -87,7 +87,7 @@ fn stop_cond_3rd_peri(almanac: Arc<Almanac>) {
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.01, start_dt, eme2k,
     );
 
-    let period = state.period();
+    let period = state.period().unwrap();
 
     // Track how many times we've passed by that TA again
     let peri_event = Event::periapsis(); // Special event shortcut!
@@ -114,18 +114,19 @@ fn stop_cond_3rd_peri(almanac: Arc<Almanac>) {
     // Confirm that this is the third apoapse event which is found
     // We use a weird check because it actually converged on a time that's 0.00042 nanoseconds _after_ the max time
     assert!(
-        (third_peri.epoch - min_epoch) >= 1.nanoseconds(),
+        (third_peri.orbit.epoch - min_epoch) >= 1.nanoseconds(),
         "Found apoapse is {} before min epoch",
-        third_peri.epoch - min_epoch
+        third_peri.orbit.epoch - min_epoch
     );
     assert!(
-        (third_peri.epoch - max_epoch) <= 1.nanoseconds(),
+        (third_peri.orbit.epoch - max_epoch) <= 1.nanoseconds(),
         "Found apoapse is {} after max epoch",
-        third_peri.epoch - max_epoch
+        third_peri.orbit.epoch - max_epoch
     );
 
     assert!(
-        third_peri.ta_deg().abs() < 1e-1 || (360.0 - third_peri.ta_deg().abs() < 1e-1),
+        third_peri.orbit.ta_deg().unwrap().abs() < 1e-1
+            || (360.0 - third_peri.orbit.ta_deg().unwrap().abs() < 1e-1),
         "converged, yet convergence criteria not met"
     );
 }
@@ -168,7 +169,7 @@ fn stop_cond_nrho_apo(almanac: Arc<Almanac>) {
     // NOTE: Here, we will propagate for the maximum duration in the original frame
     // Then convert that trajectory into the other frame, and perform the search there.
     // We can only do that for spacecraft and orbit trajectories since those have a frame.
-    let prop_time = 0.5 * state_luna.period();
+    let prop_time = 0.5 * state_luna.period().unwrap();
     let start = Instant::now();
     let (orbit, traj) = setup
         .with(Spacecraft::builder().orbit(state).build(), almanac.clone())
@@ -216,7 +217,9 @@ fn stop_cond_nrho_apo(almanac: Arc<Almanac>) {
         let event_state = event.state;
         let delta_t = event_state.epoch() - dt;
         println!("{delta_t} after start:\n{event_state:x}");
-        assert!((event_state.ta_deg() - 172.0).abs() < near_apo_event.value_precision);
+        assert!(
+            (event_state.orbit.ta_deg().unwrap() - 172.0).abs() < near_apo_event.value_precision
+        );
     }
 }
 
@@ -229,7 +232,7 @@ fn line_of_nodes(almanac: Arc<Almanac>) {
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_dt, eme2k,
     );
 
-    let period = state.period();
+    let period = state.period().unwrap();
 
     let lon_event = Event::new(StateParameter::GeodeticLongitude, 0.0);
 
@@ -239,11 +242,11 @@ fn line_of_nodes(almanac: Arc<Almanac>) {
     println!(
         "{:x} => longitude = {} degrees",
         lon_state,
-        lon_state.geodetic_longitude_deg()
+        lon_state.orbit.longitude_deg()
     );
 
     assert!(
-        lon_state.geodetic_longitude_deg().abs() < lon_event.value_precision,
+        lon_state.orbit.longitude_deg().abs() < lon_event.value_precision,
         "converged, yet convergence criteria not met"
     );
 }
@@ -257,7 +260,7 @@ fn latitude(almanac: Arc<Almanac>) {
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_dt, eme2k,
     );
 
-    let period = state.period();
+    let period = state.period().unwrap();
 
     let lat_event = Event::new(StateParameter::GeodeticLatitude, 2.0);
 
@@ -267,11 +270,11 @@ fn latitude(almanac: Arc<Almanac>) {
     println!(
         "{:x} => latitude = {} degrees",
         lon_state,
-        lon_state.geodetic_latitude_deg()
+        lon_state.orbit.latitude_deg().unwrap()
     );
 
     assert!(
-        (2.0 - lon_state.geodetic_latitude_deg()).abs() < lat_event.value_precision,
+        (2.0 - lon_state.orbit.latitude_deg().unwrap()).abs() < lat_event.value_precision,
         "converged, yet convergence criteria not met"
     );
 }
@@ -290,7 +293,8 @@ fn event_and_combination(almanac: Arc<Almanac>) {
 
     let epoch = Epoch::now().unwrap();
     // We're at periapse of a GTO
-    let orbit = Orbit::try_keplerian_altitude(42_165.0, 0.7, 30.0, 45.0, 45.0, 0.01, epoch, eme2k);
+    let orbit =
+        Orbit::try_keplerian_altitude(42_165.0, 0.7, 30.0, 45.0, 45.0, 0.01, epoch, eme2k).unwrap();
 
     let sc = Spacecraft::from_thruster(
         orbit,
@@ -317,8 +321,7 @@ fn event_and_combination(almanac: Arc<Almanac>) {
         LocalFrame::VNC,
     )]);
 
-    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
-    let dynamics = SpacecraftDynamics::from_guidance_law(orbital_dyn, burn);
+    let dynamics = SpacecraftDynamics::from_guidance_law(OrbitalDynamics::two_body(), burn);
 
     let setup = Propagator::default(dynamics);
     let mut prop = setup.with(sc, almanac.clone());

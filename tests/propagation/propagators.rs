@@ -1,7 +1,10 @@
 extern crate nyx_space as nyx;
+use std::sync::Arc;
+
 use hifitime::J2000_OFFSET;
 use nyx::cosmic::{assert_orbit_eq_or_abs, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
+use nyx::dynamics::SpacecraftDynamics;
 use nyx::propagators::error_ctrl::RSSCartesianState;
 use nyx::propagators::*;
 use nyx::time::{Epoch, Unit};
@@ -11,14 +14,14 @@ use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use rstest::*;
 
 #[fixture]
-fn almanac() -> Almanac {
-    use crate::test_almanac;
-    test_almanac()
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
 }
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn regress_leo_day_adaptive(almanac: Almanac) {
+fn regress_leo_day_adaptive(almanac: Arc<Almanac>) {
     // Regression test for propagators not available in GMAT.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
@@ -72,7 +75,7 @@ fn regress_leo_day_adaptive(almanac: Almanac) {
             dynamics.clone(),
             PropOpts::with_fixed_step(1.0 * Unit::Second),
         );
-        let mut prop = setup.with(init);
+        let mut prop = setup.with(init.into(), almanac.clone());
         prop.for_duration(prop_time).unwrap();
         assert_eq!(
             prop.state.orbit.to_cartesian_pos_vel(),
@@ -94,9 +97,14 @@ fn regress_leo_day_adaptive(almanac: Almanac) {
             dynamics.clone(),
             PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSCartesianState {}),
         );
-        let mut prop = setup.with(init);
+        let mut prop = setup.with(init.into(), almanac.clone());
         prop.for_duration(prop_time).unwrap();
-        assert_orbit_eq_or_abs(&prop.state, &all_rslts[1], 1e-7, "two body prop failed");
+        assert_orbit_eq_or_abs(
+            &prop.state.orbit,
+            &all_rslts[1],
+            1e-7,
+            "two body prop failed",
+        );
         let prev_details = prop.latest_details();
         if prev_details.error > accuracy {
             assert_eq!(
@@ -112,10 +120,15 @@ fn regress_leo_day_adaptive(almanac: Almanac) {
             dynamics,
             PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSCartesianState {}),
         );
-        let mut prop = setup.with(init);
+        let mut prop = setup.with(init.into(), almanac.clone());
         prop.for_duration(prop_time).unwrap();
         // TODO(ANISE): This was a rel check!
-        assert_orbit_eq_or_abs(&prop.state, &all_rslts[2], 1e-7, "two body prop failed");
+        assert_orbit_eq_or_abs(
+            &prop.state.orbit,
+            &all_rslts[2],
+            1e-7,
+            "two body prop failed",
+        );
         let prev_details = prop.latest_details();
         if prev_details.error > accuracy {
             assert_eq!(
@@ -129,7 +142,7 @@ fn regress_leo_day_adaptive(almanac: Almanac) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn gmat_val_leo_day_adaptive(almanac: Almanac) {
+fn gmat_val_leo_day_adaptive(almanac: Arc<Almanac>) {
     // NOTE: In this test we only use the propagators which also exist in GMAT.
     // Refer to `regress_leo_day_adaptive` for the additional propagators.
 
@@ -195,9 +208,14 @@ fn gmat_val_leo_day_adaptive(almanac: Almanac) {
             dynamics.clone(),
             PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSCartesianState {}),
         );
-        let mut prop = setup.with(init);
+        let mut prop = setup.with(init.into(), almanac.clone());
         prop.for_duration(prop_time).unwrap();
-        assert_orbit_eq_or_abs(&prop.state, &all_rslts[0], 1e-8, "two body prop failed");
+        assert_orbit_eq_or_abs(
+            &prop.state.orbit,
+            &all_rslts[0],
+            1e-8,
+            "two body prop failed",
+        );
 
         let prev_details = prop.latest_details();
         if prev_details.error > accuracy {
@@ -208,7 +226,7 @@ fn gmat_val_leo_day_adaptive(almanac: Almanac) {
             );
         }
         assert_orbit_eq_or_abs(
-            &prop.state,
+            &prop.state.orbit,
             &all_rslts[0],
             1e-8,
             "first forward two body prop failed",
@@ -241,9 +259,14 @@ fn gmat_val_leo_day_adaptive(almanac: Almanac) {
             dynamics.clone(),
             PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSCartesianState {}),
         );
-        let mut prop = setup.with(init);
+        let mut prop = setup.with(init.into(), almanac.clone());
         prop.for_duration(prop_time).unwrap();
-        assert_orbit_eq_or_abs(&prop.state, &all_rslts[1], 1e-8, "two body prop failed");
+        assert_orbit_eq_or_abs(
+            &prop.state.orbit,
+            &all_rslts[1],
+            1e-8,
+            "two body prop failed",
+        );
         println!("==> Verner56 adaptive");
         let delta = prop.state.orbit.to_cartesian_pos_vel() - all_rslts[1].to_cartesian_pos_vel();
         for i in 0..6 {
@@ -265,7 +288,7 @@ fn gmat_val_leo_day_adaptive(almanac: Almanac) {
             dynamics.clone(),
             PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSCartesianState {}),
         );
-        let mut prop = setup.with(init);
+        let mut prop = setup.with(init.into(), almanac.clone());
         prop.for_duration(prop_time).unwrap();
         assert_eq!(
             prop.state.orbit.to_cartesian_pos_vel(),
@@ -293,7 +316,7 @@ fn gmat_val_leo_day_adaptive(almanac: Almanac) {
             dynamics,
             PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSCartesianState {}),
         );
-        let mut prop = setup.with(init);
+        let mut prop = setup.with(init.into(), almanac.clone());
         prop.for_duration(prop_time).unwrap();
         assert_eq!(
             prop.state.orbit.to_cartesian_pos_vel(),
@@ -319,7 +342,7 @@ fn gmat_val_leo_day_adaptive(almanac: Almanac) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn gmat_val_leo_day_fixed(almanac: Almanac) {
+fn gmat_val_leo_day_fixed(almanac: Arc<Almanac>) {
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let prop_time = 1 * Unit::Day;
@@ -389,10 +412,10 @@ fn gmat_val_leo_day_fixed(almanac: Almanac) {
             dynamics.clone(),
             PropOpts::with_fixed_step(1.0 * Unit::Second),
         );
-        let mut prop = setup.with(init);
+        let mut prop = setup.with(init.into(), almanac.clone());
         prop.for_duration(prop_time).unwrap();
         assert_eq!(
-            prop.state, all_rslts[0],
+            prop.state.orbit, all_rslts[0],
             "first forward two body prop failed"
         );
         prop.for_duration(-prop_time).unwrap();
@@ -415,10 +438,15 @@ fn gmat_val_leo_day_fixed(almanac: Almanac) {
             dynamics.clone(),
             PropOpts::with_fixed_step(10.0 * Unit::Second),
         );
-        let mut prop = setup.with(init);
+        let mut prop = setup.with(init.into(), almanac.clone());
         prop.for_duration(prop_time).unwrap();
         // TODO(ANISE): This was a rel check!
-        assert_orbit_eq_or_abs(&prop.state, &all_rslts[1], 1e-7, "two body prop failed");
+        assert_orbit_eq_or_abs(
+            &prop.state.orbit,
+            &all_rslts[1],
+            1e-7,
+            "two body prop failed",
+        );
         println!("==> Verner56");
         let delta = prop.state.orbit.to_cartesian_pos_vel() - all_rslts[1].to_cartesian_pos_vel();
         for i in 0..6 {
@@ -432,9 +460,9 @@ fn gmat_val_leo_day_fixed(almanac: Almanac) {
             dynamics.clone(),
             PropOpts::with_fixed_step(10.0 * Unit::Second),
         );
-        let mut prop = setup.with(init);
+        let mut prop = setup.with(init.into(), almanac.clone());
         prop.for_duration(prop_time).unwrap();
-        assert_eq!(prop.state, all_rslts[2], "two body prop failed");
+        assert_eq!(prop.state.orbit, all_rslts[2], "two body prop failed");
         println!("==> Dormand45");
         let delta = prop.state.orbit.to_cartesian_pos_vel() - all_rslts[2].to_cartesian_pos_vel();
         for i in 0..6 {
@@ -448,9 +476,9 @@ fn gmat_val_leo_day_fixed(almanac: Almanac) {
             dynamics.clone(),
             PropOpts::with_fixed_step(10.0 * Unit::Second),
         );
-        let mut prop = setup.with(init);
+        let mut prop = setup.with(init.into(), almanac.clone());
         prop.for_duration(prop_time).unwrap();
-        assert_eq!(prop.state, all_rslts[3], "two body prop failed");
+        assert_eq!(prop.state.orbit, all_rslts[3], "two body prop failed");
         println!("==> Dormand78");
         let delta = prop.state.orbit.to_cartesian_pos_vel() - all_rslts[3].to_cartesian_pos_vel();
         for i in 0..6 {
@@ -462,9 +490,9 @@ fn gmat_val_leo_day_fixed(almanac: Almanac) {
     {
         let setup =
             Propagator::new::<RK89>(dynamics, PropOpts::with_fixed_step(10.0 * Unit::Second));
-        let mut prop = setup.with(init);
+        let mut prop = setup.with(init.into(), almanac.clone());
         prop.for_duration(prop_time).unwrap();
-        assert_eq!(prop.state, all_rslts[4], "two body prop failed");
+        assert_eq!(prop.state.orbit, all_rslts[4], "two body prop failed");
         println!("==> RK89");
         let delta = prop.state.orbit.to_cartesian_pos_vel() - all_rslts[4].to_cartesian_pos_vel();
         for i in 0..6 {
