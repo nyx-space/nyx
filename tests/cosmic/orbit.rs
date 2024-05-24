@@ -61,7 +61,7 @@ fn state_def_circ_inc(almanac: Almanac) {
     f64_eq!(cart.vz_km_s, 0.0, "vz");
     f64_eq!(cart.energy_km2_s2(), -25.842_247_282_849_137, "energy");
     assert_eq!(
-        cart.period(),
+        cart.period().unwrap(),
         6_740.269_063_643_045 * Unit::Second,
         "period"
     );
@@ -99,7 +99,11 @@ fn state_def_circ_inc(almanac: Almanac) {
     f64_eq!(kep.aop_deg(), 314.189_999_994_618_1, "aop");
     f64_eq!(kep.ta_deg(), 99.887_700_005_381_9, "ta");
     f64_eq!(kep.energy_km2_s2(), -24.328_848_116_377_95, "energy");
-    assert_eq!(kep.period(), 7_378.877_993_957_958 * Unit::Second, "period");
+    assert_eq!(
+        kep.period().unwrap(),
+        7_378.877_993_957_958 * Unit::Second,
+        "period"
+    );
     f64_eq!(kep.hx_km2_s(), -10_200.784_799_426_574, "HX");
     f64_eq!(kep.hy_km2_s(), -7_579.639_346_783_497, "HY");
     f64_eq!(kep.hz_km2_s(), 55_711.757_929_384_25, "HZ");
@@ -169,7 +173,7 @@ fn state_def_elliptical(almanac: Almanac) {
     );
     f64_eq!(cart.energy_km2_s2(), -25.842_247_282_849_144, "energy");
     assert_eq!(
-        cart.period(),
+        cart.period().unwrap(),
         6_740.269_063_643_042_5 * Unit::Second,
         "period"
     );
@@ -209,7 +213,11 @@ fn state_def_elliptical(almanac: Almanac) {
     f64_eq!(kep.aop_deg(), 314.190_000_000_000_4, "aop");
     f64_eq!(kep.ta_deg(), 99.887_699_999_999_58, "ta");
     f64_eq!(kep.energy_km2_s2(), -24.328_848_116_377_94, "energy");
-    assert_eq!(kep.period(), 7_378.877_993_957_964 * Unit::Second, "period");
+    assert_eq!(
+        kep.period().unwrap(),
+        7_378.877_993_957_964 * Unit::Second,
+        "period"
+    );
     f64_eq!(kep.hx_km2_s(), -10_197.722_829_337_885, "HX");
     f64_eq!(kep.hy_km2_s(), -7_577.364_166_057_776, "HY");
     f64_eq!(kep.hz_km2_s(), 55_695.034_928_191_49, "HZ");
@@ -257,7 +265,11 @@ fn state_def_circ_eq(almanac: Almanac) {
         eme2k,
     );
     f64_eq!(cart.energy_km2_s2(), -4.702_902_670_552_006, "energy");
-    assert_eq!(cart.period(), 86_820.776_152_986_1 * Unit::Second, "period");
+    assert_eq!(
+        cart.period().unwrap(),
+        86_820.776_152_986_1 * Unit::Second,
+        "period"
+    );
     f64_eq!(cart.hx_km2_s(), 2.225_951_522_241_969_5, "HX");
     f64_eq!(cart.hy_km2_s(), -0.436_714_326_090_944_6, "HY");
     f64_eq!(cart.hz_km2_s(), 129_969.001_391_865_75, "HZ");
@@ -293,7 +305,7 @@ fn state_def_circ_eq(almanac: Almanac) {
     f64_eq!(kep.ta_deg(), 98.764_999_974_596_28, "ta");
     f64_eq!(kep.energy_km2_s2(), -10.955_920_349_063_035, "energy");
     assert_eq!(
-        kep.period(),
+        kep.period().unwrap(),
         24_417.396_242_570_256 * Unit::Second,
         "period"
     );

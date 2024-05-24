@@ -27,7 +27,7 @@ fn continuous_tracking(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
     // Dummy state
-    let orbit = Orbit::keplerian_altitude(
+    let orbit = Orbit::try_keplerian_altitude(
         500.0,
         1e-3,
         30.0,
@@ -39,7 +39,7 @@ fn continuous_tracking(almanac: Arc<Almanac>) {
     );
 
     // Generate a trajectory
-    let (_, trajectory) = Propagator::default(OrbitalDynamics::two_body())
+    let (_, trajectory) = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()))
         .with(orbit)
         .for_duration_with_traj(1.5.days())
         .unwrap();

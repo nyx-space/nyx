@@ -36,9 +36,9 @@ fn event_tracker_true_anomaly(almanac: Almanac) {
 
     let events = vec![peri_event, apo_event, ta_event0, ta_event1];
 
-    let dynamics = OrbitalDynamics::two_body();
+    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
     let setup = Propagator::rk89(dynamics, PropOpts::with_tolerance(1e-9));
-    let mut prop = setup.with(state);
+    let mut prop = setup.with(state.into(), almanac);
     let (_, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
     // Find all of the events

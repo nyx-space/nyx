@@ -29,7 +29,8 @@ fn alt_orbit_raising(almanac: Arc<Almanac>) {
 
     /* Define the parking orbit */
     let epoch = Epoch::from_gregorian_utc_at_noon(2022, 3, 4);
-    let start = Orbit::keplerian_altitude(300.0, 0.01, 30.0, 90.0, 90.0, 60.0, epoch, eme2k);
+    let start =
+        Orbit::try_keplerian_altitude(300.0, 0.01, 30.0, 90.0, 90.0, 60.0, epoch, eme2k).unwrap();
 
     /* Build the spacecraft -- really only the mass is needed here */
     let sc = Spacecraft {
@@ -46,16 +47,17 @@ fn alt_orbit_raising(almanac: Arc<Almanac>) {
     };
 
     /* Define the target orbit */
-    let target = Orbit::keplerian_altitude(
+    let target = Orbit::try_keplerian_altitude(
         1500.0,
         0.01,
         30.0,
         90.0,
         90.0,
         60.0,
-        epoch + 2 * start.period(),
+        epoch + 2 * start.period().unwrap(),
         eme2k,
-    );
+    )
+    .unwrap();
 
     /* Define the multiple shooting parameters */
     let node_count = 30; // We're targeting 30 minutes in the future, so using 30 nodes
@@ -138,7 +140,7 @@ fn alt_orbit_raising(almanac: Arc<Almanac>) {
 
     // Propagate the initial orbit too
     prop.with(sc, almanac.clone())
-        .for_duration_with_traj(start.period())
+        .for_duration_with_traj(start.period().unwrap())
         .unwrap()
         .1
         .to_parquet_with_step(
@@ -149,7 +151,7 @@ fn alt_orbit_raising(almanac: Arc<Almanac>) {
 
     // Propagate the initial orbit too
     prop.with(sc.with_orbit(target), almanac.clone())
-        .for_duration_with_traj(target.period())
+        .for_duration_with_traj(target.period().unwrap())
         .unwrap()
         .1
         .to_parquet_with_step(
@@ -174,7 +176,7 @@ fn alt_orbit_raising(almanac: Arc<Almanac>) {
     // Check that error is 50km or less. That isn't great, but I blame that on the scenario and the final node being optimized.
     let achieved_geoheight = almanac
         .transform_to(
-            &multishoot_sol
+            multishoot_sol
                 .solutions
                 .last()
                 .unwrap()
@@ -184,11 +186,13 @@ fn alt_orbit_raising(almanac: Arc<Almanac>) {
             None,
         )
         .unwrap()
-        .geodetic_height_km();
+        .height_km()
+        .unwrap();
     let target_geoheight = almanac
-        .transform_to(&target, iau_earth, None)
+        .transform_to(target, iau_earth, None)
         .unwrap()
-        .geodetic_height_km();
+        .height_km()
+        .unwrap();
     assert!(
         (achieved_geoheight - target_geoheight).abs() < 1e-3,
         "Geodetic height achieved greater than 1 m above goal"
@@ -205,7 +209,8 @@ fn vmag_orbit_raising(almanac: Arc<Almanac>) {
 
     /* Define the parking orbit */
     let epoch = Epoch::from_gregorian_utc_at_noon(2022, 3, 4);
-    let start = Orbit::keplerian_altitude(300.0, 0.01, 30.0, 90.0, 90.0, 60.0, epoch, eme2k);
+    let start =
+        Orbit::try_keplerian_altitude(300.0, 0.01, 30.0, 90.0, 90.0, 60.0, epoch, eme2k).unwrap();
 
     /* Build the spacecraft -- really only the mass is needed here */
     let sc = Spacecraft {
@@ -222,16 +227,17 @@ fn vmag_orbit_raising(almanac: Arc<Almanac>) {
     };
 
     /* Define the target orbit */
-    let target = Orbit::keplerian_altitude(
+    let target = Orbit::try_keplerian_altitude(
         1500.0,
         0.01,
         30.0,
         90.0,
         90.0,
         60.0,
-        epoch + 0.05 * start.period(),
+        epoch + 0.05 * start.period().unwrap(),
         eme2k,
-    );
+    )
+    .unwrap();
 
     /* Define the multiple shooting parameters */
     let node_count = 300;
@@ -324,7 +330,7 @@ fn vmag_orbit_raising(almanac: Arc<Almanac>) {
 
     // Propagate the initial orbit too
     prop.with(sc, almanac.clone())
-        .for_duration_with_traj(start.period())
+        .for_duration_with_traj(start.period().unwrap())
         .unwrap()
         .1
         .to_parquet_with_step(
@@ -335,7 +341,7 @@ fn vmag_orbit_raising(almanac: Arc<Almanac>) {
 
     // Propagate the initial orbit too
     prop.with(sc.with_orbit(target), almanac.clone())
-        .for_duration_with_traj(target.period())
+        .for_duration_with_traj(target.period().unwrap())
         .unwrap()
         .1
         .to_parquet_with_step(
@@ -357,7 +363,7 @@ fn vmag_orbit_raising(almanac: Arc<Almanac>) {
     // Check that error is 50km or less. That isn't great, but I blame that on the scenario and the final node being optimized.
     let achieved_geoheight = almanac
         .transform_to(
-            &multishoot_sol
+            multishoot_sol
                 .solutions
                 .last()
                 .unwrap()
@@ -367,11 +373,13 @@ fn vmag_orbit_raising(almanac: Arc<Almanac>) {
             None,
         )
         .unwrap()
-        .geodetic_height_km();
+        .height_km()
+        .unwrap();
     let target_geoheight = almanac
-        .transform_to(&target, iau_earth, None)
+        .transform_to(target, iau_earth, None)
         .unwrap()
-        .geodetic_height_km();
+        .height_km()
+        .unwrap();
     assert!(
         (achieved_geoheight - target_geoheight).abs() < 1e-3,
         "Geodetic height achieved greater than 1 m above goal"

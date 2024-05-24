@@ -302,7 +302,7 @@ where
         &mut self,
     ) -> Result<(Duration, OVector<f64, <D::StateType as State>::VecLength>), PropagationError>
     {
-        let state_vec = &self.state.as_vector();
+        let state_vec = &self.state.to_vector();
         let state_ctx = &self.state;
         // Reset the number of attempts used (we don't reset the error because it's set before it's read)
         self.details.attempts = 1;

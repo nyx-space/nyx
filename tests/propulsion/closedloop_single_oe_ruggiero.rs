@@ -28,7 +28,7 @@ fn rugg_sma(almanac: Almanac) {
     let prop_time = 45 * Unit::Day;
 
     // Define the dynamics
-    let orbital_dyn = OrbitalDynamics::two_body();
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
     // Define the thruster
     let lowt = Thruster {
@@ -100,7 +100,10 @@ fn rugg_sma_regress_threshold(almanac: Almanac) {
         let sc_state =
             Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-        let sc = SpacecraftDynamics::from_guidance_law(OrbitalDynamics::two_body(), guid_law);
+        let sc = SpacecraftDynamics::from_guidance_law(
+            SpacecraftDynamics::new(OrbitalDynamics::two_body()),
+            guid_law,
+        );
         println!("[rugg_sma_regress] {:x}", orbit);
 
         let final_state =
@@ -132,7 +135,7 @@ fn rugg_sma_decr(almanac: Almanac) {
     let prop_time = 45 * Unit::Day;
 
     // Define the dynamics
-    let orbital_dyn = OrbitalDynamics::two_body();
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
     // Define the thruster
     let lowt = Thruster {
@@ -187,7 +190,7 @@ fn rugg_inc(almanac: Almanac) {
     let prop_time = 55 * Unit::Day;
 
     // Define the dynamics
-    let orbital_dyn = OrbitalDynamics::two_body();
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
     // Define the thruster
     let lowt = Thruster {
@@ -237,12 +240,12 @@ fn rugg_inc_threshold(almanac: Almanac) {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let orbit = Orbit::keplerian_altitude(350.0, 0.001, 46.0, 1.0, 1.0, 1.0, start_time, eme2k);
+    let orbit = Orbit::try_keplerian_altitude(350.0, 0.001, 46.0, 1.0, 1.0, 1.0, start_time, eme2k);
 
     let prop_time = 130 * Unit::Day;
 
     // Define the dynamics
-    let orbital_dyn = OrbitalDynamics::two_body();
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
     // Define the thruster
     let lowt = Thruster {
@@ -297,7 +300,7 @@ fn rugg_inc_decr(almanac: Almanac) {
     let prop_time = 55 * Unit::Day;
 
     // Define the dynamics
-    let orbital_dyn = OrbitalDynamics::two_body();
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
     // Define the thruster
     let lowt = Thruster {
@@ -352,7 +355,7 @@ fn rugg_ecc(almanac: Almanac) {
     let prop_time = 30 * Unit::Day;
 
     // Define the dynamics
-    let orbital_dyn = OrbitalDynamics::two_body();
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
     // Define the thruster
     let lowt = Thruster {
@@ -428,7 +431,10 @@ fn rugg_ecc_regress_threshold(almanac: Almanac) {
         let sc_state =
             Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-        let sc = SpacecraftDynamics::from_guidance_law(OrbitalDynamics::two_body(), guid_law);
+        let sc = SpacecraftDynamics::from_guidance_law(
+            SpacecraftDynamics::new(OrbitalDynamics::two_body()),
+            guid_law,
+        );
         println!("[rugg_ecc_regress] {:x}", orbit);
 
         let final_state =
@@ -462,7 +468,7 @@ fn rugg_ecc_decr(almanac: Almanac) {
     let prop_time = 30 * Unit::Day;
 
     // Define the dynamics
-    let orbital_dyn = OrbitalDynamics::two_body();
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
     // Define the thruster
     let lowt = Thruster {
@@ -519,7 +525,7 @@ fn rugg_aop(almanac: Almanac) {
     let prop_time = 44 * Unit::Minute + 10 * Unit::Second;
 
     // Define the dynamics
-    let orbital_dyn = OrbitalDynamics::two_body();
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
     // Define the thruster
     let lowt = Thruster {
@@ -575,7 +581,7 @@ fn rugg_aop_decr(almanac: Almanac) {
     let prop_time = 44 * Unit::Minute + 10 * Unit::Second;
 
     // Define the dynamics
-    let orbital_dyn = OrbitalDynamics::two_body();
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
     // Define the thruster
     let lowt = Thruster {
@@ -632,7 +638,7 @@ fn rugg_raan(almanac: Almanac) {
     let prop_time = 49 * Unit::Day;
 
     // Define the dynamics
-    let orbital_dyn = OrbitalDynamics::two_body();
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
     // Define the thruster
     let lowt = Thruster {
@@ -704,7 +710,10 @@ fn rugg_raan_regress_threshold(almanac: Almanac) {
         let sc_state =
             Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-        let sc = SpacecraftDynamics::from_guidance_law(OrbitalDynamics::two_body(), guid_law);
+        let sc = SpacecraftDynamics::from_guidance_law(
+            SpacecraftDynamics::new(OrbitalDynamics::two_body()),
+            guid_law,
+        );
         println!("[rugg_raan_regress] {:x}", orbit);
 
         let final_state =

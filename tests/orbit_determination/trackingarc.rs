@@ -23,7 +23,7 @@ fn traj(almanac: Arc<Almanac>) -> Traj<Spacecraft> {
     let _ = pretty_env_logger::try_init();
 
     // Dummy state
-    let orbit = Orbit::keplerian_altitude(
+    let orbit = Orbit::try_keplerian_altitude(
         500.0,
         1e-3,
         30.0,
@@ -32,11 +32,12 @@ fn traj(almanac: Arc<Almanac>) -> Traj<Spacecraft> {
         23.4,
         Epoch::from_str("2023-02-22T19:18:17.16 UTC").unwrap(),
         almanac.frame_from_uid(EARTH_J2000).unwrap(),
-    );
+    )
+    .unwrap();
 
     // Generate a trajectory
-    let (_, trajectory) = Propagator::default(OrbitalDynamics::two_body())
-        .with(orbit, almanac)
+    let (_, trajectory) = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()))
+        .with(Spacecraft::builder().orbit(orbit).build(), almanac)
         .for_duration_with_traj(3.days())
         .unwrap();
 
@@ -102,7 +103,8 @@ fn trk_simple(traj: Traj<Spacecraft>, devices: Vec<GroundStation>, almanac: Arc<
 
     // Build the tracking arc simulation to generate a "standard measurement".
     let mut trk =
-        TrackingArcSim::<Orbit, RangeDoppler, _>::with_seed(devices, traj, configs, 12345).unwrap();
+        TrackingArcSim::<Spacecraft, RangeDoppler, _>::with_seed(devices, traj, configs, 12345)
+            .unwrap();
 
     // Test that building the schedule is deterministic
     let orig_sched = trk.generate_schedule(almanac.clone()).unwrap();
@@ -208,7 +210,8 @@ fn trkconfig_zero_inclusion(
     let mut configs = BTreeMap::new();
     configs.insert(devices[1].name.clone(), trkcfg_always);
 
-    let mut trk = TrackingArcSim::<Orbit, RangeDoppler, _>::new(devices, traj, configs).unwrap();
+    let mut trk =
+        TrackingArcSim::<Spacecraft, RangeDoppler, _>::new(devices, traj, configs).unwrap();
 
     trk.build_schedule(almanac.clone()).unwrap();
 
@@ -241,7 +244,7 @@ fn trkconfig_invalid(traj: Traj<Spacecraft>, devices: Vec<GroundStation>) {
         configs.insert(device.name.clone(), trkcfg.clone());
     }
 
-    assert!(TrackingArcSim::<Orbit, RangeDoppler, _>::new(devices, traj, configs).is_err());
+    assert!(TrackingArcSim::<Spacecraft, RangeDoppler, _>::new(devices, traj, configs).is_err());
 }
 
 /// Test a delayed start of the configuration
@@ -265,7 +268,7 @@ fn trkconfig_delayed_start(
     configs.insert(devices[0].name.clone(), trkcfg);
 
     let mut trk =
-        TrackingArcSim::<Orbit, RangeDoppler, _>::new(vec![devices[0].clone()], traj, configs)
+        TrackingArcSim::<Spacecraft, RangeDoppler, _>::new(vec![devices[0].clone()], traj, configs)
             .unwrap();
 
     trk.build_schedule(almanac.clone()).unwrap();
@@ -311,7 +314,8 @@ fn trkconfig_cadence(traj: Traj<Spacecraft>, devices: Vec<GroundStation>, almana
             .build(),
     );
 
-    let mut trk = TrackingArcSim::<Orbit, RangeDoppler, _>::new(devices, traj, configs).unwrap();
+    let mut trk =
+        TrackingArcSim::<Spacecraft, RangeDoppler, _>::new(devices, traj, configs).unwrap();
 
     trk.build_schedule(almanac.clone()).unwrap();
 

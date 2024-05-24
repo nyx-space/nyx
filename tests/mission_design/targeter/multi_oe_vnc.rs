@@ -23,9 +23,9 @@ fn tgt_vnc_c3_decl(almanac: Arc<Almanac>) {
 
     let xi_orig = Orbit::keplerian(8_000.0, 0.2, 30.0, 60.0, 60.0, 0.0, orig_dt, eme2k);
 
-    let target_delta_t: Duration = xi_orig.period() / 2.0;
+    let target_delta_t: Duration = xi_orig.period().unwrap() / 2.0;
 
-    println!("Period: {} s", xi_orig.period().to_seconds() / 2.0);
+    println!("Period: {} s", xi_orig.period().unwrap().to_seconds() / 2.0);
 
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
@@ -71,9 +71,9 @@ fn tgt_vnc_sma_ecc(almanac: Arc<Almanac>) {
 
     let xi_orig = Orbit::keplerian(8_000.0, 0.2, 30.0, 60.0, 60.0, 0.0, orig_dt, eme2k);
 
-    let target_delta_t: Duration = xi_orig.period() / 2.0;
+    let target_delta_t: Duration = xi_orig.period().unwrap() / 2.0;
 
-    println!("Period: {} s", xi_orig.period().to_seconds() / 2.0);
+    println!("Period: {} s", xi_orig.period().unwrap().to_seconds() / 2.0);
 
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 

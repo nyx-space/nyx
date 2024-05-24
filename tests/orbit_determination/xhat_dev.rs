@@ -3,15 +3,17 @@ extern crate pretty_env_logger;
 
 use anise::constants::celestial_objects::{JUPITER, MOON, SUN};
 use anise::constants::frames::IAU_EARTH_FRAME;
-use nyx::cosmic::{Bodies, Orbit};
+use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::{OrbitalDynamics, PointMasses};
 use nyx::dynamics::sph_harmonics::Harmonics;
+use nyx::dynamics::SpacecraftDynamics;
 use nyx::io::gravity::*;
 use nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
 use nyx::od::noise::GaussMarkov;
 use nyx::od::prelude::*;
 use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use nyx::utils::rss_orbit_errors;
+use nyx::Spacecraft;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 
@@ -75,7 +77,7 @@ fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>) {
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
-    let mut initial_state_dev = initial_state.with_stm();
+    let mut initial_state_dev = initial_state;
     initial_state_dev.x_km += 5.0;
     initial_state_dev.y_km -= 5.0;
     initial_state_dev.z_km += 5.0;
@@ -88,10 +90,10 @@ fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>) {
         initial_state - initial_state_dev
     );
 
-    let orbital_dyn = OrbitalDynamics::two_body();
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let (_, traj) = setup
-        .with(initial_state)
+        .with(Spacecraft::from(initial_state).with_stm(), almanac)
         .for_duration_with_traj(prop_time)
         .unwrap();
 
@@ -105,7 +107,7 @@ fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>) {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let prop_est = setup.with(initial_state_dev);
+    let prop_est = setup.with(initial_state_dev, almanac.clone());
     let covar_radius_km = 1.0e2;
     let covar_velocity_km_s = 1.0e1;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
@@ -297,7 +299,7 @@ fn xhat_dev_test_ekf_multi_body(almanac: Arc<Almanac>) {
     );
 
     let bodies = vec![MOON, SUN, JUPITER];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies);
+    let orbital_dyn = OrbitalDynamics::point_masses(bodies);
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
     let (_, traj) = setup
@@ -471,7 +473,7 @@ fn xhat_dev_test_ekf_harmonics(almanac: Arc<Almanac>) {
     let bodies = vec![MOON, SUN, JUPITER];
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", hh_deg, hh_ord, true).unwrap();
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm);
-    let orbital_dyn = OrbitalDynamics::new(vec![harmonics, PointMasses::new(&bodies)]);
+    let orbital_dyn = OrbitalDynamics::new(vec![harmonics, PointMasses::new(bodies)]);
 
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
@@ -622,7 +624,7 @@ fn xhat_dev_test_ekf_realistic(almanac: Arc<Almanac>) {
         Bodies::JupiterBarycenter,
         Bodies::SaturnBarycenter,
     ];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies);
+    let orbital_dyn = OrbitalDynamics::point_masses(bodies);
     let truth_setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
     let (_, traj) = truth_setup
@@ -639,7 +641,7 @@ fn xhat_dev_test_ekf_realistic(almanac: Arc<Almanac>) {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be _nearly_ perfect because we've removed Saturn from the estimated trajectory
     let bodies = vec![MOON, SUN, JUPITER];
-    let estimator = OrbitalDynamics::point_masses(&bodies);
+    let estimator = OrbitalDynamics::point_masses(bodies);
     let setup = Propagator::new::<RK4Fixed>(estimator, opts);
     let prop_est = setup.with(initial_state.with_stm());
     let covar_radius_km = 1.0e2;
@@ -775,7 +777,7 @@ fn xhat_dev_test_ckf_smoother_multi_body(almanac: Arc<Almanac>) {
     );
 
     let bodies = vec![MOON, SUN, JUPITER];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies);
+    let orbital_dyn = OrbitalDynamics::point_masses(bodies);
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let (_, traj) = setup
         .with(initial_state)
@@ -1045,7 +1047,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body(almanac: Arc<Almanac>) {
     );
 
     let bodies = vec![MOON, SUN, JUPITER];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies);
+    let orbital_dyn = OrbitalDynamics::point_masses(bodies);
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let (_, traj) = setup
         .with(initial_state)
@@ -1314,7 +1316,7 @@ fn xhat_dev_test_ckf_iteration_multi_body(almanac: Arc<Almanac>) {
     );
 
     let bodies = vec![MOON, SUN, JUPITER];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies);
+    let orbital_dyn = OrbitalDynamics::point_masses(bodies);
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let (_, traj) = setup
         .with(initial_state)

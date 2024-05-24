@@ -45,8 +45,7 @@ fn multi_thread_monte_carlo_demo(almanac: Almanac) {
     let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);
     let state = Orbit::keplerian(8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k);
 
-    let orbital_dyn =
-        OrbitalDynamics::new(vec![PointMasses::new(&[SUN, MOON, JUPITER]), harmonics]);
+    let orbital_dyn = OrbitalDynamics::new(vec![PointMasses::new([SUN, MOON, JUPITER]), harmonics]);
 
     // We need to wrap the propagator setup in an Arc to enable multithreading.
     let setup = Arc::new(Propagator::default_dp78(orbital_dyn));

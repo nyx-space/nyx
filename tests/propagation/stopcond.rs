@@ -2,11 +2,14 @@ extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
+use std::sync::Arc;
+
+use anise::constants::celestial_objects::{EARTH, SUN};
 use anise::constants::frames::{EARTH_J2000, MOON_J2000};
 use anise::prelude::Almanac;
 use hifitime::J2000_OFFSET;
 use na::Vector3;
-use nyx::cosmic::{Bodies, Orbit};
+use nyx::cosmic::Orbit;
 use nyx::dynamics::guidance::{FiniteBurns, LocalFrame, Mnvr, Thruster};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::SpacecraftDynamics;
@@ -19,13 +22,13 @@ use nyx::{Spacecraft, State};
 use rstest::*;
 
 #[fixture]
-fn almanac() -> Almanac {
-    use crate::test_almanac;
-    test_almanac()
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
 }
 
 #[rstest]
-fn stop_cond_3rd_apo(almanac: Almanac) {
+fn stop_cond_3rd_apo(almanac: Arc<Almanac>) {
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_dt = Epoch::from_mjd_tai(J2000_OFFSET);
@@ -38,13 +41,13 @@ fn stop_cond_3rd_apo(almanac: Almanac) {
     // Track how many times we've passed by that TA again
     let apo_event = Event::apoapsis(); // Special event shortcut!
 
-    let setup = Propagator::default(OrbitalDynamics::two_body());
-    let mut prop = setup.with(state);
+    let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
+    let mut prop = setup.with(state.into(), almanac.clone());
     // Propagate for at five orbital periods so we know we've passed the third one
     // NOTE: We start counting at ZERO, so finding the 3rd means grabbing the second found.
     let (third_apo, traj) = prop.until_nth_event(5 * period, &apo_event, 2).unwrap();
 
-    let events = traj.find(&apo_event).unwrap();
+    let events = traj.find(&apo_event, almanac).unwrap();
     let mut prev_event_match = events[0].state.epoch();
     for event_match in events.iter().skip(1) {
         let delta_period = event_match.state.epoch() - prev_event_match - period;
@@ -76,7 +79,7 @@ fn stop_cond_3rd_apo(almanac: Almanac) {
 }
 
 #[rstest]
-fn stop_cond_3rd_peri(almanac: Almanac) {
+fn stop_cond_3rd_peri(almanac: Arc<Almanac>) {
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_dt = Epoch::from_mjd_tai(J2000_OFFSET);
@@ -89,14 +92,14 @@ fn stop_cond_3rd_peri(almanac: Almanac) {
     // Track how many times we've passed by that TA again
     let peri_event = Event::periapsis(); // Special event shortcut!
 
-    let setup = Propagator::default(OrbitalDynamics::two_body());
-    let mut prop = setup.with(state);
+    let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
+    let mut prop = setup.with(state.into(), almanac);
     // Propagate for at four orbital periods so we know we've passed the third one
     // NOTE: We're fetching the 3rd item because the initial state is actually at periapse,
     // which the event finder will find.
     let (third_peri, traj) = prop.until_nth_event(5 * period, &peri_event, 2).unwrap();
 
-    let events = traj.find(&peri_event).unwrap();
+    let events = traj.find(&peri_event, almanac).unwrap();
     let mut prev_event_match = events[0].state.epoch();
     for event_match in events.iter().skip(1) {
         let delta_period = event_match.state.epoch() - prev_event_match - period;
@@ -128,7 +131,7 @@ fn stop_cond_3rd_peri(almanac: Almanac) {
 }
 
 #[rstest]
-fn stop_cond_nrho_apo(almanac: Almanac) {
+fn stop_cond_nrho_apo(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
     use std::time::Instant;
     // The following test technically works, but the transformation of thousands of states
@@ -154,8 +157,8 @@ fn stop_cond_nrho_apo(almanac: Almanac) {
         state_luna
     );
 
-    let bodies = vec![Bodies::Earth, Bodies::Sun];
-    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(&bodies));
+    let bodies = vec![EARTH, SUN];
+    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
 
     let setup = Propagator::rk89(
         dynamics,
@@ -218,7 +221,7 @@ fn stop_cond_nrho_apo(almanac: Almanac) {
 }
 
 #[rstest]
-fn line_of_nodes(almanac: Almanac) {
+fn line_of_nodes(almanac: Arc<Almanac>) {
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_dt = Epoch::from_mjd_tai(J2000_OFFSET);
@@ -230,8 +233,8 @@ fn line_of_nodes(almanac: Almanac) {
 
     let lon_event = Event::new(StateParameter::GeodeticLongitude, 0.0);
 
-    let setup = Propagator::default(OrbitalDynamics::two_body());
-    let mut prop = setup.with(state);
+    let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
+    let mut prop = setup.with(state.into(), almanac);
     let (lon_state, _) = prop.until_event(3 * period, &lon_event).unwrap();
     println!(
         "{:x} => longitude = {} degrees",
@@ -246,7 +249,7 @@ fn line_of_nodes(almanac: Almanac) {
 }
 
 #[rstest]
-fn latitude(almanac: Almanac) {
+fn latitude(almanac: Arc<Almanac>) {
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_dt = Epoch::from_mjd_tai(J2000_OFFSET);
@@ -258,8 +261,8 @@ fn latitude(almanac: Almanac) {
 
     let lat_event = Event::new(StateParameter::GeodeticLatitude, 2.0);
 
-    let setup = Propagator::default_dp78(OrbitalDynamics::two_body());
-    let mut prop = setup.with(state);
+    let setup = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
+    let mut prop = setup.with(state.into(), almanac);
     let (lon_state, _) = prop.until_event(3 * period, &lat_event).unwrap();
     println!(
         "{:x} => latitude = {} degrees",
@@ -274,7 +277,7 @@ fn latitude(almanac: Almanac) {
 }
 
 #[rstest]
-fn event_and_combination(almanac: Almanac) {
+fn event_and_combination(almanac: Arc<Almanac>) {
     /// Event combinations cannot be implemented with a brent solver (the approache used by Nyx to find events).
     /// Instead, two events must be sought for, one after another.
     use nyx::dynamics::GuidanceMode;
@@ -287,7 +290,7 @@ fn event_and_combination(almanac: Almanac) {
 
     let epoch = Epoch::now().unwrap();
     // We're at periapse of a GTO
-    let orbit = Orbit::keplerian_altitude(42_165.0, 0.7, 30.0, 45.0, 45.0, 0.01, epoch, eme2k);
+    let orbit = Orbit::try_keplerian_altitude(42_165.0, 0.7, 30.0, 45.0, 45.0, 0.01, epoch, eme2k);
 
     let sc = Spacecraft::from_thruster(
         orbit,
@@ -314,7 +317,7 @@ fn event_and_combination(almanac: Almanac) {
         LocalFrame::VNC,
     )]);
 
-    let orbital_dyn = OrbitalDynamics::two_body();
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
     let dynamics = SpacecraftDynamics::from_guidance_law(orbital_dyn, burn);
 
     let setup = Propagator::default(dynamics);
@@ -322,7 +325,7 @@ fn event_and_combination(almanac: Almanac) {
 
     // First, propagate until apoapsis
     let (sc_apo, traj) = prop
-        .until_event(orbit.period() * 4.0, &Event::apoapsis())
+        .until_event(orbit.period().unwrap() * 4.0, &Event::apoapsis())
         .unwrap();
 
     // Check that the fuel always decreases or stays constant

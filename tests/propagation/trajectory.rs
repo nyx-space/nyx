@@ -38,7 +38,7 @@ fn traj_ephem_forward(almanac: Almanac) {
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_dt, eme2k,
     );
 
-    let setup = Propagator::default(OrbitalDynamics::two_body());
+    let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
     let mut prop = setup.with(start_state);
     // The trajectory must always be generated on its own thread, no need to worry about it ;-)
     let now = Epoch::now().unwrap();
@@ -172,7 +172,7 @@ fn traj_ephem_forward(almanac: Almanac) {
                 "#{i} differ (Δt = {delta_t})"
             );
             assert_eq!(
-                orig_state.as_vector(),
+                orig_state.to_vector(),
                 loaded_state.as_vector(),
                 "#{i} differ (Δt = {delta_t})"
             );
@@ -278,8 +278,10 @@ fn traj_spacecraft(almanac: Almanac) {
     let start_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc_dynamics =
-        SpacecraftDynamics::from_guidance_law(OrbitalDynamics::two_body(), ruggiero_ctrl.clone());
+    let sc_dynamics = SpacecraftDynamics::from_guidance_law(
+        SpacecraftDynamics::new(OrbitalDynamics::two_body()),
+        ruggiero_ctrl.clone(),
+    );
 
     let setup = Propagator::default(sc_dynamics);
     let prop_time = 44 * Unit::Minute + 10 * Unit::Second;
@@ -349,7 +351,7 @@ fn traj_spacecraft(almanac: Almanac) {
     let mut max_pos_err = (eval_state.orbit.radius() - start_state.orbit.radius()).norm();
     let mut max_vel_err = (eval_state.orbit.velocity() - start_state.orbit.velocity()).norm();
     let mut max_fuel_err = eval_state.fuel_mass_kg - start_state.fuel_mass_kg;
-    let mut max_err = (eval_state.as_vector() - start_state.as_vector()).norm();
+    let mut max_err = (eval_state.to_vector() - start_state.to_vector()).norm();
 
     while let Ok(prop_state) = rx.recv() {
         let eval_state = traj.at(prop_state.epoch()).unwrap();
@@ -377,7 +379,7 @@ fn traj_spacecraft(almanac: Almanac) {
                 prop_state.epoch()
             );
         }
-        let err = (eval_state.as_vector() - prop_state.as_vector()).norm();
+        let err = (eval_state.to_vector() - prop_state.to_vector()).norm();
         if err > max_err {
             max_err = err;
         }
@@ -477,7 +479,7 @@ fn traj_ephem_backward(almanac: Almanac) {
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_dt, eme2k,
     );
 
-    let setup = Propagator::default(OrbitalDynamics::two_body());
+    let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
     let mut prop = setup.with(start_state);
     let (end_state, ephem) = prop.for_duration_with_traj(-31 * Unit::Day).unwrap();
 
@@ -535,7 +537,7 @@ fn traj_ephem_backward(almanac: Almanac) {
 
     let mut max_pos_err = (eval_state.radius() - start_state.radius()).norm();
     let mut max_vel_err = (eval_state.velocity() - start_state.velocity()).norm();
-    let mut max_err = (eval_state.as_vector() - start_state.as_vector()).norm();
+    let mut max_err = (eval_state.to_vector() - start_state.as_vector()).norm();
 
     println!("{}", ephem);
 
@@ -550,7 +552,7 @@ fn traj_ephem_backward(almanac: Almanac) {
         if vel_err > max_vel_err {
             max_vel_err = vel_err;
         }
-        let err = (eval_state.as_vector() - prop_state.as_vector()).norm();
+        let err = (eval_state.to_vector() - prop_state.to_vector()).norm();
         if err > max_err {
             max_err = err;
         }

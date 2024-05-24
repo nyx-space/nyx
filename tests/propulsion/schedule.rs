@@ -54,7 +54,7 @@ fn val_transfer_schedule_no_depl(almanac: Almanac) {
 
     // Define the dynamics
     let bodies = vec![MOON, SUN, JUPITER];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies);
+    let orbital_dyn = OrbitalDynamics::point_masses(bodies);
 
     // Define the maneuver and its schedule
     let mnvr0 = Mnvr::from_time_invariant(
@@ -90,11 +90,11 @@ fn val_transfer_schedule_no_depl(almanac: Almanac) {
     );
 
     let (err_r, err_v) = rss_orbit_vec_errors(
-        &final_state.orbit.to_cartesian_vec(),
-        &rslt.to_cartesian_vec(),
+        &final_state.orbit.to_cartesian_pos_vel(),
+        &rslt.to_cartesian_pos_vel(),
     );
     println!("Absolute errors");
-    let delta = final_state.orbit.to_cartesian_vec() - rslt.to_cartesian_vec();
+    let delta = final_state.orbit.to_cartesian_pos_vel() - rslt.to_cartesian_pos_vel();
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());
     }
@@ -144,7 +144,7 @@ fn val_transfer_schedule_depl(almanac: Almanac) {
 
     // Define the dynamics
     let bodies = vec![MOON, SUN, JUPITER];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies);
+    let orbital_dyn = OrbitalDynamics::point_masses(bodies);
 
     // With 100% thrust: RSS errors:     pos = 3.14651e1 km      vel = 3.75245e-2 km/s
 
@@ -184,11 +184,11 @@ fn val_transfer_schedule_depl(almanac: Almanac) {
     let rslt_fuel_mass = 745.802_837_870_161;
 
     let (err_r, err_v) = rss_orbit_vec_errors(
-        &final_state.orbit.to_cartesian_vec(),
-        &rslt.to_cartesian_vec(),
+        &final_state.orbit.to_cartesian_pos_vel(),
+        &rslt.to_cartesian_pos_vel(),
     );
     println!("Absolute errors");
-    let delta = final_state.orbit.to_cartesian_vec() - rslt.to_cartesian_vec();
+    let delta = final_state.orbit.to_cartesian_pos_vel() - rslt.to_cartesian_pos_vel();
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());
     }
@@ -214,11 +214,11 @@ fn val_transfer_schedule_depl(almanac: Almanac) {
     println!("Reached: {}\nWanted:  {}", backward_state, sc_state);
 
     let (err_r, err_v) = rss_orbit_vec_errors(
-        &backward_state.orbit.to_cartesian_vec(),
-        &sc_state.orbit.to_cartesian_vec(),
+        &backward_state.orbit.to_cartesian_pos_vel(),
+        &sc_state.orbit.to_cartesian_pos_vel(),
     );
     println!("Backprop Absolute errors");
-    let delta = backward_state.orbit.to_cartesian_vec() - sc_state.orbit.to_cartesian_vec();
+    let delta = backward_state.orbit.to_cartesian_pos_vel() - sc_state.orbit.to_cartesian_pos_vel();
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());
     }
@@ -277,7 +277,7 @@ fn val_transfer_single_maneuver_depl() {
 
     // Define the dynamics
     let bodies = vec![MOON, SUN, JUPITER];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies);
+    let orbital_dyn = OrbitalDynamics::point_masses(bodies);
 
     // With 100% thrust: RSS errors:     pos = 3.14651e1 km      vel = 3.75245e-2 km/s
 
@@ -315,11 +315,11 @@ fn val_transfer_single_maneuver_depl() {
     let rslt_fuel_mass = 745.802_837_870_161;
 
     let (err_r, err_v) = rss_orbit_vec_errors(
-        &final_state.orbit.to_cartesian_vec(),
-        &rslt.to_cartesian_vec(),
+        &final_state.orbit.to_cartesian_pos_vel(),
+        &rslt.to_cartesian_pos_vel(),
     );
     println!("Absolute errors");
-    let delta = final_state.orbit.to_cartesian_vec() - rslt.to_cartesian_vec();
+    let delta = final_state.orbit.to_cartesian_pos_vel() - rslt.to_cartesian_pos_vel();
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());
     }
@@ -345,11 +345,11 @@ fn val_transfer_single_maneuver_depl() {
     println!("Reached: {}\nWanted:  {}", backward_state, sc_state);
 
     let (err_r, err_v) = rss_orbit_vec_errors(
-        &backward_state.orbit.to_cartesian_vec(),
-        &sc_state.orbit.to_cartesian_vec(),
+        &backward_state.orbit.to_cartesian_pos_vel(),
+        &sc_state.orbit.to_cartesian_pos_vel(),
     );
     println!("Backprop Absolute errors");
-    let delta = backward_state.orbit.to_cartesian_vec() - sc_state.orbit.to_cartesian_vec();
+    let delta = backward_state.orbit.to_cartesian_pos_vel() - sc_state.orbit.to_cartesian_pos_vel();
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());
     }

@@ -29,9 +29,7 @@ pub mod prelude {
         trajectory::{ExportCfg, Interpolatable, Traj},
         Event, ScTraj, StateParameter,
     };
-    pub use crate::cosmic::{
-        try_achieve_b_plane, BPlane, BPlaneTarget, Bodies, GuidanceMode, OrbitDual,
-    };
+    pub use crate::cosmic::{try_achieve_b_plane, BPlane, BPlaneTarget, GuidanceMode, OrbitDual};
     pub use crate::dynamics::{
         Drag, Harmonics, OrbitalDynamics, PointMasses, SolarPressure, SpacecraftDynamics,
     };

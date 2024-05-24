@@ -87,7 +87,7 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(almanac: Arc<Almanac>) {
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     // We're sharing both the propagator and the dynamics.
-    let orbital_dyn = OrbitalDynamics::two_body();
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
     let mut prop = setup.with(initial_state);
@@ -223,7 +223,7 @@ fn od_tb_val_with_arc(almanac: Arc<Almanac>) {
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     // We're sharing both the propagator and the dynamics.
-    let orbital_dyn = OrbitalDynamics::two_body();
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, PropOpts::with_fixed_step_s(10.0));
 
     let mut prop = setup.with(initial_state);
@@ -413,7 +413,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(almanac: Arc<Almanac>) {
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     // Generate the truth data on one thread.
-    let orbital_dyn = OrbitalDynamics::two_body();
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
@@ -639,7 +639,7 @@ fn od_tb_ckf_fixed_step_iteration_test(almanac: Arc<Almanac>) {
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
-    let orbital_dyn = OrbitalDynamics::two_body();
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
     let mut prop = setup.with(initial_state);
@@ -795,7 +795,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map(almanac: Arc<Almanac>) {
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
-    let orbital_dyn = OrbitalDynamics::two_body();
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
     let mut prop = setup.with(initial_state);
@@ -903,7 +903,7 @@ fn od_tb_ckf_map_covar(almanac: Arc<Almanac>) {
     // the measurements, and the same time step.
 
     let setup = Propagator::new::<RK4Fixed>(
-        OrbitalDynamics::two_body(),
+        SpacecraftDynamics::new(OrbitalDynamics::two_body()),
         PropOpts::with_fixed_step(step_size),
     );
     let prop_est = setup.with(initial_state.with_stm());
@@ -1134,7 +1134,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map(almanac: Arc<Alma
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
-    let orbital_dyn = OrbitalDynamics::two_body();
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
     let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();

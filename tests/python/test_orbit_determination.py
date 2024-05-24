@@ -45,7 +45,7 @@ def test_filter_arc():
     dynamics = SpacecraftDynamics.load_named(str(config_path.joinpath("dynamics.yaml")))
 
     # An propagate for two periods (we only care about the trajectory)
-    _, traj = propagate(sc, dynamics["hifi"], sc.orbit.period() * 2)
+    _, traj = propagate(sc, dynamics["hifi"], sc.orbit.period().unwrap() * 2)
     # Resample the trajectory at fixed step size
     traj = traj.resample(Unit.Second * 10.0)
     # And save the trajectory
@@ -265,7 +265,7 @@ def test_one_way_msr():
 
     # One way measurement
 
-    end_sc, traj = propagate(sc, dynamics["hifi"], sc.orbit.period() * 1.1)
+    end_sc, traj = propagate(sc, dynamics["hifi"], sc.orbit.period().unwrap() * 1.1)
     print(end_sc)
     print(traj)
 

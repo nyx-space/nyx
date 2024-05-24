@@ -33,7 +33,7 @@ fn stm_fixed_step(almanac: Almanac) {
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
     let prop = Propagator::new::<RK4Fixed>(
-        OrbitalDynamics::two_body(),
+        SpacecraftDynamics::new(OrbitalDynamics::two_body()),
         PropOpts::with_fixed_step(10 * Unit::Second),
     );
 
@@ -49,9 +49,9 @@ fn stm_fixed_step(almanac: Almanac) {
             .for_duration(100 * Unit::Second)
             .unwrap();
 
-        let nominal = ten_steps.to_cartesian_vec();
+        let nominal = ten_steps.to_cartesian_pos_vel();
 
-        let stm_err_ten_steps = ten_steps.stm().unwrap() * init.to_cartesian_vec() - nominal;
+        let stm_err_ten_steps = ten_steps.stm().unwrap() * init.to_cartesian_pos_vel() - nominal;
 
         println!("HD ten_steps.stm() = {}", ten_steps.stm().unwrap());
 
@@ -78,7 +78,7 @@ fn stm_fixed_step(almanac: Almanac) {
                 .for_duration(100 * Unit::Second)
                 .unwrap();
 
-            let jac_val = (these_ten_steps.to_cartesian_vec() - nominal) / pert;
+            let jac_val = (these_ten_steps.to_cartesian_pos_vel() - nominal) / pert;
 
             for j in 0..6 {
                 stm_fd[(j, i)] = jac_val[j];
@@ -87,7 +87,7 @@ fn stm_fixed_step(almanac: Almanac) {
 
         println!("FD stm_fd = {}", stm_fd);
 
-        let stm_fd_err_ten_steps = stm_fd * init.to_cartesian_vec() - nominal;
+        let stm_fd_err_ten_steps = stm_fd * init.to_cartesian_pos_vel() - nominal;
 
         println!("FD stm_fd_err_ten_steps = {}", stm_fd_err_ten_steps);
 
@@ -112,7 +112,7 @@ fn stm_variable_step(almanac: Almanac) {
         .with_mu_km3_s2(GMAT_EARTH_GM);
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let prop = Propagator::default_dp78(OrbitalDynamics::two_body());
+    let prop = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
 
     let eccs = vec![1e-5, 0.2];
 
@@ -126,9 +126,9 @@ fn stm_variable_step(almanac: Almanac) {
             .for_duration(100 * Unit::Second)
             .unwrap();
 
-        let nominal = ten_steps.to_cartesian_vec();
+        let nominal = ten_steps.to_cartesian_pos_vel();
 
-        let stm_err_ten_steps = ten_steps.stm().unwrap() * init.to_cartesian_vec() - nominal;
+        let stm_err_ten_steps = ten_steps.stm().unwrap() * init.to_cartesian_pos_vel() - nominal;
 
         println!("HD ten_steps.stm() = {}", ten_steps.stm().unwrap());
 
@@ -155,7 +155,7 @@ fn stm_variable_step(almanac: Almanac) {
                 .for_duration(100 * Unit::Second)
                 .unwrap();
 
-            let jac_val = (these_ten_steps.to_cartesian_vec() - nominal) / pert;
+            let jac_val = (these_ten_steps.to_cartesian_pos_vel() - nominal) / pert;
 
             for j in 0..6 {
                 stm_fd[(j, i)] = jac_val[j];
@@ -164,7 +164,7 @@ fn stm_variable_step(almanac: Almanac) {
 
         println!("FD stm_fd = {}", stm_fd);
 
-        let stm_fd_err_ten_steps = stm_fd * init.to_cartesian_vec() - nominal;
+        let stm_fd_err_ten_steps = stm_fd * init.to_cartesian_pos_vel() - nominal;
 
         println!("FD stm_fd_err_ten_steps = {}", stm_fd_err_ten_steps);
 
@@ -191,7 +191,7 @@ fn stm_between_steps(almanac: Almanac) {
         .with_mu_km3_s2(GMAT_EARTH_GM);
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let prop = Propagator::default_dp78(OrbitalDynamics::two_body());
+    let prop = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
 
     let eccs = vec![1e-5, 0.2];
 
@@ -237,7 +237,7 @@ fn stm_hifi_variable_step(almanac: Almanac) {
         .with_mu_km3_s2(GMAT_EARTH_GM);
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let prop = Propagator::default_dp78(OrbitalDynamics::point_masses(&[MOON, SUN]));
+    let prop = Propagator::default_dp78(OrbitalDynamics::point_masses(vec![MOON, SUN]));
 
     let eccs = vec![1e-5, 0.2];
 
@@ -251,9 +251,9 @@ fn stm_hifi_variable_step(almanac: Almanac) {
             .for_duration(100 * Unit::Second)
             .unwrap();
 
-        let nominal = ten_steps.to_cartesian_vec();
+        let nominal = ten_steps.to_cartesian_pos_vel();
 
-        let stm_err_ten_steps = ten_steps.stm().unwrap() * init.to_cartesian_vec() - nominal;
+        let stm_err_ten_steps = ten_steps.stm().unwrap() * init.to_cartesian_pos_vel() - nominal;
 
         println!("HD ten_steps.stm() = {}", ten_steps.stm().unwrap());
 
@@ -280,7 +280,7 @@ fn stm_hifi_variable_step(almanac: Almanac) {
                 .for_duration(100 * Unit::Second)
                 .unwrap();
 
-            let jac_val = (these_ten_steps.to_cartesian_vec() - nominal) / pert;
+            let jac_val = (these_ten_steps.to_cartesian_pos_vel() - nominal) / pert;
 
             for j in 0..6 {
                 stm_fd[(j, i)] = jac_val[j];
@@ -289,7 +289,7 @@ fn stm_hifi_variable_step(almanac: Almanac) {
 
         println!("FD stm_fd = {}", stm_fd);
 
-        let stm_fd_err_ten_steps = stm_fd * init.to_cartesian_vec() - nominal;
+        let stm_fd_err_ten_steps = stm_fd * init.to_cartesian_pos_vel() - nominal;
 
         println!("FD stm_fd_err_ten_steps = {}", stm_fd_err_ten_steps);
 
@@ -338,7 +338,7 @@ fn orbit_set_unset(almanac: Almanac) {
 
     let init = Orbit::keplerian(8000.0, 0.5, 10.0, 5.0, 25.0, 0.0, epoch, eme2k).with_stm();
 
-    let prop = Propagator::default_dp78(OrbitalDynamics::point_masses(&[MOON, SUN]));
+    let prop = Propagator::default_dp78(OrbitalDynamics::point_masses(vec![MOON, SUN]));
 
     let orbit = prop.with(init).for_duration(2 * Unit::Hour).unwrap();
 
@@ -368,7 +368,7 @@ fn sc_set_unset_static(almanac: Almanac) {
         &OVector::<f64, Const<90>>::from_column_slice(&data),
     );
 
-    let init_vec = init_sc.as_vector();
+    let init_vec = init_sc.to_vector();
 
     let mut init2 = init_sc;
     init2.set(epoch, &init_vec);
@@ -387,12 +387,11 @@ fn sc_and_orbit_stm_chk(almanac: Almanac) {
     let init_orbit = Orbit::keplerian(8000.0, 0.5, 10.0, 5.0, 25.0, 0.0, epoch, eme2k).with_stm();
     let init_sc = Spacecraft::from_srp_defaults(init_orbit, 0.0, 0.0);
 
-    let prop_orbit = Propagator::default_dp78(OrbitalDynamics::point_masses(&[MOON, SUN]));
+    let prop_orbit = Propagator::default_dp78(OrbitalDynamics::point_masses(vec![MOON, SUN]));
 
-    let prop_sc =
-        Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::point_masses(&[
-            MOON, SUN,
-        ])));
+    let prop_sc = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
+        vec![MOON, SUN],
+    )));
 
     let final_orbit = prop_orbit
         .with(init_orbit)

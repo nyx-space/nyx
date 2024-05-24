@@ -3,7 +3,7 @@ extern crate pretty_env_logger;
 
 use anise::constants::celestial_objects::{JUPITER, MOON, SATURN, SUN};
 use anise::constants::frames::IAU_EARTH_FRAME;
-use nyx::cosmic::{Bodies, Orbit};
+use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::io::ExportCfg;
 use nyx::linalg::{Matrix2, Vector2};
@@ -112,7 +112,7 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
     );
 
     let bodies = vec![MOON, SUN, JUPITER, SATURN];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies);
+    let orbital_dyn = OrbitalDynamics::point_masses(bodies);
     let truth_setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let (_, traj) = truth_setup
         .with(initial_state)
@@ -139,7 +139,7 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be _nearly_ perfect because we've removed Saturn from the estimated trajectory
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let estimator = OrbitalDynamics::point_masses(&bodies);
+    let estimator = OrbitalDynamics::point_masses(bodies);
     let setup = Propagator::new::<RK4Fixed>(estimator, opts);
     let prop_est = setup.with(initial_state_dev.with_stm());
 
@@ -310,7 +310,7 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
         Bodies::JupiterBarycenter,
         Bodies::SaturnBarycenter,
     ];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies);
+    let orbital_dyn = OrbitalDynamics::point_masses(bodies);
     let truth_setup = Propagator::default(orbital_dyn);
     let (_, traj) = truth_setup
         .with(initial_state)
@@ -336,7 +336,7 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be _nearly_ perfect because we've removed Saturn from the estimated trajectory
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let estimator = OrbitalDynamics::point_masses(&bodies);
+    let estimator = OrbitalDynamics::point_masses(bodies);
     let setup = Propagator::default(estimator);
     let prop_est = setup.with(initial_state_dev.with_stm());
 

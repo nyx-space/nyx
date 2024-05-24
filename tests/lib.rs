@@ -13,14 +13,15 @@ pub fn test_almanac() -> Almanac {
     use std::path::PathBuf;
 
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
-        .or_else(Ok("."))
+        .or::<Result<String, String>>(Ok(".".to_string()))
         .unwrap();
 
     MetaAlmanac::new(
         (PathBuf::from(manifest_dir).join("data/ci_almanac.dhall"))
             .to_string_lossy()
-            .to_owned(),
+            .to_string(),
     )
+    .unwrap()
     .process()
     .unwrap()
 }

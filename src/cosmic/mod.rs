@@ -66,7 +66,7 @@ where
     }
 
     /// Return this state as a vector for the propagation/estimation
-    fn as_vector(&self) -> OVector<f64, Self::VecLength>;
+    fn to_vector(&self) -> OVector<f64, Self::VecLength>;
 
     /// Return this state as a vector for the propagation/estimation
     /// By default, this is not implemented. This function must be implemented when filtering on this state.

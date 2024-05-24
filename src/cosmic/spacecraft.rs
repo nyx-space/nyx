@@ -133,6 +133,12 @@ impl Default for Spacecraft {
     }
 }
 
+impl From<Orbit> for Spacecraft {
+    fn from(orbit: Orbit) -> Self {
+        Self::builder().orbit(orbit).build()
+    }
+}
+
 #[cfg_attr(feature = "python", pyclass)]
 #[cfg_attr(feature = "python", pyo3(module = "nyx_space.cosmic"))]
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -466,7 +472,7 @@ impl State for Spacecraft {
 
     /// The vector is organized as such:
     /// [X, Y, Z, Vx, Vy, Vz, Cr, Cd, Fuel mass, STM(9x9)]
-    fn as_vector(&self) -> OVector<f64, Const<90>> {
+    fn to_vector(&self) -> OVector<f64, Const<90>> {
         let mut vector = OVector::<f64, Const<90>>::zeros();
         // Set the orbit state info
         for (i, val) in self.orbit.radius_km.iter().enumerate() {

@@ -22,7 +22,7 @@ use anise::ephemerides::EphemerisPhysicsSnafu;
 use anise::errors::{AlmanacResult, EphemerisSnafu};
 use snafu::ResultExt;
 
-pub use super::{Bodies, Frame, Orbit, Spacecraft};
+pub use super::{Frame, Orbit, Spacecraft};
 use crate::errors::{EventAlmanacSnafu, EventError};
 use crate::md::EventEvaluator;
 use crate::time::{Duration, Unit};

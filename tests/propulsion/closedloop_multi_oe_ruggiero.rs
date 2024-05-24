@@ -36,7 +36,7 @@ fn qlaw_as_ruggiero_case_a(almanac: Almanac) {
     let prop_time = 39.91 * Unit::Day;
 
     // Define the dynamics
-    let orbital_dyn = OrbitalDynamics::two_body();
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
     // Define the thruster
     let lowt = Thruster {
@@ -103,7 +103,7 @@ fn qlaw_as_ruggiero_case_b(almanac: Almanac) {
     let prop_time = 160.0 * Unit::Day;
 
     // Define the dynamics
-    let orbital_dyn = OrbitalDynamics::two_body();
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
     // Define the thruster
     let lowt = Thruster {
@@ -159,7 +159,7 @@ fn qlaw_as_ruggiero_case_c(almanac: Almanac) {
     let prop_time = 3.0 * Unit::Day;
 
     // Define the dynamics
-    let orbital_dyn = OrbitalDynamics::two_body();
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
     // Define the thruster
     let lowt = Thruster {
@@ -215,7 +215,7 @@ fn qlaw_as_ruggiero_case_d(almanac: Almanac) {
     let prop_time = 113.0 * Unit::Day;
 
     // Define the dynamics
-    let orbital_dyn = OrbitalDynamics::two_body();
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
     // Define the thruster
     let lowt = Thruster {
@@ -274,7 +274,7 @@ fn qlaw_as_ruggiero_case_e(almanac: Almanac) {
     let prop_time = 400.0 * Unit::Day;
 
     // Define the dynamics
-    let orbital_dyn = OrbitalDynamics::two_body();
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
     // Define the thruster
     let lowt = Thruster {
@@ -336,7 +336,7 @@ fn qlaw_as_ruggiero_case_f(almanac: Almanac) {
     let prop_time = 30.0 * Unit::Day;
 
     // Define the dynamics
-    let orbital_dyn = OrbitalDynamics::two_body();
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
     // Define the thruster
     let lowt = Thruster {
@@ -392,7 +392,7 @@ fn ruggiero_iepc_2011_102(almanac: Almanac) {
     let prop_time = 105.0 * Unit::Day;
 
     // Define the dynamics
-    let orbital_dyn = OrbitalDynamics::two_body();
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
     // Define the thruster
     let lowt = Thruster {

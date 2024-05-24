@@ -60,7 +60,7 @@ fn srp_earth_full_vis(almanac: Arc<Almanac>) {
         -8.640_729_256_514_233e-7,
     );
 
-    let (err_r, err_v) = rss_orbit_vec_errors(&final_state.orbit.to_cartesian_vec(), &rslt);
+    let (err_r, err_v) = rss_orbit_vec_errors(&final_state.orbit.to_cartesian_pos_vel(), &rslt);
     println!(
         "Error accumulated in full sunlight over {} : {:.6} m \t{:.6} m/s",
         prop_time,
@@ -112,7 +112,7 @@ fn srp_earth_leo(almanac: Arc<Almanac>) {
         9.281_283_498_115_046e-5,
     );
 
-    let (err_r, err_v) = rss_orbit_vec_errors(&final_state.orbit.to_cartesian_vec(), &rslt);
+    let (err_r, err_v) = rss_orbit_vec_errors(&final_state.orbit.to_cartesian_pos_vel(), &rslt);
     println!(
         "Error accumulated in circular equatorial LEO (with penumbras) over {} : {:.6} m \t{:.6} m/s",
         prop_time,
@@ -166,7 +166,7 @@ fn srp_earth_meo_ecc_inc(almanac: Arc<Almanac>) {
         -0.3541244448596867,
     );
 
-    let (err_r, err_v) = rss_orbit_vec_errors(&final_state.orbit.to_cartesian_vec(), &rslt);
+    let (err_r, err_v) = rss_orbit_vec_errors(&final_state.orbit.to_cartesian_pos_vel(), &rslt);
     println!(
         "Error accumulated in ecc+inc MEO (with penumbras) over {} : {:.6} m \t{:.6} m/s",
         prop_time,
@@ -181,8 +181,8 @@ fn srp_earth_meo_ecc_inc(almanac: Arc<Almanac>) {
     let final_state_dual = prop.for_duration(prop_time).unwrap();
 
     let (err_r, err_v) = rss_orbit_vec_errors(
-        &final_state.orbit.to_cartesian_vec(),
-        &final_state_dual.orbit.to_cartesian_vec(),
+        &final_state.orbit.to_cartesian_pos_vel(),
+        &final_state_dual.orbit.to_cartesian_pos_vel(),
     );
     println!(
         "Error between reals and duals accumulated over {} : {:.3e} m \t{:.3e} m/s",
@@ -310,16 +310,7 @@ fn std_atm_drag_earth_low(almanac: Arc<Almanac>) {
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
 
-    let orbit = Orbit::keplerian(
-        eme2k.equatorial_radius() + 300.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        dt,
-        eme2k,
-    );
+    let orbit = Orbit::try_keplerian_altitude(300.0, 0.0, 0.0, 0.0, 0.0, 0.0, dt, eme2k).unwrap();
 
     let prop_time = 24 * Unit::Day;
 

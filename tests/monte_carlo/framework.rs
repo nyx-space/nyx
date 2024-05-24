@@ -13,13 +13,13 @@ use anise::{
 use rstest::*;
 
 #[fixture]
-fn almanac() -> Almanac {
-    use crate::test_almanac;
-    test_almanac()
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
 }
 
 #[rstest]
-fn test_monte_carlo_epoch(almanac: Almanac) {
+fn test_monte_carlo_epoch(almanac: Arc<Almanac>) {
     extern crate pretty_env_logger;
     let _ = pretty_env_logger::try_init();
 
@@ -32,7 +32,7 @@ fn test_monte_carlo_epoch(almanac: Almanac) {
     // Build the state generator using a Gaussian distribution (you may use any distribution from rand_distr)
     // 5% error on SMA and 5% on Eccentricity
     let generator = GaussianGenerator::from_std_dev_prcts(
-        state,
+        Spacecraft::from(state),
         &[
             (StateParameter::SMA, 0.05),
             (StateParameter::Eccentricity, 0.05),
@@ -41,7 +41,9 @@ fn test_monte_carlo_epoch(almanac: Almanac) {
     .unwrap();
 
     // Set up the dynamics
-    let orbital_dyn = OrbitalDynamics::new(vec![PointMasses::new(&[SUN, MOON, JUPITER])]);
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::new(vec![PointMasses::new(vec![
+        SUN, MOON, JUPITER,
+    ])]));
 
     let prop = Propagator::default_dp78(orbital_dyn);
 
@@ -53,7 +55,7 @@ fn test_monte_carlo_epoch(almanac: Almanac) {
         scenario: "test_monte_carlo_epoch".to_string(),
     };
 
-    let rslts = my_mc.run_until_epoch(prop, dt + 1.0_f64 * Unit::Day, 10);
+    let rslts = my_mc.run_until_epoch(prop, almanac.clone(), dt + 1.0_f64 * Unit::Day, 10);
 
     let average_sma_dispersion = rslts
         .dispersion_values_of(StateParameter::SMA)

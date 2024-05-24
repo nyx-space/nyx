@@ -48,7 +48,7 @@ fn nil_measurement(almanac: Arc<Almanac>) {
 
     let at_station = Orbit::from_geodesic(lat, long, height, epoch, eme2k);
 
-    let (_, traj) = Propagator::default(OrbitalDynamics::two_body())
+    let (_, traj) = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()))
         .with(at_station, almanac.clone())
         .for_duration_with_traj(1.seconds())
         .unwrap();
@@ -113,7 +113,7 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
     let opts = PropOpts::with_fixed_step(step_size);
 
     let setup =
-        Propagator::new::<RK4Fixed>(OrbitalDynamics::point_masses(&[EARTH, MOON, SUN]), opts);
+        Propagator::new::<RK4Fixed>(OrbitalDynamics::point_masses(vec![EARTH, MOON, SUN]), opts);
 
     struct GmatMsrData {
         offset: Duration,

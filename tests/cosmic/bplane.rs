@@ -2,25 +2,26 @@ extern crate nyx_space as nyx;
 
 use anise::constants::celestial_objects::{JUPITER, MOON, SUN};
 use anise::constants::frames::MOON_J2000;
-use nyx::cosmic::{try_achieve_b_plane, BPlaneTarget, Orbit};
-use nyx::dynamics::OrbitalDynamics;
+use nyx::cosmic::{try_achieve_b_plane, BPlane, BPlaneTarget, Orbit};
+use nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
 use nyx::md::Event;
 use nyx::propagators::Propagator;
 use nyx::time::Epoch;
 
 use std::str::FromStr;
+use std::sync::Arc;
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use rstest::*;
 
 #[fixture]
-fn almanac() -> Almanac {
-    use crate::test_almanac;
-    test_almanac()
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
 }
 
 #[rstest]
-fn val_b_plane_gmat(almanac: Almanac) {
+fn val_b_plane_gmat(almanac: Arc<Almanac>) {
     // This is a reproduction of the B-plane computation from the `Ex_LunarTransfer.script` file from GMAT
     // Grab the frame
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
@@ -38,11 +39,13 @@ fn val_b_plane_gmat(almanac: Almanac) {
         eme2k,
     );
     // Propagate until periapse
-    let prop = Propagator::default(OrbitalDynamics::point_masses(&[MOON, SUN, JUPITER]));
+    let prop = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
+        vec![MOON, SUN, JUPITER],
+    )));
 
     let (out, traj) = prop
-        .with(orbit)
-        .until_event(1.1 * orbit.period(), &Event::periapsis())
+        .with(orbit.into(), almanac.clone())
+        .until_event(1.1 * orbit.period().unwrap(), &Event::periapsis())
         .unwrap();
 
     println!("{}\n{:x}", out, out);
@@ -136,16 +139,16 @@ fn val_b_plane_gmat(almanac: Almanac) {
     // Iterate through the truth data
     // TODO(ANISE): Make this verification tighter after switching to ANISE
     for data in &datum {
-        let eme2k_state = traj.at(data.epoch).unwrap();
+        let eme2k_state = traj.at(data.epoch).unwrap().orbit;
         let state = almanac.transform_to(eme2k_state, MOON_J2000, None).unwrap();
         println!("{}\n{:x}", state, state);
         assert!(
-            dbg!(eme2k_state.c3_km2_s2() - data.c3).abs() < 1e-5,
+            dbg!(eme2k_state.c3_km2_s2().unwrap() - data.c3).abs() < 1e-5,
             "invalid c3 at {}",
             data.epoch
         );
 
-        let b_plane = state.b_plane().unwrap();
+        let b_plane = BPlane::new(state).unwrap();
         assert!(
             dbg!(b_plane.b_dot_r() - data.b_r).abs() < 1.0,
             "invalid b dot R at {}",
@@ -169,9 +172,9 @@ fn val_b_plane_gmat(almanac: Almanac) {
     }
 
     // Check some stuff for the first b plane
-    let eme2k_state = traj.at(datum[0].epoch).unwrap();
+    let eme2k_state = traj.at(datum[0].epoch).unwrap().orbit;
     let state = almanac.transform_to(eme2k_state, MOON_J2000, None).unwrap();
-    let b_plane = state.b_plane().unwrap();
+    let b_plane = BPlane::new(state).unwrap();
     println!("{}\n{}", b_plane, b_plane.jacobian());
     println!("bt\n{}", b_plane.b_t);
     println!("br\n{}", b_plane.b_r);
@@ -179,7 +182,7 @@ fn val_b_plane_gmat(almanac: Almanac) {
 }
 
 #[rstest]
-fn b_plane_davis(almanac: Almanac) {
+fn b_plane_davis(almanac: Arc<Almanac>) {
     // This is a simple test from Dr. Davis' IMD class at CU Boulder.
 
     // Hyperbolic orbit
@@ -194,7 +197,7 @@ fn b_plane_davis(almanac: Almanac) {
         almanac.frame_from_uid(EARTH_J2000).unwrap(),
     );
 
-    let bp = orbit.b_plane().unwrap();
+    let bp = BPlane::new(orbit).unwrap();
     assert!((bp.b_dot_t() - 45892.323790).abs() < 1e-5, "incorrect B_T");
     assert!((bp.b_dot_r() - 10606.210428).abs() < 1e-5, "incorrect B_R");
     println!("{} km/s\n{}", orbit.vmag_km_s(), bp);

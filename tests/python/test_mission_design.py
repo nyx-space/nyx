@@ -77,7 +77,7 @@ def test_propagate():
     rslt_apo, _ = propagate(
         sc,
         dynamics["lofi"],
-        sc.orbit.period() * 2,
+        sc.orbit.period().unwrap() * 2,
         event=Event(StateParameter.Apoapsis, 0.0),
     )
     # Let's make sure that worked to within the default precision
@@ -89,7 +89,7 @@ def test_propagate():
     rslt_apo, traj = propagate(
         sc,
         dynamics["lofi"],
-        sc.orbit.period() * 2,
+        sc.orbit.period().unwrap() * 2,
         event=event,
     )
     assert abs(rslt_apo.orbit.ta_deg() - 180.0) <= 1e-6
@@ -177,7 +177,7 @@ def test_build_spacecraft():
 
     cosm = Cosm.de438()
     eme2k = cosm.frame("EME2000")  # Earth Mean Equator J2000
-    orbit = Orbit.from_keplerian_altitude(
+    orbit = Orbit.from_try_keplerian_altitude(
         400.0, 0.01, 15.6, 45.0, 90.0, 75.0, Epoch.system_now(), eme2k
     )
     # Define the SRP
@@ -243,7 +243,7 @@ def test_two_body():
 
     e = Epoch.system_now()
 
-    orbit = Orbit.from_keplerian_altitude(
+    orbit = Orbit.from_try_keplerian_altitude(
         400,
         ecc=1e-4,
         inc_deg=30.5,

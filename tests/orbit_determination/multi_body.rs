@@ -82,7 +82,7 @@ fn od_val_multi_body_ckf_perfect_stations(almanac: Arc<Almanac>) {
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     let bodies = vec![MOON, SUN, JUPITER];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies);
+    let orbital_dyn = OrbitalDynamics::point_masses(bodies);
     // Generate the truth data.
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
@@ -208,7 +208,7 @@ fn multi_body_ckf_covar_map(almanac: Arc<Almanac>) {
 
     // Generate the truth data on one thread.
     let bodies = vec![MOON, SUN, JUPITER];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies);
+    let orbital_dyn = OrbitalDynamics::point_masses(bodies);
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
 

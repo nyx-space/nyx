@@ -40,9 +40,9 @@ fn tgt_b_plane_earth_gravity_assist_no_propagation(almanac: Arc<Almanac>) {
         almanac.frame_from_uid(EARTH_J2000).unwrap(),
     );
 
-    let prop = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::point_masses(&[
-        MOON, SUN, JUPITER,
-    ])));
+    let prop = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
+        vec![MOON, SUN, JUPITER],
+    )));
 
     let spacecraft = Spacecraft::from_srp_defaults(orbit, 100.0, 0.0);
 
@@ -98,9 +98,9 @@ fn tgt_b_plane_lunar_transfer(almanac: Arc<Almanac>) {
         eme2k,
     );
 
-    let prop = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::point_masses(&[
-        MOON, SUN, JUPITER,
-    ])));
+    let prop = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
+        vec![MOON, SUN, JUPITER],
+    )));
 
     let spacecraft = Spacecraft::from_srp_defaults(orbit, 1000.0, 0.0);
     println!("{}", spacecraft);
@@ -108,7 +108,7 @@ fn tgt_b_plane_lunar_transfer(almanac: Arc<Almanac>) {
     // Propagate to periapsis
     let periapse_spacecraft = prop
         .with(spacecraft, almanac.clone())
-        .until_nth_event(1 * orbit.period(), &Event::periapsis(), 1)
+        .until_nth_event(1 * orbit.period().unwrap(), &Event::periapsis(), 1)
         .unwrap()
         .0;
 
@@ -196,9 +196,9 @@ fn tgt_b_plane_earth_gravity_assist_with_propagation(almanac: Arc<Almanac>) {
         almanac.frame_from_uid(EARTH_J2000).unwrap(),
     );
 
-    let prop = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::point_masses(&[
-        MOON, SUN, JUPITER,
-    ])));
+    let prop = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
+        vec![MOON, SUN, JUPITER],
+    )));
 
     let spacecraft = Spacecraft::from_srp_defaults(orbit, 100.0, 0.0);
 

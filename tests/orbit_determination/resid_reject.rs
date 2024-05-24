@@ -4,7 +4,7 @@ use pretty_env_logger::try_init;
 
 use rstest::*;
 
-use nyx_space::cosmic::{Bodies, Orbit};
+use nyx_space::cosmic::Orbit;
 use nyx_space::dynamics::orbital::OrbitalDynamics;
 use nyx_space::linalg::{Matrix2, Vector2};
 use nyx_space::md::prelude::*;
@@ -44,7 +44,7 @@ fn traj(epoch: Epoch, almanac: Arc<Almanac>) -> Traj<Spacecraft> {
         .build();
 
     let bodies = vec![MOON, SUN, JUPITER, SATURN];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies);
+    let orbital_dyn = OrbitalDynamics::point_masses(bodies);
     let truth_setup = Propagator::dp78(orbital_dyn, PropOpts::with_max_step(step_size));
     let (_, traj) = truth_setup
         .with(initial_state, almanac)
@@ -157,7 +157,7 @@ fn od_resid_reject_all_ckf_two_way(
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be _nearly_ perfect because we've removed Saturn from the estimated trajectory
     let bodies = vec![MOON, SUN, JUPITER];
-    let estimator = OrbitalDynamics::point_masses(&bodies);
+    let estimator = OrbitalDynamics::point_masses(bodies);
     let setup = Propagator::new::<RK4Fixed>(estimator, PropOpts::with_fixed_step(10.seconds()));
     let prop_est = setup.with(initial_state_dev.with_stm());
 
@@ -232,7 +232,7 @@ fn od_resid_reject_default_ckf_two_way(
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be _nearly_ perfect because we've removed Saturn from the estimated trajectory
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let estimator = OrbitalDynamics::point_masses(&bodies);
+    let estimator = OrbitalDynamics::point_masses(bodies);
     let setup = Propagator::new::<RK4Fixed>(estimator, PropOpts::with_fixed_step(10.seconds()));
     let prop_est = setup.with(initial_state_dev.with_stm());
 

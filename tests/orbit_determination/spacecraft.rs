@@ -99,7 +99,7 @@ fn od_val_sc_mb_srp_reals_duals_models(almanac: Arc<Almanac>) {
     // Generate the truth data on one thread.
 
     let bodies = vec![MOON, SUN, JUPITER];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies);
+    let orbital_dyn = OrbitalDynamics::point_masses(bodies);
     let sc_dynamics =
         SpacecraftDynamics::from_model(orbital_dyn, SolarPressure::default(eme2k, almanac.clone()));
 

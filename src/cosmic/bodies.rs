@@ -26,7 +26,7 @@ use std::convert::TryFrom;
 #[derive(Copy, Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[allow(clippy::upper_case_acronyms)]
 #[cfg_attr(feature = "python", pyclass)]
-pub enum Bodies {
+enum Bodies {
     SSB,
     Sun,
     MercuryBarycenter,

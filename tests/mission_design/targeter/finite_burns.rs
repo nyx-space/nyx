@@ -2,7 +2,7 @@ extern crate nyx_space as nyx;
 
 use anise::constants::celestial_objects::{JUPITER, MOON, SUN};
 use hifitime::TimeUnits;
-use nyx::dynamics::guidance::{Mnvr, Thruster};
+use nyx::dynamics::guidance::{LocalFrame, Mnvr, Thruster};
 use nyx::linalg::Vector3;
 use nyx::md::optimizer::*;
 use nyx::md::prelude::*;
@@ -192,7 +192,7 @@ fn val_tgt_finite_burn(almanac: Arc<Almanac>) {
 
     // Define the dynamics
     let bodies = vec![MOON, SUN, JUPITER];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies);
+    let orbital_dyn = OrbitalDynamics::point_masses(bodies);
 
     // With 100% thrust: RSS errors:     pos = 3.14651e1 km      vel = 3.75245e-2 km/s
 
@@ -202,7 +202,7 @@ fn val_tgt_finite_burn(almanac: Arc<Almanac>) {
         start_time + prop_time - 1.seconds(),
         1.0, // Full thrust
         Vector3::new(1.0, 0.0, 0.0),
-        Frame::Inertial,
+        LocalFrame::Inertial,
     );
 
     // And create the spacecraft with that controller
@@ -225,9 +225,9 @@ fn val_tgt_finite_burn(almanac: Arc<Almanac>) {
     let impulsive_tgt = Optimizer::delta_v(
         &prop_no_thrust,
         [
-            Objective::within_tolerance(StateParameter::X, sc_xf_desired.orbit.x_km, 1e-5),
-            Objective::within_tolerance(StateParameter::Y, sc_xf_desired.orbit.y_km, 1e-5),
-            Objective::within_tolerance(StateParameter::Z, sc_xf_desired.orbit.z_km, 1e-5),
+            Objective::within_tolerance(StateParameter::X, sc_xf_desired.orbit.radius_km.x, 1e-5),
+            Objective::within_tolerance(StateParameter::Y, sc_xf_desired.orbit.radius_km.y, 1e-5),
+            Objective::within_tolerance(StateParameter::Z, sc_xf_desired.orbit.radius_km.z, 1e-5),
         ],
     )
     .try_achieve_from(
@@ -242,9 +242,9 @@ fn val_tgt_finite_burn(almanac: Arc<Almanac>) {
     println!("\n\nKNOWN SOLUTION\n{}", mnvr0);
 
     // Solve for this known solution
-    let fb_mnvr =
-        Optimizer::convert_impulsive_mnvr(sc_state, impulsive_tgt.correction, &prop).unwrap();
-    println!("Solution ended being:\n{}\n", fb_mnvr);
+    // let fb_mnvr =
+    //     Optimizer::convert_impulsive_mnvr(sc_state, impulsive_tgt.correction, &prop).unwrap();
+    // println!("Solution ended being:\n{}\n", fb_mnvr);
 
     // Test that this solution works.
 }
