@@ -45,7 +45,10 @@ fn traj(epoch: Epoch, almanac: Arc<Almanac>) -> Traj<Spacecraft> {
 
     let bodies = vec![MOON, SUN, JUPITER, SATURN];
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
-    let truth_setup = Propagator::dp78(orbital_dyn, PropOpts::with_max_step(step_size));
+    let truth_setup = Propagator::dp78(
+        SpacecraftDynamics::new(orbital_dyn),
+        PropOpts::with_max_step(step_size),
+    );
     let (_, traj) = truth_setup
         .with(initial_state, almanac)
         .for_duration_with_traj(prop_time)
@@ -129,7 +132,8 @@ fn initial_estimate(traj: Traj<Spacecraft>) -> KfEstimate<Spacecraft> {
     println!("Initial estimate:\n{}", initial_estimate);
 
     let initial_state_dev = initial_estimate.nominal_state;
-    let (init_rss_pos_km, init_rss_vel_km_s) = rss_orbit_errors(&initial_state, &initial_state_dev);
+    let (init_rss_pos_km, init_rss_vel_km_s) =
+        rss_orbit_errors(&initial_state.orbit, &initial_state_dev.orbit);
 
     println!("Truth initial state:\n{initial_state}\n{initial_state:x}");
     println!("Filter initial state:\n{initial_state_dev}\n{initial_state_dev:x}");
@@ -137,7 +141,7 @@ fn initial_estimate(traj: Traj<Spacecraft>) -> KfEstimate<Spacecraft> {
         "Initial state dev:\t{:.3} m\t{:.3} m/s\n{}",
         init_rss_pos_km * 1e3,
         init_rss_vel_km_s * 1e3,
-        initial_state - initial_state_dev
+        (initial_state.orbit - initial_state_dev.orbit).unwrap()
     );
 
     initial_estimate
@@ -157,9 +161,9 @@ fn od_resid_reject_all_ckf_two_way(
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be _nearly_ perfect because we've removed Saturn from the estimated trajectory
     let bodies = vec![MOON, SUN, JUPITER];
-    let estimator = OrbitalDynamics::point_masses(bodies);
+    let estimator = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
     let setup = Propagator::new::<RK4Fixed>(estimator, PropOpts::with_fixed_step(10.seconds()));
-    let prop_est = setup.with(initial_state_dev.with_stm());
+    let prop_est = setup.with(initial_state_dev.with_stm(), almanac.clone());
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
@@ -231,10 +235,10 @@ fn od_resid_reject_default_ckf_two_way(
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be _nearly_ perfect because we've removed Saturn from the estimated trajectory
-    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let estimator = OrbitalDynamics::point_masses(bodies);
+    let bodies = vec![MOON, SUN, JUPITER];
+    let estimator = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
     let setup = Propagator::new::<RK4Fixed>(estimator, PropOpts::with_fixed_step(10.seconds()));
-    let prop_est = setup.with(initial_state_dev.with_stm());
+    let prop_est = setup.with(initial_state_dev.with_stm(), almanac.clone());
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
@@ -278,16 +282,16 @@ fn od_resid_reject_default_ckf_two_way(
     println!("Truth:\n{}", final_truth_state);
     println!(
         "Delta state with truth (epoch match: {}):\n{}",
-        final_truth_state.epoch == est.epoch(),
-        final_truth_state - est.state()
+        final_truth_state.epoch() == est.epoch(),
+        (final_truth_state.orbit - est.state().orbit).unwrap()
     );
 
     assert_eq!(
-        final_truth_state.epoch,
+        final_truth_state.epoch(),
         est.epoch(),
         "time of final EST and TRUTH epochs differ"
     );
-    let delta = est.state() - final_truth_state;
+    let delta = (est.state().orbit - final_truth_state.orbit).unwrap();
     println!(
         "RMAG error = {:.6} m\tVMAG error = {:.6} m/s",
         delta.rmag_km() * 1e3,

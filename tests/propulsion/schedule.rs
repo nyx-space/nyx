@@ -165,7 +165,7 @@ fn val_transfer_schedule_depl(almanac: Arc<Almanac>) {
     // NOTE: We specify the use an RK89 to match the GMAT setup.
     let setup = Propagator::rk89(sc, PropOpts::with_fixed_step(10.0 * Unit::Second));
     let final_state = setup
-        .with(sc_state, almanac)
+        .with(sc_state, almanac.clone())
         .for_duration(prop_time)
         .unwrap();
 
@@ -296,7 +296,7 @@ fn val_transfer_single_maneuver_depl(almanac: Arc<Almanac>) {
     // NOTE: We specify the use an RK89 to match the GMAT setup.
     let setup = Propagator::rk89(sc, PropOpts::with_fixed_step(10.0 * Unit::Second));
     let final_state = setup
-        .with(sc_state, almanac)
+        .with(sc_state, almanac.clone())
         .for_duration(prop_time)
         .unwrap();
 

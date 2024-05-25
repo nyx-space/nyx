@@ -746,7 +746,7 @@ fn two_body_dual(almanac: Arc<Almanac>) {
     let step_size = 10 * Unit::Second;
 
     let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step(step_size));
-    let mut prop = setup.with(init.into(), almanac);
+    let mut prop = setup.with(init.into(), almanac.clone());
     let final_state = prop.for_duration(prop_time).unwrap();
 
     // Check that the STM is correct by back propagating by the previous step, and multiplying by the STM.
@@ -800,10 +800,10 @@ fn multi_body_dynamics_dual(almanac: Arc<Almanac>) {
 
     let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step(step_size));
     let final_state = setup
-        .with(halo_rcvr.into(), almanac)
+        .with(halo_rcvr.into(), almanac.clone())
         .for_duration(prop_time)
         .unwrap();
-    let mut prop = setup.with(Spacecraft::from(halo_rcvr).with_stm(), almanac);
+    let mut prop = setup.with(Spacecraft::from(halo_rcvr).with_stm(), almanac.clone());
     let final_state_dual = prop.for_duration(prop_time).unwrap();
     println!("Final STM {}", final_state_dual.stm().unwrap());
 
@@ -966,7 +966,7 @@ fn val_earth_sph_harmonics_12x12(almanac: Arc<Almanac>) {
     let setup = Propagator::rk89(dynamics.clone(), PropOpts::with_tolerance(1e-9));
     let prop_time = 1 * Unit::Day;
     let final_state = setup
-        .with(state.into(), almanac)
+        .with(state.into(), almanac.clone())
         .for_duration(prop_time)
         .unwrap();
 
@@ -990,7 +990,7 @@ fn val_earth_sph_harmonics_12x12(almanac: Arc<Almanac>) {
     let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step_s(30.0));
     let prop_time = 6 * Unit::Hour;
     let final_state = setup
-        .with(state.into(), almanac)
+        .with(state.into(), almanac.clone())
         .for_duration(prop_time)
         .unwrap();
     // Compare the case with the hyperdual EOMs (computation uses another part of the code)

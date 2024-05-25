@@ -77,9 +77,10 @@ fn traj_ephem_forward(almanac: Arc<Almanac>) {
     // Now let's re-generate the truth data and ensure that each state we generate is in the ephemeris and matches the expected state within tolerance.
 
     let (tx, rx) = channel();
+    let almanac_c = almanac.clone();
     std::thread::spawn(move || {
         setup
-            .with(start_state.into(), almanac.clone())
+            .with(start_state.into(), almanac_c)
             .for_duration_with_channel(31 * Unit::Day, tx)
             .unwrap();
     });
@@ -337,9 +338,10 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
     // Now let's re-generate the truth data and ensure that each state we generate is in the ephemeris and matches the expected state within tolerance.
 
     let (tx, rx) = channel();
+    let almanac_c = almanac.clone();
     std::thread::spawn(move || {
         setup
-            .with(start_state.into(), almanac.clone())
+            .with(start_state.into(), almanac_c)
             .until_epoch_with_channel(end_state.epoch(), tx)
             .unwrap();
     });

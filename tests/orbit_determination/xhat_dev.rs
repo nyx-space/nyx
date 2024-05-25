@@ -93,7 +93,7 @@ fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>) {
     let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let (_, traj) = setup
-        .with(Spacecraft::from(initial_state).with_stm(), almanac)
+        .with(Spacecraft::from(initial_state).with_stm(), almanac.clone())
         .for_duration_with_traj(prop_time)
         .unwrap();
 

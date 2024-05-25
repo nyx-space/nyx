@@ -93,7 +93,7 @@ fn stop_cond_3rd_peri(almanac: Arc<Almanac>) {
     let peri_event = Event::periapsis(); // Special event shortcut!
 
     let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
-    let mut prop = setup.with(state.into(), almanac);
+    let mut prop = setup.with(state.into(), almanac.clone());
     // Propagate for at four orbital periods so we know we've passed the third one
     // NOTE: We're fetching the 3rd item because the initial state is actually at periapse,
     // which the event finder will find.

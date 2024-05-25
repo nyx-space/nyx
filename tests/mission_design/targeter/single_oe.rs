@@ -207,11 +207,8 @@ fn orbit_stm_chk(almanac: Arc<Almanac>) {
     let achievement_epoch = orig_dt + target_delta_t;
 
     loop {
-        let prev_state = prop_instance
-            .state
-            .to_vector()
-            .fixed_rows::<9>(0)
-            .to_owned();
+        let prev_vector = prop_instance.state.to_vector();
+        let prev_state = prev_vector.fixed_rows::<9>(0).to_owned();
         prop_instance.single_step().unwrap();
         if prop_instance.state.epoch() > achievement_epoch {
             // Go backward if we've done too far

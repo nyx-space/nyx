@@ -83,7 +83,9 @@ fn alt_orbit_raising(almanac: Arc<Almanac>) {
         );
     }
 
-    let multishoot_sol = opti.solve(CostFunction::MinimumFuel, almanac).unwrap();
+    let multishoot_sol = opti
+        .solve(CostFunction::MinimumFuel, almanac.clone())
+        .unwrap();
 
     println!("Final nodes\nNode no,X (km),Y (km),Z (km),Epoch:GregorianUtc");
     for (i, node) in opti.targets.iter().enumerate() {
@@ -93,7 +95,9 @@ fn alt_orbit_raising(almanac: Arc<Almanac>) {
         );
     }
 
-    let all_trajectories = multishoot_sol.build_trajectories(&prop, almanac).unwrap();
+    let all_trajectories = multishoot_sol
+        .build_trajectories(&prop, almanac.clone())
+        .unwrap();
 
     let mut full_traj = all_trajectories[0].clone();
 

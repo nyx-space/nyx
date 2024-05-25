@@ -68,7 +68,7 @@ fn qlaw_as_ruggiero_case_a(almanac: Arc<Almanac>) {
 
     let setup =
         Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second));
-    let mut prop = setup.with(sc_state, almanac);
+    let mut prop = setup.with(sc_state, almanac.clone());
     let (final_state, traj) = prop.for_duration_with_traj(prop_time).unwrap();
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[qlaw_as_ruggiero_case_a] {:x}", final_state.orbit);
@@ -77,7 +77,7 @@ fn qlaw_as_ruggiero_case_a(almanac: Arc<Almanac>) {
     for e in &events {
         println!(
             "[qlaw_as_ruggiero_case_a] Found {} events of kind {}",
-            traj.find(e, almanac).unwrap().len(),
+            traj.find(e, almanac.clone()).unwrap().len(),
             e
         );
     }

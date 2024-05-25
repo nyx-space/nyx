@@ -55,7 +55,7 @@ fn leo_sun_earth_eclipses(almanac: Arc<Almanac>) {
     let mut prev_eclipse_state = EclipseState::Umbra;
     let mut cnt_changes = 0;
     while let Ok(rx_state) = truth_rx.recv() {
-        let new_eclipse_state = e_loc.compute(rx_state.orbit, almanac).unwrap();
+        let new_eclipse_state = e_loc.compute(rx_state.orbit, almanac.clone()).unwrap();
         if new_eclipse_state != prev_eclipse_state {
             println!("{:.6} now in {:?}", rx_state.orbit.epoch, new_eclipse_state);
             prev_eclipse_state = new_eclipse_state;
@@ -81,12 +81,14 @@ fn geo_sun_earth_eclipses(almanac: Arc<Almanac>) {
 
     let bodies = vec![SUN, JUPITER];
 
+    let almanac_c = almanac.clone();
+
     thread::spawn(move || {
         let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
         let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step_s(60.0));
 
         setup
-            .with(geo.into(), almanac.clone())
+            .with(geo.into(), almanac_c)
             .for_duration_with_channel(prop_time, truth_tx)
             .unwrap();
     });
@@ -101,7 +103,7 @@ fn geo_sun_earth_eclipses(almanac: Arc<Almanac>) {
     let mut prev_eclipse_state = EclipseState::Umbra;
     let mut cnt_changes = 0;
     while let Ok(rx_state) = truth_rx.recv() {
-        let new_eclipse_state = e_loc.compute(rx_state.orbit, almanac).unwrap();
+        let new_eclipse_state = e_loc.compute(rx_state.orbit, almanac.clone()).unwrap();
         if new_eclipse_state != prev_eclipse_state {
             println!("{:.6} now in {:?}", rx_state.orbit.epoch, new_eclipse_state);
             prev_eclipse_state = new_eclipse_state;

@@ -34,7 +34,7 @@ fn srp_earth_full_vis(almanac: Arc<Almanac>) {
 
     // Define the dynamics
 
-    let srp = SolarPressure::default(eme2k, almanac);
+    let srp = SolarPressure::default(eme2k, almanac.clone());
 
     let dry_mass = 300.0;
 

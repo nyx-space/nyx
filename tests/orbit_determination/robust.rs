@@ -5,6 +5,7 @@ use anise::constants::celestial_objects::{JUPITER, MOON, SATURN, SUN};
 use anise::constants::frames::IAU_EARTH_FRAME;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::OrbitalDynamics;
+use nyx::dynamics::SpacecraftDynamics;
 use nyx::io::ExportCfg;
 use nyx::linalg::{Matrix2, Vector2};
 use nyx::md::StateParameter;
@@ -13,6 +14,7 @@ use nyx::od::prelude::*;
 use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use nyx::time::{Epoch, TimeUnits, Unit};
 use nyx::utils::rss_orbit_errors;
+use nyx::Spacecraft;
 use polars::prelude::*;
 use std::collections::BTreeMap;
 use std::env;
@@ -83,7 +85,9 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+    let initial_state = Spacecraft::from(Orbit::keplerian(
+        22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k,
+    ));
 
     // Disperse the initial state based on some orbital elements errors given from ULA Atlas 5 user guide, table 2.3.3-1 <https://www.ulalaunch.com/docs/default-source/rockets/atlasvusersguide2010a.pdf>
     // This assumes that the errors are ONE TENTH of the values given in the table. It assumes that the launch provider has provided an initial state vector, whose error is lower than the injection errors.
@@ -100,7 +104,8 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
     println!("Initial estimate:\n{}", initial_estimate);
 
     let initial_state_dev = initial_estimate.nominal_state;
-    let (init_rss_pos_km, init_rss_vel_km_s) = rss_orbit_errors(&initial_state, &initial_state_dev);
+    let (init_rss_pos_km, init_rss_vel_km_s) =
+        rss_orbit_errors(&initial_state.orbit, &initial_state_dev.orbit);
 
     println!("Truth initial state:\n{initial_state}\n{initial_state:x}");
     println!("Filter initial state:\n{initial_state_dev}\n{initial_state_dev:x}");
@@ -108,14 +113,14 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
         "Initial state dev:\t{:.3} m\t{:.3} m/s\n{}",
         init_rss_pos_km * 1e3,
         init_rss_vel_km_s * 1e3,
-        initial_state - initial_state_dev
+        (initial_state.orbit - initial_state_dev.orbit).unwrap()
     );
 
     let bodies = vec![MOON, SUN, JUPITER, SATURN];
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
-    let truth_setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
+    let truth_setup = Propagator::new::<RK4Fixed>(SpacecraftDynamics::new(orbital_dyn), opts);
     let (_, traj) = truth_setup
-        .with(initial_state)
+        .with(initial_state, almanac.clone())
         .for_duration_with_traj(prop_time)
         .unwrap();
 
@@ -138,10 +143,10 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be _nearly_ perfect because we've removed Saturn from the estimated trajectory
-    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let estimator = OrbitalDynamics::point_masses(bodies);
+    let bodies = vec![MOON, SUN, JUPITER];
+    let estimator = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
     let setup = Propagator::new::<RK4Fixed>(estimator, opts);
-    let prop_est = setup.with(initial_state_dev.with_stm());
+    let prop_est = setup.with(initial_state_dev.with_stm(), almanac.clone());
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
@@ -165,13 +170,13 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
         .unwrap();
 
     let (sm_rss_pos_km, sm_rss_vel_km_s) =
-        rss_orbit_errors(&initial_state, &odp.estimates[0].state());
+        rss_orbit_errors(&initial_state.orbit, &odp.estimates[0].state().orbit);
 
     println!(
         "Initial state error after smoothing:\t{:.3} m\t{:.3} m/s\n{}",
         sm_rss_pos_km * 1e3,
         sm_rss_vel_km_s * 1e3,
-        initial_state - odp.estimates[0].state()
+        (initial_state.orbit - odp.estimates[0].state().orbit).unwrap()
     );
 
     odp.process_arc::<GroundStation>(&remaining).unwrap();
@@ -190,8 +195,8 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
     println!("Truth:\n{}", final_truth_state);
     println!(
         "Delta state with truth (epoch match: {}):\n{}",
-        final_truth_state.epoch == est.epoch(),
-        final_truth_state - est.state()
+        final_truth_state.epoch() == est.epoch(),
+        (final_truth_state.orbit - est.state().orbit).unwrap()
     );
 
     for i in 0..6 {
@@ -212,11 +217,11 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
     }
 
     assert_eq!(
-        final_truth_state.epoch,
+        final_truth_state.epoch(),
         est.epoch(),
         "time of final EST and TRUTH epochs differ"
     );
-    let delta = est.state() - final_truth_state;
+    let delta = (est.state().orbit - final_truth_state.orbit).unwrap();
     println!(
         "RMAG error = {:.6} m\tVMAG error = {:.6} m/s",
         delta.rmag_km() * 1e3,
@@ -251,7 +256,9 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+    let initial_state = Spacecraft::from(Orbit::keplerian(
+        22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k,
+    ));
 
     let mut dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
@@ -293,7 +300,8 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
     println!("Initial estimate:\n{}", initial_estimate);
 
     let initial_state_dev = initial_estimate.nominal_state;
-    let (init_rss_pos_km, init_rss_vel_km_s) = rss_orbit_errors(&initial_state, &initial_state_dev);
+    let (init_rss_pos_km, init_rss_vel_km_s) =
+        rss_orbit_errors(&initial_state.orbit, &initial_state_dev.orbit);
 
     println!("Truth initial state:\n{initial_state}\n{initial_state:x}");
     println!("Filter initial state:\n{initial_state_dev}\n{initial_state_dev:x}");
@@ -301,19 +309,14 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
         "Initial state dev:\t{:.3} m\t{:.3} m/s\n{}",
         init_rss_pos_km * 1e3,
         init_rss_vel_km_s * 1e3,
-        initial_state - initial_state_dev
+        (initial_state.orbit - initial_state_dev.orbit).unwrap()
     );
 
-    let bodies = vec![
-        Bodies::Luna,
-        Bodies::Sun,
-        Bodies::JupiterBarycenter,
-        Bodies::SaturnBarycenter,
-    ];
+    let bodies = vec![MOON, SUN, JUPITER, SATURN];
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
-    let truth_setup = Propagator::default(orbital_dyn);
+    let truth_setup = Propagator::default(SpacecraftDynamics::new(orbital_dyn));
     let (_, traj) = truth_setup
-        .with(initial_state)
+        .with(initial_state, almanac.clone())
         .for_duration_with_traj(prop_time)
         .unwrap();
 
@@ -335,10 +338,10 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be _nearly_ perfect because we've removed Saturn from the estimated trajectory
-    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let estimator = OrbitalDynamics::point_masses(bodies);
+    let bodies = vec![MOON, SUN, JUPITER];
+    let estimator = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
     let setup = Propagator::default(estimator);
-    let prop_est = setup.with(initial_state_dev.with_stm());
+    let prop_est = setup.with(initial_state_dev.with_stm(), almanac.clone());
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
@@ -509,8 +512,8 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
     println!("Truth:\n{}", final_truth_state);
     println!(
         "Delta state with truth (epoch match: {}):\n{}",
-        final_truth_state.epoch == est.epoch(),
-        final_truth_state - est.state()
+        final_truth_state.epoch() == est.epoch(),
+        (final_truth_state.orbit - est.state().orbit).unwrap()
     );
 
     for i in 0..6 {
@@ -531,11 +534,11 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
     }
 
     assert_eq!(
-        final_truth_state.epoch,
+        final_truth_state.epoch(),
         est.epoch(),
         "time of final EST and TRUTH epochs differ"
     );
-    let delta = est.state() - final_truth_state;
+    let delta = (est.state().orbit - final_truth_state.orbit).unwrap();
     println!(
         "RMAG error = {:.6} m\tVMAG error = {:.6} m/s",
         delta.rmag_km() * 1e3,

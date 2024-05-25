@@ -105,7 +105,7 @@ fn rugg_sma_regress_threshold(almanac: Arc<Almanac>) {
 
         let final_state =
             Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-                .with(sc_state, almanac)
+                .with(sc_state, almanac.clone())
                 .for_duration(prop_time)
                 .unwrap();
 
@@ -434,7 +434,7 @@ fn rugg_ecc_regress_threshold(almanac: Arc<Almanac>) {
 
         let final_state =
             Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-                .with(sc_state, almanac)
+                .with(sc_state, almanac.clone())
                 .for_duration(prop_time)
                 .unwrap();
 
@@ -656,7 +656,7 @@ fn rugg_raan(almanac: Arc<Almanac>) {
 
     let setup =
         Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second));
-    let mut prop = setup.with(sc_state, almanac);
+    let mut prop = setup.with(sc_state, almanac.clone());
     let (final_state, traj) = prop.for_duration_with_traj(prop_time).unwrap();
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_raan] {:x}", final_state.orbit);
@@ -706,7 +706,7 @@ fn rugg_raan_regress_threshold(almanac: Arc<Almanac>) {
 
         let final_state =
             Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-                .with(sc_state, almanac)
+                .with(sc_state, almanac.clone())
                 .for_duration(prop_time)
                 .unwrap();
 
