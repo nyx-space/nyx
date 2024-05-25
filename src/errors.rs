@@ -96,7 +96,7 @@ impl From<ConfigError> for NyxError {
     }
 }
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, PartialEq, Snafu)]
 #[snafu(visibility(pub(crate)))]
 pub enum StateError {
     #[snafu(display("{param} is unavailable for this kind of state"))]
@@ -112,7 +112,7 @@ pub enum StateError {
     NoThrusterAvail,
 }
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, PartialEq, Snafu)]
 #[snafu(visibility(pub(crate)))]
 pub enum EventError {
     #[snafu(display("during event computation: {source}"))]

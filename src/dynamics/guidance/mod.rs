@@ -116,7 +116,7 @@ pub(crate) fn ra_dec_from_unit_vector(vhat: Vector3<f64>) -> (f64, f64) {
     (alpha, delta)
 }
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, PartialEq, Snafu)]
 pub enum GuidanceError {
     #[snafu(display("No thruster attached to spacecraft"))]
     NoThrustersDefined,

@@ -56,7 +56,7 @@ impl fmt::Display for IntegrationDetails {
     }
 }
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, PartialEq, Snafu)]
 pub enum PropagationError {
     #[snafu(display("encountered a dynamics error {source}"))]
     Dynamics { source: DynamicsError },
