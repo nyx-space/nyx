@@ -6,7 +6,7 @@ use anise::constants::frames::IAU_EARTH_FRAME;
 use nyx::cosmic::{Orbit, Spacecraft};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::spacecraft::{SolarPressure, SpacecraftDynamics};
-use nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
+use nyx::linalg::{Matrix2, SMatrix, SVector, Vector2};
 use nyx::md::trajectory::ExportCfg;
 use nyx::md::{Event, StateParameter};
 use nyx::od::noise::GaussMarkov;
@@ -152,23 +152,27 @@ fn od_val_sc_mb_srp_reals_duals_models(almanac: Arc<Almanac>) {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let initial_state_est = initial_state.with_stm();
-    let sc_init_est = Spacecraft::from_srp_defaults(initial_state_est, dry_mass_kg, sc_area);
+    let initial_state_est = initial_state;
+    let sc_init_est =
+        Spacecraft::from_srp_defaults(initial_state_est, dry_mass_kg, sc_area).with_stm();
     // Use the same setup as earlier
     let prop_est = setup.with(sc_init_est, almanac.clone());
     let covar_radius_km = 1.0e-3_f64.powi(2);
     let covar_velocity_km_s = 1.0e-6_f64.powi(2);
-    let init_covar = Matrix6::from_diagonal(&Vector6::new(
+    let init_covar = SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([
         covar_radius_km,
         covar_radius_km,
         covar_radius_km,
         covar_velocity_km_s,
         covar_velocity_km_s,
         covar_velocity_km_s,
-    ));
+        0.0,
+        0.0,
+        0.0,
+    ]));
 
     // Define the initial orbit estimate
-    let initial_estimate = KfEstimate::from_covar(initial_state_est, init_covar);
+    let initial_estimate = KfEstimate::from_covar(sc_init_est, init_covar);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise =
@@ -230,7 +234,7 @@ fn od_val_sc_mb_srp_reals_duals_models(almanac: Arc<Almanac>) {
         est.covar.diagonal().norm()
     );
 
-    let delta = est.state() - final_truth.orbit;
+    let delta = (est.state().orbit - final_truth.orbit).unwrap();
     println!(
         "RMAG error = {:.2e} m\tVMAG error = {:.3e} mm/s",
         delta.rmag_km() * 1e3,

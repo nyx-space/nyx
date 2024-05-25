@@ -8,7 +8,7 @@ use nyx::dynamics::sph_harmonics::Harmonics;
 use nyx::dynamics::SpacecraftDynamics;
 use nyx::io::ConfigRepr;
 use nyx::io::{gravity::*, ExportCfg};
-use nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
+use nyx::linalg::{Matrix2, SMatrix, SVector, Vector2};
 use nyx::od::noise::GaussMarkov;
 use nyx::od::prelude::*;
 use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
@@ -109,17 +109,20 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(almanac: Arc<Almanac>) {
     let prop_est = setup.with(Spacecraft::from(initial_state).with_stm(), almanac.clone());
     let covar_radius_km = 1.0e-6;
     let covar_velocity_km_s = 1.0e-6;
-    let init_covar = Matrix6::from_diagonal(&Vector6::new(
+    let init_covar = SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([
         covar_radius_km,
         covar_radius_km,
         covar_radius_km,
         covar_velocity_km_s,
         covar_velocity_km_s,
         covar_velocity_km_s,
-    ));
+        0.0,
+        0.0,
+        0.0,
+    ]));
 
     // Define the initial estimate
-    let initial_estimate = KfEstimate::from_covar(initial_state, init_covar);
+    let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
     println!("initial estimate:\n{}", initial_estimate);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
@@ -170,7 +173,7 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(almanac: Arc<Almanac>) {
     // Check the final estimate
     let est = &odp.estimates[odp.estimates.len() - 1];
     println!("{}\n\n{}\n{}", est.state_deviation(), est, final_truth);
-    let delta = est.state() - final_truth;
+    let delta = (est.state().orbit - final_truth.orbit).unwrap();
     println!(
         "RMAG error = {:.3} m\tVMAG error = {:.3} mm/s",
         delta.rmag_km() * 1e3,
@@ -278,17 +281,20 @@ fn od_tb_val_with_arc(almanac: Arc<Almanac>) {
     let prop_est = setup.with(Spacecraft::from(initial_state).with_stm(), almanac.clone());
     let covar_radius_km = 1.0e-6;
     let covar_velocity_km_s = 1.0e-6;
-    let init_covar = Matrix6::from_diagonal(&Vector6::new(
+    let init_covar = SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([
         covar_radius_km,
         covar_radius_km,
         covar_radius_km,
         covar_velocity_km_s,
         covar_velocity_km_s,
         covar_velocity_km_s,
-    ));
+        0.0,
+        0.0,
+        0.0,
+    ]));
 
     // Define the initial estimate
-    let initial_estimate = KfEstimate::from_covar(initial_state, init_covar);
+    let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
     println!("initial estimate:\n{}", initial_estimate);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
@@ -339,7 +345,7 @@ fn od_tb_val_with_arc(almanac: Arc<Almanac>) {
     // Check the final estimate
     let est = &odp.estimates[odp.estimates.len() - 1];
     println!("{}\n\n{}\n{}", est.state_deviation(), est, final_truth);
-    let delta = est.state() - final_truth;
+    let delta = (est.state().orbit - final_truth.orbit).unwrap();
     println!(
         "RMAG error = {:.3} m\tVMAG error = {:.3} mm/s",
         delta.rmag_km() * 1e3,
@@ -442,19 +448,22 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(almanac: Arc<Almanac>) {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let initial_state_est = initial_state.with_stm();
+    let initial_state_est = Spacecraft::from(initial_state).with_stm();
     // Use the same setup as earlier
-    let prop_est = setup.with(initial_state_est);
+    let prop_est = setup.with(initial_state_est, almanac.clone());
     let covar_radius_km = 1.0e-3;
     let covar_velocity_km_s = 1.0e-6;
-    let init_covar = Matrix6::from_diagonal(&Vector6::new(
+    let init_covar = SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([
         covar_radius_km,
         covar_radius_km,
         covar_radius_km,
         covar_velocity_km_s,
         covar_velocity_km_s,
         covar_velocity_km_s,
-    ));
+        0.0,
+        0.0,
+        0.0,
+    ]));
 
     // Define the initial orbit estimate
     let initial_estimate = KfEstimate::from_covar(initial_state_est, init_covar);
@@ -532,7 +541,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(almanac: Arc<Almanac>) {
         est.covar.diagonal().norm()
     );
 
-    let delta = est.state() - final_truth;
+    let delta = (est.state().orbit - final_truth.orbit).unwrap();
     println!(
         "RMAG error = {:.2e} m\tVMAG error = {:.3e} mm/s",
         delta.rmag_km() * 1e3,
@@ -580,7 +589,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(almanac: Arc<Almanac>) {
         est.covar.diagonal().norm()
     );
 
-    let delta = est.state() - final_truth;
+    let delta = (est.state().orbit - final_truth.orbit).unwrap();
     println!(
         "RMAG error = {:.2e} m\tVMAG error = {:.3e} mm/s",
         delta.rmag_km() * 1e3,
@@ -659,21 +668,23 @@ fn od_tb_ckf_fixed_step_iteration_test(almanac: Arc<Almanac>) {
     let prop_est = setup.with(Spacecraft::from(initial_state).with_stm(), almanac.clone());
     let covar_radius_km = 1.0e-3;
     let covar_velocity_km_s = 1.0e-6;
-    let init_covar = Matrix6::from_diagonal(&Vector6::new(
+    let init_covar = SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([
         covar_radius_km,
         covar_radius_km,
         covar_radius_km,
         covar_velocity_km_s,
         covar_velocity_km_s,
         covar_velocity_km_s,
-    ));
-
+        0.0,
+        0.0,
+        0.0,
+    ]));
     // Define the initial estimate (x_hat): add 100 meters in X, remove 100 meters in Y and add 50 meters in Z
     let mut initial_state2 = initial_state;
-    initial_state2.x_km += 0.1;
-    initial_state2.y_km -= 0.1;
-    initial_state2.z_km += 0.05;
-    let initial_estimate = KfEstimate::from_covar(initial_state2, init_covar);
+    initial_state2.radius_km.x += 0.1;
+    initial_state2.radius_km.y -= 0.1;
+    initial_state2.radius_km.z += 0.05;
+    let initial_estimate = KfEstimate::from_covar(initial_state2.into(), init_covar);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
@@ -685,7 +696,7 @@ fn od_tb_ckf_fixed_step_iteration_test(almanac: Arc<Almanac>) {
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
     // Check the final estimate prior to iteration
-    let delta = odp.estimates.last().unwrap().state() - final_truth;
+    let delta = (odp.estimates.last().unwrap().state().orbit - final_truth.orbit).unwrap();
     println!(
         "RMAG error = {:.2e} m\tVMAG error = {:.3e} mm/s",
         delta.rmag_km() * 1e3,
@@ -711,8 +722,8 @@ fn od_tb_ckf_fixed_step_iteration_test(almanac: Arc<Almanac>) {
     )
     .unwrap();
 
-    let dstate_no_iteration = initial_state - initial_state2;
-    let dstate_iteration = initial_state - odp.estimates[0].state();
+    let dstate_no_iteration = (initial_state - initial_state2).unwrap();
+    let dstate_iteration = (initial_state - odp.estimates[0].state().orbit).unwrap();
 
     println!("{}\n{}", initial_state2, odp.estimates[0].state());
 
@@ -738,7 +749,7 @@ fn od_tb_ckf_fixed_step_iteration_test(almanac: Arc<Almanac>) {
     // Check the final estimate
     let est = &odp.estimates[odp.estimates.len() - 1];
     println!("{}\n\n{}\n{}", est.state_deviation(), est, final_truth);
-    let delta = est.state() - final_truth;
+    let delta = (est.state().orbit - final_truth.orbit).unwrap();
     println!(
         "RMAG error = {:.3} m\tVMAG error = {:.3} mm/s",
         delta.rmag_km() * 1e3,
@@ -817,17 +828,20 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map(almanac: Arc<Almanac>) {
     // Set up the filter
     let covar_radius_km = 1.0e-3;
     let covar_velocity_km_s = 1.0e-6;
-    let init_covar = Matrix6::from_diagonal(&Vector6::new(
+    let init_covar = SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([
         covar_radius_km,
         covar_radius_km,
         covar_radius_km,
         covar_velocity_km_s,
         covar_velocity_km_s,
         covar_velocity_km_s,
-    ));
+        0.0,
+        0.0,
+        0.0,
+    ]));
 
     // Define the initial estimate
-    let initial_estimate = KfEstimate::from_covar(initial_state, init_covar);
+    let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
@@ -875,7 +889,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map(almanac: Arc<Almanac>) {
     // Check the final estimate
     let est = &odp.estimates[odp.estimates.len() - 1];
     println!("{}\n\n{}\n{}", est.state_deviation(), est, final_truth);
-    let delta = est.state() - final_truth;
+    let delta = (est.state().orbit - final_truth.orbit).unwrap();
     println!(
         "RMAG error = {:.3} m\tVMAG error = {:.3} mm/s",
         delta.rmag_km() * 1e3,
@@ -911,27 +925,30 @@ fn od_tb_ckf_map_covar(almanac: Arc<Almanac>) {
     let prop_est = setup.with(Spacecraft::from(initial_state).with_stm(), almanac.clone());
     let covar_radius_km = 1.0e-3;
     let covar_velocity_km_s = 1.0e-6;
-    let init_covar = Matrix6::from_diagonal(&Vector6::new(
+    let init_covar = SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([
         covar_radius_km,
         covar_radius_km,
         covar_radius_km,
         covar_velocity_km_s,
         covar_velocity_km_s,
         covar_velocity_km_s,
-    ));
+        0.0,
+        0.0,
+        0.0,
+    ]));
 
-    let initial_estimate = KfEstimate::from_covar(initial_state, init_covar);
+    let initial_estimate = KfEstimate::from_covar(Spacecraft::from(initial_state), init_covar);
 
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
     let mut odp: ODProcess<
-        OrbitalDynamics,
+        SpacecraftDynamics,
         nyx::propagators::RSSCartesianStep,
         RangeDoppler,
         nalgebra::Const<3>,
-        Orbit,
-        KF<Orbit, nalgebra::Const<3>, nalgebra::Const<2>>,
+        Spacecraft,
+        KF<Spacecraft, nalgebra::Const<3>, nalgebra::Const<2>>,
     > = ODProcess::ckf(prop_est, ckf, None, almanac);
 
     odp.predict_for(30.seconds(), duration).unwrap();
@@ -1013,7 +1030,7 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect(almanac: Arc<Almanac>) {
 
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm);
-    let orbital_dyn = OrbitalDynamics::from_model(harmonics);
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::from_model(harmonics));
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
     let mut prop = setup.with(initial_state.into(), almanac.clone());
@@ -1033,17 +1050,20 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect(almanac: Arc<Almanac>) {
     // Set up the filter
     let covar_radius_km = 1.0e-3;
     let covar_velocity_km_s = 1.0e-6;
-    let init_covar = Matrix6::from_diagonal(&Vector6::new(
+    let init_covar = SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([
         covar_radius_km,
         covar_radius_km,
         covar_radius_km,
         covar_velocity_km_s,
         covar_velocity_km_s,
         covar_velocity_km_s,
-    ));
+        0.0,
+        0.0,
+        0.0,
+    ]));
 
     // Define the initial estimate
-    let initial_estimate = KfEstimate::from_covar(initial_state, init_covar);
+    let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
@@ -1077,7 +1097,7 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect(almanac: Arc<Almanac>) {
     // Check the final estimate
     let est = &odp.estimates[odp.estimates.len() - 1];
     println!("{}\n\n{}\n{}", est.state_deviation(), est, final_truth);
-    let delta = est.state() - final_truth;
+    let delta = (est.state().orbit - final_truth.orbit).unwrap();
     println!(
         "RMAG error = {:.3} m\tVMAG error = {:.3} mm/s",
         delta.rmag_km() * 1e3,
@@ -1155,17 +1175,20 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map(almanac: Arc<Alma
     // Set up the filter
     let covar_radius_km = 1.0e-3;
     let covar_velocity_km_s = 1.0e-6;
-    let init_covar = Matrix6::from_diagonal(&Vector6::new(
+    let init_covar = SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([
         covar_radius_km,
         covar_radius_km,
         covar_radius_km,
         covar_velocity_km_s,
         covar_velocity_km_s,
         covar_velocity_km_s,
-    ));
+        0.0,
+        0.0,
+        0.0,
+    ]));
 
     // Define the initial estimate
-    let initial_estimate = KfEstimate::from_covar(initial_state, init_covar);
+    let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
@@ -1217,7 +1240,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map(almanac: Arc<Alma
     // Check the final estimate
     let est = &odp.estimates[odp.estimates.len() - 1];
     println!("{}\n\n{}\n{}", est.state_deviation(), est, final_truth);
-    let delta = est.state() - final_truth;
+    let delta = (est.state().orbit - final_truth.orbit).unwrap();
     println!(
         "RMAG error = {:.3} m\tVMAG error = {:.3} m/s",
         delta.rmag_km() * 1e3,

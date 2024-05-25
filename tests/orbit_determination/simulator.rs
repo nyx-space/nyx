@@ -36,11 +36,12 @@ fn continuous_tracking(almanac: Arc<Almanac>) {
         23.4,
         Epoch::from_str("2023-02-22T19:18:17.16 UTC").unwrap(),
         almanac.frame_from_uid(EARTH_J2000).unwrap(),
-    );
+    )
+    .unwrap();
 
     // Generate a trajectory
     let (_, trajectory) = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()))
-        .with(orbit)
+        .with(orbit.into(), almanac.clone())
         .for_duration_with_traj(1.5.days())
         .unwrap();
 
@@ -96,9 +97,10 @@ fn continuous_tracking(almanac: Arc<Almanac>) {
     dbg!(&configs);
 
     // Build the tracking arc simulation to generate a "standard measurement".
-    let mut trk =
-        TrackingArcSim::<Orbit, RangeDoppler, _>::with_seed(devices, trajectory, configs, 12345)
-            .unwrap();
+    let mut trk = TrackingArcSim::<Spacecraft, RangeDoppler, _>::with_seed(
+        devices, trajectory, configs, 12345,
+    )
+    .unwrap();
 
     trk.build_schedule(almanac.clone()).unwrap();
     let arc = trk.generate_measurements(almanac).unwrap();
