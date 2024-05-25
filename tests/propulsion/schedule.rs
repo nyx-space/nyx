@@ -15,13 +15,13 @@ use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use rstest::*;
 
 #[fixture]
-fn almanac() -> Almanac {
-    use crate::test_almanac;
-    test_almanac()
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
 }
 
 #[rstest]
-fn val_transfer_schedule_no_depl(almanac: Almanac) {
+fn val_transfer_schedule_no_depl(almanac: Arc<Almanac>) {
     /*
         NOTE: Due to how lifetime of variables work in Rust, we need to define all of the
         components of a spacecraft before defining the spacecraft itself.
@@ -73,7 +73,7 @@ fn val_transfer_schedule_no_depl(almanac: Almanac) {
     // Setup a propagator, and propagate for that duration
     // NOTE: We specify the use an RK89 to match the GMAT setup.
     let final_state = Propagator::rk89(sc, PropOpts::with_fixed_step(10.0 * Unit::Second))
-        .with(sc_state, Arc::new(almanac))
+        .with(sc_state, almanac)
         .for_duration(prop_time)
         .unwrap();
 
@@ -116,7 +116,7 @@ fn val_transfer_schedule_no_depl(almanac: Almanac) {
 }
 
 #[rstest]
-fn val_transfer_schedule_depl(almanac: Almanac) {
+fn val_transfer_schedule_depl(almanac: Arc<Almanac>) {
     let eme2k = almanac
         .frame_from_uid(EARTH_J2000)
         .unwrap()
@@ -165,7 +165,7 @@ fn val_transfer_schedule_depl(almanac: Almanac) {
     // NOTE: We specify the use an RK89 to match the GMAT setup.
     let setup = Propagator::rk89(sc, PropOpts::with_fixed_step(10.0 * Unit::Second));
     let final_state = setup
-        .with(sc_state, Arc::new(almanac))
+        .with(sc_state, almanac)
         .for_duration(prop_time)
         .unwrap();
 
@@ -208,7 +208,7 @@ fn val_transfer_schedule_depl(almanac: Almanac) {
 
     // Now, test that backward propagation of maneuvers also works.
     let backward_state = setup
-        .with(final_state, Arc::new(almanac))
+        .with(final_state, almanac)
         .for_duration(-prop_time)
         .unwrap();
     println!("Reached: {}\nWanted:  {}", backward_state, sc_state);
@@ -241,8 +241,8 @@ fn val_transfer_schedule_depl(almanac: Almanac) {
     );
 }
 
-#[test]
-fn val_transfer_single_maneuver_depl() {
+#[rstest]
+fn val_transfer_single_maneuver_depl(almanac: Arc<Almanac>) {
     /* This is the same test as val_transfer_schedule_depl but uses the maneuver directly as the guidance law. It should work in the same way. */
 
     let eme2k = almanac
@@ -296,7 +296,7 @@ fn val_transfer_single_maneuver_depl() {
     // NOTE: We specify the use an RK89 to match the GMAT setup.
     let setup = Propagator::rk89(sc, PropOpts::with_fixed_step(10.0 * Unit::Second));
     let final_state = setup
-        .with(sc_state, Arc::new(almanac))
+        .with(sc_state, almanac)
         .for_duration(prop_time)
         .unwrap();
 
@@ -339,7 +339,7 @@ fn val_transfer_single_maneuver_depl() {
 
     // Now, test that backward propagation of maneuvers also works.
     let backward_state = setup
-        .with(final_state, Arc::new(almanac))
+        .with(final_state, almanac)
         .for_duration(-prop_time)
         .unwrap();
     println!("Reached: {}\nWanted:  {}", backward_state, sc_state);

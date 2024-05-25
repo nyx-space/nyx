@@ -16,13 +16,13 @@ use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use rstest::*;
 
 #[fixture]
-fn almanac() -> Almanac {
-    use crate::test_almanac;
-    test_almanac()
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
 }
 
 #[rstest]
-fn qlaw_as_ruggiero_case_a(almanac: Almanac) {
+fn qlaw_as_ruggiero_case_a(almanac: Arc<Almanac>) {
     // Source: AAS-2004-5089
     let eme2k = almanac
         .frame_from_uid(EARTH_J2000)
@@ -36,7 +36,7 @@ fn qlaw_as_ruggiero_case_a(almanac: Almanac) {
     let prop_time = 39.91 * Unit::Day;
 
     // Define the dynamics
-    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
+    let orbital_dyn = OrbitalDynamics::two_body();
 
     // Define the thruster
     let lowt = Thruster {
@@ -55,7 +55,7 @@ fn qlaw_as_ruggiero_case_a(almanac: Almanac) {
         Event::within_tolerance(StateParameter::Eccentricity, 0.01, 5e-5),
     ];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit).unwrap();
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit.into()).unwrap();
 
     let dry_mass = 1.0;
     let fuel_mass = 299.0;
@@ -68,7 +68,7 @@ fn qlaw_as_ruggiero_case_a(almanac: Almanac) {
 
     let setup =
         Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second));
-    let mut prop = setup.with(sc_state, Arc::new(almanac));
+    let mut prop = setup.with(sc_state, almanac);
     let (final_state, traj) = prop.for_duration_with_traj(prop_time).unwrap();
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[qlaw_as_ruggiero_case_a] {:x}", final_state.orbit);
@@ -77,7 +77,7 @@ fn qlaw_as_ruggiero_case_a(almanac: Almanac) {
     for e in &events {
         println!(
             "[qlaw_as_ruggiero_case_a] Found {} events of kind {}",
-            traj.find(e, Arc::new(almanac)).unwrap().len(),
+            traj.find(e, almanac).unwrap().len(),
             e
         );
     }
@@ -91,7 +91,7 @@ fn qlaw_as_ruggiero_case_a(almanac: Almanac) {
 }
 
 #[rstest]
-fn qlaw_as_ruggiero_case_b(almanac: Almanac) {
+fn qlaw_as_ruggiero_case_b(almanac: Arc<Almanac>) {
     // Source: AAS-2004-5089
 
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
@@ -103,7 +103,7 @@ fn qlaw_as_ruggiero_case_b(almanac: Almanac) {
     let prop_time = 160.0 * Unit::Day;
 
     // Define the dynamics
-    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
+    let orbital_dyn = OrbitalDynamics::two_body();
 
     // Define the thruster
     let lowt = Thruster {
@@ -117,7 +117,7 @@ fn qlaw_as_ruggiero_case_b(almanac: Almanac) {
         Objective::within_tolerance(StateParameter::Inclination, 0.05, 5e-3),
     ];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit).unwrap();
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit.into()).unwrap();
 
     let fuel_mass = 1999.9;
     let dry_mass = 0.1;
@@ -130,7 +130,7 @@ fn qlaw_as_ruggiero_case_b(almanac: Almanac) {
 
     let final_state =
         Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state, Arc::new(almanac))
+            .with(sc_state, almanac)
             .for_duration(prop_time)
             .unwrap();
 
@@ -147,7 +147,7 @@ fn qlaw_as_ruggiero_case_b(almanac: Almanac) {
 }
 
 #[rstest]
-fn qlaw_as_ruggiero_case_c(almanac: Almanac) {
+fn qlaw_as_ruggiero_case_c(almanac: Arc<Almanac>) {
     // Source: AAS-2004-5089
 
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
@@ -159,7 +159,7 @@ fn qlaw_as_ruggiero_case_c(almanac: Almanac) {
     let prop_time = 3.0 * Unit::Day;
 
     // Define the dynamics
-    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
+    let orbital_dyn = OrbitalDynamics::two_body();
 
     // Define the thruster
     let lowt = Thruster {
@@ -172,7 +172,7 @@ fn qlaw_as_ruggiero_case_c(almanac: Almanac) {
         Objective::within_tolerance(StateParameter::Eccentricity, 0.7, 5e-5),
     ];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit).unwrap();
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit.into()).unwrap();
 
     let fuel_mass = 299.9;
     let dry_mass = 0.1;
@@ -185,7 +185,7 @@ fn qlaw_as_ruggiero_case_c(almanac: Almanac) {
 
     let final_state =
         Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state, Arc::new(almanac))
+            .with(sc_state, almanac)
             .for_duration(prop_time)
             .unwrap();
 
@@ -202,7 +202,7 @@ fn qlaw_as_ruggiero_case_c(almanac: Almanac) {
 
 #[rstest]
 #[ignore = "https://gitlab.com/chrisrabotin/nyx/issues/103"]
-fn qlaw_as_ruggiero_case_d(almanac: Almanac) {
+fn qlaw_as_ruggiero_case_d(almanac: Arc<Almanac>) {
     // Broken: https://gitlab.com/chrisrabotin/nyx/issues/103
     // Source: AAS-2004-5089
 
@@ -215,7 +215,7 @@ fn qlaw_as_ruggiero_case_d(almanac: Almanac) {
     let prop_time = 113.0 * Unit::Day;
 
     // Define the dynamics
-    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
+    let orbital_dyn = OrbitalDynamics::two_body();
 
     // Define the thruster
     let lowt = Thruster {
@@ -230,7 +230,7 @@ fn qlaw_as_ruggiero_case_d(almanac: Almanac) {
         Objective::within_tolerance(StateParameter::RAAN, 360.0 - 90.0, 5e-3),
     ];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit).unwrap();
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit.into()).unwrap();
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
@@ -243,7 +243,7 @@ fn qlaw_as_ruggiero_case_d(almanac: Almanac) {
 
     let final_state =
         Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state, Arc::new(almanac))
+            .with(sc_state, almanac)
             .for_duration(prop_time)
             .unwrap();
 
@@ -261,7 +261,7 @@ fn qlaw_as_ruggiero_case_d(almanac: Almanac) {
 
 #[rstest]
 #[ignore = "https://gitlab.com/chrisrabotin/nyx/issues/103"]
-fn qlaw_as_ruggiero_case_e(almanac: Almanac) {
+fn qlaw_as_ruggiero_case_e(almanac: Arc<Almanac>) {
     // Broken: https://gitlab.com/chrisrabotin/nyx/issues/103
     // Source: AAS-2004-5089
 
@@ -274,7 +274,7 @@ fn qlaw_as_ruggiero_case_e(almanac: Almanac) {
     let prop_time = 400.0 * Unit::Day;
 
     // Define the dynamics
-    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
+    let orbital_dyn = OrbitalDynamics::two_body();
 
     // Define the thruster
     let lowt = Thruster {
@@ -290,7 +290,7 @@ fn qlaw_as_ruggiero_case_e(almanac: Almanac) {
         Objective::within_tolerance(StateParameter::AoP, 180.0, 5e-3),
     ];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit).unwrap();
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit.into()).unwrap();
 
     let fuel_mass = 1999.9;
     let dry_mass = 0.1;
@@ -303,7 +303,7 @@ fn qlaw_as_ruggiero_case_e(almanac: Almanac) {
 
     let final_state =
         Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state, Arc::new(almanac))
+            .with(sc_state, almanac)
             .for_duration(prop_time)
             .unwrap();
 
@@ -320,7 +320,7 @@ fn qlaw_as_ruggiero_case_e(almanac: Almanac) {
 }
 
 #[rstest]
-fn qlaw_as_ruggiero_case_f(almanac: Almanac) {
+fn qlaw_as_ruggiero_case_f(almanac: Arc<Almanac>) {
     // Source: AAS-2004-5089
     /*
         NOTE: Due to how lifetime of variables work in Rust, we need to define all of the
@@ -336,7 +336,7 @@ fn qlaw_as_ruggiero_case_f(almanac: Almanac) {
     let prop_time = 30.0 * Unit::Day;
 
     // Define the dynamics
-    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
+    let orbital_dyn = OrbitalDynamics::two_body();
 
     // Define the thruster
     let lowt = Thruster {
@@ -346,7 +346,7 @@ fn qlaw_as_ruggiero_case_f(almanac: Almanac) {
 
     let objectives = &[Objective::new(StateParameter::Eccentricity, 0.15)];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit).unwrap();
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit.into()).unwrap();
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
@@ -360,7 +360,7 @@ fn qlaw_as_ruggiero_case_f(almanac: Almanac) {
     let setup =
         Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second));
     let (final_state, traj) = setup
-        .with(sc_state, Arc::new(almanac))
+        .with(sc_state, almanac)
         .for_duration_with_traj(prop_time)
         .unwrap();
 
@@ -381,7 +381,7 @@ fn qlaw_as_ruggiero_case_f(almanac: Almanac) {
 }
 
 #[rstest]
-fn ruggiero_iepc_2011_102(almanac: Almanac) {
+fn ruggiero_iepc_2011_102(almanac: Arc<Almanac>) {
     // Source: IEPC 2011 102
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
@@ -392,7 +392,7 @@ fn ruggiero_iepc_2011_102(almanac: Almanac) {
     let prop_time = 105.0 * Unit::Day;
 
     // Define the dynamics
-    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
+    let orbital_dyn = OrbitalDynamics::two_body();
 
     // Define the thruster
     let lowt = Thruster {
@@ -406,7 +406,7 @@ fn ruggiero_iepc_2011_102(almanac: Almanac) {
         Objective::within_tolerance(StateParameter::Eccentricity, 0.011, 5e-5),
     ];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit).unwrap();
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit.into()).unwrap();
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
@@ -419,7 +419,7 @@ fn ruggiero_iepc_2011_102(almanac: Almanac) {
 
     let final_state =
         Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state, Arc::new(almanac))
+            .with(sc_state, almanac)
             .for_duration(prop_time)
             .unwrap();
 
