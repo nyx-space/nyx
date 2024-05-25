@@ -15,19 +15,20 @@ use nyx::time::{Epoch, TimeSeries, Unit};
 use nyx::State;
 use std::path::PathBuf;
 use std::sync::mpsc::channel;
+use std::sync::Arc;
 
 use anise::prelude::Almanac;
 use rstest::*;
 
 #[fixture]
-fn almanac() -> Almanac {
-    use crate::test_almanac;
-    test_almanac()
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
 }
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn traj_ephem_forward(almanac: Almanac) {
+fn traj_ephem_forward(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
     // Test that we can correctly interpolate a spacecraft orbit
 
@@ -39,7 +40,7 @@ fn traj_ephem_forward(almanac: Almanac) {
     );
 
     let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
-    let mut prop = setup.with(start_state);
+    let mut prop = setup.with(start_state.into(), almanac.clone());
     // The trajectory must always be generated on its own thread, no need to worry about it ;-)
     let now = Epoch::now().unwrap();
     let (end_state, ephem) = prop.for_duration_with_traj(31 * Unit::Day).unwrap();
@@ -52,22 +53,22 @@ fn traj_ephem_forward(almanac: Almanac) {
     let mut cnt = 0.0;
     for state in ephem.every(1 * Unit::Day) {
         cnt += 1.0;
-        sum_sma += state.sma_km()
+        sum_sma += state.orbit.sma_km().unwrap()
     }
     println!(
         "Average SMA: {:.3} km\tShould be: {:.3}",
         sum_sma / cnt,
-        start_state.sma_km()
+        start_state.sma_km().unwrap()
     );
     // assert!(dbg!(sum_sma / cnt - start_state.sma()).abs() < 1e-6);
 
     // === Below is the validation of the ephemeris == //
 
-    assert_eq!(ephem.first(), &start_state, "Wrong initial state");
+    assert_eq!(ephem.first().orbit, start_state, "Wrong initial state");
     assert_eq!(ephem.last(), &end_state, "Wrong final state");
     assert!(ephem.last().stm().is_err(), "STM is set!");
     assert!(
-        ephem.at(end_state.epoch + 1 * Unit::Nanosecond).is_err(),
+        ephem.at(end_state.epoch() + 1 * Unit::Nanosecond).is_err(),
         "Expected to be outside of interpolation window!"
     );
 
@@ -78,7 +79,7 @@ fn traj_ephem_forward(almanac: Almanac) {
     let (tx, rx) = channel();
     std::thread::spawn(move || {
         setup
-            .with(start_state)
+            .with(start_state.into(), almanac.clone())
             .for_duration_with_channel(31 * Unit::Day, tx)
             .unwrap();
     });
@@ -86,17 +87,17 @@ fn traj_ephem_forward(almanac: Almanac) {
     // Evaluate the first time of the trajectory to make sure that one is there too.
     let eval_state = ephem.at(start_dt).unwrap();
 
-    let mut max_pos_err = (eval_state.radius() - start_state.radius()).norm();
-    let mut max_vel_err = (eval_state.velocity() - start_state.velocity()).norm();
+    let mut max_pos_err = (eval_state.orbit.radius_km - start_state.radius_km).norm();
+    let mut max_vel_err = (eval_state.orbit.velocity_km_s - start_state.velocity_km_s).norm();
 
     while let Ok(prop_state) = rx.recv() {
-        let eval_state = ephem.at(prop_state.epoch).unwrap();
+        let eval_state = ephem.at(prop_state.epoch()).unwrap();
 
-        let pos_err = (eval_state.radius() - prop_state.radius()).norm();
+        let pos_err = (eval_state.orbit.radius_km - prop_state.orbit.radius_km).norm();
         if pos_err > max_pos_err {
             max_pos_err = pos_err;
         }
-        let vel_err = (eval_state.velocity() - prop_state.velocity()).norm();
+        let vel_err = (eval_state.orbit.velocity_km_s - prop_state.orbit.velocity_km_s).norm();
         if vel_err > max_vel_err {
             max_vel_err = vel_err;
         }
@@ -139,7 +140,7 @@ fn traj_ephem_forward(almanac: Almanac) {
     // Reload this trajectory and make sure that it matches
 
     let dyn_traj = TrajectoryLoader::from_parquet(exported_path).unwrap();
-    let concrete_traj = dyn_traj.to_traj::<Orbit>().unwrap();
+    let concrete_traj = dyn_traj.to_traj::<Spacecraft>().unwrap();
 
     if ephem != concrete_traj {
         // Uh oh, let's see where the differences are.
@@ -173,7 +174,7 @@ fn traj_ephem_forward(almanac: Almanac) {
             );
             assert_eq!(
                 orig_state.to_vector(),
-                loaded_state.as_vector(),
+                loaded_state.to_vector(),
                 "#{i} differ (Δt = {delta_t})"
             );
         }
@@ -203,13 +204,13 @@ fn traj_ephem_forward(almanac: Almanac) {
     );
 
     let conv_state = ephem_back_to_earth.at(start_dt).unwrap();
-    let mut max_pos_err = (eval_state.radius() - conv_state.radius()).norm();
-    let mut max_vel_err = (eval_state.velocity() - conv_state.velocity()).norm();
+    let mut max_pos_err = (eval_state.orbit.radius_km - conv_state.orbit.radius_km).norm();
+    let mut max_vel_err = (eval_state.orbit.velocity_km_s - conv_state.orbit.velocity_km_s).norm();
 
     for conv_state in ephem_back_to_earth.every(5 * Unit::Minute) {
-        let eval_state = ephem.at(conv_state.epoch).unwrap();
+        let eval_state = ephem.at(conv_state.epoch()).unwrap();
 
-        let pos_err = (eval_state.radius() - conv_state.radius()).norm();
+        let pos_err = (eval_state.orbit.radius_km - conv_state.orbit.radius_km).norm();
         if pos_err > max_pos_err {
             println!(
                 "Eval: {}\nConv: {}\t{:.3} m",
@@ -219,7 +220,7 @@ fn traj_ephem_forward(almanac: Almanac) {
             );
             max_pos_err = pos_err;
         }
-        let vel_err = (eval_state.velocity() - conv_state.velocity()).norm();
+        let vel_err = (eval_state.orbit.velocity_km_s - conv_state.orbit.velocity_km_s).norm();
         if vel_err > max_vel_err {
             max_vel_err = vel_err;
         }
@@ -245,7 +246,7 @@ fn traj_ephem_forward(almanac: Almanac) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn traj_spacecraft(almanac: Almanac) {
+fn traj_spacecraft(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
     // Test the interpolation of a spaceraft trajectory and of its fuel. Includes a demo of checking what the guidance mode _should_ be provided the state.
     // Note that we _do not_ attempt to interpolate the Guidance Mode.
@@ -255,7 +256,7 @@ fn traj_spacecraft(almanac: Almanac) {
 
     // Build the initial orbit
     let start_dt = Epoch::from_gregorian_utc_at_noon(2021, 1, 1);
-    let sma = eme2k.equatorial_radius() + 900.0;
+    let sma = eme2k.mean_equatorial_radius_km().unwrap() + 900.0;
     let orbit = Orbit::keplerian(sma, 5e-5, 5e-3, 0.0, 178.0, 0.0, start_dt, eme2k);
 
     // Define the objectives and the control law
@@ -265,7 +266,7 @@ fn traj_spacecraft(almanac: Almanac) {
         5e-3,
     )];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit).unwrap();
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit.into()).unwrap();
 
     // Build the spacecraft state
     let fuel_mass = 67.0;
@@ -278,14 +279,12 @@ fn traj_spacecraft(almanac: Almanac) {
     let start_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc_dynamics = SpacecraftDynamics::from_guidance_law(
-        SpacecraftDynamics::new(OrbitalDynamics::two_body()),
-        ruggiero_ctrl.clone(),
-    );
+    let sc_dynamics =
+        SpacecraftDynamics::from_guidance_law(OrbitalDynamics::two_body(), ruggiero_ctrl.clone());
 
     let setup = Propagator::default(sc_dynamics);
     let prop_time = 44 * Unit::Minute + 10 * Unit::Second;
-    let mut prop = setup.with(start_state, almanac.clone());
+    let mut prop = setup.with(start_state.into(), almanac.clone());
     let (end_state, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
     // Example of iterating through the spaceraft trajectory and checking what the guidance mode is at each time.
@@ -340,7 +339,7 @@ fn traj_spacecraft(almanac: Almanac) {
     let (tx, rx) = channel();
     std::thread::spawn(move || {
         setup
-            .with(start_state, almanac.clone())
+            .with(start_state.into(), almanac.clone())
             .until_epoch_with_channel(end_state.epoch(), tx)
             .unwrap();
     });
@@ -348,20 +347,20 @@ fn traj_spacecraft(almanac: Almanac) {
     // Evaluate the first time of the trajectory to make sure that one is there too.
     let eval_state = traj.at(start_dt).unwrap();
 
-    let mut max_pos_err = (eval_state.orbit.radius() - start_state.orbit.radius()).norm();
-    let mut max_vel_err = (eval_state.orbit.velocity() - start_state.orbit.velocity()).norm();
+    let mut max_pos_err = (eval_state.orbit.radius_km - start_state.orbit.radius_km).norm();
+    let mut max_vel_err = (eval_state.orbit.velocity_km_s - start_state.orbit.velocity_km_s).norm();
     let mut max_fuel_err = eval_state.fuel_mass_kg - start_state.fuel_mass_kg;
     let mut max_err = (eval_state.to_vector() - start_state.to_vector()).norm();
 
     while let Ok(prop_state) = rx.recv() {
         let eval_state = traj.at(prop_state.epoch()).unwrap();
 
-        let pos_err = (eval_state.orbit.radius() - prop_state.orbit.radius()).norm();
+        let pos_err = (eval_state.orbit.radius_km - prop_state.orbit.radius_km).norm();
         if pos_err > max_pos_err {
             max_pos_err = pos_err;
             println!("pos_err = {:.3e} m @ {}", pos_err * 1e3, prop_state.epoch());
         }
-        let vel_err = (eval_state.orbit.velocity() - prop_state.orbit.velocity()).norm();
+        let vel_err = (eval_state.orbit.velocity_km_s - prop_state.orbit.velocity_km_s).norm();
         if vel_err > max_vel_err {
             max_vel_err = vel_err;
             println!(
@@ -423,8 +422,8 @@ fn traj_spacecraft(almanac: Almanac) {
     );
 
     let conv_state = ephem_back_to_earth.at(start_dt).unwrap();
-    let mut max_pos_err = (eval_state.orbit.radius() - conv_state.orbit.radius()).norm();
-    let mut max_vel_err = (eval_state.orbit.velocity() - conv_state.orbit.velocity()).norm();
+    let mut max_pos_err = (eval_state.orbit.radius_km - conv_state.orbit.radius_km).norm();
+    let mut max_vel_err = (eval_state.orbit.velocity_km_s - conv_state.orbit.velocity_km_s).norm();
 
     for conv_state in ephem_back_to_earth.every(5 * Unit::Minute) {
         let eval_state = traj.at(conv_state.epoch()).unwrap();
@@ -438,11 +437,11 @@ fn traj_spacecraft(almanac: Almanac) {
             eval_state.epoch() - conv_state.epoch()
         );
 
-        let pos_err = (eval_state.orbit.radius() - conv_state.orbit.radius()).norm();
+        let pos_err = (eval_state.orbit.radius_km - conv_state.orbit.radius_km).norm();
         if pos_err > max_pos_err {
             max_pos_err = pos_err;
         }
-        let vel_err = (eval_state.orbit.velocity() - conv_state.orbit.velocity()).norm();
+        let vel_err = (eval_state.orbit.velocity_km_s - conv_state.orbit.velocity_km_s).norm();
         if vel_err > max_vel_err {
             max_vel_err = vel_err;
         }
@@ -469,7 +468,7 @@ fn traj_spacecraft(almanac: Almanac) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn traj_ephem_backward(almanac: Almanac) {
+fn traj_ephem_backward(almanac: Arc<Almanac>) {
     // Test that we can correctly interpolate a spacecraft orbit
 
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
@@ -480,7 +479,7 @@ fn traj_ephem_backward(almanac: Almanac) {
     );
 
     let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
-    let mut prop = setup.with(start_state);
+    let mut prop = setup.with(start_state.into(), almanac.clone());
     let (end_state, ephem) = prop.for_duration_with_traj(-31 * Unit::Day).unwrap();
 
     // Example of iterating through the trajectory.
@@ -493,7 +492,7 @@ fn traj_ephem_backward(almanac: Almanac) {
         // let state = ephem.at(epoch + 17 * Unit::Second).unwrap();
         // sum_sma += state.sma();
         match ephem.at(epoch) {
-            Ok(state) => sum_sma += state.sma_km(),
+            Ok(state) => sum_sma += state.orbit.sma_km().unwrap(),
             Err(e) => println!("{}", e),
         }
     }
@@ -510,15 +509,15 @@ fn traj_ephem_backward(almanac: Almanac) {
         end_state
     );
     assert_eq!(
-        ephem.last(),
-        &start_state,
+        ephem.last().orbit,
+        start_state,
         "Wrong final state\nGot:  {}\nWant: {}",
         ephem.last(),
         start_state
     );
     assert!(ephem.last().stm().is_err(), "STM is set!");
     assert!(
-        ephem.at(end_state.epoch - 1 * Unit::Nanosecond).is_err(),
+        ephem.at(end_state.epoch() - 1 * Unit::Nanosecond).is_err(),
         "Expected to be outside of interpolation window!"
     );
 
@@ -527,7 +526,7 @@ fn traj_ephem_backward(almanac: Almanac) {
     let (tx, rx) = channel();
     std::thread::spawn(move || {
         setup
-            .with(start_state)
+            .with(start_state.into(), almanac.clone())
             .for_duration_with_channel(-31 * Unit::Day, tx)
             .unwrap();
     });
@@ -535,20 +534,22 @@ fn traj_ephem_backward(almanac: Almanac) {
     // Evaluate the first time of the trajectory to make sure that one is there too.
     let eval_state = ephem.at(start_dt).unwrap();
 
-    let mut max_pos_err = (eval_state.radius() - start_state.radius()).norm();
-    let mut max_vel_err = (eval_state.velocity() - start_state.velocity()).norm();
-    let mut max_err = (eval_state.to_vector() - start_state.as_vector()).norm();
+    let mut max_pos_err = (eval_state.orbit.radius_km - start_state.radius_km).norm();
+    let mut max_vel_err = (eval_state.orbit.velocity_km_s - start_state.velocity_km_s).norm();
+    let mut max_err = (eval_state.to_vector().fixed_rows::<6>(0).to_owned()
+        - start_state.to_cartesian_pos_vel())
+    .norm();
 
     println!("{}", ephem);
 
     while let Ok(prop_state) = rx.recv() {
-        let eval_state = ephem.at(prop_state.epoch).unwrap();
+        let eval_state = ephem.at(prop_state.epoch()).unwrap();
 
-        let pos_err = (eval_state.radius() - prop_state.radius()).norm();
+        let pos_err = (eval_state.orbit.radius_km - prop_state.orbit.radius_km).norm();
         if pos_err > max_pos_err {
             max_pos_err = pos_err;
         }
-        let vel_err = (eval_state.velocity() - prop_state.velocity()).norm();
+        let vel_err = (eval_state.orbit.velocity_km_s - prop_state.orbit.velocity_km_s).norm();
         if vel_err > max_vel_err {
             max_vel_err = vel_err;
         }
