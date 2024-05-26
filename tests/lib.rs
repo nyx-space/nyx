@@ -12,15 +12,38 @@ use anise::prelude::{Almanac, MetaAlmanac};
 pub fn test_almanac() -> Almanac {
     use std::path::PathBuf;
 
-    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string());
+    let manifest_dir =
+        PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string()));
 
-    MetaAlmanac::new(
-        (PathBuf::from(manifest_dir).join("data/ci_almanac.dhall"))
-            .to_string_lossy()
-            .to_string(),
+    // MetaAlmanac::new(
+    //     (PathBuf::from(manifest_dir).join("data/ci_almanac.dhall"))
+    //         .to_string_lossy()
+    //         .to_string(),
+    // )
+    // .unwrap()
+    // .process()
+    // .unwrap()
+
+    Almanac::new(
+        &manifest_dir
+            .clone()
+            .join("data/de440s.bsp")
+            .to_string_lossy(),
     )
     .unwrap()
-    .process()
+    .load(
+        &manifest_dir
+            .clone()
+            .join("data/pck08.pca")
+            .to_string_lossy(),
+    )
+    .unwrap()
+    .load(
+        &manifest_dir
+            .clone()
+            .join("data/earth_latest_high_prec.bpc")
+            .to_string_lossy(),
+    )
     .unwrap()
 }
 
