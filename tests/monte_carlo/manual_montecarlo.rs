@@ -3,7 +3,7 @@ extern crate rand;
 extern crate rand_distr;
 extern crate rayon;
 
-use anise::constants::celestial_objects::{JUPITER, MOON, SUN};
+use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SUN};
 use anise::constants::frames::IAU_EARTH_FRAME;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::{Harmonics, SpacecraftDynamics};
@@ -46,7 +46,7 @@ fn multi_thread_monte_carlo_demo(almanac: Almanac) {
     let state = Orbit::keplerian(8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k);
 
     let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::new(vec![
-        PointMasses::new(vec![SUN, MOON, JUPITER]),
+        PointMasses::new(vec![SUN, MOON, JUPITER_BARYCENTER]),
         harmonics,
     ]));
 

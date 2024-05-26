@@ -1,7 +1,7 @@
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
-use anise::constants::celestial_objects::{JUPITER, MOON, SATURN, SUN};
+use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SATURN_BARYCENTER, SUN};
 use anise::constants::frames::IAU_EARTH_FRAME;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::OrbitalDynamics;
@@ -116,7 +116,7 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
         (initial_state.orbit - initial_state_dev.orbit).unwrap()
     );
 
-    let bodies = vec![MOON, SUN, JUPITER, SATURN];
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER, SATURN_BARYCENTER];
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
     let truth_setup = Propagator::new::<RK4Fixed>(SpacecraftDynamics::new(orbital_dyn), opts);
     let (_, traj) = truth_setup
@@ -142,8 +142,8 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
     arc.to_parquet_simple(&path).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
-    // We expect the estimated orbit to be _nearly_ perfect because we've removed Saturn from the estimated trajectory
-    let bodies = vec![MOON, SUN, JUPITER];
+    // We expect the estimated orbit to be _nearly_ perfect because we've removed SATURN_BARYCENTER from the estimated trajectory
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let estimator = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
     let setup = Propagator::new::<RK4Fixed>(estimator, opts);
     let prop_est = setup.with(initial_state_dev.with_stm(), almanac.clone());
@@ -312,7 +312,7 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
         (initial_state.orbit - initial_state_dev.orbit).unwrap()
     );
 
-    let bodies = vec![MOON, SUN, JUPITER, SATURN];
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER, SATURN_BARYCENTER];
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
     let truth_setup = Propagator::default(SpacecraftDynamics::new(orbital_dyn));
     let (_, traj) = truth_setup
@@ -337,8 +337,8 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
     println!("{arc}");
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
-    // We expect the estimated orbit to be _nearly_ perfect because we've removed Saturn from the estimated trajectory
-    let bodies = vec![MOON, SUN, JUPITER];
+    // We expect the estimated orbit to be _nearly_ perfect because we've removed SATURN_BARYCENTER from the estimated trajectory
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let estimator = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
     let setup = Propagator::default(estimator);
     let prop_est = setup.with(initial_state_dev.with_stm(), almanac.clone());

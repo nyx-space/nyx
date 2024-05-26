@@ -10,7 +10,7 @@ use crate::propagation::GMAT_EARTH_GM;
 use nyx::dynamics::guidance::LocalFrame;
 use std::sync::Arc;
 
-use anise::constants::celestial_objects::{JUPITER, MOON, SUN};
+use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SUN};
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use rstest::*;
 
@@ -53,7 +53,7 @@ fn val_transfer_schedule_no_depl(almanac: Arc<Almanac>) {
     let end_time = start_time + prop_time;
 
     // Define the dynamics
-    let bodies = vec![MOON, SUN, JUPITER];
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
 
     // Define the maneuver and its schedule
@@ -143,7 +143,7 @@ fn val_transfer_schedule_depl(almanac: Arc<Almanac>) {
     let end_time = start_time + prop_time;
 
     // Define the dynamics
-    let bodies = vec![MOON, SUN, JUPITER];
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
 
     // With 100% thrust: RSS errors:     pos = 3.14651e1 km      vel = 3.75245e-2 km/s
@@ -276,7 +276,7 @@ fn val_transfer_single_maneuver_depl(almanac: Arc<Almanac>) {
     let end_time = start_time + prop_time;
 
     // Define the dynamics
-    let bodies = vec![MOON, SUN, JUPITER];
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
 
     // With 100% thrust: RSS errors:     pos = 3.14651e1 km      vel = 3.75245e-2 km/s

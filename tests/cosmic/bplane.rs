@@ -1,6 +1,6 @@
 extern crate nyx_space as nyx;
 
-use anise::constants::celestial_objects::{JUPITER, MOON, SUN};
+use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SUN};
 use anise::constants::frames::MOON_J2000;
 use nyx::cosmic::{try_achieve_b_plane, BPlane, BPlaneTarget, Orbit};
 use nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
@@ -40,7 +40,7 @@ fn val_b_plane_gmat(almanac: Arc<Almanac>) {
     );
     // Propagate until periapse
     let prop = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
-        vec![MOON, SUN, JUPITER],
+        vec![MOON, SUN, JUPITER_BARYCENTER],
     )));
 
     let (out, traj) = prop

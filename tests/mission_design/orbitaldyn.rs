@@ -2,7 +2,7 @@ extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
 use crate::propagation::GMAT_EARTH_GM;
-use anise::constants::celestial_objects::{EARTH, JUPITER, MOON, SUN};
+use anise::constants::celestial_objects::{EARTH, JUPITER_BARYCENTER, MOON, SUN};
 use anise::constants::frames::IAU_EARTH_FRAME;
 use hifitime::J2000_OFFSET;
 use na::{Const, OMatrix};
@@ -395,7 +395,7 @@ fn val_halo_multi_body_dynamics(almanac: Arc<Almanac>) {
         0.302_817_582_487_008_6,
     );
 
-    let bodies = vec![MOON, SUN, JUPITER];
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
 
     let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step(10 * Unit::Second));
@@ -460,7 +460,7 @@ fn val_halo_multi_body_dynamics_adaptive(almanac: Arc<Almanac>) {
         0.350_981_431_322_089_4,
     );
 
-    let bodies = vec![MOON, SUN, JUPITER];
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
 
     let setup = Propagator::default(dynamics);
@@ -529,7 +529,7 @@ fn val_llo_multi_body_dynamics_adaptive(almanac: Arc<Almanac>) {
         0.472_036_197_968_369_3,
     );
 
-    let bodies = vec![MOON, SUN, JUPITER];
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
 
     let setup = Propagator::default(dynamics);
@@ -587,7 +587,7 @@ fn val_leo_multi_body_dynamics_adaptive_wo_moon(almanac: Arc<Almanac>) {
         5.848_971_837_743_221,
     );
 
-    let bodies = vec![MOON, SUN, JUPITER];
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
 
     let setup = Propagator::default(dynamics);
@@ -649,7 +649,7 @@ fn val_leo_multi_body_dynamics_adaptive(almanac: Arc<Almanac>) {
         5.848_960_991_136_447,
     );
 
-    let bodies = vec![SUN, JUPITER];
+    let bodies = vec![SUN, JUPITER_BARYCENTER];
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
 
     let setup = Propagator::default(dynamics);
@@ -794,7 +794,7 @@ fn multi_body_dynamics_dual(almanac: Arc<Almanac>) {
         eme2k,
     );
 
-    // let bodies = vec![MOON, SUN, JUPITER];
+    // let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     // let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
@@ -1151,7 +1151,7 @@ fn hf_prop(almanac: Arc<Almanac>) {
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
 
-    let bodies = vec![MOON, SUN, JUPITER];
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::new(vec![
         PointMasses::new(bodies),
         harmonics,

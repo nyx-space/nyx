@@ -1,6 +1,6 @@
 extern crate nyx_space as nyx;
 
-use anise::constants::celestial_objects::JUPITER;
+use anise::constants::celestial_objects::JUPITER_BARYCENTER;
 use anise::constants::celestial_objects::MOON;
 use anise::constants::celestial_objects::SUN;
 use anise::constants::frames::IAU_EARTH_FRAME;
@@ -81,7 +81,7 @@ fn od_val_multi_body_ckf_perfect_stations(almanac: Arc<Almanac>) {
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
-    let bodies = vec![MOON, SUN, JUPITER];
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
     // Generate the truth data.
     let setup = Propagator::new::<RK4Fixed>(SpacecraftDynamics::new(orbital_dyn), opts);
@@ -210,7 +210,7 @@ fn multi_body_ckf_covar_map(almanac: Arc<Almanac>) {
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     // Generate the truth data on one thread.
-    let bodies = vec![MOON, SUN, JUPITER];
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
     let setup = Propagator::new::<RK4Fixed>(SpacecraftDynamics::new(orbital_dyn), opts);
     let mut prop = setup.with(initial_state.into(), almanac.clone());

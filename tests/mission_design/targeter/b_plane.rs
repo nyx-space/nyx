@@ -1,6 +1,6 @@
 extern crate nyx_space as nyx;
 
-use anise::constants::celestial_objects::JUPITER;
+use anise::constants::celestial_objects::JUPITER_BARYCENTER;
 use anise::constants::celestial_objects::MOON;
 use anise::constants::celestial_objects::SUN;
 use anise::constants::frames::MOON_J2000;
@@ -41,7 +41,7 @@ fn tgt_b_plane_earth_gravity_assist_no_propagation(almanac: Arc<Almanac>) {
     );
 
     let prop = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
-        vec![MOON, SUN, JUPITER],
+        vec![MOON, SUN, JUPITER_BARYCENTER],
     )));
 
     let spacecraft = Spacecraft::from_srp_defaults(orbit, 100.0, 0.0);
@@ -99,7 +99,7 @@ fn tgt_b_plane_lunar_transfer(almanac: Arc<Almanac>) {
     );
 
     let prop = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
-        vec![MOON, SUN, JUPITER],
+        vec![MOON, SUN, JUPITER_BARYCENTER],
     )));
 
     let spacecraft = Spacecraft::from_srp_defaults(orbit, 1000.0, 0.0);
@@ -197,7 +197,7 @@ fn tgt_b_plane_earth_gravity_assist_with_propagation(almanac: Arc<Almanac>) {
     );
 
     let prop = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
-        vec![MOON, SUN, JUPITER],
+        vec![MOON, SUN, JUPITER_BARYCENTER],
     )));
 
     let spacecraft = Spacecraft::from_srp_defaults(orbit, 100.0, 0.0);

@@ -1,6 +1,6 @@
 extern crate nyx_space as nyx;
 
-use anise::constants::celestial_objects::{JUPITER, MOON, SUN};
+use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SUN};
 use hifitime::TimeUnits;
 use nyx::dynamics::guidance::{LocalFrame, Mnvr, Thruster};
 use nyx::linalg::Vector3;
@@ -191,7 +191,7 @@ fn val_tgt_finite_burn(almanac: Arc<Almanac>) {
     let prop_time = 15.0 * Unit::Second;
 
     // Define the dynamics
-    let bodies = vec![MOON, SUN, JUPITER];
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
 
     // With 100% thrust: RSS errors:     pos = 3.14651e1 km      vel = 3.75245e-2 km/s

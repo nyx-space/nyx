@@ -5,7 +5,7 @@ use nyx::md::prelude::*;
 
 use anise::{
     constants::{
-        celestial_objects::{JUPITER, MOON, SUN},
+        celestial_objects::{JUPITER_BARYCENTER, MOON, SUN},
         frames::EARTH_J2000,
     },
     prelude::Almanac,
@@ -42,7 +42,9 @@ fn test_monte_carlo_epoch(almanac: Arc<Almanac>) {
 
     // Set up the dynamics
     let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::new(vec![PointMasses::new(vec![
-        SUN, MOON, JUPITER,
+        SUN,
+        MOON,
+        JUPITER_BARYCENTER,
     ])]));
 
     let prop = Propagator::default_dp78(orbital_dyn);

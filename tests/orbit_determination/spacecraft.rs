@@ -1,7 +1,7 @@
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
-use anise::constants::celestial_objects::{JUPITER, MOON, SUN};
+use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SUN};
 use anise::constants::frames::IAU_EARTH_FRAME;
 use nyx::cosmic::{Orbit, Spacecraft};
 use nyx::dynamics::orbital::OrbitalDynamics;
@@ -98,7 +98,7 @@ fn od_val_sc_mb_srp_reals_duals_models(almanac: Arc<Almanac>) {
 
     // Generate the truth data on one thread.
 
-    let bodies = vec![MOON, SUN, JUPITER];
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
     let sc_dynamics =
         SpacecraftDynamics::from_model(orbital_dyn, SolarPressure::default(eme2k, almanac.clone()));
@@ -124,7 +124,7 @@ fn od_val_sc_mb_srp_reals_duals_models(almanac: Arc<Almanac>) {
     let cfg = ExportCfg::from_metadata(vec![
         (
             "Dynamics".to_string(),
-            "SRP, Moon, Sun, Jupiter".to_string(),
+            "SRP, Moon, Sun, JUPITER_BARYCENTER".to_string(),
         ),
         // An `Event:` metadata will be appropriately parsed and plotted with the Nyx plotting tools.
         (

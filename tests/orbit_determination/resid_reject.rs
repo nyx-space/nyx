@@ -1,4 +1,4 @@
-use anise::constants::celestial_objects::{JUPITER, MOON, SATURN, SUN};
+use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SATURN_BARYCENTER, SUN};
 use anise::constants::frames::{EARTH_J2000, IAU_EARTH_FRAME};
 use pretty_env_logger::try_init;
 
@@ -43,7 +43,7 @@ fn traj(epoch: Epoch, almanac: Arc<Almanac>) -> Traj<Spacecraft> {
         ))
         .build();
 
-    let bodies = vec![MOON, SUN, JUPITER, SATURN];
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER, SATURN_BARYCENTER];
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
     let truth_setup = Propagator::dp78(
         SpacecraftDynamics::new(orbital_dyn),
@@ -159,8 +159,8 @@ fn od_resid_reject_all_ckf_two_way(
     let initial_state_dev = initial_estimate.nominal_state;
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
-    // We expect the estimated orbit to be _nearly_ perfect because we've removed Saturn from the estimated trajectory
-    let bodies = vec![MOON, SUN, JUPITER];
+    // We expect the estimated orbit to be _nearly_ perfect because we've removed SATURN_BARYCENTER from the estimated trajectory
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let estimator = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
     let setup = Propagator::new::<RK4Fixed>(estimator, PropOpts::with_fixed_step(10.seconds()));
     let prop_est = setup.with(initial_state_dev.with_stm(), almanac.clone());
@@ -234,8 +234,8 @@ fn od_resid_reject_default_ckf_two_way(
     let initial_state_dev = initial_estimate.nominal_state;
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
-    // We expect the estimated orbit to be _nearly_ perfect because we've removed Saturn from the estimated trajectory
-    let bodies = vec![MOON, SUN, JUPITER];
+    // We expect the estimated orbit to be _nearly_ perfect because we've removed SATURN_BARYCENTER from the estimated trajectory
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let estimator = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
     let setup = Propagator::new::<RK4Fixed>(estimator, PropOpts::with_fixed_step(10.seconds()));
     let prop_est = setup.with(initial_state_dev.with_stm(), almanac.clone());

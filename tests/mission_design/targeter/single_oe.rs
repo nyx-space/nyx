@@ -1,6 +1,6 @@
 extern crate nyx_space as nyx;
 
-use anise::constants::celestial_objects::JUPITER;
+use anise::constants::celestial_objects::JUPITER_BARYCENTER;
 use anise::constants::celestial_objects::MOON;
 use anise::constants::celestial_objects::SUN;
 use nyx::md::optimizer::*;
@@ -90,7 +90,7 @@ fn tgt_sma_from_peri_fd(almanac: Arc<Almanac>) {
 
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
-    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(vec![MOON, SUN, JUPITER]));
+    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(vec![MOON, SUN, JUPITER_BARYCENTER]));
     let setup = Propagator::default_dp78(dynamics);
 
     // Try to increase SMA
@@ -144,7 +144,7 @@ fn tgt_hd_sma_from_peri(almanac: Arc<Almanac>) {
 
     let spacecraft = Spacecraft::new(xi_orig, 100.0, 0.0, 0.0, 0.0, 0.0, 0.0).with_stm();
 
-    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(vec![MOON, SUN, JUPITER]));
+    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(vec![MOON, SUN, JUPITER_BARYCENTER]));
     let setup = Propagator::default_dp78(dynamics);
 
     // Try to increase SMA
@@ -200,7 +200,7 @@ fn orbit_stm_chk(almanac: Arc<Almanac>) {
 
     // let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
-    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(vec![MOON, SUN, JUPITER]));
+    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(vec![MOON, SUN, JUPITER_BARYCENTER]));
     let setup = Propagator::default_dp78(dynamics);
     let mut prop_instance = setup.with(Spacecraft::from(xi_orig).with_stm(), almanac);
 
@@ -321,7 +321,7 @@ fn tgt_ecc_from_peri(almanac: Arc<Almanac>) {
 
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
-    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(vec![MOON, SUN, JUPITER]));
+    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(vec![MOON, SUN, JUPITER_BARYCENTER]));
     let setup = Propagator::default_dp78(dynamics);
 
     let xf_desired_ecc = 0.4;

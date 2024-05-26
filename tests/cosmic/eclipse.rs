@@ -1,6 +1,6 @@
 extern crate nyx_space as nyx;
 
-use anise::constants::celestial_objects::{JUPITER, SUN};
+use anise::constants::celestial_objects::{JUPITER_BARYCENTER, SUN};
 use anise::constants::frames::SUN_J2000;
 use nyx::cosmic::eclipse::{EclipseLocator, EclipseState};
 use nyx::cosmic::Orbit;
@@ -32,7 +32,7 @@ fn leo_sun_earth_eclipses(almanac: Arc<Almanac>) {
 
     let (truth_tx, truth_rx) = mpsc::channel();
 
-    let bodies = vec![SUN, JUPITER];
+    let bodies = vec![SUN, JUPITER_BARYCENTER];
 
     let almanac_c = almanac.clone();
     thread::spawn(move || {
@@ -79,7 +79,7 @@ fn geo_sun_earth_eclipses(almanac: Arc<Almanac>) {
 
     let (truth_tx, truth_rx) = mpsc::channel();
 
-    let bodies = vec![SUN, JUPITER];
+    let bodies = vec![SUN, JUPITER_BARYCENTER];
 
     let almanac_c = almanac.clone();
 
