@@ -7,22 +7,13 @@ mod propulsion;
 
 use std::sync::Arc;
 
-use anise::prelude::{Almanac, MetaAlmanac};
+use anise::prelude::Almanac;
 
 pub fn test_almanac() -> Almanac {
     use std::path::PathBuf;
 
     let manifest_dir =
         PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string()));
-
-    // MetaAlmanac::new(
-    //     (PathBuf::from(manifest_dir).join("data/ci_almanac.dhall"))
-    //         .to_string_lossy()
-    //         .to_string(),
-    // )
-    // .unwrap()
-    // .process()
-    // .unwrap()
 
     Almanac::new(
         &manifest_dir
@@ -40,7 +31,6 @@ pub fn test_almanac() -> Almanac {
     .unwrap()
     .load(
         &manifest_dir
-            .clone()
             .join("data/earth_latest_high_prec.bpc")
             .to_string_lossy(),
     )
