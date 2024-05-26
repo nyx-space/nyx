@@ -19,7 +19,6 @@
 use crate::errors::NyxError;
 use crate::md::StateParameter;
 use crate::time::Epoch;
-use crate::Orbit;
 
 use arrow::error::ArrowError;
 use parquet::errors::ParquetError;
@@ -41,15 +40,12 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use typed_builder::TypedBuilder;
 
-use self::orbit::OrbitSerde;
-
 /// Handles writing to an XYZV file
 pub mod cosmo;
 pub mod estimate;
 /// Handles loading of gravity models using files of NASA PDS and GMAT COF. Several gunzipped files are provided with nyx.
 pub mod gravity;
 pub mod matrices;
-pub mod orbit;
 pub mod tracking_data;
 pub mod trajectory_data;
 
@@ -345,15 +341,6 @@ where
 //     }
 //     Ok(frames)
 // }
-
-/// A deserializer from Epoch string
-pub(crate) fn orbit_from_str<'de, D>(deserializer: D) -> Result<Orbit, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let orbit_serde: OrbitSerde = Deserialize::deserialize(deserializer)?;
-    Ok(orbit_serde.into())
-}
 
 pub(crate) fn maybe_duration_to_str<S>(
     duration: &Option<Duration>,

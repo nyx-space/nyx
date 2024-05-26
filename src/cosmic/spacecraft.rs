@@ -29,7 +29,7 @@ use super::{AstroPhysicsSnafu, BPlane, State};
 use crate::dynamics::guidance::Thruster;
 use crate::dynamics::DynamicsError;
 use crate::errors::{StateAstroSnafu, StateError};
-use crate::io::{orbit_from_str, ConfigRepr};
+use crate::io::ConfigRepr;
 use crate::linalg::{Const, DimName, OMatrix, OVector};
 use crate::md::StateParameter;
 use crate::time::Epoch;
@@ -88,7 +88,6 @@ impl From<GuidanceMode> for f64 {
 #[cfg_attr(feature = "python", pyo3(module = "nyx_space.cosmic"))]
 pub struct Spacecraft {
     /// Initial orbit the vehicle is in
-    #[serde(deserialize_with = "orbit_from_str")]
     pub orbit: Orbit,
     /// Dry mass, i.e. mass without fuel, in kg
     #[builder(default)]
@@ -222,7 +221,8 @@ impl Spacecraft {
                 area_m2: drag_area_m2,
                 cd,
             },
-            stm: Some(OMatrix::<f64, Const<9>, Const<9>>::identity()),
+            // stm: Some(OMatrix::<f64, Const<9>, Const<9>>::identity()),
+            stm: None,
             ..Default::default()
         }
     }
@@ -855,15 +855,17 @@ fn test_serde() {
     // Check that we can omit the thruster info entirely.
     let s = r#"
 orbit:
-    x_km: -9042.862234
-    y_km: 18536.333069
-    z_km: 6999.957069
-    vx_km_s: -3.288789
-    vy_km_s: -2.226285
-    vz_km_s: 1.646738
+    radius_km:
+        - -9042.862234
+        - 18536.333069
+        - 6999.957069
+    velocity_km_s:
+        - -3.288789
+        - -2.226285
+        - 1.646738
     epoch: 2018-09-15T00:15:53.098000000 UTC
     frame:
-      ephemeris_id: 301
+      ephemeris_id: 399
       orientation_id: 1
       mu_km3_s2: null
       shape: null
@@ -883,18 +885,20 @@ drag:
     // Check that we can specify a thruster info entirely.
     let s = r#"
 orbit:
-    x_km: -9042.862234
-    y_km: 18536.333069
-    z_km: 6999.957069
-    vx_km_s: -3.288789
-    vy_km_s: -2.226285
-    vz_km_s: 1.646738
+    radius_km:
+    - -9042.862234
+    - 18536.333069
+    - 6999.957069
+    velocity_km_s:
+    - -3.288789
+    - -2.226285
+    - 1.646738
     epoch: 2018-09-15T00:15:53.098000000 UTC
     frame:
-      ephemeris_id: 301
-      orientation_id: 1
-      mu_km3_s2: null
-      shape: null
+        ephemeris_id: 399
+        orientation_id: 1
+        mu_km3_s2: null
+        shape: null
 dry_mass_kg: 500.0
 fuel_mass_kg: 159.0
 srp:
@@ -919,18 +923,20 @@ thruster:
     // Tests the minimum definition which will set all of the defaults too
     let s = r#"
 orbit:
-    x_km: -9042.862234
-    y_km: 18536.333069
-    z_km: 6999.957069
-    vx_km_s: -3.288789
-    vy_km_s: -2.226285
-    vz_km_s: 1.646738
+    radius_km:
+    - -9042.862234
+    - 18536.333069
+    - 6999.957069
+    velocity_km_s:
+    - -3.288789
+    - -2.226285
+    - 1.646738
     epoch: 2018-09-15T00:15:53.098000000 UTC
     frame:
-      ephemeris_id: 301
-      orientation_id: 1
-      mu_km3_s2: null
-      shape: null
+        ephemeris_id: 399
+        orientation_id: 1
+        mu_km3_s2: null
+        shape: null
 dry_mass_kg: 500.0
 fuel_mass_kg: 159.0
 "#;

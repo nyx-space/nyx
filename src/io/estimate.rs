@@ -16,15 +16,16 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anise::astro::orbit::Orbit;
 use serde::{Deserialize, Serialize};
 
-use super::{matrices::Matrix6Serde, orbit::OrbitSerde, ConfigRepr};
+use super::{matrices::Matrix6Serde, ConfigRepr};
 
 /// Enables serializing and deserializing of an orbit estimate.
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct OrbitEstimateSerde {
     /// Expected nominal orbit
-    pub nominal: OrbitSerde,
+    pub nominal: Orbit,
     /// Covariance _must_ be specified as in Cartesian format
     pub covar: Matrix6Serde,
 }
