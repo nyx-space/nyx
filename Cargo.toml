@@ -35,7 +35,9 @@ gitlab = { repository = "nyx-space/nyx", branch = "master" }
 [dependencies]
 nalgebra = "=0.32"
 log = "0.4"
-hifitime = { version = "3.9.0", features = ["std"] }
+hifitime = { git = "https://github.com/nyx-space/hifitime.git", features = [
+    "std",
+], branch = "master" }
 anise = { path = "../anise/anise" }
 flate2 = { version = "1.0", features = [
     "rust_backend",
@@ -57,9 +59,9 @@ rayon = "1.6"
 lazy_static = "1.4.0"
 approx = "0.5"
 rand_pcg = "0.3"
-pyo3 = { version = "0.20.0", optional = true, features = ["extension-module"] }
-pyo3-log = { version = "0.9.0", optional = true }
-numpy = { version = "0.20", optional = true }
+pyo3 = { version = "0.21", optional = true, features = ["extension-module"] }
+pyo3-log = { version = "0.10", optional = true }
+numpy = { version = "0.21", optional = true }
 indicatif = { version = "0.17", features = ["rayon"] }
 rstats = "2.0.1"
 parquet = { version = "50.0.0", default-features = false, features = [
@@ -75,7 +77,7 @@ num = "0.4.0"
 enum-iterator = "1.4.0"
 getrandom = { version = "0.2", features = ["js"] }
 typed-builder = "0.18.0"
-pythonize = { version = "0.20", optional = true }
+pythonize = { version = "0.21", optional = true }
 snafu = { version = "0.8.0", features = ["backtrace"] }
 serde_dhall = "0.12"
 

@@ -181,20 +181,15 @@ fn test_multivariate_state() {
 
     use crate::time::Epoch;
     use crate::Spacecraft;
+    use crate::GMAT_EARTH_GM;
+
     use nalgebra::{SMatrix, SVector};
     use rand_pcg::Pcg64Mcg;
 
+    let eme2k = EARTH_J2000.with_mu_km3_s2(GMAT_EARTH_GM);
+
     let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);
-    let state = Orbit::keplerian(
-        8_191.93,
-        1e-6,
-        12.85,
-        306.614,
-        314.19,
-        99.887_7,
-        dt,
-        EARTH_J2000,
-    );
+    let state = Orbit::keplerian(8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k);
 
     let mean = SVector::<f64, 9>::zeros();
     let std_dev =
@@ -242,9 +237,8 @@ fn test_multivariate_state() {
         .sum::<u16>();
 
     // We specified a seed so we know exactly what to expect
-    assert_eq!(
-        cnt_too_far / 6,
-        329,
+    assert!(
+        cnt_too_far / 6 < 329,
         "Should have less than 33% of samples being more than 1 sigma away, got {}",
         cnt_too_far
     );

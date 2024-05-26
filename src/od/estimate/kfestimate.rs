@@ -251,13 +251,13 @@ where
 
 #[cfg(test)]
 mod ut_kfest {
-    use crate::{md::StateParameter, od::estimate::KfEstimate, Spacecraft};
+    use crate::{md::StateParameter, od::estimate::KfEstimate, Spacecraft, GMAT_EARTH_GM};
     use anise::{constants::frames::EARTH_J2000, prelude::Orbit};
     use hifitime::Epoch;
 
     #[test]
     fn test_estimate_from_disp() {
-        let eme2k = EARTH_J2000;
+        let eme2k = EARTH_J2000.with_mu_km3_s2(GMAT_EARTH_GM);
         let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
         let initial_state = Spacecraft::builder()
             .orbit(Orbit::keplerian(

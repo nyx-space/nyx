@@ -12,9 +12,7 @@ use anise::prelude::{Almanac, MetaAlmanac};
 pub fn test_almanac() -> Almanac {
     use std::path::PathBuf;
 
-    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
-        .or::<Result<String, String>>(Ok(".".to_string()))
-        .unwrap();
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string());
 
     MetaAlmanac::new(
         (PathBuf::from(manifest_dir).join("data/ci_almanac.dhall"))

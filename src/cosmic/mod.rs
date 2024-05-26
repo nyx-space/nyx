@@ -147,14 +147,6 @@ pub enum AstroError {
     AstroAlmanac { source: AlmanacError },
 }
 
-// Re-Export bodies
-mod bodies;
-pub use self::bodies::*;
-
-// Re-Export orbit
-// mod orbit;
-// pub use self::orbit::*;
-
 // Re-Export OrbitDual
 mod orbitdual;
 pub use self::orbitdual::*;

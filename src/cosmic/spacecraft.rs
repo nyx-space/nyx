@@ -862,7 +862,11 @@ orbit:
     vy_km_s: -2.226285
     vz_km_s: 1.646738
     epoch: 2018-09-15T00:15:53.098000000 UTC
-    frame: Earth J2000
+    frame:
+      ephemeris_id: 301
+      orientation_id: 1
+      mu_km3_s2: null
+      shape: null
 dry_mass_kg: 500.0
 fuel_mass_kg: 159.0
 srp:
@@ -886,7 +890,11 @@ orbit:
     vy_km_s: -2.226285
     vz_km_s: 1.646738
     epoch: 2018-09-15T00:15:53.098000000 UTC
-    frame: Earth J2000
+    frame:
+      ephemeris_id: 301
+      orientation_id: 1
+      mu_km3_s2: null
+      shape: null
 dry_mass_kg: 500.0
 fuel_mass_kg: 159.0
 srp:
@@ -918,7 +926,11 @@ orbit:
     vy_km_s: -2.226285
     vz_km_s: 1.646738
     epoch: 2018-09-15T00:15:53.098000000 UTC
-    frame: Earth J2000
+    frame:
+      ephemeris_id: 301
+      orientation_id: 1
+      mu_km3_s2: null
+      shape: null
 dry_mass_kg: 500.0
 fuel_mass_kg: 159.0
 "#;

@@ -1,5 +1,9 @@
 name: Demo ground station
-frame: IAU Earth
+frame:
+  ephemeris_id: 399
+  orientation_id: 399
+  mu_km3_s2: null
+  shape: null
 elevation_mask_deg: 5.0
 latitude_deg: 2.3522
 longitude_deg: 48.8566

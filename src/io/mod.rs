@@ -290,6 +290,26 @@ where
     Duration::from_str(&s).map_err(serde::de::Error::custom)
 }
 
+// /// Deserialize a type `S` by deserializing a string, then using the `FromStr`
+// /// impl of `S` to create the result. The generic type `S` is not required to
+// /// implement `Deserialize`.
+// pub(crate) fn deserialize_from_str<'de, S, D>(deserializer: D) -> Result<S, D::Error>
+// where
+//     S: core::str::FromStr,
+//     S::Err: core::fmt::Display,
+//     D: Deserializer<'de>,
+// {
+//     let s: String = Deserialize::deserialize(deserializer)?;
+//     S::from_str(&s).map_err(de::Error::custom)
+// }
+
+// pub(crate) fn frame_to_str<S>(frame: &Frame, serializer: S) -> Result<S::Ok, S::Error>
+// where
+//     S: Serializer,
+// {
+//     serializer.serialize_str(&format!("{frame}"))
+// }
+
 // //TODO(ANISE): Add frame from str to ANISE?
 // pub(crate) fn frame_from_str<'de, D>(deserializer: D) -> Result<Frame, D::Error>
 // where

@@ -351,6 +351,7 @@ pub type GaussianGenerator<S> = Generator<S, Normal<f64>>;
 mod genertor_ut {
     use super::*;
     use crate::Spacecraft;
+    use crate::GMAT_EARTH_GM;
 
     #[test]
     fn generate_orbit() {
@@ -360,17 +361,12 @@ mod genertor_ut {
         use crate::time::Epoch;
         use rand_pcg::Pcg64Mcg;
 
+        let eme2k = EARTH_J2000.with_mu_km3_s2(GMAT_EARTH_GM);
+
         let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);
         let state = Spacecraft::builder()
             .orbit(Orbit::keplerian(
-                8_191.93,
-                1e-6,
-                12.85,
-                306.614,
-                314.19,
-                99.887_7,
-                dt,
-                EARTH_J2000,
+                8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k,
             ))
             .build();
 
@@ -462,17 +458,10 @@ mod genertor_ut {
         use anise::constants::frames::EARTH_J2000;
         use anise::prelude::Orbit;
 
+        let eme2k = EARTH_J2000.with_mu_km3_s2(GMAT_EARTH_GM);
+
         let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);
-        let orbit = Orbit::keplerian(
-            8_191.93,
-            1e-6,
-            12.85,
-            306.614,
-            314.19,
-            99.887_7,
-            dt,
-            EARTH_J2000,
-        );
+        let orbit = Orbit::keplerian(8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k);
 
         let nominal_thrust = 50.0;
         let nominal_isp = 300.0;

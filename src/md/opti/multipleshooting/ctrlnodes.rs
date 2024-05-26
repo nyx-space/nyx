@@ -176,7 +176,10 @@ y = -80.02184491079583
 z = -1702.1160791417442
 vmag = 0.0
 epoch = "2023-11-25T14:11:46.789000034 UTC"
-frame = "Moon J2000"
+
+[nodes.frame]
+ephemeris_id = 301
+orientation_id = 1
 
 [[nodes]]
 x = -381.68254116206856
@@ -184,7 +187,10 @@ y = -48.21573534985666
 z = -1705.829637126235
 vmag = 0.0
 epoch = "2023-11-25T14:12:06.789000034 UTC"
-frame = "Moon J2000"
+
+[nodes.frame]
+ephemeris_id = 301
+orientation_id = 1
 
 [[nodes]]
 x = -368.8474537620047
@@ -192,7 +198,10 @@ y = -16.401929604226403
 z = -1708.8692139449731
 vmag = 0.0
 epoch = "2023-11-25T14:12:26.789000034 UTC"
-frame = "Moon J2000"
+
+[nodes.frame]
+ephemeris_id = 301
+orientation_id = 1
 "#;
 
     let toml_nodes: NodesSerde = toml::from_str(str_nodes).unwrap();

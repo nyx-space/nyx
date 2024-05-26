@@ -285,7 +285,7 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
 
     let setup = Propagator::default(sc_dynamics);
     let prop_time = 44 * Unit::Minute + 10 * Unit::Second;
-    let mut prop = setup.with(start_state.into(), almanac.clone());
+    let mut prop = setup.with(start_state, almanac.clone());
     let (end_state, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
     // Example of iterating through the spaceraft trajectory and checking what the guidance mode is at each time.
@@ -341,7 +341,7 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
     let almanac_c = almanac.clone();
     std::thread::spawn(move || {
         setup
-            .with(start_state.into(), almanac_c)
+            .with(start_state, almanac_c)
             .until_epoch_with_channel(end_state.epoch(), tx)
             .unwrap();
     });
