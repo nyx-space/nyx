@@ -290,20 +290,20 @@ impl Dynamics for SpacecraftDynamics {
 
     fn eom(
         &self,
-        delta_t: f64,
+        delta_t_s: f64,
         state: &OVector<f64, Const<90>>,
         ctx: &Self::StateType,
         almanac: Arc<Almanac>,
     ) -> Result<OVector<f64, Const<90>>, DynamicsError> {
         // Rebuild the osculating state for the EOM context.
-        let osc_sc = ctx.set_with_delta_seconds(delta_t, state);
+        let osc_sc = ctx.set_with_delta_seconds(delta_t_s, state);
         let mut d_x = OVector::<f64, Const<90>>::zeros();
 
         // Maybe I use this only when estimating the orbit state from a spacecraft, but that functionality will soon disappear.
         match ctx.stm {
             Some(stm) => {
                 // Call the gradient (also called the dual EOM function of the force models)
-                let (state, grad) = self.dual_eom(delta_t, &osc_sc, almanac)?;
+                let (state, grad) = self.dual_eom(delta_t_s, &osc_sc, almanac)?;
 
                 // Apply the gradient to the STM
                 let stm_dt = stm * grad;
@@ -324,10 +324,9 @@ impl Dynamics for SpacecraftDynamics {
                 for (i, val) in self
                     .orbital_dyn
                     .eom(
-                        delta_t,
+                        delta_t_s,
                         &orbital_dyn_vec,
                         &ctx.orbit,
-                        // Some(&ctx_stm),
                         None,
                         almanac.clone(),
                     )?

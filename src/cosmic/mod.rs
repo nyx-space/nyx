@@ -71,7 +71,7 @@ where
     /// Return this state as a vector for the propagation/estimation
     /// By default, this is not implemented. This function must be implemented when filtering on this state.
     fn stm(&self) -> Result<OMatrix<f64, Self::Size, Self::Size>, DynamicsError> {
-        unimplemented!()
+        Err(DynamicsError::StateTransitionMatrixUnset)
     }
 
     /// Return this state as a vector for the propagation/estimation
@@ -88,13 +88,16 @@ where
 
     /// Reconstruct a new State from the provided delta time in seconds compared to the current state
     /// and with the provided vector.
-    fn set_with_delta_seconds(self, delta_t_s: f64, vector: &OVector<f64, Self::VecLength>) -> Self
+    fn set_with_delta_seconds(
+        mut self,
+        delta_t_s: f64,
+        vector: &OVector<f64, Self::VecLength>,
+    ) -> Self
     where
         DefaultAllocator: Allocator<f64, Self::VecLength>,
     {
-        let mut me = self;
-        me.set(me.epoch() + delta_t_s, vector);
-        me
+        self.set(self.epoch() + delta_t_s, vector);
+        self
     }
 
     /// Retrieve the Epoch

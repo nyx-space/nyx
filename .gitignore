@@ -3,7 +3,6 @@
 Cargo.lock
 tests/Papers
 node_modules/
-*.bsp
 *.script.bak
 **/*.csv
 *.old
