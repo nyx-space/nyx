@@ -14,6 +14,8 @@ use std::sync::Arc;
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use rstest::*;
 
+use crate::propagation::GMAT_EARTH_GM;
+
 #[fixture]
 fn almanac() -> Arc<Almanac> {
     use crate::test_almanac_arcd;
@@ -24,7 +26,10 @@ fn almanac() -> Arc<Almanac> {
 fn val_b_plane_gmat(almanac: Arc<Almanac>) {
     // This is a reproduction of the B-plane computation from the `Ex_LunarTransfer.script` file from GMAT
     // Grab the frame
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
     // Define the epoch
     let epoch = Epoch::from_gregorian_utc(2014, 7, 22, 11, 29, 10, 811_000);
     // Define the initial orbit

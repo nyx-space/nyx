@@ -299,7 +299,6 @@ impl Dynamics for SpacecraftDynamics {
         let osc_sc = ctx.set_with_delta_seconds(delta_t, state);
         let mut d_x = OVector::<f64, Const<90>>::zeros();
 
-        // TODO(ANISE): Can I just always compute the STM from dual_eom if it's set?
         // Maybe I use this only when estimating the orbit state from a spacecraft, but that functionality will soon disappear.
         match ctx.stm {
             Some(stm) => {
@@ -321,8 +320,6 @@ impl Dynamics for SpacecraftDynamics {
             None => {
                 // Compute the orbital dynamics
                 let orbital_dyn_vec = state.fixed_rows::<42>(0).into_owned();
-                // TODO(ANISE): The STM is ALWAYS set to identity and that's probably wrong.
-                let ctx_stm = OMatrix::<f64, Const<6>, Const<6>>::identity();
                 // Copy the d orbit dt data
                 for (i, val) in self
                     .orbital_dyn
@@ -330,7 +327,8 @@ impl Dynamics for SpacecraftDynamics {
                         delta_t,
                         &orbital_dyn_vec,
                         &ctx.orbit,
-                        Some(&ctx_stm),
+                        // Some(&ctx_stm),
+                        None,
                         almanac.clone(),
                     )?
                     .iter()

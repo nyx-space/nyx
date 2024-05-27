@@ -234,7 +234,7 @@ fn exp_drag_earth(almanac: Arc<Almanac>) {
     // Define the dynamics
 
     let srp = SolarPressure::default(eme2k, almanac.clone()).unwrap();
-    let drag = Drag::earth_exp();
+    let drag = Drag::earth_exp(almanac.clone()).unwrap();
 
     let dry_mass = 300.0;
 
@@ -269,7 +269,7 @@ fn std_atm_drag_earth(almanac: Arc<Almanac>) {
     // Define the dynamics
 
     let srp = SolarPressure::default(eme2k, almanac.clone()).unwrap();
-    let drag = Drag::std_atm1976();
+    let drag = Drag::std_atm1976(almanac.clone()).unwrap();
 
     let dry_mass = 300.0;
 
@@ -317,7 +317,7 @@ fn std_atm_drag_earth_low(almanac: Arc<Almanac>) {
     // Define the dynamics
 
     let srp = SolarPressure::default(eme2k, almanac.clone()).unwrap();
-    let drag = Drag::std_atm1976();
+    let drag = Drag::std_atm1976(almanac.clone()).unwrap();
 
     let dry_mass = 300.0;
 

@@ -20,7 +20,9 @@ use anise::almanac::Almanac;
 use anise::constants::frames::IAU_EARTH_FRAME;
 use snafu::ResultExt;
 
-use super::{DynamicsAlmanacSnafu, DynamicsAstroSnafu, DynamicsError, ForceModel};
+use super::{
+    DynamicsAlmanacSnafu, DynamicsAstroSnafu, DynamicsError, DynamicsPlanetarySnafu, ForceModel,
+};
 use crate::cosmic::{AstroError, AstroPhysicsSnafu, Frame, Spacecraft};
 use crate::linalg::{Matrix3, Vector3};
 use std::fmt;
@@ -91,25 +93,33 @@ pub struct Drag {
 
 impl Drag {
     /// Common exponential drag model for the Earth
-    pub fn earth_exp() -> Arc<Self> {
-        Arc::new(Self {
+    pub fn earth_exp(almanac: Arc<Almanac>) -> Result<Arc<Self>, DynamicsError> {
+        Ok(Arc::new(Self {
             density: AtmDensity::Exponential {
                 rho0: 3.614e-13,
                 r0: 700_000.0,
                 ref_alt_m: 88_667.0,
             },
-            drag_frame: IAU_EARTH_FRAME,
-        })
+            drag_frame: almanac.frame_from_uid(IAU_EARTH_FRAME).with_context(|_| {
+                DynamicsPlanetarySnafu {
+                    action: "planetary data from third body not loaded",
+                }
+            })?,
+        }))
     }
 
     /// Drag model which uses the standard atmosphere 1976 model for atmospheric density
-    pub fn std_atm1976() -> Arc<Self> {
-        Arc::new(Self {
+    pub fn std_atm1976(almanac: Arc<Almanac>) -> Result<Arc<Self>, DynamicsError> {
+        Ok(Arc::new(Self {
             density: AtmDensity::StdAtm {
                 max_alt_m: 1_000_000.0,
             },
-            drag_frame: IAU_EARTH_FRAME,
-        })
+            drag_frame: almanac.frame_from_uid(IAU_EARTH_FRAME).with_context(|_| {
+                DynamicsPlanetarySnafu {
+                    action: "planetary data from third body not loaded",
+                }
+            })?,
+        }))
     }
 }
 

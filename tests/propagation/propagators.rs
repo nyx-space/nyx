@@ -13,6 +13,8 @@ use nyx::utils::rss_orbit_errors;
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use rstest::*;
 
+use crate::propagation::GMAT_EARTH_GM;
+
 #[fixture]
 fn almanac() -> Arc<Almanac> {
     use crate::test_almanac_arcd;
@@ -23,7 +25,10 @@ fn almanac() -> Arc<Almanac> {
 #[rstest]
 fn regress_leo_day_adaptive(almanac: Arc<Almanac>) {
     // Regression test for propagators not available in GMAT.
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
 
     let prop_time = 1 * Unit::Day;
     let accuracy = 1e-12;
@@ -146,7 +151,10 @@ fn gmat_val_leo_day_adaptive(almanac: Arc<Almanac>) {
     // NOTE: In this test we only use the propagators which also exist in GMAT.
     // Refer to `regress_leo_day_adaptive` for the additional propagators.
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
 
     let prop_time = 1 * Unit::Day;
     let accuracy = 1e-12;
@@ -343,7 +351,10 @@ fn gmat_val_leo_day_adaptive(almanac: Arc<Almanac>) {
 #[allow(clippy::identity_op)]
 #[rstest]
 fn gmat_val_leo_day_fixed(almanac: Arc<Almanac>) {
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
 
     let prop_time = 1 * Unit::Day;
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
