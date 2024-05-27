@@ -68,7 +68,8 @@ impl ForceModel for ConstantDrag {
             })?;
 
         let velocity = osc.velocity_km_s;
-        Ok(-0.5 * self.rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
+        // Note the 1e3 factor to convert drag units from ((kg * km^2 * s^-2) / m^1) to (kg * km * s^-2)
+        Ok(-0.5 * 1e3 * self.rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
     }
 
     fn dual_eom(
@@ -146,7 +147,8 @@ impl ForceModel for Drag {
         match self.density {
             AtmDensity::Constant(rho) => {
                 let velocity = osc.velocity_km_s;
-                Ok(-0.5 * rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
+                // Note the 1e3 factor to convert drag units from ((kg * km^2 * s^-2) / m^1) to (kg * km * s^-2)
+                Ok(-0.5 * 1e3 * rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
             }
 
             AtmDensity::Exponential {
@@ -175,7 +177,8 @@ impl ForceModel for Drag {
                     .velocity_km_s;
 
                 let velocity = velocity_integr_frame - osc.velocity_km_s;
-                Ok(-0.5 * rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
+                // Note the 1e3 factor to convert drag units from ((kg * km^2 * s^-2) / m^1) to (kg * km * s^-2)
+                Ok(-0.5 * 1e3 * rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
             }
 
             AtmDensity::StdAtm { max_alt_m } => {
@@ -212,7 +215,8 @@ impl ForceModel for Drag {
                     .velocity_km_s;
 
                 let velocity = velocity_integr_frame - osc.velocity_km_s;
-                Ok(-0.5 * rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
+                // Note the 1e3 factor to convert drag units from ((kg * km^2 * s^-2) / m^1) to (kg * km * s^-2)
+                Ok(-0.5 * 1e3 * rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
             }
         }
     }
