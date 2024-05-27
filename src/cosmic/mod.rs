@@ -19,9 +19,6 @@
 use anise::errors::{AlmanacError, PhysicsError};
 pub use anise::prelude::{Frame, Orbit};
 
-// pub use self::xb::Xb;
-// use self::xb::{Ephemeris, Epoch as XbEpoch};
-// pub use crate::cosmic::{Frame, GuidanceMode, Orbit, Spacecraft};
 pub use crate::cosmic::{GuidanceMode, Spacecraft};
 use crate::dynamics::DynamicsError;
 pub use crate::errors::NyxError;
@@ -167,10 +164,6 @@ pub use self::spacecraft::*;
 
 mod rotations;
 pub use self::rotations::*;
-
-// mod cosm;
-// mod xb;
-// pub use self::cosm::*;
 
 /// The eclipse module allows finding eclipses and (conversely) visibility between a state and another one (e.g. a planet or the Sun).
 pub mod eclipse;

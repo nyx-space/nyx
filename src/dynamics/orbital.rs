@@ -24,10 +24,8 @@ use crate::linalg::{Const, Matrix3, Matrix6, OVector, Vector3, Vector6};
 
 use anise::almanac::Almanac;
 use anise::astro::Aberration;
-use hifitime::TimeUnits;
 use hyperdual::linalg::norm;
 use hyperdual::{extract_jacobian_and_result, hyperspace_from_vector, Float, OHyperdual};
-use nalgebra::OMatrix;
 use snafu::ResultExt;
 use std::f64;
 use std::fmt;
@@ -88,55 +86,37 @@ impl fmt::Display for OrbitalDynamics {
 impl OrbitalDynamics {
     pub(crate) fn eom(
         &self,
-        delta_t_s: f64,
-        state: &OVector<f64, Const<42>>,
-        ctx: &Orbit,
-        ctx_stm: Option<&OMatrix<f64, Const<6>, Const<6>>>,
+        osc: &Orbit,
         almanac: Arc<Almanac>,
     ) -> Result<OVector<f64, Const<42>>, DynamicsError> {
-        // TODO(ANISE): Consider passing a mut Matrix3 to put the STM data into
-        let mut osc = ctx.with_cartesian_pos_vel(state.fixed_rows::<6>(0).into_owned());
-        osc.epoch += delta_t_s.seconds();
+        // Still return something of size 42, but the STM will be zeros.
+        let body_acceleration = (-osc
+            .frame
+            .mu_km3_s2()
+            .with_context(|_| AstroPhysicsSnafu)
+            .with_context(|_| DynamicsAstroSnafu)?
+            / osc.rmag_km().powi(3))
+            * osc.radius_km;
 
-        let (new_state, new_stm) = match ctx_stm {
-            Some(stm) => {
-                let (state, grad) = self.dual_eom(delta_t_s, &osc, almanac)?;
+        let mut d_x = Vector6::from_iterator(
+            osc.velocity_km_s
+                .iter()
+                .chain(body_acceleration.iter())
+                .cloned(),
+        );
 
-                let stm_dt = stm * grad;
-                // Rebuild the STM as a vector.
-                let stm_as_vec = OVector::<f64, Const<36>>::from_column_slice(stm_dt.as_slice());
-                (state, stm_as_vec)
+        // Apply the acceleration models
+        for model in &self.accel_models {
+            let model_acc = model.eom(&osc, almanac.clone())?;
+            for i in 0..3 {
+                d_x[i + 3] += model_acc[i];
             }
+        }
 
-            None => {
-                // Still return something of size 42, but the STM will be zeros.
-                let body_acceleration = (-osc
-                    .frame
-                    .mu_km3_s2()
-                    .with_context(|_| AstroPhysicsSnafu)
-                    .with_context(|_| DynamicsAstroSnafu)?
-                    / osc.rmag_km().powi(3))
-                    * osc.radius_km;
-                let mut d_x = Vector6::from_iterator(
-                    osc.velocity_km_s
-                        .iter()
-                        .chain(body_acceleration.iter())
-                        .cloned(),
-                );
-
-                // Apply the acceleration models
-                for model in &self.accel_models {
-                    let model_acc = model.eom(&osc, almanac.clone())?;
-                    for i in 0..3 {
-                        d_x[i + 3] += model_acc[i];
-                    }
-                }
-
-                (d_x, OVector::<f64, Const<36>>::zeros())
-            }
-        };
         Ok(OVector::<f64, Const<42>>::from_iterator(
-            new_state.iter().chain(new_stm.iter()).cloned(),
+            d_x.iter()
+                .chain(OVector::<f64, Const<36>>::zeros().iter())
+                .cloned(),
         ))
     }
 

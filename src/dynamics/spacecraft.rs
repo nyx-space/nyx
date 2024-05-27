@@ -319,17 +319,9 @@ impl Dynamics for SpacecraftDynamics {
             }
             None => {
                 // Compute the orbital dynamics
-                let orbital_dyn_vec = state.fixed_rows::<42>(0).into_owned();
-                // Copy the d orbit dt data
                 for (i, val) in self
                     .orbital_dyn
-                    .eom(
-                        delta_t_s,
-                        &orbital_dyn_vec,
-                        &ctx.orbit,
-                        None,
-                        almanac.clone(),
-                    )?
+                    .eom(&osc_sc.orbit, almanac.clone())?
                     .iter()
                     .enumerate()
                 {
