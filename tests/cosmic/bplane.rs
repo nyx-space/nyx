@@ -146,7 +146,10 @@ fn val_b_plane_gmat(almanac: Arc<Almanac>) {
     for data in &datum {
         let eme2k_state = traj.at(data.epoch).unwrap().orbit;
         let state = almanac.transform_to(eme2k_state, MOON_J2000, None).unwrap();
-        println!("{}\n{:x}", state, state);
+        // TODO(ANISE): The transformed state is _not_ hyperbolic indeed! Eccentricity is 0.17.
+        // Compare with Cosm to understand why this state is no longer hyperbolic, the code looks to be identical.
+        println!("EME2K = {}\nEME2K = {:x}", eme2k_state, eme2k_state);
+        println!("STATE = {}\nSTATE = {:x}", state, state);
         assert!(
             dbg!(eme2k_state.c3_km2_s2().unwrap() - data.c3).abs() < 1e-5,
             "invalid c3 at {}",
