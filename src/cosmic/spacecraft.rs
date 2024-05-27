@@ -221,8 +221,6 @@ impl Spacecraft {
                 area_m2: drag_area_m2,
                 cd,
             },
-            // stm: Some(OMatrix::<f64, Const<9>, Const<9>>::identity()),
-            stm: None,
             ..Default::default()
         }
     }
@@ -241,7 +239,6 @@ impl Spacecraft {
             fuel_mass_kg,
             thruster: Some(thruster),
             mode,
-            stm: Some(OMatrix::<f64, Const<9>, Const<9>>::identity()),
             ..Default::default()
         }
     }
@@ -252,7 +249,6 @@ impl Spacecraft {
             orbit,
             dry_mass_kg,
             srp: SrpConfig::from_area(srp_area_m2),
-            stm: Some(OMatrix::<f64, Const<9>, Const<9>>::identity()),
             ..Default::default()
         }
     }
@@ -263,7 +259,6 @@ impl Spacecraft {
             orbit,
             dry_mass_kg,
             drag: DragConfig::from_area(drag_area_m2),
-            stm: Some(OMatrix::<f64, Const<9>, Const<9>>::identity()),
             ..Default::default()
         }
     }
