@@ -47,7 +47,7 @@ fn leo_sun_earth_eclipses(almanac: Arc<Almanac>) {
 
     // Initialize the EclipseLocator
     let e_loc = EclipseLocator {
-        light_source: SUN_J2000,
+        light_source: almanac.frame_from_uid(SUN_J2000).unwrap(),
         shadow_bodies: vec![eme2k],
     };
 
@@ -95,7 +95,7 @@ fn geo_sun_earth_eclipses(almanac: Arc<Almanac>) {
 
     // Initialize the EclipseLocator
     let e_loc = EclipseLocator {
-        light_source: SUN_J2000,
+        light_source: almanac.frame_from_uid(SUN_J2000).unwrap(),
         shadow_bodies: vec![eme2k],
     };
 

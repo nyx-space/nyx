@@ -279,7 +279,7 @@ pub fn eclipse_state(
 
     if ls_mean_eq_radius_km < std::f64::EPSILON {
         // TODO(ANISE): I think I need the opposite data here! Hence the neg!
-        let observed = -almanac.transform_to(observer, light_source, None)?;
+        let observed = almanac.transform_to(observer, light_source, None)?;
 
         // let observed = almanac.celestial_state(
         //     &light_source.ephem_path(),
@@ -294,13 +294,11 @@ pub fn eclipse_state(
     // `eb` stands for eclipsing body; `ls` stands for light source.
     // Get the radius vector of the spacecraft to the eclipsing body
 
-    // let r_eb = almanac.frame_chg(observer, eclipsing_body).radius();
-    let r_eb = -almanac
+    let r_eb = almanac
         .transform_to(observer, eclipsing_body, None)?
         .radius_km;
 
     // Get the radius vector of the light source to the spacecraft
-    // let r_ls = -almanac.frame_chg(observer, light_source).radius();
     let r_ls = -almanac
         .transform_to(observer, light_source, None)?
         .radius_km;
