@@ -100,8 +100,10 @@ fn od_val_sc_mb_srp_reals_duals_models(almanac: Arc<Almanac>) {
 
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
-    let sc_dynamics =
-        SpacecraftDynamics::from_model(orbital_dyn, SolarPressure::default(eme2k, almanac.clone()));
+    let sc_dynamics = SpacecraftDynamics::from_model(
+        orbital_dyn,
+        SolarPressure::default(eme2k, almanac.clone()).unwrap(),
+    );
 
     let sc_init_state = Spacecraft::from_srp_defaults(initial_state, dry_mass_kg, sc_area);
 

@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::{DynamicsAlmanacSnafu, DynamicsError, ForceModel};
+use super::{DynamicsAlmanacSnafu, DynamicsError, DynamicsPlanetarySnafu, ForceModel};
 use crate::cosmic::eclipse::EclipseLocator;
 use crate::cosmic::{Frame, Spacecraft, AU, SPEED_OF_LIGHT};
 use crate::linalg::{Const, Matrix3, Vector3};
@@ -37,17 +37,24 @@ pub struct SolarPressure {
 
 impl SolarPressure {
     /// Will set the solar flux at 1 AU to: Phi = 1367.0
-    pub fn default_raw(shadow_bodies: Vec<Frame>, _almanac: Arc<Almanac>) -> Self {
+    pub fn default_raw(
+        shadow_bodies: Vec<Frame>,
+        almanac: Arc<Almanac>,
+    ) -> Result<Self, DynamicsError> {
         let e_loc = EclipseLocator {
-            light_source: SUN_J2000,
+            light_source: almanac.frame_from_uid(SUN_J2000).with_context(|_| {
+                DynamicsPlanetarySnafu {
+                    action: "planetary data from third body not loaded",
+                }
+            })?,
             shadow_bodies,
         };
-        Self { phi: 1367.0, e_loc }
+        Ok(Self { phi: 1367.0, e_loc })
     }
 
     /// Accounts for the shadowing of only one body and will set the solar flux at 1 AU to: Phi = 1367.0
-    pub fn default(shadow_body: Frame, almanac: Arc<Almanac>) -> Arc<Self> {
-        Arc::new(Self::default_raw(vec![shadow_body], almanac))
+    pub fn default(shadow_body: Frame, almanac: Arc<Almanac>) -> Result<Arc<Self>, DynamicsError> {
+        Ok(Arc::new(Self::default_raw(vec![shadow_body], almanac)?))
     }
 
     /// Must provide the flux in W/m^2
@@ -55,10 +62,10 @@ impl SolarPressure {
         flux_w_m2: f64,
         shadow_bodies: Vec<Frame>,
         almanac: Arc<Almanac>,
-    ) -> Arc<Self> {
-        let mut me = Self::default_raw(shadow_bodies, almanac);
+    ) -> Result<Arc<Self>, DynamicsError> {
+        let mut me = Self::default_raw(shadow_bodies, almanac)?;
         me.phi = flux_w_m2;
-        Arc::new(me)
+        Ok(Arc::new(me))
     }
 }
 
