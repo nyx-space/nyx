@@ -133,7 +133,9 @@ fn traj_ephem_forward(almanac: Arc<Almanac>) {
     let exported_path = ephem
         .to_parquet(
             path,
-            Some(vec![&EclipseLocator::cislunar().to_penumbra_event()]),
+            Some(vec![
+                &EclipseLocator::cislunar(almanac.clone()).to_penumbra_event()
+            ]),
             ExportCfg::timestamped(),
             almanac.clone(),
         )
