@@ -135,6 +135,7 @@ fn traj_ephem_forward(almanac: Arc<Almanac>) {
             path,
             Some(vec![&EclipseLocator::cislunar().to_penumbra_event()]),
             ExportCfg::timestamped(),
+            almanac.clone(),
         )
         .unwrap();
 

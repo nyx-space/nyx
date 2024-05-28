@@ -63,6 +63,7 @@ fn continuous_tracking(almanac: Arc<Almanac>) {
                 timestamp: true,
                 ..Default::default()
             },
+            almanac.clone(),
         )
         .unwrap();
 

@@ -329,8 +329,11 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
     // And serialize to disk
     let path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "output_data"].iter().collect();
 
-    traj.to_parquet_simple(path.join("ekf_robust_two_way_traj.parquet"))
-        .unwrap();
+    traj.to_parquet_simple(
+        path.join("ekf_robust_two_way_traj.parquet"),
+        almanac.clone(),
+    )
+    .unwrap();
     arc.to_parquet_simple(path.join("ekf_robust_two_way_msr.parquet"))
         .unwrap();
 

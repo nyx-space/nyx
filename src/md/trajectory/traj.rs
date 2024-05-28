@@ -26,6 +26,7 @@ use crate::linalg::DefaultAllocator;
 use crate::md::prelude::{GuidanceMode, StateParameter};
 use crate::md::EventEvaluator;
 use crate::time::{Duration, Epoch, TimeSeries, TimeUnits};
+use anise::almanac::Almanac;
 use arrow::array::{Array, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
@@ -144,8 +145,12 @@ where
     }
 
     /// Store this trajectory arc to a parquet file with the default configuration (depends on the state type, search for `export_params` in the documentation for details).
-    pub fn to_parquet_simple<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf, Box<dyn Error>> {
-        self.to_parquet(path, None, ExportCfg::default())
+    pub fn to_parquet_simple<P: AsRef<Path>>(
+        &self,
+        path: P,
+        almanac: Arc<Almanac>,
+    ) -> Result<PathBuf, Box<dyn Error>> {
+        self.to_parquet(path, None, ExportCfg::default(), almanac)
     }
 
     /// Store this trajectory arc to a parquet file with the provided configuration
@@ -153,8 +158,9 @@ where
         &self,
         path: P,
         cfg: ExportCfg,
+        almanac: Arc<Almanac>,
     ) -> Result<PathBuf, Box<dyn Error>> {
-        self.to_parquet(path, None, cfg)
+        self.to_parquet(path, None, cfg, almanac)
     }
 
     /// Store this trajectory arc to a parquet file with the provided configuration and event evaluators
@@ -163,6 +169,7 @@ where
         path: P,
         events: Option<Vec<&dyn EventEvaluator<S>>>,
         cfg: ExportCfg,
+        almanac: Arc<Almanac>,
     ) -> Result<PathBuf, Box<dyn Error>> {
         let tick = Epoch::now().unwrap();
         info!("Exporting trajectory to parquet file...");
@@ -263,8 +270,16 @@ where
         );
 
         // Add all of the evaluated events
-        if let Some(_events) = events {
-            unimplemented!("Removed in ANISE updated");
+        if let Some(events) = events {
+            // warn!("Adding events was removed when switching to ANISE");
+            info!("Evaluating {} event(s)", events.len());
+            for event in events {
+                let mut data = Float64Builder::new();
+                for s in &states {
+                    data.append_value(event.eval(s, almanac.clone()).map_err(|e| Box::new(e))?);
+                }
+                record.push(Arc::new(data.finish()));
+            }
         }
 
         // Serialize all of the devices and add that to the parquet file too.

@@ -87,6 +87,7 @@ impl Traj<Spacecraft> {
         &self,
         path: P,
         step: Duration,
+        almanac: Arc<Almanac>,
     ) -> Result<(), Box<dyn Error>> {
         self.to_parquet_with_cfg(
             path,
@@ -94,6 +95,7 @@ impl Traj<Spacecraft> {
                 step: Some(step),
                 ..Default::default()
             },
+            almanac,
         )?;
 
         Ok(())
@@ -110,7 +112,7 @@ impl Traj<Spacecraft> {
         metadata: Option<HashMap<String, String>>,
         almanac: Arc<Almanac>,
     ) -> Result<PathBuf, Box<dyn Error>> {
-        let traj = self.to_frame(body_fixed_frame, almanac)?;
+        let traj = self.to_frame(body_fixed_frame, almanac.clone())?;
 
         let mut cfg = ExportCfg::builder()
             .step(1.minutes())
@@ -123,7 +125,7 @@ impl Traj<Spacecraft> {
             .build();
         cfg.metadata = metadata;
 
-        traj.to_parquet(path, events, cfg)
+        traj.to_parquet(path, events, cfg, almanac)
     }
 
     /// Convert this spacecraft trajectory into an Orbit trajectory, loosing all references to the spacecraft
