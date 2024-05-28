@@ -372,7 +372,7 @@ impl Spacecraft {
 impl PartialEq for Spacecraft {
     fn eq(&self, other: &Self) -> bool {
         let mass_tol = 1e-6; // milligram
-        self.orbit == other.orbit
+        self.orbit.eq_within(&other.orbit, 1e-9, 1e-12)
             && (self.dry_mass_kg - other.dry_mass_kg).abs() < mass_tol
             && (self.fuel_mass_kg - other.fuel_mass_kg).abs() < mass_tol
             && self.srp == other.srp
