@@ -263,81 +263,70 @@ impl Spacecraft {
         }
     }
 
-    pub fn with_dv_km_s(self, dv_km_s: Vector3<f64>) -> Self {
-        let mut me = self;
-        me.orbit.apply_dv_km_s(dv_km_s);
-        me
+    pub fn with_dv_km_s(mut self, dv_km_s: Vector3<f64>) -> Self {
+        self.orbit.apply_dv_km_s(dv_km_s);
+        self
     }
 
     /// Returns a copy of the state with a new dry mass
-    pub fn with_dry_mass(self, dry_mass_kg: f64) -> Self {
-        let mut me = self;
-        me.dry_mass_kg = dry_mass_kg;
-        me
+    pub fn with_dry_mass(mut self, dry_mass_kg: f64) -> Self {
+        self.dry_mass_kg = dry_mass_kg;
+        self
     }
 
     /// Returns a copy of the state with a new fuel mass
-    pub fn with_fuel_mass(self, fuel_mass_kg: f64) -> Self {
-        let mut me = self;
-        me.fuel_mass_kg = fuel_mass_kg;
-        me
+    pub fn with_fuel_mass(mut self, fuel_mass_kg: f64) -> Self {
+        self.fuel_mass_kg = fuel_mass_kg;
+        self
     }
 
     /// Returns a copy of the state with a new SRP area and CR
-    pub fn with_srp(self, srp_area_m2: f64, cr: f64) -> Self {
-        let mut me = self;
-        me.srp = SrpConfig {
+    pub fn with_srp(mut self, srp_area_m2: f64, cr: f64) -> Self {
+        self.srp = SrpConfig {
             area_m2: srp_area_m2,
             cr,
         };
 
-        me
+        self
     }
 
     /// Returns a copy of the state with a new SRP area
-    pub fn with_srp_area(self, srp_area_m2: f64) -> Self {
-        let mut me = self;
-        me.srp.area_m2 = srp_area_m2;
-        me
+    pub fn with_srp_area(mut self, srp_area_m2: f64) -> Self {
+        self.srp.area_m2 = srp_area_m2;
+        self
     }
 
     /// Returns a copy of the state with a new coefficient of reflectivity
-    pub fn with_cr(self, cr: f64) -> Self {
-        let mut me = self;
-        me.srp.cr = cr;
-        me
+    pub fn with_cr(mut self, cr: f64) -> Self {
+        self.srp.cr = cr;
+        self
     }
 
     /// Returns a copy of the state with a new drag area and CD
-    pub fn with_drag(self, drag_area_m2: f64, cd: f64) -> Self {
-        let mut me = self;
-        me.drag = DragConfig {
+    pub fn with_drag(mut self, drag_area_m2: f64, cd: f64) -> Self {
+        self.drag = DragConfig {
             area_m2: drag_area_m2,
             cd,
         };
-        me
+        self
     }
 
     /// Returns a copy of the state with a new SRP area
-    pub fn with_drag_area(self, drag_area_m2: f64) -> Self {
-        let mut me = self;
-        me.drag.area_m2 = drag_area_m2;
-        me
+    pub fn with_drag_area(mut self, drag_area_m2: f64) -> Self {
+        self.drag.area_m2 = drag_area_m2;
+        self
     }
 
     /// Returns a copy of the state with a new coefficient of drag
-    pub fn with_cd(self, cd: f64) -> Self {
-        let mut me = self;
-        me.drag.cd = cd;
-        me
+    pub fn with_cd(mut self, cd: f64) -> Self {
+        self.drag.cd = cd;
+        self
     }
 
     /// Returns a copy of the state with a new orbit
-    pub fn with_orbit(self, orbit: Orbit) -> Self {
-        let mut me = self;
-        me.orbit = orbit;
-        me.stm = Some(OMatrix::<f64, Const<9>, Const<9>>::identity());
-        me
+    pub fn with_orbit(mut self, orbit: Orbit) -> Self {
+        self.orbit = orbit;
+        self
     }
 
     /// Returns the root sum square error between this spacecraft and the other, in kilometers for the position, kilometers per second in velocity, and kilograms in fuel
@@ -355,10 +344,9 @@ impl Spacecraft {
     }
 
     /// Copies the current state but sets the STM to identity
-    pub fn with_stm(self) -> Self {
-        let mut me = self;
-        me.enable_stm();
-        me
+    pub fn with_stm(mut self) -> Self {
+        self.enable_stm();
+        self
     }
 
     /// Returns the total mass in kilograms
@@ -367,10 +355,9 @@ impl Spacecraft {
     }
 
     /// Returns a copy of the state with the provided guidance mode
-    pub fn with_guidance_mode(self, mode: GuidanceMode) -> Self {
-        let mut me = self;
-        me.mode = mode;
-        me
+    pub fn with_guidance_mode(mut self, mode: GuidanceMode) -> Self {
+        self.mode = mode;
+        self
     }
 
     pub fn mode(&self) -> GuidanceMode {
@@ -787,15 +774,14 @@ impl Add<OVector<f64, Const<6>>> for Spacecraft {
     type Output = Self;
 
     /// Adds the provided state deviation to this orbit
-    fn add(self, other: OVector<f64, Const<6>>) -> Self {
+    fn add(mut self, other: OVector<f64, Const<6>>) -> Self {
         let radius_km = other.fixed_rows::<3>(0).into_owned();
         let vel_km_s = other.fixed_rows::<3>(3).into_owned();
 
-        let mut me = self;
-        me.orbit.radius_km += radius_km;
-        me.orbit.velocity_km_s += vel_km_s;
+        self.orbit.radius_km += radius_km;
+        self.orbit.velocity_km_s += vel_km_s;
 
-        me
+        self
     }
 }
 
@@ -803,18 +789,17 @@ impl Add<OVector<f64, Const<9>>> for Spacecraft {
     type Output = Self;
 
     /// Adds the provided state deviation to this orbit
-    fn add(self, other: OVector<f64, Const<9>>) -> Self {
+    fn add(mut self, other: OVector<f64, Const<9>>) -> Self {
         let radius_km = other.fixed_rows::<3>(0).into_owned();
         let vel_km_s = other.fixed_rows::<3>(3).into_owned();
 
-        let mut me = self;
-        me.orbit.radius_km += radius_km;
-        me.orbit.velocity_km_s += vel_km_s;
-        me.srp.cr += other[6];
-        me.drag.cd += other[7];
-        me.fuel_mass_kg += other[8];
+        self.orbit.radius_km += radius_km;
+        self.orbit.velocity_km_s += vel_km_s;
+        self.srp.cr += other[6];
+        self.drag.cd += other[7];
+        self.fuel_mass_kg += other[8];
 
-        me
+        self
     }
 }
 

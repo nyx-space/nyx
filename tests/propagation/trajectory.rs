@@ -414,10 +414,23 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
 
     // And let's convert into another frame and back to check the error
     let ephem_luna = traj.to_frame(MOON_J2000, almanac.clone()).unwrap();
+    println!("{}", ephem_luna.states[0]);
     // And convert back, to see the error this leads to
-    let ephem_back_to_earth = ephem_luna.to_frame(eme2k, almanac.clone()).unwrap();
+    let ephem_back_to_earth = ephem_luna.to_frame(EARTH_J2000, almanac.clone()).unwrap();
 
     // This checks that we have exactly the same states after a conversion back to the original frame.
+    for (sno, (state_0, state_1)) in traj
+        .states
+        .iter()
+        .zip(ephem_back_to_earth.states.iter())
+        .enumerate()
+    {
+        assert_eq!(
+            state_0, state_1,
+            "#{sno} differ:\nWANT: {state_0}\nGOT:  {state_1}"
+        );
+    }
+
     assert_eq!(
         traj, ephem_back_to_earth,
         "Expecting exactly the same data returned after converting back"

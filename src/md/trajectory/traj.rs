@@ -558,10 +558,11 @@ where
             for state in &other
                 .states
                 .iter()
+                .copied()
                 .filter(|s| s.epoch() > self.last().epoch())
-                .collect::<Vec<&S>>()
+                .collect::<Vec<S>>()
             {
-                me.states.push(**state);
+                me.states.push(*state);
             }
             me.finalize();
 
