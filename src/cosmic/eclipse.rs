@@ -140,10 +140,13 @@ impl fmt::Display for EclipseLocator {
 impl EclipseLocator {
     /// Creates a new typical eclipse locator.
     /// The light source is the Sun, and the shadow bodies are the Earth and the Moon.
-    pub fn cislunar() -> Self {
+    pub fn cislunar(almanac: Arc<Almanac>) -> Self {
+        // TODO(ANISE): Can I replace this with not a frame but just the planetary data that si fetched at run-time?
+        let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+        let moon_j2k = almanac.frame_from_uid(MOON_J2000).unwrap();
         Self {
-            light_source: SUN_J2000,
-            shadow_bodies: vec![EARTH_J2000, MOON_J2000],
+            light_source: almanac.frame_from_uid(SUN_J2000).unwrap(),
+            shadow_bodies: vec![eme2k, moon_j2k],
         }
     }
 

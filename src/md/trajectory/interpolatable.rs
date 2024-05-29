@@ -54,7 +54,7 @@ where
 }
 
 impl Interpolatable for Spacecraft {
-    fn interpolate(self, epoch: Epoch, states: &[Self]) -> Self {
+    fn interpolate(mut self, epoch: Epoch, states: &[Self]) -> Self {
         // Interpolate the Orbit first
         // Statically allocated arrays of the maximum number of samples
         let mut epochs_tdb = [0.0; INTERPOLATION_SAMPLES + 1];
@@ -105,7 +105,7 @@ impl Interpolatable for Spacecraft {
             / (states.last().unwrap().epoch().to_tdb_seconds()
                 - states.first().unwrap().epoch().to_tdb_seconds());
 
-        let mut me = self.with_orbit(Orbit::new(
+        self.orbit = Orbit::new(
             x_km,
             y_km,
             z_km,
@@ -114,11 +114,11 @@ impl Interpolatable for Spacecraft {
             vz_km_s,
             epoch,
             self.orbit.frame,
-        ));
-        me.fuel_mass_kg += fuel_kg_dt
+        );
+        self.fuel_mass_kg += fuel_kg_dt
             * (epoch.to_tdb_seconds() - states.first().unwrap().epoch().to_tdb_seconds());
 
-        me
+        self
     }
 
     fn frame(&self) -> Frame {

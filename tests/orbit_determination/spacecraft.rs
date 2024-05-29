@@ -139,7 +139,7 @@ fn od_val_sc_mb_srp_reals_duals_models(almanac: Arc<Almanac>) {
         ),
     ]);
 
-    traj.to_parquet(path.clone(), Some(vec![&event]), cfg)
+    traj.to_parquet(path.clone(), Some(vec![&event]), cfg, almanac.clone())
         .unwrap();
 
     // Simulate tracking data

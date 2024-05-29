@@ -133,8 +133,11 @@ fn traj_ephem_forward(almanac: Arc<Almanac>) {
     let exported_path = ephem
         .to_parquet(
             path,
-            Some(vec![&EclipseLocator::cislunar().to_penumbra_event()]),
+            Some(vec![
+                &EclipseLocator::cislunar(almanac.clone()).to_penumbra_event()
+            ]),
             ExportCfg::timestamped(),
+            almanac.clone(),
         )
         .unwrap();
 
@@ -417,7 +420,6 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
     // And convert back, to see the error this leads to
     let ephem_back_to_earth = ephem_luna.to_frame(eme2k, almanac.clone()).unwrap();
 
-    // This checks that we have exactly the same states after a conversion back to the original frame.
     assert_eq!(
         traj, ephem_back_to_earth,
         "Expecting exactly the same data returned after converting back"
@@ -427,6 +429,8 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
     let mut max_pos_err = (eval_state.orbit.radius_km - conv_state.orbit.radius_km).norm();
     let mut max_vel_err = (eval_state.orbit.velocity_km_s - conv_state.orbit.velocity_km_s).norm();
 
+    // TODO(ANISE): This test fails for a strange reason. I don't understand why it fails.
+    // All of the states match within nanometers, and all of the epochs also match. Yet, the interpolation seems to be off?
     for conv_state in ephem_back_to_earth.every(5 * Unit::Minute) {
         let eval_state = traj.at(conv_state.epoch()).unwrap();
 
@@ -439,11 +443,14 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
             eval_state.epoch() - conv_state.epoch()
         );
 
-        let pos_err = (eval_state.orbit.radius_km - conv_state.orbit.radius_km).norm();
+        let pos_err = eval_state.orbit.rss_radius_km(&conv_state.orbit).unwrap();
         if pos_err > max_pos_err {
             max_pos_err = pos_err;
         }
-        let vel_err = (eval_state.orbit.velocity_km_s - conv_state.orbit.velocity_km_s).norm();
+        let vel_err = eval_state
+            .orbit
+            .rss_velocity_km_s(&conv_state.orbit)
+            .unwrap();
         if vel_err > max_vel_err {
             max_vel_err = vel_err;
         }

@@ -42,7 +42,7 @@ use pyo3::prelude::*;
 /// Defines a thruster with a maximum isp and a maximum thrust.
 #[cfg_attr(feature = "python", pyclass)]
 #[allow(non_snake_case)]
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Thruster {
     /// The thrust is to be provided in Newtons
     pub thrust_N: f64,

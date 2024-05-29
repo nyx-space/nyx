@@ -243,7 +243,7 @@ fn od_tb_val_with_arc(almanac: Arc<Almanac>) {
     ]
     .iter()
     .collect();
-    traj.to_parquet_simple(path).unwrap();
+    traj.to_parquet_simple(path, almanac.clone()).unwrap();
 
     // Load the tracking configs
     let trkconfig_yaml: PathBuf = [

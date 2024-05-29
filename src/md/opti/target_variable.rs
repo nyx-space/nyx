@@ -167,28 +167,24 @@ impl Variable {
         Ok(())
     }
 
-    pub fn with_initial_guess(self, guess: f64) -> Self {
-        let mut me = self;
-        me.init_guess = guess;
-        me
+    pub fn with_initial_guess(mut self, guess: f64) -> Self {
+        self.init_guess = guess;
+        self
     }
 
-    pub fn with_pert(self, pert: f64) -> Self {
-        let mut me = self;
-        me.perturbation = pert;
-        me
+    pub fn with_pert(mut self, pert: f64) -> Self {
+        self.perturbation = pert;
+        self
     }
 
-    pub fn with_min(self, min_val: f64) -> Self {
-        let mut me = self;
-        me.min_value = min_val;
-        me
+    pub fn with_min(mut self, min_val: f64) -> Self {
+        self.min_value = min_val;
+        self
     }
 
-    pub fn with_max(self, max_val: f64) -> Self {
-        let mut me = self;
-        me.max_value = max_val;
-        me
+    pub fn with_max(mut self, max_val: f64) -> Self {
+        self.max_value = max_val;
+        self
     }
 
     /// Ensure that `val` is within the variable bounds

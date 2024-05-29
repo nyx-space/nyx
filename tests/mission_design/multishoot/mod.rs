@@ -107,6 +107,7 @@ fn alt_orbit_raising(almanac: Arc<Almanac>) {
         traj.to_parquet_with_step(
             output_path.join(format!("multishoot_to_node_{i}.parquet")),
             2 * Unit::Second,
+            almanac.clone(),
         )
         .unwrap();
         if i > 0 {
@@ -150,6 +151,7 @@ fn alt_orbit_raising(almanac: Arc<Almanac>) {
         .to_parquet_with_step(
             output_path.join("multishoot_start.parquet"),
             2 * Unit::Second,
+            almanac.clone(),
         )
         .unwrap();
 
@@ -161,6 +163,7 @@ fn alt_orbit_raising(almanac: Arc<Almanac>) {
         .to_parquet_with_step(
             output_path.join("multishoot_target.parquet"),
             2 * Unit::Second,
+            almanac.clone(),
         )
         .unwrap();
 
@@ -174,6 +177,7 @@ fn alt_orbit_raising(almanac: Arc<Almanac>) {
         .to_parquet_with_step(
             output_path.join("multishoot_to_end.parquet"),
             2 * Unit::Second,
+            almanac.clone(),
         )
         .unwrap();
 
@@ -282,6 +286,7 @@ fn vmag_orbit_raising(almanac: Arc<Almanac>) {
         traj.to_parquet_with_step(
             output_path.join(format!("multishoot_to_node_{i}.parquet")),
             2 * Unit::Second,
+            almanac.clone(),
         )
         .unwrap();
         if i > 0 {
@@ -340,6 +345,7 @@ fn vmag_orbit_raising(almanac: Arc<Almanac>) {
         .to_parquet_with_step(
             output_path.join("multishoot_start.parquet"),
             2 * Unit::Second,
+            almanac.clone(),
         )
         .unwrap();
 
@@ -351,6 +357,7 @@ fn vmag_orbit_raising(almanac: Arc<Almanac>) {
         .to_parquet_with_step(
             output_path.join("multishoot_to_target.parquet"),
             2 * Unit::Second,
+            almanac.clone(),
         )
         .unwrap();
 
@@ -361,7 +368,11 @@ fn vmag_orbit_raising(almanac: Arc<Almanac>) {
         .unwrap();
 
     end_traj
-        .to_parquet_with_step(output_path.join("multishoot_end.parquet"), 2 * Unit::Second)
+        .to_parquet_with_step(
+            output_path.join("multishoot_end.parquet"),
+            2 * Unit::Second,
+            almanac.clone(),
+        )
         .unwrap();
 
     // Check that error is 50km or less. That isn't great, but I blame that on the scenario and the final node being optimized.
@@ -390,7 +401,7 @@ fn vmag_orbit_raising(almanac: Arc<Almanac>) {
     );
 
     for (i, traj) in multishoot_sol
-        .build_trajectories(&prop, almanac)
+        .build_trajectories(&prop, almanac.clone())
         .unwrap()
         .iter()
         .enumerate()
@@ -398,6 +409,7 @@ fn vmag_orbit_raising(almanac: Arc<Almanac>) {
         traj.to_parquet_with_step(
             &format!("multishoot_to_node_{}.parquet", i),
             2 * Unit::Second,
+            almanac.clone(),
         )
         .unwrap();
     }

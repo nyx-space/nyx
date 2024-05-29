@@ -360,12 +360,12 @@ fn qlaw_as_ruggiero_case_f(almanac: Arc<Almanac>) {
     let setup =
         Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second));
     let (final_state, traj) = setup
-        .with(sc_state, almanac)
+        .with(sc_state, almanac.clone())
         .for_duration_with_traj(prop_time)
         .unwrap();
 
     // Save as parquet
-    traj.to_parquet_simple("output_data/rugg_case_f.parquet")
+    traj.to_parquet_simple("output_data/rugg_case_f.parquet", almanac)
         .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
