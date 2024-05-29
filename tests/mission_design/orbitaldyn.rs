@@ -119,12 +119,14 @@ fn val_two_body_dynamics(almanac: Arc<Almanac>) {
     let mut prop = setup.with(state.into(), almanac);
     prop.for_duration(prop_time).unwrap();
 
+    let details = prop.details;
+
     println!("==> val_two_body_dynamics absolute errors");
     let delta = prop.state.orbit.to_cartesian_pos_vel() - rslt.to_cartesian_pos_vel();
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());
     }
-    println!();
+    println!("\nFinal step info {details}");
 
     assert_orbit_eq_or_abs(&prop.state.orbit, &rslt, 2e-9, "two body prop failed");
 

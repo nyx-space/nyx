@@ -488,20 +488,20 @@ impl State for Spacecraft {
     /// Vector is expected to be organized as such:
     /// [X, Y, Z, Vx, Vy, Vz, Cr, Cd, Fuel mass, STM(9x9)]
     fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Const<90>>) {
-        self.set_epoch(epoch);
         let sc_state =
             OVector::<f64, Self::Size>::from_column_slice(&vector.as_slice()[..Self::Size::dim()]);
-        let sc_full_stm = OMatrix::<f64, Self::Size, Self::Size>::from_column_slice(
-            &vector.as_slice()[Self::Size::dim()..],
-        );
 
         if self.stm.is_some() {
+            let sc_full_stm = OMatrix::<f64, Self::Size, Self::Size>::from_column_slice(
+                &vector.as_slice()[Self::Size::dim()..],
+            );
+
             self.stm = Some(sc_full_stm);
         }
 
-        // Extract the orbit information
         let radius_km = sc_state.fixed_rows::<3>(0).into_owned();
         let vel_km_s = sc_state.fixed_rows::<3>(3).into_owned();
+        self.orbit.epoch = epoch;
         self.orbit.radius_km = radius_km;
         self.orbit.velocity_km_s = vel_km_s;
         self.srp.cr = sc_state[6];
