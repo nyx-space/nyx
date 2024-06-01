@@ -53,11 +53,12 @@ impl Traj<Spacecraft> {
         let start_instant = Instant::now();
         let mut traj = Self::new();
         for state in &self.states {
-            let new_orbit = almanac
-                .transform_to(state.orbit, new_frame, None)
-                .with_context(|_| FromAlmanacSnafu {
-                    action: "transforming trajectory into new frame",
-                })?;
+            let new_orbit =
+                almanac
+                    .transform_to(state.orbit, new_frame, None)
+                    .context(FromAlmanacSnafu {
+                        action: "transforming trajectory into new frame",
+                    })?;
             let mut new_state = state.with_orbit(new_orbit);
             new_state.orbit.frame = new_frame;
             traj.states.push(new_state);

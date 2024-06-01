@@ -88,16 +88,16 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
         let pre_sc = prop
             .with(spacecraft)
             .for_duration(-60.0 * Unit::Minute)
-            .with_context(|_| PropSnafu)?;
+            .context(PropSnafu)?;
         let (_, pre_traj) = prop
             .with(pre_sc)
             .until_epoch_with_traj(impulse_epoch)
-            .with_context(|_| PropSnafu)?;
+            .context(PropSnafu)?;
         // Post-traj is the trajectory _after_ the impulsive maneuver
         let (_, post_traj) = prop
             .with(spacecraft.with_dv(dv))
             .for_duration_with_traj(60.0 * Unit::Minute)
-            .with_context(|_| PropSnafu)?;
+            .context(PropSnafu)?;
 
         println!("{pre_traj}");
         println!("{post_traj}");
@@ -121,10 +121,10 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
         // The objectives will be updated if the duration of the maneuver is changed
         let mut sc_x0 = pre_traj
             .at(mnvr.start)
-            .with_context(|_| TargetingTrajSnafu)?;
+            .context(TargetingTrajSnafu)?;
         let mut sc_xf_desired = post_traj
             .at(mnvr.end)
-            .with_context(|_| TargetingTrajSnafu)?;
+            .context(TargetingTrajSnafu)?;
         let mut objectives = [
             Objective {
                 parameter: StateParameter::X,
@@ -202,7 +202,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
             let sc_xf_achieved = prop
                 .with(sc_x0.with_guidance_mode(GuidanceMode::Thrust))
                 .until_epoch(mnvr.end)
-                .with_context(|_| PropSnafu)?;
+                .context(PropSnafu)?;
 
             println!("#{it} INIT: {sc_x0}\nAchieved: {sc_xf_achieved}\nDesired: {sc_xf_desired}");
 
@@ -411,10 +411,10 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
             if update_obj {
                 sc_x0 = pre_traj
                     .at(mnvr.start)
-                    .with_context(|_| TargetingTrajSnafu)?;
+                    .context(TargetingTrajSnafu)?;
                 sc_xf_desired = post_traj
                     .at(mnvr.end)
-                    .with_context(|_| TargetingTrajSnafu)?;
+                    .context(TargetingTrajSnafu)?;
                 objectives = [
                     Objective::within_tolerance(StateParameter::X, sc_xf_desired.orbit.x_km, 1e-3),
                     Objective::within_tolerance(StateParameter::Y, sc_xf_desired.orbit.y_km, 1e-3),

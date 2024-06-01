@@ -152,43 +152,35 @@ impl OrbitDual {
             StateParameter::HY => Ok(self.hy()),
             StateParameter::HZ => Ok(self.hz()),
             StateParameter::Hmag => Ok(self.hmag()),
-            StateParameter::Energy => Ok(self.energy().with_context(|_| AstroPhysicsSnafu)?),
-            StateParameter::SMA => Ok(self.sma().with_context(|_| AstroPhysicsSnafu)?),
-            StateParameter::Eccentricity => Ok(self.ecc().with_context(|_| AstroPhysicsSnafu)?),
+            StateParameter::Energy => Ok(self.energy().context(AstroPhysicsSnafu)?),
+            StateParameter::SMA => Ok(self.sma().context(AstroPhysicsSnafu)?),
+            StateParameter::Eccentricity => Ok(self.ecc().context(AstroPhysicsSnafu)?),
             StateParameter::Inclination => Ok(self.inc()),
-            StateParameter::AoP => Ok(self.aop().with_context(|_| AstroPhysicsSnafu)?),
-            StateParameter::AoL => Ok(self.aol().with_context(|_| AstroPhysicsSnafu)?),
+            StateParameter::AoP => Ok(self.aop().context(AstroPhysicsSnafu)?),
+            StateParameter::AoL => Ok(self.aol().context(AstroPhysicsSnafu)?),
             StateParameter::RAAN => Ok(self.raan()),
-            StateParameter::Periapsis => {
-                Ok(self.periapsis().with_context(|_| AstroPhysicsSnafu)?)
-            }
-            StateParameter::Apoapsis => Ok(self.apoapsis().with_context(|_| AstroPhysicsSnafu)?),
-            StateParameter::TrueLongitude => {
-                Ok(self.tlong().with_context(|_| AstroPhysicsSnafu)?)
-            }
-            StateParameter::FlightPathAngle => {
-                Ok(self.fpa().with_context(|_| AstroPhysicsSnafu)?)
-            }
-            StateParameter::MeanAnomaly => Ok(self.ma().with_context(|_| AstroPhysicsSnafu)?),
-            StateParameter::EccentricAnomaly => {
-                Ok(self.ea().with_context(|_| AstroPhysicsSnafu)?)
-            }
+            StateParameter::Periapsis => Ok(self.periapsis().context(AstroPhysicsSnafu)?),
+            StateParameter::Apoapsis => Ok(self.apoapsis().context(AstroPhysicsSnafu)?),
+            StateParameter::TrueLongitude => Ok(self.tlong().context(AstroPhysicsSnafu)?),
+            StateParameter::FlightPathAngle => Ok(self.fpa().context(AstroPhysicsSnafu)?),
+            StateParameter::MeanAnomaly => Ok(self.ma().context(AstroPhysicsSnafu)?),
+            StateParameter::EccentricAnomaly => Ok(self.ea().context(AstroPhysicsSnafu)?),
             StateParameter::GeodeticHeight => {
-                Ok(self.geodetic_height().with_context(|_| AstroPhysicsSnafu)?)
+                Ok(self.geodetic_height().context(AstroPhysicsSnafu)?)
             }
-            StateParameter::GeodeticLatitude => Ok(self
-                .geodetic_latitude()
-                .with_context(|_| AstroPhysicsSnafu)?),
+            StateParameter::GeodeticLatitude => {
+                Ok(self.geodetic_latitude().context(AstroPhysicsSnafu)?)
+            }
             StateParameter::GeodeticLongitude => Ok(self.geodetic_longitude()),
-            StateParameter::C3 => Ok(self.c3().with_context(|_| AstroPhysicsSnafu)?),
+            StateParameter::C3 => Ok(self.c3().context(AstroPhysicsSnafu)?),
             StateParameter::RightAscension => Ok(self.right_ascension()),
             StateParameter::Declination => Ok(self.declination()),
             StateParameter::HyperbolicAnomaly => self.hyperbolic_anomaly(),
             StateParameter::SemiParameter => {
-                Ok(self.semi_parameter().with_context(|_| AstroPhysicsSnafu)?)
+                Ok(self.semi_parameter().context(AstroPhysicsSnafu)?)
             }
             StateParameter::SemiMinorAxis => {
-                Ok(self.semi_minor_axis().with_context(|_| AstroPhysicsSnafu)?)
+                Ok(self.semi_minor_axis().context(AstroPhysicsSnafu)?)
             }
             _ => Err(AstroError::PartialsUndefined),
         }
@@ -646,13 +638,13 @@ impl OrbitDual {
 
     /// Returns the hyperbolic anomaly in degrees between 0 and 360.0
     pub fn hyperbolic_anomaly(&self) -> Result<OrbitPartial, AstroError> {
-        let ecc = self.ecc().with_context(|_| AstroPhysicsSnafu)?;
+        let ecc = self.ecc().context(AstroPhysicsSnafu)?;
         if ecc.real() <= 1.0 {
             Err(AstroError::NotHyperbolic)
         } else {
             let (sin_ta, cos_ta) = self
                 .ta()
-                .with_context(|_| AstroPhysicsSnafu)?
+                .context(AstroPhysicsSnafu)?
                 .dual
                 .to_radians()
                 .sin_cos();

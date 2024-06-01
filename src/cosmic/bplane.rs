@@ -53,14 +53,14 @@ pub struct BPlane {
 impl BPlane {
     /// Returns a newly define B-Plane if the orbit is hyperbolic and already in Dual form
     pub fn from_dual(orbit: OrbitDual) -> Result<Self, AstroError> {
-        if orbit.ecc().with_context(|_| AstroPhysicsSnafu)?.real() <= 1.0 {
+        if orbit.ecc().context(AstroPhysicsSnafu)?.real() <= 1.0 {
             Err(AstroError::NotHyperbolic)
         } else {
             let one = OHyperdual::from(1.0);
             let zero = OHyperdual::from(0.0);
 
-            let e_hat = orbit.evec().with_context(|_| AstroPhysicsSnafu)?
-                / orbit.ecc().with_context(|_| AstroPhysicsSnafu)?.dual;
+            let e_hat = orbit.evec().context(AstroPhysicsSnafu)?
+                / orbit.ecc().context(AstroPhysicsSnafu)?.dual;
             let h_hat = orbit.hvec() / orbit.hmag().dual;
             let n_hat = h_hat.cross(&e_hat);
 
@@ -68,7 +68,7 @@ impl BPlane {
             // let s = e_hat / orbit.ecc() + (1.0 - (1.0 / orbit.ecc()).powi(2)).sqrt() * n_hat;
             // let s_hat = s / s.norm();
 
-            let ecc = orbit.ecc().with_context(|_| AstroPhysicsSnafu)?;
+            let ecc = orbit.ecc().context(AstroPhysicsSnafu)?;
 
             let incoming_asymptote_fact = (one - (one / ecc.dual).powi(2)).sqrt();
 
@@ -84,9 +84,7 @@ impl BPlane {
             // let b_vec = orbit.semi_minor_axis()
             //     * ((1.0 - (1.0 / orbit.ecc()).powi(2)).sqrt() * e_hat
             //         - (1.0 / orbit.ecc() * n_hat));
-            let semi_minor_axis = orbit
-                .semi_minor_axis()
-                .with_context(|_| AstroPhysicsSnafu)?;
+            let semi_minor_axis = orbit.semi_minor_axis().context(AstroPhysicsSnafu)?;
 
             let b_vec = Vector3::new(
                 semi_minor_axis.dual
@@ -342,7 +340,7 @@ pub fn try_achieve_b_plane(
             }
 
             // Build current B Plane
-            let b_plane = BPlane::new(real_orbit).with_context(|_| AstroSnafu)?;
+            let b_plane = BPlane::new(real_orbit).context(AstroSnafu)?;
 
             // Check convergence
             let br_err = target.b_r_km - b_plane.b_dot_r();
@@ -390,7 +388,7 @@ pub fn try_achieve_b_plane(
             }
 
             // Build current B Plane
-            let b_plane = BPlane::new(real_orbit).with_context(|_| AstroSnafu)?;
+            let b_plane = BPlane::new(real_orbit).context(AstroSnafu)?;
 
             // Check convergence
             let br_err = target.b_r_km - b_plane.b_dot_r();

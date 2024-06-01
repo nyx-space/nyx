@@ -347,9 +347,8 @@ impl Dynamics for SpacecraftDynamics {
                     });
                 }
                 let thruster = osc_sc.thruster.unwrap();
-                let thrust_throttle_lvl = guid_law
-                    .throttle(&osc_sc)
-                    .with_context(|_| DynamicsGuidanceSnafu)?;
+                let thrust_throttle_lvl =
+                    guid_law.throttle(&osc_sc).context(DynamicsGuidanceSnafu)?;
                 if !(0.0..=1.0).contains(&thrust_throttle_lvl) {
                     return Err(DynamicsError::DynamicsGuidance {
                         source: GuidanceError::ThrottleRatio {
@@ -358,9 +357,8 @@ impl Dynamics for SpacecraftDynamics {
                     });
                 } else if thrust_throttle_lvl > 0.0 {
                     // Thrust arc
-                    let thrust_inertial = guid_law
-                        .direction(&osc_sc)
-                        .with_context(|_| DynamicsGuidanceSnafu)?;
+                    let thrust_inertial =
+                        guid_law.direction(&osc_sc).context(DynamicsGuidanceSnafu)?;
                     if (thrust_inertial.norm() - 1.0).abs() > NORM_ERR {
                         let (alpha, delta) = ra_dec_from_unit_vector(thrust_inertial);
                         return Err(DynamicsError::DynamicsGuidance {

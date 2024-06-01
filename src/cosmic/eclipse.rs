@@ -194,7 +194,7 @@ impl EventEvaluator<Spacecraft> for UmbraEvent {
         match self
             .e_loc
             .compute(sc.orbit, almanac)
-            .with_context(|_| EventAlmanacSnafu)?
+            .context(EventAlmanacSnafu)?
         {
             EclipseState::Umbra => Ok(0.0),
             EclipseState::Visibilis => Ok(1.0),
@@ -215,7 +215,7 @@ impl EventEvaluator<Spacecraft> for UmbraEvent {
             "{}",
             self.e_loc
                 .compute(state.orbit, almanac)
-                .with_context(|_| EventAlmanacSnafu)?
+                .context(EventAlmanacSnafu)?
         ))
     }
 }
@@ -236,7 +236,7 @@ impl EventEvaluator<Spacecraft> for PenumbraEvent {
         match self
             .e_loc
             .compute(sc.orbit, almanac)
-            .with_context(|_| EventAlmanacSnafu)?
+            .context(EventAlmanacSnafu)?
         {
             EclipseState::Umbra => Ok(0.0),
             EclipseState::Visibilis => Ok(1.0),
@@ -258,7 +258,7 @@ impl EventEvaluator<Spacecraft> for PenumbraEvent {
             "{}",
             self.e_loc
                 .compute(state.orbit, almanac)
-                .with_context(|_| EventAlmanacSnafu)?
+                .context(EventAlmanacSnafu)?
         ))
     }
 }
@@ -273,10 +273,10 @@ pub fn eclipse_state(
     // If the light source's radius is zero, just call the line of sight algorithm
     let ls_mean_eq_radius_km = light_source
         .mean_equatorial_radius_km()
-        .with_context(|_| EphemerisPhysicsSnafu {
+        .context(EphemerisPhysicsSnafu {
             action: "fetching mean equatorial radius of light source",
         })
-        .with_context(|_| EphemerisSnafu {
+        .context(EphemerisSnafu {
             action: "computing eclipse state",
         })?;
 
@@ -315,10 +315,10 @@ pub fn eclipse_state(
 
     let eb_mean_eq_radius_km = eclipsing_body
         .mean_equatorial_radius_km()
-        .with_context(|_| EphemerisPhysicsSnafu {
+        .context(EphemerisPhysicsSnafu {
             action: "fetching mean equatorial radius of eclipsing body",
         })
-        .with_context(|_| EphemerisSnafu {
+        .context(EphemerisSnafu {
             action: "computing eclipse state",
         })?;
 
@@ -392,10 +392,10 @@ pub fn line_of_sight(
 
     let eb_mean_eq_radius_km = eclipsing_body
         .mean_equatorial_radius_km()
-        .with_context(|_| EphemerisPhysicsSnafu {
+        .context(EphemerisPhysicsSnafu {
             action: "fetching mean equatorial radius of eclipsing body",
         })
-        .with_context(|_| EphemerisSnafu {
+        .context(EphemerisSnafu {
             action: "computing eclipse state",
         })?;
 

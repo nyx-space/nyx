@@ -67,8 +67,8 @@ where
         let mut xa = 0.0;
         let mut xb = (xb_e - xa_e).to_seconds();
         // Evaluate the event at both bounds
-        let ya_state = self.at(xa_e).with_context(|_| EventTrajSnafu {})?;
-        let yb_state = self.at(xb_e).with_context(|_| EventTrajSnafu {})?;
+        let ya_state = self.at(xa_e).context(EventTrajSnafu {})?;
+        let yb_state = self.at(xb_e).context(EventTrajSnafu {})?;
         let mut ya = event.eval(&ya_state, almanac.clone())?;
         let mut yb = event.eval(&yb_state, almanac.clone())?;
 
@@ -142,7 +142,7 @@ where
             }
             let next_try = self
                 .at(xa_e + s * Unit::Second)
-                .with_context(|_| EventTrajSnafu {})?;
+                .context(EventTrajSnafu {})?;
             let ys = event.eval(&next_try, almanac.clone())?;
             xd = xc;
             xc = xb;
@@ -151,7 +151,7 @@ where
                 // Root bracketed between a and s
                 let next_try = self
                     .at(xa_e + xa * Unit::Second)
-                    .with_context(|_| EventTrajSnafu {})?;
+                    .context(EventTrajSnafu {})?;
                 let ya_p = event.eval(&next_try, almanac.clone())?;
                 let (_a, _ya, _b, _yb) = arrange(xa, ya_p, s, ys);
                 {
@@ -164,7 +164,7 @@ where
                 // Root bracketed between s and b
                 let next_try = self
                     .at(xa_e + xb * Unit::Second)
-                    .with_context(|_| EventTrajSnafu {})?;
+                    .context(EventTrajSnafu {})?;
                 let yb_p = event.eval(&next_try, almanac.clone())?;
                 let (_a, _ya, _b, _yb) = arrange(s, ys, xb, yb_p);
                 {

@@ -56,7 +56,7 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
         let delta_t = xf.epoch - x0.epoch();
         let xf_bf = almanac
             .transform_to(xf, body_frame, None)
-            .with_context(|_| MultiShootAlmanacSnafu {
+            .context(MultiShootAlmanacSnafu {
                 action: "converting node into the body frame",
             })?;
 
@@ -65,8 +65,8 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
         let (_, traj) = prop
             .with(x0, almanac.clone())
             .for_duration_with_traj(delta_t)
-            .with_context(|_| PropSnafu)
-            .with_context(|_| TargetingSnafu { segment: 0_usize })?;
+            .context(PropSnafu)
+            .context(TargetingSnafu { segment: 0_usize })?;
 
         // Build each node successively (includes xf)
         let mut nodes = Vec::with_capacity(node_count + 1);
@@ -76,44 +76,36 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
         for i in 0..node_count {
             // Compute the position we want.
             let this_epoch = prev_node_epoch + duration_increment;
-            let orbit_point = traj
-                .at(this_epoch)
-                .with_context(|_| MultiShootTrajSnafu)?
-                .orbit;
+            let orbit_point = traj.at(this_epoch).context(MultiShootTrajSnafu)?.orbit;
             // Convert this orbit into the body frame
             let orbit_point_bf = almanac
                 .clone()
                 .transform_to(orbit_point, body_frame, None)
-                .with_context(|_| MultiShootAlmanacSnafu {
+                .context(MultiShootAlmanacSnafu {
                     action: "converting node into the body frame",
                 })?;
 
             // Note that the altitude here might be different, so we scale the altitude change by the current altitude
-            let desired_alt_i = (xf_bf.height_km().with_context(|_| MultiShootPhysicsSnafu)?
-                - orbit_point_bf
-                    .height_km()
-                    .with_context(|_| MultiShootPhysicsSnafu)?)
+            let desired_alt_i = (xf_bf.height_km().context(MultiShootPhysicsSnafu)?
+                - orbit_point_bf.height_km().context(MultiShootPhysicsSnafu)?)
                 / ((node_count - i) as f64).sqrt();
             // Build the node in the body frame and convert that to the original frame
             let node_bf = Orbit::try_latlongalt(
                 orbit_point_bf
                     .latitude_deg()
-                    .with_context(|_| MultiShootPhysicsSnafu)?,
+                    .context(MultiShootPhysicsSnafu)?,
                 orbit_point_bf.longitude_deg(),
-                orbit_point_bf
-                    .height_km()
-                    .with_context(|_| MultiShootPhysicsSnafu)?
-                    + desired_alt_i,
+                orbit_point_bf.height_km().context(MultiShootPhysicsSnafu)? + desired_alt_i,
                 angular_velocity_deg_s,
                 this_epoch,
                 body_frame,
             )
-            .with_context(|_| MultiShootPhysicsSnafu)?;
+            .context(MultiShootPhysicsSnafu)?;
 
             // Convert that back into the inertial frame
             let this_node = almanac
                 .transform_to(node_bf, inertial_frame, None)
-                .with_context(|_| MultiShootAlmanacSnafu {
+                .context(MultiShootAlmanacSnafu {
                     action: "converting node back into the inertial frame",
                 })?
                 .radius_km;

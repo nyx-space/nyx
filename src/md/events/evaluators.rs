@@ -44,7 +44,7 @@ impl EventEvaluator<Spacecraft> for Event {
                 state.with_orbit(
                     almanac
                         .transform_to(state.orbit, frame, None)
-                        .with_context(|_| EventAlmanacSnafu)?,
+                        .context(EventAlmanacSnafu)?,
                 )
             }
         } else {
@@ -54,20 +54,17 @@ impl EventEvaluator<Spacecraft> for Event {
         // Return the parameter centered around the desired value
         match self.parameter {
             StateParameter::Apoapsis => Ok(angled_value(
-                state.orbit.ta_deg().with_context(|_| EventPhysicsSnafu)?,
+                state.orbit.ta_deg().context(EventPhysicsSnafu)?,
                 180.0,
             )),
             StateParameter::Periapsis => Ok(between_pm_x(
-                state.orbit.ta_deg().with_context(|_| EventPhysicsSnafu)?,
+                state.orbit.ta_deg().context(EventPhysicsSnafu)?,
                 180.0,
             )),
             StateParameter::FuelMass => Ok(state.fuel_mass_kg - self.desired_value),
-            _ => Ok(state
-                .value(self.parameter)
-                .with_context(|_| EventStateSnafu {
-                    param: self.parameter,
-                })?
-                - self.desired_value),
+            _ => Ok(state.value(self.parameter).context(EventStateSnafu {
+                param: self.parameter,
+            })? - self.desired_value),
         }
     }
 
@@ -95,11 +92,9 @@ impl EventEvaluator<Spacecraft> for Event {
                 } else {
                     format!(" ({})", self.parameter.unit())
                 };
-                let val = state
-                    .value(self.parameter)
-                    .with_context(|_| EventStateSnafu {
-                        param: self.parameter,
-                    })?;
+                let val = state.value(self.parameter).context(EventStateSnafu {
+                    param: self.parameter,
+                })?;
 
                 Ok(format!("{}{} = {:.3}{}", self.parameter, unit, val, unit))
             }

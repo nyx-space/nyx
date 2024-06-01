@@ -96,7 +96,7 @@ where
             .prop
             .dynamics
             .finally(self.state, self.almanac.clone())
-            .with_context(|_| DynamicsSnafu)?;
+            .context(DynamicsSnafu)?;
 
         let backprop = duration.is_negative();
         if backprop {
@@ -271,7 +271,7 @@ where
         // Now, find the requested event
         let events = traj
             .find(event, self.almanac.clone())
-            .with_context(|_| TrajectoryEventSnafu)?;
+            .context(TrajectoryEventSnafu)?;
         match events.get(trigger) {
             Some(event_state) => Ok((event_state.state, traj)),
             None => Err(PropagationError::NthEventError {
@@ -289,7 +289,7 @@ where
             .prop
             .dynamics
             .finally(self.state, self.almanac.clone())
-            .with_context(|_| DynamicsSnafu)?;
+            .context(DynamicsSnafu)?;
 
         Ok(())
     }
@@ -313,7 +313,7 @@ where
                 .prop
                 .dynamics
                 .eom(0.0, state_vec, state_ctx, self.almanac.clone())
-                .with_context(|_| DynamicsSnafu)?;
+                .context(DynamicsSnafu)?;
             self.k[0] = ki;
             let mut a_idx: usize = 0;
             for i in 0..(self.prop.stages - 1) {
@@ -338,7 +338,7 @@ where
                         state_ctx,
                         self.almanac.clone(),
                     )
-                    .with_context(|_| DynamicsSnafu)?;
+                    .context(DynamicsSnafu)?;
                 self.k[i + 1] = ki;
             }
             // Compute the next state and the error

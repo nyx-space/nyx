@@ -349,36 +349,36 @@ where
         let props = pq_writer(Some(metadata));
 
         let file = File::create(&path_buf)
-            .with_context(|_| StdIOSnafu {
+            .context(StdIOSnafu {
                 action: "creating OD results file",
             })
-            .with_context(|_| ODIOSnafu)?;
+            .context(ODIOSnafu)?;
 
         let mut writer = ArrowWriter::try_new(file, schema.clone(), props)
-            .with_context(|_| ParquetSnafu {
+            .context(ParquetSnafu {
                 action: "exporting OD results",
             })
-            .with_context(|_| ODIOSnafu)?;
+            .context(ODIOSnafu)?;
 
         let batch = RecordBatch::try_new(schema, record)
-            .with_context(|_| ArrowSnafu {
+            .context(ArrowSnafu {
                 action: "writing OD results",
             })
-            .with_context(|_| ODIOSnafu)?;
+            .context(ODIOSnafu)?;
 
         writer
             .write(&batch)
-            .with_context(|_| ParquetSnafu {
+            .context(ParquetSnafu {
                 action: "writing OD results",
             })
-            .with_context(|_| ODIOSnafu)?;
+            .context(ODIOSnafu)?;
 
         writer
             .close()
-            .with_context(|_| ParquetSnafu {
+            .context(ParquetSnafu {
                 action: "closing OD results file",
             })
-            .with_context(|_| ODIOSnafu)?;
+            .context(ODIOSnafu)?;
 
         // Return the path this was written to
         let tock_time = Epoch::now().unwrap() - tick;

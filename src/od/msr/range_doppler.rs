@@ -22,6 +22,7 @@ use crate::linalg::{DefaultAllocator, OMatrix, OVector, Vector2, U2};
 use crate::od::msr::RangeMsr;
 use crate::od::{EstimateFrom, Measurement};
 use crate::{Spacecraft, TimeTagged};
+use anise::astro::AzElRange;
 use arrow::datatypes::{DataType, Field};
 use hifitime::{Epoch, Unit};
 use std::collections::HashMap;
@@ -42,93 +43,58 @@ impl RangeDoppler {
     /// + If the epochs of the two states differ.
     /// + If the frames of the two states differ.
     pub fn one_way(
-        tx: Orbit,
-        rx: Orbit,
+        aer: AzElRange,
         timestamp_noise_s: f64,
         range_noise_km: f64,
         doppler_noise_km_s: f64,
     ) -> Self {
-        assert_eq!(tx.frame, rx.frame, "tx & rx in different frames");
-        assert_eq!(tx.epoch, rx.epoch, "tx & rx states have different times");
-
-        let range_vec_km = tx.radius_km - rx.radius_km;
-        let doppler_km_s =
-            range_vec_km.dot(&(tx.velocity_km_s - rx.velocity_km_s)) / range_vec_km.norm();
-
         Self {
-            epoch: tx.epoch + timestamp_noise_s * Unit::Second,
+            epoch: aer.epoch + timestamp_noise_s * Unit::Second,
             obs: Vector2::new(
-                range_vec_km.norm() + range_noise_km,
-                doppler_km_s + doppler_noise_km_s,
+                aer.range_km + range_noise_km,
+                aer.range_rate_km_s + doppler_noise_km_s,
             ),
         }
     }
 
     /// Initialize a new two-way range and Doppler measurement from the provided states as times t_1 and t_2 and the effective noises.
     ///
-    /// The measurement is time-tagged at realization, i.e. at the end of the integration time.
+    /// The measurement is time-tagged at realization, i.e. at the end of the integration time (plus timestamp noise).
+    ///
+    /// # Noise
+    /// The measurements are not considered to be independent distributed variables. As such, the noises are reduced by a factor of sqrt(2).
     ///
     /// # Panics
     /// + If the epochs of the two states differ.
     /// + If the frames of the two states differ.
     /// + If both epochs are identical.
     pub fn two_way(
-        tx: (Orbit, Orbit),
-        rx: (Orbit, Orbit),
+        aer_t0: AzElRange,
+        aer_t1: AzElRange,
         timestamp_noise_s: f64,
         range_noise_km: f64,
         doppler_noise_km_s: f64,
     ) -> Self {
-        assert_eq!(tx.0.frame, tx.1.frame, "both tx in different frames");
-        assert_ne!(tx.0.epoch, tx.1.epoch, "tx states have identical times");
-        assert_ne!(rx.0.epoch, rx.1.epoch, "rx states have identical times");
         assert_eq!(
-            tx.0.epoch, rx.0.epoch,
-            "tx and rx have different t_1: {} != {}",
-            tx.0.epoch, rx.0.epoch
-        );
-        assert_eq!(
-            tx.1.epoch, rx.1.epoch,
-            "tx and rx have different t_1: {} != {}",
-            tx.1.epoch, rx.1.epoch
+            aer_t0.epoch, aer_t1.epoch,
+            "AER data have different t_1: {} != {}",
+            aer_t0.epoch, aer_t1.epoch
         );
 
-        /*
-        Claude:
-
-        There are a few reasons this two-way method determines range and range-rate using:
-
-        Rx position at t1 (reception time) AND Tx position at t0 (original transmit time)
-
-        Rather than both positions at t1:
-
-            + To properly represent the total delay between transmit and receive
-            + Because the measurement depends on and is constrained to the actual transmit position, regardless of where the transmitter is at reception time
-            + For accurate velocity determination in the correct line-of-sight direction
-            + As an approximation for the signal path over the interval given limited position information
-
-         */
-
-        let range_1_km = (rx.0.radius_km - tx.0.radius_km) * 0.5;
-        let range_12_km = rx.1.radius_km - tx.0.radius_km;
-        let range_2_km = range_12_km * 0.5;
-        let range_km = range_1_km + range_2_km;
-
-        // Compute the average velocity of the receiver over the integration time.
-        let v_rx = (rx.1.velocity_km_s + rx.0.velocity_km_s) * 0.5;
-        let doppler_km_s = range_km.dot(&(v_rx - tx.0.velocity_km_s)) / range_km.norm();
+        let range_km = (aer_t1.range_km - aer_t0.range_km) * 0.5;
+        let doppler_km_s = (aer_t1.range_rate_km_s - aer_t0.range_rate_km_s) * 0.5;
 
         // Time tagged at the realization of this measurement, i.e. at the end of the integration time.
-        let epoch = rx.1.epoch + timestamp_noise_s * Unit::Second;
+        let epoch = aer_t1.epoch + timestamp_noise_s * Unit::Second;
 
         let obs = Vector2::new(
-            range_km.norm() + range_noise_km / 2.0,
-            doppler_km_s + doppler_noise_km_s / 2.0,
+            range_km + range_noise_km / 2.0_f64.sqrt(),
+            doppler_km_s + doppler_noise_km_s / 2.0_f64.sqrt(),
         );
 
         debug!(
-            "two way msr @ {epoch}:\nrx.0 = {}\nrx.1 = {}{obs}",
-            rx.0, rx.1
+            "two way msr @ {epoch}:\naer_t0 = {}\naer_t1 = {}{obs}",
+            aer_t0, aer_t1
         );
 
         Self { epoch, obs }

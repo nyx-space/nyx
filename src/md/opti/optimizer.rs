@@ -285,7 +285,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                 prop.dynamics = prop.dynamics.with_guidance_law(Arc::new(mnvr));
                 prop.with(solution.corrected_state, almanac)
                     .until_epoch_with_traj(solution.achieved_state.epoch())
-                    .with_context(|_| PropSnafu)?
+                    .context(PropSnafu)?
             }
             Err(_) => {
                 // This isn't a finite burn maneuver, let's just apply the correction
@@ -293,7 +293,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                 self.prop
                     .with(solution.corrected_state, almanac)
                     .until_epoch_with_traj(solution.achieved_state.epoch())
-                    .with_context(|_| PropSnafu)?
+                    .context(PropSnafu)?
             }
         };
 
@@ -309,7 +309,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
         // Build the B-Plane once, if needed
         let b_plane = if is_bplane_tgt {
-            Some(BPlane::from_dual(xf_dual).with_context(|_| AstroSnafu)?)
+            Some(BPlane::from_dual(xf_dual).context(AstroSnafu)?)
         } else {
             None
         };
@@ -325,9 +325,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                     _ => unreachable!(),
                 }
             } else {
-                xf_dual
-                    .partial_for(obj.parameter)
-                    .with_context(|_| AstroSnafu)?
+                xf_dual.partial_for(obj.parameter).context(AstroSnafu)?
             };
 
             let param_err = obj.desired_value - partial.real();

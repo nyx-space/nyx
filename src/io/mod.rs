@@ -210,17 +210,17 @@ impl PartialEq for InputOutputError {
     }
 }
 
-// TOD(ANISE): This should use the Trait thing from PyO3
+// TODO(ANISE): This should use the Trait thing from PyO3
 pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {
     /// Builds the configuration representation from the path to a yaml
     fn load<P>(path: P) -> Result<Self, ConfigError>
     where
         P: AsRef<Path>,
     {
-        let file = File::open(path).with_context(|_| ReadSnafu)?;
+        let file = File::open(path).context(ReadSnafu)?;
         let reader = BufReader::new(file);
 
-        serde_yaml::from_reader(reader).with_context(|_| ParseSnafu)
+        serde_yaml::from_reader(reader).context(ParseSnafu)
     }
 
     /// Builds a sequence of "Selves" from the provided path to a yaml
@@ -228,10 +228,10 @@ pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {
     where
         P: AsRef<Path>,
     {
-        let file = File::open(path).with_context(|_| ReadSnafu)?;
+        let file = File::open(path).context(ReadSnafu)?;
         let reader = BufReader::new(file);
 
-        serde_yaml::from_reader(reader).with_context(|_| ParseSnafu)
+        serde_yaml::from_reader(reader).context(ParseSnafu)
     }
 
     /// Builds a map of names to "selves" from the provided path to a yaml
@@ -239,16 +239,16 @@ pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {
     where
         P: AsRef<Path>,
     {
-        let file = File::open(path).with_context(|_| ReadSnafu)?;
+        let file = File::open(path).context(ReadSnafu)?;
         let reader = BufReader::new(file);
 
-        serde_yaml::from_reader(reader).with_context(|_| ParseSnafu)
+        serde_yaml::from_reader(reader).context(ParseSnafu)
     }
 
     /// Builds a sequence of "Selves" from the provided string of a yaml
     fn loads_many(data: &str) -> Result<Vec<Self>, ConfigError> {
         debug!("Loading YAML:\n{data}");
-        serde_yaml::from_str(data).with_context(|_| ParseSnafu)
+        serde_yaml::from_str(data).context(ParseSnafu)
     }
 }
 

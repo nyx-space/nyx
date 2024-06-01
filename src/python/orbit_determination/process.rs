@@ -99,7 +99,7 @@ pub(crate) fn process_tracking_arc(
 
     let mut odp = ODProcess::new(prop_est, kf, trigger, resid_crit, Cosm::de438());
 
-    let concrete_arc = arc.to_tracking_arc().with_context(|_| ODIOSnafu)?;
+    let concrete_arc = arc.to_tracking_arc().context(ODIOSnafu)?;
 
     odp.process_arc::<GroundStation>(&concrete_arc)?;
 

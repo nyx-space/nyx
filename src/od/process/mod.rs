@@ -543,7 +543,7 @@ where
                 let (_, traj_covar) = self
                     .prop
                     .for_duration_with_traj(next_step_size)
-                    .with_context(|_| ODPropSnafu)?;
+                    .context(ODPropSnafu)?;
 
                 for state in traj_covar.states {
                     traj.states.push(S::extract(state));
@@ -684,11 +684,9 @@ where
         loop {
             let mut epoch = self.prop.state.epoch();
             if epoch + self.prop.details.step > end_epoch {
-                self.prop
-                    .until_epoch(end_epoch)
-                    .with_context(|_| ODPropSnafu)?;
+                self.prop.until_epoch(end_epoch).context(ODPropSnafu)?;
             } else {
-                self.prop.for_duration(step).with_context(|_| ODPropSnafu)?;
+                self.prop.for_duration(step).context(ODPropSnafu)?;
             }
 
             // Perform time update

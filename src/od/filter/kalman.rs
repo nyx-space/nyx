@@ -225,7 +225,7 @@ where
     ///
     /// May return a FilterError if the STM was not updated.
     fn time_update(&mut self, nominal_state: T) -> Result<Self::Estimate, ODError> {
-        let stm = nominal_state.stm().with_context(|_| ODDynamicsSnafu)?;
+        let stm = nominal_state.stm().context(ODDynamicsSnafu)?;
         let mut covar_bar = stm * self.prev_estimate.covar * stm.transpose();
 
         // Try to apply an SNC, if applicable
@@ -306,7 +306,7 @@ where
             return Err(ODError::SensitivityNotUpdated);
         }
 
-        let stm = nominal_state.stm().with_context(|_| ODDynamicsSnafu)?;
+        let stm = nominal_state.stm().context(ODDynamicsSnafu)?;
 
         let epoch = nominal_state.epoch();
 

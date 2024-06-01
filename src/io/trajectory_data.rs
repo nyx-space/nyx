@@ -59,7 +59,7 @@ pub struct TrajectoryLoader {
 
 impl TrajectoryLoader {
     pub fn from_parquet<P: AsRef<Path>>(path: P) -> Result<Self, InputOutputError> {
-        let file = File::open(&path).with_context(|_| StdIOSnafu {
+        let file = File::open(&path).context(StdIOSnafu {
             action: "opening trajectory file",
         })?;
 
@@ -116,13 +116,13 @@ impl TrajectoryLoader {
             (StateParameter::FuelMass, false),
         ];
 
-        let file = File::open(&self.path).with_context(|_| StdIOSnafu {
+        let file = File::open(&self.path).context(StdIOSnafu {
             action: "opening output trajectory file",
         })?;
 
         let builder = ParquetRecordBatchReaderBuilder::try_new(file).unwrap();
 
-        let reader = builder.build().with_context(|_| ParquetSnafu {
+        let reader = builder.build().context(ParquetSnafu {
             action: "building output trajectory file",
         })?;
 
