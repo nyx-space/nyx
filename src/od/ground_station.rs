@@ -159,11 +159,13 @@ impl GroundStation {
     /// Computes the azimuth and elevation of the provided object seen from this ground station, both in degrees.
     /// Also returns the ground station's orbit in the frame of the receiver
     pub fn azimuth_elevation_of(&self, rx: Orbit, almanac: &Almanac) -> AlmanacResult<AzElRange> {
-        almanac.azimuth_elevation_range_sez(rx, self.to_orbit(rx.epoch).unwrap())
+        almanac
+            .clone()
+            .azimuth_elevation_range_sez(rx, self.to_orbit(rx.epoch, almanac).unwrap())
     }
 
     /// Return this ground station as an orbit in its current frame
-    pub fn to_orbit(&self, epoch: Epoch) -> PhysicsResult<Orbit> {
+    pub fn to_orbit(&self, epoch: Epoch, almanac: &Almanac) -> PhysicsResult<Orbit> {
         use anise::constants::usual_planetary_constants::MEAN_EARTH_ANGULAR_VELOCITY_DEG_S;
         Orbit::try_latlongalt(
             self.latitude_deg,
@@ -171,7 +173,7 @@ impl GroundStation {
             self.height_km,
             MEAN_EARTH_ANGULAR_VELOCITY_DEG_S,
             epoch,
-            self.frame,
+            almanac.frame_from_uid(self.frame).unwrap(),
         )
     }
 
@@ -275,7 +277,7 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
     }
 
     fn location(&self, epoch: Epoch, frame: Frame, almanac: Arc<Almanac>) -> AlmanacResult<Orbit> {
-        almanac.transform_to(self.to_orbit(epoch).unwrap(), frame, None)
+        almanac.transform_to(self.to_orbit(epoch, &almanac).unwrap(), frame, None)
     }
 
     fn measure_instantaneous(
@@ -332,10 +334,10 @@ where
         Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size> + Allocator<f64, S::VecLength>,
 {
     /// Compute the elevation in the SEZ frame. This call will panic if the frame of the input state does not match that of the ground station.
-    fn eval(&self, rx_gs_frame: &S, _almanac: Arc<Almanac>) -> Result<f64, EventError> {
+    fn eval(&self, rx_gs_frame: &S, almanac: Arc<Almanac>) -> Result<f64, EventError> {
         let dt = rx_gs_frame.epoch();
         // Then, compute the rotation matrix from the body fixed frame of the ground station to its topocentric frame SEZ.
-        let tx_gs_frame = self.to_orbit(dt).unwrap();
+        let tx_gs_frame = self.to_orbit(dt, &almanac).unwrap();
 
         let from = tx_gs_frame.frame.orientation_id * 1_000 + 1;
         let dcm_topo2fixed = tx_gs_frame
