@@ -303,8 +303,8 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
             )))
         } else {
             debug!(
-                "{} (el. mask {:.3} deg), object at {:.3} deg -- no measurement",
-                self.name, self.elevation_mask_deg, aer.elevation_deg
+                "{} {} (el. mask {:.3} deg), object at {:.3} deg -- no measurement",
+                self.name, rx.orbit.epoch, self.elevation_mask_deg, aer.elevation_deg
             );
             Ok(None)
         }
