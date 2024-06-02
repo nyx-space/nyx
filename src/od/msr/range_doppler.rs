@@ -75,11 +75,14 @@ impl RangeDoppler {
         range_noise_km: f64,
         doppler_noise_km_s: f64,
     ) -> Self {
-        assert_eq!(
-            aer_t0.epoch, aer_t1.epoch,
-            "AER data have different t_1: {} != {}",
-            aer_t0.epoch, aer_t1.epoch
-        );
+        if aer_t0.epoch == aer_t1.epoch {
+            return Self::one_way(
+                aer_t1,
+                timestamp_noise_s,
+                range_noise_km,
+                doppler_noise_km_s,
+            );
+        }
 
         let range_km = (aer_t1.range_km - aer_t0.range_km) * 0.5;
         let doppler_km_s = (aer_t1.range_rate_km_s - aer_t0.range_rate_km_s) * 0.5;

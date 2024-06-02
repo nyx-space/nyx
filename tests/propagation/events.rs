@@ -60,7 +60,7 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
     // Find all eclipses!
     let e_loc = EclipseLocator {
         light_source: SUN_J2000,
-        shadow_bodies: vec![EARTH_J2000],
+        shadow_bodies: vec![eme2k],
     };
 
     // Adding this print to confirm that the penumbra calculation continuously increases and then decreases.

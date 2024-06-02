@@ -330,5 +330,5 @@ fn trkconfig_cadence(traj: Traj<Spacecraft>, devices: Vec<GroundStation>, almana
     );
 
     // Regression
-    assert_eq!(arc.measurements.len(), 216);
+    assert_eq!(arc.measurements.len(), 215);
 }
