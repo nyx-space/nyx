@@ -19,7 +19,7 @@
 use anise::almanac::Almanac;
 use anise::constants::frames::{EARTH_J2000, MOON_J2000, SUN_J2000};
 use anise::ephemerides::EphemerisPhysicsSnafu;
-use anise::errors::{AlmanacResult, EphemerisSnafu};
+use anise::errors::{AlmanacError, AlmanacResult, EphemerisSnafu};
 use snafu::ResultExt;
 
 pub use super::{Frame, Orbit, Spacecraft};
@@ -141,7 +141,7 @@ impl EclipseLocator {
     /// Creates a new typical eclipse locator.
     /// The light source is the Sun, and the shadow bodies are the Earth and the Moon.
     pub fn cislunar(almanac: Arc<Almanac>) -> Self {
-        // TODO(ANISE): Can I replace this with not a frame but just the planetary data that si fetched at run-time?
+        // TODO(ANISE): Can I replace this with not a frame but just the planetary data that is fetched at run-time?
         let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
         let moon_j2k = almanac.frame_from_uid(MOON_J2000).unwrap();
         Self {
@@ -266,11 +266,28 @@ impl EventEvaluator<Spacecraft> for PenumbraEvent {
 /// Computes the umbra/visibilis/penumbra state between between two states accounting for eclipsing of the providing geoid.
 pub fn eclipse_state(
     observer: Orbit,
-    light_source: Frame,
-    eclipsing_body: Frame,
+    mut light_source: Frame,
+    mut eclipsing_body: Frame,
     almanac: &Almanac,
 ) -> AlmanacResult<EclipseState> {
-    // If the light source's radius is zero, just call the line of sight algorithm
+    if light_source.mean_equatorial_radius_km().is_err() {
+        light_source =
+            almanac
+                .frame_from_uid(light_source)
+                .map_err(|e| AlmanacError::GenericError {
+                    err: format!("{e} when fetching light source data ({light_source})"),
+                })?;
+    }
+
+    if eclipsing_body.mean_equatorial_radius_km().is_err() {
+        eclipsing_body =
+            almanac
+                .frame_from_uid(light_source)
+                .map_err(|e| AlmanacError::GenericError {
+                    err: format!("{e} when fetching eclipsing body data ({eclipsing_body})"),
+                })?;
+    }
+
     let ls_mean_eq_radius_km = light_source
         .mean_equatorial_radius_km()
         .context(EphemerisPhysicsSnafu {
@@ -279,6 +296,8 @@ pub fn eclipse_state(
         .context(EphemerisSnafu {
             action: "computing eclipse state",
         })?;
+
+    // If the light source's radius is zero, just call the line of sight algorithm
 
     if ls_mean_eq_radius_km < std::f64::EPSILON {
         // TODO(ANISE): I think I need the opposite data here! Hence the neg!

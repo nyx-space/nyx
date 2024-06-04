@@ -35,7 +35,7 @@ fn empty_estimate() {
     );
     f64_nil!(empty.covar.norm(), "expected covar norm to be nil");
     f64_nil!(
-        empty.stm.diagonal().norm() - 6.0_f64.sqrt(),
+        empty.stm.diagonal().norm() - 9.0_f64.sqrt(),
         "expected STM norm to be sqrt(dim(STM))"
     );
     assert!(empty.predicted, "expected predicted to be true");
