@@ -22,14 +22,14 @@ use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use rstest::*;
 
 #[fixture]
-fn almanac() -> Almanac {
-    use crate::test_almanac;
-    test_almanac()
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
 }
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn multi_thread_monte_carlo_demo(almanac: Almanac) {
+fn multi_thread_monte_carlo_demo(almanac: Arc<Almanac>) {
     /*
     In this demo, we'll be running a 100 runs with the same dynamics and end state, but with a slightly variation in eccentricity.
     */
@@ -76,7 +76,7 @@ fn multi_thread_monte_carlo_demo(almanac: Almanac) {
         .par_iter()
         .for_each_with((setup, almanac), |(setup, almanac), state| {
             let final_state = setup
-                .with(*state, Arc::new(almanac.clone()))
+                .with(*state, almanac.clone())
                 .for_duration(prop_time)
                 .unwrap();
             assert_eq!(end_epoch, final_state.epoch());
