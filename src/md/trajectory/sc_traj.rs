@@ -59,9 +59,7 @@ impl Traj<Spacecraft> {
                     .context(FromAlmanacSnafu {
                         action: "transforming trajectory into new frame",
                     })?;
-            let mut new_state = state.with_orbit(new_orbit);
-            new_state.orbit.frame = new_frame;
-            traj.states.push(new_state);
+            traj.states.push(state.with_orbit(new_orbit));
         }
         traj.finalize();
 
