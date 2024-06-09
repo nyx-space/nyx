@@ -276,7 +276,7 @@ where
             for event in events {
                 let mut data = Float64Builder::new();
                 for s in &states {
-                    data.append_value(event.eval(s, almanac.clone()).map_err(|e| Box::new(e))?);
+                    data.append_value(event.eval(s, almanac.clone()).map_err(Box::new)?);
                 }
                 record.push(Arc::new(data.finish()));
             }

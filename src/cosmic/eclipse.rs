@@ -442,20 +442,47 @@ pub fn line_of_sight(
 
 #[cfg(test)]
 mod tests {
-    // TODO(ANISE) Switch to RSTEST here for the almanac
     use super::*;
-    use anise::almanac::metaload::MetaAlmanac;
     use hifitime::Epoch;
+    use rstest::*;
 
-    #[test]
-    fn los_edge_case() {
-        let almanac = MetaAlmanac::latest().unwrap();
+    #[fixture]
+    pub fn almanac() -> Almanac {
+        use std::path::PathBuf;
+
+        let manifest_dir =
+            PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string()));
+
+        Almanac::new(
+            &manifest_dir
+                .clone()
+                .join("data/de440s.bsp")
+                .to_string_lossy(),
+        )
+        .unwrap()
+        .load(
+            &manifest_dir
+                .clone()
+                .join("data/pck08.pca")
+                .to_string_lossy(),
+        )
+        .unwrap()
+        .load(
+            &manifest_dir
+                .join("data/earth_latest_high_prec.bpc")
+                .to_string_lossy(),
+        )
+        .unwrap()
+    }
+
+    #[rstest]
+    fn los_edge_case(almanac: Almanac) {
         let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
         let luna = almanac.frame_from_uid(MOON_J2000).unwrap();
 
-        let dt1 = Epoch::from_gregorian_tai(2020, 1, 1, 6, 7, 40, 0);
-        let dt2 = Epoch::from_gregorian_tai(2020, 1, 1, 6, 7, 50, 0);
-        let dt3 = Epoch::from_gregorian_tai(2020, 1, 1, 6, 8, 0, 0);
+        let dt1 = Epoch::from_gregorian_tai_hms(2020, 1, 1, 6, 7, 40);
+        let dt2 = Epoch::from_gregorian_tai_hms(2020, 1, 1, 6, 7, 50);
+        let dt3 = Epoch::from_gregorian_tai_hms(2020, 1, 1, 6, 8, 0);
 
         let xmtr1 = Orbit::new(
             397_477.494_485,
@@ -547,9 +574,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn los_earth_eclipse() {
-        let almanac = MetaAlmanac::latest().unwrap();
+    #[rstest]
+    fn los_earth_eclipse(almanac: Almanac) {
         let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
         let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
