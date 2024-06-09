@@ -42,7 +42,7 @@ impl SolarPressure {
         almanac: Arc<Almanac>,
     ) -> Result<Self, DynamicsError> {
         let e_loc = EclipseLocator {
-            light_source: almanac.frame_from_uid(SUN_J2000).with_context(|_| {
+            light_source: almanac.frame_from_uid(SUN_J2000).context({
                 DynamicsPlanetarySnafu {
                     action: "planetary data from third body not loaded",
                 }
@@ -76,7 +76,7 @@ impl ForceModel for SolarPressure {
         // TODO(ANISE): I think this needs to be flipped as well!
         let r_sun = almanac
             .transform_to(ctx.orbit, self.e_loc.light_source, None)
-            .with_context(|_| DynamicsAlmanacSnafu {
+            .context(DynamicsAlmanacSnafu {
                 action: "transforming state to vector seen from Sun",
             })?
             .radius_km;
@@ -92,7 +92,7 @@ impl ForceModel for SolarPressure {
         let k: f64 = self
             .e_loc
             .compute(osc, almanac)
-            .with_context(|_| DynamicsAlmanacSnafu {
+            .context(DynamicsAlmanacSnafu {
                 action: "solar radiation pressure computation",
             })?
             .into();
@@ -115,7 +115,7 @@ impl ForceModel for SolarPressure {
         // TODO(ANISE): I think this needs to be flipped as well!
         let r_sun = almanac
             .transform_to(ctx.orbit, self.e_loc.light_source, None)
-            .with_context(|_| DynamicsAlmanacSnafu {
+            .context(DynamicsAlmanacSnafu {
                 action: "transforming state to vector seen from Sun",
             })?
             .radius_km;
@@ -134,7 +134,7 @@ impl ForceModel for SolarPressure {
         let k: f64 = self
             .e_loc
             .compute(osc, almanac)
-            .with_context(|_| DynamicsAlmanacSnafu {
+            .context(DynamicsAlmanacSnafu {
                 action: "solar radiation pressure computation",
             })?
             .into();

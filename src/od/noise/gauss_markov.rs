@@ -468,7 +468,7 @@ impl GaussMarkov {
             for item in as_list.iter() {
                 // Check that the item is a dictionary
                 let next: Self =
-                    serde_yaml::from_value(pyany_to_value(item)?).with_context(|_| ParseSnafu)?;
+                    serde_yaml::from_value(pyany_to_value(item)?).context(ParseSnafu)?;
                 selves.push(next);
             }
             Ok(selves)

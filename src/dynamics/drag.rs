@@ -63,7 +63,7 @@ impl ForceModel for ConstantDrag {
     fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
         let osc = almanac
             .transform_to(ctx.orbit, self.drag_frame, None)
-            .with_context(|_| DynamicsAlmanacSnafu {
+            .context(DynamicsAlmanacSnafu {
                 action: "transforming into drag frame",
             })?;
 
@@ -101,7 +101,7 @@ impl Drag {
                 r0: 700_000.0,
                 ref_alt_m: 88_667.0,
             },
-            drag_frame: almanac.frame_from_uid(IAU_EARTH_FRAME).with_context(|_| {
+            drag_frame: almanac.frame_from_uid(IAU_EARTH_FRAME).context({
                 DynamicsPlanetarySnafu {
                     action: "planetary data from third body not loaded",
                 }
@@ -115,7 +115,7 @@ impl Drag {
             density: AtmDensity::StdAtm {
                 max_alt_m: 1_000_000.0,
             },
-            drag_frame: almanac.frame_from_uid(IAU_EARTH_FRAME).with_context(|_| {
+            drag_frame: almanac.frame_from_uid(IAU_EARTH_FRAME).context({
                 DynamicsPlanetarySnafu {
                     action: "planetary data from third body not loaded",
                 }
@@ -140,7 +140,7 @@ impl ForceModel for Drag {
 
         let osc = almanac
             .transform_to(ctx.orbit, self.drag_frame, None)
-            .with_context(|_| DynamicsAlmanacSnafu {
+            .context(DynamicsAlmanacSnafu {
                 action: "transforming into drag frame",
             })?;
 
@@ -162,8 +162,8 @@ impl ForceModel for Drag {
                             + self
                                 .drag_frame
                                 .mean_equatorial_radius_km()
-                                .with_context(|_| AstroPhysicsSnafu)
-                                .with_context(|_| DynamicsAstroSnafu)?))
+                                .context(AstroPhysicsSnafu)
+                                .context(DynamicsAstroSnafu)?))
                         / ref_alt_m)
                         .exp();
 
@@ -171,7 +171,7 @@ impl ForceModel for Drag {
                 // let velocity_integr_frame = self.cosm.frame_chg(&osc, integration_frame).velocity();
                 let velocity_integr_frame = almanac
                     .transform_to(osc, integration_frame, None)
-                    .with_context(|_| DynamicsAlmanacSnafu {
+                    .context(DynamicsAlmanacSnafu {
                         action: "rotating into the integration frame",
                     })?
                     .velocity_km_s;
@@ -186,8 +186,8 @@ impl ForceModel for Drag {
                     - self
                         .drag_frame
                         .mean_equatorial_radius_km()
-                        .with_context(|_| AstroPhysicsSnafu)
-                        .with_context(|_| DynamicsAstroSnafu)?;
+                        .context(AstroPhysicsSnafu)
+                        .context(DynamicsAstroSnafu)?;
                 let rho = if altitude_km > max_alt_m / 1_000.0 {
                     // Use a constant density
                     10.0_f64.powf((-7e-5) * altitude_km - 14.464)
@@ -209,7 +209,7 @@ impl ForceModel for Drag {
                 // let velocity_integr_frame = self.cosm.frame_chg(&osc, integration_frame).velocity();
                 let velocity_integr_frame = almanac
                     .transform_to(osc, integration_frame, None)
-                    .with_context(|_| DynamicsAlmanacSnafu {
+                    .context(DynamicsAlmanacSnafu {
                         action: "rotating into the integration frame",
                     })?
                     .velocity_km_s;

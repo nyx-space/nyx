@@ -57,7 +57,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             .prop
             .with(initial_state, almanac.clone())
             .until_epoch(correction_epoch)
-            .with_context(|_| PropSnafu)?;
+            .context(PropSnafu)?;
 
         debug!("initial_state = {}", initial_state);
         debug!("xi_start = {}", xi_start);
@@ -132,7 +132,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                 .prop
                 .with(xi, almanac.clone())
                 .until_epoch(achievement_epoch)
-                .with_context(|_| PropSnafu)?
+                .context(PropSnafu)?
                 .orbit;
 
             // Check linearization
@@ -147,8 +147,8 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                 Some(frame) => {
                     let orbit_obj_frame = almanac
                         .transform_to(xf, *frame, None)
-                        .with_context(|_| AstroAlmanacSnafu)
-                        .with_context(|_| AstroSnafu)?;
+                        .context(AstroAlmanacSnafu)
+                        .context(AstroSnafu)?;
 
                     OrbitDual::from(orbit_obj_frame)
                 }
@@ -161,7 +161,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
             // Build the B-Plane once, if needed, and always in the objective frame
             let b_plane = if is_bplane_tgt {
-                Some(BPlane::from_dual(xf_dual_obj_frame).with_context(|_| AstroSnafu)?)
+                Some(BPlane::from_dual(xf_dual_obj_frame).context(AstroSnafu)?)
             } else {
                 None
             };
@@ -184,7 +184,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                 } else {
                     xf_dual_obj_frame
                         .partial_for(obj.parameter)
-                        .with_context(|_| AstroSnafu)?
+                        .context(AstroSnafu)?
                 };
 
                 let achieved = xf_partial.real();

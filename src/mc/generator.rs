@@ -85,7 +85,7 @@ where
         self.template
             .clone()
             .set_value(dispersion.param, 0.0)
-            .with_context(|_| StateSnafu)?;
+            .context(StateSnafu)?;
         self.dispersions.push(dispersion);
         Ok(())
     }
@@ -158,7 +158,7 @@ where
         param: StateParameter,
         std_dev: f64,
     ) -> Result<(), MonteCarloError> {
-        self.template.value(param).with_context(|_| StateSnafu)?;
+        self.template.value(param).context(StateSnafu)?;
         self.dispersions
             .push(Dispersion::new(param, Normal::new(0.0, std_dev).unwrap()));
         Ok(())
@@ -202,10 +202,7 @@ where
 
         let mut me: Self = template.into();
 
-        me.add_3std_dev(
-            param,
-            template.value(param).with_context(|_| StateSnafu)? * prct,
-        )?;
+        me.add_3std_dev(param, template.value(param).context(StateSnafu)? * prct)?;
 
         Ok(me)
     }
@@ -223,10 +220,7 @@ where
                 ParamPercentageSnafu { param, prct }
             );
 
-            me.add_3std_dev(
-                param,
-                template.value(param).with_context(|_| StateSnafu)? * prct,
-            )?;
+            me.add_3std_dev(param, template.value(param).context(StateSnafu)? * prct)?;
         }
 
         Ok(me)
@@ -257,10 +251,7 @@ where
                 ParamPercentageSnafu { param, prct }
             );
 
-            me.add_std_dev(
-                param,
-                template.value(param).with_context(|_| StateSnafu)? * prct,
-            )?;
+            me.add_std_dev(param, template.value(param).context(StateSnafu)? * prct)?;
         }
 
         Ok(me)
@@ -292,10 +283,7 @@ where
 
         let mut me: Self = template.into();
 
-        me.add_std_dev(
-            param,
-            template.value(param).with_context(|_| StateSnafu)? * prct,
-        )?;
+        me.add_std_dev(param, template.value(param).context(StateSnafu)? * prct)?;
 
         Ok(me)
     }

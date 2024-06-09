@@ -92,8 +92,8 @@ impl OrbitalDynamics {
         let body_acceleration = (-osc
             .frame
             .mu_km3_s2()
-            .with_context(|_| AstroPhysicsSnafu)
-            .with_context(|_| DynamicsAstroSnafu)?
+            .context(AstroPhysicsSnafu)
+            .context(DynamicsAstroSnafu)?
             / osc.rmag_km().powi(3))
             * osc.radius_km;
 
@@ -139,8 +139,8 @@ impl OrbitalDynamics {
             * (OHyperdual::<f64, Const<7>>::from_real(
                 -osc.frame
                     .mu_km3_s2()
-                    .with_context(|_| AstroPhysicsSnafu)
-                    .with_context(|_| DynamicsAstroSnafu)?,
+                    .context(AstroPhysicsSnafu)
+                    .context(DynamicsAstroSnafu)?,
             ) / rmag.powi(3));
 
         // Extract result into Vector6 and Matrix6
@@ -228,14 +228,14 @@ impl AccelModel for PointMasses {
 
             let third_body_frame = almanac
                 .frame_from_uid(osc.frame.with_ephem(third_body))
-                .with_context(|_| DynamicsPlanetarySnafu {
+                .context(DynamicsPlanetarySnafu {
                     action: "planetary data from third body not loaded",
                 })?;
 
             // Orbit of j-th body as seen from primary body
             let st_ij = almanac
                 .transform(third_body_frame, osc.frame, osc.epoch, self.correction)
-                .with_context(|_| DynamicsAlmanacSnafu {
+                .context(DynamicsAlmanacSnafu {
                     action: "computing third body gravitational pull",
                 })?;
 
@@ -245,8 +245,8 @@ impl AccelModel for PointMasses {
             let r_j3 = r_j.norm().powi(3);
             d_x += -third_body_frame
                 .mu_km3_s2()
-                .with_context(|_| AstroPhysicsSnafu)
-                .with_context(|_| DynamicsAstroSnafu)?
+                .context(AstroPhysicsSnafu)
+                .context(DynamicsAstroSnafu)?
                 * (r_j / r_j3 + r_ij / r_ij3);
         }
         Ok(d_x)
@@ -267,7 +267,7 @@ impl AccelModel for PointMasses {
         for third_body in &self.celestial_objects {
             let third_body_frame = almanac
                 .frame_from_uid(Frame::from_ephem_j2000(*third_body))
-                .with_context(|_| DynamicsPlanetarySnafu {
+                .context(DynamicsPlanetarySnafu {
                     action: "planetary data from third body not loaded",
                 })?;
 
@@ -279,14 +279,14 @@ impl AccelModel for PointMasses {
             let gm_d = OHyperdual::<f64, Const<7>>::from_real(
                 -third_body_frame
                     .mu_km3_s2()
-                    .with_context(|_| AstroPhysicsSnafu)
-                    .with_context(|_| DynamicsAstroSnafu)?,
+                    .context(AstroPhysicsSnafu)
+                    .context(DynamicsAstroSnafu)?,
             );
 
             // Orbit of j-th body as seen from primary body
             let st_ij = almanac
                 .transform(third_body_frame, osc.frame, osc.epoch, self.correction)
-                .with_context(|_| DynamicsAlmanacSnafu {
+                .context(DynamicsAlmanacSnafu {
                     action: "computing third body gravitational pull",
                 })?;
 

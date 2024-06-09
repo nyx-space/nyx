@@ -340,9 +340,10 @@ fn orbit_set_unset_static(almanac: Arc<Almanac>) {
         .with_mu_km3_s2(GMAT_EARTH_GM);
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let mut init = Spacecraft::from(
-        Orbit::keplerian(8000.0, 0.5, 10.0, 5.0, 25.0, 0.0, epoch, eme2k),
-    ).with_stm();
+    let mut init = Spacecraft::from(Orbit::keplerian(
+        8000.0, 0.5, 10.0, 5.0, 25.0, 0.0, epoch, eme2k,
+    ))
+    .with_stm();
 
     // Change STM
     let stm_data = (0..36).map(|x| x as f64).collect::<Vec<f64>>();

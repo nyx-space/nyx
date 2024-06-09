@@ -105,36 +105,33 @@ impl Ruggiero {
 
     /// Returns the efficiency η ∈ [0; 1] of correcting a specific orbital element at the provided osculating orbit
     pub fn efficency(parameter: &StateParameter, osc_orbit: &Orbit) -> Result<f64, GuidanceError> {
-        let e = osc_orbit.ecc().with_context(|_| GuidancePhysicsSnafu {
+        let e = osc_orbit.ecc().context(GuidancePhysicsSnafu {
             action: "computing Ruggiero efficency",
         })?;
 
         let ν_ta = osc_orbit
             .ta_deg()
-            .with_context(|_| GuidancePhysicsSnafu {
+            .context(GuidancePhysicsSnafu {
                 action: "computing Ruggiero efficency",
             })?
             .to_radians();
 
         let ω = osc_orbit
             .aop_deg()
-            .with_context(|_| GuidancePhysicsSnafu {
+            .context(GuidancePhysicsSnafu {
                 action: "computing Ruggiero efficency",
             })?
             .to_radians();
 
         match parameter {
             StateParameter::SMA => {
-                let a = osc_orbit.sma_km().with_context(|_| GuidancePhysicsSnafu {
+                let a = osc_orbit.sma_km().context(GuidancePhysicsSnafu {
                     action: "computing Ruggiero efficency",
                 })?;
 
-                let μ = osc_orbit
-                    .frame
-                    .mu_km3_s2()
-                    .with_context(|_| GuidancePhysicsSnafu {
-                        action: "computing Ruggiero efficency",
-                    })?;
+                let μ = osc_orbit.frame.mu_km3_s2().context(GuidancePhysicsSnafu {
+                    action: "computing Ruggiero efficency",
+                })?;
                 Ok(osc_orbit.vmag_km_s() * ((a * (1.0 - e)) / (μ * (1.0 + e))).sqrt())
             }
             StateParameter::Eccentricity => {
@@ -199,11 +196,7 @@ impl GuidanceLaw for Ruggiero {
     fn achieved(&self, state: &Spacecraft) -> Result<bool, GuidanceError> {
         for obj in self.objectives.iter().flatten() {
             if !obj
-                .assess_raw(
-                    state
-                        .value(obj.parameter)
-                        .with_context(|_| GuidStateSnafu)?,
-                )
+                .assess_raw(state.value(obj.parameter).context(GuidStateSnafu)?)
                 .0
             {
                 return Ok(false);
@@ -223,34 +216,34 @@ impl GuidanceLaw for Ruggiero {
                 }
 
                 // Compute all of the orbital elements here to unclutter the algorithm
-                let ecc = osc.ecc().with_context(|_| GuidancePhysicsSnafu {
+                let ecc = osc.ecc().context(GuidancePhysicsSnafu {
                     action: "computing Ruggiero guidance",
                 })?;
 
                 let ta_rad = osc
                     .ta_deg()
-                    .with_context(|_| GuidancePhysicsSnafu {
+                    .context(GuidancePhysicsSnafu {
                         action: "computing Ruggiero guidance",
                     })?
                     .to_radians();
 
                 let inc_rad = osc
                     .inc_deg()
-                    .with_context(|_| GuidancePhysicsSnafu {
+                    .context(GuidancePhysicsSnafu {
                         action: "computing Ruggiero guidance",
                     })?
                     .to_radians();
 
                 let aop_rad = osc
                     .aop_deg()
-                    .with_context(|_| GuidancePhysicsSnafu {
+                    .context(GuidancePhysicsSnafu {
                         action: "computing Ruggiero guidance",
                     })?
                     .to_radians();
 
                 let ea_rad = osc
                     .ea_deg()
-                    .with_context(|_| GuidancePhysicsSnafu {
+                    .context(GuidancePhysicsSnafu {
                         action: "computing Ruggiero guidance",
                     })?
                     .to_radians();
@@ -290,11 +283,9 @@ impl GuidanceLaw for Ruggiero {
                         // And choose whether to do an in-plane or out of plane thrust
                         if (ta_rad - opti_ta_alpha).abs() < (ta_rad - opti_ta_beta).abs() {
                             // In plane
-                            let p =
-                                osc.semi_parameter_km()
-                                    .with_context(|_| GuidancePhysicsSnafu {
-                                        action: "computing Ruggiero guidance",
-                                    })?;
+                            let p = osc.semi_parameter_km().context(GuidancePhysicsSnafu {
+                                action: "computing Ruggiero guidance",
+                            })?;
                             let (sin_ta, cos_ta) = ta_rad.sin_cos();
                             let alpha = (-p * cos_ta).atan2((p + osc.rmag_km()) * sin_ta);
                             steering += unit_vector_from_plane_angles(alpha, 0.0) * weight;
@@ -318,7 +309,7 @@ impl GuidanceLaw for Ruggiero {
             // Convert to inertial -- this whole guidance law is computed in the RCN frame
             Ok(osc
                 .dcm_from_rcn_to_inertial()
-                .with_context(|_| GuidancePhysicsSnafu {
+                .context(GuidancePhysicsSnafu {
                     action: "computing RCN frame",
                 })?
                 * steering)

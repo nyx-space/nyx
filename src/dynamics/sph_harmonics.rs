@@ -151,7 +151,7 @@ impl AccelModel for Harmonics {
         // Convert the osculating orbit to the correct frame (needed for multiple harmonic fields)
         let state = almanac
             .transform_to(*osc, self.compute_frame, None)
-            .with_context(|_| DynamicsAlmanacSnafu {
+            .context(DynamicsAlmanacSnafu {
                 action: "transforming into gravity field frame",
             })?;
 
@@ -197,14 +197,14 @@ impl AccelModel for Harmonics {
         let eq_radius_km = self
             .compute_frame
             .mean_equatorial_radius_km()
-            .with_context(|_| AstroPhysicsSnafu)
-            .with_context(|_| DynamicsAstroSnafu)?;
+            .context(AstroPhysicsSnafu)
+            .context(DynamicsAstroSnafu)?;
 
         let mu_km3_s2 = self
             .compute_frame
             .mu_km3_s2()
-            .with_context(|_| AstroPhysicsSnafu)
-            .with_context(|_| DynamicsAstroSnafu)?;
+            .context(AstroPhysicsSnafu)
+            .context(DynamicsAstroSnafu)?;
 
         let rho = eq_radius_km / r_;
         let mut rho_np1 = mu_km3_s2 / r_ * rho;
@@ -251,10 +251,10 @@ impl AccelModel for Harmonics {
         // No. Therefore, we do not need to account for the transport theorem here.
         let dcm = almanac
             .rotate_from_to(self.compute_frame, osc.frame, osc.epoch)
-            .with_context(|_| OrientationSnafu {
+            .context(OrientationSnafu {
                 action: "transform state dcm",
             })
-            .with_context(|_| DynamicsAlmanacSnafu {
+            .context(DynamicsAlmanacSnafu {
                 action: "transforming into gravity field frame",
             })?;
 
@@ -269,7 +269,7 @@ impl AccelModel for Harmonics {
         // Convert the osculating orbit to the correct frame (needed for multiple harmonic fields)
         let state = almanac
             .transform_to(*osc, self.compute_frame, None)
-            .with_context(|_| DynamicsAlmanacSnafu {
+            .context(DynamicsAlmanacSnafu {
                 action: "transforming into gravity field frame",
             })?;
 
@@ -317,14 +317,14 @@ impl AccelModel for Harmonics {
         let real_eq_radius_km = self
             .compute_frame
             .mean_equatorial_radius_km()
-            .with_context(|_| AstroPhysicsSnafu)
-            .with_context(|_| DynamicsAstroSnafu)?;
+            .context(AstroPhysicsSnafu)
+            .context(DynamicsAstroSnafu)?;
 
         let real_mu_km3_s2 = self
             .compute_frame
             .mu_km3_s2()
-            .with_context(|_| AstroPhysicsSnafu)
-            .with_context(|_| DynamicsAstroSnafu)?;
+            .context(AstroPhysicsSnafu)
+            .context(DynamicsAstroSnafu)?;
 
         let eq_radius = OHyperdual::<f64, U7>::from(real_eq_radius_km);
         let rho = eq_radius / r_;
@@ -374,10 +374,10 @@ impl AccelModel for Harmonics {
 
         let dcm = almanac
             .rotate_from_to(self.compute_frame, osc.frame, osc.epoch)
-            .with_context(|_| OrientationSnafu {
+            .context(OrientationSnafu {
                 action: "transform state dcm",
             })
-            .with_context(|_| DynamicsAlmanacSnafu {
+            .context(DynamicsAlmanacSnafu {
                 action: "transforming into gravity field frame",
             })?
             .rot_mat;
