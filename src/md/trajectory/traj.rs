@@ -17,7 +17,7 @@
 */
 
 use super::traj_it::TrajIterator;
-use super::{ExportCfg, INTERPOLATION_SAMPLES};
+use super::{ExportCfg, InterpolationSnafu, INTERPOLATION_SAMPLES};
 use super::{Interpolatable, TrajError};
 use crate::errors::NyxError;
 use crate::io::watermark::pq_writer;
@@ -32,6 +32,7 @@ use arrow::array::{Array, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 use parquet::arrow::ArrowWriter;
+use snafu::ResultExt;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
@@ -112,7 +113,9 @@ where
                     states.push(self.states[idx]);
                 }
 
-                Ok(self.states[idx].interpolate(epoch, &states))
+                self.states[idx]
+                    .interpolate(epoch, &states)
+                    .context(InterpolationSnafu)
             }
         }
     }

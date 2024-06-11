@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use anise::math::interpolation::hermite_eval;
+use anise::math::interpolation::{hermite_eval, InterpolationError};
 
 pub(crate) const INTERPOLATION_SAMPLES: usize = 13;
 
@@ -38,7 +38,7 @@ where
         + Allocator<f64, Self::VecLength>,
 {
     /// Interpolates a new state at the provided epochs given a slice of states.
-    fn interpolate(self, epoch: Epoch, states: &[Self]) -> Self;
+    fn interpolate(self, epoch: Epoch, states: &[Self]) -> Result<Self, InterpolationError>;
 
     /// Returns the frame of this state
     fn frame(&self) -> Frame;
@@ -54,7 +54,7 @@ where
 }
 
 impl Interpolatable for Spacecraft {
-    fn interpolate(mut self, epoch: Epoch, states: &[Self]) -> Self {
+    fn interpolate(mut self, epoch: Epoch, states: &[Self]) -> Result<Self, InterpolationError> {
         // Interpolate the Orbit first
         // Statically allocated arrays of the maximum number of samples
         let mut epochs_tdb = [0.0; INTERPOLATION_SAMPLES];
@@ -75,11 +75,11 @@ impl Interpolatable for Spacecraft {
             epochs_tdb[cno] = state.epoch().to_et_seconds();
         }
 
-        let (x_km, vx_km_s) = hermite_eval(&epochs_tdb, &xs, &vxs, epoch.to_et_seconds()).unwrap();
+        let (x_km, vx_km_s) = hermite_eval(&epochs_tdb, &xs, &vxs, epoch.to_et_seconds())?;
 
-        let (y_km, vy_km_s) = hermite_eval(&epochs_tdb, &ys, &vys, epoch.to_et_seconds()).unwrap();
+        let (y_km, vy_km_s) = hermite_eval(&epochs_tdb, &ys, &vys, epoch.to_et_seconds())?;
 
-        let (z_km, vz_km_s) = hermite_eval(&epochs_tdb, &zs, &vzs, epoch.to_et_seconds()).unwrap();
+        let (z_km, vz_km_s) = hermite_eval(&epochs_tdb, &zs, &vzs, epoch.to_et_seconds())?;
 
         self.orbit = Orbit::new(
             x_km,
@@ -100,7 +100,7 @@ impl Interpolatable for Spacecraft {
 
         self.fuel_mass_kg += fuel_kg_dt * (epoch - first.epoch()).to_seconds();
 
-        self
+        Ok(self)
     }
 
     fn frame(&self) -> Frame {

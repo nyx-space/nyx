@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anise::math::interpolation::InterpolationError;
 use snafu::prelude::*;
 
 mod interpolatable;
@@ -33,7 +34,7 @@ pub use crate::io::ExportCfg;
 use super::StateParameter;
 use crate::time::{Duration, Epoch};
 
-#[derive(Clone, PartialEq, Eq, Debug, Snafu)]
+#[derive(Clone, PartialEq, Debug, Snafu)]
 pub enum TrajError {
     #[snafu(display("Event {event} not found between {start} and {end}"))]
     EventNotFound {
@@ -51,4 +52,6 @@ pub enum TrajError {
         req_dur: Duration,
         spline_dur: Duration,
     },
+    #[snafu(display("Interpolation failed: {source}"))]
+    Interpolation { source: InterpolationError },
 }
