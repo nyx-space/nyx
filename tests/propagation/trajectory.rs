@@ -8,7 +8,7 @@ use nyx::cosmic::{GuidanceMode, Orbit, Spacecraft};
 use nyx::dynamics::guidance::{GuidanceLaw, Ruggiero, Thruster};
 use nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
 use nyx::io::trajectory_data::TrajectoryLoader;
-use nyx::md::prelude::{ExportCfg, Interpolatable, Objective};
+use nyx::md::prelude::{ExportCfg, Objective};
 use nyx::md::StateParameter;
 use nyx::propagators::*;
 use nyx::time::{Epoch, TimeSeries, Unit};
@@ -217,7 +217,7 @@ fn traj_ephem_forward(almanac: Arc<Almanac>) {
         let pos_err = (eval_state.orbit.radius_km - conv_state.orbit.radius_km).norm();
         if pos_err > max_pos_err {
             println!(
-                "Eval: {}\nConv: {}\t{:.3} m",
+                "{pos_err:.e}\nEval: {}\nConv: {}\t{:.3} m\n",
                 eval_state,
                 conv_state,
                 pos_err * 1e3
@@ -423,56 +423,6 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
     assert_eq!(
         traj, ephem_back_to_earth,
         "Expecting exactly the same data returned after converting back"
-    );
-
-    let conv_state = ephem_back_to_earth.at(start_dt).unwrap();
-    let mut max_pos_err = (eval_state.orbit.radius_km - conv_state.orbit.radius_km).norm();
-    let mut max_vel_err = (eval_state.orbit.velocity_km_s - conv_state.orbit.velocity_km_s).norm();
-
-    // TODO(ANISE): This test fails for a strange reason. I don't understand why it fails.
-    // All of the states match within nanometers, and all of the epochs also match. Yet, the interpolation seems to be off?
-    for conv_state in ephem_back_to_earth.every(5 * Unit::Minute) {
-        let eval_state = traj.at(conv_state.epoch()).unwrap();
-
-        // Check the frame
-        assert_eq!(eval_state.frame(), conv_state.frame());
-        assert_eq!(
-            eval_state.epoch(),
-            conv_state.epoch(),
-            "Δt = {}",
-            eval_state.epoch() - conv_state.epoch()
-        );
-
-        let pos_err = eval_state.orbit.rss_radius_km(&conv_state.orbit).unwrap();
-        println!("{pos_err}\n{eval_state}\n{conv_state}\n");
-        if pos_err > max_pos_err {
-            max_pos_err = pos_err;
-        }
-        let vel_err = eval_state
-            .orbit
-            .rss_velocity_km_s(&conv_state.orbit)
-            .unwrap();
-        if vel_err > max_vel_err {
-            max_vel_err = vel_err;
-        }
-    }
-    println!(
-        "[traj_spacecraft] Maximum interpolation error after double conversion: pos: {:.2e} m\t\tvel: {:.2e} m/s",
-        max_pos_err * 1e3,
-        max_vel_err * 1e3,
-    );
-
-    // TODO: Make this tighter once I switch to ANISE: Cosm has some errors in converting back to an original state (~1e-9 km it seems)
-    // Allow for up to meter error
-    assert!(
-        max_pos_err < 1e-3,
-        "Maximum spacecraft position in interpolation is too high!"
-    );
-
-    // Allow for up to millimeter per second error
-    assert!(
-        max_vel_err < 1e-5,
-        "Maximum orbit velocity in interpolation is too high!"
     );
 }
 

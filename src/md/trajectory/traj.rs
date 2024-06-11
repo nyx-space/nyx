@@ -21,6 +21,7 @@ use super::{ExportCfg, INTERPOLATION_SAMPLES};
 use super::{Interpolatable, TrajError};
 use crate::errors::NyxError;
 use crate::io::watermark::pq_writer;
+use crate::io::InputOutputError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 use crate::md::prelude::{GuidanceMode, StateParameter};
@@ -111,13 +112,6 @@ where
                     states.push(self.states[idx]);
                 }
 
-                dbg!(first_idx, last_idx);
-                if first_idx == 61 {
-                    for state in &states {
-                        println!("{state}");
-                    }
-                }
-
                 Ok(self.states[idx].interpolate(epoch, &states))
             }
         }
@@ -191,9 +185,15 @@ where
             Field::new("Epoch:TAI (s)", DataType::Float64, false),
         ];
 
+        let frame = self.states[0].frame();
         let more_meta = Some(vec![(
             "Frame".to_string(),
-            format!("{}", self.states[0].frame()),
+            serde_dhall::serialize(&frame).to_string().map_err(|e| {
+                Box::new(InputOutputError::SerializeDhall {
+                    what: format!("frame `{frame}`"),
+                    err: e.to_string(),
+                })
+            })?,
         )]);
 
         let mut fields = match cfg.fields {

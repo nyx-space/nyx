@@ -57,13 +57,13 @@ impl Interpolatable for Spacecraft {
     fn interpolate(mut self, epoch: Epoch, states: &[Self]) -> Self {
         // Interpolate the Orbit first
         // Statically allocated arrays of the maximum number of samples
-        let mut epochs_tdb = [0.0; INTERPOLATION_SAMPLES + 1];
-        let mut xs = [0.0; INTERPOLATION_SAMPLES + 1];
-        let mut ys = [0.0; INTERPOLATION_SAMPLES + 1];
-        let mut zs = [0.0; INTERPOLATION_SAMPLES + 1];
-        let mut vxs = [0.0; INTERPOLATION_SAMPLES + 1];
-        let mut vys = [0.0; INTERPOLATION_SAMPLES + 1];
-        let mut vzs = [0.0; INTERPOLATION_SAMPLES + 1];
+        let mut epochs_tdb = [0.0; INTERPOLATION_SAMPLES];
+        let mut xs = [0.0; INTERPOLATION_SAMPLES];
+        let mut ys = [0.0; INTERPOLATION_SAMPLES];
+        let mut zs = [0.0; INTERPOLATION_SAMPLES];
+        let mut vxs = [0.0; INTERPOLATION_SAMPLES];
+        let mut vys = [0.0; INTERPOLATION_SAMPLES];
+        let mut vzs = [0.0; INTERPOLATION_SAMPLES];
 
         for (cno, state) in states.iter().enumerate() {
             xs[cno] = state.orbit.radius_km.x;
@@ -72,38 +72,14 @@ impl Interpolatable for Spacecraft {
             vxs[cno] = state.orbit.velocity_km_s.x;
             vys[cno] = state.orbit.velocity_km_s.y;
             vzs[cno] = state.orbit.velocity_km_s.z;
-            epochs_tdb[cno] = state.epoch().to_tdb_seconds();
+            epochs_tdb[cno] = state.epoch().to_et_seconds();
         }
 
-        let (x_km, vx_km_s) = hermite_eval(
-            &epochs_tdb[..states.len()],
-            &xs[..states.len()],
-            &vxs[..states.len()],
-            epoch.to_et_seconds(),
-        )
-        .unwrap();
+        let (x_km, vx_km_s) = hermite_eval(&epochs_tdb, &xs, &vxs, epoch.to_et_seconds()).unwrap();
 
-        let (y_km, vy_km_s) = hermite_eval(
-            &epochs_tdb[..states.len()],
-            &ys[..states.len()],
-            &vys[..states.len()],
-            epoch.to_et_seconds(),
-        )
-        .unwrap();
+        let (y_km, vy_km_s) = hermite_eval(&epochs_tdb, &ys, &vys, epoch.to_et_seconds()).unwrap();
 
-        let (z_km, vz_km_s) = hermite_eval(
-            &epochs_tdb[..states.len()],
-            &zs[..states.len()],
-            &vzs[..states.len()],
-            epoch.to_et_seconds(),
-        )
-        .unwrap();
-
-        // Fuel is linearly interpolated -- should really be a Lagrange interpolation here
-        let fuel_kg_dt = (states.last().unwrap().fuel_mass_kg
-            - states.first().unwrap().fuel_mass_kg)
-            / (states.last().unwrap().epoch().to_tdb_seconds()
-                - states.first().unwrap().epoch().to_tdb_seconds());
+        let (z_km, vz_km_s) = hermite_eval(&epochs_tdb, &zs, &vzs, epoch.to_et_seconds()).unwrap();
 
         self.orbit = Orbit::new(
             x_km,
@@ -115,8 +91,14 @@ impl Interpolatable for Spacecraft {
             epoch,
             self.orbit.frame,
         );
-        self.fuel_mass_kg += fuel_kg_dt
-            * (epoch.to_tdb_seconds() - states.first().unwrap().epoch().to_tdb_seconds());
+
+        // Fuel is linearly interpolated -- should really be a Lagrange interpolation here
+        let first = states.first().unwrap();
+        let last = states.last().unwrap();
+        let fuel_kg_dt =
+            (last.fuel_mass_kg - first.fuel_mass_kg) / (last.epoch() - first.epoch()).to_seconds();
+
+        self.fuel_mass_kg += fuel_kg_dt * (epoch - first.epoch()).to_seconds();
 
         self
     }
