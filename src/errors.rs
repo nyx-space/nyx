@@ -79,7 +79,8 @@ pub enum NyxError {
     ConfigError { source: ConfigError },
     #[snafu(display("issue due to Almanac: {action} {source}"))]
     FromAlmanacError {
-        source: AlmanacError,
+        #[snafu(source(from(AlmanacError, Box::new)))]
+        source: Box<AlmanacError>,
         action: &'static str,
     },
 }
@@ -116,7 +117,10 @@ pub enum StateError {
 #[snafu(visibility(pub(crate)))]
 pub enum EventError {
     #[snafu(display("during event computation: {source}"))]
-    EventAlmanacError { source: AlmanacError },
+    EventAlmanacError {
+        #[snafu(source(from(AlmanacError, Box::new)))]
+        source: Box<AlmanacError>,
+    },
     #[snafu(display("during event computation: {source}"))]
     EventStateError {
         param: StateParameter,

@@ -189,7 +189,8 @@ pub enum ODError {
     ODIOError { source: InputOutputError },
     #[snafu(display("OD failed due to Almanac: {action} {source}"))]
     ODAlmanac {
-        source: AlmanacError,
+        #[snafu(source(from(AlmanacError, Box::new)))]
+        source: Box<AlmanacError>,
         action: &'static str,
     },
 }

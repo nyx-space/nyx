@@ -444,6 +444,7 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
         );
 
         let pos_err = eval_state.orbit.rss_radius_km(&conv_state.orbit).unwrap();
+        println!("{pos_err}\n{eval_state}\n{conv_state}\n");
         if pos_err > max_pos_err {
             max_pos_err = pos_err;
         }

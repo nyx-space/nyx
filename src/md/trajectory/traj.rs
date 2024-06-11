@@ -111,6 +111,13 @@ where
                     states.push(self.states[idx]);
                 }
 
+                dbg!(first_idx, last_idx);
+                if first_idx == 61 {
+                    for state in &states {
+                        println!("{state}");
+                    }
+                }
+
                 Ok(self.states[idx].interpolate(epoch, &states))
             }
         }

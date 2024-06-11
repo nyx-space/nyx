@@ -46,7 +46,8 @@ pub enum MultipleShootingError {
     MultiShootTrajError { source: TrajError },
     #[snafu(display("duration a multiple shoot, issue due to Almanac: {action} {source}"))]
     MultiShootAlmanacError {
-        source: AlmanacError,
+        #[snafu(source(from(AlmanacError, Box::new)))]
+        source: Box<AlmanacError>,
         action: &'static str,
     },
     #[snafu(display("duration a multiple shoot, physics issue:  {source}"))]

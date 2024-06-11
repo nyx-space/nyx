@@ -185,7 +185,8 @@ pub enum DynamicsError {
     #[snafu(display("dynamical model issue due to Almanac: {action} {source}"))]
     DynamicsAlmanacError {
         action: &'static str,
-        source: AlmanacError,
+        #[snafu(source(from(AlmanacError, Box::new)))]
+        source: Box<AlmanacError>,
     },
     #[snafu(display("dynamical model issue due to planetary data: {action} {source}"))]
     DynamicsPlanetaryError {

@@ -144,7 +144,10 @@ pub enum AstroError {
     #[snafu(display("physics error occured during astro computation: {source}"))]
     AstroPhysics { source: PhysicsError },
     #[snafu(display("ANISE Almanac error occured during astro computation: {source}"))]
-    AstroAlmanac { source: AlmanacError },
+    AstroAlmanac {
+        #[snafu(source(from(AlmanacError, Box::new)))]
+        source: Box<AlmanacError>,
+    },
 }
 
 // Re-Export OrbitDual
