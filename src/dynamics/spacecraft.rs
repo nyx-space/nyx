@@ -308,7 +308,7 @@ impl Dynamics for SpacecraftDynamics {
                 // Apply the gradient to the STM
                 let stm_dt = stm * grad;
 
-                // Rebuild the state vectors
+                // Rebuild the state vector
                 for (i, val) in state.iter().enumerate() {
                     d_x[i] = *val;
                 }

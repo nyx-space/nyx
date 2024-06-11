@@ -346,7 +346,7 @@ fn orbit_set_unset_static(almanac: Arc<Almanac>) {
     .with_stm();
 
     // Change STM
-    let stm_data = (0..36).map(|x| x as f64).collect::<Vec<f64>>();
+    let stm_data = (0..81).map(|x| x as f64).collect::<Vec<f64>>();
     init.stm.as_mut().unwrap().copy_from_slice(&stm_data);
 
     let init_vec = init.to_vector();

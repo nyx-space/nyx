@@ -59,8 +59,8 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             .until_epoch(correction_epoch)
             .context(PropSnafu)?;
 
-        debug!("initial_state = {}", initial_state);
-        debug!("xi_start = {}", xi_start);
+        debug!("initial_state = {initial_state:?}");
+        debug!("xi_start = {xi_start:?}");
 
         let mut xi = xi_start;
 
@@ -132,13 +132,12 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                 .prop
                 .with(xi, almanac.clone())
                 .until_epoch(achievement_epoch)
-                .context(PropSnafu)?
-                .orbit;
+                .context(PropSnafu)?;
 
             // Check linearization
-            if !are_eigenvalues_stable(xi.with_orbit(xf).stm().unwrap().complex_eigenvalues()) {
+            if !are_eigenvalues_stable(xf.stm().unwrap().complex_eigenvalues()) {
                 warn!(
-                    "STM linearization is broken for the requested time step of {}",
+                    "STM linearization assumption is wrong for a time step of {}",
                     achievement_epoch - correction_epoch
                 );
             }
@@ -146,13 +145,13 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             let xf_dual_obj_frame = match &self.objective_frame {
                 Some(frame) => {
                     let orbit_obj_frame = almanac
-                        .transform_to(xf, *frame, None)
+                        .transform_to(xf.orbit, *frame, None)
                         .context(AstroAlmanacSnafu)
                         .context(AstroSnafu)?;
 
                     OrbitDual::from(orbit_obj_frame)
                 }
-                None => OrbitDual::from(xf),
+                None => OrbitDual::from(xf.orbit),
             };
 
             // Build the error vector
@@ -222,10 +221,12 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                 }
 
                 for (j, var) in self.variables.iter().enumerate() {
+                    // Grab the STM first.
+                    let sc_stm = xf.stm().unwrap();
+                    let stm = sc_stm.fixed_view::<6, 6>(0, 0);
                     let idx = var.component.vec_index();
                     // Compute the partial of the objective over all components wrt to all of the components in the STM of the control variable.
-                    let rslt =
-                        &partial_vec * xi.with_orbit(xf).stm().unwrap().fixed_columns::<1>(idx);
+                    let rslt = &partial_vec * stm.fixed_columns::<1>(idx);
                     jac[(i, j)] = rslt[(0, 0)];
                 }
             }
@@ -255,7 +256,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
                 let sol = TargeterSolution {
                     corrected_state: state,
-                    achieved_state: xi_start.with_orbit(xf),
+                    achieved_state: xf,
                     correction: total_correction,
                     computation_dur: conv_dur,
                     variables: self.variables,
