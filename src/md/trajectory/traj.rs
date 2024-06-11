@@ -406,9 +406,15 @@ where
             hdrs.push(field);
         }
 
+        let frame = self.states[0].frame();
         let more_meta = Some(vec![(
             "Frame".to_string(),
-            format!("{}", self.states[0].frame()),
+            serde_dhall::serialize(&frame).to_string().map_err(|e| {
+                Box::new(InputOutputError::SerializeDhall {
+                    what: format!("frame `{frame}`"),
+                    err: e.to_string(),
+                })
+            })?,
         )]);
 
         let mut cfg = cfg;

@@ -109,7 +109,17 @@ where
 
         let frame_name = self.estimates[0].state().frame();
 
-        let more_meta = Some(vec![("Frame".to_string(), format!("{}", frame_name))]);
+        let more_meta = Some(vec![(
+            "Frame".to_string(),
+            serde_dhall::serialize(&frame_name)
+                .to_string()
+                .map_err(|e| ODError::ODIOError {
+                    source: InputOutputError::SerializeDhall {
+                        what: format!("frame `{frame_name}`"),
+                        err: e.to_string(),
+                    },
+                })?,
+        )]);
 
         let mut fields = match cfg.fields {
             Some(fields) => fields,
