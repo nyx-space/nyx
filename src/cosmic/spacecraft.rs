@@ -471,13 +471,6 @@ impl State for Spacecraft {
         vector[8] = self.fuel_mass_kg;
         // Add the STM to the vector
         if let Some(stm) = self.stm {
-            // TODO(ANISE): Remove commented code
-            // Set the 6x6 of the orbit STM first
-            // for i in 0..6 {
-            //     for j in 0..6 {
-            //         stm[(i, j)] = self.orbit.stm().unwrap()[(i, j)];
-            //     }
-            // }
             for (idx, stm_val) in stm.as_slice().iter().enumerate() {
                 vector[idx + Self::Size::dim()] = *stm_val;
             }

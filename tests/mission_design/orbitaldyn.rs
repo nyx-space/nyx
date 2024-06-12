@@ -716,6 +716,10 @@ fn two_body_dual(almanac: Arc<Almanac>) {
 
     let fx = fx.fixed_rows::<6>(0).to_owned();
 
+    // TODO(ANISE): Velocity computation is incorrect!
+
+    println!("{fx}\n{expected_fx}");
+
     assert!(
         (fx - expected_fx).norm() < 1e-16,
         "f(x) computation is incorrect {:e}",

@@ -138,7 +138,7 @@ impl ForceModel for Drag {
     fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
         let integration_frame = ctx.orbit.frame;
 
-        let osc = almanac
+        let osc_drag_frame = almanac
             .transform_to(ctx.orbit, self.drag_frame, None)
             .context(DynamicsAlmanacSnafu {
                 action: "transforming into drag frame",
@@ -146,7 +146,7 @@ impl ForceModel for Drag {
 
         match self.density {
             AtmDensity::Constant(rho) => {
-                let velocity = osc.velocity_km_s;
+                let velocity = osc_drag_frame.velocity_km_s;
                 // Note the 1e3 factor to convert drag units from ((kg * km^2 * s^-2) / m^1) to (kg * km * s^-2)
                 Ok(-0.5 * 1e3 * rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
             }
@@ -156,8 +156,9 @@ impl ForceModel for Drag {
                 r0,
                 ref_alt_m,
             } => {
+                // Compute rho in the drag frame.
                 let rho = rho0
-                    * (-(osc.rmag_km()
+                    * (-(osc_drag_frame.rmag_km()
                         - (r0
                             + self
                                 .drag_frame
@@ -170,19 +171,19 @@ impl ForceModel for Drag {
                 //TODO(ANISE): Looks like there is a frame issue here abnd we're transforming into the original frame!
                 // let velocity_integr_frame = self.cosm.frame_chg(&osc, integration_frame).velocity();
                 let velocity_integr_frame = almanac
-                    .transform_to(osc, integration_frame, None)
+                    .transform_to(osc_drag_frame, integration_frame, None)
                     .context(DynamicsAlmanacSnafu {
                         action: "rotating into the integration frame",
                     })?
                     .velocity_km_s;
 
-                let velocity = velocity_integr_frame - osc.velocity_km_s;
+                let velocity = velocity_integr_frame - osc_drag_frame.velocity_km_s;
                 // Note the 1e3 factor to convert drag units from ((kg * km^2 * s^-2) / m^1) to (kg * km * s^-2)
                 Ok(-0.5 * 1e3 * rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
             }
 
             AtmDensity::StdAtm { max_alt_m } => {
-                let altitude_km = osc.rmag_km()
+                let altitude_km = osc_drag_frame.rmag_km()
                     - self
                         .drag_frame
                         .mean_equatorial_radius_km()
@@ -208,13 +209,13 @@ impl ForceModel for Drag {
 
                 // let velocity_integr_frame = self.cosm.frame_chg(&osc, integration_frame).velocity();
                 let velocity_integr_frame = almanac
-                    .transform_to(osc, integration_frame, None)
+                    .transform_to(osc_drag_frame, integration_frame, None)
                     .context(DynamicsAlmanacSnafu {
                         action: "rotating into the integration frame",
                     })?
                     .velocity_km_s;
 
-                let velocity = velocity_integr_frame - osc.velocity_km_s;
+                let velocity = velocity_integr_frame - osc_drag_frame.velocity_km_s;
                 // Note the 1e3 factor to convert drag units from ((kg * km^2 * s^-2) / m^1) to (kg * km * s^-2)
                 Ok(-0.5 * 1e3 * rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
             }

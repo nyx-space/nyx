@@ -141,7 +141,6 @@ impl EclipseLocator {
     /// Creates a new typical eclipse locator.
     /// The light source is the Sun, and the shadow bodies are the Earth and the Moon.
     pub fn cislunar(almanac: Arc<Almanac>) -> Self {
-        // TODO(ANISE): Can I replace this with not a frame but just the planetary data that is fetched at run-time?
         let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
         let moon_j2k = almanac.frame_from_uid(MOON_J2000).unwrap();
         Self {

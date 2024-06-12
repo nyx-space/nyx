@@ -288,62 +288,6 @@ where
     Duration::from_str(&s).map_err(serde::de::Error::custom)
 }
 
-// /// Deserialize a type `S` by deserializing a string, then using the `FromStr`
-// /// impl of `S` to create the result. The generic type `S` is not required to
-// /// implement `Deserialize`.
-// pub(crate) fn deserialize_from_str<'de, S, D>(deserializer: D) -> Result<S, D::Error>
-// where
-//     S: core::str::FromStr,
-//     S::Err: core::fmt::Display,
-//     D: Deserializer<'de>,
-// {
-//     let s: String = Deserialize::deserialize(deserializer)?;
-//     S::from_str(&s).map_err(de::Error::custom)
-// }
-
-// pub(crate) fn frame_to_str<S>(frame: &Frame, serializer: S) -> Result<S::Ok, S::Error>
-// where
-//     S: Serializer,
-// {
-//     serializer.serialize_str(&format!("{frame}"))
-// }
-
-// //TODO(ANISE): Add frame from str to ANISE?
-// pub(crate) fn frame_from_str<'de, D>(deserializer: D) -> Result<Frame, D::Error>
-// where
-//     D: Deserializer<'de>,
-// {
-//     let s = String::deserialize(deserializer)?;
-//     // TODO: Figure out how to use DeserializeSeed here, but I'm not sure it would work. -- https://github.com/nyx-space/nyx/issues/86
-//     let cosm = Cosm::de438();
-//     cosm.try_frame(&s).map_err(serde::de::Error::custom)
-// }
-
-// //TODO(ANISE): Add frame from str to ANISE?
-// pub(crate) fn frames_to_str<S>(frames: &Vec<Frame>, serializer: S) -> Result<S::Ok, S::Error>
-// where
-//     S: Serializer,
-// {
-//     let mut seq = serializer.serialize_seq(Some(frames.len()))?;
-//     for frame in frames {
-//         seq.serialize_element(&format!("{frame}"))?;
-//     }
-//     seq.end()
-// }
-
-// pub(crate) fn frames_from_str<'de, D>(deserializer: D) -> Result<Vec<Frame>, D::Error>
-// where
-//     D: Deserializer<'de>,
-// {
-//     let frame_names: Vec<String> = Vec::deserialize(deserializer)?;
-//     let cosm = Cosm::de438();
-//     let mut frames = Vec::new();
-//     for name in frame_names {
-//         frames.push(cosm.try_frame(&name).map_err(serde::de::Error::custom)?)
-//     }
-//     Ok(frames)
-// }
-
 pub(crate) fn maybe_duration_to_str<S>(
     duration: &Option<Duration>,
     serializer: S,

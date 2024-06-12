@@ -32,7 +32,6 @@ use std::default::Default;
 use std::fmt;
 use std::sync::Arc;
 
-//TODO(ANISE): Add an EventError that can be sourced from an almanac
 /// A trait to specify how a specific event must be evaluated.
 pub trait EventEvaluator<S: State>: fmt::Display + Send + Sync
 where

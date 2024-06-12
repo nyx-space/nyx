@@ -274,8 +274,6 @@ where
         // Add the 1-sigma covariance in the RIC frame
         let mut ric_covariances = Vec::new();
 
-        // TODO(ANISE): Replace this with all of ANISE's stuff.
-
         for s in &estimates {
             let dcm6x6 = s
                 .state()
