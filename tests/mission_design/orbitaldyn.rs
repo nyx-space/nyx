@@ -697,7 +697,7 @@ fn two_body_dual(almanac: Arc<Almanac>) {
         eme2k,
     );
 
-    println!("{:x}", init);
+    println!("{init:x}\n{eme2k}");
 
     let expected_fx = Vector6::new(
         -3.288_789_003_770_57,
@@ -710,6 +710,13 @@ fn two_body_dual(almanac: Arc<Almanac>) {
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
+    let init_sc = Spacecraft::from(init);
+    let fx_real = dynamics
+        .eom(0.0, &init_sc.to_vector(), &init_sc, almanac.clone())
+        .unwrap();
+
+    let fx_orbit_real = fx_real.fixed_rows::<6>(0).to_owned();
+
     let (fx, grad) = dynamics
         .dual_eom(0.0, &Spacecraft::from(init).with_stm(), almanac.clone())
         .unwrap();
@@ -717,8 +724,14 @@ fn two_body_dual(almanac: Arc<Almanac>) {
     let fx = fx.fixed_rows::<6>(0).to_owned();
 
     // TODO(ANISE): Velocity computation is incorrect!
+    // This is MOST LIKELY the source of the error in the val dynamics!
 
-    println!("{fx}\n{expected_fx}");
+    println!("{fx_orbit_real}\n{fx}\n{expected_fx}");
+
+    assert!(
+        (fx_orbit_real - fx).norm() < 1e-16,
+        "Dual and real computations differ"
+    );
 
     assert!(
         (fx - expected_fx).norm() < 1e-16,
