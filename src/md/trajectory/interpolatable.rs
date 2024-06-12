@@ -75,11 +75,17 @@ impl Interpolatable for Spacecraft {
             epochs_tdb[cno] = state.epoch().to_et_seconds();
         }
 
-        let (x_km, vx_km_s) = hermite_eval(&epochs_tdb, &xs, &vxs, epoch.to_et_seconds())?;
+        // Ensure that if we don't have enough states, we only interpolate using what we have instead of INTERPOLATION_SAMPLES
+        let n = states.len();
 
-        let (y_km, vy_km_s) = hermite_eval(&epochs_tdb, &ys, &vys, epoch.to_et_seconds())?;
+        let (x_km, vx_km_s) =
+            hermite_eval(&epochs_tdb[..n], &xs[..n], &vxs[..n], epoch.to_et_seconds())?;
 
-        let (z_km, vz_km_s) = hermite_eval(&epochs_tdb, &zs, &vzs, epoch.to_et_seconds())?;
+        let (y_km, vy_km_s) =
+            hermite_eval(&epochs_tdb[..n], &ys[..n], &vys[..n], epoch.to_et_seconds())?;
+
+        let (z_km, vz_km_s) =
+            hermite_eval(&epochs_tdb[..n], &zs[..n], &vzs[..n], epoch.to_et_seconds())?;
 
         self.orbit = Orbit::new(
             x_km,
