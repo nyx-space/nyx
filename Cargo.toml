@@ -38,7 +38,7 @@ log = "0.4"
 hifitime = { git = "https://github.com/nyx-space/hifitime.git", features = [
     "std",
 ], branch = "master" }
-anise = { path = "../anise/anise" }
+anise = { git = "https://github.com/nyx-space/anise.git", branch = "191-quad" }
 flate2 = { version = "1.0", features = [
     "rust_backend",
 ], default-features = false }
