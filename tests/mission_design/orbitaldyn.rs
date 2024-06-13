@@ -1,10 +1,9 @@
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
-use crate::propagation::GMAT_EARTH_GM;
 use anise::constants::celestial_objects::{EARTH, JUPITER_BARYCENTER, MOON, SUN};
 use anise::constants::frames::IAU_EARTH_FRAME;
-use hifitime::J2000_OFFSET;
+use hifitime::MJD_J2000;
 use na::{Const, OMatrix};
 use nyx::cosmic::{assert_orbit_eq_or_abs, Orbit};
 use nyx::dynamics::{Dynamics, OrbitalDynamics, PointMasses, SpacecraftDynamics};
@@ -23,6 +22,12 @@ use std::sync::Arc;
 fn almanac() -> Arc<Almanac> {
     use crate::test_almanac_arcd;
     test_almanac_arcd()
+}
+
+#[fixture]
+fn almanac_gmat() -> Arc<Almanac> {
+    use crate::test_almanac_gmat_arcd;
+    test_almanac_gmat_arcd()
 }
 
 #[allow(clippy::identity_op)]
@@ -98,7 +103,7 @@ fn val_two_body_dynamics(almanac: Arc<Almanac>) {
 
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
-    let dt = Epoch::from_mjd_tai(J2000_OFFSET);
+    let dt = Epoch::from_mjd_tai(MJD_J2000);
     let state = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
@@ -166,17 +171,15 @@ fn val_two_body_dynamics(almanac: Arc<Almanac>) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn val_halo_earth_moon_dynamics(almanac: Arc<Almanac>) {
+fn val_halo_earth_moon_dynamics(almanac_gmat: Arc<Almanac>) {
+    let almanac = almanac_gmat;
     /*
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
     */
     let prop_time = 1 * Unit::Day;
 
-    let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
-        .unwrap()
-        .with_mu_km3_s2(GMAT_EARTH_GM);
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -232,17 +235,15 @@ fn val_halo_earth_moon_dynamics(almanac: Arc<Almanac>) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn val_halo_earth_moon_dynamics_adaptive(almanac: Arc<Almanac>) {
+fn val_halo_earth_moon_dynamics_adaptive(almanac_gmat: Arc<Almanac>) {
+    let almanac = almanac_gmat;
     /*
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
     */
     let prop_time = 1 * Unit::Day;
 
-    let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
-        .unwrap()
-        .with_mu_km3_s2(GMAT_EARTH_GM);
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
@@ -299,17 +300,15 @@ fn val_halo_earth_moon_dynamics_adaptive(almanac: Arc<Almanac>) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn val_llo_earth_moon_dynamics_adaptive(almanac: Arc<Almanac>) {
+fn val_llo_earth_moon_dynamics_adaptive(almanac_gmat: Arc<Almanac>) {
+    let almanac = almanac_gmat;
     /*
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
     */
     let prop_time = 1 * Unit::Day;
 
-    let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
-        .unwrap()
-        .with_mu_km3_s2(GMAT_EARTH_GM);
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
@@ -363,17 +362,15 @@ fn val_llo_earth_moon_dynamics_adaptive(almanac: Arc<Almanac>) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn val_halo_multi_body_dynamics(almanac: Arc<Almanac>) {
+fn val_halo_multi_body_dynamics(almanac_gmat: Arc<Almanac>) {
+    let almanac = almanac_gmat;
     /*
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
     */
     let prop_time = 1 * Unit::Day;
 
-    let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
-        .unwrap()
-        .with_mu_km3_s2(GMAT_EARTH_GM);
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -427,7 +424,8 @@ fn val_halo_multi_body_dynamics(almanac: Arc<Almanac>) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn val_halo_multi_body_dynamics_adaptive(almanac: Arc<Almanac>) {
+fn val_halo_multi_body_dynamics_adaptive(almanac_gmat: Arc<Almanac>) {
+    let almanac = almanac_gmat;
     /*
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
@@ -435,10 +433,7 @@ fn val_halo_multi_body_dynamics_adaptive(almanac: Arc<Almanac>) {
 
     let prop_time = 1 * Unit::Day;
 
-    let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
-        .unwrap()
-        .with_mu_km3_s2(GMAT_EARTH_GM);
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
@@ -496,7 +491,8 @@ fn val_halo_multi_body_dynamics_adaptive(almanac: Arc<Almanac>) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn val_llo_multi_body_dynamics_adaptive(almanac: Arc<Almanac>) {
+fn val_llo_multi_body_dynamics_adaptive(almanac_gmat: Arc<Almanac>) {
+    let almanac = almanac_gmat;
     /*
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
@@ -504,10 +500,7 @@ fn val_llo_multi_body_dynamics_adaptive(almanac: Arc<Almanac>) {
 
     let prop_time = 1 * Unit::Day;
 
-    let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
-        .unwrap()
-        .with_mu_km3_s2(GMAT_EARTH_GM);
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
@@ -561,7 +554,8 @@ fn val_llo_multi_body_dynamics_adaptive(almanac: Arc<Almanac>) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn val_leo_multi_body_dynamics_adaptive_wo_moon(almanac: Arc<Almanac>) {
+fn val_leo_multi_body_dynamics_adaptive_wo_moon(almanac_gmat: Arc<Almanac>) {
+    let almanac = almanac_gmat;
     /*
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
@@ -569,10 +563,7 @@ fn val_leo_multi_body_dynamics_adaptive_wo_moon(almanac: Arc<Almanac>) {
 
     let prop_time = 1 * Unit::Day;
 
-    let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
-        .unwrap()
-        .with_mu_km3_s2(GMAT_EARTH_GM);
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -623,7 +614,8 @@ fn val_leo_multi_body_dynamics_adaptive_wo_moon(almanac: Arc<Almanac>) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn val_leo_multi_body_dynamics_adaptive(almanac: Arc<Almanac>) {
+fn val_leo_multi_body_dynamics_adaptive(almanac_gmat: Arc<Almanac>) {
+    let almanac = almanac_gmat;
     /*
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
@@ -631,10 +623,7 @@ fn val_leo_multi_body_dynamics_adaptive(almanac: Arc<Almanac>) {
 
     let prop_time = 1 * Unit::Day;
 
-    let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
-        .unwrap()
-        .with_mu_km3_s2(GMAT_EARTH_GM);
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -697,20 +686,18 @@ fn two_body_dual(almanac: Arc<Almanac>) {
         eme2k,
     );
 
-    println!("{init:x}\n{eme2k}");
-
     let expected_fx = Vector6::new(
         -3.288_789_003_770_57,
         -2.226_285_193_102_822,
         1.646_738_380_722_676_5,
-        0.000_348_875_166_673_120_14,
-        -0.000_715_134_890_031_838_4,
-        -0.000_270_059_537_150_490_5,
+        0.000_348_875_166_711_715_13,
+        -0.000_715_134_890_110_951_6,
+        -0.000_270_059_537_180_366_4,
     );
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
-    let init_sc = Spacecraft::from(init);
+    let init_sc = Spacecraft::from(init).with_stm();
     let fx_real = dynamics
         .eom(0.0, &init_sc.to_vector(), &init_sc, almanac.clone())
         .unwrap();
@@ -722,9 +709,6 @@ fn two_body_dual(almanac: Arc<Almanac>) {
         .unwrap();
 
     let fx = fx.fixed_rows::<6>(0).to_owned();
-
-    // TODO(ANISE): Velocity computation is incorrect!
-    // This is MOST LIKELY the source of the error in the val dynamics!
 
     println!("{fx_orbit_real}\n{fx}\n{expected_fx}");
 
@@ -766,7 +750,7 @@ fn two_body_dual(almanac: Arc<Almanac>) {
     let step_size = 10 * Unit::Second;
 
     let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step(step_size));
-    let mut prop = setup.with(init.into(), almanac.clone());
+    let mut prop = setup.with(init_sc, almanac.clone());
     let final_state = prop.for_duration(prop_time).unwrap();
 
     // Check that the STM is correct by back propagating by the previous step, and multiplying by the STM.
@@ -896,7 +880,7 @@ fn val_earth_sph_harmonics_j2(almanac: Arc<Almanac>) {
     let earth_sph_harm = HarmonicsMem::from_j2(monte_earth_j2);
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm);
 
-    let dt = Epoch::from_mjd_tai(J2000_OFFSET);
+    let dt = Epoch::from_mjd_tai(MJD_J2000);
     let state = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
@@ -951,22 +935,20 @@ fn val_earth_sph_harmonics_j2(almanac: Arc<Almanac>) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn val_earth_sph_harmonics_12x12(almanac: Arc<Almanac>) {
+fn val_earth_sph_harmonics_12x12(almanac_gmat: Arc<Almanac>) {
+    let almanac = almanac_gmat;
     extern crate pretty_env_logger;
     let _ = pretty_env_logger::try_init();
     use nyx::dynamics::sph_harmonics::Harmonics;
     use nyx::io::gravity::*;
 
-    let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
-        .unwrap()
-        .with_mu_km3_s2(GMAT_EARTH_GM);
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 12, 12, true).unwrap();
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm);
 
-    let dt = Epoch::from_mjd_tai(J2000_OFFSET);
+    let dt = Epoch::from_mjd_tai(MJD_J2000);
     let state = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
@@ -1034,22 +1016,20 @@ fn val_earth_sph_harmonics_12x12(almanac: Arc<Almanac>) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn val_earth_sph_harmonics_70x70(almanac: Arc<Almanac>) {
+fn val_earth_sph_harmonics_70x70(almanac_gmat: Arc<Almanac>) {
+    let almanac = almanac_gmat;
     extern crate pretty_env_logger;
     let _ = pretty_env_logger::try_init();
     use nyx::dynamics::Harmonics;
     use nyx::io::gravity::*;
 
-    let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
-        .unwrap()
-        .with_mu_km3_s2(GMAT_EARTH_GM);
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm);
 
-    let dt = Epoch::from_mjd_tai(J2000_OFFSET);
+    let dt = Epoch::from_mjd_tai(MJD_J2000);
     let state = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
@@ -1092,22 +1072,20 @@ fn val_earth_sph_harmonics_70x70(almanac: Arc<Almanac>) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn val_earth_sph_harmonics_70x70_partials(almanac: Arc<Almanac>) {
+fn val_earth_sph_harmonics_70x70_partials(almanac_gmat: Arc<Almanac>) {
+    let almanac = almanac_gmat;
     extern crate pretty_env_logger;
     let _ = pretty_env_logger::try_init();
     use nyx::dynamics::Harmonics;
     use nyx::io::gravity::*;
 
-    let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
-        .unwrap()
-        .with_mu_km3_s2(GMAT_EARTH_GM);
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm);
 
-    let dt = Epoch::from_mjd_tai(J2000_OFFSET);
+    let dt = Epoch::from_mjd_tai(MJD_J2000);
     let state = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
@@ -1157,16 +1135,13 @@ fn hf_prop(almanac: Arc<Almanac>) {
     use nyx::dynamics::sph_harmonics::Harmonics;
     use nyx::io::gravity::*;
 
-    let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
-        .unwrap()
-        .with_mu_km3_s2(GMAT_EARTH_GM);
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 21, 21, true).unwrap();
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm);
 
-    let dt = Epoch::from_mjd_tai(J2000_OFFSET);
+    let dt = Epoch::from_mjd_tai(MJD_J2000);
     let state = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
@@ -1190,10 +1165,7 @@ fn hf_prop(almanac: Arc<Almanac>) {
 fn val_cislunar_dynamics(almanac: Arc<Almanac>) {
     let prop_time = 36 * Unit::Hour;
 
-    let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
-        .unwrap()
-        .with_mu_km3_s2(GMAT_EARTH_GM);
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     // "2022 NOV 27 05:55:49"
     let dt = Epoch::from_gregorian_utc_hms(2022, 11, 27, 5, 55, 49);

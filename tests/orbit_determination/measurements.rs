@@ -24,13 +24,13 @@ fn almanac() -> Arc<Almanac> {
 
 #[rstest]
 fn nil_measurement(almanac: Arc<Almanac>) {
-    use hifitime::J2000_OFFSET;
+    use hifitime::JD_J2000;
     // Let's create a station and make it estimate the range and range rate of something which is strictly in the same spot.
 
     let lat = -7.906_635_7;
     let long = 345.5975;
     let height = 0.0;
-    let epoch = Epoch::from_mjd_tai(J2000_OFFSET);
+    let epoch = Epoch::from_mjd_tai(JD_J2000);
 
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
