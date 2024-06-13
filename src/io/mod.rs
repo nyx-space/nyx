@@ -252,6 +252,12 @@ pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {
         debug!("Loading YAML:\n{data}");
         serde_yaml::from_str(data).context(ParseSnafu)
     }
+
+    /// Builds a sequence of "Selves" from the provided string of a yaml
+    fn loads_named(data: &str) -> Result<BTreeMap<String, Self>, ConfigError> {
+        debug!("Loading YAML:\n{data}");
+        serde_yaml::from_str(data).context(ParseSnafu)
+    }
 }
 
 pub(crate) fn epoch_to_str<S>(epoch: &Epoch, serializer: S) -> Result<S::Ok, S::Error>

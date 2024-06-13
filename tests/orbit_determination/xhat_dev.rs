@@ -93,7 +93,7 @@ fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>) {
     let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let (_, traj) = setup
-        .with(Spacecraft::from(initial_state).with_stm(), almanac.clone())
+        .with(Spacecraft::from(initial_state), almanac.clone())
         .for_duration_with_traj(prop_time)
         .unwrap();
 
@@ -107,7 +107,10 @@ fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>) {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let prop_est = setup.with(initial_state_dev.into(), almanac.clone());
+    let prop_est = setup.with(
+        Spacecraft::from(initial_state_dev).with_stm(),
+        almanac.clone(),
+    );
     let covar_radius_km = 1.0e2;
     let covar_velocity_km_s = 1.0e1;
     let init_covar = SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([

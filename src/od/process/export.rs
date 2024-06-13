@@ -21,6 +21,7 @@ use crate::io::{ArrowSnafu, ExportCfg, ParquetSnafu, StdIOSnafu};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName};
 use crate::md::trajectory::Interpolatable;
+use crate::md::StateParameter;
 use crate::od::estimate::*;
 use crate::od::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
@@ -107,15 +108,15 @@ where
             Field::new("Epoch:TAI (s)", DataType::Float64, false),
         ];
 
-        let frame_name = self.estimates[0].state().frame();
+        let frame = self.estimates[0].state().frame();
 
         let more_meta = Some(vec![(
             "Frame".to_string(),
-            serde_dhall::serialize(&frame_name)
+            serde_dhall::serialize(&frame)
                 .to_string()
                 .map_err(|e| ODError::ODIOError {
                     source: InputOutputError::SerializeDhall {
-                        what: format!("frame `{frame_name}`"),
+                        what: format!("frame `{frame}`"),
                         err: e.to_string(),
                     },
                 })?,
@@ -128,7 +129,7 @@ where
 
         // Check that we can retrieve this information
         fields.retain(|param| match self.estimates[0].state().value(*param) {
-            Ok(_) => true,
+            Ok(_) => param != &StateParameter::GuidanceMode,
             Err(_) => {
                 warn!("Removed unavailable field `{param}` from orbit determination export",);
                 false
@@ -139,43 +140,25 @@ where
             hdrs.push(field.to_field(more_meta.clone()));
         }
 
-        let cov_hdrs = match <S as State>::Size::dim() {
-            6 => {
-                // Add orbit 1-sigma covariance info, plotting to perform computations as desired
-                vec![
-                    "Covariance XX",
-                    "Covariance XY",
-                    "Covariance XZ",
-                    "Covariance XVx",
-                    "Covariance XVy",
-                    "Covariance XVz",
-                    "Covariance YY",
-                    "Covariance YZ",
-                    "Covariance YVx",
-                    "Covariance YVy",
-                    "Covariance YVz",
-                    "Covariance ZZ",
-                    "Covariance ZVx",
-                    "Covariance ZVy",
-                    "Covariance ZVz",
-                    "Covariance VxVx",
-                    "Covariance VxVy",
-                    "Covariance VxVz",
-                    "Covariance VyVy",
-                    "Covariance VyVz",
-                    "Covariance VzVz",
-                ]
+        let state_items = ["X", "Y", "Z", "Vx", "Vy", "Vz", "Cr", "Cd", "Mass"];
+        let est_size = <S as State>::Size::dim();
+        assert!(
+            est_size <= state_items.len(),
+            "state of size {est_size} is not yet supported"
+        );
+
+        let mut cov_hdrs = Vec::new();
+
+        for i in 0..state_items.len() {
+            for j in i..state_items.len() {
+                cov_hdrs.push(format!("Covariance {}{}", state_items[i], state_items[j]));
             }
-            _ => todo!(
-                "exporting a state of size {} is not yet supported",
-                <S as State>::Size::dim()
-            ),
-        };
+        }
 
         // Add the covariance in the integration frame
         for hdr in &cov_hdrs {
             hdrs.push(Field::new(
-                format!("{hdr} ({frame_name})"),
+                format!("{hdr} ({frame:x})"),
                 DataType::Float64,
                 false,
             ));
@@ -262,8 +245,8 @@ where
             record.push(Arc::new(data.finish()));
         }
         // Add the 1-sigma covariance in the integration frame
-        for i in 0..<S as State>::Size::dim() {
-            for j in i..<S as State>::Size::dim() {
+        for i in 0..est_size {
+            for j in i..est_size {
                 let mut data = Float64Builder::new();
                 for s in &estimates {
                     data.append_value(s.covar()[(i, j)]);
@@ -294,8 +277,8 @@ where
         }
 
         // Now store the RIC covariance data.
-        for i in 0..<S as State>::Size::dim() {
-            for j in i..<S as State>::Size::dim() {
+        for i in 0..est_size {
+            for j in i..est_size {
                 let mut data = Float64Builder::new();
                 for cov in ric_covariances.iter().take(estimates.len()) {
                     data.append_value(cov[(i, j)]);
@@ -370,7 +353,7 @@ where
 
         let batch = RecordBatch::try_new(schema, record)
             .context(ArrowSnafu {
-                action: "writing OD results",
+                action: "writing OD results (building batch record)",
             })
             .context(ODIOSnafu)?;
 

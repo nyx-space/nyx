@@ -419,7 +419,7 @@ where
     where
         Dev: TrackingDeviceSim<S, Msr>,
     {
-        let mut devices = arc.rebuild_devices::<S, Dev>().unwrap();
+        let mut devices = arc.rebuild_devices::<S, Dev>().context(ODConfigSnafu)?;
 
         let measurements = &arc.measurements;
         let step_size = match arc.min_duration_sep() {
@@ -441,7 +441,7 @@ where
     where
         Dev: TrackingDeviceSim<S, Msr>,
     {
-        let mut devices = arc.rebuild_devices::<S, Dev>().unwrap();
+        let mut devices = arc.rebuild_devices::<S, Dev>().context(ODConfigSnafu)?;
 
         let measurements = &arc.measurements;
         let step_size = match arc.min_duration_sep() {

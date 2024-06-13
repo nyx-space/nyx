@@ -243,18 +243,12 @@ where
             }
         }
 
-        let mut devices = Vec::new();
-        for device in self.devices.values() {
-            let repr = serde_yaml::to_string(device).unwrap();
-            devices.push(repr);
-        }
-
         // Reorder the measurements
         measurements.sort_by_key(|(_name, msr)| msr.epoch());
 
         // Build the tracking arc.
         let trk = TrackingArc {
-            device_cfg: serde_yaml::to_string(&devices).unwrap(),
+            device_cfg: serde_yaml::to_string(&self.devices).unwrap(),
             measurements,
         };
 

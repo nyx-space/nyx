@@ -231,20 +231,13 @@ where
             + Allocator<f64, <MsrIn as State>::Size, <MsrIn as State>::Size>
             + Allocator<f64, <MsrIn as State>::VecLength>,
     {
-        // TODO(ANISE): Support errors in serde of device!
-        let devices_repr = D::loads_many(&self.device_cfg)?;
+        let devices = D::loads_named(&self.device_cfg)?;
 
-        let mut devices = BTreeMap::new();
-
-        for device in devices_repr {
-            if !self.device_names().contains(&device.name()) {
-                warn!(
-                    "{} from arc config does not appear in measurements -- ignored",
-                    device.name()
-                );
+        for device in devices.keys() {
+            if !self.device_names().contains(device) {
+                info!("no measurements from {device} in loaded arc");
                 continue;
             }
-            devices.insert(device.name(), device);
         }
 
         Ok(devices)

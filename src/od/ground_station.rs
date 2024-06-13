@@ -452,7 +452,7 @@ mod gs_ut {
         let expected = vec![
             GroundStation {
                 name: "Demo ground station".to_string(),
-                frame: IAU_EARTH_FRAME,
+                frame: IAU_EARTH_FRAME.with_mu_km3_s2(398600.435436096),
                 elevation_mask_deg: 5.0,
                 range_noise_km: Some(GaussMarkov::new(1.days(), 5e-3, 1e-4).unwrap()),
                 doppler_noise_km_s: Some(GaussMarkov::new(1.days(), 5e-5, 1.5e-6).unwrap()),
@@ -465,7 +465,7 @@ mod gs_ut {
             },
             GroundStation {
                 name: "Canberra".to_string(),
-                frame: IAU_EARTH_FRAME,
+                frame: IAU_EARTH_FRAME.with_mu_km3_s2(398600.435436096),
                 elevation_mask_deg: 5.0,
                 range_noise_km: Some(GaussMarkov::new(1.days(), 5e-3, 1e-4).unwrap()),
                 doppler_noise_km_s: Some(GaussMarkov::new(1.days(), 5e-5, 1.5e-6).unwrap()),
@@ -479,5 +479,9 @@ mod gs_ut {
         ];
 
         assert_eq!(expected, stations);
+
+        // Serialize back
+        let reser = serde_yaml::to_string(&expected).unwrap();
+        dbg!(reser);
     }
 }
