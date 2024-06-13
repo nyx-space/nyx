@@ -131,7 +131,7 @@ pub enum EventError {
     #[snafu(display("when computing an event in a trajectory {source}"))]
     EventTrajError { source: TrajError },
     #[snafu(display("Event {event} not found between {start} and {end}"))]
-    EventNotFound {
+    NotFound {
         start: Epoch,
         end: Epoch,
         event: String,

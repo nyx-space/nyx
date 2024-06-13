@@ -116,7 +116,7 @@ where
             }
             if has_converged(xa, xb) {
                 // The event isn't in the bracket
-                return Err(EventError::EventNotFound {
+                return Err(EventError::NotFound {
                     start,
                     end,
                     event: format!("{event}"),
@@ -176,7 +176,7 @@ where
             }
         }
         error!("Brent solver failed after {max_iter} iterations");
-        Err(EventError::EventNotFound {
+        Err(EventError::NotFound {
             start,
             end,
             event: format!("{event}"),
@@ -208,7 +208,7 @@ where
         let start_epoch = self.first().epoch();
         let end_epoch = self.last().epoch();
         if start_epoch == end_epoch {
-            return Err(EventError::EventNotFound {
+            return Err(EventError::NotFound {
                 start: start_epoch,
                 end: end_epoch,
                 event: format!("{event}"),
@@ -286,7 +286,7 @@ where
 
                     // If there still isn't any match, report that the event was not found
                     if states.is_empty() {
-                        return Err(EventError::EventNotFound {
+                        return Err(EventError::NotFound {
                             start: start_epoch,
                             end: end_epoch,
                             event: format!("{event}"),
@@ -294,7 +294,7 @@ where
                     }
                 }
                 Err(_) => {
-                    return Err(EventError::EventNotFound {
+                    return Err(EventError::NotFound {
                         start: start_epoch,
                         end: end_epoch,
                         event: format!("{event}"),
@@ -415,7 +415,7 @@ where
                         EventDetails::new(*self.last(), last_eval, event, self, almanac.clone())?,
                     ]
                 } else {
-                    return Err(EventError::EventNotFound {
+                    return Err(EventError::NotFound {
                         start: self.first().epoch(),
                         end: self.last().epoch(),
                         event: format!("{event}"),
