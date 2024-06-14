@@ -51,6 +51,9 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust.version }}
+      
+      - name: Download data
+        run: wget -O data/de440s.bsp http://public-data.nyxspace.com/anise/de440s.bsp
 
       - name: Set up cargo cache
         uses: actions/cache@v3
