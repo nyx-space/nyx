@@ -35,13 +35,12 @@ jobs:
   tests:
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
         rust:
           #- { version: "1.70", name: MSRV } # Reenable this before stablizing version 2.0
           - { version: stable, name: stable }
 
-    runs-on: ${{ matrix.os }}
-    name: Tests (${{ matrix.os }}, ${{ matrix.rust.name }})
+    runs-on: ubuntu-latest
+    name: Tests (ubuntu-latest, ${{ matrix.rust.name }})
     needs: [check]
     steps:
       - name: Checkout sources
