@@ -142,11 +142,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                     }
                     Vary::ThrustLevel => {
                         mnvr.thrust_prct += var.perturbation;
-                        if mnvr.thrust_prct > 1.0 {
-                            mnvr.thrust_prct = 1.0
-                        } else if mnvr.thrust_prct < 0.0 {
-                            mnvr.thrust_prct = 0.0
-                        }
+                        mnvr.thrust_prct = mnvr.thrust_prct.clamp(0.0, 1.0);
                     }
                     _ => unreachable!(),
                 }
@@ -174,7 +170,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             total_correction[i] += var.init_guess;
         }
 
-        let mut prev_err_norm = std::f64::INFINITY;
+        let mut prev_err_norm = f64::INFINITY;
 
         // Determine padding in debugging info
         // For the width, we find the largest desired values and multiply it by the order of magnitude of its tolerance
@@ -384,11 +380,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                             }
                             Vary::ThrustLevel => {
                                 this_mnvr.thrust_prct += var.perturbation;
-                                if this_mnvr.thrust_prct > 1.0 {
-                                    this_mnvr.thrust_prct = 1.0
-                                } else if this_mnvr.thrust_prct < 0.0 {
-                                    this_mnvr.thrust_prct = 0.0
-                                }
+                                this_mnvr.thrust_prct = this_mnvr.thrust_prct.clamp(0.0, 1.0);
                             }
                             _ => unreachable!(),
                         }

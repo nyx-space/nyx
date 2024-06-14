@@ -298,7 +298,7 @@ pub fn eclipse_state(
 
     // If the light source's radius is zero, just call the line of sight algorithm
 
-    if ls_mean_eq_radius_km < std::f64::EPSILON {
+    if ls_mean_eq_radius_km < f64::EPSILON {
         // TODO(ANISE): I think I need the opposite data here! Hence the neg!
         let observed = almanac.transform_to(observer, light_source, None)?;
 

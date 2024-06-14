@@ -330,7 +330,7 @@ pub fn try_achieve_b_plane(
     let max_iter = 10;
 
     let mut real_orbit = orbit;
-    let mut prev_b_plane_err = std::f64::INFINITY;
+    let mut prev_b_plane_err = f64::INFINITY;
 
     if !target.ltof_target_set() {
         // If no LTOF is targeted, we'll solve this with a least squared approach.

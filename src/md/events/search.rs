@@ -334,8 +334,8 @@ where
         E: EventEvaluator<S>,
     {
         let step: Duration = 1 * precision;
-        let mut min_val = std::f64::INFINITY;
-        let mut max_val = std::f64::NEG_INFINITY;
+        let mut min_val = f64::INFINITY;
+        let mut max_val = f64::NEG_INFINITY;
         let mut min_state = S::zeros();
         let mut max_state = S::zeros();
 

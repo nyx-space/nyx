@@ -117,14 +117,10 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
         const NUM_VARIABLES: usize = 6;
 
         // The correction stores, in order, alpha_0, \dot{alpha_0}, \ddot{alpha_0}, beta_0, \dot{beta_0}, \ddot{beta_0}
-        let mut prev_err_norm = std::f64::INFINITY;
+        let mut prev_err_norm = f64::INFINITY;
         // The objectives will be updated if the duration of the maneuver is changed
-        let mut sc_x0 = pre_traj
-            .at(mnvr.start)
-            .context(TargetingTrajSnafu)?;
-        let mut sc_xf_desired = post_traj
-            .at(mnvr.end)
-            .context(TargetingTrajSnafu)?;
+        let mut sc_x0 = pre_traj.at(mnvr.start).context(TargetingTrajSnafu)?;
+        let mut sc_xf_desired = post_traj.at(mnvr.end).context(TargetingTrajSnafu)?;
         let mut objectives = [
             Objective {
                 parameter: StateParameter::X,
@@ -409,12 +405,8 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
 
             println!("New mnvr {mnvr}");
             if update_obj {
-                sc_x0 = pre_traj
-                    .at(mnvr.start)
-                    .context(TargetingTrajSnafu)?;
-                sc_xf_desired = post_traj
-                    .at(mnvr.end)
-                    .context(TargetingTrajSnafu)?;
+                sc_x0 = pre_traj.at(mnvr.start).context(TargetingTrajSnafu)?;
+                sc_xf_desired = post_traj.at(mnvr.end).context(TargetingTrajSnafu)?;
                 objectives = [
                     Objective::within_tolerance(StateParameter::X, sc_xf_desired.orbit.x_km, 1e-3),
                     Objective::within_tolerance(StateParameter::Y, sc_xf_desired.orbit.y_km, 1e-3),

@@ -18,7 +18,6 @@
 
 /* NOTE: This code is effectively a clone of bacon-sci, MIT License, by Wyatt Campbell. */
 
-use std::f64::EPSILON;
 use std::fmt;
 use std::ops;
 
@@ -107,23 +106,12 @@ impl<const SIZE: usize> Polynomial<SIZE> {
         false
     }
 
-    /// Shifts all of the coefficients by one degree, dropping the largest degree.
-    /// For example:
-    /// P(x) = 10x^3 -6.13353243x^2 + 3.61185323x + 0.194533 .. becomes ...
-    /// P(x) = -6.13353243x^3 + 3.61185323x^2 + 0.194533x
-    pub(crate) fn shift_by_one(&mut self) {
-        let prev_coeff = self.coefficients;
-        self.coefficients[1..((prev_coeff.len() - 1) + 1)]
-            .clone_from_slice(&prev_coeff[..(prev_coeff.len() - 1)]);
-        self.coefficients[0] = 0.0;
-    }
-
     fn fmt_with_var(&self, f: &mut fmt::Formatter, var: String) -> fmt::Result {
         write!(f, "P({var}) = ")?;
         let mut data = Vec::with_capacity(SIZE);
 
         for (i, c) in self.coefficients.iter().enumerate().rev() {
-            if c.abs() <= EPSILON {
+            if c.abs() <= f64::EPSILON {
                 continue;
             }
 
@@ -253,31 +241,6 @@ impl<const S1: usize, const S2: usize> ops::Sub<Polynomial<S2>> for Polynomial<S
     fn sub(self, other: Polynomial<S2>) -> Self::Output {
         sub(self, other)
     }
-}
-
-/// Multiply two polynomials. First parameter is the size of the first polynomial, second is the size of the second, and third is the sum of both minus one.
-/// Implementation is naive and has a complexity of O(n*m) where n and m are the sizes of the polynomials.
-pub(crate) fn multiply<const S1: usize, const S2: usize, const S3: usize>(
-    p1: Polynomial<S1>,
-    p2: Polynomial<S2>,
-) -> Polynomial<S3> {
-    let mut rslt = Polynomial::<S3>::zeros();
-    for (exponent, val) in p2.coefficients.iter().enumerate() {
-        if (*val).abs() < std::f64::EPSILON {
-            // Skip any zeros to allow multiplying large polynomials with themselves.
-            continue;
-        }
-        let if_was_scalar = *val * p1;
-        for (pos, ival) in if_was_scalar.coefficients.iter().enumerate() {
-            if (*ival).abs() < std::f64::EPSILON {
-                // Skip any zeros to allow multiplying large polynomials with themselves.
-                continue;
-            }
-            rslt.coefficients[pos + exponent] += *ival;
-        }
-    }
-
-    rslt
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -533,50 +496,4 @@ fn poly_sub() {
             "Constant polynomial returned wrong value"
         );
     }
-}
-
-#[test]
-fn poly_multiply() {
-    let p1 = Polynomial {
-        coefficients: [4.0, -2.0, 3.0],
-    };
-    let p2 = Polynomial {
-        coefficients: [0.0, -5.0, 0.0, 2.0],
-    };
-    //      P(x) = (3x^2 - 2x + 4) * (2x^3 - 5x)
-    // <=>  P(x) = (3x^2 - 2x + 4) * (2x^3) + (- 5x) * (3x^2 - 2x + 4)
-    // <=>  P(x) = (6x^5 - 4x^4 + 8x^3) + (-15x^3 + 10x^2 -20x)
-    // <=>  P(x) = 6x^5 - 4x^4 -7x^3 + 10x^2 -20x
-    let p_expected = Polynomial {
-        coefficients: [0.0, -20.0, 10.0, -7.0, -4.0, 6.0],
-    };
-
-    let p3 = multiply::<3, 4, 6>(p1, p2);
-    println!("p3 = {:x}\npe = {:x}", p3, p_expected);
-    assert_eq!(p3, p_expected);
-    // Check this is correct
-    for i in -100..=100 {
-        let x = i as f64;
-        let expect = p1.eval(x) * p2.eval(x);
-        assert!(
-            (p3.eval(x) - expect).abs() < 2e-16,
-            "Constant polynomial returned wrong value"
-        );
-    }
-}
-
-#[test]
-fn poly_shift_mulx() {
-    let mut p1 = Polynomial {
-        coefficients: [0.194533, 3.61185323, -6.13353243, 10.0],
-    };
-
-    let pe = Polynomial {
-        coefficients: [0.0, 0.194533, 3.61185323, -6.13353243],
-    };
-
-    println!("p1 = {:x}", p1);
-    p1.shift_by_one();
-    println!("p1 = {:x}\npe = {:x}", p1, pe);
-    assert_eq!(p1, pe);
 }

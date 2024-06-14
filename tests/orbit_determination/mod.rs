@@ -18,11 +18,10 @@ mod two_body;
 mod xhat_dev;
 
 use self::nyx::linalg::{Matrix2, SMatrix, Vector2};
-use std::f64::EPSILON;
 
 macro_rules! f64_nil {
     ($x:expr, $msg:expr) => {
-        assert!($x.abs() < EPSILON, $msg)
+        assert!($x.abs() < f64::EPSILON, $msg)
     };
 }
 

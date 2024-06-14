@@ -16,7 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub mod hermite;
 mod polynomial;
 
 pub use polynomial::{CommonPolynomial, Polynomial};

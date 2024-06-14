@@ -110,7 +110,7 @@ fn val_transfer_schedule_no_depl(almanac: Arc<Almanac>) {
 
     // Ensure that there was no change in fuel mass since tank depletion was off
     assert!(
-        (final_state.fuel_mass_kg - fuel_mass).abs() < std::f64::EPSILON,
+        (final_state.fuel_mass_kg - fuel_mass).abs() < f64::EPSILON,
         "incorrect fuel mass"
     );
 }

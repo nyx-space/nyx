@@ -30,7 +30,6 @@ use crate::TimeTagged;
 use hyperdual::linalg::norm;
 use hyperdual::{Float, OHyperdual};
 use std::f64::consts::PI;
-use std::f64::EPSILON;
 use std::fmt;
 
 /// Orbit defines an orbital state
@@ -362,7 +361,7 @@ impl OrbitDual {
             );
         }
         let cos_nu = self.evec()?.dot(&self.radius()) / (self.ecc()?.dual * self.rmag().dual);
-        if (cos_nu.real().abs() - 1.0).abs() < EPSILON {
+        if (cos_nu.real().abs() - 1.0).abs() < f64::EPSILON {
             // This bug drove me crazy when writing SMD in Go in 2017.
             if cos_nu > 1.0 {
                 Ok(OrbitPartial {
