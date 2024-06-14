@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -79,6 +79,7 @@ pub fn dv_execution_error<R: Rng>(
     Ok(new_mag * (dv / dv.norm()))
 }
 
+#[allow(clippy::float_equality_without_abs)]
 #[test]
 fn test_dv_mag_fixed() {
     use super::thread_rng;

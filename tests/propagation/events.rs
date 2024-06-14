@@ -74,7 +74,7 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
         IAU_EARTH_FRAME,
     );
     let mut min_el = f64::INFINITY;
-    let mut max_el = std::f64::NEG_INFINITY;
+    let mut max_el = f64::NEG_INFINITY;
     let mut min_dt = dt;
     let mut max_dt = dt;
     for state in traj.every(10 * Unit::Second) {
