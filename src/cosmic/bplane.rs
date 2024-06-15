@@ -19,6 +19,7 @@
 use anise::prelude::{Frame, Orbit};
 
 use super::{AstroError, AstroPhysicsSnafu, OrbitDual, OrbitPartial};
+use crate::cosmic::NotHyperbolicSnafu;
 use crate::linalg::{Matrix2, Matrix3, Vector2, Vector3};
 use crate::md::objective::Objective;
 use crate::md::{AstroSnafu, StateParameter, TargetingError};
@@ -28,7 +29,7 @@ use hyperdual::linalg::norm;
 use hyperdual::{Float, OHyperdual};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
-use snafu::ResultExt;
+use snafu::{ensure, ResultExt};
 use std::convert::From;
 use std::fmt;
 
@@ -53,83 +54,84 @@ pub struct BPlane {
 impl BPlane {
     /// Returns a newly define B-Plane if the orbit is hyperbolic and already in Dual form
     pub fn from_dual(orbit: OrbitDual) -> Result<Self, AstroError> {
-        if orbit.ecc().context(AstroPhysicsSnafu)?.real() <= 1.0 {
-            Err(AstroError::NotHyperbolic)
-        } else {
-            let one = OHyperdual::from(1.0);
-            let zero = OHyperdual::from(0.0);
+        ensure!(
+            orbit.ecc().context(AstroPhysicsSnafu)?.real() > 1.0,
+            NotHyperbolicSnafu
+        );
 
-            let e_hat = orbit.evec().context(AstroPhysicsSnafu)?
-                / orbit.ecc().context(AstroPhysicsSnafu)?.dual;
-            let h_hat = orbit.hvec() / orbit.hmag().dual;
-            let n_hat = h_hat.cross(&e_hat);
+        let one = OHyperdual::from(1.0);
+        let zero = OHyperdual::from(0.0);
 
-            // The reals implementation (which was initially validated) was:
-            // let s = e_hat / orbit.ecc() + (1.0 - (1.0 / orbit.ecc()).powi(2)).sqrt() * n_hat;
-            // let s_hat = s / s.norm();
+        let e_hat =
+            orbit.evec().context(AstroPhysicsSnafu)? / orbit.ecc().context(AstroPhysicsSnafu)?.dual;
+        let h_hat = orbit.hvec() / orbit.hmag().dual;
+        let n_hat = h_hat.cross(&e_hat);
 
-            let ecc = orbit.ecc().context(AstroPhysicsSnafu)?;
+        // The reals implementation (which was initially validated) was:
+        // let s = e_hat / orbit.ecc() + (1.0 - (1.0 / orbit.ecc()).powi(2)).sqrt() * n_hat;
+        // let s_hat = s / s.norm();
 
-            let incoming_asymptote_fact = (one - (one / ecc.dual).powi(2)).sqrt();
+        let ecc = orbit.ecc().context(AstroPhysicsSnafu)?;
 
-            let s = Vector3::new(
-                e_hat[0] / ecc.dual + incoming_asymptote_fact * n_hat[0],
-                e_hat[1] / ecc.dual + incoming_asymptote_fact * n_hat[1],
-                e_hat[2] / ecc.dual + incoming_asymptote_fact * n_hat[2],
-            );
+        let incoming_asymptote_fact = (one - (one / ecc.dual).powi(2)).sqrt();
 
-            let s_hat = s / norm(&s); // Just to make sure to renormalize everything
+        let s = Vector3::new(
+            e_hat[0] / ecc.dual + incoming_asymptote_fact * n_hat[0],
+            e_hat[1] / ecc.dual + incoming_asymptote_fact * n_hat[1],
+            e_hat[2] / ecc.dual + incoming_asymptote_fact * n_hat[2],
+        );
 
-            // The reals implementation (which was initially validated) was:
-            // let b_vec = orbit.semi_minor_axis()
-            //     * ((1.0 - (1.0 / orbit.ecc()).powi(2)).sqrt() * e_hat
-            //         - (1.0 / orbit.ecc() * n_hat));
-            let semi_minor_axis = orbit.semi_minor_axis().context(AstroPhysicsSnafu)?;
+        let s_hat = s / norm(&s); // Just to make sure to renormalize everything
 
-            let b_vec = Vector3::new(
-                semi_minor_axis.dual
-                    * (incoming_asymptote_fact * e_hat[0] - ((one / ecc.dual) * n_hat[0])),
-                semi_minor_axis.dual
-                    * (incoming_asymptote_fact * e_hat[1] - ((one / ecc.dual) * n_hat[1])),
-                semi_minor_axis.dual
-                    * (incoming_asymptote_fact * e_hat[2] - ((one / ecc.dual) * n_hat[2])),
-            );
+        // The reals implementation (which was initially validated) was:
+        // let b_vec = orbit.semi_minor_axis()
+        //     * ((1.0 - (1.0 / orbit.ecc()).powi(2)).sqrt() * e_hat
+        //         - (1.0 / orbit.ecc() * n_hat));
+        let semi_minor_axis = orbit.semi_minor_axis().context(AstroPhysicsSnafu)?;
 
-            let t = s_hat.cross(&Vector3::new(zero, zero, one));
-            let t_hat = t / norm(&t);
-            let r_hat = s_hat.cross(&t_hat);
+        let b_vec = Vector3::new(
+            semi_minor_axis.dual
+                * (incoming_asymptote_fact * e_hat[0] - ((one / ecc.dual) * n_hat[0])),
+            semi_minor_axis.dual
+                * (incoming_asymptote_fact * e_hat[1] - ((one / ecc.dual) * n_hat[1])),
+            semi_minor_axis.dual
+                * (incoming_asymptote_fact * e_hat[2] - ((one / ecc.dual) * n_hat[2])),
+        );
 
-            // Build the rotation matrix from inertial to B Plane
-            let str_rot = Matrix3::new(
-                s_hat[0].real(),
-                s_hat[1].real(),
-                s_hat[2].real(),
-                t_hat[0].real(),
-                t_hat[1].real(),
-                t_hat[2].real(),
-                r_hat[0].real(),
-                r_hat[1].real(),
-                r_hat[2].real(),
-            );
+        let t = s_hat.cross(&Vector3::new(zero, zero, one));
+        let t_hat = t / norm(&t);
+        let r_hat = s_hat.cross(&t_hat);
 
-            Ok(BPlane {
-                b_r: OrbitPartial {
-                    dual: b_vec.dot(&r_hat),
-                    param: StateParameter::BdotR,
-                },
-                b_t: OrbitPartial {
-                    dual: b_vec.dot(&t_hat),
-                    param: StateParameter::BdotT,
-                },
-                ltof_s: OrbitPartial {
-                    dual: b_vec.dot(&s_hat) / orbit.vmag().dual,
-                    param: StateParameter::BLTOF,
-                },
-                str_dcm: str_rot,
-                frame: orbit.frame,
-                epoch: orbit.dt,
-            })
-        }
+        // Build the rotation matrix from inertial to B Plane
+        let str_rot = Matrix3::new(
+            s_hat[0].real(),
+            s_hat[1].real(),
+            s_hat[2].real(),
+            t_hat[0].real(),
+            t_hat[1].real(),
+            t_hat[2].real(),
+            r_hat[0].real(),
+            r_hat[1].real(),
+            r_hat[2].real(),
+        );
+
+        Ok(BPlane {
+            b_r: OrbitPartial {
+                dual: b_vec.dot(&r_hat),
+                param: StateParameter::BdotR,
+            },
+            b_t: OrbitPartial {
+                dual: b_vec.dot(&t_hat),
+                param: StateParameter::BdotT,
+            },
+            ltof_s: OrbitPartial {
+                dual: b_vec.dot(&s_hat) / orbit.vmag().dual,
+                param: StateParameter::BLTOF,
+            },
+            str_dcm: str_rot,
+            frame: orbit.frame,
+            epoch: orbit.dt,
+        })
     }
 
     /// Returns a newly defined B-Plane if the orbit is hyperbolic.
@@ -143,7 +145,7 @@ impl BPlane {
         self.str_dcm
     }
 
-    /// Returns the Jacobian of the B plane (BT, BR, LTOF) with respect to the velocity
+    /// Returns the Jacobian of the B plane (BR, BT, LTOF) with respect to the velocity
     pub fn jacobian(&self) -> Matrix3<f64> {
         Matrix3::new(
             self.b_r.wtr_vx(),
@@ -158,26 +160,26 @@ impl BPlane {
         )
     }
 
-    /// Returns the Jacobian of the B plane (BT, BR) with respect to two of the velocity components
+    /// Returns the Jacobian of the B plane (BR, BT) with respect to two of the velocity components
     pub fn jacobian2(&self, invariant: StateParameter) -> Result<Matrix2<f64>, AstroError> {
         match invariant {
             StateParameter::VX => Ok(Matrix2::new(
-                self.b_t.wtr_vy(),
-                self.b_t.wtr_vz(),
                 self.b_r.wtr_vy(),
                 self.b_r.wtr_vz(),
+                self.b_t.wtr_vy(),
+                self.b_t.wtr_vz(),
             )),
             StateParameter::VY => Ok(Matrix2::new(
-                self.b_t.wtr_vx(),
-                self.b_t.wtr_vz(),
                 self.b_r.wtr_vx(),
                 self.b_r.wtr_vz(),
+                self.b_t.wtr_vx(),
+                self.b_t.wtr_vz(),
             )),
             StateParameter::VZ => Ok(Matrix2::new(
-                self.b_t.wtr_vx(),
-                self.b_t.wtr_vy(),
                 self.b_r.wtr_vx(),
                 self.b_r.wtr_vy(),
+                self.b_t.wtr_vx(),
+                self.b_t.wtr_vy(),
             )),
             _ => Err(AstroError::BPlaneInvariant),
         }
@@ -253,7 +255,7 @@ pub struct BPlaneTarget {
 impl BPlaneTarget {
     /// Initializes a new B Plane target with only the targets and the default tolerances.
     /// Default tolerances are 1 millimeter in positions and 1 second in LTOF
-    pub fn from_targets(b_r_km: f64, b_t_km: f64, ltof: Duration) -> Self {
+    pub fn from_targets(b_t_km: f64, b_r_km: f64, ltof: Duration) -> Self {
         let tol_ltof: Duration = 6.0 * Unit::Hour;
         Self {
             b_t_km,
@@ -403,13 +405,13 @@ pub fn try_achieve_b_plane(
             }
 
             // Build the error vector
-            let b_plane_err = Vector3::new(bt_err, br_err, ltof_err);
+            let b_plane_err = Vector3::new(br_err, bt_err, ltof_err);
 
             if b_plane_err.norm() >= prev_b_plane_err {
                 return Err(TargetingError::CorrectionIneffective {
                     prev_val: prev_b_plane_err,
                     cur_val: b_plane_err.norm(),
-                    action: "LTOF enabled correction is failing. Try to not set an LTOF target. Delta-V correction is ineffective at reducing the B-Plane error",
+                    action: "LTOF enabled correction is failing. Try to not set an LTOF target.",
                 });
             }
             prev_b_plane_err = b_plane_err.norm();

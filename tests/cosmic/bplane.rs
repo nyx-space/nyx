@@ -232,11 +232,11 @@ fn b_plane_davis(almanac: Arc<Almanac>) {
     assert!((delta_v[2] - 0.046145009839345504).abs() < 1e-9);
 
     // BUG: LTOF targeting will fail.
-    // let delta_v = try_achieve_b_plane(
+    // let (delta_v, achieved_b_plane) = try_achieve_b_plane(
     //     orbit,
     //     BPlaneTarget::from_targets(
-    //         5022.26511510685,
     //         13135.7982982557,
+    //         5022.26511510685,
     //         1 * Unit::Day + 3 * Unit::Hour,
     //     ),
     // )
