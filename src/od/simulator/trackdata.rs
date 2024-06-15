@@ -31,8 +31,6 @@ use crate::md::trajectory::Interpolatable;
 use crate::od::{Measurement, ODError};
 use crate::Orbit;
 
-// TODO(ANISE): TrackignDevice is now FromStr. Does that make sense?!
-
 /// Tracking device simulator.
 pub trait TrackingDeviceSim<MsrIn, Msr>: ConfigRepr
 where

@@ -84,8 +84,8 @@ impl RangeDoppler {
             );
         }
 
-        let range_km = (aer_t1.range_km - aer_t0.range_km) * 0.5;
-        let doppler_km_s = (aer_t1.range_rate_km_s - aer_t0.range_rate_km_s) * 0.5;
+        let range_km = (aer_t1.range_km + aer_t0.range_km) * 0.5;
+        let doppler_km_s = (aer_t1.range_rate_km_s + aer_t0.range_rate_km_s) * 0.5;
 
         // Time tagged at the realization of this measurement, i.e. at the end of the integration time.
         let epoch = aer_t1.epoch + timestamp_noise_s * Unit::Second;
