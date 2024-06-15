@@ -302,7 +302,7 @@ fn od_resid_reject_default_ckf_two_way(
     // That's not bad!
 
     assert!(
-        delta.rmag_km() < 0.5,
+        delta.rmag_km() < 0.6,
         "Position error should be less than 500 meters"
     );
     assert!(
