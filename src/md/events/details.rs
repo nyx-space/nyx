@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -16,13 +16,16 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::errors::NyxError;
+use anise::almanac::Almanac;
+
+use crate::errors::EventError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 use crate::md::prelude::{Interpolatable, Traj};
 use crate::md::EventEvaluator;
 use crate::time::Duration;
 use core::fmt;
+use std::sync::Arc;
 
 /// Enumerates the possible edges of an event in a trajectory.
 ///
@@ -86,16 +89,17 @@ where
         value: f64,
         event: &E,
         traj: &Traj<S>,
-    ) -> Result<Self, NyxError> {
+        almanac: Arc<Almanac>,
+    ) -> Result<Self, EventError> {
         let epoch = state.epoch();
         let prev_value = if let Ok(state) = traj.at(epoch - event.epoch_precision()) {
-            Some(event.eval(&state))
+            Some(event.eval(&state, almanac.clone())?)
         } else {
             None
         };
 
         let next_value = if let Ok(state) = traj.at(epoch + event.epoch_precision()) {
-            Some(event.eval(&state))
+            Some(event.eval(&state, almanac.clone())?)
         } else {
             None
         };
@@ -137,7 +141,7 @@ where
             prev_value,
             next_value,
             pm_duration: event.epoch_precision(),
-            repr: event.eval_string(&state).to_string(),
+            repr: event.eval_string(&state, almanac)?.to_string(),
         })
     }
 }

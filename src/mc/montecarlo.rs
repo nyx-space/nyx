@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -29,6 +29,7 @@ use crate::propagators::{ErrorCtrl, Propagator};
 use crate::time::Unit;
 use crate::time::{Duration, Epoch};
 use crate::State;
+use anise::almanac::Almanac;
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rand_distr::Distribution;
 use rayon::prelude::ParallelIterator;
@@ -36,6 +37,7 @@ use rayon::prelude::*;
 use std::f64;
 use std::fmt;
 use std::sync::mpsc::channel;
+use std::sync::Arc;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant as StdInstant;
 
@@ -81,6 +83,7 @@ where
     pub fn run_until_nth_event<'a, D, E, F>(
         self,
         prop: Propagator<'a, D, E>,
+        almanac: Arc<Almanac>,
         max_duration: Duration,
         event: &F,
         trigger: usize,
@@ -96,7 +99,7 @@ where
             + Allocator<f64, <D::StateType as State>::VecLength>,
         <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
     {
-        self.resume_run_until_nth_event(prop, 0, max_duration, event, trigger, num_runs)
+        self.resume_run_until_nth_event(prop, almanac, 0, max_duration, event, trigger, num_runs)
     }
 
     /// Generate states and propagate each independently until a specific event is found `trigger` times.
@@ -105,6 +108,7 @@ where
     pub fn resume_run_until_nth_event<'a, D, E, F>(
         &self,
         prop: Propagator<'a, D, E>,
+        almanac: Arc<Almanac>,
         skip: usize,
         max_duration: Duration,
         event: &F,
@@ -134,9 +138,9 @@ where
         init_states.par_iter().progress_with(pb).for_each_with(
             (prop, tx),
             |(prop, tx), (index, dispersed_state)| {
-                let result =
-                    prop.with(dispersed_state.state)
-                        .until_nth_event(max_duration, event, trigger);
+                let result = prop
+                    .with(dispersed_state.state, almanac.clone())
+                    .until_nth_event(max_duration, event, trigger);
 
                 // Build a single run result
                 let run = Run {
@@ -179,6 +183,7 @@ where
     pub fn run_until_epoch<'a, D, E>(
         self,
         prop: Propagator<'a, D, E>,
+        almanac: Arc<Almanac>,
         end_epoch: Epoch,
         num_runs: usize,
     ) -> Results<S, PropResult<S>>
@@ -191,7 +196,7 @@ where
             + Allocator<f64, <D::StateType as State>::VecLength>,
         <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
     {
-        self.resume_run_until_epoch(prop, 0, end_epoch, num_runs)
+        self.resume_run_until_epoch(prop, almanac, 0, end_epoch, num_runs)
     }
 
     /// Resumes a Monte Carlo run by skipping the first `skip` items, generating states only after that, and propagate each independently until the specified epoch.
@@ -200,6 +205,7 @@ where
     pub fn resume_run_until_epoch<'a, D, E>(
         &self,
         prop: Propagator<'a, D, E>,
+        almanac: Arc<Almanac>,
         skip: usize,
         end_epoch: Epoch,
         num_runs: usize,
@@ -227,7 +233,7 @@ where
             (prop, tx),
             |(arc_prop, tx), (index, dispersed_state)| {
                 let result = arc_prop
-                    .with(dispersed_state.state)
+                    .with(dispersed_state.state, almanac.clone())
                     .until_epoch_with_traj(end_epoch);
 
                 // Build a single run result

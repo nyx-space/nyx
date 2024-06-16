@@ -1,4 +1,4 @@
-from nyx_space.cosmic import Cosm, Orbit, Spacecraft, SrpConfig, DragConfig
+from nyx_space.cosmic import Orbit, Spacecraft, SrpConfig, DragConfig
 from nyx_space.time import Epoch, Unit, Duration
 from nyx_space.monte_carlo import generate_orbits, generate_spacecraft, StateParameter
 import pickle
@@ -42,7 +42,7 @@ def test_define_spacecraft():
 
     e = Epoch.system_now()
 
-    orbit = Orbit.from_keplerian_altitude(
+    orbit = Orbit.from_try_keplerian_altitude(
         400,
         ecc=1e-4,
         inc_deg=30.5,
@@ -53,7 +53,7 @@ def test_define_spacecraft():
         frame=eme2k,
     )
 
-    assert orbit.period() == Unit.Second * 5553.623455582
+    assert orbit.period().unwrap() == Unit.Second * 5553.623455582
 
     print(orbit)
     print(repr(orbit))
@@ -107,7 +107,7 @@ def test_generate_states():
 
     e = Epoch.system_now()
 
-    orbit = Orbit.from_keplerian_altitude(
+    orbit = Orbit.from_try_keplerian_altitude(
         400,
         ecc=1e-4,
         inc_deg=30.5,

@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -25,7 +25,8 @@ use crate::md::trajectory::TrajError;
 use crate::propagators::PropagationError;
 use crate::time::Epoch;
 use crate::Orbit;
-pub use crate::{cosmic::Cosm, State, TimeTagged};
+pub use crate::{State, TimeTagged};
+use anise::errors::AlmanacError;
 use hifitime::Duration;
 use snafu::prelude::Snafu;
 use std::sync::Arc;
@@ -186,4 +187,10 @@ pub enum ODError {
     ODConfigError { source: ConfigError },
     #[snafu(display("OD failed because of an I/O error: {source}"))]
     ODIOError { source: InputOutputError },
+    #[snafu(display("OD failed due to Almanac: {action} {source}"))]
+    ODAlmanac {
+        #[snafu(source(from(AlmanacError, Box::new)))]
+        source: Box<AlmanacError>,
+        action: &'static str,
+    },
 }

@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -19,7 +19,7 @@
 use rayon::prelude::*;
 use snafu::ResultExt;
 
-use crate::dynamics::guidance::{ra_dec_from_unit_vector, GuidanceErrors, Mnvr};
+use crate::dynamics::guidance::{ra_dec_from_unit_vector, GuidanceError, LocalFrame, Mnvr};
 use crate::linalg::{SMatrix, SVector, Vector3};
 use crate::md::objective::Objective;
 use crate::md::{prelude::*, PropSnafu, TargetingError};
@@ -41,7 +41,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
     ) -> Result<Mnvr, TargetingError> {
         if spacecraft.thruster.is_none() {
             return Err(TargetingError::GuidanceError {
-                source: GuidanceErrors::NoThrustersDefined,
+                source: GuidanceError::NoThrustersDefined,
             });
         }
 
@@ -50,7 +50,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
         /* ************************* */
         // Calculate the u, dot u (=0) and ddot u from this state
         let u = dv / dv.norm();
-        let r = spacecraft.orbit.radius();
+        let r = spacecraft.orbit.radius_km;
         let rmag = spacecraft.orbit.rmag_km();
         let u_ddot = (3.0 * spacecraft.orbit.frame.gm() / rmag.powi(5))
             * (r.dot(&u) * r - (r.dot(&u).powi(2) * u));
@@ -76,7 +76,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
             thrust_prct: 1.0,
             alpha_inplane_radians,
             delta_outofplane_radians: beta_outofplane_radians,
-            frame: Frame::Inertial,
+            frame: LocalFrame::Inertial,
         };
 
         println!("INITIAL GUESS\n{mnvr}\n\n");
@@ -88,16 +88,16 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
         let pre_sc = prop
             .with(spacecraft)
             .for_duration(-60.0 * Unit::Minute)
-            .with_context(|_| PropSnafu)?;
+            .context(PropSnafu)?;
         let (_, pre_traj) = prop
             .with(pre_sc)
             .until_epoch_with_traj(impulse_epoch)
-            .with_context(|_| PropSnafu)?;
+            .context(PropSnafu)?;
         // Post-traj is the trajectory _after_ the impulsive maneuver
         let (_, post_traj) = prop
             .with(spacecraft.with_dv(dv))
             .for_duration_with_traj(60.0 * Unit::Minute)
-            .with_context(|_| PropSnafu)?;
+            .context(PropSnafu)?;
 
         println!("{pre_traj}");
         println!("{post_traj}");
@@ -117,14 +117,10 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
         const NUM_VARIABLES: usize = 6;
 
         // The correction stores, in order, alpha_0, \dot{alpha_0}, \ddot{alpha_0}, beta_0, \dot{beta_0}, \ddot{beta_0}
-        let mut prev_err_norm = std::f64::INFINITY;
+        let mut prev_err_norm = f64::INFINITY;
         // The objectives will be updated if the duration of the maneuver is changed
-        let mut sc_x0 = pre_traj
-            .at(mnvr.start)
-            .with_context(|_| TargetingTrajSnafu)?;
-        let mut sc_xf_desired = post_traj
-            .at(mnvr.end)
-            .with_context(|_| TargetingTrajSnafu)?;
+        let mut sc_x0 = pre_traj.at(mnvr.start).context(TargetingTrajSnafu)?;
+        let mut sc_xf_desired = post_traj.at(mnvr.end).context(TargetingTrajSnafu)?;
         let mut objectives = [
             Objective {
                 parameter: StateParameter::X,
@@ -202,7 +198,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
             let sc_xf_achieved = prop
                 .with(sc_x0.with_guidance_mode(GuidanceMode::Thrust))
                 .until_epoch(mnvr.end)
-                .with_context(|_| PropSnafu)?;
+                .context(PropSnafu)?;
 
             println!("#{it} INIT: {sc_x0}\nAchieved: {sc_xf_achieved}\nDesired: {sc_xf_desired}");
 
@@ -303,7 +299,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
                 //         .transpose();
                 //     let velocity_correction =
                 //         dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
-                //     corrected_state.orbit.apply_dv(velocity_correction);
+                //     corrected_state.orbit.apply_dv_km_s(velocity_correction);
                 // } else {
                 //     corrected_state.orbit = corrected_state.orbit + state_correction;
                 // }
@@ -409,12 +405,8 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
 
             println!("New mnvr {mnvr}");
             if update_obj {
-                sc_x0 = pre_traj
-                    .at(mnvr.start)
-                    .with_context(|_| TargetingTrajSnafu)?;
-                sc_xf_desired = post_traj
-                    .at(mnvr.end)
-                    .with_context(|_| TargetingTrajSnafu)?;
+                sc_x0 = pre_traj.at(mnvr.start).context(TargetingTrajSnafu)?;
+                sc_xf_desired = post_traj.at(mnvr.end).context(TargetingTrajSnafu)?;
                 objectives = [
                     Objective::within_tolerance(StateParameter::X, sc_xf_desired.orbit.x_km, 1e-3),
                     Objective::within_tolerance(StateParameter::Y, sc_xf_desired.orbit.y_km, 1e-3),

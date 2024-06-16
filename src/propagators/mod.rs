@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -33,7 +33,7 @@ pub use rk_methods::*;
 mod options;
 pub use options::*;
 
-use crate::{dynamics::DynamicsError, io::ConfigError, md::trajectory::TrajError, time::Duration};
+use crate::{dynamics::DynamicsError, errors::EventError, io::ConfigError, time::Duration};
 
 /// Stores the details of the previous integration step of a given propagator. Access as `my_prop.clone().latest_details()`.
 #[derive(Copy, Clone, Debug)]
@@ -56,12 +56,12 @@ impl fmt::Display for IntegrationDetails {
     }
 }
 
-#[derive(Debug, Snafu, PartialEq)]
+#[derive(Debug, PartialEq, Snafu)]
 pub enum PropagationError {
     #[snafu(display("encountered a dynamics error {source}"))]
     Dynamics { source: DynamicsError },
     #[snafu(display("when propagating until an event: {source}"))]
-    TrajectoryEventError { source: TrajError },
+    TrajectoryEventError { source: EventError },
     #[snafu(display("requested propagation until event #{nth} but only {found} found"))]
     NthEventError { nth: usize, found: usize },
     #[snafu(display("propagation failed because {source}"))]

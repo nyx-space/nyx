@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -17,9 +17,8 @@
 */
 
 use super::scheduler::Scheduler;
-use crate::cosmic::Cosm;
+use crate::io::ConfigRepr;
 use crate::io::{duration_from_str, duration_to_str, epoch_from_str, epoch_to_str, ConfigError};
-use crate::io::{ConfigRepr, Configurable};
 use hifitime::TimeUnits;
 use hifitime::{Duration, Epoch};
 #[cfg(feature = "python")]
@@ -27,7 +26,7 @@ use pyo3::prelude::*;
 use serde::Deserialize;
 use serde_derive::Serialize;
 use std::fmt::Debug;
-use std::sync::Arc;
+use std::str::FromStr;
 use typed_builder::TypedBuilder;
 
 /// Stores a tracking configuration, there is one per tracking data simulator (e.g. one for ground station #1 and another for #2).
@@ -57,21 +56,11 @@ pub struct TrkConfig {
 
 impl ConfigRepr for TrkConfig {}
 
-impl Configurable for TrkConfig {
-    type IntermediateRepr = Self;
+impl FromStr for TrkConfig {
+    type Err = ConfigError;
 
-    fn from_config(
-        cfg: Self::IntermediateRepr,
-        _cosm: Arc<Cosm>,
-    ) -> Result<Self, crate::io::ConfigError>
-    where
-        Self: Sized,
-    {
-        Ok(cfg)
-    }
-
-    fn to_config(&self) -> Result<Self::IntermediateRepr, crate::io::ConfigError> {
-        Ok(self.clone())
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        serde_yaml::from_str(s).map_err(|source| ConfigError::ParseError { source })
     }
 }
 

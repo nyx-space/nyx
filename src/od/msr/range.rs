@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -67,7 +67,8 @@ impl RangeMsr {
         assert_eq!(tx.epoch, rx.epoch, "tx and rx states have different times");
 
         let dt = tx.epoch;
-        let hyperstate = hyperspace_from_vector(&(rx - tx).to_cartesian_vec());
+        let hyperstate =
+            hyperspace_from_vector(&(rx.to_cartesian_pos_vel() - tx.to_cartesian_pos_vel()));
         let (obs, h_tilde) = Self::compute_sensitivity(&hyperstate);
 
         RangeMsr {

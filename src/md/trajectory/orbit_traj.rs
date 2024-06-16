@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -39,7 +39,7 @@ impl Traj<Orbit> {
     /// Allows converting the source trajectory into the (almost) equivalent trajectory in another frame.
     /// This simply converts each state into the other frame and may lead to aliasing due to the Nyquist–Shannon sampling theorem.
     #[allow(clippy::map_clone)]
-    pub fn to_frame(&self, new_frame: Frame, cosm: Arc<Cosm>) -> Result<Self, NyxError> {
+    pub fn to_frame(&self, new_frame: Frame, almanac: Arc<Almanac>) -> Result<Self, NyxError> {
         if self.states.is_empty() {
             return Err(NyxError::Trajectory {
                 source: TrajError::CreationError {
@@ -83,7 +83,7 @@ impl Traj<Orbit> {
         body_fixed_frame: Frame,
         events: Option<Vec<&dyn EventEvaluator<Orbit>>>,
         metadata: Option<HashMap<String, String>>,
-        cosm: Arc<Cosm>,
+        almanac: Arc<Almanac>,
     ) -> Result<PathBuf, Box<dyn Error>> {
         let traj = self.to_frame(body_fixed_frame, cosm)?;
 

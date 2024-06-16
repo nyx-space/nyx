@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -99,7 +99,7 @@ pub(crate) fn process_tracking_arc(
 
     let mut odp = ODProcess::new(prop_est, kf, trigger, resid_crit, Cosm::de438());
 
-    let concrete_arc = arc.to_tracking_arc().with_context(|_| ODIOSnafu)?;
+    let concrete_arc = arc.to_tracking_arc().context(ODIOSnafu)?;
 
     odp.process_arc::<GroundStation>(&concrete_arc)?;
 

@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -17,8 +17,8 @@
 */
 use hifitime::Epoch;
 
-use super::{GuidanceLaw, Mnvr};
-use crate::cosmic::{Frame, GuidanceMode, Spacecraft};
+use super::{GuidanceError, GuidanceLaw, Mnvr};
+use crate::cosmic::{GuidanceMode, Spacecraft};
 use crate::linalg::Vector3;
 use crate::State;
 use std::fmt;
@@ -54,46 +54,41 @@ impl fmt::Display for FiniteBurns {
 }
 
 impl GuidanceLaw for FiniteBurns {
-    fn direction(&self, osc: &Spacecraft) -> Vector3<f64> {
+    fn direction(&self, osc: &Spacecraft) -> Result<Vector3<f64>, GuidanceError> {
         // NOTE: We do not increment the mnvr number here. The power function is called first,
         // so we let that function handle starting and stopping of the maneuver.
         match osc.mode() {
             GuidanceMode::Thrust => {
                 if let Some(next_mnvr) = self.maneuver_at(osc.epoch()) {
                     if next_mnvr.start <= osc.epoch() {
-                        if matches!(next_mnvr.frame, Frame::Inertial) {
-                            next_mnvr.vector(osc.epoch())
-                        } else {
-                            osc.orbit.dcm_from_traj_frame(next_mnvr.frame).unwrap()
-                                * next_mnvr.vector(osc.epoch())
-                        }
+                        <Mnvr as GuidanceLaw>::direction(next_mnvr, osc)
                     } else {
-                        Vector3::zeros()
+                        Ok(Vector3::zeros())
                     }
                 } else {
-                    Vector3::zeros()
+                    Ok(Vector3::zeros())
                 }
             }
-            _ => Vector3::zeros(),
+            _ => Ok(Vector3::zeros()),
         }
     }
 
-    fn throttle(&self, osc: &Spacecraft) -> f64 {
+    fn throttle(&self, osc: &Spacecraft) -> Result<f64, GuidanceError> {
         match osc.mode() {
             GuidanceMode::Thrust => {
                 if let Some(next_mnvr) = self.maneuver_at(osc.epoch()) {
                     if next_mnvr.start <= osc.epoch() {
-                        next_mnvr.thrust_prct
+                        Ok(next_mnvr.thrust_prct)
                     } else {
-                        0.0
+                        Ok(0.0)
                     }
                 } else {
-                    0.0
+                    Ok(0.0)
                 }
             }
             _ => {
                 // We aren't in maneuver mode, so return 0% throttle
-                0.0
+                Ok(0.0)
             }
         }
     }

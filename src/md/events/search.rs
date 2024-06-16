@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -17,16 +17,18 @@
 */
 
 use super::details::{EventArc, EventDetails, EventEdge};
-use crate::errors::NyxError;
+use crate::errors::{EventError, EventTrajSnafu};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 use crate::md::prelude::{Interpolatable, Traj};
-use crate::md::trajectory::TrajError;
 use crate::md::EventEvaluator;
 use crate::time::{Duration, Epoch, TimeSeries, Unit};
+use anise::almanac::Almanac;
 use rayon::prelude::*;
+use snafu::ResultExt;
 use std::iter::Iterator;
 use std::sync::mpsc::channel;
+use std::sync::Arc;
 
 impl<S: Interpolatable> Traj<S>
 where
@@ -40,7 +42,8 @@ where
         start: Epoch,
         end: Epoch,
         event: &E,
-    ) -> Result<EventDetails<S>, NyxError>
+        almanac: Arc<Almanac>,
+    ) -> Result<EventDetails<S>, EventError>
     where
         E: EventEvaluator<S>,
     {
@@ -64,10 +67,10 @@ where
         let mut xa = 0.0;
         let mut xb = (xb_e - xa_e).to_seconds();
         // Evaluate the event at both bounds
-        let ya_state = self.at(xa_e)?;
-        let yb_state = self.at(xb_e)?;
-        let mut ya = event.eval(&ya_state);
-        let mut yb = event.eval(&yb_state);
+        let ya_state = self.at(xa_e).context(EventTrajSnafu {})?;
+        let yb_state = self.at(xb_e).context(EventTrajSnafu {})?;
+        let mut ya = event.eval(&ya_state, almanac.clone())?;
+        let mut yb = event.eval(&yb_state, almanac.clone())?;
 
         // Check if we're already at the root
         if ya.abs() <= event.value_precision().abs() {
@@ -75,13 +78,13 @@ where
                 "{event} -- found with |{ya}| < {} @ {xa_e}",
                 event.value_precision().abs()
             );
-            return EventDetails::new(ya_state, ya, event, self);
+            return EventDetails::new(ya_state, ya, event, self, almanac.clone());
         } else if yb.abs() <= event.value_precision().abs() {
             debug!(
                 "{event} -- found with |{yb}| < {} @ {xb_e}",
                 event.value_precision().abs()
             );
-            return EventDetails::new(yb_state, yb, event, self);
+            return EventDetails::new(yb_state, yb, event, self, almanac.clone());
         }
 
         // The Brent solver, from the roots crate (sadly could not directly integrate it here)
@@ -99,7 +102,7 @@ where
                     event.value_precision().abs(),
                     state.epoch(),
                 );
-                return EventDetails::new(state, ya, event, self);
+                return EventDetails::new(state, ya, event, self, almanac.clone());
             }
             if yb.abs() < event.value_precision().abs() {
                 // Can't fail, we got it earlier
@@ -109,15 +112,15 @@ where
                     event.value_precision().abs(),
                     state.epoch()
                 );
-                return EventDetails::new(state, yb, event, self);
+                return EventDetails::new(state, yb, event, self, almanac.clone());
             }
             if has_converged(xa, xb) {
                 // The event isn't in the bracket
-                return Err(NyxError::from(TrajError::EventNotFound {
+                return Err(EventError::NotFound {
                     start,
                     end,
                     event: format!("{event}"),
-                }));
+                });
             }
             let mut s = if (ya - yc).abs() > f64::EPSILON && (yb - yc).abs() > f64::EPSILON {
                 xa * yb * yc / ((ya - yb) * (ya - yc))
@@ -137,15 +140,19 @@ where
             } else {
                 flag = false;
             }
-            let next_try = self.at(xa_e + s * Unit::Second)?;
-            let ys = event.eval(&next_try);
+            let next_try = self
+                .at(xa_e + s * Unit::Second)
+                .context(EventTrajSnafu {})?;
+            let ys = event.eval(&next_try, almanac.clone())?;
             xd = xc;
             xc = xb;
             yc = yb;
             if ya * ys < 0.0 {
                 // Root bracketed between a and s
-                let next_try = self.at(xa_e + xa * Unit::Second)?;
-                let ya_p = event.eval(&next_try);
+                let next_try = self
+                    .at(xa_e + xa * Unit::Second)
+                    .context(EventTrajSnafu {})?;
+                let ya_p = event.eval(&next_try, almanac.clone())?;
                 let (_a, _ya, _b, _yb) = arrange(xa, ya_p, s, ys);
                 {
                     xa = _a;
@@ -155,8 +162,10 @@ where
                 }
             } else {
                 // Root bracketed between s and b
-                let next_try = self.at(xa_e + xb * Unit::Second)?;
-                let yb_p = event.eval(&next_try);
+                let next_try = self
+                    .at(xa_e + xb * Unit::Second)
+                    .context(EventTrajSnafu {})?;
+                let yb_p = event.eval(&next_try, almanac.clone())?;
                 let (_a, _ya, _b, _yb) = arrange(s, ys, xb, yb_p);
                 {
                     xa = _a;
@@ -166,8 +175,11 @@ where
                 }
             }
         }
-        Err(NyxError::MaxIterReached {
-            msg: format!("Brent solver failed after {max_iter} iterations",),
+        error!("Brent solver failed after {max_iter} iterations");
+        Err(EventError::NotFound {
+            start,
+            end,
+            event: format!("{event}"),
         })
     }
 
@@ -185,14 +197,18 @@ where
     /// If this heuristic fails to find any such events, then `find_minmax` is called on the event with a time precision of `Unit::Second`.
     /// Then we search only within the min and max bounds of the provided event.
     #[allow(clippy::identity_op)]
-    pub fn find<E>(&self, event: &E) -> Result<Vec<EventDetails<S>>, TrajError>
+    pub fn find<E>(
+        &self,
+        event: &E,
+        almanac: Arc<Almanac>,
+    ) -> Result<Vec<EventDetails<S>>, EventError>
     where
         E: EventEvaluator<S>,
     {
         let start_epoch = self.first().epoch();
         let end_epoch = self.last().epoch();
         if start_epoch == end_epoch {
-            return Err(TrajError::EventNotFound {
+            return Err(EventError::NotFound {
                 start: start_epoch,
                 end: end_epoch,
                 event: format!("{event}"),
@@ -205,7 +221,9 @@ where
 
         let epochs: Vec<Epoch> = TimeSeries::inclusive(start_epoch, end_epoch, heuristic).collect();
         epochs.into_par_iter().for_each_with(sender, |s, epoch| {
-            if let Ok(event_state) = self.find_bracketed(epoch, epoch + heuristic, event) {
+            if let Ok(event_state) =
+                self.find_bracketed(epoch, epoch + heuristic, event, almanac.clone())
+            {
                 s.send(event_state).unwrap()
             };
         });
@@ -216,7 +234,7 @@ where
             warn!("Heuristic failed to find any {event} event, using slower approach");
             // Crap, we didn't find the event.
             // Let's find the min and max of this event throughout the trajectory, and search around there.
-            match self.find_minmax(event, Unit::Second) {
+            match self.find_minmax(event, Unit::Second, almanac.clone()) {
                 Ok((min_event, max_event)) => {
                     let lower_min_epoch =
                         if min_event.epoch() - 1 * Unit::Millisecond < self.first().epoch() {
@@ -247,22 +265,28 @@ where
                         };
 
                     // Search around the min event
-                    if let Ok(event_state) =
-                        self.find_bracketed(lower_min_epoch, lower_max_epoch, event)
-                    {
+                    if let Ok(event_state) = self.find_bracketed(
+                        lower_min_epoch,
+                        lower_max_epoch,
+                        event,
+                        almanac.clone(),
+                    ) {
                         states.push(event_state);
                     };
 
                     // Search around the max event
-                    if let Ok(event_state) =
-                        self.find_bracketed(upper_min_epoch, upper_max_epoch, event)
-                    {
+                    if let Ok(event_state) = self.find_bracketed(
+                        upper_min_epoch,
+                        upper_max_epoch,
+                        event,
+                        almanac.clone(),
+                    ) {
                         states.push(event_state);
                     };
 
                     // If there still isn't any match, report that the event was not found
                     if states.is_empty() {
-                        return Err(TrajError::EventNotFound {
+                        return Err(EventError::NotFound {
                             start: start_epoch,
                             end: end_epoch,
                             event: format!("{event}"),
@@ -270,7 +294,7 @@ where
                     }
                 }
                 Err(_) => {
-                    return Err(TrajError::EventNotFound {
+                    return Err(EventError::NotFound {
                         start: start_epoch,
                         end: end_epoch,
                         event: format!("{event}"),
@@ -300,13 +324,18 @@ where
 
     /// Find the minimum and maximum of the provided event through the trajectory
     #[allow(clippy::identity_op)]
-    pub fn find_minmax<E>(&self, event: &E, precision: Unit) -> Result<(S, S), NyxError>
+    pub fn find_minmax<E>(
+        &self,
+        event: &E,
+        precision: Unit,
+        almanac: Arc<Almanac>,
+    ) -> Result<(S, S), EventError>
     where
         E: EventEvaluator<S>,
     {
         let step: Duration = 1 * precision;
-        let mut min_val = std::f64::INFINITY;
-        let mut max_val = std::f64::NEG_INFINITY;
+        let mut min_val = f64::INFINITY;
+        let mut max_val = f64::NEG_INFINITY;
         let mut min_state = S::zeros();
         let mut max_state = S::zeros();
 
@@ -316,9 +345,11 @@ where
             TimeSeries::inclusive(self.first().epoch(), self.last().epoch(), step).collect();
 
         epochs.into_par_iter().for_each_with(sender, |s, epoch| {
+            // The `at` call will work because we only query within the start and end times of the trajectory
             let state = self.at(epoch).unwrap();
-            let this_eval = event.eval(&state);
-            s.send((this_eval, state)).unwrap();
+            if let Ok(this_eval) = event.eval(&state, almanac.clone()) {
+                s.send((this_eval, state)).unwrap();
+            }
         });
 
         let evald_states: Vec<_> = receiver.iter().collect();
@@ -360,31 +391,35 @@ where
     /// then this function checks whether the event is true at the start and end of the trajectory. If so, it means
     /// that there is a single arc that spans the whole trajectory.
     ///
-    pub fn find_arcs<E>(&self, event: &E) -> Result<Vec<EventArc<S>>, NyxError>
+    pub fn find_arcs<E>(
+        &self,
+        event: &E,
+        almanac: Arc<Almanac>,
+    ) -> Result<Vec<EventArc<S>>, EventError>
     where
         E: EventEvaluator<S>,
     {
-        let mut events = match self.find(event) {
+        let mut events = match self.find(event, almanac.clone()) {
             Ok(events) => events,
             Err(_) => {
                 // We haven't found the start or end of an arc, i.e. no zero crossing on the event.
                 // However, if the trajectory start and end are above the event value, then we found an arc.
-                let first_eval = event.eval(self.first());
-                let last_eval = event.eval(self.last());
+                let first_eval = event.eval(self.first(), almanac.clone())?;
+                let last_eval = event.eval(self.last(), almanac.clone())?;
                 if first_eval > 0.0 && last_eval > 0.0 {
                     // No event crossing found, but from the start until the end of the trajectory, we're in the same arc
                     // because the evaluation of the event is above the zero crossing.
                     // Hence, there's a single arc, and it's from start until the end of the trajectory.
                     vec![
-                        EventDetails::new(*self.first(), first_eval, event, self)?,
-                        EventDetails::new(*self.last(), last_eval, event, self)?,
+                        EventDetails::new(*self.first(), first_eval, event, self, almanac.clone())?,
+                        EventDetails::new(*self.last(), last_eval, event, self, almanac.clone())?,
                     ]
                 } else {
-                    return Err(NyxError::from(TrajError::EventNotFound {
+                    return Err(EventError::NotFound {
                         start: self.first().epoch(),
                         end: self.last().epoch(),
                         event: format!("{event}"),
-                    }));
+                    });
                 }
             }
         };
@@ -399,8 +434,14 @@ where
 
         // If the first event isn't a rising edge, then we mark the start of the trajectory as a rising edge
         let mut prev_rise = if events[0].edge != EventEdge::Rising {
-            let value = event.eval(self.first());
-            Some(EventDetails::new(*self.first(), value, event, self)?)
+            let value = event.eval(self.first(), almanac.clone())?;
+            Some(EventDetails::new(
+                *self.first(),
+                value,
+                event,
+                self,
+                almanac.clone(),
+            )?)
         } else {
             Some(events[0].clone())
         };
@@ -450,8 +491,8 @@ where
                 arcs.push(arc);
             } else {
                 // Use the last trajectory as the end of the arc
-                let value = event.eval(self.last());
-                let fall = EventDetails::new(*self.last(), value, event, self)?;
+                let value = event.eval(self.last(), almanac.clone())?;
+                let fall = EventDetails::new(*self.last(), value, event, self, almanac.clone())?;
                 let arc = EventArc {
                     rise: prev_rise.clone().unwrap(),
                     fall,

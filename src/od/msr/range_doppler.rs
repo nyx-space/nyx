@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -22,9 +22,9 @@ use crate::linalg::{DefaultAllocator, OMatrix, OVector, Vector2, U2};
 use crate::od::msr::RangeMsr;
 use crate::od::{EstimateFrom, Measurement};
 use crate::{Spacecraft, TimeTagged};
+use anise::astro::AzElRange;
 use arrow::datatypes::{DataType, Field};
 use hifitime::{Epoch, Unit};
-use nalgebra::Matrix2x6;
 use std::collections::HashMap;
 
 /// A simultaneous range and Doppler measurement in units of km and km/s, available both in one way and two way measurement.
@@ -43,92 +43,61 @@ impl RangeDoppler {
     /// + If the epochs of the two states differ.
     /// + If the frames of the two states differ.
     pub fn one_way(
-        tx: Orbit,
-        rx: Orbit,
+        aer: AzElRange,
         timestamp_noise_s: f64,
         range_noise_km: f64,
         doppler_noise_km_s: f64,
     ) -> Self {
-        assert_eq!(tx.frame, rx.frame, "tx & rx in different frames");
-        assert_eq!(tx.epoch, rx.epoch, "tx & rx states have different times");
-
-        let range_vec_km = tx.radius() - rx.radius();
-        let doppler_km_s = range_vec_km.dot(&(tx.velocity() - rx.velocity())) / range_vec_km.norm();
-
         Self {
-            epoch: tx.epoch + timestamp_noise_s * Unit::Second,
+            epoch: aer.epoch + timestamp_noise_s * Unit::Second,
             obs: Vector2::new(
-                range_vec_km.norm() + range_noise_km,
-                doppler_km_s + doppler_noise_km_s,
+                aer.range_km + range_noise_km,
+                aer.range_rate_km_s + doppler_noise_km_s,
             ),
         }
     }
 
     /// Initialize a new two-way range and Doppler measurement from the provided states as times t_1 and t_2 and the effective noises.
     ///
-    /// The measurement is time-tagged at realization, i.e. at the end of the integration time.
+    /// The measurement is time-tagged at realization, i.e. at the end of the integration time (plus timestamp noise).
+    ///
+    /// # Noise
+    /// The measurements are not considered to be independent distributed variables. As such, the noises are reduced by a factor of sqrt(2).
     ///
     /// # Panics
     /// + If the epochs of the two states differ.
     /// + If the frames of the two states differ.
     /// + If both epochs are identical.
     pub fn two_way(
-        tx: (Orbit, Orbit),
-        rx: (Orbit, Orbit),
+        aer_t0: AzElRange,
+        aer_t1: AzElRange,
         timestamp_noise_s: f64,
         range_noise_km: f64,
         doppler_noise_km_s: f64,
     ) -> Self {
-        assert_eq!(tx.0.frame, tx.1.frame, "both tx in different frames");
-        assert_ne!(tx.0.epoch, tx.1.epoch, "tx states have identical times");
-        assert_ne!(rx.0.epoch, rx.1.epoch, "rx states have identical times");
-        assert_eq!(
-            tx.0.epoch, rx.0.epoch,
-            "tx and rx have different t_1: {} != {}",
-            tx.0.epoch, rx.0.epoch
-        );
-        assert_eq!(
-            tx.1.epoch, rx.1.epoch,
-            "tx and rx have different t_1: {} != {}",
-            tx.1.epoch, rx.1.epoch
-        );
+        if aer_t0.epoch == aer_t1.epoch {
+            return Self::one_way(
+                aer_t1,
+                timestamp_noise_s,
+                range_noise_km,
+                doppler_noise_km_s,
+            );
+        }
 
-        /*
-        Claude:
-
-        There are a few reasons this two-way method determines range and range-rate using:
-
-        Rx position at t1 (reception time) AND Tx position at t0 (original transmit time)
-
-        Rather than both positions at t1:
-
-            + To properly represent the total delay between transmit and receive
-            + Because the measurement depends on and is constrained to the actual transmit position, regardless of where the transmitter is at reception time
-            + For accurate velocity determination in the correct line-of-sight direction
-            + As an approximation for the signal path over the interval given limited position information
-
-         */
-
-        let range_1_km = (rx.0.radius() - tx.0.radius()) * 0.5;
-        let range_12_km = rx.1.radius() - tx.0.radius();
-        let range_2_km = range_12_km * 0.5;
-        let range_km = range_1_km + range_2_km;
-
-        // Compute the average velocity of the receiver over the integration time.
-        let v_rx = (rx.1.velocity() + rx.0.velocity()) * 0.5;
-        let doppler_km_s = range_km.dot(&(v_rx - tx.0.velocity())) / range_km.norm();
+        let range_km = (aer_t1.range_km + aer_t0.range_km) * 0.5;
+        let doppler_km_s = (aer_t1.range_rate_km_s + aer_t0.range_rate_km_s) * 0.5;
 
         // Time tagged at the realization of this measurement, i.e. at the end of the integration time.
-        let epoch = rx.1.epoch + timestamp_noise_s * Unit::Second;
+        let epoch = aer_t1.epoch + timestamp_noise_s * Unit::Second;
 
         let obs = Vector2::new(
-            range_km.norm() + range_noise_km / 2.0,
-            doppler_km_s + doppler_noise_km_s / 2.0,
+            range_km + range_noise_km / 2.0_f64.sqrt(),
+            doppler_km_s + doppler_noise_km_s / 2.0_f64.sqrt(),
         );
 
         debug!(
-            "two way msr @ {epoch}:\nrx.0 = {}\nrx.1 = {}{obs}",
-            rx.0, rx.1
+            "two way msr @ {epoch}:\naer_t0 = {}\naer_t1 = {}{obs}",
+            aer_t0, aer_t1
         );
 
         Self { epoch, obs }
@@ -170,40 +139,22 @@ impl Measurement for RangeDoppler {
     }
 }
 
-impl EstimateFrom<Spacecraft, RangeDoppler> for Orbit {
+impl EstimateFrom<Spacecraft, RangeDoppler> for Spacecraft {
     fn extract(from: Spacecraft) -> Self {
-        from.orbit
-    }
-
-    fn sensitivity(
-        msr: &RangeDoppler,
-        receiver: Self,
-        transmitter: Self,
-    ) -> OMatrix<f64, <RangeDoppler as Measurement>::MeasurementSize, Self::Size>
-    where
-        DefaultAllocator:
-            Allocator<f64, <RangeDoppler as Measurement>::MeasurementSize, Self::Size>,
-    {
-        <Orbit as EstimateFrom<Orbit, RangeDoppler>>::sensitivity(msr, receiver, transmitter)
-    }
-}
-
-impl EstimateFrom<Orbit, RangeDoppler> for Orbit {
-    fn extract(from: Orbit) -> Self {
         from
     }
 
     fn sensitivity(
         msr: &RangeDoppler,
         receiver: Self,
-        transmitter: Self,
+        transmitter: Orbit,
     ) -> OMatrix<f64, <RangeDoppler as Measurement>::MeasurementSize, Self::Size>
     where
         DefaultAllocator:
             Allocator<f64, <RangeDoppler as Measurement>::MeasurementSize, Self::Size>,
     {
-        let delta_r = receiver.radius() - transmitter.radius();
-        let delta_v = receiver.velocity() - transmitter.velocity();
+        let delta_r = receiver.orbit.radius_km - transmitter.radius_km;
+        let delta_v = receiver.orbit.velocity_km_s - transmitter.velocity_km_s;
         let ρ = msr.observation()[0];
         let ρ_dot = msr.observation()[1];
         let m11 = delta_r.x / ρ;
@@ -213,24 +164,13 @@ impl EstimateFrom<Orbit, RangeDoppler> for Orbit {
         let m22 = delta_v.y / ρ - ρ_dot * delta_r.y / ρ.powi(2);
         let m23 = delta_v.z / ρ - ρ_dot * delta_r.z / ρ.powi(2);
 
-        Matrix2x6::new(m11, m12, m13, 0.0, 0.0, 0.0, m21, m22, m23, m11, m12, m13)
-    }
-}
+        let items = &[
+            m11, m12, m13, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, m21, m22, m23, m11, m12, m13, 0.0, 0.0,
+            0.0,
+        ];
 
-impl EstimateFrom<Spacecraft, RangeDoppler> for Spacecraft {
-    fn extract(from: Spacecraft) -> Self {
-        from
-    }
-
-    fn sensitivity(
-        _msr: &RangeDoppler,
-        _receiver: Self,
-        _transmitter: Orbit,
-    ) -> OMatrix<f64, <RangeDoppler as Measurement>::MeasurementSize, Self::Size>
-    where
-        DefaultAllocator:
-            Allocator<f64, <RangeDoppler as Measurement>::MeasurementSize, Self::Size>,
-    {
-        todo!("cannot yet estimate a full spacecraft state")
+        OMatrix::<f64, <RangeDoppler as Measurement>::MeasurementSize, Self::Size>::from_row_slice(
+            items,
+        )
     }
 }

@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -16,25 +16,23 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::guidance::{ra_dec_from_unit_vector, GuidanceErrors, GuidanceLaw};
+use anise::prelude::Almanac;
+use snafu::ResultExt;
+
+use super::guidance::{ra_dec_from_unit_vector, GuidanceError, GuidanceLaw};
 use super::orbital::OrbitalDynamics;
-use super::{AccelModel, Dynamics, ForceModel};
+use super::{Dynamics, DynamicsGuidanceSnafu, ForceModel};
 pub use crate::cosmic::{GuidanceMode, Spacecraft, STD_GRAVITY};
 use crate::dynamics::DynamicsError;
-use crate::errors::NyxError;
-use crate::io::dynamics::DynamicsSerde;
-use crate::io::gravity::HarmonicsMem;
 
-use crate::io::{ConfigError, Configurable};
 use crate::linalg::{Const, DimName, OMatrix, OVector, Vector3};
 pub use crate::md::prelude::SolarPressure;
-use crate::md::prelude::{Harmonics, PointMasses};
 use crate::State;
 
 use std::fmt::{self, Write};
 use std::sync::Arc;
 
-use crate::cosmic::{AstroError, Cosm};
+use crate::cosmic::AstroError;
 #[cfg(feature = "python")]
 use crate::io::ConfigRepr;
 #[cfg(feature = "python")]
@@ -60,6 +58,7 @@ const NORM_ERR: f64 = 1e-4;
 #[cfg_attr(feature = "python", pyo3(module = "nyx_space.mission_design"))]
 pub struct SpacecraftDynamics {
     pub orbital_dyn: OrbitalDynamics,
+    // TODO(ANISE): Remove the force model generic OR find a way to serialize the name of what's loaded (BTreeMap with the name of the class to instantiate maybe?). Refer to DynamicsSerde as an example.
     pub force_models: Vec<Arc<dyn ForceModel>>,
     pub guid_law: Option<Arc<dyn GuidanceLaw>>,
     pub decrement_mass: bool,
@@ -134,10 +133,10 @@ impl SpacecraftDynamics {
     }
 
     /// A shortcut to spacecraft.guid_law if a guidance law is defined for these dynamics
-    pub fn guidance_achieved(&self, state: &Spacecraft) -> Result<bool, NyxError> {
+    pub fn guidance_achieved(&self, state: &Spacecraft) -> Result<bool, GuidanceError> {
         match &self.guid_law {
             Some(guid_law) => guid_law.achieved(state),
-            None => Err(NyxError::NoObjectiveDefined),
+            None => Err(GuidanceError::NoGuidanceObjectiveDefined),
         }
     }
 
@@ -267,7 +266,11 @@ impl Dynamics for SpacecraftDynamics {
     type HyperdualSize = Const<9>;
     type StateType = Spacecraft;
 
-    fn finally(&self, next_state: Self::StateType) -> Result<Self::StateType, DynamicsError> {
+    fn finally(
+        &self,
+        next_state: Self::StateType,
+        _almanac: Arc<Almanac>,
+    ) -> Result<Self::StateType, DynamicsError> {
         if next_state.fuel_mass_kg < 0.0 {
             error!("negative fuel mass at {}", next_state.epoch());
             return Err(DynamicsError::FuelExhausted {
@@ -287,74 +290,79 @@ impl Dynamics for SpacecraftDynamics {
 
     fn eom(
         &self,
-        delta_t: f64,
+        delta_t_s: f64,
         state: &OVector<f64, Const<90>>,
         ctx: &Self::StateType,
+        almanac: Arc<Almanac>,
     ) -> Result<OVector<f64, Const<90>>, DynamicsError> {
         // Rebuild the osculating state for the EOM context.
-        let osc_sc = ctx.set_with_delta_seconds(delta_t, state);
+        let osc_sc = ctx.set_with_delta_seconds(delta_t_s, state);
         let mut d_x = OVector::<f64, Const<90>>::zeros();
 
-        if ctx.orbit.stm.is_some() {
-            // Call the gradient (also called the dual EOM function of the force models)
-            let (state, grad) = self.dual_eom(delta_t, &osc_sc)?;
+        // Maybe I use this only when estimating the orbit state from a spacecraft, but that functionality will soon disappear.
+        match ctx.stm {
+            Some(stm) => {
+                // Call the gradient (also called the dual EOM function of the force models)
+                let (state, grad) = self.dual_eom(delta_t_s, &osc_sc, almanac)?;
 
-            // Apply the gradient to the STM
-            let stm_dt = ctx.stm()? * grad;
+                // Apply the gradient to the STM
+                let stm_dt = stm * grad;
 
-            // Rebuild the state vectors
-            for (i, val) in state.iter().enumerate() {
-                d_x[i] = *val;
-            }
+                // Rebuild the state vector
+                for (i, val) in state.iter().enumerate() {
+                    d_x[i] = *val;
+                }
 
-            for (i, val) in stm_dt.iter().enumerate() {
-                d_x[i + <Spacecraft as State>::Size::dim()] = *val;
-            }
-        } else {
-            // Compute the orbital dynamics
-            let orbital_dyn_vec = state.fixed_rows::<42>(0).into_owned();
-            // Copy the d orbit dt data
-            for (i, val) in self
-                .orbital_dyn
-                .eom(delta_t, &orbital_dyn_vec, &ctx.orbit)?
-                .iter()
-                .enumerate()
-            {
-                d_x[i] = *val;
-            }
-
-            // Apply the force models for non STM propagation
-            for model in &self.force_models {
-                let model_frc = model.eom(&osc_sc)? / osc_sc.mass_kg();
-                for i in 0..3 {
-                    d_x[i + 3] += model_frc[i];
+                for (i, val) in stm_dt.iter().enumerate() {
+                    d_x[i + <Spacecraft as State>::Size::dim()] = *val;
                 }
             }
-        }
+            None => {
+                // Compute the orbital dynamics
+                for (i, val) in self
+                    .orbital_dyn
+                    .eom(&osc_sc.orbit, almanac.clone())?
+                    .iter()
+                    .enumerate()
+                {
+                    d_x[i] = *val;
+                }
+
+                // Apply the force models for non STM propagation
+                for model in &self.force_models {
+                    let model_frc = model.eom(&osc_sc, almanac.clone())? / osc_sc.mass_kg();
+                    for i in 0..3 {
+                        d_x[i + 3] += model_frc[i];
+                    }
+                }
+            }
+        };
 
         // Now include the control as needed.
         if let Some(guid_law) = &self.guid_law {
             let (thrust_force, fuel_rate) = {
                 if osc_sc.thruster.is_none() {
                     return Err(DynamicsError::DynamicsGuidance {
-                        source: GuidanceErrors::NoThrustersDefined,
+                        source: GuidanceError::NoThrustersDefined,
                     });
                 }
                 let thruster = osc_sc.thruster.unwrap();
-                let thrust_throttle_lvl = guid_law.throttle(&osc_sc);
+                let thrust_throttle_lvl =
+                    guid_law.throttle(&osc_sc).context(DynamicsGuidanceSnafu)?;
                 if !(0.0..=1.0).contains(&thrust_throttle_lvl) {
                     return Err(DynamicsError::DynamicsGuidance {
-                        source: GuidanceErrors::ThrottleRatio {
+                        source: GuidanceError::ThrottleRatio {
                             ratio: thrust_throttle_lvl,
                         },
                     });
                 } else if thrust_throttle_lvl > 0.0 {
                     // Thrust arc
-                    let thrust_inertial = guid_law.direction(&osc_sc);
+                    let thrust_inertial =
+                        guid_law.direction(&osc_sc).context(DynamicsGuidanceSnafu)?;
                     if (thrust_inertial.norm() - 1.0).abs() > NORM_ERR {
                         let (alpha, delta) = ra_dec_from_unit_vector(thrust_inertial);
                         return Err(DynamicsError::DynamicsGuidance {
-                            source: GuidanceErrors::InvalidDirection {
+                            source: GuidanceError::InvalidDirection {
                                 x: thrust_inertial[0],
                                 y: thrust_inertial[1],
                                 z: thrust_inertial[2],
@@ -399,13 +407,16 @@ impl Dynamics for SpacecraftDynamics {
         &self,
         delta_t_s: f64,
         ctx: &Self::StateType,
+        almanac: Arc<Almanac>,
     ) -> Result<(OVector<f64, Const<9>>, OMatrix<f64, Const<9>, Const<9>>), DynamicsError> {
         // Rebuild the appropriately sized state and STM.
         // This is the orbital state followed by Cr and Cd
         let mut d_x = OVector::<f64, Const<9>>::zeros();
         let mut grad = OMatrix::<f64, Const<9>, Const<9>>::zeros();
 
-        let (orb_state, orb_grad) = self.orbital_dyn.dual_eom(delta_t_s, &ctx.orbit)?;
+        let (orb_state, orb_grad) =
+            self.orbital_dyn
+                .dual_eom(delta_t_s, &ctx.orbit, almanac.clone())?;
 
         // Copy the d orbit dt data
         for (i, val) in orb_state.iter().enumerate() {
@@ -427,7 +438,7 @@ impl Dynamics for SpacecraftDynamics {
         // Call the EOMs
         let total_mass = ctx.mass_kg();
         for model in &self.force_models {
-            let (model_frc, model_grad) = model.dual_eom(ctx)?;
+            let (model_frc, model_grad) = model.dual_eom(ctx, almanac.clone())?;
             for i in 0..3 {
                 // Add the velocity changes
                 d_x[i + 3] += model_frc[i] / total_mass;
@@ -439,67 +450,5 @@ impl Dynamics for SpacecraftDynamics {
         }
 
         Ok((d_x, grad))
-    }
-}
-
-impl Configurable for SpacecraftDynamics {
-    type IntermediateRepr = DynamicsSerde;
-
-    fn from_config(cfg: Self::IntermediateRepr, cosm: Arc<Cosm>) -> Result<Self, ConfigError>
-    where
-        Self: Sized,
-    {
-        // Builds the orbital dynamics
-        let mut accel_models: Vec<Arc<dyn AccelModel + Sync>> = Vec::new();
-
-        accel_models.push(PointMasses::new(&cfg.point_masses, cosm.clone()));
-
-        if let Some(harmonics_serde) = cfg.harmonics {
-            for hh in harmonics_serde {
-                let gunzipped = hh.coeffs.ends_with(".gz");
-                let stor = if hh.coeffs.contains("cof") {
-                    HarmonicsMem::from_cof(&hh.coeffs, hh.degree, hh.order, gunzipped)
-                        .map_err(|e| ConfigError::InvalidConfig { msg: e.to_string() })?
-                } else if hh.coeffs.contains("sha") {
-                    HarmonicsMem::from_shadr(&hh.coeffs, hh.degree, hh.order, gunzipped)
-                        .map_err(|e| ConfigError::InvalidConfig { msg: e.to_string() })?
-                } else if hh.coeffs.contains("EGM") {
-                    HarmonicsMem::from_egm(&hh.coeffs, hh.degree, hh.order, gunzipped)
-                        .map_err(|e| ConfigError::InvalidConfig { msg: e.to_string() })?
-                } else {
-                    return Err(ConfigError::InvalidConfig {
-                        msg: "Unknown coefficients file type".to_string(),
-                    });
-                };
-
-                // Grab the frame
-                let frame = cosm
-                    .try_frame(&hh.frame)
-                    .map_err(|e| ConfigError::InvalidConfig { msg: e.to_string() })?;
-
-                accel_models.push(Harmonics::from_stor(frame, stor, cosm.clone()));
-            }
-        }
-
-        let orbital_dyn = OrbitalDynamics::new(accel_models);
-
-        let mut force_models: Vec<Arc<dyn ForceModel>> = Vec::new();
-
-        // SRP
-        if let Some(srp) = cfg.srp {
-            force_models.push(SolarPressure::with_flux(
-                srp.phi.map_or(1367.0, |v| v),
-                srp.shadows,
-                cosm,
-            ));
-        }
-
-        // TODO: Drag -- https://github.com/nyx-space/nyx/issues/86
-
-        Ok(SpacecraftDynamics::from_models(orbital_dyn, force_models))
-    }
-
-    fn to_config(&self) -> Result<Self::IntermediateRepr, ConfigError> {
-        todo!()
     }
 }

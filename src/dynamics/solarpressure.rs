@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -16,11 +16,14 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::{DynamicsError, ForceModel};
+use super::{DynamicsAlmanacSnafu, DynamicsError, DynamicsPlanetarySnafu, ForceModel};
 use crate::cosmic::eclipse::EclipseLocator;
-use crate::cosmic::{Cosm, Frame, Spacecraft, AU, SPEED_OF_LIGHT};
+use crate::cosmic::{Frame, Spacecraft, AU, SPEED_OF_LIGHT};
 use crate::linalg::{Const, Matrix3, Vector3};
+use anise::almanac::Almanac;
+use anise::constants::frames::SUN_J2000;
 use hyperdual::{hyperspace_from_vector, linalg::norm, Float, OHyperdual};
+use snafu::ResultExt;
 use std::fmt;
 use std::sync::Arc;
 
@@ -34,42 +37,65 @@ pub struct SolarPressure {
 
 impl SolarPressure {
     /// Will set the solar flux at 1 AU to: Phi = 1367.0
-    pub fn default_raw(shadow_bodies: Vec<Frame>, cosm: Arc<Cosm>) -> Self {
+    pub fn default_raw(
+        shadow_bodies: Vec<Frame>,
+        almanac: Arc<Almanac>,
+    ) -> Result<Self, DynamicsError> {
         let e_loc = EclipseLocator {
-            light_source: cosm.frame("Sun J2000"),
+            light_source: almanac.frame_from_uid(SUN_J2000).context({
+                DynamicsPlanetarySnafu {
+                    action: "planetary data from third body not loaded",
+                }
+            })?,
             shadow_bodies,
-            cosm,
         };
-        Self { phi: 1367.0, e_loc }
+        Ok(Self { phi: 1367.0, e_loc })
     }
 
     /// Accounts for the shadowing of only one body and will set the solar flux at 1 AU to: Phi = 1367.0
-    pub fn default(shadow_body: Frame, cosm: Arc<Cosm>) -> Arc<Self> {
-        Arc::new(Self::default_raw(vec![shadow_body], cosm))
+    pub fn default(shadow_body: Frame, almanac: Arc<Almanac>) -> Result<Arc<Self>, DynamicsError> {
+        Ok(Arc::new(Self::default_raw(vec![shadow_body], almanac)?))
     }
 
     /// Must provide the flux in W/m^2
-    pub fn with_flux(flux_w_m2: f64, shadow_bodies: Vec<Frame>, cosm: Arc<Cosm>) -> Arc<Self> {
-        let mut me = Self::default_raw(shadow_bodies, cosm);
+    pub fn with_flux(
+        flux_w_m2: f64,
+        shadow_bodies: Vec<Frame>,
+        almanac: Arc<Almanac>,
+    ) -> Result<Arc<Self>, DynamicsError> {
+        let mut me = Self::default_raw(shadow_bodies, almanac)?;
         me.phi = flux_w_m2;
-        Arc::new(me)
+        Ok(Arc::new(me))
     }
 }
 
 impl ForceModel for SolarPressure {
-    fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, DynamicsError> {
-        let osc = &ctx.orbit;
+    fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
+        let osc = ctx.orbit;
         // Compute the position of the Sun as seen from the spacecraft
-        let r_sun = self
-            .e_loc
-            .cosm
-            .frame_chg(osc, self.e_loc.light_source)
-            .radius();
+        // TODO(ANISE): I think this needs to be flipped as well!
+        let r_sun = almanac
+            .transform_to(ctx.orbit, self.e_loc.light_source, None)
+            .context(DynamicsAlmanacSnafu {
+                action: "transforming state to vector seen from Sun",
+            })?
+            .radius_km;
+        // let r_sun = self
+        //     .e_loc
+        //     .cosm
+        //     .frame_chg(osc, self.e_loc.light_source)
+        //     .radius();
 
         let r_sun_unit = r_sun / r_sun.norm();
 
         // Compute the shaddowing factor.
-        let k: f64 = self.e_loc.compute(osc).into();
+        let k: f64 = self
+            .e_loc
+            .compute(osc, almanac)
+            .context(DynamicsAlmanacSnafu {
+                action: "solar radiation pressure computation",
+            })?
+            .into();
 
         let r_sun_au = r_sun.norm() / AU;
         // in N/(m^2)
@@ -79,21 +105,39 @@ impl ForceModel for SolarPressure {
         Ok(1e-3 * ctx.srp.cr * ctx.srp.area_m2 * flux_pressure * r_sun_unit)
     }
 
-    fn dual_eom(&self, ctx: &Spacecraft) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
-        let osc = &ctx.orbit;
+    fn dual_eom(
+        &self,
+        ctx: &Spacecraft,
+        almanac: Arc<Almanac>,
+    ) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
+        let osc = ctx.orbit;
+
+        // TODO(ANISE): I think this needs to be flipped as well!
+        let r_sun = almanac
+            .transform_to(ctx.orbit, self.e_loc.light_source, None)
+            .context(DynamicsAlmanacSnafu {
+                action: "transforming state to vector seen from Sun",
+            })?
+            .radius_km;
 
         // Compute the position of the Sun as seen from the spacecraft
-        let r_sun = self
-            .e_loc
-            .cosm
-            .frame_chg(osc, self.e_loc.light_source)
-            .radius();
+        // let r_sun = self
+        //     .e_loc
+        //     .cosm
+        //     .frame_chg(osc, self.e_loc.light_source)
+        //     .radius();
 
         let r_sun_d: Vector3<OHyperdual<f64, Const<9>>> = hyperspace_from_vector(&r_sun);
         let r_sun_unit = r_sun_d / norm(&r_sun_d);
 
         // Compute the shadowing factor.
-        let k: f64 = self.e_loc.compute(osc).into();
+        let k: f64 = self
+            .e_loc
+            .compute(osc, almanac)
+            .context(DynamicsAlmanacSnafu {
+                action: "solar radiation pressure computation",
+            })?
+            .into();
 
         let r_sun_au = norm(&r_sun_d) / AU;
         let inv_r_sun_au = OHyperdual::<f64, Const<9>>::from_real(1.0) / (r_sun_au);

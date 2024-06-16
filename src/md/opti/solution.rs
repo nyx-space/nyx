@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -19,7 +19,7 @@
 use hifitime::TimeUnits;
 use snafu::{ensure, ResultExt};
 
-use crate::dynamics::guidance::Mnvr;
+use crate::dynamics::guidance::{LocalFrame, Mnvr};
 use crate::linalg::SVector;
 use crate::md::objective::Objective;
 use crate::md::{prelude::*, GuidanceSnafu, NotFiniteSnafu, TargetingError};
@@ -72,7 +72,7 @@ impl<const V: usize, const O: usize> TargeterSolution<V, O> {
             thrust_prct: 1.0,
             alpha_inplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
             delta_outofplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
-            frame: Frame::RCN,
+            frame: LocalFrame::RCN,
         };
 
         for (i, var) in self.variables.iter().enumerate() {
@@ -124,21 +124,21 @@ impl<const V: usize, const O: usize> TargeterSolution<V, O> {
                     let mut vector = mnvr.direction();
                     vector[var.component.vec_index()] += corr;
                     var.ensure_bounds(&mut vector[var.component.vec_index()]);
-                    mnvr.set_direction(vector).with_context(|_| GuidanceSnafu)?;
+                    mnvr.set_direction(vector).context(GuidanceSnafu)?;
                 }
                 Vary::ThrustRateX | Vary::ThrustRateY | Vary::ThrustRateZ => {
                     let mut vector = mnvr.rate();
                     let idx = (var.component.vec_index() - 1) % 3;
                     vector[idx] += corr;
                     var.ensure_bounds(&mut vector[idx]);
-                    mnvr.set_rate(vector).with_context(|_| GuidanceSnafu)?;
+                    mnvr.set_rate(vector).context(GuidanceSnafu)?;
                 }
                 Vary::ThrustAccelX | Vary::ThrustAccelY | Vary::ThrustAccelZ => {
                     let mut vector = mnvr.accel();
                     let idx = (var.component.vec_index() - 1) % 3;
                     vector[idx] += corr;
                     var.ensure_bounds(&mut vector[idx]);
-                    mnvr.set_accel(vector).with_context(|_| GuidanceSnafu)?;
+                    mnvr.set_accel(vector).context(GuidanceSnafu)?;
                 }
                 Vary::ThrustLevel => {
                     mnvr.thrust_prct += corr;

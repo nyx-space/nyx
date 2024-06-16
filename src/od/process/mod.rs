@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -26,6 +26,7 @@ pub use crate::od::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::propagators::PropInstance;
 pub use crate::time::{Duration, Unit};
+use anise::prelude::Almanac;
 use snafu::prelude::*;
 mod conf;
 pub use conf::{IterationConf, SmoothingArc};
@@ -83,7 +84,7 @@ pub struct ODProcess<
     pub ekf_trigger: Option<EkfTrigger>,
     /// Residual rejection criteria allows preventing bad measurements from affecting the estimation.
     pub resid_crit: Option<FltResid>,
-    pub cosm: Arc<Cosm>,
+    pub almanac: Arc<Almanac>,
     init_state: D::StateType,
     _marker: PhantomData<A>,
 }
@@ -129,7 +130,7 @@ where
         kf: K,
         ekf_trigger: Option<EkfTrigger>,
         resid_crit: Option<FltResid>,
-        cosm: Arc<Cosm>,
+        almanac: Arc<Almanac>,
     ) -> Self {
         let init_state = prop.state;
         Self {
@@ -139,7 +140,7 @@ where
             residuals: Vec::with_capacity(10_000),
             ekf_trigger,
             resid_crit,
-            cosm,
+            almanac,
             init_state,
             _marker: PhantomData::<A>,
         }
@@ -151,7 +152,7 @@ where
         kf: K,
         trigger: EkfTrigger,
         resid_crit: Option<FltResid>,
-        cosm: Arc<Cosm>,
+        almanac: Arc<Almanac>,
     ) -> Self {
         let init_state = prop.state;
         Self {
@@ -161,7 +162,7 @@ where
             residuals: Vec::with_capacity(10_000),
             ekf_trigger: Some(trigger),
             resid_crit,
-            cosm,
+            almanac,
             init_state,
             _marker: PhantomData::<A>,
         }
@@ -418,7 +419,7 @@ where
     where
         Dev: TrackingDeviceSim<S, Msr>,
     {
-        let mut devices = arc.rebuild_devices::<S, Dev>(self.cosm.clone()).unwrap();
+        let mut devices = arc.rebuild_devices::<S, Dev>().context(ODConfigSnafu)?;
 
         let measurements = &arc.measurements;
         let step_size = match arc.min_duration_sep() {
@@ -440,7 +441,7 @@ where
     where
         Dev: TrackingDeviceSim<S, Msr>,
     {
-        let mut devices = arc.rebuild_devices::<S, Dev>(self.cosm.clone()).unwrap();
+        let mut devices = arc.rebuild_devices::<S, Dev>().context(ODConfigSnafu)?;
 
         let measurements = &arc.measurements;
         let step_size = match arc.min_duration_sep() {
@@ -542,7 +543,7 @@ where
                 let (_, traj_covar) = self
                     .prop
                     .for_duration_with_traj(next_step_size)
-                    .with_context(|_| ODPropSnafu)?;
+                    .context(ODPropSnafu)?;
 
                 for state in traj_covar.states {
                     traj.states.push(S::extract(state));
@@ -561,11 +562,12 @@ where
                     match devices.get_mut(device_name) {
                         Some(device) => {
                             if let Some(computed_meas) =
-                                device.measure(epoch, &traj, None, self.cosm.clone())?
+                                device.measure(epoch, &traj, None, self.almanac.clone())?
                             {
                                 // Grab the device location
-                                let device_loc =
-                                    device.location(epoch, nominal_state.frame(), &self.cosm);
+                                let device_loc = device
+                                    .location(epoch, nominal_state.frame(), self.almanac.clone())
+                                    .unwrap();
 
                                 // Switch back from extended if necessary
                                 if let Some(trigger) = &mut self.ekf_trigger {
@@ -682,11 +684,9 @@ where
         loop {
             let mut epoch = self.prop.state.epoch();
             if epoch + self.prop.details.step > end_epoch {
-                self.prop
-                    .until_epoch(end_epoch)
-                    .with_context(|_| ODPropSnafu)?;
+                self.prop.until_epoch(end_epoch).context(ODPropSnafu)?;
             } else {
-                self.prop.for_duration(step).with_context(|_| ODPropSnafu)?;
+                self.prop.for_duration(step).context(ODPropSnafu)?;
             }
 
             // Perform time update
@@ -783,7 +783,7 @@ where
         prop: PropInstance<'a, D, E>,
         kf: K,
         resid_crit: Option<FltResid>,
-        cosm: Arc<Cosm>,
+        almanac: Arc<Almanac>,
     ) -> Self {
         let init_state = prop.state;
         Self {
@@ -794,7 +794,7 @@ where
             resid_crit,
             ekf_trigger: None,
             init_state,
-            cosm,
+            almanac,
             _marker: PhantomData::<A>,
         }
     }

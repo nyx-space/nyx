@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -92,12 +92,12 @@ impl DynamicTrackingArc {
         DefaultAllocator: Allocator<f64, Msr::MeasurementSize>,
     {
         // Read the file since we closed it earlier
-        let file = File::open(&self.path).with_context(|_| StdIOSnafu {
+        let file = File::open(&self.path).context(StdIOSnafu {
             action: "opening file for tracking arc",
         })?;
         let builder = ParquetRecordBatchReaderBuilder::try_new(file).unwrap();
 
-        let reader = builder.build().with_context(|_| ParquetSnafu {
+        let reader = builder.build().context(ParquetSnafu {
             action: "reading tracking arc",
         })?;
 

@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -15,18 +15,20 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
+
+use anise::frames::Frame;
+use arrow::{array::Float64Array, record_batch::RecordBatchReader};
+use hifitime::Epoch;
+use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+use snafu::prelude::*;
+use std::fs::File;
+use std::{collections::HashMap, fmt::Display, path::Path};
+
 use crate::{
     io::MissingDataSnafu,
     linalg::{allocator::Allocator, DefaultAllocator},
     md::{prelude::Traj, trajectory::Interpolatable, StateParameter},
 };
-use arrow::{array::Float64Array, record_batch::RecordBatchReader};
-use hifitime::Epoch;
-use snafu::prelude::*;
-
-use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
-use std::fs::File;
-use std::{collections::HashMap, fmt::Display, path::Path};
 
 #[cfg(feature = "python")]
 use crate::python::mission_design::{OrbitTraj as OrbitTrajPy, SpacecraftTraj as ScTrajPy};
@@ -43,8 +45,6 @@ use pyo3::class::basic::CompareOp;
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 
-use crate::cosmic::Cosm;
-
 use super::{InputOutputError, ParquetSnafu, StdIOSnafu};
 
 /// A dynamic trajectory allows loading a trajectory Parquet file and converting it
@@ -59,7 +59,7 @@ pub struct TrajectoryLoader {
 
 impl TrajectoryLoader {
     pub fn from_parquet<P: AsRef<Path>>(path: P) -> Result<Self, InputOutputError> {
-        let file = File::open(&path).with_context(|_| StdIOSnafu {
+        let file = File::open(&path).context(StdIOSnafu {
             action: "opening trajectory file",
         })?;
 
@@ -116,13 +116,13 @@ impl TrajectoryLoader {
             (StateParameter::FuelMass, false),
         ];
 
-        let file = File::open(&self.path).with_context(|_| StdIOSnafu {
+        let file = File::open(&self.path).context(StdIOSnafu {
             action: "opening output trajectory file",
         })?;
 
         let builder = ParquetRecordBatchReaderBuilder::try_new(file).unwrap();
 
-        let reader = builder.build().with_context(|_| ParquetSnafu {
+        let reader = builder.build().context(ParquetSnafu {
             action: "building output trajectory file",
         })?;
 
@@ -135,18 +135,16 @@ impl TrajectoryLoader {
                         potential_field.1 = true;
                         if potential_field.0 != StateParameter::FuelMass {
                             if let Some(frame_info) = field.metadata().get("Frame") {
-                                if frame.is_none() {
-                                    frame = Some(frame_info.to_string())
-                                } else if frame.as_ref().unwrap().as_str() != frame_info {
-                                    return Err(InputOutputError::Inconsistency {
-                                        msg: format!(
-                                        "Frame previous set to `{}` but set to `{}` in field `{}`",
-                                        frame.unwrap(),
-                                        frame_info,
-                                        field.name()
-                                    ),
-                                    });
-                                }
+                                // Frame is expected to be serialized as Dhall.
+                                match serde_dhall::from_str(frame_info).parse::<Frame>() {
+                                    Err(e) => {
+                                        return Err(InputOutputError::ParseDhall {
+                                            data: frame_info.to_string(),
+                                            err: format!("{e}"),
+                                        })
+                                    }
+                                    Ok(deser_frame) => frame = Some(deser_frame),
+                                };
                             }
                         }
                         break;
@@ -240,17 +238,13 @@ impl TrajectoryLoader {
                 );
             }
 
-            // Grab the frame
-            // TODO: This is ugly and wrong because we might be using another frame info! -- Hopefully fix via https://github.com/nyx-space/nyx/issues/86
-            // So arguably, the cosm to load should be in the metadata or passed to this function!
-            let cosm = Cosm::de438();
-            let frame = cosm.try_frame(frame.as_ref().unwrap().as_str()).unwrap();
+            // Grab the frame -- it should have been serialized with all of the data so we don't need to reload it.
 
             // Build the states
             for i in 0..batch.num_rows() {
                 let mut state = S::zeros();
                 state.set_epoch(Epoch::from_tai_seconds(epochs.value(i)));
-                state.set_frame(frame);
+                state.set_frame(frame.unwrap()); // We checked it was set above with an ensure! call
                 state.unset_stm(); // We don't have any STM data, so let's unset this.
 
                 for (j, (param, exists)) in found_fields.iter().enumerate() {

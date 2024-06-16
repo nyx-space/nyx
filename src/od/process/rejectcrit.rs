@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -16,8 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::cosmic::Cosm;
-use crate::io::{ConfigError, ConfigRepr, Configurable};
+use crate::io::ConfigRepr;
 #[cfg(feature = "python")]
 use crate::python::PythonError;
 #[cfg(feature = "python")]
@@ -29,7 +28,6 @@ use pyo3::prelude::*;
 #[cfg(feature = "python")]
 use pythonize::{depythonize, pythonize};
 use serde_derive::{Deserialize, Serialize};
-use std::sync::Arc;
 
 /// Reject measurements with a residual ratio greater than the provided sigmas values. Will only be turned used if at least min_accepted measurements have been processed so far.
 /// If unsure, use the default: `FltResid::default()` in Rust, and `FltResid()` in Python (i.e. construct without arguments).
@@ -122,18 +120,3 @@ impl Default for FltResid {
 }
 
 impl ConfigRepr for FltResid {}
-
-impl Configurable for FltResid {
-    type IntermediateRepr = Self;
-
-    fn from_config(cfg: Self, _cosm: Arc<Cosm>) -> Result<Self, ConfigError>
-    where
-        Self: Sized,
-    {
-        Ok(cfg)
-    }
-
-    fn to_config(&self) -> Result<Self::IntermediateRepr, ConfigError> {
-        Ok(*self)
-    }
-}

@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -16,9 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use snafu::ResultExt;
+
 use super::{
-    unit_vector_from_plane_angles, Frame, GuidanceLaw, GuidanceMode, NyxError, Orbit, Spacecraft,
-    Vector3,
+    unit_vector_from_plane_angles, GuidStateSnafu, GuidanceError, GuidanceLaw, GuidanceMode,
+    GuidancePhysicsSnafu, NyxError, Orbit, Spacecraft, Vector3,
 };
 pub use crate::md::objective::Objective;
 pub use crate::md::StateParameter;
@@ -34,7 +36,7 @@ pub struct Ruggiero {
     pub objectives: [Option<Objective>; 5],
     /// Stores the minimum efficiency to correct a given orbital element, defaults to zero (i.e. always correct)
     pub ηthresholds: [f64; 5],
-    init_state: Orbit,
+    init_state: Spacecraft,
 }
 
 /// The Ruggiero is a locally optimal guidance law of a state for specific osculating elements.
@@ -43,7 +45,7 @@ pub struct Ruggiero {
 impl Ruggiero {
     /// Creates a new Ruggiero locally optimal control as an Arc
     /// Note: this returns an Arc so it can be plugged into the Spacecraft dynamics directly.
-    pub fn new(objectives: &[Objective], initial: Orbit) -> Result<Arc<Self>, NyxError> {
+    pub fn new(objectives: &[Objective], initial: Spacecraft) -> Result<Arc<Self>, NyxError> {
         Self::with_ηthresholds(objectives, &[0.0; 5], initial)
     }
 
@@ -52,7 +54,7 @@ impl Ruggiero {
     pub fn with_ηthresholds(
         objectives: &[Objective],
         ηthresholds: &[f64],
-        initial: Orbit,
+        initial: Spacecraft,
     ) -> Result<Arc<Self>, NyxError> {
         let mut objs: [Option<Objective>; 5] = [None, None, None, None, None];
         let mut eff: [f64; 5] = [0.0; 5];
@@ -102,16 +104,37 @@ impl Ruggiero {
     }
 
     /// Returns the efficiency η ∈ [0; 1] of correcting a specific orbital element at the provided osculating orbit
-    pub fn efficency(parameter: &StateParameter, osc_orbit: &Orbit) -> Result<f64, NyxError> {
-        let e = osc_orbit.ecc();
+    pub fn efficency(parameter: &StateParameter, osc_orbit: &Orbit) -> Result<f64, GuidanceError> {
+        let e = osc_orbit.ecc().context(GuidancePhysicsSnafu {
+            action: "computing Ruggiero efficency",
+        })?;
+
+        let ν_ta = osc_orbit
+            .ta_deg()
+            .context(GuidancePhysicsSnafu {
+                action: "computing Ruggiero efficency",
+            })?
+            .to_radians();
+
+        let ω = osc_orbit
+            .aop_deg()
+            .context(GuidancePhysicsSnafu {
+                action: "computing Ruggiero efficency",
+            })?
+            .to_radians();
+
         match parameter {
             StateParameter::SMA => {
-                let a = osc_orbit.sma_km();
-                let μ = osc_orbit.frame.gm();
+                let a = osc_orbit.sma_km().context(GuidancePhysicsSnafu {
+                    action: "computing Ruggiero efficency",
+                })?;
+
+                let μ = osc_orbit.frame.mu_km3_s2().context(GuidancePhysicsSnafu {
+                    action: "computing Ruggiero efficency",
+                })?;
                 Ok(osc_orbit.vmag_km_s() * ((a * (1.0 - e)) / (μ * (1.0 + e))).sqrt())
             }
             StateParameter::Eccentricity => {
-                let ν_ta = osc_orbit.ta_deg().to_radians();
                 let num = 1.0 + 2.0 * e * ν_ta.cos() + ν_ta.cos().powi(2);
                 let denom = 1.0 + e * ν_ta.cos();
                 // NOTE: There is a typo in IEPC 2011 102: the max of this efficiency function is at ν=0
@@ -120,38 +143,31 @@ impl Ruggiero {
                 Ok(num / (2.0 * denom))
             }
             StateParameter::Inclination => {
-                let ν_ta = osc_orbit.ta_deg().to_radians();
-                let ω = osc_orbit.aop_deg().to_radians();
                 let num = (ω + ν_ta).cos().abs()
                     * ((1.0 - e.powi(2) * ω.sin().powi(2)).sqrt() - e * ω.cos().abs());
                 let denom = 1.0 + e * ν_ta.cos();
                 Ok(num / denom)
             }
             StateParameter::RAAN => {
-                let ν_ta = osc_orbit.ta_deg().to_radians();
-                let ω = osc_orbit.aop_deg().to_radians();
                 let num = (ω + ν_ta).sin().abs()
                     * ((1.0 - e.powi(2) * ω.cos().powi(2)).sqrt() - e * ω.sin().abs());
                 let denom = 1.0 + e * ν_ta.cos();
                 Ok(num / denom)
             }
             StateParameter::AoP => Ok(1.0),
-            _ => Err(NyxError::StateParameterUnavailable {
-                param: *parameter,
-                msg: "not a control variable in Ruggiero".to_string(),
-            }),
+            _ => Err(GuidanceError::InvalidControl { param: *parameter }),
         }
     }
 
     /// Computes the weight at which to correct this orbital element, will be zero if the current efficiency is below the threshold
-    fn weighting(&self, obj: &Objective, osc_orbit: &Orbit, η_threshold: f64) -> f64 {
+    fn weighting(&self, obj: &Objective, osc_sc: &Spacecraft, η_threshold: f64) -> f64 {
         let init = self.init_state.value(obj.parameter).unwrap();
-        let osc = osc_orbit.value(obj.parameter).unwrap();
+        let osc = osc_sc.value(obj.parameter).unwrap();
         let target = obj.desired_value;
         let tol = obj.tolerance;
 
         // Calculate the efficiency of correcting this specific orbital element
-        let η = Self::efficency(&obj.parameter, osc_orbit).unwrap();
+        let η = Self::efficency(&obj.parameter, &osc_sc.orbit).unwrap();
 
         if (osc - target).abs() < tol || η < η_threshold {
             0.0
@@ -177,75 +193,105 @@ impl fmt::Display for Ruggiero {
 
 impl GuidanceLaw for Ruggiero {
     /// Returns whether the guidance law has achieved all goals
-    fn achieved(&self, state: &Spacecraft) -> Result<bool, NyxError> {
+    fn achieved(&self, state: &Spacecraft) -> Result<bool, GuidanceError> {
         for obj in self.objectives.iter().flatten() {
-            if !obj.assess_raw(state.orbit.value(obj.parameter)?).0 {
+            if !obj
+                .assess_raw(state.value(obj.parameter).context(GuidStateSnafu)?)
+                .0
+            {
                 return Ok(false);
             }
         }
         Ok(true)
     }
 
-    fn direction(&self, sc: &Spacecraft) -> Vector3<f64> {
+    fn direction(&self, sc: &Spacecraft) -> Result<Vector3<f64>, GuidanceError> {
         if sc.mode() == GuidanceMode::Thrust {
             let osc = sc.orbit;
             let mut steering = Vector3::zeros();
             for (i, obj) in self.objectives.iter().flatten().enumerate() {
-                let weight = self.weighting(obj, &osc, self.ηthresholds[i]);
+                let weight = self.weighting(obj, sc, self.ηthresholds[i]);
                 if weight.abs() <= 0.0 {
                     continue;
                 }
 
+                // Compute all of the orbital elements here to unclutter the algorithm
+                let ecc = osc.ecc().context(GuidancePhysicsSnafu {
+                    action: "computing Ruggiero guidance",
+                })?;
+
+                let ta_rad = osc
+                    .ta_deg()
+                    .context(GuidancePhysicsSnafu {
+                        action: "computing Ruggiero guidance",
+                    })?
+                    .to_radians();
+
+                let inc_rad = osc
+                    .inc_deg()
+                    .context(GuidancePhysicsSnafu {
+                        action: "computing Ruggiero guidance",
+                    })?
+                    .to_radians();
+
+                let aop_rad = osc
+                    .aop_deg()
+                    .context(GuidancePhysicsSnafu {
+                        action: "computing Ruggiero guidance",
+                    })?
+                    .to_radians();
+
+                let ea_rad = osc
+                    .ea_deg()
+                    .context(GuidancePhysicsSnafu {
+                        action: "computing Ruggiero guidance",
+                    })?
+                    .to_radians();
+
                 match obj.parameter {
                     StateParameter::SMA => {
-                        let num = osc.ecc() * osc.ta_deg().to_radians().sin();
-                        let denom = 1.0 + osc.ecc() * osc.ta_deg().to_radians().cos();
+                        let num = ecc * ta_rad.sin();
+                        let denom = 1.0 + ecc * ta_rad.cos();
                         let alpha = num.atan2(denom);
                         steering += unit_vector_from_plane_angles(alpha, 0.0) * weight;
                     }
                     StateParameter::Eccentricity => {
-                        let num = osc.ta_deg().to_radians().sin();
-                        let denom =
-                            osc.ta_deg().to_radians().cos() + osc.ea_deg().to_radians().cos();
+                        let num = ta_rad.sin();
+                        let denom = ta_rad.cos() + ea_rad.cos();
                         let alpha = num.atan2(denom);
                         steering += unit_vector_from_plane_angles(alpha, 0.0) * weight;
                     }
                     StateParameter::Inclination => {
-                        let beta =
-                            half_pi.copysign(((osc.ta_deg() + osc.aop_deg()).to_radians()).cos());
+                        let beta = half_pi.copysign((ta_rad + aop_rad).cos());
                         steering += unit_vector_from_plane_angles(0.0, beta) * weight;
                     }
                     StateParameter::RAAN => {
-                        let beta =
-                            half_pi.copysign(((osc.ta_deg() + osc.aop_deg()).to_radians()).sin());
+                        let beta = half_pi.copysign((ta_rad + aop_rad).sin());
                         steering += unit_vector_from_plane_angles(0.0, beta) * weight;
                     }
                     StateParameter::AoP => {
-                        let oe2 = 1.0 - osc.ecc().powi(2);
-                        let e3 = osc.ecc().powi(3);
+                        let oe2 = 1.0 - ecc.powi(2);
+                        let e3 = ecc.powi(3);
                         // Compute the optimal true anomaly for in-plane thrusting
                         let sqrt_val = (0.25 * (oe2 / e3).powi(2) + 1.0 / 27.0).sqrt();
                         let opti_ta_alpha = ((oe2 / (2.0 * e3) + sqrt_val).powf(1.0 / 3.0)
                             - (-oe2 / (2.0 * e3) + sqrt_val).powf(1.0 / 3.0)
-                            - 1.0 / osc.ecc())
-                        .acos();
+                            - 1.0 / ecc)
+                            .acos();
                         // Compute the optimal true anomaly for out of plane thrusting
-                        let opti_ta_beta = (-osc.ecc() * osc.aop_deg().to_radians().cos()).acos()
-                            - osc.aop_deg().to_radians();
+                        let opti_ta_beta = (-ecc * aop_rad.cos()).acos() - aop_rad;
                         // And choose whether to do an in-plane or out of plane thrust
-                        if (osc.ta_deg().to_radians() - opti_ta_alpha).abs()
-                            < (osc.ta_deg().to_radians() - opti_ta_beta).abs()
-                        {
+                        if (ta_rad - opti_ta_alpha).abs() < (ta_rad - opti_ta_beta).abs() {
                             // In plane
-                            let p = osc.semi_parameter_km();
-                            let (sin_ta, cos_ta) = osc.ta_deg().to_radians().sin_cos();
+                            let p = osc.semi_parameter_km().context(GuidancePhysicsSnafu {
+                                action: "computing Ruggiero guidance",
+                            })?;
+                            let (sin_ta, cos_ta) = ta_rad.sin_cos();
                             let alpha = (-p * cos_ta).atan2((p + osc.rmag_km()) * sin_ta);
                             steering += unit_vector_from_plane_angles(alpha, 0.0) * weight;
                         } else {
                             // Out of plane
-                            let beta = half_pi.copysign(
-                                -(osc.ta_deg().to_radians() + osc.aop_deg().to_radians()).sin(),
-                            ) * osc.inc_deg().to_radians().cos();
+                            let beta = half_pi.copysign(-(ta_rad + aop_rad).sin()) * inc_rad.cos();
                             steering += unit_vector_from_plane_angles(0.0, beta) * weight;
                         };
                     }
@@ -259,26 +305,31 @@ impl GuidanceLaw for Ruggiero {
             } else {
                 steering
             };
+
             // Convert to inertial -- this whole guidance law is computed in the RCN frame
-            osc.dcm_from_traj_frame(Frame::RCN).unwrap() * steering
+            Ok(osc
+                .dcm_from_rcn_to_inertial()
+                .context(GuidancePhysicsSnafu {
+                    action: "computing RCN frame",
+                })?
+                * steering)
         } else {
-            Vector3::zeros()
+            Ok(Vector3::zeros())
         }
     }
 
     // Either thrust full power or not at all
-    fn throttle(&self, sc: &Spacecraft) -> f64 {
+    fn throttle(&self, sc: &Spacecraft) -> Result<f64, GuidanceError> {
         if sc.mode() == GuidanceMode::Thrust {
-            let osc = sc.orbit;
             for (i, obj) in self.objectives.iter().flatten().enumerate() {
-                let weight = self.weighting(obj, &osc, self.ηthresholds[i]);
+                let weight = self.weighting(obj, sc, self.ηthresholds[i]);
                 if weight.abs() > 0.0 {
-                    return 1.0;
+                    return Ok(1.0);
                 }
             }
-            0.0
+            Ok(0.0)
         } else {
-            0.0
+            Ok(0.0)
         }
     }
 
@@ -302,13 +353,13 @@ impl GuidanceLaw for Ruggiero {
 
 #[test]
 fn ruggiero_weight() {
-    use crate::cosmic::Cosm;
     use crate::time::Epoch;
-    let mut cosm = Cosm::de438_raw();
-    cosm.frame_mut_gm("EME2000", 398_600.433);
-    let eme2k = cosm.frame("EME2000");
+    use anise::constants::frames::EARTH_J2000;
+
+    let eme2k = EARTH_J2000.with_mu_km3_s2(398_600.433);
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let orbit = Orbit::keplerian(7378.1363, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, eme2k);
+    let sc = Spacecraft::new(orbit, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
 
     // Define the objectives
     let objectives = &[
@@ -316,9 +367,9 @@ fn ruggiero_weight() {
         Objective::within_tolerance(StateParameter::Eccentricity, 0.01, 5e-5),
     ];
 
-    let ruggiero = Ruggiero::new(objectives, orbit).unwrap();
+    let ruggiero = Ruggiero::new(objectives, sc).unwrap();
     // 7301.597157 201.699933 0.176016 -0.202974 7.421233 0.006476 298.999726
-    let osc = Orbit::cartesian(
+    let osc = Orbit::new(
         7_303.253_461_441_64f64,
         127.478_714_816_381_75,
         0.111_246_193_227_445_4,
@@ -339,7 +390,7 @@ fn ruggiero_weight() {
         0.000_872_534_222_883_2,
     );
 
-    let got = ruggiero.direction(&osc_sc);
+    let got = ruggiero.direction(&osc_sc).unwrap();
 
     assert!(
         dbg!(expected - got).norm() < 1e-12,

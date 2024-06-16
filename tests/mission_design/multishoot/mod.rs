@@ -6,15 +6,32 @@ use nyx::dynamics::guidance::Thruster;
 use nyx::md::opti::multishoot::*;
 use nyx::md::prelude::*;
 
-#[test]
-fn alt_orbit_raising() {
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
-    let iau_earth = cosm.frame("IAU_Earth");
+use anise::{
+    constants::{
+        frames::{EARTH_J2000, IAU_EARTH_FRAME},
+        usual_planetary_constants::MEAN_EARTH_ANGULAR_VELOCITY_DEG_S,
+    },
+    prelude::Almanac,
+};
+use rstest::*;
+use std::sync::Arc;
+
+#[fixture]
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
+}
+
+#[rstest]
+fn alt_orbit_raising(almanac: Arc<Almanac>) {
+    let _ = pretty_env_logger::try_init();
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     /* Define the parking orbit */
     let epoch = Epoch::from_gregorian_utc_at_noon(2022, 3, 4);
-    let start = Orbit::keplerian_altitude(300.0, 0.01, 30.0, 90.0, 90.0, 60.0, epoch, eme2k);
+    let start =
+        Orbit::try_keplerian_altitude(300.0, 0.01, 30.0, 90.0, 90.0, 60.0, epoch, eme2k).unwrap();
 
     /* Build the spacecraft -- really only the mass is needed here */
     let sc = Spacecraft {
@@ -31,16 +48,17 @@ fn alt_orbit_raising() {
     };
 
     /* Define the target orbit */
-    let target = Orbit::keplerian_altitude(
+    let target = Orbit::try_keplerian_altitude(
         1500.0,
         0.01,
         30.0,
         90.0,
         90.0,
         60.0,
-        epoch + 2 * start.period(),
+        epoch + 2 * start.period().unwrap(),
         eme2k,
-    );
+    )
+    .unwrap();
 
     /* Define the multiple shooting parameters */
     let node_count = 30; // We're targeting 30 minutes in the future, so using 30 nodes
@@ -50,9 +68,10 @@ fn alt_orbit_raising() {
         sc,
         target,
         node_count,
+        MEAN_EARTH_ANGULAR_VELOCITY_DEG_S,
         iau_earth,
         &prop,
-        cosm.clone(),
+        almanac.clone(),
     )
     .unwrap();
 
@@ -65,7 +84,9 @@ fn alt_orbit_raising() {
         );
     }
 
-    let multishoot_sol = opti.solve(CostFunction::MinimumFuel).unwrap();
+    let multishoot_sol = opti
+        .solve(CostFunction::MinimumFuel, almanac.clone())
+        .unwrap();
 
     println!("Final nodes\nNode no,X (km),Y (km),Z (km),Epoch:GregorianUtc");
     for (i, node) in opti.targets.iter().enumerate() {
@@ -75,7 +96,9 @@ fn alt_orbit_raising() {
         );
     }
 
-    let all_trajectories = multishoot_sol.build_trajectories(&prop).unwrap();
+    let all_trajectories = multishoot_sol
+        .build_trajectories(&prop, almanac.clone())
+        .unwrap();
 
     let mut full_traj = all_trajectories[0].clone();
 
@@ -85,6 +108,7 @@ fn alt_orbit_raising() {
         traj.to_parquet_with_step(
             output_path.join(format!("multishoot_to_node_{i}.parquet")),
             2 * Unit::Second,
+            almanac.clone(),
         )
         .unwrap();
         if i > 0 {
@@ -121,30 +145,32 @@ fn alt_orbit_raising() {
     );
 
     // Propagate the initial orbit too
-    prop.with(sc)
-        .for_duration_with_traj(start.period())
+    prop.with(sc, almanac.clone())
+        .for_duration_with_traj(start.period().unwrap())
         .unwrap()
         .1
         .to_parquet_with_step(
             output_path.join("multishoot_start.parquet"),
             2 * Unit::Second,
+            almanac.clone(),
         )
         .unwrap();
 
     // Propagate the initial orbit too
-    prop.with(sc.with_orbit(target))
-        .for_duration_with_traj(target.period())
+    prop.with(sc.with_orbit(target), almanac.clone())
+        .for_duration_with_traj(target.period().unwrap())
         .unwrap()
         .1
         .to_parquet_with_step(
             output_path.join("multishoot_target.parquet"),
             2 * Unit::Second,
+            almanac.clone(),
         )
         .unwrap();
 
     // Just propagate this spacecraft for one orbit for plotting
     let (_, end_traj) = prop
-        .with(sc_sol)
+        .with(sc_sol, almanac.clone())
         .for_duration_with_traj(2 * Unit::Hour)
         .unwrap();
 
@@ -152,22 +178,30 @@ fn alt_orbit_raising() {
         .to_parquet_with_step(
             output_path.join("multishoot_to_end.parquet"),
             2 * Unit::Second,
+            almanac.clone(),
         )
         .unwrap();
 
     // Check that error is 50km or less. That isn't great, but I blame that on the scenario and the final node being optimized.
-    let achieved_geoheight = cosm
-        .frame_chg(
-            &multishoot_sol
+    let achieved_geoheight = almanac
+        .transform_to(
+            multishoot_sol
                 .solutions
                 .last()
                 .unwrap()
                 .achieved_state
                 .orbit,
             iau_earth,
+            None,
         )
-        .geodetic_height_km();
-    let target_geoheight = cosm.frame_chg(&target, iau_earth).geodetic_height_km();
+        .unwrap()
+        .height_km()
+        .unwrap();
+    let target_geoheight = almanac
+        .transform_to(target, iau_earth, None)
+        .unwrap()
+        .height_km()
+        .unwrap();
     assert!(
         (achieved_geoheight - target_geoheight).abs() < 1e-3,
         "Geodetic height achieved greater than 1 m above goal"
@@ -175,17 +209,17 @@ fn alt_orbit_raising() {
 }
 
 #[ignore = "Does not have a valid test case yet"]
-#[test]
-fn vmag_orbit_raising() {
+#[rstest]
+fn vmag_orbit_raising(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
-    let iau_earth = cosm.frame("IAU_Earth");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     /* Define the parking orbit */
     let epoch = Epoch::from_gregorian_utc_at_noon(2022, 3, 4);
-    let start = Orbit::keplerian_altitude(300.0, 0.01, 30.0, 90.0, 90.0, 60.0, epoch, eme2k);
+    let start =
+        Orbit::try_keplerian_altitude(300.0, 0.01, 30.0, 90.0, 90.0, 60.0, epoch, eme2k).unwrap();
 
     /* Build the spacecraft -- really only the mass is needed here */
     let sc = Spacecraft {
@@ -202,16 +236,17 @@ fn vmag_orbit_raising() {
     };
 
     /* Define the target orbit */
-    let target = Orbit::keplerian_altitude(
+    let target = Orbit::try_keplerian_altitude(
         1500.0,
         0.01,
         30.0,
         90.0,
         90.0,
         60.0,
-        epoch + 0.05 * start.period(),
+        epoch + 0.05 * start.period().unwrap(),
         eme2k,
-    );
+    )
+    .unwrap();
 
     /* Define the multiple shooting parameters */
     let node_count = 300;
@@ -228,7 +263,9 @@ fn vmag_orbit_raising() {
         );
     }
 
-    let multishoot_sol = opti.solve(CostFunction::MinimumFuel).unwrap();
+    let multishoot_sol = opti
+        .solve(CostFunction::MinimumFuel, almanac.clone())
+        .unwrap();
 
     println!("Final nodes\nNode no,X (km),Y (km),Z (km),Epoch:GregorianUtc");
     for (i, node) in opti.targets.iter().enumerate() {
@@ -238,7 +275,9 @@ fn vmag_orbit_raising() {
         );
     }
 
-    let all_trajectories = multishoot_sol.build_trajectories(&prop).unwrap();
+    let all_trajectories = multishoot_sol
+        .build_trajectories(&prop, almanac.clone())
+        .unwrap();
 
     let mut full_traj = all_trajectories[0].clone();
 
@@ -248,6 +287,7 @@ fn vmag_orbit_raising() {
         traj.to_parquet_with_step(
             output_path.join(format!("multishoot_to_node_{i}.parquet")),
             2 * Unit::Second,
+            almanac.clone(),
         )
         .unwrap();
         if i > 0 {
@@ -299,57 +339,70 @@ fn vmag_orbit_raising() {
     assert!((dv_ms - 735.9).abs() < 0.1, "Wrong total DV");
 
     // Propagate the initial orbit too
-    prop.with(sc)
-        .for_duration_with_traj(start.period())
+    prop.with(sc, almanac.clone())
+        .for_duration_with_traj(start.period().unwrap())
         .unwrap()
         .1
         .to_parquet_with_step(
             output_path.join("multishoot_start.parquet"),
             2 * Unit::Second,
+            almanac.clone(),
         )
         .unwrap();
 
     // Propagate the initial orbit too
-    prop.with(sc.with_orbit(target))
-        .for_duration_with_traj(target.period())
+    prop.with(sc.with_orbit(target), almanac.clone())
+        .for_duration_with_traj(target.period().unwrap())
         .unwrap()
         .1
         .to_parquet_with_step(
             output_path.join("multishoot_to_target.parquet"),
             2 * Unit::Second,
+            almanac.clone(),
         )
         .unwrap();
 
     // Just propagate this spacecraft for one orbit for plotting
     let (_, end_traj) = prop
-        .with(sc_sol)
+        .with(sc_sol, almanac.clone())
         .for_duration_with_traj(2 * Unit::Hour)
         .unwrap();
 
     end_traj
-        .to_parquet_with_step(output_path.join("multishoot_end.parquet"), 2 * Unit::Second)
+        .to_parquet_with_step(
+            output_path.join("multishoot_end.parquet"),
+            2 * Unit::Second,
+            almanac.clone(),
+        )
         .unwrap();
 
     // Check that error is 50km or less. That isn't great, but I blame that on the scenario and the final node being optimized.
-    let achieved_geoheight = cosm
-        .frame_chg(
-            &multishoot_sol
+    let achieved_geoheight = almanac
+        .transform_to(
+            multishoot_sol
                 .solutions
                 .last()
                 .unwrap()
                 .achieved_state
                 .orbit,
             iau_earth,
+            None,
         )
-        .geodetic_height_km();
-    let target_geoheight = cosm.frame_chg(&target, iau_earth).geodetic_height_km();
+        .unwrap()
+        .height_km()
+        .unwrap();
+    let target_geoheight = almanac
+        .transform_to(target, iau_earth, None)
+        .unwrap()
+        .height_km()
+        .unwrap();
     assert!(
         (achieved_geoheight - target_geoheight).abs() < 1e-3,
         "Geodetic height achieved greater than 1 m above goal"
     );
 
     for (i, traj) in multishoot_sol
-        .build_trajectories(&prop)
+        .build_trajectories(&prop, almanac.clone())
         .unwrap()
         .iter()
         .enumerate()
@@ -357,6 +410,7 @@ fn vmag_orbit_raising() {
         traj.to_parquet_with_step(
             &format!("multishoot_to_node_{}.parquet", i),
             2 * Unit::Second,
+            almanac.clone(),
         )
         .unwrap();
     }

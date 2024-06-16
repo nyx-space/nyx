@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -16,14 +16,17 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::{ra_dec_from_unit_vector, GuidanceErrors, GuidanceLaw};
-use crate::cosmic::{Frame, GuidanceMode, Spacecraft};
+use super::{
+    ra_dec_from_unit_vector, GuidanceError, GuidanceLaw, GuidancePhysicsSnafu, LocalFrame,
+};
+use crate::cosmic::{GuidanceMode, Spacecraft};
 use crate::dynamics::guidance::unit_vector_from_ra_dec;
 use crate::linalg::Vector3;
 use crate::polyfit::CommonPolynomial;
 use crate::time::{Epoch, Unit};
 use crate::State;
 use hifitime::{Duration, TimeUnits};
+use snafu::ResultExt;
 use std::fmt;
 
 /// Mnvr defined a single maneuver. Direction MUST be in the VNC frame (Velocity / Normal / Cross).
@@ -43,7 +46,7 @@ pub struct Mnvr {
     /// The interpolation polynomial for the out-of-plane angle
     pub delta_outofplane_radians: CommonPolynomial,
     /// The frame in which the maneuvers are defined.
-    pub frame: Frame,
+    pub frame: LocalFrame,
 }
 
 impl fmt::Display for Mnvr {
@@ -84,7 +87,7 @@ impl fmt::Display for Mnvr {
 impl Mnvr {
     /// Creates an impulsive maneuver whose vector is the deltaV.
     /// TODO: This should use William's algorithm
-    pub fn from_impulsive(dt: Epoch, vector: Vector3<f64>, frame: Frame) -> Self {
+    pub fn from_impulsive(dt: Epoch, vector: Vector3<f64>, frame: LocalFrame) -> Self {
         Self::from_time_invariant(dt, dt + Unit::Millisecond, 1.0, vector, frame)
     }
 
@@ -94,7 +97,7 @@ impl Mnvr {
         end: Epoch,
         thrust_lvl: f64,
         vector: Vector3<f64>,
-        frame: Frame,
+        frame: LocalFrame,
     ) -> Self {
         // Convert to angles
         let (alpha, delta) = ra_dec_from_unit_vector(vector);
@@ -134,7 +137,7 @@ impl Mnvr {
     }
 
     /// Set the time-invariant direction for this finite burn while keeping the other components as they are
-    pub fn set_direction(&mut self, vector: Vector3<f64>) -> Result<(), GuidanceErrors> {
+    pub fn set_direction(&mut self, vector: Vector3<f64>) -> Result<(), GuidanceError> {
         self.set_direction_and_rates(vector, self.rate(), self.accel())
     }
 
@@ -150,7 +153,7 @@ impl Mnvr {
     }
 
     /// Set the rate of direction for this finite burn while keeping the other components as they are
-    pub fn set_rate(&mut self, rate: Vector3<f64>) -> Result<(), GuidanceErrors> {
+    pub fn set_rate(&mut self, rate: Vector3<f64>) -> Result<(), GuidanceError> {
         self.set_direction_and_rates(self.direction(), rate, self.accel())
     }
 
@@ -166,7 +169,7 @@ impl Mnvr {
     }
 
     /// Set the acceleration of the direction of this finite burn while keeping the other components as they are
-    pub fn set_accel(&mut self, accel: Vector3<f64>) -> Result<(), GuidanceErrors> {
+    pub fn set_accel(&mut self, accel: Vector3<f64>) -> Result<(), GuidanceError> {
         self.set_direction_and_rates(self.direction(), self.rate(), accel)
     }
 
@@ -176,10 +179,10 @@ impl Mnvr {
         dir: Vector3<f64>,
         rate: Vector3<f64>,
         accel: Vector3<f64>,
-    ) -> Result<(), GuidanceErrors> {
+    ) -> Result<(), GuidanceError> {
         let (alpha, delta) = ra_dec_from_unit_vector(dir);
         if alpha.is_nan() || delta.is_nan() {
-            return Err(GuidanceErrors::InvalidDirection {
+            return Err(GuidanceError::InvalidDirection {
                 x: dir[0],
                 y: dir[1],
                 z: dir[2],
@@ -193,7 +196,7 @@ impl Mnvr {
         } else {
             let (alpha_dt, delta_dt) = ra_dec_from_unit_vector(rate);
             if alpha_dt.is_nan() || delta_dt.is_nan() {
-                return Err(GuidanceErrors::InvalidRate {
+                return Err(GuidanceError::InvalidRate {
                     x: rate[0],
                     y: rate[1],
                     z: rate[2],
@@ -207,7 +210,7 @@ impl Mnvr {
             } else {
                 let (alpha_ddt, delta_ddt) = ra_dec_from_unit_vector(accel);
                 if alpha_ddt.is_nan() || delta_ddt.is_nan() {
-                    return Err(GuidanceErrors::InvalidAcceleration {
+                    return Err(GuidanceError::InvalidAcceleration {
                         x: accel[0],
                         y: accel[1],
                         z: accel[2],
@@ -226,26 +229,27 @@ impl Mnvr {
 }
 
 impl GuidanceLaw for Mnvr {
-    fn direction(&self, osc: &Spacecraft) -> Vector3<f64> {
+    fn direction(&self, osc: &Spacecraft) -> Result<Vector3<f64>, GuidanceError> {
         match osc.mode() {
-            GuidanceMode::Thrust => {
-                if matches!(self.frame, Frame::Inertial) {
-                    self.vector(osc.epoch())
-                } else {
-                    osc.orbit.dcm_from_traj_frame(self.frame).unwrap() * self.vector(osc.epoch())
-                }
-            }
-            _ => Vector3::zeros(),
+            GuidanceMode::Thrust => match self.frame {
+                LocalFrame::Inertial => Ok(self.vector(osc.epoch())),
+                _ => Ok(self.frame.dcm_to_inertial(osc.orbit).context({
+                    GuidancePhysicsSnafu {
+                        action: "computing RCN frame",
+                    }
+                })? * self.vector(osc.epoch())),
+            },
+            _ => Ok(Vector3::zeros()),
         }
     }
 
-    fn throttle(&self, osc: &Spacecraft) -> f64 {
+    fn throttle(&self, osc: &Spacecraft) -> Result<f64, GuidanceError> {
         // match self.next(osc) {
         match osc.mode() {
-            GuidanceMode::Thrust => self.thrust_prct,
+            GuidanceMode::Thrust => Ok(self.thrust_prct),
             _ => {
                 // We aren't in maneuver mode, so return 0% throttle
-                0.0
+                Ok(0.0)
             }
         }
         // self.thrust_lvl

@@ -1,19 +1,30 @@
 extern crate nyx_space as nyx;
 
+use anise::constants::celestial_objects::{JUPITER_BARYCENTER, SUN};
+use anise::constants::frames::SUN_J2000;
 use nyx::cosmic::eclipse::{EclipseLocator, EclipseState};
-use nyx::cosmic::{Bodies, Cosm, Orbit};
+use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::OrbitalDynamics;
+use nyx::dynamics::SpacecraftDynamics;
 use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, Unit};
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc};
 use std::thread;
 
-#[test]
-fn leo_sun_earth_eclipses() {
+use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use rstest::*;
+
+#[fixture]
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
+}
+
+#[rstest]
+fn leo_sun_earth_eclipses(almanac: Arc<Almanac>) {
     let prop_time = 2.0 * Unit::Day;
 
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -21,33 +32,32 @@ fn leo_sun_earth_eclipses() {
 
     let (truth_tx, truth_rx) = mpsc::channel();
 
-    let bodies = vec![Bodies::Sun, Bodies::JupiterBarycenter];
+    let bodies = vec![SUN, JUPITER_BARYCENTER];
 
-    let cosmc = cosm.clone();
+    let almanac_c = almanac.clone();
     thread::spawn(move || {
-        let dynamics = OrbitalDynamics::point_masses(&bodies, cosmc);
+        let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
         let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step_s(60.0));
 
         setup
-            .with(leo)
+            .with(leo.into(), almanac_c)
             .for_duration_with_channel(prop_time, truth_tx)
             .unwrap();
     });
 
     // Initialize the EclipseLocator
     let e_loc = EclipseLocator {
-        light_source: cosm.frame("Sun J2000"),
+        light_source: almanac.frame_from_uid(SUN_J2000).unwrap(),
         shadow_bodies: vec![eme2k],
-        cosm,
     };
 
     // Receive the states on the main thread.
     let mut prev_eclipse_state = EclipseState::Umbra;
     let mut cnt_changes = 0;
     while let Ok(rx_state) = truth_rx.recv() {
-        let new_eclipse_state = e_loc.compute(&rx_state);
+        let new_eclipse_state = e_loc.compute(rx_state.orbit, almanac.clone()).unwrap();
         if new_eclipse_state != prev_eclipse_state {
-            println!("{:.6} now in {:?}", rx_state.epoch, new_eclipse_state);
+            println!("{:.6} now in {:?}", rx_state.orbit.epoch, new_eclipse_state);
             prev_eclipse_state = new_eclipse_state;
             cnt_changes += 1;
         }
@@ -56,12 +66,11 @@ fn leo_sun_earth_eclipses() {
     assert_eq!(cnt_changes, 68, "wrong number of eclipse state changes");
 }
 
-#[test]
-fn geo_sun_earth_eclipses() {
+#[rstest]
+fn geo_sun_earth_eclipses(almanac: Arc<Almanac>) {
     let prop_time = 2 * Unit::Day;
 
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     // GEO are in shadow or near shadow during the equinoxes.
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 3, 19);
@@ -70,33 +79,33 @@ fn geo_sun_earth_eclipses() {
 
     let (truth_tx, truth_rx) = mpsc::channel();
 
-    let bodies = vec![Bodies::Sun, Bodies::JupiterBarycenter];
+    let bodies = vec![SUN, JUPITER_BARYCENTER];
+
+    let almanac_c = almanac.clone();
 
     thread::spawn(move || {
-        let cosm = Cosm::de438();
-        let dynamics = OrbitalDynamics::point_masses(&bodies, cosm);
+        let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
         let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step_s(60.0));
 
         setup
-            .with(geo)
+            .with(geo.into(), almanac_c)
             .for_duration_with_channel(prop_time, truth_tx)
             .unwrap();
     });
 
     // Initialize the EclipseLocator
     let e_loc = EclipseLocator {
-        light_source: cosm.frame("Sun J2000"),
+        light_source: almanac.frame_from_uid(SUN_J2000).unwrap(),
         shadow_bodies: vec![eme2k],
-        cosm,
     };
 
     // Receive the states on the main thread.
     let mut prev_eclipse_state = EclipseState::Umbra;
     let mut cnt_changes = 0;
     while let Ok(rx_state) = truth_rx.recv() {
-        let new_eclipse_state = e_loc.compute(&rx_state);
+        let new_eclipse_state = e_loc.compute(rx_state.orbit, almanac.clone()).unwrap();
         if new_eclipse_state != prev_eclipse_state {
-            println!("{:.6} now in {:?}", rx_state.epoch, new_eclipse_state);
+            println!("{:.6} now in {:?}", rx_state.orbit.epoch, new_eclipse_state);
             prev_eclipse_state = new_eclipse_state;
             cnt_changes += 1;
         }

@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import yaml
 from nyx_space.analysis import diff_traj_parquet
-from nyx_space.cosmic import Cosm, Spacecraft
+from nyx_space.cosmic import Spacecraft
 from nyx_space.mission_design import SpacecraftDynamics, TrajectoryLoader, propagate
 from nyx_space.orbit_determination import (
     DynamicTrackingArc,
@@ -45,7 +45,7 @@ def test_filter_arc():
     dynamics = SpacecraftDynamics.load_named(str(config_path.joinpath("dynamics.yaml")))
 
     # An propagate for two periods (we only care about the trajectory)
-    _, traj = propagate(sc, dynamics["hifi"], sc.orbit.period() * 2)
+    _, traj = propagate(sc, dynamics["hifi"], sc.orbit.period().unwrap() * 2)
     # Resample the trajectory at fixed step size
     traj = traj.resample(Unit.Second * 10.0)
     # And save the trajectory
@@ -265,7 +265,7 @@ def test_one_way_msr():
 
     # One way measurement
 
-    end_sc, traj = propagate(sc, dynamics["hifi"], sc.orbit.period() * 1.1)
+    end_sc, traj = propagate(sc, dynamics["hifi"], sc.orbit.period().unwrap() * 1.1)
     print(end_sc)
     print(traj)
 

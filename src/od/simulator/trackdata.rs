@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -18,20 +18,21 @@
 
 use std::sync::Arc;
 
+use anise::almanac::Almanac;
+use anise::errors::AlmanacResult;
 use hifitime::Epoch;
 use rand_pcg::Pcg64Mcg;
 
+use crate::io::ConfigRepr;
+use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 use crate::md::prelude::{Frame, Traj};
 use crate::md::trajectory::Interpolatable;
 use crate::od::{Measurement, ODError};
 use crate::Orbit;
-use crate::{io::Configurable, linalg::allocator::Allocator};
-
-use super::Cosm;
 
 /// Tracking device simulator.
-pub trait TrackingDeviceSim<MsrIn, Msr>: Configurable
+pub trait TrackingDeviceSim<MsrIn, Msr>: ConfigRepr
 where
     MsrIn: Interpolatable,
     Msr: Measurement,
@@ -58,17 +59,17 @@ where
         epoch: Epoch,
         traj: &Traj<MsrIn>,
         rng: Option<&mut Pcg64Mcg>,
-        cosm: Arc<Cosm>,
+        almanac: Arc<Almanac>,
     ) -> Result<Option<Msr>, ODError>;
 
     /// Returns the device location at the given epoch and in the given frame.
-    fn location(&self, epoch: Epoch, frame: Frame, cosm: &Cosm) -> Orbit;
+    fn location(&self, epoch: Epoch, frame: Frame, almanac: Arc<Almanac>) -> AlmanacResult<Orbit>;
 
     // Perform an instantaneous measurement (without integration times, i.e. one-way). Returns None if the object is not visible, else returns the measurement.
     fn measure_instantaneous(
         &mut self,
         rx: MsrIn,
         rng: Option<&mut Pcg64Mcg>,
-        cosm: Arc<Cosm>,
+        almanac: Arc<Almanac>,
     ) -> Result<Option<Msr>, ODError>;
 }

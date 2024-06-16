@@ -1,6 +1,10 @@
 extern crate nyx_space as nyx;
 
-use nyx::cosmic::{Cosm, Orbit};
+use anise::constants::celestial_objects::{EARTH, MOON, SUN};
+use anise::constants::frames::IAU_EARTH_FRAME;
+use anise::constants::usual_planetary_constants::MEAN_EARTH_ANGULAR_VELOCITY_DEG_S;
+use nyx::cosmic::Orbit;
+use nyx::dynamics::SpacecraftDynamics;
 use nyx::od::noise::GaussMarkov;
 use nyx::od::prelude::*;
 use nyx::time::Epoch;
@@ -8,17 +12,27 @@ use nyx::{dynamics::OrbitalDynamics, propagators::Propagator};
 use rand::SeedableRng;
 use rand_pcg::Pcg64Mcg;
 
-#[test]
-fn nil_measurement() {
-    use hifitime::J2000_OFFSET;
+use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use rstest::*;
+use std::sync::Arc;
+
+#[fixture]
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
+}
+
+#[rstest]
+fn nil_measurement(almanac: Arc<Almanac>) {
+    use hifitime::JD_J2000;
     // Let's create a station and make it estimate the range and range rate of something which is strictly in the same spot.
 
     let lat = -7.906_635_7;
     let long = 345.5975;
     let height = 0.0;
-    let epoch = Epoch::from_mjd_tai(J2000_OFFSET);
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+    let epoch = Epoch::from_mjd_tai(JD_J2000);
+
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let mut station = GroundStation {
         name: "nil".to_string(),
@@ -34,14 +48,25 @@ fn nil_measurement() {
         light_time_correction: false,
     };
 
-    let at_station = Orbit::from_geodesic(lat, long, height, epoch, eme2k);
+    let at_station = Orbit::try_latlongalt(
+        lat,
+        long,
+        height,
+        MEAN_EARTH_ANGULAR_VELOCITY_DEG_S,
+        epoch,
+        eme2k,
+    )
+    .unwrap();
 
-    let (_, traj) = Propagator::default(OrbitalDynamics::two_body())
-        .with(at_station)
+    let (_, traj) = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()))
+        .with(at_station.into(), almanac.clone())
         .for_duration_with_traj(1.seconds())
         .unwrap();
 
-    assert!(station.measure(epoch, &traj, None, cosm).unwrap().is_none());
+    assert!(station
+        .measure(epoch, &traj, None, almanac)
+        .unwrap()
+        .is_none());
 }
 
 /// Tests that the measurements generated from a topocentric frame are correct.
@@ -49,15 +74,13 @@ fn nil_measurement() {
 /// for frame transformation that simpler cases might not use.
 /// GMAT script: Cislunar_Measurement_Generation.script
 #[allow(clippy::identity_op)]
-#[test]
-fn val_measurements_topo() {
-    use self::nyx::cosmic::{Cosm, Orbit};
+#[rstest]
+fn val_measurements_topo(almanac: Arc<Almanac>) {
+    use self::nyx::cosmic::Orbit;
     use self::nyx::md::prelude::*;
     use self::nyx::od::prelude::*;
     use self::nyx::propagators::RK4Fixed;
     use std::str::FromStr;
-
-    let cosm = Cosm::de438_gmat();
 
     let cislunar1 = Orbit::cartesian(
         -6252.59501113,
@@ -67,7 +90,7 @@ fn val_measurements_topo() {
         -8.85806596,
         -5.08576325,
         Epoch::from_str("2023-11-16T06:36:30.232000 UTC").unwrap(),
-        cosm.frame("EME2000"),
+        almanac.frame_from_uid(EARTH_J2000).unwrap(),
     );
 
     // In GMAT's uncommon MJD notation, this epoch corresponds to 29912.78296296296.
@@ -79,10 +102,10 @@ fn val_measurements_topo() {
         -1.78800739052,
         -1.69330836191,
         Epoch::from_str("2022-11-29T06:47:28.0 TAI").unwrap(),
-        cosm.frame("EME2000"),
+        almanac.frame_from_uid(EARTH_J2000).unwrap(),
     );
 
-    let iau_earth = cosm.frame("IAU Earth");
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     let elevation_mask = 7.0; // in degrees
     let mut dss65_madrid = GroundStation::dss65_madrid(
@@ -100,7 +123,7 @@ fn val_measurements_topo() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     let setup = Propagator::new::<RK4Fixed>(
-        OrbitalDynamics::point_masses(&[Bodies::Earth, Bodies::Luna, Bodies::Sun], cosm.clone()),
+        SpacecraftDynamics::new(OrbitalDynamics::point_masses(vec![EARTH, MOON, SUN])),
         opts,
     );
 
@@ -111,7 +134,7 @@ fn val_measurements_topo() {
     }
 
     let (_, traj1) = setup
-        .with(cislunar1)
+        .with(cislunar1.into(), almanac.clone())
         .for_duration_with_traj(prop_time)
         .unwrap();
 
@@ -148,7 +171,7 @@ fn val_measurements_topo() {
     let mut traj1_msr_cnt = 0;
     for state in traj1.every(1 * Unit::Minute) {
         if dss65_madrid
-            .measure(state.epoch(), &traj1, Some(&mut rng), cosm.clone())
+            .measure(state.epoch(), &traj1, Some(&mut rng), almanac.clone())
             .unwrap()
             .is_some()
         {
@@ -163,11 +186,11 @@ fn val_measurements_topo() {
     );
     // Now, let's check specific arbitrarily selected observations
     for truth in &traj1_val_data {
-        let now = cislunar1.epoch() + truth.offset;
+        let now = cislunar1.epoch + truth.offset;
         let state = traj1.at(now).unwrap();
         // Will panic if the measurement is not visible
         let meas = dss65_madrid
-            .measure(state.epoch(), &traj1, Some(&mut rng), cosm.clone())
+            .measure(state.epoch(), &traj1, Some(&mut rng), almanac.clone())
             .unwrap()
             .unwrap();
 
@@ -209,14 +232,14 @@ fn val_measurements_topo() {
     ];
     let mut traj2_msr_cnt = 0;
     let (_, traj2) = setup
-        .with(cislunar2)
+        .with(cislunar2.into(), almanac.clone())
         .for_duration_with_traj(prop_time)
         .unwrap();
 
     // Now iterate the trajectory to count the measurements.
     for state in traj2.every(1 * Unit::Minute) {
         if dss65_madrid
-            .measure(state.epoch(), &traj2, Some(&mut rng), cosm.clone())
+            .measure(state.epoch(), &traj2, Some(&mut rng), almanac.clone())
             .unwrap()
             .is_some()
         {
@@ -231,11 +254,11 @@ fn val_measurements_topo() {
     );
     // Now, let's check specific arbitrarily selected observations
     for truth in &traj2_val_data {
-        let now = cislunar2.epoch() + truth.offset;
+        let now = cislunar2.epoch + truth.offset;
         let state = traj2.at(now).unwrap();
         // Will panic if the measurement is not visible
         let meas = dss65_madrid
-            .measure(state.epoch(), &traj2, Some(&mut rng), cosm.clone())
+            .measure(state.epoch(), &traj2, Some(&mut rng), almanac.clone())
             .unwrap()
             .unwrap();
         let obs = meas.observation();

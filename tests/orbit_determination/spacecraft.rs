@@ -1,10 +1,12 @@
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
-use nyx::cosmic::{Bodies, Cosm, Orbit, Spacecraft};
+use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SUN};
+use anise::constants::frames::IAU_EARTH_FRAME;
+use nyx::cosmic::{Orbit, Spacecraft};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::spacecraft::{SolarPressure, SpacecraftDynamics};
-use nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
+use nyx::linalg::{Matrix2, SMatrix, SVector, Vector2};
 use nyx::md::trajectory::ExportCfg;
 use nyx::md::{Event, StateParameter};
 use nyx::od::noise::GaussMarkov;
@@ -14,9 +16,19 @@ use nyx::time::{Epoch, TimeUnits, Unit};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use rstest::*;
+use std::sync::Arc;
+
+#[fixture]
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
+}
+
 #[allow(clippy::identity_op)]
-#[test]
-fn od_val_sc_mb_srp_reals_duals_models() {
+#[rstest]
+fn od_val_sc_mb_srp_reals_duals_models(almanac: Arc<Almanac>) {
     /*
      * This tests that the state transition matrix computation is correct when multiple celestial gravities and solar radiation pressure
      * are added to the model.
@@ -33,9 +45,7 @@ fn od_val_sc_mb_srp_reals_duals_models() {
      **/
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-
-    let iau_earth = cosm.frame("IAU Earth");
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
     // Define the ground stations.
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
@@ -80,7 +90,7 @@ fn od_val_sc_mb_srp_reals_duals_models() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, epoch, eme2k);
 
     let dry_mass_kg = 100.0; // in kg
@@ -88,15 +98,17 @@ fn od_val_sc_mb_srp_reals_duals_models() {
 
     // Generate the truth data on one thread.
 
-    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm.clone());
-    let sc_dynamics =
-        SpacecraftDynamics::from_model(orbital_dyn, SolarPressure::default(eme2k, cosm.clone()));
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
+    let orbital_dyn = OrbitalDynamics::point_masses(bodies);
+    let sc_dynamics = SpacecraftDynamics::from_model(
+        orbital_dyn,
+        SolarPressure::default(eme2k, almanac.clone()).unwrap(),
+    );
 
     let sc_init_state = Spacecraft::from_srp_defaults(initial_state, dry_mass_kg, sc_area);
 
     let setup = Propagator::new::<RK4Fixed>(sc_dynamics, opts);
-    let mut prop = setup.with(sc_init_state);
+    let mut prop = setup.with(sc_init_state, almanac.clone());
     let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
     // Test the exporting of a spacecraft trajectory
@@ -114,7 +126,7 @@ fn od_val_sc_mb_srp_reals_duals_models() {
     let cfg = ExportCfg::from_metadata(vec![
         (
             "Dynamics".to_string(),
-            "SRP, Moon, Sun, Jupiter".to_string(),
+            "SRP, Moon, Sun, JUPITER_BARYCENTER".to_string(),
         ),
         // An `Event:` metadata will be appropriately parsed and plotted with the Nyx plotting tools.
         (
@@ -127,14 +139,14 @@ fn od_val_sc_mb_srp_reals_duals_models() {
         ),
     ]);
 
-    traj.to_parquet(path.clone(), Some(vec![&event]), cfg)
+    traj.to_parquet(path.clone(), Some(vec![&event]), cfg, almanac.clone())
         .unwrap();
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
-    arc_sim.build_schedule(cosm.clone()).unwrap();
+    arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     arc.to_parquet_simple(path.with_file_name("sc_msr_arc.parquet"))
         .unwrap();
@@ -142,23 +154,27 @@ fn od_val_sc_mb_srp_reals_duals_models() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let initial_state_est = initial_state.with_stm();
-    let sc_init_est = Spacecraft::from_srp_defaults(initial_state_est, dry_mass_kg, sc_area);
+    let initial_state_est = initial_state;
+    let sc_init_est =
+        Spacecraft::from_srp_defaults(initial_state_est, dry_mass_kg, sc_area).with_stm();
     // Use the same setup as earlier
-    let prop_est = setup.with(sc_init_est);
+    let prop_est = setup.with(sc_init_est, almanac.clone());
     let covar_radius_km = 1.0e-3_f64.powi(2);
     let covar_velocity_km_s = 1.0e-6_f64.powi(2);
-    let init_covar = Matrix6::from_diagonal(&Vector6::new(
+    let init_covar = SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([
         covar_radius_km,
         covar_radius_km,
         covar_radius_km,
         covar_velocity_km_s,
         covar_velocity_km_s,
         covar_velocity_km_s,
-    ));
+        0.0,
+        0.0,
+        0.0,
+    ]));
 
     // Define the initial orbit estimate
-    let initial_estimate = KfEstimate::from_covar(initial_state_est, init_covar);
+    let initial_estimate = KfEstimate::from_covar(sc_init_est, init_covar);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise =
@@ -166,7 +182,7 @@ fn od_val_sc_mb_srp_reals_duals_models() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, None, cosm);
+    let mut odp = ODProcess::ckf(prop_est, ckf, None, almanac);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -220,7 +236,7 @@ fn od_val_sc_mb_srp_reals_duals_models() {
         est.covar.diagonal().norm()
     );
 
-    let delta = est.state() - final_truth.orbit;
+    let delta = (est.state().orbit - final_truth.orbit).unwrap();
     println!(
         "RMAG error = {:.2e} m\tVMAG error = {:.3e} mm/s",
         delta.rmag_km() * 1e3,

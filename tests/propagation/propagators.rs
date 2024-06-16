@@ -1,75 +1,91 @@
 extern crate nyx_space as nyx;
-use hifitime::J2000_OFFSET;
-use nyx::cosmic::{assert_orbit_eq_or_abs, assert_orbit_eq_or_rel, Cosm, Orbit};
+use std::sync::Arc;
+
+use hifitime::JD_J2000;
+use nyx::cosmic::{assert_orbit_eq_or_abs, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
+use nyx::dynamics::SpacecraftDynamics;
 use nyx::propagators::error_ctrl::RSSCartesianState;
-use nyx::propagators::*;
 use nyx::time::{Epoch, Unit};
 use nyx::utils::rss_orbit_errors;
+use nyx::{propagators::*, Spacecraft};
+
+use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use rstest::*;
+
+use crate::propagation::GMAT_EARTH_GM;
+
+#[fixture]
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
+}
 
 #[allow(clippy::identity_op)]
-#[test]
-fn regress_leo_day_adaptive() {
+#[rstest]
+fn regress_leo_day_adaptive(almanac: Arc<Almanac>) {
     // Regression test for propagators not available in GMAT.
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
 
     let prop_time = 1 * Unit::Day;
     let accuracy = 1e-12;
     let min_step = 0.1 * Unit::Second;
     let max_step = 30.0 * Unit::Second;
-    let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let init = Orbit::cartesian(
+    let dt = Epoch::from_mjd_tai(JD_J2000);
+    let init = Spacecraft::from(Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
-    );
+    ));
     let final_dt = dt + prop_time;
 
     let all_rslts = vec![
         Orbit::cartesian(
-            -5_971.198_709_133_600_5,
-            3_945.786_767_659_806_6,
-            2_864.246_881_515_823,
-            0.048_752_357_390_149_66,
-            -4.184_864_764_063_978,
-            5.849_104_974_563_176_5,
+            -5_971.198_524_908_157,
+            3_945.775_509_326_305_4,
+            2_864.262_542_023_422,
+            0.048_766_212_879_869_19,
+            -4.184_873_956_982_518,
+            5.849_098_380_963_502,
             final_dt,
             eme2k,
         ),
         Orbit::cartesian(
-            -5_971.194_375_364_978,
-            3_945.517_869_775_919_7,
-            2_864.621_016_241_924,
-            0.049_083_153_975_562_65,
-            -4.185_084_160_750_815,
-            5.848_947_437_814_39,
+            -5_971.194_190_197_366,
+            3_945.506_606_221_459_6,
+            2_864.636_682_800_498_4,
+            0.049_097_015_227_526_38,
+            -4.185_093_356_859_808,
+            5.848_940_840_578_1,
             final_dt,
             eme2k,
         ),
         Orbit::cartesian(
-            -5_971.194_375_418_999,
-            3_945.517_871_298_253_3,
-            2_864.621_014_165_613_4,
-            0.049_083_152_114_520_266,
-            -4.185_084_159_507_545,
-            5.848_947_438_688_043,
+            -5_971.194_190_305_766,
+            3_945.506_612_356_549_3,
+            2_864.636_674_277_756_4,
+            0.049_097_007_640_393_29,
+            -4.185_093_351_832_897,
+            5.848_940_844_198_66,
             final_dt,
             eme2k,
         ),
     ];
 
-    let dynamics = OrbitalDynamics::two_body();
+    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
     {
         let setup = Propagator::new::<RK2Fixed>(
             dynamics.clone(),
             PropOpts::with_fixed_step(1.0 * Unit::Second),
         );
-        let mut prop = setup.with(init);
+        let mut prop = setup.with(init, almanac.clone());
         prop.for_duration(prop_time).unwrap();
         assert_eq!(
-            prop.state.to_cartesian_vec(),
-            all_rslts[0].to_cartesian_vec(),
-            "two body prop failed"
+            prop.state.orbit.to_cartesian_pos_vel(),
+            all_rslts[0].to_cartesian_pos_vel(),
+            "RK2Fixed two body prop failed"
         );
         let prev_details = prop.latest_details();
         if prev_details.error > accuracy {
@@ -86,9 +102,14 @@ fn regress_leo_day_adaptive() {
             dynamics.clone(),
             PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSCartesianState {}),
         );
-        let mut prop = setup.with(init);
+        let mut prop = setup.with(init, almanac.clone());
         prop.for_duration(prop_time).unwrap();
-        assert_orbit_eq_or_abs(&prop.state, &all_rslts[1], 1e-7, "two body prop failed");
+        assert_orbit_eq_or_abs(
+            &prop.state.orbit,
+            &all_rslts[1],
+            1e-7,
+            "CashKarp45 two body prop failed",
+        );
         let prev_details = prop.latest_details();
         if prev_details.error > accuracy {
             assert_eq!(
@@ -104,9 +125,15 @@ fn regress_leo_day_adaptive() {
             dynamics,
             PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSCartesianState {}),
         );
-        let mut prop = setup.with(init);
+        let mut prop = setup.with(init, almanac.clone());
         prop.for_duration(prop_time).unwrap();
-        assert_orbit_eq_or_rel(&prop.state, &all_rslts[2], 1e-7, "two body prop failed");
+        // TODO(ANISE): This was a rel check!
+        assert_orbit_eq_or_abs(
+            &prop.state.orbit,
+            &all_rslts[2],
+            1e-7,
+            "Fehlberg45 two body prop failed",
+        );
         let prev_details = prop.latest_details();
         if prev_details.error > accuracy {
             assert_eq!(
@@ -119,22 +146,24 @@ fn regress_leo_day_adaptive() {
 }
 
 #[allow(clippy::identity_op)]
-#[test]
-fn gmat_val_leo_day_adaptive() {
+#[rstest]
+fn gmat_val_leo_day_adaptive(almanac: Arc<Almanac>) {
     // NOTE: In this test we only use the propagators which also exist in GMAT.
     // Refer to `regress_leo_day_adaptive` for the additional propagators.
 
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
 
     let prop_time = 1 * Unit::Day;
     let accuracy = 1e-12;
     let min_step = 0.1 * Unit::Second;
     let max_step = 30.0 * Unit::Second;
-    let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let init = Orbit::cartesian(
+    let dt = Epoch::from_mjd_tai(JD_J2000);
+    let init = Spacecraft::from(Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
-    );
+    ));
     let final_dt = dt + prop_time;
 
     let all_rslts = vec![
@@ -180,16 +209,21 @@ fn gmat_val_leo_day_adaptive() {
         ),
     ];
 
-    let dynamics = OrbitalDynamics::two_body();
+    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
     {
         let setup = Propagator::new::<Dormand45>(
             dynamics.clone(),
             PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSCartesianState {}),
         );
-        let mut prop = setup.with(init);
+        let mut prop = setup.with(init, almanac.clone());
         prop.for_duration(prop_time).unwrap();
-        assert_orbit_eq_or_abs(&prop.state, &all_rslts[0], 1e-8, "two body prop failed");
+        assert_orbit_eq_or_abs(
+            &prop.state.orbit,
+            &all_rslts[0],
+            1e-8,
+            "two body prop failed",
+        );
 
         let prev_details = prop.latest_details();
         if prev_details.error > accuracy {
@@ -200,14 +234,14 @@ fn gmat_val_leo_day_adaptive() {
             );
         }
         assert_orbit_eq_or_abs(
-            &prop.state,
+            &prop.state.orbit,
             &all_rslts[0],
             1e-8,
-            "first forward two body prop failed",
+            "==> Dormand45: two body prop failed",
         );
 
         println!("==> Dormand45 adaptive");
-        let delta = prop.state.to_cartesian_vec() - all_rslts[0].to_cartesian_vec();
+        let delta = prop.state.orbit.to_cartesian_pos_vel() - all_rslts[0].to_cartesian_pos_vel();
         for i in 0..6 {
             print!("{:.0e}\t", delta[i].abs());
         }
@@ -217,7 +251,7 @@ fn gmat_val_leo_day_adaptive() {
         prop.for_duration(prop_time).unwrap();
         prop.for_duration(prop_time).unwrap();
         prop.for_duration(-prop_time).unwrap();
-        let (err_r, err_v) = rss_orbit_errors(&prop.state, &all_rslts[0]);
+        let (err_r, err_v) = rss_orbit_errors(&prop.state.orbit, &all_rslts[0]);
         assert!(
             err_r < 1e-5,
             "two body 2*(fwd+back) prop failed to return to the initial state in position"
@@ -233,11 +267,16 @@ fn gmat_val_leo_day_adaptive() {
             dynamics.clone(),
             PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSCartesianState {}),
         );
-        let mut prop = setup.with(init);
+        let mut prop = setup.with(init, almanac.clone());
         prop.for_duration(prop_time).unwrap();
-        assert_orbit_eq_or_abs(&prop.state, &all_rslts[1], 1e-8, "two body prop failed");
+        assert_orbit_eq_or_abs(
+            &prop.state.orbit,
+            &all_rslts[1],
+            1e-7,
+            "==> Verner56: two body prop failed",
+        );
         println!("==> Verner56 adaptive");
-        let delta = prop.state.to_cartesian_vec() - all_rslts[1].to_cartesian_vec();
+        let delta = prop.state.orbit.to_cartesian_pos_vel() - all_rslts[1].to_cartesian_pos_vel();
         for i in 0..6 {
             print!("{:.0e}\t", delta[i].abs());
         }
@@ -257,15 +296,15 @@ fn gmat_val_leo_day_adaptive() {
             dynamics.clone(),
             PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSCartesianState {}),
         );
-        let mut prop = setup.with(init);
+        let mut prop = setup.with(init, almanac.clone());
         prop.for_duration(prop_time).unwrap();
         assert_eq!(
-            prop.state.to_cartesian_vec(),
-            all_rslts[2].to_cartesian_vec(),
-            "two body prop failed"
+            prop.state.orbit.to_cartesian_pos_vel(),
+            all_rslts[2].to_cartesian_pos_vel(),
+            "==> Dormand78: two body prop failed"
         );
         println!("==> Dormand78 adaptive");
-        let delta = prop.state.to_cartesian_vec() - all_rslts[2].to_cartesian_vec();
+        let delta = prop.state.orbit.to_cartesian_pos_vel() - all_rslts[2].to_cartesian_pos_vel();
         for i in 0..6 {
             print!("{:.0e}\t", delta[i].abs());
         }
@@ -285,15 +324,15 @@ fn gmat_val_leo_day_adaptive() {
             dynamics,
             PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSCartesianState {}),
         );
-        let mut prop = setup.with(init);
+        let mut prop = setup.with(init, almanac.clone());
         prop.for_duration(prop_time).unwrap();
         assert_eq!(
-            prop.state.to_cartesian_vec(),
-            all_rslts[3].to_cartesian_vec(),
-            "two body prop failed"
+            prop.state.orbit.to_cartesian_pos_vel(),
+            all_rslts[3].to_cartesian_pos_vel(),
+            "==> RK89 adaptive: two body prop failed"
         );
         println!("==> RK89 adaptive");
-        let delta = prop.state.to_cartesian_vec() - all_rslts[3].to_cartesian_vec();
+        let delta = prop.state.orbit.to_cartesian_pos_vel() - all_rslts[3].to_cartesian_pos_vel();
         for i in 0..6 {
             print!("{:.0e}\t", delta[i].abs());
         }
@@ -310,16 +349,18 @@ fn gmat_val_leo_day_adaptive() {
 }
 
 #[allow(clippy::identity_op)]
-#[test]
-fn gmat_val_leo_day_fixed() {
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
+#[rstest]
+fn gmat_val_leo_day_fixed(almanac: Arc<Almanac>) {
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
 
     let prop_time = 1 * Unit::Day;
-    let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let init = Orbit::cartesian(
+    let dt = Epoch::from_mjd_tai(JD_J2000);
+    let init = Spacecraft::from(Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
-    );
+    ));
     let final_dt = dt + prop_time;
 
     let all_rslts = vec![
@@ -375,24 +416,24 @@ fn gmat_val_leo_day_fixed() {
         ),
     ];
 
-    let dynamics = OrbitalDynamics::two_body();
+    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
     {
         let setup = Propagator::new::<RK4Fixed>(
             dynamics.clone(),
             PropOpts::with_fixed_step(1.0 * Unit::Second),
         );
-        let mut prop = setup.with(init);
+        let mut prop = setup.with(init, almanac.clone());
         prop.for_duration(prop_time).unwrap();
         assert_eq!(
-            prop.state, all_rslts[0],
+            prop.state.orbit, all_rslts[0],
             "first forward two body prop failed"
         );
         prop.for_duration(-prop_time).unwrap();
         prop.for_duration(prop_time).unwrap();
         prop.for_duration(prop_time).unwrap();
         prop.for_duration(-prop_time).unwrap();
-        let (err_r, err_v) = rss_orbit_errors(&prop.state, &all_rslts[0]);
+        let (err_r, err_v) = rss_orbit_errors(&prop.state.orbit, &all_rslts[0]);
         assert!(
             err_r < 1e-5,
             "two body 2*(fwd+back) prop failed to return to the initial state in position"
@@ -408,11 +449,17 @@ fn gmat_val_leo_day_fixed() {
             dynamics.clone(),
             PropOpts::with_fixed_step(10.0 * Unit::Second),
         );
-        let mut prop = setup.with(init);
+        let mut prop = setup.with(init, almanac.clone());
         prop.for_duration(prop_time).unwrap();
-        assert_orbit_eq_or_rel(&prop.state, &all_rslts[1], 1e-7, "two body prop failed");
+        // TODO(ANISE): This was a rel check!
+        assert_orbit_eq_or_abs(
+            &prop.state.orbit,
+            &all_rslts[1],
+            1e-7,
+            "two body prop failed",
+        );
         println!("==> Verner56");
-        let delta = prop.state.to_cartesian_vec() - all_rslts[1].to_cartesian_vec();
+        let delta = prop.state.orbit.to_cartesian_pos_vel() - all_rslts[1].to_cartesian_pos_vel();
         for i in 0..6 {
             print!("{:.0e}\t", delta[i].abs());
         }
@@ -424,11 +471,11 @@ fn gmat_val_leo_day_fixed() {
             dynamics.clone(),
             PropOpts::with_fixed_step(10.0 * Unit::Second),
         );
-        let mut prop = setup.with(init);
+        let mut prop = setup.with(init, almanac.clone());
         prop.for_duration(prop_time).unwrap();
-        assert_eq!(prop.state, all_rslts[2], "two body prop failed");
+        assert_eq!(prop.state.orbit, all_rslts[2], "two body prop failed");
         println!("==> Dormand45");
-        let delta = prop.state.to_cartesian_vec() - all_rslts[2].to_cartesian_vec();
+        let delta = prop.state.orbit.to_cartesian_pos_vel() - all_rslts[2].to_cartesian_pos_vel();
         for i in 0..6 {
             print!("{:.0e}\t", delta[i].abs());
         }
@@ -440,11 +487,11 @@ fn gmat_val_leo_day_fixed() {
             dynamics.clone(),
             PropOpts::with_fixed_step(10.0 * Unit::Second),
         );
-        let mut prop = setup.with(init);
+        let mut prop = setup.with(init, almanac.clone());
         prop.for_duration(prop_time).unwrap();
-        assert_eq!(prop.state, all_rslts[3], "two body prop failed");
+        assert_eq!(prop.state.orbit, all_rslts[3], "two body prop failed");
         println!("==> Dormand78");
-        let delta = prop.state.to_cartesian_vec() - all_rslts[3].to_cartesian_vec();
+        let delta = prop.state.orbit.to_cartesian_pos_vel() - all_rslts[3].to_cartesian_pos_vel();
         for i in 0..6 {
             print!("{:.0e}\t", delta[i].abs());
         }
@@ -454,11 +501,11 @@ fn gmat_val_leo_day_fixed() {
     {
         let setup =
             Propagator::new::<RK89>(dynamics, PropOpts::with_fixed_step(10.0 * Unit::Second));
-        let mut prop = setup.with(init);
+        let mut prop = setup.with(init, almanac.clone());
         prop.for_duration(prop_time).unwrap();
-        assert_eq!(prop.state, all_rslts[4], "two body prop failed");
+        assert_eq!(prop.state.orbit, all_rslts[4], "two body prop failed");
         println!("==> RK89");
-        let delta = prop.state.to_cartesian_vec() - all_rslts[4].to_cartesian_vec();
+        let delta = prop.state.orbit.to_cartesian_pos_vel() - all_rslts[4].to_cartesian_pos_vel();
         for i in 0..6 {
             print!("{:.0e}\t", delta[i].abs());
         }

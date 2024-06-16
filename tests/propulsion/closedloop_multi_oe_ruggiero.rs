@@ -1,7 +1,9 @@
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
-use self::nyx::cosmic::{Cosm, GuidanceMode, Orbit, Spacecraft};
+use std::sync::Arc;
+
+use self::nyx::cosmic::{GuidanceMode, Orbit, Spacecraft};
 use self::nyx::dynamics::guidance::{Objective, Ruggiero, Thruster};
 use self::nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
 use self::nyx::md::{Event, StateParameter};
@@ -10,14 +12,22 @@ use self::nyx::time::{Epoch, Unit};
 
 /// NOTE: Herein shows the difference between the QLaw and Ruggiero (and other control laws).
 /// The Ruggiero control law takes quite some longer to converge than the QLaw.
+use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use rstest::*;
 
-#[test]
-fn qlaw_as_ruggiero_case_a() {
+#[fixture]
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
+}
+
+#[rstest]
+fn qlaw_as_ruggiero_case_a(almanac: Arc<Almanac>) {
     // Source: AAS-2004-5089
-
-    let mut cosm = Cosm::de438_raw();
-    cosm.frame_mut_gm("EME2000", 398_600.433);
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac
+        .frame_from_uid(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(398_600.433);
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -45,7 +55,7 @@ fn qlaw_as_ruggiero_case_a() {
         Event::within_tolerance(StateParameter::Eccentricity, 0.01, 5e-5),
     ];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit).unwrap();
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit.into()).unwrap();
 
     let dry_mass = 1.0;
     let fuel_mass = 299.0;
@@ -58,7 +68,7 @@ fn qlaw_as_ruggiero_case_a() {
 
     let setup =
         Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second));
-    let mut prop = setup.with(sc_state);
+    let mut prop = setup.with(sc_state, almanac.clone());
     let (final_state, traj) = prop.for_duration_with_traj(prop_time).unwrap();
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[qlaw_as_ruggiero_case_a] {:x}", final_state.orbit);
@@ -67,7 +77,7 @@ fn qlaw_as_ruggiero_case_a() {
     for e in &events {
         println!(
             "[qlaw_as_ruggiero_case_a] Found {} events of kind {}",
-            traj.find(e).unwrap().len(),
+            traj.find(e, almanac.clone()).unwrap().len(),
             e
         );
     }
@@ -80,11 +90,11 @@ fn qlaw_as_ruggiero_case_a() {
     assert!((fuel_usage - 93.449).abs() < 1.0);
 }
 
-#[test]
-fn qlaw_as_ruggiero_case_b() {
+#[rstest]
+fn qlaw_as_ruggiero_case_b(almanac: Arc<Almanac>) {
     // Source: AAS-2004-5089
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -107,7 +117,7 @@ fn qlaw_as_ruggiero_case_b() {
         Objective::within_tolerance(StateParameter::Inclination, 0.05, 5e-3),
     ];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit).unwrap();
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit.into()).unwrap();
 
     let fuel_mass = 1999.9;
     let dry_mass = 0.1;
@@ -120,7 +130,7 @@ fn qlaw_as_ruggiero_case_b() {
 
     let final_state =
         Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state)
+            .with(sc_state, almanac)
             .for_duration(prop_time)
             .unwrap();
 
@@ -136,11 +146,11 @@ fn qlaw_as_ruggiero_case_b() {
     assert!((fuel_usage - 223.515).abs() < 1.0);
 }
 
-#[test]
-fn qlaw_as_ruggiero_case_c() {
+#[rstest]
+fn qlaw_as_ruggiero_case_c(almanac: Arc<Almanac>) {
     // Source: AAS-2004-5089
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -162,7 +172,7 @@ fn qlaw_as_ruggiero_case_c() {
         Objective::within_tolerance(StateParameter::Eccentricity, 0.7, 5e-5),
     ];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit).unwrap();
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit.into()).unwrap();
 
     let fuel_mass = 299.9;
     let dry_mass = 0.1;
@@ -175,7 +185,7 @@ fn qlaw_as_ruggiero_case_c() {
 
     let final_state =
         Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state)
+            .with(sc_state, almanac)
             .for_duration(prop_time)
             .unwrap();
 
@@ -190,13 +200,13 @@ fn qlaw_as_ruggiero_case_c() {
     assert!((fuel_usage - 41.742).abs() < 1.0);
 }
 
-#[test]
+#[rstest]
 #[ignore = "https://gitlab.com/chrisrabotin/nyx/issues/103"]
-fn qlaw_as_ruggiero_case_d() {
+fn qlaw_as_ruggiero_case_d(almanac: Arc<Almanac>) {
     // Broken: https://gitlab.com/chrisrabotin/nyx/issues/103
     // Source: AAS-2004-5089
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -220,7 +230,7 @@ fn qlaw_as_ruggiero_case_d() {
         Objective::within_tolerance(StateParameter::RAAN, 360.0 - 90.0, 5e-3),
     ];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit).unwrap();
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit.into()).unwrap();
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
@@ -233,7 +243,7 @@ fn qlaw_as_ruggiero_case_d() {
 
     let final_state =
         Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state)
+            .with(sc_state, almanac)
             .for_duration(prop_time)
             .unwrap();
 
@@ -249,13 +259,13 @@ fn qlaw_as_ruggiero_case_d() {
     assert!((fuel_usage - 23.0).abs() < 1.0);
 }
 
-#[test]
+#[rstest]
 #[ignore = "https://gitlab.com/chrisrabotin/nyx/issues/103"]
-fn qlaw_as_ruggiero_case_e() {
+fn qlaw_as_ruggiero_case_e(almanac: Arc<Almanac>) {
     // Broken: https://gitlab.com/chrisrabotin/nyx/issues/103
     // Source: AAS-2004-5089
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -280,7 +290,7 @@ fn qlaw_as_ruggiero_case_e() {
         Objective::within_tolerance(StateParameter::AoP, 180.0, 5e-3),
     ];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit).unwrap();
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit.into()).unwrap();
 
     let fuel_mass = 1999.9;
     let dry_mass = 0.1;
@@ -293,7 +303,7 @@ fn qlaw_as_ruggiero_case_e() {
 
     let final_state =
         Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state)
+            .with(sc_state, almanac)
             .for_duration(prop_time)
             .unwrap();
 
@@ -309,16 +319,15 @@ fn qlaw_as_ruggiero_case_e() {
     assert!((fuel_usage - 23.0).abs() < 1.0);
 }
 
-#[test]
-fn qlaw_as_ruggiero_case_f() {
+#[rstest]
+fn qlaw_as_ruggiero_case_f(almanac: Arc<Almanac>) {
     // Source: AAS-2004-5089
     /*
         NOTE: Due to how lifetime of variables work in Rust, we need to define all of the
         components of a spacecraft before defining the spacecraft itself.
     */
 
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -337,7 +346,7 @@ fn qlaw_as_ruggiero_case_f() {
 
     let objectives = &[Objective::new(StateParameter::Eccentricity, 0.15)];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit).unwrap();
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit.into()).unwrap();
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
@@ -351,12 +360,12 @@ fn qlaw_as_ruggiero_case_f() {
     let setup =
         Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second));
     let (final_state, traj) = setup
-        .with(sc_state)
+        .with(sc_state, almanac.clone())
         .for_duration_with_traj(prop_time)
         .unwrap();
 
     // Save as parquet
-    traj.to_parquet_simple("output_data/rugg_case_f.parquet")
+    traj.to_parquet_simple("output_data/rugg_case_f.parquet", almanac)
         .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
@@ -371,11 +380,10 @@ fn qlaw_as_ruggiero_case_f() {
     assert!((fuel_usage - 10.378).abs() < 1.0);
 }
 
-#[test]
-fn ruggiero_iepc_2011_102() {
+#[rstest]
+fn ruggiero_iepc_2011_102(almanac: Arc<Almanac>) {
     // Source: IEPC 2011 102
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -398,7 +406,7 @@ fn ruggiero_iepc_2011_102() {
         Objective::within_tolerance(StateParameter::Eccentricity, 0.011, 5e-5),
     ];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit).unwrap();
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit.into()).unwrap();
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
@@ -411,7 +419,7 @@ fn ruggiero_iepc_2011_102() {
 
     let final_state =
         Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state)
+            .with(sc_state, almanac)
             .for_duration(prop_time)
             .unwrap();
 

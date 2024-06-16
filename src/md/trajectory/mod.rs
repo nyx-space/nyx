@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -16,10 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anise::math::interpolation::InterpolationError;
 use snafu::prelude::*;
 
 mod interpolatable;
-mod orbit_traj;
+// mod orbit_traj;
 mod sc_traj;
 mod traj;
 mod traj_it;
@@ -33,7 +34,7 @@ pub use crate::io::ExportCfg;
 use super::StateParameter;
 use crate::time::{Duration, Epoch};
 
-#[derive(Clone, PartialEq, Eq, Debug, Snafu)]
+#[derive(Clone, PartialEq, Debug, Snafu)]
 pub enum TrajError {
     #[snafu(display("Event {event} not found between {start} and {end}"))]
     EventNotFound {
@@ -51,4 +52,6 @@ pub enum TrajError {
         req_dur: Duration,
         spline_dur: Duration,
     },
+    #[snafu(display("Interpolation failed: {source}"))]
+    Interpolation { source: InterpolationError },
 }

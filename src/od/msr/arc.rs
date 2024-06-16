@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -24,9 +24,8 @@ use std::ops::RangeBounds;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::cosmic::Cosm;
 use crate::io::watermark::pq_writer;
-use crate::io::{ConfigError, ConfigRepr, ExportCfg};
+use crate::io::{ConfigError, ExportCfg};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName};
 use crate::md::trajectory::Interpolatable;
@@ -224,10 +223,7 @@ where
 
     /// If this tracking arc has devices that can be used to generate simulated measurements,
     /// then this function can be used to rebuild said measurement devices
-    pub fn rebuild_devices<MsrIn, D>(
-        &self,
-        cosm: Arc<Cosm>,
-    ) -> Result<BTreeMap<String, D>, ConfigError>
+    pub fn rebuild_devices<MsrIn, D>(&self) -> Result<BTreeMap<String, D>, ConfigError>
     where
         MsrIn: Interpolatable,
         D: TrackingDeviceSim<MsrIn, Msr>,
@@ -235,20 +231,13 @@ where
             + Allocator<f64, <MsrIn as State>::Size, <MsrIn as State>::Size>
             + Allocator<f64, <MsrIn as State>::VecLength>,
     {
-        let devices_repr = D::IntermediateRepr::loads_many(&self.device_cfg)?;
+        let devices = D::loads_named(&self.device_cfg)?;
 
-        let mut devices = BTreeMap::new();
-
-        for serde in devices_repr {
-            let device = D::from_config(serde, cosm.clone())?;
-            if !self.device_names().contains(&device.name()) {
-                warn!(
-                    "{} from arc config does not appear in measurements -- ignored",
-                    device.name()
-                );
+        for device in devices.keys() {
+            if !self.device_names().contains(device) {
+                info!("no measurements from {device} in loaded arc");
                 continue;
             }
-            devices.insert(device.name(), device);
         }
 
         Ok(devices)

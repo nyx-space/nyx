@@ -1,3 +1,4 @@
+use anise::constants::frames::{EARTH_J2000, IAU_EARTH_FRAME};
 use nyx_space::io::tracking_data::DynamicTrackingArc;
 use nyx_space::io::ConfigRepr;
 use nyx_space::md::prelude::*;
@@ -12,14 +13,17 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 #[fixture]
-fn traj() -> Traj<Orbit> {
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
+}
+
+#[fixture]
+fn traj(almanac: Arc<Almanac>) -> Traj<Spacecraft> {
     let _ = pretty_env_logger::try_init();
 
-    // Load cosm
-    let cosm = Cosm::de438();
-
     // Dummy state
-    let orbit = Orbit::keplerian_altitude(
+    let orbit = Orbit::try_keplerian_altitude(
         500.0,
         1e-3,
         30.0,
@@ -27,12 +31,13 @@ fn traj() -> Traj<Orbit> {
         75.0,
         23.4,
         Epoch::from_str("2023-02-22T19:18:17.16 UTC").unwrap(),
-        cosm.frame("EME2000"),
-    );
+        almanac.frame_from_uid(EARTH_J2000).unwrap(),
+    )
+    .unwrap();
 
     // Generate a trajectory
-    let (_, trajectory) = Propagator::default(OrbitalDynamics::two_body())
-        .with(orbit)
+    let (_, trajectory) = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()))
+        .with(Spacecraft::builder().orbit(orbit).build(), almanac)
         .for_duration_with_traj(3.days())
         .unwrap();
 
@@ -58,10 +63,7 @@ fn devices() -> Vec<GroundStation> {
 }
 
 #[rstest]
-fn trk_simple(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
-    // Load cosm
-    let cosm = Cosm::de438();
-
+fn trk_simple(traj: Traj<Spacecraft>, devices: Vec<GroundStation>, almanac: Arc<Almanac>) {
     // Path to output data
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
@@ -71,14 +73,15 @@ fn trk_simple(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
     .iter()
     .collect();
 
-    traj.to_parquet_simple(path.clone()).unwrap();
+    traj.to_parquet_simple(path.clone(), almanac.clone())
+        .unwrap();
 
     traj.to_groundtrack_parquet(
         path.with_file_name("tracking_truth_ephem_groundtrack.parquet"),
-        cosm.frame("IAU Earth"),
+        almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap(),
         None,
         None,
-        cosm.clone(),
+        almanac.clone(),
     )
     .unwrap();
 
@@ -101,21 +104,22 @@ fn trk_simple(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
 
     // Build the tracking arc simulation to generate a "standard measurement".
     let mut trk =
-        TrackingArcSim::<Orbit, RangeDoppler, _>::with_seed(devices, traj, configs, 12345).unwrap();
+        TrackingArcSim::<Spacecraft, RangeDoppler, _>::with_seed(devices, traj, configs, 12345)
+            .unwrap();
 
     // Test that building the schedule is deterministic
-    let orig_sched = trk.generate_schedule(cosm.clone()).unwrap();
+    let orig_sched = trk.generate_schedule(almanac.clone()).unwrap();
     for ii in 0..5 {
-        let sched = trk.generate_schedule(cosm.clone()).unwrap();
+        let sched = trk.generate_schedule(almanac.clone()).unwrap();
         assert_eq!(
             sched, orig_sched,
             "{ii} was different:\n orig {orig_sched:?}\n sched {sched:?}"
         );
     }
 
-    trk.build_schedule(cosm.clone()).unwrap();
+    trk.build_schedule(almanac.clone()).unwrap();
 
-    let arc = trk.generate_measurements(cosm).unwrap();
+    let arc = trk.generate_measurements(almanac).unwrap();
 
     // Test filtering by epoch
     let start_epoch = arc.measurements[0].1.epoch() + 1.minutes();
@@ -190,9 +194,11 @@ fn trk_simple(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
 
 /// Tests that inclusion epochs work
 #[rstest]
-fn trkconfig_zero_inclusion(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
-    let cosm = Cosm::de438();
-
+fn trkconfig_zero_inclusion(
+    traj: Traj<Spacecraft>,
+    devices: Vec<GroundStation>,
+    almanac: Arc<Almanac>,
+) {
     // Build a tracking config that should always see this vehicle.
     let trkcfg_always = TrkConfig::builder()
         .strands(vec![Strand {
@@ -205,11 +211,12 @@ fn trkconfig_zero_inclusion(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
     let mut configs = BTreeMap::new();
     configs.insert(devices[1].name.clone(), trkcfg_always);
 
-    let mut trk = TrackingArcSim::<Orbit, RangeDoppler, _>::new(devices, traj, configs).unwrap();
+    let mut trk =
+        TrackingArcSim::<Spacecraft, RangeDoppler, _>::new(devices, traj, configs).unwrap();
 
-    trk.build_schedule(cosm.clone()).unwrap();
+    trk.build_schedule(almanac.clone()).unwrap();
 
-    let arc = trk.generate_measurements(cosm).unwrap();
+    let arc = trk.generate_measurements(almanac).unwrap();
 
     // Regression
     assert_eq!(arc.measurements.len(), 113);
@@ -223,7 +230,7 @@ fn trkconfig_zero_inclusion(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
 
 /// Test invalid tracking configurations
 #[rstest]
-fn trkconfig_invalid(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
+fn trkconfig_invalid(traj: Traj<Spacecraft>, devices: Vec<GroundStation>) {
     // Build a tracking config where the exclusion range is less than the sampling rate
     let trkcfg = TrkConfig::builder()
         .strands(vec![Strand {
@@ -238,14 +245,16 @@ fn trkconfig_invalid(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
         configs.insert(device.name.clone(), trkcfg.clone());
     }
 
-    assert!(TrackingArcSim::<Orbit, RangeDoppler, _>::new(devices, traj, configs).is_err());
+    assert!(TrackingArcSim::<Spacecraft, RangeDoppler, _>::new(devices, traj, configs).is_err());
 }
 
 /// Test a delayed start of the configuration
 #[rstest]
-fn trkconfig_delayed_start(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
-    let cosm = Cosm::de438();
-
+fn trkconfig_delayed_start(
+    traj: Traj<Spacecraft>,
+    devices: Vec<GroundStation>,
+    almanac: Arc<Almanac>,
+) {
     let trkcfg = TrkConfig::builder()
         .strands(vec![Strand {
             start: traj.first().epoch() + 2.hours(),
@@ -260,12 +269,12 @@ fn trkconfig_delayed_start(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
     configs.insert(devices[0].name.clone(), trkcfg);
 
     let mut trk =
-        TrackingArcSim::<Orbit, RangeDoppler, _>::new(vec![devices[0].clone()], traj, configs)
+        TrackingArcSim::<Spacecraft, RangeDoppler, _>::new(vec![devices[0].clone()], traj, configs)
             .unwrap();
 
-    trk.build_schedule(cosm.clone()).unwrap();
+    trk.build_schedule(almanac.clone()).unwrap();
 
-    let arc = trk.generate_measurements(cosm).unwrap();
+    let arc = trk.generate_measurements(almanac).unwrap();
 
     // Check the sampling of the arc.
     assert_eq!(
@@ -280,9 +289,7 @@ fn trkconfig_delayed_start(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
 
 /// Test different cadences and availabilities
 #[rstest]
-fn trkconfig_cadence(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
-    let cosm = Cosm::de438();
-
+fn trkconfig_cadence(traj: Traj<Spacecraft>, devices: Vec<GroundStation>, almanac: Arc<Almanac>) {
     // Build the configs map with a single ground station
     let mut configs = BTreeMap::new();
 
@@ -308,11 +315,12 @@ fn trkconfig_cadence(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
             .build(),
     );
 
-    let mut trk = TrackingArcSim::<Orbit, RangeDoppler, _>::new(devices, traj, configs).unwrap();
+    let mut trk =
+        TrackingArcSim::<Spacecraft, RangeDoppler, _>::new(devices, traj, configs).unwrap();
 
-    trk.build_schedule(cosm.clone()).unwrap();
+    trk.build_schedule(almanac.clone()).unwrap();
 
-    let arc = trk.generate_measurements(cosm).unwrap();
+    let arc = trk.generate_measurements(almanac).unwrap();
 
     // Check the sampling of the arc is one minute: we don't have any overlap of availability and the default sampling is one minute.
     assert_eq!(
@@ -322,5 +330,5 @@ fn trkconfig_cadence(traj: Traj<Orbit>, devices: Vec<GroundStation>) {
     );
 
     // Regression
-    assert_eq!(arc.measurements.len(), 216);
+    assert_eq!(arc.measurements.len(), 215);
 }

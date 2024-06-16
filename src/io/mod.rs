@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -19,7 +19,7 @@
 use crate::errors::NyxError;
 use crate::md::StateParameter;
 use crate::time::Epoch;
-use crate::Orbit;
+
 use arrow::error::ArrowError;
 use parquet::errors::ParquetError;
 use snafu::prelude::*;
@@ -27,7 +27,6 @@ pub(crate) mod watermark;
 use hifitime::prelude::{Format, Formatter};
 use hifitime::Duration;
 use serde::de::DeserializeOwned;
-use serde::ser::SerializeSeq;
 use serde::{Deserialize, Deserializer};
 use serde::{Serialize, Serializer};
 use serde_yaml::Error as YamlError;
@@ -39,22 +38,14 @@ use std::io::BufReader;
 use std::io::Error as IoError;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::Arc;
 use typed_builder::TypedBuilder;
-
-use self::orbit::OrbitSerde;
-use crate::cosmic::{Cosm, Frame};
 
 /// Handles writing to an XYZV file
 pub mod cosmo;
-pub mod dynamics;
 pub mod estimate;
-/// Handles reading from frames defined in input files
-pub mod frame_serde;
 /// Handles loading of gravity models using files of NASA PDS and GMAT COF. Several gunzipped files are provided with nyx.
 pub mod gravity;
 pub mod matrices;
-pub mod orbit;
 pub mod tracking_data;
 pub mod trajectory_data;
 
@@ -209,6 +200,10 @@ pub enum InputOutputError {
         source: ArrowError,
         action: &'static str,
     },
+    #[snafu(display("error parsing `{data}` as Dhall config: {err}"))]
+    ParseDhall { data: String, err: String },
+    #[snafu(display("error serializing {what} to Dhall: {err}"))]
+    SerializeDhall { what: String, err: String },
 }
 
 impl PartialEq for InputOutputError {
@@ -217,16 +212,17 @@ impl PartialEq for InputOutputError {
     }
 }
 
+// TODO(ANISE): This should use the Trait thing from PyO3
 pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {
     /// Builds the configuration representation from the path to a yaml
     fn load<P>(path: P) -> Result<Self, ConfigError>
     where
         P: AsRef<Path>,
     {
-        let file = File::open(path).with_context(|_| ReadSnafu)?;
+        let file = File::open(path).context(ReadSnafu)?;
         let reader = BufReader::new(file);
 
-        serde_yaml::from_reader(reader).with_context(|_| ParseSnafu)
+        serde_yaml::from_reader(reader).context(ParseSnafu)
     }
 
     /// Builds a sequence of "Selves" from the provided path to a yaml
@@ -234,10 +230,10 @@ pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {
     where
         P: AsRef<Path>,
     {
-        let file = File::open(path).with_context(|_| ReadSnafu)?;
+        let file = File::open(path).context(ReadSnafu)?;
         let reader = BufReader::new(file);
 
-        serde_yaml::from_reader(reader).with_context(|_| ParseSnafu)
+        serde_yaml::from_reader(reader).context(ParseSnafu)
     }
 
     /// Builds a map of names to "selves" from the provided path to a yaml
@@ -245,38 +241,23 @@ pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {
     where
         P: AsRef<Path>,
     {
-        let file = File::open(path).with_context(|_| ReadSnafu)?;
+        let file = File::open(path).context(ReadSnafu)?;
         let reader = BufReader::new(file);
 
-        serde_yaml::from_reader(reader).with_context(|_| ParseSnafu)
+        serde_yaml::from_reader(reader).context(ParseSnafu)
     }
 
     /// Builds a sequence of "Selves" from the provided string of a yaml
     fn loads_many(data: &str) -> Result<Vec<Self>, ConfigError> {
         debug!("Loading YAML:\n{data}");
-        serde_yaml::from_str(data).with_context(|_| ParseSnafu)
-    }
-}
-
-/// Trait to specify that a structure can be configured from a file, either in TOML, YAML, JSON, INI, etc.
-pub trait Configurable
-where
-    Self: Sized,
-{
-    /// The intermediate representation needed to create `Self` or to serialize Self.
-    type IntermediateRepr: ConfigRepr;
-
-    fn from_yaml<P: AsRef<Path>>(path: P, cosm: Arc<Cosm>) -> Result<Self, ConfigError> {
-        Self::from_config(Self::IntermediateRepr::load(path)?, cosm)
+        serde_yaml::from_str(data).context(ParseSnafu)
     }
 
-    /// Creates a new instance of `self` from the configuration.
-    fn from_config(cfg: Self::IntermediateRepr, cosm: Arc<Cosm>) -> Result<Self, ConfigError>
-    where
-        Self: Sized;
-
-    /// Converts self into the intermediate representation which is serializable.
-    fn to_config(&self) -> Result<Self::IntermediateRepr, ConfigError>;
+    /// Builds a sequence of "Selves" from the provided string of a yaml
+    fn loads_named(data: &str) -> Result<BTreeMap<String, Self>, ConfigError> {
+        debug!("Loading YAML:\n{data}");
+        serde_yaml::from_str(data).context(ParseSnafu)
+    }
 }
 
 pub(crate) fn epoch_to_str<S>(epoch: &Epoch, serializer: S) -> Result<S::Ok, S::Error>
@@ -311,56 +292,6 @@ where
     // implementation of the custom deserialization function
     let s = String::deserialize(deserializer)?;
     Duration::from_str(&s).map_err(serde::de::Error::custom)
-}
-
-pub(crate) fn frame_to_str<S>(frame: &Frame, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    serializer.serialize_str(&format!("{frame}"))
-}
-
-pub(crate) fn frame_from_str<'de, D>(deserializer: D) -> Result<Frame, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s = String::deserialize(deserializer)?;
-    // TODO: Figure out how to use DeserializeSeed here, but I'm not sure it would work. -- https://github.com/nyx-space/nyx/issues/86
-    let cosm = Cosm::de438();
-    cosm.try_frame(&s).map_err(serde::de::Error::custom)
-}
-
-pub(crate) fn frames_to_str<S>(frames: &Vec<Frame>, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    let mut seq = serializer.serialize_seq(Some(frames.len()))?;
-    for frame in frames {
-        seq.serialize_element(&format!("{frame}"))?;
-    }
-    seq.end()
-}
-
-pub(crate) fn frames_from_str<'de, D>(deserializer: D) -> Result<Vec<Frame>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let frame_names: Vec<String> = Vec::deserialize(deserializer)?;
-    let cosm = Cosm::de438();
-    let mut frames = Vec::new();
-    for name in frame_names {
-        frames.push(cosm.try_frame(&name).map_err(serde::de::Error::custom)?)
-    }
-    Ok(frames)
-}
-
-/// A deserializer from Epoch string
-pub(crate) fn orbit_from_str<'de, D>(deserializer: D) -> Result<Orbit, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let orbit_serde: OrbitSerde = Deserialize::deserialize(deserializer)?;
-    Ok(orbit_serde.into())
 }
 
 pub(crate) fn maybe_duration_to_str<S>(

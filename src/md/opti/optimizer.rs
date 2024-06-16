@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -18,6 +18,7 @@
 
 use snafu::ResultExt;
 
+use crate::dynamics::guidance::LocalFrame;
 use crate::errors::TargetingError;
 use crate::md::objective::Objective;
 use crate::md::prelude::*;
@@ -39,11 +40,11 @@ pub struct Optimizer<'a, E: ErrorCtrl, const V: usize, const O: usize> {
     pub objectives: [Objective; O],
     /// An optional frame (and Cosm) to compute the objectives in.
     /// Needed if the propagation frame is separate from objectives frame (e.g. for B Plane targeting).
-    pub objective_frame: Option<(Frame, Arc<Cosm>)>,
+    pub objective_frame: Option<Frame>,
     /// The kind of correction to apply to achieve the objectives
     pub variables: [Variable; V],
     /// The frame in which the correction should be applied, must be either a local frame or inertial
-    pub correction_frame: Option<Frame>,
+    pub correction_frame: Option<LocalFrame>,
     /// Maximum number of iterations
     pub iterations: usize,
 }
@@ -118,7 +119,7 @@ impl<'a, E: ErrorCtrl, const O: usize> Optimizer<'a, E, 3, O> {
             ],
             iterations: 100,
             objective_frame: None,
-            correction_frame: Some(Frame::VNC),
+            correction_frame: Some(LocalFrame::VNC),
         }
     }
 }
@@ -221,14 +222,13 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
         variables: [Variable; V],
         objectives: [Objective; O],
         objective_frame: Frame,
-        cosm: Arc<Cosm>,
     ) -> Self {
         Self {
             prop,
             objectives,
             variables,
             iterations: 100,
-            objective_frame: Some((objective_frame, cosm)),
+            objective_frame: Some(objective_frame),
             correction_frame: None,
         }
     }
@@ -245,7 +245,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             variables,
             iterations: 100,
             objective_frame: None,
-            correction_frame: Some(Frame::VNC),
+            correction_frame: Some(LocalFrame::VNC),
         }
     }
 
@@ -256,13 +256,18 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
         initial_state: Spacecraft,
         correction_epoch: Epoch,
         achievement_epoch: Epoch,
+        almanac: Arc<Almanac>,
     ) -> Result<TargeterSolution<V, O>, TargetingError> {
-        self.try_achieve_fd(initial_state, correction_epoch, achievement_epoch)
+        self.try_achieve_fd(initial_state, correction_epoch, achievement_epoch, almanac)
     }
 
     /// Apply a correction and propagate to achievement epoch. Also checks that the objectives are indeed matched
-    pub fn apply(&self, solution: &TargeterSolution<V, O>) -> Result<Spacecraft, TargetingError> {
-        let (xf, _) = self.apply_with_traj(solution)?;
+    pub fn apply(
+        &self,
+        solution: &TargeterSolution<V, O>,
+        almanac: Arc<Almanac>,
+    ) -> Result<Spacecraft, TargetingError> {
+        let (xf, _) = self.apply_with_traj(solution, almanac)?;
         Ok(xf)
     }
 
@@ -271,23 +276,24 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
     pub fn apply_with_traj(
         &self,
         solution: &TargeterSolution<V, O>,
+        almanac: Arc<Almanac>,
     ) -> Result<(Spacecraft, Traj<Spacecraft>), TargetingError> {
         let (xf, traj) = match solution.to_mnvr() {
             Ok(mnvr) => {
                 println!("{mnvr}");
                 let mut prop = self.prop.clone();
                 prop.dynamics = prop.dynamics.with_guidance_law(Arc::new(mnvr));
-                prop.with(solution.corrected_state)
+                prop.with(solution.corrected_state, almanac)
                     .until_epoch_with_traj(solution.achieved_state.epoch())
-                    .with_context(|_| PropSnafu)?
+                    .context(PropSnafu)?
             }
             Err(_) => {
                 // This isn't a finite burn maneuver, let's just apply the correction
                 // Propagate until achievement epoch
                 self.prop
-                    .with(solution.corrected_state)
+                    .with(solution.corrected_state, almanac)
                     .until_epoch_with_traj(solution.achieved_state.epoch())
-                    .with_context(|_| PropSnafu)?
+                    .context(PropSnafu)?
             }
         };
 
@@ -303,7 +309,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
         // Build the B-Plane once, if needed
         let b_plane = if is_bplane_tgt {
-            Some(BPlane::from_dual(xf_dual).with_context(|_| AstroSnafu)?)
+            Some(BPlane::from_dual(xf_dual).context(AstroSnafu)?)
         } else {
             None
         };
@@ -319,9 +325,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                     _ => unreachable!(),
                 }
             } else {
-                xf_dual
-                    .partial_for(obj.parameter)
-                    .with_context(|_| AstroSnafu)?
+                xf_dual.partial_for(obj.parameter).context(AstroSnafu)?
             };
 
             let param_err = obj.desired_value - partial.real();

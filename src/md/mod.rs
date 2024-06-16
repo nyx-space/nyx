@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -17,22 +17,19 @@
 */
 
 use crate::cosmic::AstroError;
-use crate::dynamics::guidance::GuidanceErrors;
+use crate::dynamics::guidance::GuidanceError;
 use crate::errors::NyxError;
 use crate::propagators::PropagationError;
-use crate::{Orbit, Spacecraft};
+use crate::Spacecraft;
 use snafu::prelude::*;
 
 pub mod prelude {
     pub use super::{
         optimizer::*,
         trajectory::{ExportCfg, Interpolatable, Traj},
-        Ephemeris, Event, ScTraj, StateParameter,
+        Event, ScTraj, StateParameter,
     };
-    pub use crate::cosmic::{
-        try_achieve_b_plane, BPlane, BPlaneTarget, Bodies, Cosm, Frame, GuidanceMode,
-        LightTimeCalc, Orbit, OrbitDual,
-    };
+    pub use crate::cosmic::{try_achieve_b_plane, BPlane, BPlaneTarget, GuidanceMode, OrbitDual};
     pub use crate::dynamics::{
         Drag, Harmonics, OrbitalDynamics, PointMasses, SolarPressure, SpacecraftDynamics,
     };
@@ -43,6 +40,8 @@ pub mod prelude {
     pub use crate::time::{Duration, Epoch, TimeUnits, Unit};
     pub use crate::Spacecraft;
     pub use crate::{State, TimeTagged};
+
+    pub use anise::prelude::*;
     pub use std::sync::Arc;
 }
 
@@ -55,7 +54,7 @@ pub mod objective;
 pub mod opti;
 pub use opti::optimizer;
 pub type ScTraj = trajectory::Traj<Spacecraft>;
-pub type Ephemeris = trajectory::Traj<Orbit>;
+// pub type Ephemeris = trajectory::Traj<Orbit>;
 
 mod param;
 pub use param::StateParameter;
@@ -65,7 +64,7 @@ pub use opti::target_variable::{Variable, Vary};
 use self::trajectory::TrajError;
 
 #[allow(clippy::result_large_err)]
-#[derive(PartialEq, Debug, Snafu)]
+#[derive(Debug, Snafu)]
 #[snafu(visibility(pub(crate)))]
 pub enum TargetingError {
     #[snafu(display(
@@ -94,7 +93,7 @@ pub enum TargetingError {
         action: &'static str,
     },
     #[snafu(display("encountered a guidance error: {source}"))]
-    GuidanceError { source: GuidanceErrors },
+    GuidanceError { source: GuidanceError },
     #[snafu(display("not a finite burn"))]
     NotFinite,
     #[snafu(display("Jacobian is signular"))]

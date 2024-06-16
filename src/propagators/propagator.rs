@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -15,6 +15,10 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
+
+use std::sync::Arc;
+
+use anise::almanac::Almanac;
 
 use super::error_ctrl::{ErrorCtrl, RSSCartesianStep};
 use super::{Dormand78, IntegrationDetails, PropInstance, PropOpts, RK, RK89};
@@ -88,7 +92,7 @@ where
         Self::new::<Dormand78>(dynamics, opts)
     }
 
-    pub fn with(&'a self, state: D::StateType) -> PropInstance<'a, D, E> {
+    pub fn with(&'a self, state: D::StateType, almanac: Arc<Almanac>) -> PropInstance<'a, D, E> {
         // Pre-allocate the k used in the propagator
         let mut k = Vec::with_capacity(self.stages + 1);
         for _ in 0..self.stages {
@@ -102,6 +106,7 @@ where
                 error: 0.0,
                 attempts: 1,
             },
+            almanac,
             step_size: self.opts.init_step,
             fixed_step: self.opts.fixed_step,
             k,

@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -16,7 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::cosmic::{Cosm, Frame, Orbit};
+use anise::errors::OrientationSnafu;
+use anise::prelude::Almanac;
+use snafu::ResultExt;
+
+use crate::cosmic::{AstroPhysicsSnafu, Frame, Orbit};
 use crate::dynamics::AccelModel;
 use crate::io::gravity::HarmonicsMem;
 use crate::linalg::{DMatrix, Matrix3, Vector3, U7};
@@ -26,11 +30,10 @@ use std::cmp::min;
 use std::fmt;
 use std::sync::Arc;
 
-use super::DynamicsError;
+use super::{DynamicsAlmanacSnafu, DynamicsAstroSnafu, DynamicsError};
 
 #[derive(Clone)]
 pub struct Harmonics {
-    cosm: Arc<Cosm>,
     compute_frame: Frame,
     stor: HarmonicsMem,
     a_nm: DMatrix<f64>,
@@ -47,11 +50,7 @@ pub struct Harmonics {
 
 impl Harmonics {
     /// Create a new Harmonics dynamical model from the provided gravity potential storage instance.
-    pub fn from_stor(compute_frame: Frame, stor: HarmonicsMem, cosm: Arc<Cosm>) -> Arc<Self> {
-        assert!(
-            compute_frame.is_geoid(),
-            "harmonics only work around geoids"
-        );
+    pub fn from_stor(compute_frame: Frame, stor: HarmonicsMem) -> Arc<Self> {
         let degree_np2 = stor.max_degree_n() + 2;
         let mut a_nm = DMatrix::from_element(degree_np2 + 1, degree_np2 + 1, 0.0);
         let mut b_nm = DMatrix::from_element(degree_np2, degree_np2, 0.0);
@@ -119,7 +118,6 @@ impl Harmonics {
         }
 
         Arc::new(Self {
-            cosm,
             compute_frame,
             stor,
             a_nm,
@@ -149,15 +147,19 @@ impl fmt::Display for Harmonics {
 }
 
 impl AccelModel for Harmonics {
-    fn eom(&self, osc: &Orbit) -> Result<Vector3<f64>, DynamicsError> {
+    fn eom(&self, osc: &Orbit, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
         // Convert the osculating orbit to the correct frame (needed for multiple harmonic fields)
-        let state = self.cosm.frame_chg(osc, self.compute_frame);
+        let state = almanac
+            .transform_to(*osc, self.compute_frame, None)
+            .context(DynamicsAlmanacSnafu {
+                action: "transforming into gravity field frame",
+            })?;
 
         // Using the GMAT notation, with extra character for ease of highlight
         let r_ = state.rmag_km();
-        let s_ = state.x_km / r_;
-        let t_ = state.y_km / r_;
-        let u_ = state.z_km / r_;
+        let s_ = state.radius_km.x / r_;
+        let t_ = state.radius_km.y / r_;
+        let u_ = state.radius_km.z / r_;
         let max_degree = self.stor.max_degree_n(); // In GMAT, the degree is NN
         let max_order = self.stor.max_order_m(); // In GMAT, the order is MM
 
@@ -192,8 +194,20 @@ impl AccelModel for Harmonics {
             i_m.push(s_ * i_m[m - 1] + t_ * r_m[m - 1]);
         }
 
-        let rho = self.compute_frame.equatorial_radius() / r_;
-        let mut rho_np1 = self.compute_frame.gm() / r_ * rho;
+        let eq_radius_km = self
+            .compute_frame
+            .mean_equatorial_radius_km()
+            .context(AstroPhysicsSnafu)
+            .context(DynamicsAstroSnafu)?;
+
+        let mu_km3_s2 = self
+            .compute_frame
+            .mu_km3_s2()
+            .context(AstroPhysicsSnafu)
+            .context(DynamicsAstroSnafu)?;
+
+        let rho = eq_radius_km / r_;
+        let mut rho_np1 = mu_km3_s2 / r_ * rho;
         let mut a0 = 0.0;
         let mut a1 = 0.0;
         let mut a2 = 0.0;
@@ -225,7 +239,7 @@ impl AccelModel for Harmonics {
                 sum2 += self.vr01[(n, m)] * a_nm[(n, m + 1)] * d_;
                 sum3 += self.vr11[(n, m)] * a_nm[(n + 1, m + 1)] * d_;
             }
-            let rr = rho_np1 / self.compute_frame.equatorial_radius();
+            let rr = rho_np1 / eq_radius_km;
             a0 += rr * sum0;
             a1 += rr * sum1;
             a2 += rr * sum2;
@@ -235,18 +249,31 @@ impl AccelModel for Harmonics {
         // Rotate this acceleration vector back into the integration frame (no center change needed, it's just a vector)
         // As discussed with Sai, if the Earth was spinning faster, would the acceleration due to the harmonics be any different?
         // No. Therefore, we do not need to account for the transport theorem here.
-        let dcm = self
-            .cosm
-            .try_position_dcm_from_to(&self.compute_frame, &osc.frame, osc.epoch)
-            .unwrap();
-        Ok(dcm * accel)
+        let dcm = almanac
+            .rotate_from_to(self.compute_frame, osc.frame, osc.epoch)
+            .context(OrientationSnafu {
+                action: "transform state dcm",
+            })
+            .context(DynamicsAlmanacSnafu {
+                action: "transforming into gravity field frame",
+            })?;
+
+        Ok(dcm.rot_mat * accel)
     }
 
-    fn dual_eom(&self, osc: &Orbit) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
+    fn dual_eom(
+        &self,
+        osc: &Orbit,
+        almanac: Arc<Almanac>,
+    ) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
         // Convert the osculating orbit to the correct frame (needed for multiple harmonic fields)
-        let state = self.cosm.frame_chg(osc, self.compute_frame);
+        let state = almanac
+            .transform_to(*osc, self.compute_frame, None)
+            .context(DynamicsAlmanacSnafu {
+                action: "transforming into gravity field frame",
+            })?;
 
-        let radius: Vector3<OHyperdual<f64, U7>> = hyperspace_from_vector(&state.radius());
+        let radius: Vector3<OHyperdual<f64, U7>> = hyperspace_from_vector(&state.radius_km);
 
         // Using the GMAT notation, with extra character for ease of highlight
         let r_ = norm(&radius);
@@ -287,9 +314,21 @@ impl AccelModel for Harmonics {
             i_m.push(s_ * i_m[m - 1] + t_ * r_m[m - 1]);
         }
 
-        let eq_radius = OHyperdual::<f64, U7>::from(self.compute_frame.equatorial_radius());
+        let real_eq_radius_km = self
+            .compute_frame
+            .mean_equatorial_radius_km()
+            .context(AstroPhysicsSnafu)
+            .context(DynamicsAstroSnafu)?;
+
+        let real_mu_km3_s2 = self
+            .compute_frame
+            .mu_km3_s2()
+            .context(AstroPhysicsSnafu)
+            .context(DynamicsAstroSnafu)?;
+
+        let eq_radius = OHyperdual::<f64, U7>::from(real_eq_radius_km);
         let rho = eq_radius / r_;
-        let mut rho_np1 = OHyperdual::<f64, U7>::from(self.compute_frame.gm()) / r_ * rho;
+        let mut rho_np1 = OHyperdual::<f64, U7>::from(real_mu_km3_s2) / r_ * rho;
 
         let mut a0 = OHyperdual::<f64, U7>::from(0.0);
         let mut a1 = OHyperdual::<f64, U7>::from(0.0);
@@ -333,10 +372,15 @@ impl AccelModel for Harmonics {
             a3 -= rr * sum3;
         }
 
-        let dcm = self
-            .cosm
-            .try_position_dcm_from_to(&self.compute_frame, &osc.frame, osc.epoch)
-            .unwrap();
+        let dcm = almanac
+            .rotate_from_to(self.compute_frame, osc.frame, osc.epoch)
+            .context(OrientationSnafu {
+                action: "transform state dcm",
+            })
+            .context(DynamicsAlmanacSnafu {
+                action: "transforming into gravity field frame",
+            })?
+            .rot_mat;
 
         // Convert DCM to OHyperdual DCMs
         let mut dcm_d = Matrix3::<OHyperdual<f64, U7>>::zeros();

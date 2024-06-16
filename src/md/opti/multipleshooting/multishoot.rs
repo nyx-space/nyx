@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -73,6 +73,7 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
     pub fn solve(
         &mut self,
         cost: CostFunction,
+        almanac: Arc<Almanac>,
     ) -> Result<MultipleShootingSolution<T, OT>, MultipleShootingError> {
         let mut prev_cost = 1e12; // We don't use infinity because we compare a ratio of cost
         for it in 0..self.max_iterations {
@@ -102,8 +103,9 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
                         initial_states[i],
                         initial_states[i].epoch(),
                         self.targets[i].epoch(),
+                        almanac.clone(),
                     )
-                    .with_context(|_| TargetingSnafu { segment: i })?;
+                    .context(TargetingSnafu { segment: i })?;
 
                 let nominal_delta_v = sol.correction;
 
@@ -138,8 +140,9 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
                             initial_states[i],
                             initial_states[i].epoch(),
                             self.targets[i].epoch(),
+                            almanac.clone(),
                         )
-                        .with_context(|_| TargetingSnafu { segment: i })?;
+                        .context(TargetingSnafu { segment: i })?;
 
                     // ∂Δv_x / ∂r_x
                     outer_jacobian[(3 * i, OT * i + axis)] = (inner_sol_a.correction[0]
@@ -163,8 +166,9 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
                             inner_sol_a.achieved_state,
                             inner_sol_a.achieved_state.epoch(),
                             self.targets[i + 1].epoch(),
+                            almanac.clone(),
                         )
-                        .with_context(|_| TargetingSnafu { segment: i })?;
+                        .context(TargetingSnafu { segment: i })?;
 
                     // Compute the partials wrt the next Δv
                     // ∂Δv_x / ∂r_x
@@ -184,8 +188,8 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
                      ** 2.D. Compute the difference between the arrival and departure velocities and node i+1
                      ** *** */
                     if i < self.targets.len() - 3 {
-                        let dv_ip1 = inner_sol_b.achieved_state.orbit.velocity()
-                            - initial_states[i + 2].orbit.velocity();
+                        let dv_ip1 = inner_sol_b.achieved_state.orbit.velocity_km_s
+                            - initial_states[i + 2].orbit.velocity_km_s;
                         // ∂Δv_x / ∂r_x
                         outer_jacobian[(3 * (i + 2), OT * i + axis)] =
                             dv_ip1[0] / next_node[axis].tolerance;
@@ -252,8 +256,9 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
                             initial_states[i],
                             initial_states[i].epoch(),
                             node.epoch(),
+                            almanac.clone(),
                         )
-                        .with_context(|_| TargetingSnafu { segment: i })?;
+                        .context(TargetingSnafu { segment: i })?;
                     initial_states.push(sol.achieved_state);
                     ms_sol.solutions.push(sol);
                 }
@@ -263,8 +268,8 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
 
             prev_cost = new_cost;
             // 2. Solve for the next position of the nodes using a pseudo inverse.
-            let inv_jac = pseudo_inverse!(&outer_jacobian)
-                .with_context(|_| TargetingSnafu { segment: 0_usize })?;
+            let inv_jac =
+                pseudo_inverse!(&outer_jacobian).context(TargetingSnafu { segment: 0_usize })?;
             let delta_r = inv_jac * cost_vec;
             // 3. Apply the correction to the node positions and iterator
             let node_vector = -delta_r;
@@ -291,9 +296,9 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize> 
         // Add the starting point too
         nodemsg.push_str(&format!(
             "[{:.3}, {:.3}, {:.3}, {}, {}, {}, {}, {}, {}],\n",
-            self.x0.orbit.x_km,
-            self.x0.orbit.y_km,
-            self.x0.orbit.z_km,
+            self.x0.orbit.radius_km.x,
+            self.x0.orbit.radius_km.y,
+            self.x0.orbit.radius_km.z,
             self.current_iteration,
             0.0,
             0.0,
@@ -355,13 +360,14 @@ impl<T: MultishootNode<O>, const O: usize> MultipleShootingSolution<T, O> {
     pub fn build_trajectories<'a, E: ErrorCtrl>(
         &self,
         prop: &'a Propagator<'a, SpacecraftDynamics, E>,
+        almanac: Arc<Almanac>,
     ) -> Result<Vec<ScTraj>, MultipleShootingError> {
         let mut trajz = Vec::with_capacity(self.nodes.len());
 
         for (i, node) in self.nodes.iter().enumerate() {
             let (_, traj) = Optimizer::delta_v(prop, (*node).into())
-                .apply_with_traj(&self.solutions[i])
-                .with_context(|_| TargetingSnafu { segment: i })?;
+                .apply_with_traj(&self.solutions[i], almanac.clone())
+                .context(TargetingSnafu { segment: i })?;
             trajz.push(traj);
         }
 

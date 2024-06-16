@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -17,20 +17,22 @@
 */
 
 use super::traj_it::TrajIterator;
-use super::{ExportCfg, INTERPOLATION_SAMPLES};
+use super::{ExportCfg, InterpolationSnafu, INTERPOLATION_SAMPLES};
 use super::{Interpolatable, TrajError};
 use crate::errors::NyxError;
 use crate::io::watermark::pq_writer;
+use crate::io::InputOutputError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
-use crate::md::prelude::{Frame, GuidanceMode, StateParameter};
+use crate::md::prelude::{GuidanceMode, StateParameter};
 use crate::md::EventEvaluator;
 use crate::time::{Duration, Epoch, TimeSeries, TimeUnits};
-use crate::utils::dcm_finite_differencing;
+use anise::almanac::Almanac;
 use arrow::array::{Array, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 use parquet::arrow::ArrowWriter;
+use snafu::ResultExt;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
@@ -111,7 +113,9 @@ where
                     states.push(self.states[idx]);
                 }
 
-                Ok(self.states[idx].interpolate(epoch, &states))
+                self.states[idx]
+                    .interpolate(epoch, &states)
+                    .context(InterpolationSnafu)
             }
         }
     }
@@ -145,8 +149,12 @@ where
     }
 
     /// Store this trajectory arc to a parquet file with the default configuration (depends on the state type, search for `export_params` in the documentation for details).
-    pub fn to_parquet_simple<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf, Box<dyn Error>> {
-        self.to_parquet(path, None, ExportCfg::default())
+    pub fn to_parquet_simple<P: AsRef<Path>>(
+        &self,
+        path: P,
+        almanac: Arc<Almanac>,
+    ) -> Result<PathBuf, Box<dyn Error>> {
+        self.to_parquet(path, None, ExportCfg::default(), almanac)
     }
 
     /// Store this trajectory arc to a parquet file with the provided configuration
@@ -154,8 +162,9 @@ where
         &self,
         path: P,
         cfg: ExportCfg,
+        almanac: Arc<Almanac>,
     ) -> Result<PathBuf, Box<dyn Error>> {
-        self.to_parquet(path, None, cfg)
+        self.to_parquet(path, None, cfg, almanac)
     }
 
     /// Store this trajectory arc to a parquet file with the provided configuration and event evaluators
@@ -164,6 +173,7 @@ where
         path: P,
         events: Option<Vec<&dyn EventEvaluator<S>>>,
         cfg: ExportCfg,
+        almanac: Arc<Almanac>,
     ) -> Result<PathBuf, Box<dyn Error>> {
         let tick = Epoch::now().unwrap();
         info!("Exporting trajectory to parquet file...");
@@ -178,9 +188,15 @@ where
             Field::new("Epoch:TAI (s)", DataType::Float64, false),
         ];
 
+        let frame = self.states[0].frame();
         let more_meta = Some(vec![(
             "Frame".to_string(),
-            format!("{}", self.states[0].frame()),
+            serde_dhall::serialize(&frame).to_string().map_err(|e| {
+                Box::new(InputOutputError::SerializeDhall {
+                    what: format!("frame `{frame}`"),
+                    err: e.to_string(),
+                })
+            })?,
         )]);
 
         let mut fields = match cfg.fields {
@@ -265,11 +281,12 @@ where
 
         // Add all of the evaluated events
         if let Some(events) = events {
+            // warn!("Adding events was removed when switching to ANISE");
             info!("Evaluating {} event(s)", events.len());
             for event in events {
                 let mut data = Float64Builder::new();
                 for s in &states {
-                    data.append_value(event.eval(s));
+                    data.append_value(event.eval(s, almanac.clone()).map_err(Box::new)?);
                 }
                 record.push(Arc::new(data.finish()));
             }
@@ -392,9 +409,15 @@ where
             hdrs.push(field);
         }
 
+        let frame = self.states[0].frame();
         let more_meta = Some(vec![(
             "Frame".to_string(),
-            format!("{}", self.states[0].frame()),
+            serde_dhall::serialize(&frame).to_string().map_err(|e| {
+                Box::new(InputOutputError::SerializeDhall {
+                    what: format!("frame `{frame}`"),
+                    err: e.to_string(),
+                })
+            })?,
         )]);
 
         let mut cfg = cfg;
@@ -436,65 +459,20 @@ where
             .every_between(step, cfg.start_epoch.unwrap(), cfg.end_epoch.unwrap())
             .collect::<Vec<S>>();
 
-        let self_states_pre = self
-            .every_between(
-                step,
-                cfg.start_epoch.unwrap() + step - 1.seconds(),
-                cfg.end_epoch.unwrap(),
-            )
-            .collect::<Vec<S>>();
-
-        let self_states_post = self
-            .every_between(
-                step,
-                cfg.start_epoch.unwrap() + 1.seconds(),
-                cfg.end_epoch.unwrap(),
-            )
-            .collect::<Vec<S>>();
-
-        // Build the list of 6x6 RIC DCM
-        // Assuming identical rate just before and after the first DCM and for the last DCM
-        let mut inertial2ric_dcms = Vec::with_capacity(self_states.len());
-        for (ii, self_state) in self_states.iter().enumerate() {
-            let dcm_cur = self_state
-                .orbit()
-                .dcm_from_traj_frame(Frame::RIC)
-                .unwrap()
-                .transpose();
-
-            let dcm_pre = if ii == 0 {
-                dcm_cur
-            } else {
-                match self_states_pre.get(ii - 1) {
-                    Some(state) => state
-                        .orbit()
-                        .dcm_from_traj_frame(Frame::RIC)
-                        .unwrap()
-                        .transpose(),
-                    None => dcm_cur,
-                }
-            };
-
-            let dcm_post = if ii == self_states_post.len() {
-                dcm_cur
-            } else {
-                match self_states_post.get(ii) {
-                    Some(state) => state
-                        .orbit()
-                        .dcm_from_traj_frame(Frame::RIC)
-                        .unwrap()
-                        .transpose(),
-                    None => dcm_cur,
-                }
-            };
-
-            let dcm6x6 = dcm_finite_differencing(dcm_pre, dcm_cur, dcm_post);
-            inertial2ric_dcms.push(dcm6x6);
-        }
-
         let other_states = other
             .every_between(step, cfg.start_epoch.unwrap(), cfg.end_epoch.unwrap())
             .collect::<Vec<S>>();
+
+        // Build an array of all the RIC differences
+        let mut ric_diff = Vec::with_capacity(other_states.len());
+        for (ii, other_state) in other_states.iter().enumerate() {
+            let self_orbit = *self_states[ii].orbit();
+            let other_orbit = *other_state.orbit();
+
+            let this_ric_diff = self_orbit.ric_difference(&other_orbit).map_err(Box::new)?;
+
+            ric_diff.push(this_ric_diff);
+        }
 
         // Build all of the records
 
@@ -514,20 +492,8 @@ where
         // Add the RIC data
         for coord_no in 0..6 {
             let mut data = Float64Builder::new();
-            for (ii, other_state) in other_states.iter().enumerate() {
-                let mut self_orbit = *self_states[ii].orbit();
-                let mut other_orbit = *other_state.orbit();
-
-                // Grab the DCM
-                let dcm_inertial2ric = inertial2ric_dcms[ii];
-
-                // Rotate both into the "self" RIC
-                self_orbit.rotate_by(dcm_inertial2ric);
-                other_orbit.rotate_by(dcm_inertial2ric);
-
-                data.append_value(
-                    (self_orbit.to_cartesian_vec() - other_orbit.to_cartesian_vec())[coord_no],
-                );
+            for this_ric_dff in &ric_diff {
+                data.append_value(this_ric_dff.to_cartesian_pos_vel()[coord_no]);
             }
             record.push(Arc::new(data.finish()));
         }
@@ -623,10 +589,11 @@ where
             for state in &other
                 .states
                 .iter()
+                .copied()
                 .filter(|s| s.epoch() > self.last().epoch())
-                .collect::<Vec<&S>>()
+                .collect::<Vec<S>>()
             {
-                me.states.push(**state);
+                me.states.push(*state);
             }
             me.finalize();
 

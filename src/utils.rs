@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -18,7 +18,7 @@
 
 use crate::cosmic::Orbit;
 use crate::linalg::{
-    allocator::Allocator, DefaultAllocator, DimName, Matrix3, Matrix6, OVector, Vector3, Vector6,
+    allocator::Allocator, DefaultAllocator, DimName, Matrix3, OVector, Vector3, Vector6,
 };
 use nalgebra::Complex;
 
@@ -534,8 +534,8 @@ fn test_rss_errors() {
 /// A tuple of f64 values representing the RSS orbit errors in radius and velocity.
 pub fn rss_orbit_errors(prop_err: &Orbit, cur_state: &Orbit) -> (f64, f64) {
     (
-        rss_errors(&prop_err.radius(), &cur_state.radius()),
-        rss_errors(&prop_err.velocity(), &cur_state.velocity()),
+        rss_errors(&prop_err.radius_km, &cur_state.radius_km),
+        rss_errors(&prop_err.velocity_km_s, &cur_state.velocity_km_s),
     )
 }
 
@@ -629,32 +629,6 @@ fn test_capitalize() {
     let s = "hello";
     let result = capitalize(s);
     assert_eq!(result, "Hello");
-}
-
-/// Builds a 6x6 DCM from the current, previous, and post DCMs, assuming that the previous and post DCMs are exactly one second before and one second after the current DCM.
-pub(crate) fn dcm_finite_differencing(
-    dcm_pre: Matrix3<f64>,
-    dcm_cur: Matrix3<f64>,
-    dcm_post: Matrix3<f64>,
-) -> Matrix6<f64> {
-    let drdt = 0.5 * dcm_post - 0.5 * dcm_pre;
-
-    dcm_assemble(dcm_cur, drdt)
-}
-
-pub(crate) fn dcm_assemble(r: Matrix3<f64>, drdt: Matrix3<f64>) -> Matrix6<f64> {
-    let mut full_dcm = Matrix6::zeros();
-    for i in 0..6 {
-        for j in 0..6 {
-            if (i < 3 && j < 3) || (i >= 3 && j >= 3) {
-                full_dcm[(i, j)] = r[(i % 3, j % 3)];
-            } else if i >= 3 && j < 3 {
-                full_dcm[(i, j)] = drdt[(i - 3, j)];
-            }
-        }
-    }
-
-    full_dcm
 }
 
 #[macro_export]

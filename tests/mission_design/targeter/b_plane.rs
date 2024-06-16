@@ -1,16 +1,30 @@
 extern crate nyx_space as nyx;
 
+use anise::constants::celestial_objects::JUPITER_BARYCENTER;
+use anise::constants::celestial_objects::MOON;
+use anise::constants::celestial_objects::SUN;
+use anise::constants::frames::MOON_J2000;
 use nyx::md::optimizer::*;
 use nyx::md::prelude::*;
 
-#[test]
-fn tgt_b_plane_earth_gravity_assist_no_propagation() {
+use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use rstest::*;
+use std::sync::Arc;
+
+#[fixture]
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
+}
+
+#[rstest]
+fn tgt_b_plane_earth_gravity_assist_no_propagation(almanac: Arc<Almanac>) {
     // Rebuild the "in-place" targeting from the B-Plane test of `try_achieve`
 
     let _ = pretty_env_logger::try_init();
 
     // This is a reproduction of the B-plane computation from the `Ex_LunarTransfer.script` file from GMAT
-    let cosm = Cosm::de438_gmat();
+
     // Define the epoch
     let epoch = Epoch::from_gregorian_utc_at_midnight(2016, 1, 1);
 
@@ -23,12 +37,11 @@ fn tgt_b_plane_earth_gravity_assist_no_propagation() {
         5.36316523097915,
         -5.22166308425181,
         epoch,
-        cosm.frame("EME2000"),
+        almanac.frame_from_uid(EARTH_J2000).unwrap(),
     );
 
     let prop = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
-        &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
-        cosm,
+        vec![MOON, SUN, JUPITER_BARYCENTER],
     )));
 
     let spacecraft = Spacecraft::from_srp_defaults(orbit, 100.0, 0.0);
@@ -37,7 +50,9 @@ fn tgt_b_plane_earth_gravity_assist_no_propagation() {
 
     let tgt = Optimizer::delta_v(&prop, b_plane_tgt.to_objectives());
 
-    let sol = tgt.try_achieve_from(spacecraft, epoch, epoch).unwrap();
+    let sol = tgt
+        .try_achieve_from(spacecraft, epoch, epoch, almanac.clone())
+        .unwrap();
 
     println!("{}", sol);
 
@@ -54,21 +69,21 @@ fn tgt_b_plane_earth_gravity_assist_no_propagation() {
         "Finite differencing result different from GMAT by over 1 m/s"
     );
 
-    tgt.apply(&sol).unwrap();
+    tgt.apply(&sol, almanac).unwrap();
 }
 
 #[allow(clippy::identity_op)]
-#[test]
+#[rstest]
 #[ignore = "https://gitlab.com/nyx-space/nyx/-/issues/212"]
-fn tgt_b_plane_lunar_transfer() {
+fn tgt_b_plane_lunar_transfer(almanac: Arc<Almanac>) {
     // WARNING: This test is ignored until https://gitlab.com/nyx-space/nyx/-/issues/212
     let _ = pretty_env_logger::try_init();
 
     // This is a reproduction of the B-plane computation from the `Ex_LunarTransfer.script` file from GMAT
-    let cosm = Cosm::de438_gmat();
+
     // Grab the frame
-    let eme2k = cosm.frame("EME2000");
-    let luna = cosm.frame("Luna");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let luna = almanac.frame_from_uid(MOON_J2000).unwrap();
     // Define the epoch
     let epoch = Epoch::from_gregorian_utc(2014, 7, 22, 11, 29, 10, 811_000);
     // Define the initial orbit in EME2k but convert it to Moon J2000
@@ -84,8 +99,7 @@ fn tgt_b_plane_lunar_transfer() {
     );
 
     let prop = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
-        &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
-        cosm.clone(),
+        vec![MOON, SUN, JUPITER_BARYCENTER],
     )));
 
     let spacecraft = Spacecraft::from_srp_defaults(orbit, 1000.0, 0.0);
@@ -93,8 +107,8 @@ fn tgt_b_plane_lunar_transfer() {
 
     // Propagate to periapsis
     let periapse_spacecraft = prop
-        .with(spacecraft)
-        .until_nth_event(1 * orbit.period(), &Event::periapsis(), 1)
+        .with(spacecraft, almanac.clone())
+        .until_nth_event(1 * orbit.period().unwrap(), &Event::periapsis(), 1)
         .unwrap()
         .0;
 
@@ -133,14 +147,13 @@ fn tgt_b_plane_lunar_transfer() {
         ],
         b_plane_tgt.to_objectives_with_tolerance(3.0),
         luna,
-        cosm,
     );
 
     let tcm_epoch = periapse_spacecraft.epoch();
     let loi_epoch = tcm_epoch + 556697 * Unit::Second;
 
     let sol = tgt
-        .try_achieve_from(periapse_spacecraft, tcm_epoch, loi_epoch)
+        .try_achieve_from(periapse_spacecraft, tcm_epoch, loi_epoch, almanac.clone())
         .unwrap();
 
     println!("{}", sol);
@@ -159,16 +172,15 @@ fn tgt_b_plane_lunar_transfer() {
     );
 
     // Check that the solution works with the same dynamics.
-    tgt.apply(&sol).unwrap();
+    tgt.apply(&sol, almanac).unwrap();
 }
 
-#[test]
-fn tgt_b_plane_earth_gravity_assist_with_propagation() {
+#[rstest]
+fn tgt_b_plane_earth_gravity_assist_with_propagation(almanac: Arc<Almanac>) {
     // Rebuild the "tgt_b_plane_earth_gravity_assist" scenario but with a propagation and applying the dv earlier
 
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438_gmat();
     // Define the epoch
     let epoch = Epoch::from_gregorian_utc_at_midnight(2016, 1, 1);
 
@@ -181,18 +193,17 @@ fn tgt_b_plane_earth_gravity_assist_with_propagation() {
         5.36316523097915,
         -5.22166308425181,
         epoch,
-        cosm.frame("EME2000"),
+        almanac.frame_from_uid(EARTH_J2000).unwrap(),
     );
 
     let prop = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
-        &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
-        cosm,
+        vec![MOON, SUN, JUPITER_BARYCENTER],
     )));
 
     let spacecraft = Spacecraft::from_srp_defaults(orbit, 100.0, 0.0);
 
     let prior_sc = prop
-        .with(spacecraft)
+        .with(spacecraft, almanac.clone())
         .for_duration(-12 * Unit::Hour)
         .unwrap();
 
@@ -201,7 +212,7 @@ fn tgt_b_plane_earth_gravity_assist_with_propagation() {
     let tgt = Optimizer::delta_v(&prop, b_plane_tgt.to_objectives());
 
     let sol = tgt
-        .try_achieve_from(prior_sc, prior_sc.epoch(), epoch)
+        .try_achieve_from(prior_sc, prior_sc.epoch(), epoch, almanac.clone())
         .unwrap();
 
     println!("{}", sol);
@@ -209,5 +220,5 @@ fn tgt_b_plane_earth_gravity_assist_with_propagation() {
     // As expected, the further out we are, the better the less delta-V is needed to match a B-Plane
     assert!(sol.correction.norm() <= 225.309e-3);
 
-    tgt.apply(&sol).unwrap();
+    tgt.apply(&sol, almanac).unwrap();
 }

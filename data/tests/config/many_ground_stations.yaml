@@ -1,5 +1,9 @@
 - name: Demo ground station
-  frame: IAU Earth
+  frame:
+    ephemeris_id: 399
+    orientation_id: 399
+    mu_km3_s2: 398600.435436096
+    shape: null
   elevation_mask_deg: 5.0
   range_noise_km:
     tau: 24 h
@@ -15,7 +19,11 @@
   height_km: 0.4
 
 - name: Canberra
-  frame: IAU Earth
+  frame:
+    ephemeris_id: 399
+    orientation_id: 399
+    mu_km3_s2: 398600.435436096
+    shape: null
   latitude_deg: -35.398333
   longitude_deg: 148.981944
   height_km: 0.691750

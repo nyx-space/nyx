@@ -1,215 +1,215 @@
-name: Python
-on:
-  push:
-    branches:
-      - main
-      - master
-    tags:
-      - '*'
-  pull_request:
-  workflow_dispatch:
+# name: Python
+# on:
+#   push:
+#     branches:
+#       - main
+#       - master
+#     tags:
+#       - '*'
+#   pull_request:
+#   workflow_dispatch:
 
-permissions:
-  contents: read
+# permissions:
+#   contents: read
 
-jobs:
-  linux:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target: [x86_64]
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
+# jobs:
+#   linux:
+#     runs-on: ubuntu-latest
+#     strategy:
+#       matrix:
+#         target: [x86_64]
+#     steps:
+#       - uses: actions/checkout@v3
+#       - uses: actions/setup-python@v4
+#         with:
+#           python-version: "3.11"
 
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.target }}
-          args: --release --out dist --find-interpreter -F python
-          sccache: 'true'
-          rust-toolchain: 1.74
+#       - name: Build wheels
+#         uses: PyO3/maturin-action@v1
+#         with:
+#           target: ${{ matrix.target }}
+#           args: --release --out dist --find-interpreter -F python
+#           sccache: 'true'
+#           rust-toolchain: 1.74
 
-      - name: Upload wheels
-        uses: actions/upload-artifact@v3
-        with:
-          name: wheels
-          path: dist
+#       - name: Upload wheels
+#         uses: actions/upload-artifact@v3
+#         with:
+#           name: wheels
+#           path: dist
 
-      - name: pytest x86_64
-        if: ${{ matrix.target == 'x86_64' }}
-        run: |
-          set -e
-          ls -lh dist
-          pip install nyx_space --find-links dist --force-reinstall -v --no-cache-dir
-          pip install pytest numpy pandas plotly pyarrow scipy pyyaml
-          pytest
+#       - name: pytest x86_64
+#         if: ${{ matrix.target == 'x86_64' }}
+#         run: |
+#           set -e
+#           ls -lh dist
+#           pip install nyx_space --find-links dist --force-reinstall -v --no-cache-dir
+#           pip install pytest numpy pandas plotly pyarrow scipy pyyaml
+#           pytest
 
-      - name: Upload python tests HTMLs
-        uses: actions/upload-artifact@v3
-        with:
-          name: od-plots
-          path: output_data/*.html
+#       - name: Upload python tests HTMLs
+#         uses: actions/upload-artifact@v3
+#         with:
+#           name: od-plots
+#           path: output_data/*.html
 
-  windows:
-    runs-on: windows-latest
-    strategy:
-      matrix:
-        target: [x64]
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-          architecture: ${{ matrix.target }}
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.target }}
-          args: --release --out dist --find-interpreter -F python
-          rust-toolchain: 1.74
-      - name: Upload wheels
-        uses: actions/upload-artifact@v3
-        with:
-          name: wheels
-          path: dist
+#   windows:
+#     runs-on: windows-latest
+#     strategy:
+#       matrix:
+#         target: [x64]
+#     steps:
+#       - uses: actions/checkout@v3
+#       - uses: actions/setup-python@v4
+#         with:
+#           python-version: "3.11"
+#           architecture: ${{ matrix.target }}
+#       - name: Build wheels
+#         uses: PyO3/maturin-action@v1
+#         with:
+#           target: ${{ matrix.target }}
+#           args: --release --out dist --find-interpreter -F python
+#           rust-toolchain: 1.74
+#       - name: Upload wheels
+#         uses: actions/upload-artifact@v3
+#         with:
+#           name: wheels
+#           path: dist
 
-      - name: pytest
-        shell: bash
-        run: |
-          set -e
-          ls -lh dist
-          pip install --find-links dist --force-reinstall nyx_space
-          pip install pytest numpy pandas plotly pyarrow pyyaml
-          pytest
+#       - name: pytest
+#         shell: bash
+#         run: |
+#           set -e
+#           ls -lh dist
+#           pip install --find-links dist --force-reinstall nyx_space
+#           pip install pytest numpy pandas plotly pyarrow pyyaml
+#           pytest
 
-  macos:
-    runs-on: macos-latest
-    strategy:
-      matrix:
-        target: [x86_64, aarch64]
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
+#   macos:
+#     runs-on: macos-latest
+#     strategy:
+#       matrix:
+#         target: [x86_64, aarch64]
+#     steps:
+#       - uses: actions/checkout@v3
+#       - uses: actions/setup-python@v4
+#         with:
+#           python-version: "3.11"
 
-      - name: Update cargo packages
-        run: cargo update
+#       - name: Update cargo packages
+#         run: cargo update
 
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.target }}
-          args: --release --out dist --find-interpreter -F python
-          sccache: 'true'
-          rust-toolchain: 1.74
+#       - name: Build wheels
+#         uses: PyO3/maturin-action@v1
+#         with:
+#           target: ${{ matrix.target }}
+#           args: --release --out dist --find-interpreter -F python
+#           sccache: 'true'
+#           rust-toolchain: 1.74
       
-      - name: Upload wheels
-        uses: actions/upload-artifact@v3
-        with:
-          name: wheels
-          path: dist
+#       - name: Upload wheels
+#         uses: actions/upload-artifact@v3
+#         with:
+#           name: wheels
+#           path: dist
 
-      - name: pytest
-        if: ${{ !startsWith(matrix.target, 'aarch64') }}
-        shell: bash
-        run: |
-          set -e
-          ls -lh dist
-          pip install --find-links dist --force-reinstall nyx_space
-          pip install pytest numpy pandas plotly pyarrow pyyaml
-          pytest
+#       - name: pytest
+#         if: ${{ !startsWith(matrix.target, 'aarch64') }}
+#         shell: bash
+#         run: |
+#           set -e
+#           ls -lh dist
+#           pip install --find-links dist --force-reinstall nyx_space
+#           pip install pytest numpy pandas plotly pyarrow pyyaml
+#           pytest
 
-  sdist:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Build sdist
-        uses: PyO3/maturin-action@v1
-        with:
-          command: sdist
-          args: --out dist
-          rust-toolchain: 1.74
-      - name: Upload sdist
-        uses: actions/upload-artifact@v3
-        with:
-          name: wheels
-          path: dist
+#   sdist:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v3
+#       - name: Build sdist
+#         uses: PyO3/maturin-action@v1
+#         with:
+#           command: sdist
+#           args: --out dist
+#           rust-toolchain: 1.74
+#       - name: Upload sdist
+#         uses: actions/upload-artifact@v3
+#         with:
+#           name: wheels
+#           path: dist
 
-  release:
-    name: Release
-    runs-on: ubuntu-latest
-    if: github.ref_type == 'tag'
-    needs: [linux, windows, macos, sdist]
-    steps:
-      - uses: actions/download-artifact@v3
-        with:
-          name: wheels
-      - name: Publish to PyPI
-        uses: PyO3/maturin-action@v1
-        env:
-          MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
-        with:
-          command: upload
-          args: --skip-existing *
+#   release:
+#     name: Release
+#     runs-on: ubuntu-latest
+#     if: github.ref_type == 'tag'
+#     needs: [linux, windows, macos, sdist]
+#     steps:
+#       - uses: actions/download-artifact@v3
+#         with:
+#           name: wheels
+#       - name: Publish to PyPI
+#         uses: PyO3/maturin-action@v1
+#         env:
+#           MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+#         with:
+#           command: upload
+#           args: --skip-existing *
 
-  packaging:
-    permissions: write-all
-    runs-on: ubuntu-latest
-    needs: [linux]
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v2
+#   packaging:
+#     permissions: write-all
+#     runs-on: ubuntu-latest
+#     needs: [linux]
+#     steps:
+#       - name: Check out code
+#         uses: actions/checkout@v2
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-        with:
-          buildkitd-flags: --debug
+#       - name: Set up Docker Buildx
+#         uses: docker/setup-buildx-action@v2
+#         with:
+#           buildkitd-flags: --debug
 
-      - name: Cache Docker layers
-        uses: actions/cache@v2
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
+#       - name: Cache Docker layers
+#         uses: actions/cache@v2
+#         with:
+#           path: /tmp/.buildx-cache
+#           key: ${{ runner.os }}-buildx-${{ github.sha }}
+#           restore-keys: |
+#             ${{ runner.os }}-buildx-
 
-      - name: Build development image
-        run: docker build -f Dockerfile.dev -t nyx-build .
+#       - name: Build development image
+#         run: docker build -f Dockerfile.dev -t nyx-build .
 
-      - name: Run development container and build the package
-        run: docker run --name nyx-builder nyx-build
+#       - name: Run development container and build the package
+#         run: docker run --name nyx-builder nyx-build
 
-      - name: Copy built package from container to host
-        run: docker cp nyx-builder:/app/target/wheels ./dist
+#       - name: Copy built package from container to host
+#         run: docker cp nyx-builder:/app/target/wheels ./dist
 
-      - name: Get short SHA
-        id: short-sha
-        run: echo "::set-output name=sha::$(echo ${GITHUB_SHA::8})"
+#       - name: Get short SHA
+#         id: short-sha
+#         run: echo "::set-output name=sha::$(echo ${GITHUB_SHA::8})"
 
-      - name: Get the version
-        id: get_version
-        run: echo ::set-output name=VERSION::${GITHUB_REF#refs/tags/}
+#       - name: Get the version
+#         id: get_version
+#         run: echo ::set-output name=VERSION::${GITHUB_REF#refs/tags/}
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+#       - name: Login to GitHub Container Registry
+#         uses: docker/login-action@v2
+#         with:
+#           registry: ghcr.io
+#           username: ${{ github.actor }}
+#           password: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Build and push Docker image with built package
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: |
-            ghcr.io/nyx-space/nyx-fds:${{ steps.short-sha.outputs.sha }}
-            ghcr.io/nyx-space/nyx-fds:${{ github.ref == 'refs/heads/master' && 'latest' || steps.short-sha.outputs.sha }}
-            ghcr.io/nyx-space/nyx-fds:${{ startsWith(github.ref, 'refs/tags/') && steps.get_version.outputs.VERSION || steps.short-sha.outputs.sha }}
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache
+#       - name: Build and push Docker image with built package
+#         uses: docker/build-push-action@v4
+#         with:
+#           context: .
+#           file: ./Dockerfile
+#           push: true
+#           tags: |
+#             ghcr.io/nyx-space/nyx-fds:${{ steps.short-sha.outputs.sha }}
+#             ghcr.io/nyx-space/nyx-fds:${{ github.ref == 'refs/heads/master' && 'latest' || steps.short-sha.outputs.sha }}
+#             ghcr.io/nyx-space/nyx-fds:${{ startsWith(github.ref, 'refs/tags/') && steps.get_version.outputs.VERSION || steps.short-sha.outputs.sha }}
+#           cache-from: type=local,src=/tmp/.buildx-cache
+#           cache-to: type=local,dest=/tmp/.buildx-cache

@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -115,7 +115,7 @@ where
             thrust_lvl: 1.0,
             alpha_inplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
             delta_outofplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
-            frame: Frame::RCN,
+            frame: LocalFrame::RCN,
         };
 
         let mut finite_burn_target = false;
@@ -180,7 +180,7 @@ where
                     let dcm_vnc2inertial = xi.orbit.dcm_from_traj_frame(frame).unwrap();
                     let velocity_correction =
                         dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
-                    xi.orbit.apply_dv(velocity_correction);
+                    xi.orbit.apply_dv_km_s(velocity_correction);
                 } else {
                     xi.orbit.x += state_correction[0];
                     xi.orbit.y += state_correction[1];
@@ -355,7 +355,7 @@ where
                         let dcm_vnc2inertial = this_xi.orbit.dcm_from_traj_frame(frame).unwrap();
                         let velocity_correction =
                             dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
-                        this_xi.orbit.apply_dv(velocity_correction);
+                        this_xi.orbit.apply_dv_km_s(velocity_correction);
                     } else {
                         this_xi = xi + state_correction;
                     }

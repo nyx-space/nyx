@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -16,7 +16,13 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::{AstroError, Frame, Orbit, ECC_EPSILON};
+use anise::astro::orbit::ECC_EPSILON;
+use anise::astro::PhysicsResult;
+use anise::prelude::{Frame, Orbit};
+use snafu::ResultExt;
+
+use super::AstroError;
+use crate::cosmic::AstroPhysicsSnafu;
 use crate::linalg::{Vector3, U7};
 use crate::md::StateParameter;
 use crate::time::Epoch;
@@ -24,7 +30,6 @@ use crate::TimeTagged;
 use hyperdual::linalg::norm;
 use hyperdual::{Float, OHyperdual};
 use std::f64::consts::PI;
-use std::f64::EPSILON;
 use std::fmt;
 
 /// Orbit defines an orbital state
@@ -57,12 +62,12 @@ impl From<Orbit> for OrbitDual {
     /// Initialize a new OrbitDual from an orbit, no other initializers
     fn from(orbit: Orbit) -> Self {
         Self {
-            x: OHyperdual::from_slice(&[orbit.x_km, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
-            y: OHyperdual::from_slice(&[orbit.y_km, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0]),
-            z: OHyperdual::from_slice(&[orbit.z_km, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]),
-            vx: OHyperdual::from_slice(&[orbit.vx_km_s, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0]),
-            vy: OHyperdual::from_slice(&[orbit.vy_km_s, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0]),
-            vz: OHyperdual::from_slice(&[orbit.vz_km_s, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]),
+            x: OHyperdual::from_slice(&[orbit.radius_km.x, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+            y: OHyperdual::from_slice(&[orbit.radius_km.y, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0]),
+            z: OHyperdual::from_slice(&[orbit.radius_km.z, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]),
+            vx: OHyperdual::from_slice(&[orbit.velocity_km_s.x, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0]),
+            vy: OHyperdual::from_slice(&[orbit.velocity_km_s.y, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0]),
+            vz: OHyperdual::from_slice(&[orbit.velocity_km_s.z, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]),
             dt: orbit.epoch,
             frame: orbit.frame,
         }
@@ -146,28 +151,36 @@ impl OrbitDual {
             StateParameter::HY => Ok(self.hy()),
             StateParameter::HZ => Ok(self.hz()),
             StateParameter::Hmag => Ok(self.hmag()),
-            StateParameter::Energy => Ok(self.energy()),
-            StateParameter::SMA => Ok(self.sma()),
-            StateParameter::Eccentricity => Ok(self.ecc()),
+            StateParameter::Energy => Ok(self.energy().context(AstroPhysicsSnafu)?),
+            StateParameter::SMA => Ok(self.sma().context(AstroPhysicsSnafu)?),
+            StateParameter::Eccentricity => Ok(self.ecc().context(AstroPhysicsSnafu)?),
             StateParameter::Inclination => Ok(self.inc()),
-            StateParameter::AoP => Ok(self.aop()),
-            StateParameter::AoL => Ok(self.aol()),
+            StateParameter::AoP => Ok(self.aop().context(AstroPhysicsSnafu)?),
+            StateParameter::AoL => Ok(self.aol().context(AstroPhysicsSnafu)?),
             StateParameter::RAAN => Ok(self.raan()),
-            StateParameter::Periapsis => Ok(self.periapsis()),
-            StateParameter::Apoapsis => Ok(self.apoapsis()),
-            StateParameter::TrueLongitude => Ok(self.tlong()),
-            StateParameter::FlightPathAngle => Ok(self.fpa()),
-            StateParameter::MeanAnomaly => Ok(self.ma()),
-            StateParameter::EccentricAnomaly => Ok(self.ea()),
-            StateParameter::GeodeticHeight => Ok(self.geodetic_height()),
-            StateParameter::GeodeticLatitude => Ok(self.geodetic_latitude()),
+            StateParameter::Periapsis => Ok(self.periapsis().context(AstroPhysicsSnafu)?),
+            StateParameter::Apoapsis => Ok(self.apoapsis().context(AstroPhysicsSnafu)?),
+            StateParameter::TrueLongitude => Ok(self.tlong().context(AstroPhysicsSnafu)?),
+            StateParameter::FlightPathAngle => Ok(self.fpa().context(AstroPhysicsSnafu)?),
+            StateParameter::MeanAnomaly => Ok(self.ma().context(AstroPhysicsSnafu)?),
+            StateParameter::EccentricAnomaly => Ok(self.ea().context(AstroPhysicsSnafu)?),
+            StateParameter::GeodeticHeight => {
+                Ok(self.geodetic_height().context(AstroPhysicsSnafu)?)
+            }
+            StateParameter::GeodeticLatitude => {
+                Ok(self.geodetic_latitude().context(AstroPhysicsSnafu)?)
+            }
             StateParameter::GeodeticLongitude => Ok(self.geodetic_longitude()),
-            StateParameter::C3 => Ok(self.c3()),
+            StateParameter::C3 => Ok(self.c3().context(AstroPhysicsSnafu)?),
             StateParameter::RightAscension => Ok(self.right_ascension()),
             StateParameter::Declination => Ok(self.declination()),
             StateParameter::HyperbolicAnomaly => self.hyperbolic_anomaly(),
-            StateParameter::SemiParameter => Ok(self.semi_parameter()),
-            StateParameter::SemiMinorAxis => Ok(self.semi_minor_axis()),
+            StateParameter::SemiParameter => {
+                Ok(self.semi_parameter().context(AstroPhysicsSnafu)?)
+            }
+            StateParameter::SemiMinorAxis => {
+                Ok(self.semi_minor_axis().context(AstroPhysicsSnafu)?)
+            }
             _ => Err(AstroError::PartialsUndefined),
         }
     }
@@ -236,325 +249,263 @@ impl OrbitDual {
     }
 
     /// Returns the specific mechanical energy
-    pub fn energy(&self) -> OrbitPartial {
-        match self.frame {
-            Frame::Geoid { gm, .. } | Frame::Celestial { gm, .. } => OrbitPartial {
-                dual: self.vmag().dual.powi(2) / OHyperdual::from(2.0)
-                    - OHyperdual::from(gm) / self.rmag().dual,
-                param: StateParameter::Energy,
-            },
-            _ => panic!("orbital energy not defined in this frame"),
-        }
+    pub fn energy(&self) -> PhysicsResult<OrbitPartial> {
+        Ok(OrbitPartial {
+            dual: self.vmag().dual.powi(2) / OHyperdual::from(2.0)
+                - OHyperdual::from(self.frame.mu_km3_s2()?) / self.rmag().dual,
+            param: StateParameter::Energy,
+        })
     }
 
     /// Returns the semi-major axis in km
-    pub fn sma(&self) -> OrbitPartial {
-        match self.frame {
-            Frame::Geoid { gm, .. } | Frame::Celestial { gm, .. } => OrbitPartial {
-                dual: -OHyperdual::from(gm) / (OHyperdual::from(2.0) * self.energy().dual),
-                param: StateParameter::SMA,
-            },
-            _ => panic!("sma not defined in this frame"),
-        }
+    pub fn sma(&self) -> PhysicsResult<OrbitPartial> {
+        Ok(OrbitPartial {
+            dual: -OHyperdual::from(self.frame.mu_km3_s2()?)
+                / (OHyperdual::from(2.0) * self.energy()?.dual),
+            param: StateParameter::SMA,
+        })
     }
 
     /// Returns the eccentricity vector (no unit)
-    pub(crate) fn evec(&self) -> Vector3<OHyperdual<f64, U7>> {
-        match self.frame {
-            Frame::Geoid { gm, .. } | Frame::Celestial { gm, .. } => {
-                let r = self.radius();
-                let v = self.velocity();
-                let hgm = OHyperdual::from(gm);
-                // Split up this operation because it doesn't seem to be implemented
-                // ((norm(&v).powi(2) - hgm / norm(&r)) * r - (r.dot(&v)) * v) / hgm
-                Vector3::new(
-                    ((norm(&v).powi(2) - hgm / norm(&r)) * r[0] - (r.dot(&v)) * v[0]) / hgm,
-                    ((norm(&v).powi(2) - hgm / norm(&r)) * r[1] - (r.dot(&v)) * v[1]) / hgm,
-                    ((norm(&v).powi(2) - hgm / norm(&r)) * r[2] - (r.dot(&v)) * v[2]) / hgm,
-                )
-            }
-            _ => panic!("eccentricity not defined in this frame"),
-        }
+    pub(crate) fn evec(&self) -> PhysicsResult<Vector3<OHyperdual<f64, U7>>> {
+        let r = self.radius();
+        let v = self.velocity();
+        let hgm = OHyperdual::from(self.frame.mu_km3_s2()?);
+        // Split up this operation because it doesn't seem to be implemented
+        // ((norm(&v).powi(2) - hgm / norm(&r)) * r - (r.dot(&v)) * v) / hgm
+        Ok(Vector3::new(
+            ((norm(&v).powi(2) - hgm / norm(&r)) * r[0] - (r.dot(&v)) * v[0]) / hgm,
+            ((norm(&v).powi(2) - hgm / norm(&r)) * r[1] - (r.dot(&v)) * v[1]) / hgm,
+            ((norm(&v).powi(2) - hgm / norm(&r)) * r[2] - (r.dot(&v)) * v[2]) / hgm,
+        ))
     }
 
     /// Returns the eccentricity (no unit)
-    pub fn ecc(&self) -> OrbitPartial {
-        OrbitPartial {
-            dual: norm(&self.evec()),
+    pub fn ecc(&self) -> PhysicsResult<OrbitPartial> {
+        Ok(OrbitPartial {
+            dual: norm(&self.evec()?),
             param: StateParameter::Eccentricity,
-        }
+        })
     }
 
     /// Returns the inclination in degrees
     pub fn inc(&self) -> OrbitPartial {
-        match self.frame {
-            Frame::Celestial { .. } | Frame::Geoid { .. } => OrbitPartial {
-                dual: (self.hvec()[(2, 0)] / self.hmag().dual).acos().to_degrees(),
-                param: StateParameter::Inclination,
-            },
-            _ => panic!("inclination not defined in this frame"),
+        OrbitPartial {
+            dual: (self.hvec()[(2, 0)] / self.hmag().dual).acos().to_degrees(),
+            param: StateParameter::Inclination,
         }
     }
 
     /// Returns the argument of periapsis in degrees
-    pub fn aop(&self) -> OrbitPartial {
-        match self.frame {
-            Frame::Celestial { .. } | Frame::Geoid { .. } => {
-                let n = Vector3::new(
-                    OHyperdual::from(0.0),
-                    OHyperdual::from(0.0),
-                    OHyperdual::from(1.0),
-                )
-                .cross(&self.hvec());
-                let aop = (n.dot(&self.evec()) / (norm(&n) * self.ecc().dual)).acos();
-                if aop.is_nan() {
-                    error!("AoP is NaN");
-                    OrbitPartial {
-                        dual: OHyperdual::from(0.0),
-                        param: StateParameter::AoP,
-                    }
-                } else if self.evec()[2].real() < 0.0 {
-                    OrbitPartial {
-                        dual: (OHyperdual::from(2.0 * PI) - aop).to_degrees(),
-                        param: StateParameter::AoP,
-                    }
-                } else {
-                    OrbitPartial {
-                        dual: aop.to_degrees(),
-                        param: StateParameter::AoP,
-                    }
-                }
-            }
-            _ => panic!("aop not defined in this frame"),
+    pub fn aop(&self) -> PhysicsResult<OrbitPartial> {
+        let n = Vector3::new(
+            OHyperdual::from(0.0),
+            OHyperdual::from(0.0),
+            OHyperdual::from(1.0),
+        )
+        .cross(&self.hvec());
+        let aop = (n.dot(&self.evec()?) / (norm(&n) * self.ecc()?.dual)).acos();
+        if aop.is_nan() {
+            error!("AoP is NaN");
+            Ok(OrbitPartial {
+                dual: OHyperdual::from(0.0),
+                param: StateParameter::AoP,
+            })
+        } else if self.evec()?[2].real() < 0.0 {
+            Ok(OrbitPartial {
+                dual: (OHyperdual::from(2.0 * PI) - aop).to_degrees(),
+                param: StateParameter::AoP,
+            })
+        } else {
+            Ok(OrbitPartial {
+                dual: aop.to_degrees(),
+                param: StateParameter::AoP,
+            })
         }
     }
 
     /// Returns the right ascension of ther ascending node in degrees
     pub fn raan(&self) -> OrbitPartial {
-        match self.frame {
-            Frame::Celestial { .. } | Frame::Geoid { .. } => {
-                let n = Vector3::new(
-                    OHyperdual::from(0.0),
-                    OHyperdual::from(0.0),
-                    OHyperdual::from(1.0),
-                )
-                .cross(&self.hvec());
-                let raan = (n[(0, 0)] / norm(&n)).acos();
-                if raan.is_nan() {
-                    warn!("RAAN is NaN");
-                    OrbitPartial {
-                        dual: OHyperdual::from(0.0),
-                        param: StateParameter::RAAN,
-                    }
-                } else if n[(1, 0)] < 0.0 {
-                    OrbitPartial {
-                        dual: (OHyperdual::from(2.0 * PI) - raan).to_degrees(),
-                        param: StateParameter::RAAN,
-                    }
-                } else {
-                    OrbitPartial {
-                        dual: raan.to_degrees(),
-                        param: StateParameter::RAAN,
-                    }
-                }
+        let n = Vector3::new(
+            OHyperdual::from(0.0),
+            OHyperdual::from(0.0),
+            OHyperdual::from(1.0),
+        )
+        .cross(&self.hvec());
+        let raan = (n[(0, 0)] / norm(&n)).acos();
+        if raan.is_nan() {
+            warn!("RAAN is NaN");
+            OrbitPartial {
+                dual: OHyperdual::from(0.0),
+                param: StateParameter::RAAN,
             }
-            _ => panic!("RAAN not defined in this frame"),
+        } else if n[(1, 0)] < 0.0 {
+            OrbitPartial {
+                dual: (OHyperdual::from(2.0 * PI) - raan).to_degrees(),
+                param: StateParameter::RAAN,
+            }
+        } else {
+            OrbitPartial {
+                dual: raan.to_degrees(),
+                param: StateParameter::RAAN,
+            }
         }
     }
 
     /// Returns the true anomaly in degrees between 0 and 360.0
-    ///
-    /// NOTE: This function will emit a warning stating that the TA should be avoided if in a very near circular orbit
-    /// Code from https://github.com/ChristopherRabotin/GMAT/blob/80bde040e12946a61dae90d9fc3538f16df34190/src/gmatutil/util/StateConversionUtil.cpp#L6835
-    pub fn ta(&self) -> OrbitPartial {
-        match self.frame {
-            Frame::Celestial { .. } | Frame::Geoid { .. } => {
-                if self.ecc().real() < ECC_EPSILON {
-                    warn!(
-                        "true anomaly ill-defined for circular orbit (e = {})",
-                        self.ecc()
-                    );
-                }
-                let cos_nu = self.evec().dot(&self.radius()) / (self.ecc().dual * self.rmag().dual);
-                if (cos_nu.real().abs() - 1.0).abs() < EPSILON {
-                    // This bug drove me crazy when writing SMD in Go in 2017.
-                    if cos_nu > 1.0 {
-                        OrbitPartial {
-                            dual: OHyperdual::from(180.0),
-                            param: StateParameter::TrueAnomaly,
-                        }
-                    } else {
-                        OrbitPartial {
-                            dual: OHyperdual::from(0.0),
-                            param: StateParameter::TrueAnomaly,
-                        }
-                    }
-                } else {
-                    let ta = cos_nu.acos();
-                    if ta.is_nan() {
-                        warn!("TA is NaN");
-                        OrbitPartial {
-                            dual: OHyperdual::from(0.0),
-                            param: StateParameter::TrueAnomaly,
-                        }
-                    } else if self.radius().dot(&self.velocity()) < 0.0 {
-                        OrbitPartial {
-                            dual: (OHyperdual::from(2.0 * PI) - ta).to_degrees(),
-                            param: StateParameter::TrueAnomaly,
-                        }
-                    } else {
-                        OrbitPartial {
-                            dual: ta.to_degrees(),
-                            param: StateParameter::TrueAnomaly,
-                        }
-                    }
-                }
+    pub fn ta(&self) -> PhysicsResult<OrbitPartial> {
+        if self.ecc()?.real() < ECC_EPSILON {
+            warn!(
+                "true anomaly ill-defined for circular orbit (e = {})",
+                self.ecc()?
+            );
+        }
+        let cos_nu = self.evec()?.dot(&self.radius()) / (self.ecc()?.dual * self.rmag().dual);
+        if (cos_nu.real().abs() - 1.0).abs() < f64::EPSILON {
+            // This bug drove me crazy when writing SMD in Go in 2017.
+            if cos_nu > 1.0 {
+                Ok(OrbitPartial {
+                    dual: OHyperdual::from(180.0),
+                    param: StateParameter::TrueAnomaly,
+                })
+            } else {
+                Ok(OrbitPartial {
+                    dual: OHyperdual::from(0.0),
+                    param: StateParameter::TrueAnomaly,
+                })
             }
-            _ => panic!("true anomaly not defined in this frame"),
+        } else {
+            let ta = cos_nu.acos();
+            if ta.is_nan() {
+                warn!("TA is NaN");
+                Ok(OrbitPartial {
+                    dual: OHyperdual::from(0.0),
+                    param: StateParameter::TrueAnomaly,
+                })
+            } else if self.radius().dot(&self.velocity()) < 0.0 {
+                Ok(OrbitPartial {
+                    dual: (OHyperdual::from(2.0 * PI) - ta).to_degrees(),
+                    param: StateParameter::TrueAnomaly,
+                })
+            } else {
+                Ok(OrbitPartial {
+                    dual: ta.to_degrees(),
+                    param: StateParameter::TrueAnomaly,
+                })
+            }
         }
     }
 
     /// Returns the true longitude in degrees
-    pub fn tlong(&self) -> OrbitPartial {
-        match self.frame {
-            Frame::Celestial { .. } | Frame::Geoid { .. } => {
-                // Angles already in degrees
-                OrbitPartial {
-                    dual: self.aop().dual + self.raan().dual + self.ta().dual,
-                    param: StateParameter::TrueLongitude,
-                }
-            }
-            _ => panic!("true longitude not defined in this frame"),
-        }
+    pub fn tlong(&self) -> PhysicsResult<OrbitPartial> {
+        // Angles already in degrees
+        Ok(OrbitPartial {
+            dual: self.aop()?.dual + self.raan().dual + self.ta()?.dual,
+            param: StateParameter::TrueLongitude,
+        })
     }
 
     /// Returns the argument of latitude in degrees
     ///
     /// NOTE: If the orbit is near circular, the AoL will be computed from the true longitude
     /// instead of relying on the ill-defined true anomaly.
-    pub fn aol(&self) -> OrbitPartial {
-        match self.frame {
-            Frame::Celestial { .. } | Frame::Geoid { .. } => {
-                if self.ecc().real() < ECC_EPSILON {
-                    OrbitPartial {
-                        dual: self.tlong().dual - self.raan().dual,
-                        param: StateParameter::AoL,
-                    }
-                } else {
-                    OrbitPartial {
-                        dual: self.aop().dual + self.ta().dual,
-                        param: StateParameter::AoL,
-                    }
-                }
-            }
-            _ => panic!("argument of latitude not defined in this frame"),
+    pub fn aol(&self) -> PhysicsResult<OrbitPartial> {
+        if self.ecc()?.real() < ECC_EPSILON {
+            Ok(OrbitPartial {
+                dual: self.tlong()?.dual - self.raan().dual,
+                param: StateParameter::AoL,
+            })
+        } else {
+            Ok(OrbitPartial {
+                dual: self.aop()?.dual + self.ta()?.dual,
+                param: StateParameter::AoL,
+            })
         }
     }
 
     /// Returns the radius of periapsis (or perigee around Earth), in kilometers.
-    pub fn periapsis(&self) -> OrbitPartial {
-        match self.frame {
-            Frame::Celestial { .. } | Frame::Geoid { .. } => OrbitPartial {
-                dual: self.sma().dual * (OHyperdual::from(1.0) - self.ecc().dual),
-                param: StateParameter::Periapsis,
-            },
-            _ => panic!("periapsis not defined in this frame"),
-        }
+    pub fn periapsis(&self) -> PhysicsResult<OrbitPartial> {
+        Ok(OrbitPartial {
+            dual: self.sma()?.dual * (OHyperdual::from(1.0) - self.ecc()?.dual),
+            param: StateParameter::Periapsis,
+        })
     }
 
     /// Returns the radius of apoapsis (or apogee around Earth), in kilometers.
-    pub fn apoapsis(&self) -> OrbitPartial {
-        match self.frame {
-            Frame::Celestial { .. } | Frame::Geoid { .. } => OrbitPartial {
-                dual: self.sma().dual * (OHyperdual::from(1.0) + self.ecc().dual),
-                param: StateParameter::Apoapsis,
-            },
-            _ => panic!("apoapsis not defined in this frame"),
-        }
+    pub fn apoapsis(&self) -> PhysicsResult<OrbitPartial> {
+        Ok(OrbitPartial {
+            dual: self.sma()?.dual * (OHyperdual::from(1.0) + self.ecc()?.dual),
+            param: StateParameter::Apoapsis,
+        })
     }
 
     /// Returns the eccentric anomaly in degrees
     ///
     /// This is a conversion from GMAT's StateConversionUtil::TrueToEccentricAnomaly
-    pub fn ea(&self) -> OrbitPartial {
-        match self.frame {
-            Frame::Celestial { .. } | Frame::Geoid { .. } => {
-                let (sin_ta, cos_ta) = self.ta().dual.to_radians().sin_cos();
-                let ecc_cos_ta = self.ecc().dual * cos_ta;
-                let sin_ea = ((OHyperdual::from(1.0) - self.ecc().dual.powi(2)).sqrt() * sin_ta)
-                    / (OHyperdual::from(1.0) + ecc_cos_ta);
-                let cos_ea = (self.ecc().dual + cos_ta) / (OHyperdual::from(1.0) + ecc_cos_ta);
-                // The atan2 function is a bit confusing: https://doc.rust-lang.org/std/primitive.f64.html#method.atan2 .
-                OrbitPartial {
-                    dual: sin_ea.atan2(cos_ea).to_degrees(),
-                    param: StateParameter::EccentricAnomaly,
-                }
-            }
-            _ => panic!("eccentric anomaly is not defined in this frame"),
-        }
+    pub fn ea(&self) -> PhysicsResult<OrbitPartial> {
+        let (sin_ta, cos_ta) = self.ta()?.dual.to_radians().sin_cos();
+        let ecc_cos_ta = self.ecc()?.dual * cos_ta;
+        let sin_ea = ((OHyperdual::from(1.0) - self.ecc()?.dual.powi(2)).sqrt() * sin_ta)
+            / (OHyperdual::from(1.0) + ecc_cos_ta);
+        let cos_ea = (self.ecc()?.dual + cos_ta) / (OHyperdual::from(1.0) + ecc_cos_ta);
+        // The atan2 function is a bit confusing: https://doc.rust-lang.org/std/primitive.f64.html#method.atan2 .
+        Ok(OrbitPartial {
+            dual: sin_ea.atan2(cos_ea).to_degrees(),
+            param: StateParameter::EccentricAnomaly,
+        })
     }
 
     /// Returns the flight path angle in degrees
-    pub fn fpa(&self) -> OrbitPartial {
-        let nu = self.ta().dual.to_radians();
-        let ecc = self.ecc().dual;
+    pub fn fpa(&self) -> PhysicsResult<OrbitPartial> {
+        let nu = self.ta()?.dual.to_radians();
+        let ecc = self.ecc()?.dual;
         let denom =
             (OHyperdual::from(1.0) + OHyperdual::from(2.0) * ecc * nu.cos() + ecc.powi(2)).sqrt();
         let sin_fpa = ecc * nu.sin() / denom;
         let cos_fpa = OHyperdual::from(1.0) + ecc * nu.cos() / denom;
-        OrbitPartial {
+        Ok(OrbitPartial {
             dual: sin_fpa.atan2(cos_fpa).to_degrees(),
             param: StateParameter::FlightPathAngle,
-        }
+        })
     }
 
     /// Returns the mean anomaly in degrees
-    ///
-    /// This is a conversion from GMAT's StateConversionUtil::TrueToMeanAnomaly
-    pub fn ma(&self) -> OrbitPartial {
-        match self.frame {
-            Frame::Celestial { .. } | Frame::Geoid { .. } => {
-                if self.ecc().real() < 1.0 {
-                    OrbitPartial {
-                        dual: (self.ea().dual.to_radians()
-                            - self.ecc().dual * self.ea().dual.to_radians().sin())
-                        .to_degrees(),
-                        param: StateParameter::MeanAnomaly,
-                    }
-                } else if self.ecc().real() > 1.0 {
-                    info!("computing the hyperbolic anomaly");
-                    // From GMAT's TrueToHyperbolicAnomaly
-                    OrbitPartial {
-                        dual: ((self.ta().dual.to_radians().sin()
-                            * (self.ecc().dual.powi(2) - OHyperdual::from(1.0)))
-                        .sqrt()
-                            / (OHyperdual::from(1.0)
-                                + self.ecc().dual * self.ta().dual.to_radians().cos()))
-                        .asinh()
-                        .to_degrees(),
-                        param: StateParameter::MeanAnomaly,
-                    }
-                } else {
-                    error!("parabolic orbit: setting mean anomaly to 0.0");
-                    OrbitPartial {
-                        dual: OHyperdual::from(0.0),
-                        param: StateParameter::MeanAnomaly,
-                    }
-                }
-            }
-            _ => panic!("mean anomaly is not defined in this frame"),
+    pub fn ma(&self) -> PhysicsResult<OrbitPartial> {
+        if self.ecc()?.real() < 1.0 {
+            Ok(OrbitPartial {
+                dual: (self.ea()?.dual.to_radians()
+                    - self.ecc()?.dual * self.ea()?.dual.to_radians().sin())
+                .to_degrees(),
+                param: StateParameter::MeanAnomaly,
+            })
+        } else if self.ecc()?.real() > 1.0 {
+            info!("computing the hyperbolic anomaly");
+            // From GMAT's TrueToHyperbolicAnomaly
+            Ok(OrbitPartial {
+                dual: ((self.ta()?.dual.to_radians().sin()
+                    * (self.ecc()?.dual.powi(2) - OHyperdual::from(1.0)))
+                .sqrt()
+                    / (OHyperdual::from(1.0)
+                        + self.ecc()?.dual * self.ta()?.dual.to_radians().cos()))
+                .asinh()
+                .to_degrees(),
+                param: StateParameter::MeanAnomaly,
+            })
+        } else {
+            error!("parabolic orbit: setting mean anomaly to 0.0");
+            Ok(OrbitPartial {
+                dual: OHyperdual::from(0.0),
+                param: StateParameter::MeanAnomaly,
+            })
         }
     }
 
     /// Returns the semi parameter (or semilatus rectum)
-    pub fn semi_parameter(&self) -> OrbitPartial {
-        match self.frame {
-            Frame::Celestial { .. } | Frame::Geoid { .. } => OrbitPartial {
-                dual: self.sma().dual * (OHyperdual::from(1.0) - self.ecc().dual.powi(2)),
-                param: StateParameter::SemiParameter,
-            },
-            _ => panic!("semi parameter is not defined in this frame"),
-        }
+    pub fn semi_parameter(&self) -> PhysicsResult<OrbitPartial> {
+        Ok(OrbitPartial {
+            dual: self.sma()?.dual * (OHyperdual::from(1.0) - self.ecc()?.dual.powi(2)),
+            param: StateParameter::SemiParameter,
+        })
     }
 
     /// Returns the geodetic longitude (λ) in degrees. Value is between 0 and 360 degrees.
@@ -562,91 +513,73 @@ impl OrbitDual {
     /// Although the reference is not Vallado, the math from Vallado proves to be equivalent.
     /// Reference: G. Xu and Y. Xu, "GPS", DOI 10.1007/978-3-662-50367-6_2, 2016
     pub fn geodetic_longitude(&self) -> OrbitPartial {
-        match self.frame {
-            Frame::Geoid { .. } => OrbitPartial {
-                dual: self.y.atan2(self.x).to_degrees(),
-                param: StateParameter::GeodeticLongitude,
-            },
-            _ => panic!("geodetic elements only defined in a Geoid frame"),
+        OrbitPartial {
+            dual: self.y.atan2(self.x).to_degrees(),
+            param: StateParameter::GeodeticLongitude,
         }
     }
 
     /// Returns the geodetic latitude (φ) in degrees. Value is between -180 and +180 degrees.
     ///
     /// Reference: Vallado, 4th Ed., Algorithm 12 page 172.
-    pub fn geodetic_latitude(&self) -> OrbitPartial {
-        match self.frame {
-            Frame::Geoid {
-                flattening,
-                semi_major_radius,
-                ..
-            } => {
-                let eps = 1e-12;
-                let max_attempts = 20;
-                let mut attempt_no = 0;
-                let r_delta = (self.x.powi(2) + self.y.powi(2)).sqrt();
-                let mut latitude = (self.z / self.rmag().dual).asin();
-                let e2 = OHyperdual::from(flattening * (2.0 - flattening));
-                loop {
-                    attempt_no += 1;
-                    let c_earth = OHyperdual::from(semi_major_radius)
-                        / ((OHyperdual::from(1.0) - e2 * (latitude).sin().powi(2)).sqrt());
-                    let new_latitude = (self.z + c_earth * e2 * (latitude).sin()).atan2(r_delta);
-                    if (latitude - new_latitude).abs() < eps {
-                        return OrbitPartial {
-                            dual: new_latitude.to_degrees(),
-                            param: StateParameter::GeodeticLatitude,
-                        };
-                    } else if attempt_no >= max_attempts {
-                        error!(
-                            "geodetic latitude failed to converge -- error = {}",
-                            (latitude - new_latitude).abs()
-                        );
-                        return OrbitPartial {
-                            dual: new_latitude.to_degrees(),
-                            param: StateParameter::GeodeticLatitude,
-                        };
-                    }
-                    latitude = new_latitude;
-                }
+    pub fn geodetic_latitude(&self) -> PhysicsResult<OrbitPartial> {
+        let flattening = self.frame.flattening()?;
+        let eps = 1e-12;
+        let max_attempts = 20;
+        let mut attempt_no = 0;
+        let r_delta = (self.x.powi(2) + self.y.powi(2)).sqrt();
+        let mut latitude = (self.z / self.rmag().dual).asin();
+        let e2 = OHyperdual::from(flattening * (2.0 - flattening));
+        loop {
+            attempt_no += 1;
+            let c_earth = OHyperdual::from(self.frame.semi_major_radius_km()?)
+                / ((OHyperdual::from(1.0) - e2 * (latitude).sin().powi(2)).sqrt());
+            let new_latitude = (self.z + c_earth * e2 * (latitude).sin()).atan2(r_delta);
+            if (latitude - new_latitude).abs() < eps {
+                return Ok(OrbitPartial {
+                    dual: new_latitude.to_degrees(),
+                    param: StateParameter::GeodeticLatitude,
+                });
+            } else if attempt_no >= max_attempts {
+                error!(
+                    "geodetic latitude failed to converge -- error = {}",
+                    (latitude - new_latitude).abs()
+                );
+                return Ok(OrbitPartial {
+                    dual: new_latitude.to_degrees(),
+                    param: StateParameter::GeodeticLatitude,
+                });
             }
-            _ => panic!("geodetic elements only defined in a Geoid frame"),
+            latitude = new_latitude;
         }
     }
 
     /// Returns the geodetic height in km.
     ///
     /// Reference: Vallado, 4th Ed., Algorithm 12 page 172.
-    pub fn geodetic_height(&self) -> OrbitPartial {
-        match self.frame {
-            Frame::Geoid {
-                flattening,
-                semi_major_radius,
-                ..
-            } => {
-                let e2 = OHyperdual::from(flattening * (2.0 - flattening));
-                let latitude = self.geodetic_latitude().dual.to_radians();
-                let sin_lat = latitude.sin();
-                if (latitude - OHyperdual::from(1.0)).abs() < 0.1 {
-                    // We are near poles, let's use another formulation.
-                    let s_earth0: f64 = semi_major_radius * (1.0 - flattening).powi(2);
-                    let s_earth = OHyperdual::from(s_earth0)
-                        / ((OHyperdual::from(1.0) - e2 * sin_lat.powi(2)).sqrt());
-                    OrbitPartial {
-                        dual: self.z / latitude.sin() - s_earth,
-                        param: StateParameter::GeodeticHeight,
-                    }
-                } else {
-                    let c_earth = OHyperdual::from(semi_major_radius)
-                        / ((OHyperdual::from(1.0) - e2 * sin_lat.powi(2)).sqrt());
-                    let r_delta = (self.x.powi(2) + self.y.powi(2)).sqrt();
-                    OrbitPartial {
-                        dual: r_delta / latitude.cos() - c_earth,
-                        param: StateParameter::GeodeticHeight,
-                    }
-                }
-            }
-            _ => panic!("geodetic elements only defined in a Geoid frame"),
+    pub fn geodetic_height(&self) -> PhysicsResult<OrbitPartial> {
+        let flattening = self.frame.flattening()?;
+        let semi_major_radius = self.frame.semi_major_radius_km()?;
+        let e2 = OHyperdual::from(flattening * (2.0 - flattening));
+        let latitude = self.geodetic_latitude()?.dual.to_radians();
+        let sin_lat = latitude.sin();
+        if (latitude - OHyperdual::from(1.0)).abs() < 0.1 {
+            // We are near poles, let's use another formulation.
+            let s_earth0: f64 = semi_major_radius * (1.0 - flattening).powi(2);
+            let s_earth = OHyperdual::from(s_earth0)
+                / ((OHyperdual::from(1.0) - e2 * sin_lat.powi(2)).sqrt());
+            Ok(OrbitPartial {
+                dual: self.z / latitude.sin() - s_earth,
+                param: StateParameter::GeodeticHeight,
+            })
+        } else {
+            let c_earth = OHyperdual::from(semi_major_radius)
+                / ((OHyperdual::from(1.0) - e2 * sin_lat.powi(2)).sqrt());
+            let r_delta = (self.x.powi(2) + self.y.powi(2)).sqrt();
+            Ok(OrbitPartial {
+                dual: r_delta / latitude.cos() - c_earth,
+                param: StateParameter::GeodeticHeight,
+            })
         }
     }
 
@@ -669,20 +602,20 @@ impl OrbitDual {
     }
 
     /// Returns the semi minor axis in km, includes code for a hyperbolic orbit
-    pub fn semi_minor_axis(&self) -> OrbitPartial {
-        if self.ecc().real() <= 1.0 {
-            OrbitPartial {
-                dual: ((self.sma().dual * self.ecc().dual).powi(2) - self.sma().dual.powi(2))
+    pub fn semi_minor_axis(&self) -> PhysicsResult<OrbitPartial> {
+        if self.ecc()?.real() <= 1.0 {
+            Ok(OrbitPartial {
+                dual: ((self.sma()?.dual * self.ecc()?.dual).powi(2) - self.sma()?.dual.powi(2))
                     .sqrt(),
                 param: StateParameter::SemiMinorAxis,
-            }
+            })
         } else {
-            OrbitPartial {
+            Ok(OrbitPartial {
                 dual: self.hmag().dual.powi(2)
-                    / (OHyperdual::from(self.frame.gm())
-                        * (self.ecc().dual.powi(2) - OHyperdual::from(1.0)).sqrt()),
+                    / (OHyperdual::from(self.frame.mu_km3_s2()?)
+                        * (self.ecc()?.dual.powi(2) - OHyperdual::from(1.0)).sqrt()),
                 param: StateParameter::SemiMinorAxis,
-            }
+            })
         }
     }
 
@@ -695,21 +628,27 @@ impl OrbitDual {
     }
 
     /// Returns the $C_3$ of this orbit
-    pub fn c3(&self) -> OrbitPartial {
-        OrbitPartial {
-            dual: -OHyperdual::from(self.frame.gm()) / self.sma().dual,
+    pub fn c3(&self) -> PhysicsResult<OrbitPartial> {
+        Ok(OrbitPartial {
+            dual: -OHyperdual::from(self.frame.mu_km3_s2()?) / self.sma()?.dual,
             param: StateParameter::C3,
-        }
+        })
     }
 
     /// Returns the hyperbolic anomaly in degrees between 0 and 360.0
     pub fn hyperbolic_anomaly(&self) -> Result<OrbitPartial, AstroError> {
-        if self.ecc().real() <= 1.0 {
+        let ecc = self.ecc().context(AstroPhysicsSnafu)?;
+        if ecc.real() <= 1.0 {
             Err(AstroError::NotHyperbolic)
         } else {
-            let (sin_ta, cos_ta) = self.ta().dual.to_radians().sin_cos();
-            let sinh_h = (sin_ta * (self.ecc().dual.powi(2) - OHyperdual::from(1.0)).sqrt())
-                / (OHyperdual::from(1.0) + self.ecc().dual * cos_ta);
+            let (sin_ta, cos_ta) = self
+                .ta()
+                .context(AstroPhysicsSnafu)?
+                .dual
+                .to_radians()
+                .sin_cos();
+            let sinh_h = (sin_ta * (ecc.dual.powi(2) - OHyperdual::from(1.0)).sqrt())
+                / (OHyperdual::from(1.0) + ecc.dual * cos_ta);
             Ok(OrbitPartial {
                 dual: sinh_h.asinh().to_degrees(),
                 param: StateParameter::HyperbolicAnomaly,

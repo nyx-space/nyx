@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -16,9 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::cosmic::{Frame, Orbit};
+use crate::cosmic::Orbit;
 use crate::linalg::Vector3;
-use crate::State;
 
 pub use super::guidance::Mnvr;
 
@@ -56,7 +55,7 @@ impl DeltaVctrl for ImpulsiveBurns {
         } else {
             let next_mnvr = self.mnvrs[self.mnvr_no];
             if next_mnvr.start <= state.epoch && next_mnvr.end >= state.epoch {
-                state.dcm_from_traj_frame(Frame::VNC).unwrap() * next_mnvr.vector(state.epoch())
+                state.dcm_from_vnc_to_inertial().unwrap() * next_mnvr.vector(state.epoch)
             } else {
                 Vector3::zeros()
             }

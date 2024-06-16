@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -16,14 +16,14 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::cosmic::{Cosm, Frame};
+use anise::prelude::Frame;
+
 use crate::md::prelude::{Objective, StateParameter};
 use crate::time::Epoch;
 use crate::NyxError;
 use serde_derive::{Deserialize, Serialize};
 use std::convert::Into;
 use std::str::FromStr;
-use std::sync::Arc;
 
 use super::multishoot::MultishootNode;
 
@@ -33,10 +33,10 @@ pub struct NodesSerde {
 }
 
 impl NodesSerde {
-    pub fn to_node_vec(&self, cosm: Arc<Cosm>) -> Result<Vec<Node>, NyxError> {
+    pub fn to_node_vec(&self) -> Result<Vec<Node>, NyxError> {
         let mut rtn = Vec::with_capacity(self.nodes.len());
         for n in &self.nodes {
-            rtn.push(n.to_node(cosm.clone())?)
+            rtn.push(n.to_node()?)
         }
         Ok(rtn)
     }
@@ -49,12 +49,11 @@ pub struct NodeSerde {
     pub z: f64,
     pub vmag: Option<f64>,
     pub epoch: String,
-    pub frame: String,
+    pub frame: Frame,
 }
 
 impl NodeSerde {
-    pub fn to_node(&self, cosm: Arc<Cosm>) -> Result<Node, NyxError> {
-        let frame = cosm.try_frame(self.frame.as_str())?;
+    pub fn to_node(&self) -> Result<Node, NyxError> {
         let epoch = Epoch::from_str(&self.epoch).unwrap();
 
         Ok(Node {
@@ -62,7 +61,7 @@ impl NodeSerde {
             y: self.y,
             z: self.z,
             vmag: self.vmag.unwrap_or(0.0),
-            frame,
+            frame: self.frame,
             epoch,
         })
     }
@@ -147,7 +146,7 @@ impl Into<NodeSerde> for Node {
             y: self.y,
             z: self.z,
             vmag: Some(self.vmag),
-            frame: self.frame.to_string(),
+            frame: self.frame,
             epoch: self.epoch.to_string(),
         }
     }
@@ -161,7 +160,7 @@ impl Into<NodeSerde> for &Node {
             y: self.y,
             z: self.z,
             vmag: Some(self.vmag),
-            frame: self.frame.to_string(),
+            frame: self.frame,
             epoch: self.epoch.to_string(),
         }
     }
@@ -177,7 +176,10 @@ y = -80.02184491079583
 z = -1702.1160791417442
 vmag = 0.0
 epoch = "2023-11-25T14:11:46.789000034 UTC"
-frame = "Moon J2000"
+
+[nodes.frame]
+ephemeris_id = 301
+orientation_id = 1
 
 [[nodes]]
 x = -381.68254116206856
@@ -185,7 +187,10 @@ y = -48.21573534985666
 z = -1705.829637126235
 vmag = 0.0
 epoch = "2023-11-25T14:12:06.789000034 UTC"
-frame = "Moon J2000"
+
+[nodes.frame]
+ephemeris_id = 301
+orientation_id = 1
 
 [[nodes]]
 x = -368.8474537620047
@@ -193,14 +198,15 @@ y = -16.401929604226403
 z = -1708.8692139449731
 vmag = 0.0
 epoch = "2023-11-25T14:12:26.789000034 UTC"
-frame = "Moon J2000"
+
+[nodes.frame]
+ephemeris_id = 301
+orientation_id = 1
 "#;
 
     let toml_nodes: NodesSerde = toml::from_str(str_nodes).unwrap();
 
-    let cosm = Cosm::de438();
-
-    let nodes = toml_nodes.to_node_vec(cosm).unwrap();
+    let nodes = toml_nodes.to_node_vec().unwrap();
 
     dbg!(&nodes);
 

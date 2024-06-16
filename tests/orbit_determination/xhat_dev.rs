@@ -1,17 +1,31 @@
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
-use nyx::cosmic::{Bodies, Cosm, Orbit};
+use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SATURN_BARYCENTER, SUN};
+use anise::constants::frames::IAU_EARTH_FRAME;
+use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::{OrbitalDynamics, PointMasses};
 use nyx::dynamics::sph_harmonics::Harmonics;
+use nyx::dynamics::SpacecraftDynamics;
 use nyx::io::gravity::*;
-use nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
+use nyx::linalg::{Matrix2, SMatrix, SVector, Vector2};
 use nyx::od::noise::GaussMarkov;
 use nyx::od::prelude::*;
 use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use nyx::utils::rss_orbit_errors;
+use nyx::Spacecraft;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
+
+use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use rstest::*;
+use std::sync::Arc;
+
+#[fixture]
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
+}
 
 /*
  * These tests check that if we start with a state deviation in the estimate, the filter will eventually converge back.
@@ -20,12 +34,11 @@ use std::convert::TryFrom;
 **/
 
 #[allow(clippy::identity_op)]
-#[test]
-fn xhat_dev_test_ekf_two_body() {
+#[rstest]
+fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-    let iau_earth = cosm.frame("IAU Earth");
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
@@ -61,53 +74,59 @@ fn xhat_dev_test_ekf_two_body() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
-    let mut initial_state_dev = initial_state.with_stm();
-    initial_state_dev.x_km += 5.0;
-    initial_state_dev.y_km -= 5.0;
-    initial_state_dev.z_km += 5.0;
+    let mut initial_state_dev = initial_state;
+    initial_state_dev.radius_km.x += 5.0;
+    initial_state_dev.radius_km.y -= 5.0;
+    initial_state_dev.radius_km.z += 5.0;
 
     let (err_p, err_v) = rss_orbit_errors(&initial_state_dev, &initial_state);
     println!(
         "Initial state dev: {:.3} m\t{:.3} m/s\nDelta: {}",
         err_p * 1e3,
         err_v * 1e3,
-        initial_state - initial_state_dev
+        (initial_state - initial_state_dev).unwrap()
     );
 
-    let orbital_dyn = OrbitalDynamics::two_body();
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let (_, traj) = setup
-        .with(initial_state)
+        .with(Spacecraft::from(initial_state), almanac.clone())
         .for_duration_with_traj(prop_time)
         .unwrap();
 
     // Simulate tracking data
     println!("{traj}");
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
-    arc_sim.build_schedule(cosm.clone()).unwrap();
+    arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let prop_est = setup.with(initial_state_dev);
+    let prop_est = setup.with(
+        Spacecraft::from(initial_state_dev).with_stm(),
+        almanac.clone(),
+    );
     let covar_radius_km = 1.0e2;
     let covar_velocity_km_s = 1.0e1;
-    let init_covar = Matrix6::from_diagonal(&Vector6::new(
+    let init_covar = SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([
         covar_radius_km,
         covar_radius_km,
         covar_radius_km,
         covar_velocity_km_s,
         covar_velocity_km_s,
         covar_velocity_km_s,
-    ));
+        0.0,
+        0.0,
+        0.0,
+    ]));
 
     // Define the initial estimate
-    let initial_estimate = KfEstimate::from_covar(initial_state_dev, init_covar);
+    let initial_estimate = KfEstimate::from_covar(initial_state_dev.into(), init_covar);
     println!("Initial estimate:\n{}", initial_estimate);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
@@ -117,7 +136,7 @@ fn xhat_dev_test_ekf_two_body() {
     let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
     let kf = KF::new(initial_estimate, process_noise, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, kf, None, cosm);
+    let mut odp = ODProcess::ckf(prop_est, kf, None, almanac);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
     let pre_smooth_first_est = odp.estimates[0];
@@ -138,13 +157,13 @@ fn xhat_dev_test_ekf_two_body() {
     );
 
     // Check the new initial estimate is better than at the start
-    let smoothed_init_state = odp.estimates[0].state();
+    let smoothed_init_state = odp.estimates[0].state().orbit;
     let (sm_err_p, sm_err_v) = rss_orbit_errors(&smoothed_init_state, &initial_state);
     println!(
         "New initial state dev: {:.3} m\t{:.3} m/s\n{}",
         sm_err_p * 1e3,
         sm_err_v * 1e3,
-        smoothed_init_state - initial_state_dev
+        (smoothed_init_state - initial_state_dev).unwrap()
     );
 
     assert!(
@@ -160,13 +179,13 @@ fn xhat_dev_test_ekf_two_body() {
     println!("Estimate:\n{}", est);
     let final_truth_state = traj.at(est.epoch()).unwrap();
     println!("Truth:\n{}", final_truth_state);
-    let (err_p, err_v) = rss_orbit_errors(&est.state(), &final_truth_state);
+    let (err_p, err_v) = rss_orbit_errors(&est.state().orbit, &final_truth_state.orbit);
     println!(
         "Delta state with truth (epoch match: {}): {:.3} m\t{:.3} m/s\n{}",
-        final_truth_state.epoch == est.epoch(),
+        final_truth_state.epoch() == est.epoch(),
         err_p * 1e3,
         err_v * 1e3,
-        final_truth_state - est.state()
+        (final_truth_state.orbit - est.state().orbit).unwrap()
     );
 
     for i in 0..6 {
@@ -181,11 +200,13 @@ fn xhat_dev_test_ekf_two_body() {
     }
 
     assert_eq!(
-        final_truth_state.epoch,
+        final_truth_state.epoch(),
         est.epoch(),
         "time of final EST and TRUTH epochs differ"
     );
-    let rmag_err = (final_truth_state - est.state()).rmag_km();
+    let rmag_err = (final_truth_state.orbit - est.state().orbit)
+        .unwrap()
+        .rmag_km();
     assert!(
         rmag_err < sm_err_p,
         "final radius error ({:.3} m) should be better than initial state error ({:.3} m)",
@@ -193,7 +214,9 @@ fn xhat_dev_test_ekf_two_body() {
         sm_err_p * 1e3
     );
 
-    let vmag_err = (final_truth_state - est.state()).vmag_km_s();
+    let vmag_err = (final_truth_state.orbit - est.state().orbit)
+        .unwrap()
+        .vmag_km_s();
     assert!(
         vmag_err < sm_err_v,
         "final velocity error ({:.3} m) should be better than initial state error ({:.3} m)",
@@ -203,9 +226,22 @@ fn xhat_dev_test_ekf_two_body() {
 
     let post_smooth_first_est = odp.estimates[0];
 
-    let (init_pos_rss, init_vel_rss) = initial_state.rss(&initial_state_dev);
-    let (zero_it_pos_rss, zero_it_vel_rss) = initial_state.rss(&pre_smooth_first_est.state());
-    let (one_it_pos_rss, one_it_vel_rss) = initial_state.rss(&post_smooth_first_est.state());
+    let init_pos_rss = initial_state.rss_radius_km(&initial_state_dev).unwrap();
+    let init_vel_rss = initial_state.rss_velocity_km_s(&initial_state_dev).unwrap();
+    let zero_it_pos_rss = initial_state
+        .rss_radius_km(&pre_smooth_first_est.state().orbit)
+        .unwrap();
+    let zero_it_vel_rss = initial_state
+        .rss_velocity_km_s(&pre_smooth_first_est.state().orbit)
+        .unwrap();
+
+    let one_it_pos_rss = initial_state
+        .rss_radius_km(&post_smooth_first_est.state().orbit)
+        .unwrap();
+    let one_it_vel_rss = initial_state
+        .rss_velocity_km_s(&post_smooth_first_est.state().orbit)
+        .unwrap();
+
     println!(
         "[pos] init: {}\tzero: {}\t one: {}",
         init_pos_rss, zero_it_pos_rss, one_it_pos_rss,
@@ -222,15 +258,14 @@ fn xhat_dev_test_ekf_two_body() {
 }
 
 #[allow(clippy::identity_op)]
-#[test]
-fn xhat_dev_test_ekf_multi_body() {
+#[rstest]
+fn xhat_dev_test_ekf_multi_body(almanac: Arc<Almanac>) {
     // We seed both propagators with the same initial state, but we let a large state deviation in the filter.
     // This does _not_ impact the prefits, but it impacts the state deviation and therefore the state estimate.
     // As such, it checks that the filter can return to a nominal state.
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-    let iau_earth = cosm.frame("IAU Earth");
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     // Define the ground stations.
     let ekf_num_meas = 500;
@@ -270,54 +305,57 @@ fn xhat_dev_test_ekf_multi_body() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
     let mut initial_state_dev = initial_state;
-    initial_state_dev.x_km += 9.5;
-    initial_state_dev.y_km -= 9.5;
-    initial_state_dev.z_km += 9.5;
+    initial_state_dev.radius_km.x += 9.5;
+    initial_state_dev.radius_km.y -= 9.5;
+    initial_state_dev.radius_km.z += 9.5;
 
     let (err_p, err_v) = rss_orbit_errors(&initial_state_dev, &initial_state);
     println!(
         "Initial state dev: {:.3} m\t{:.3} m/s\n{}",
         err_p * 1e3,
         err_v * 1e3,
-        initial_state - initial_state_dev
+        (initial_state - initial_state_dev).unwrap()
     );
 
-    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm.clone());
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
     let (_, traj) = setup
-        .with(initial_state)
+        .with(initial_state.into(), almanac.clone())
         .for_duration_with_traj(prop_time)
         .unwrap();
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
-    arc_sim.build_schedule(cosm.clone()).unwrap();
+    arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let prop_est = setup.with(initial_state.with_stm());
+    let prop_est = setup.with(Spacecraft::from(initial_state).with_stm(), almanac.clone());
     let covar_radius_km = 1.0e2;
     let covar_velocity_km_s = 1.0e1;
-    let init_covar = Matrix6::from_diagonal(&Vector6::new(
+    let init_covar = SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([
         covar_radius_km,
         covar_radius_km,
         covar_radius_km,
         covar_velocity_km_s,
         covar_velocity_km_s,
         covar_velocity_km_s,
-    ));
+        0.0,
+        0.0,
+        0.0,
+    ]));
 
     // Define the initial estimate
-    let initial_estimate = KfEstimate::from_covar(initial_state_dev, init_covar);
+    let initial_estimate = KfEstimate::from_covar(initial_state_dev.into(), init_covar);
     println!("Initial estimate:\n{}", initial_estimate);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
@@ -330,7 +368,7 @@ fn xhat_dev_test_ekf_multi_body() {
     let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
 
-    let mut odp = ODProcess::ekf(prop_est, kf, trig, None, cosm);
+    let mut odp = ODProcess::ekf(prop_est, kf, trig, None, almanac);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
     odp.iterate_arc::<GroundStation>(&arc, IterationConf::try_from(SmoothingArc::All).unwrap())
@@ -344,16 +382,16 @@ fn xhat_dev_test_ekf_multi_body() {
     println!("Truth:\n{}", final_truth_state);
 
     // Some sanity checks to make sure that we have correctly indexed the estimates
-    assert_eq!(est.epoch(), final_truth_state.epoch);
+    assert_eq!(est.epoch(), final_truth_state.epoch());
 
-    let (err_p, err_v) = rss_orbit_errors(&est.state(), &final_truth_state);
+    let (err_p, err_v) = rss_orbit_errors(&est.state().orbit, &final_truth_state.orbit);
 
     // Some printing for debugging
     println!(
         "RSS error: estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
         err_p * 1e3,
         err_v * 1e3,
-        final_truth_state - est.state()
+        (final_truth_state.orbit - est.state().orbit).unwrap()
     );
 
     for i in 0..6 {
@@ -381,11 +419,13 @@ fn xhat_dev_test_ekf_multi_body() {
     }
 
     assert_eq!(
-        final_truth_state.epoch,
+        final_truth_state.epoch(),
         est.epoch(),
         "time of final EST and TRUTH epochs differ"
     );
-    let rmag_err = (final_truth_state - est.state()).rmag_km();
+    let rmag_err = (final_truth_state.orbit - est.state().orbit)
+        .unwrap()
+        .rmag_km();
     assert!(
         rmag_err < 0.1,
         "final radius error should be on 100 meter level (is instead {:.3} m)",
@@ -394,12 +434,11 @@ fn xhat_dev_test_ekf_multi_body() {
 }
 
 #[allow(clippy::identity_op)]
-#[test]
-fn xhat_dev_test_ekf_harmonics() {
+#[rstest]
+fn xhat_dev_test_ekf_harmonics(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-    let iau_earth = cosm.frame("IAU Earth");
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     // Define the ground stations.
     let ekf_num_meas = 5000;
@@ -439,62 +478,67 @@ fn xhat_dev_test_ekf_harmonics() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = cosm.frame("EME2000");
-    let iau_earth = cosm.frame("IAU Earth");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
     let mut initial_state_dev = initial_state;
-    initial_state_dev.x_km += 9.5;
-    initial_state_dev.y_km -= 9.5;
-    initial_state_dev.z_km += 9.5;
+    initial_state_dev.radius_km.x += 9.5;
+    initial_state_dev.radius_km.y -= 9.5;
+    initial_state_dev.radius_km.z += 9.5;
 
     let (err_p, err_v) = rss_orbit_errors(&initial_state_dev, &initial_state);
     println!(
         "Initial state dev: {:.3} m\t{:.3} m/s\n{}",
         err_p * 1e3,
         err_v * 1e3,
-        initial_state - initial_state_dev
+        (initial_state - initial_state_dev).unwrap()
     );
 
     let hh_deg = 20;
     let hh_ord = 20;
 
-    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", hh_deg, hh_ord, true).unwrap();
-    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, cosm.clone());
-    let orbital_dyn =
-        OrbitalDynamics::new(vec![harmonics, PointMasses::new(&bodies, cosm.clone())]);
+    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm);
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::new(vec![
+        harmonics,
+        PointMasses::new(bodies),
+    ]));
 
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
     let (_, traj) = setup
-        .with(initial_state)
+        .with(initial_state.into(), almanac.clone())
         .for_duration_with_traj(prop_time)
         .unwrap();
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
-    arc_sim.build_schedule(cosm.clone()).unwrap();
+    arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let prop_est = setup.with(initial_state.with_stm());
+    let prop_est = setup.with(Spacecraft::from(initial_state).with_stm(), almanac.clone());
     let covar_radius_km = 1.0e2;
     let covar_velocity_km_s = 1.0e1;
-    let init_covar = Matrix6::from_diagonal(&Vector6::new(
+    let init_covar = SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([
         covar_radius_km,
         covar_radius_km,
         covar_radius_km,
         covar_velocity_km_s,
         covar_velocity_km_s,
         covar_velocity_km_s,
-    ));
+        0.0,
+        0.0,
+        0.0,
+    ]));
 
     // Define the initial estimate
-    let initial_estimate = KfEstimate::from_covar(initial_state_dev, init_covar);
+    let initial_estimate = KfEstimate::from_covar(initial_state_dev.into(), init_covar);
     println!("Initial estimate:\n{}", initial_estimate);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
@@ -507,7 +551,7 @@ fn xhat_dev_test_ekf_harmonics() {
     let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
 
-    let mut odp = ODProcess::ekf(prop_est, kf, trig, None, cosm);
+    let mut odp = ODProcess::ekf(prop_est, kf, trig, None, almanac);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -517,13 +561,13 @@ fn xhat_dev_test_ekf_harmonics() {
 
     println!("Estimate:\n{}", est);
     println!("Truth:\n{}", final_truth_state);
-    let (err_p, err_v) = rss_orbit_errors(&est.state(), &final_truth_state);
+    let (err_p, err_v) = rss_orbit_errors(&est.state().orbit, &final_truth_state.orbit);
     println!(
         "Delta state with truth (epoch match: {}): {:.3} m\t{:.3} m/s\n{}",
-        final_truth_state.epoch == est.epoch(),
+        final_truth_state.epoch() == est.epoch(),
         err_p * 1e3,
         err_v * 1e3,
-        final_truth_state - est.state()
+        (final_truth_state.orbit - est.state().orbit).unwrap()
     );
 
     for i in 0..6 {
@@ -540,11 +584,13 @@ fn xhat_dev_test_ekf_harmonics() {
     assert!(est.within_3sigma(), "Final estimate is not within 3 sigma!");
 
     assert_eq!(
-        final_truth_state.epoch,
+        final_truth_state.epoch(),
         est.epoch(),
         "time of final EST and TRUTH epochs differ"
     );
-    let rmag_err = (final_truth_state - est.state()).rmag_km();
+    let rmag_err = (final_truth_state.orbit - est.state().orbit)
+        .unwrap()
+        .rmag_km();
     // XXX: Revisit this test
     assert!(
         rmag_err < 5e-1,
@@ -554,12 +600,11 @@ fn xhat_dev_test_ekf_harmonics() {
 }
 
 #[allow(clippy::identity_op)]
-#[test]
-fn xhat_dev_test_ekf_realistic() {
+#[rstest]
+fn xhat_dev_test_ekf_realistic(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-    let iau_earth = cosm.frame("IAU Earth");
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     // Define the ground stations.
     let ekf_num_meas = 500;
@@ -599,55 +644,56 @@ fn xhat_dev_test_ekf_realistic() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
     let mut initial_state_dev = initial_state;
-    initial_state_dev.x_km += 9.5;
-    initial_state_dev.y_km -= 9.5;
-    initial_state_dev.z_km += 9.5;
+    initial_state_dev.radius_km.x += 9.5;
+    initial_state_dev.radius_km.y -= 9.5;
+    initial_state_dev.radius_km.z += 9.5;
 
-    println!("Initial state dev:\n{}", initial_state - initial_state_dev);
+    println!(
+        "Initial state dev:\n{}",
+        (initial_state - initial_state_dev).unwrap()
+    );
 
-    let bodies = vec![
-        Bodies::Luna,
-        Bodies::Sun,
-        Bodies::JupiterBarycenter,
-        Bodies::SaturnBarycenter,
-    ];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm.clone());
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER, SATURN_BARYCENTER];
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
     let truth_setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
     let (_, traj) = truth_setup
-        .with(initial_state)
+        .with(initial_state.into(), almanac.clone())
         .for_duration_with_traj(prop_time)
         .unwrap();
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
-    arc_sim.build_schedule(cosm.clone()).unwrap();
+    arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
-    // We expect the estimated orbit to be _nearly_ perfect because we've removed Saturn from the estimated trajectory
-    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let estimator = OrbitalDynamics::point_masses(&bodies, cosm.clone());
+    // We expect the estimated orbit to be _nearly_ perfect because we've removed SATURN_BARYCENTER from the estimated trajectory
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
+    let estimator = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
     let setup = Propagator::new::<RK4Fixed>(estimator, opts);
-    let prop_est = setup.with(initial_state.with_stm());
+    let prop_est = setup.with(Spacecraft::from(initial_state).with_stm(), almanac.clone());
     let covar_radius_km = 1.0e2;
     let covar_velocity_km_s = 1.0e1;
-    let init_covar = Matrix6::from_diagonal(&Vector6::new(
+    let init_covar = SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([
         covar_radius_km,
         covar_radius_km,
         covar_radius_km,
         covar_velocity_km_s,
         covar_velocity_km_s,
         covar_velocity_km_s,
-    ));
+        0.0,
+        0.0,
+        0.0,
+    ]));
 
     // Define the initial estimate
-    let initial_estimate = KfEstimate::from_covar(initial_state_dev, init_covar);
+    let initial_estimate = KfEstimate::from_covar(initial_state_dev.into(), init_covar);
     println!("Initial estimate:\n{}", initial_estimate);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
@@ -658,7 +704,7 @@ fn xhat_dev_test_ekf_realistic() {
     let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
 
-    let mut odp = ODProcess::ekf(prop_est, kf, trig, None, cosm);
+    let mut odp = ODProcess::ekf(prop_est, kf, trig, None, almanac);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -670,8 +716,8 @@ fn xhat_dev_test_ekf_realistic() {
     println!("Truth:\n{}", final_truth_state);
     println!(
         "Delta state with truth (epoch match: {}):\n{}",
-        final_truth_state.epoch == est.epoch(),
-        final_truth_state - est.state()
+        final_truth_state.epoch() == est.epoch(),
+        (final_truth_state.orbit - est.state().orbit).unwrap()
     );
 
     for i in 0..6 {
@@ -699,11 +745,13 @@ fn xhat_dev_test_ekf_realistic() {
     }
 
     assert_eq!(
-        final_truth_state.epoch,
+        final_truth_state.epoch(),
         est.epoch(),
         "time of final EST and TRUTH epochs differ"
     );
-    let rmag_err = (final_truth_state - est.state()).rmag_km();
+    let rmag_err = (final_truth_state.orbit - est.state().orbit)
+        .unwrap()
+        .rmag_km();
     assert!(
         rmag_err < 5e-1,
         "final radius error should be less than 500 m (is instead {:.3} m)",
@@ -712,12 +760,11 @@ fn xhat_dev_test_ekf_realistic() {
 }
 
 #[allow(clippy::identity_op)]
-#[test]
-fn xhat_dev_test_ckf_smoother_multi_body() {
+#[rstest]
+fn xhat_dev_test_ckf_smoother_multi_body(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-    let iau_earth = cosm.frame("IAU Earth");
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
@@ -752,53 +799,56 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
     let mut initial_state_dev = initial_state;
-    initial_state_dev.x_km += 9.5;
-    initial_state_dev.y_km -= 9.5;
-    initial_state_dev.z_km += 9.5;
+    initial_state_dev.radius_km.x += 9.5;
+    initial_state_dev.radius_km.y -= 9.5;
+    initial_state_dev.radius_km.z += 9.5;
 
     let (err_p, err_v) = rss_orbit_errors(&initial_state_dev, &initial_state);
     println!(
         "Initial state dev: {:.3} m\t{:.3} m/s\n{}",
         err_p * 1e3,
         err_v * 1e3,
-        initial_state - initial_state_dev
+        (initial_state - initial_state_dev).unwrap()
     );
 
-    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm.clone());
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let (_, traj) = setup
-        .with(initial_state)
+        .with(initial_state.into(), almanac.clone())
         .for_duration_with_traj(prop_time)
         .unwrap();
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
-    arc_sim.build_schedule(cosm.clone()).unwrap();
+    arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let prop_est = setup.with(initial_state.with_stm());
+    let prop_est = setup.with(Spacecraft::from(initial_state).with_stm(), almanac.clone());
     let covar_radius_km = 1.0e2;
     let covar_velocity_km_s = 1.0e1;
-    let init_covar = Matrix6::from_diagonal(&Vector6::new(
+    let init_covar = SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([
         covar_radius_km,
         covar_radius_km,
         covar_radius_km,
         covar_velocity_km_s,
         covar_velocity_km_s,
         covar_velocity_km_s,
-    ));
+        0.0,
+        0.0,
+        0.0,
+    ]));
 
     // Define the initial estimate
-    let initial_estimate = KfEstimate::from_covar(initial_state_dev, init_covar);
+    let initial_estimate = KfEstimate::from_covar(initial_state_dev.into(), init_covar);
     println!("Initial estimate:\n{}", initial_estimate);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
@@ -806,7 +856,7 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
 
     let kf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, kf, None, cosm);
+    let mut odp = ODProcess::ckf(prop_est, kf, None, almanac);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -832,10 +882,10 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
     // Check the first estimate, which should be better thanks to smoothing
     // Only the print the final estimate
     let est = &odp.estimates[0];
-    let truth_state = traj.at(est.epoch()).unwrap();
+    let truth_state = traj.at(est.epoch()).unwrap().orbit;
     let smoothed_est = &smoothed_estimates[0];
-    let (err_p, err_v) = rss_orbit_errors(&est.state(), &truth_state);
-    let (err_p_sm, err_v_sm) = rss_orbit_errors(&smoothed_est.state(), &truth_state);
+    let (err_p, err_v) = rss_orbit_errors(&est.state().orbit, &truth_state);
+    let (err_p_sm, err_v_sm) = rss_orbit_errors(&smoothed_est.state().orbit, &truth_state);
 
     println!("=== FIRST ===\nEstimate:\n{}", est);
     println!("Smoother estimate:\n{}", smoothed_est);
@@ -845,14 +895,14 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
         "RSS error: estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
         err_p * 1e3,
         err_v * 1e3,
-        truth_state - est.state()
+        (truth_state - est.state().orbit).unwrap()
     );
 
     println!(
         "RSS error: smoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
         err_p_sm * 1e3,
         err_v_sm * 1e3,
-        truth_state - smoothed_est.state()
+        (truth_state - smoothed_est.state().orbit).unwrap()
     );
 
     let mut rss_pos_avr = 0.0;
@@ -867,14 +917,14 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
         let smoothed_est = &smoothed_estimates[i];
 
         // Check that the covariance deflated
-        let truth_state = traj.at(est.epoch()).unwrap();
+        let truth_state = traj.at(est.epoch()).unwrap().orbit;
 
         // Some sanity checks to make sure that we have correctly indexed the estimates
         assert_eq!(smoothed_est.epoch(), est.epoch());
         assert_eq!(est.epoch(), truth_state.epoch);
 
-        let (err_p, err_v) = rss_orbit_errors(&est.state(), &truth_state);
-        let (err_p_sm, err_v_sm) = rss_orbit_errors(&smoothed_est.state(), &truth_state);
+        let (err_p, err_v) = rss_orbit_errors(&est.state().orbit, &truth_state);
+        let (err_p_sm, err_v_sm) = rss_orbit_errors(&smoothed_est.state().orbit, &truth_state);
 
         rss_pos_avr += err_p;
         rss_vel_avr += err_v;
@@ -899,14 +949,14 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
                 "RSS error: estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
                 err_p * 1e3,
                 err_v * 1e3,
-                truth_state - est.state()
+                (truth_state - est.state().orbit).unwrap()
             );
 
             println!(
                 "RSS error: smoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
                 err_p_sm * 1e3,
                 err_v_sm * 1e3,
-                truth_state - smoothed_est.state()
+                (truth_state - smoothed_est.state().orbit).unwrap()
             );
         }
 
@@ -937,10 +987,10 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
                 i,
                 err_p * 1e3,
                 err_v * 1e3,
-                truth_state - est.state(),
+                (truth_state - est.state().orbit).unwrap(),
                 err_p_sm * 1e3,
                 err_v_sm * 1e3,
-                truth_state - smoothed_est.state()
+                (truth_state - smoothed_est.state().orbit).unwrap()
             );
         }
 
@@ -983,12 +1033,11 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
 }
 
 #[allow(clippy::identity_op)]
-#[test]
-fn xhat_dev_test_ekf_snc_smoother_multi_body() {
+#[rstest]
+fn xhat_dev_test_ekf_snc_smoother_multi_body(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-    let iau_earth = cosm.frame("IAU Earth");
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     let elevation_mask = 10.0;
     let dss65_madrid = GroundStation::dss65_madrid(
@@ -1023,50 +1072,53 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
     let mut initial_state_dev = initial_state;
-    initial_state_dev.x_km += 9.5;
-    initial_state_dev.y_km -= 9.5;
-    initial_state_dev.z_km += 9.5;
+    initial_state_dev.radius_km.x += 9.5;
+    initial_state_dev.radius_km.y -= 9.5;
+    initial_state_dev.radius_km.z += 9.5;
 
     let (err_p, err_v) = rss_orbit_errors(&initial_state_dev, &initial_state);
     println!(
         "Initial state dev: {:.3} m\t{:.3} m/s\n{}",
         err_p * 1e3,
         err_v * 1e3,
-        initial_state - initial_state_dev
+        (initial_state - initial_state_dev).unwrap()
     );
 
-    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm.clone());
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let (_, traj) = setup
-        .with(initial_state)
+        .with(initial_state.into(), almanac.clone())
         .for_duration_with_traj(prop_time)
         .unwrap();
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
-    arc_sim.build_schedule(cosm.clone()).unwrap();
+    arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let prop_est = setup.with(initial_state.with_stm());
+    let prop_est = setup.with(Spacecraft::from(initial_state).with_stm(), almanac.clone());
     let covar_radius_km = 1.0e2;
     let covar_velocity_km_s = 1.0e1;
-    let init_covar = Matrix6::from_diagonal(&Vector6::new(
+    let init_covar = SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([
         covar_radius_km,
         covar_radius_km,
         covar_radius_km,
         covar_velocity_km_s,
         covar_velocity_km_s,
         covar_velocity_km_s,
-    ));
+        0.0,
+        0.0,
+        0.0,
+    ]));
 
     // Define the ground stations.
     let ekf_num_meas = 100;
@@ -1074,7 +1126,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
     let ekf_disable_time = 1 * Unit::Hour;
 
     // Define the initial estimate
-    let initial_estimate = KfEstimate::from_covar(initial_state_dev, init_covar);
+    let initial_estimate = KfEstimate::from_covar(initial_state_dev.into(), init_covar);
     println!("Initial estimate:\n{}", initial_estimate);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
@@ -1089,7 +1141,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
         kf,
         EkfTrigger::new(ekf_num_meas, ekf_disable_time),
         None,
-        cosm,
+        almanac,
     );
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
@@ -1111,14 +1163,14 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
 
         // Check that the covariance deflated
         let est = &odp.estimates[odp.estimates.len() - offset];
-        let truth_state = traj.at(est.epoch()).unwrap();
+        let truth_state = traj.at(est.epoch()).unwrap().orbit;
 
         // Some sanity checks to make sure that we have correctly indexed the estimates
         assert_eq!(smoothed_est.epoch(), est.epoch());
         assert_eq!(est.epoch(), truth_state.epoch);
 
-        let (err_p, err_v) = rss_orbit_errors(&est.state(), &truth_state);
-        let (err_p_sm, err_v_sm) = rss_orbit_errors(&smoothed_est.state(), &truth_state);
+        let (err_p, err_v) = rss_orbit_errors(&est.state().orbit, &truth_state);
+        let (err_p_sm, err_v_sm) = rss_orbit_errors(&smoothed_est.state().orbit, &truth_state);
 
         rss_pos_avr += err_p;
         rss_vel_avr += err_v;
@@ -1143,14 +1195,14 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
                 "RSS error: estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
                 err_p * 1e3,
                 err_v * 1e3,
-                truth_state - est.state()
+                (truth_state - est.state().orbit).unwrap()
             );
 
             println!(
                 "RSS error: smoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
                 err_p_sm * 1e3,
                 err_v_sm * 1e3,
-                truth_state - smoothed_est.state()
+                (truth_state - smoothed_est.state().orbit).unwrap()
             );
 
             // Check that the covariance decreased for the final estimate
@@ -1168,8 +1220,10 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
                 }
             }
 
-            let rmag_err_sm = (truth_state - smoothed_est.state()).rmag_km();
-            let rmag_err = (truth_state - est.state()).rmag_km();
+            let rmag_err_sm = (truth_state - smoothed_est.state().orbit)
+                .unwrap()
+                .rmag_km();
+            let rmag_err = (truth_state - est.state().orbit).unwrap().rmag_km();
             assert!(
                 rmag_err_sm < 0.150 || rmag_err_sm < rmag_err,
                 "final radius error should be on ~ 150 meter level (is instead {:.3} m) OR the smoothed estimate should be better (but {:.3} m > {:.3} m)",
@@ -1192,10 +1246,10 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
                 odp.estimates.len() - offset,
                 err_p * 1e3,
                 err_v * 1e3,
-                truth_state - est.state(),
+                (truth_state - est.state().orbit).unwrap(),
                 err_p_sm * 1e3,
                 err_v_sm * 1e3,
-                truth_state - smoothed_est.state()
+                (truth_state - smoothed_est.state().orbit).unwrap()
             );
         }
 
@@ -1206,10 +1260,10 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
                 odp.estimates.len() - offset,
                 err_p * 1e3,
                 err_v * 1e3,
-                truth_state - est.state(),
+                (truth_state - est.state().orbit).unwrap(),
                 err_p_sm * 1e3,
                 err_v_sm * 1e3,
-                truth_state - smoothed_est.state()
+                (truth_state - smoothed_est.state().orbit).unwrap()
             );
         }
 
@@ -1253,12 +1307,11 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
 }
 
 #[allow(clippy::identity_op)]
-#[test]
-fn xhat_dev_test_ckf_iteration_multi_body() {
+#[rstest]
+fn xhat_dev_test_ckf_iteration_multi_body(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-    let iau_earth = cosm.frame("IAU Earth");
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
@@ -1293,53 +1346,56 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
     let mut initial_state_dev = initial_state;
-    initial_state_dev.x_km += 9.5;
-    initial_state_dev.y_km -= 9.5;
-    initial_state_dev.z_km += 9.5;
+    initial_state_dev.radius_km.x += 9.5;
+    initial_state_dev.radius_km.y -= 9.5;
+    initial_state_dev.radius_km.z += 9.5;
 
     let (err_p, err_v) = rss_orbit_errors(&initial_state_dev, &initial_state);
     println!(
         "Initial state dev: {:.3} m\t{:.3} m/s\n{}",
         err_p * 1e3,
         err_v * 1e3,
-        initial_state - initial_state_dev
+        (initial_state - initial_state_dev).unwrap()
     );
 
-    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm.clone());
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let (_, traj) = setup
-        .with(initial_state)
+        .with(initial_state.into(), almanac.clone())
         .for_duration_with_traj(prop_time)
         .unwrap();
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
-    arc_sim.build_schedule(cosm.clone()).unwrap();
+    arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let prop_est = setup.with(initial_state.with_stm());
+    let prop_est = setup.with(Spacecraft::from(initial_state).with_stm(), almanac.clone());
     let covar_radius_km = 1.0e2;
     let covar_velocity_km_s = 1.0e1;
-    let init_covar = Matrix6::from_diagonal(&Vector6::new(
+    let init_covar = SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([
         covar_radius_km,
         covar_radius_km,
         covar_radius_km,
         covar_velocity_km_s,
         covar_velocity_km_s,
         covar_velocity_km_s,
-    ));
+        0.0,
+        0.0,
+        0.0,
+    ]));
 
     // Define the initial estimate
-    let initial_estimate = KfEstimate::from_covar(initial_state_dev, init_covar);
+    let initial_estimate = KfEstimate::from_covar(initial_state_dev.into(), init_covar);
     println!("Initial estimate:\n{}", initial_estimate);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
@@ -1347,7 +1403,7 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
 
     let kf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, kf, None, cosm);
+    let mut odp = ODProcess::ckf(prop_est, kf, None, almanac);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -1372,14 +1428,14 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
 
         // Check that the covariance deflated
         let est = &odp.estimates[odp.estimates.len() - offset];
-        let truth_state = traj.at(est.epoch()).unwrap();
+        let truth_state = traj.at(est.epoch()).unwrap().orbit;
 
         // Some sanity checks to make sure that we have correctly indexed the estimates
         assert_eq!(prior_est.epoch(), est.epoch());
         assert_eq!(est.epoch(), truth_state.epoch);
 
-        let (err_p, err_v) = rss_orbit_errors(&prior_est.state(), &truth_state);
-        let (err_p_it, err_v_it) = rss_orbit_errors(&est.state(), &truth_state);
+        let (err_p, err_v) = rss_orbit_errors(&prior_est.state().orbit, &truth_state);
+        let (err_p_it, err_v_it) = rss_orbit_errors(&est.state().orbit, &truth_state);
 
         rss_pos_avr += err_p;
         rss_vel_avr += err_v;
@@ -1404,14 +1460,14 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
                 "RSS error: estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
                 err_p * 1e3,
                 err_v * 1e3,
-                truth_state - prior_est.state()
+                (truth_state - prior_est.state().orbit).unwrap()
             );
 
             println!(
                 "RSS error: iterated estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
                 err_p_it * 1e3,
                 err_v_it * 1e3,
-                truth_state - est.state()
+                (truth_state - est.state().orbit).unwrap()
             );
 
             // Check that the covariance decreased for the final estimate
@@ -1429,7 +1485,7 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
                 }
             }
 
-            let rmag_err = (truth_state - est.state()).rmag_km();
+            let rmag_err = (truth_state - est.state().orbit).unwrap().rmag_km();
             assert!(
                 rmag_err < 1e-2,
                 "final radius error should be on meter level (is instead {:.3} m)",
@@ -1452,10 +1508,10 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
                 odp.estimates.len() - offset,
                 err_p * 1e3,
                 err_v * 1e3,
-                truth_state - prior_est.state(),
+                (truth_state - prior_est.state().orbit).unwrap(),
                 err_p_it * 1e3,
                 err_v_it * 1e3,
-                truth_state - est.state()
+                (truth_state - est.state().orbit).unwrap()
             );
         }
 
@@ -1466,10 +1522,10 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
                 odp.estimates.len() - offset,
                 err_p * 1e3,
                 err_v * 1e3,
-                truth_state - prior_est.state(),
+                (truth_state - prior_est.state().orbit).unwrap(),
                 err_p_it * 1e3,
                 err_v_it * 1e3,
-                truth_state - est.state()
+                (truth_state - est.state().orbit).unwrap()
             );
         }
 

@@ -5,20 +5,29 @@ use nyx::dynamics::guidance::Thruster;
 use nyx::md::optimizer::*;
 use nyx::md::prelude::*;
 
-#[test]
-fn tgt_c3_decl() {
+use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use rstest::*;
+use std::sync::Arc;
+
+#[fixture]
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
+}
+
+#[rstest]
+fn tgt_c3_decl(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
     let xi_orig = Orbit::keplerian(8_000.0, 0.2, 30.0, 60.0, 60.0, 0.0, orig_dt, eme2k);
 
-    let target_delta_t: Duration = xi_orig.period() / 2.0;
+    let target_delta_t: Duration = xi_orig.period().unwrap() / 2.0;
 
-    println!("Period: {} s", xi_orig.period().to_seconds() / 2.0);
+    println!("Period: {} s", xi_orig.period().unwrap().to_seconds() / 2.0);
 
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
@@ -36,12 +45,17 @@ fn tgt_c3_decl() {
     println!("{}", tgt);
 
     let solution_fd = tgt
-        .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t)
+        .try_achieve_from(
+            spacecraft,
+            orig_dt,
+            orig_dt + target_delta_t,
+            almanac.clone(),
+        )
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);
 
-    tgt.apply(&solution_fd).unwrap();
+    tgt.apply(&solution_fd, almanac).unwrap();
 
     let gmat_sol = 2.385704523944014;
     println!(
@@ -56,20 +70,19 @@ fn tgt_c3_decl() {
     );
 }
 
-#[test]
-fn conv_tgt_sma_ecc() {
+#[rstest]
+fn conv_tgt_sma_ecc(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
     let xi_orig = Orbit::keplerian(8_000.0, 0.2, 30.0, 60.0, 60.0, 0.0, orig_dt, eme2k);
 
-    let target_delta_t: Duration = xi_orig.period() / 2.0;
+    let target_delta_t: Duration = xi_orig.period().unwrap() / 2.0;
 
-    println!("Period: {} s", xi_orig.period().to_seconds() / 2.0);
+    println!("Period: {} s", xi_orig.period().unwrap().to_seconds() / 2.0);
 
     let spacecraft = Spacecraft {
         orbit: xi_orig,
@@ -120,7 +133,7 @@ fn conv_tgt_sma_ecc() {
     let achievement_epoch = orig_dt + target_delta_t;
 
     let solution_fd = tgt
-        .try_achieve_from(spacecraft, orig_dt, achievement_epoch)
+        .try_achieve_from(spacecraft, orig_dt, achievement_epoch, almanac)
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);
@@ -173,20 +186,19 @@ fn conv_tgt_sma_ecc() {
     // println!("{:x}", xf);
 }
 
-#[test]
-fn tgt_hd_sma_ecc() {
+#[rstest]
+fn tgt_hd_sma_ecc(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
-    let xi_orig = Orbit::keplerian(8_000.0, 0.2, 30.0, 60.0, 60.0, 0.0, orig_dt, eme2k).with_stm();
+    let xi_orig = Orbit::keplerian(8_000.0, 0.2, 30.0, 60.0, 60.0, 0.0, orig_dt, eme2k);
 
-    let target_delta_t: Duration = xi_orig.period() / 20.0;
+    let target_delta_t: Duration = xi_orig.period().unwrap() / 20.0;
 
-    let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
+    let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0).with_stm();
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
     let setup = Propagator::default_dp78(dynamics);
@@ -222,7 +234,7 @@ fn tgt_hd_sma_ecc() {
     println!("{}", tgt);
 
     let solution_fd = tgt
-        .try_achieve_dual(spacecraft, orig_dt, orig_dt + target_delta_t)
+        .try_achieve_dual(spacecraft, orig_dt, orig_dt + target_delta_t, almanac)
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);

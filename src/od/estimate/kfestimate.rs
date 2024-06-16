@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -17,11 +17,12 @@
 */
 
 use super::{Estimate, State};
-use crate::cosmic::Orbit;
 use crate::linalg::allocator::Allocator;
-use crate::linalg::{DefaultAllocator, DimName, Matrix, OMatrix, OVector, Vector6, U6};
+use crate::linalg::{DefaultAllocator, DimName, Matrix, OMatrix, OVector};
 use crate::mc::GaussianGenerator;
 use crate::md::StateParameter;
+use crate::Spacecraft;
+use nalgebra::Const;
 use rand::SeedableRng;
 use rand_distr::Distribution;
 use rand_pcg::Pcg64Mcg;
@@ -93,13 +94,13 @@ where
     }
 }
 
-impl KfEstimate<Orbit> {
+impl KfEstimate<Spacecraft> {
     /// Generates an initial Kalman filter state estimate dispersed from the nominal state using the provided standard deviation parameters.
     ///
     /// The resulting estimate will have a diagonal covariance matrix constructed from the variances of each parameter.
     /// *Limitation:* This method incorrectly assumes all parameters are statistically independent.
     pub fn disperse_from_diag(
-        nominal_state: Orbit,
+        nominal_state: Spacecraft,
         params: &[(StateParameter, f64)],
         seed: Option<u128>,
     ) -> Self {
@@ -113,29 +114,34 @@ impl KfEstimate<Orbit> {
         let dispersed_state = gen.sample(&mut rng);
 
         // Compute the difference between both states
-        let delta = nominal_state - dispersed_state.state;
+        let delta_orbit = (nominal_state.orbit - dispersed_state.state.orbit).unwrap();
 
         // Build the covariance as three times the absolute value of the error, squared.
 
-        let diag = Vector6::new(
-            (3.0 * delta.x_km.abs()).powi(2),
-            (3.0 * delta.y_km.abs()).powi(2),
-            (3.0 * delta.z_km.abs()).powi(2),
-            (3.0 * delta.vx_km_s.abs()).powi(2),
-            (3.0 * delta.vy_km_s.abs()).powi(2),
-            (3.0 * delta.vz_km_s.abs()).powi(2),
-        );
+        let diag_data = [
+            (3.0 * delta_orbit.radius_km.x.abs()).powi(2),
+            (3.0 * delta_orbit.radius_km.y.abs()).powi(2),
+            (3.0 * delta_orbit.radius_km.z.abs()).powi(2),
+            (3.0 * delta_orbit.velocity_km_s.x.abs()).powi(2),
+            (3.0 * delta_orbit.velocity_km_s.y.abs()).powi(2),
+            (3.0 * delta_orbit.velocity_km_s.z.abs()).powi(2),
+            (3.0 * (nominal_state.srp.cr - dispersed_state.state.srp.cr).abs()).powi(2),
+            (3.0 * (nominal_state.drag.cd - dispersed_state.state.drag.cd).abs()).powi(2),
+            (3.0 * (nominal_state.fuel_mass_kg - dispersed_state.state.fuel_mass_kg).abs()).powi(2),
+        ];
+
+        let diag = OVector::<f64, Const<9>>::from_iterator(diag_data);
 
         // Build the covar from the diagonal
         let covar = Matrix::from_diagonal(&diag);
 
         Self {
             nominal_state: dispersed_state.state,
-            state_deviation: OVector::<f64, U6>::zeros(),
+            state_deviation: OVector::<f64, Const<9>>::zeros(),
             covar,
             covar_bar: covar,
             predicted: true,
-            stm: OMatrix::<f64, U6, U6>::identity(),
+            stm: OMatrix::<f64, Const<9>, Const<9>>::identity(),
         }
     }
 }
@@ -243,44 +249,53 @@ where
     }
 }
 
-#[test]
-fn test_estimate_from_disp() {
-    use crate::cosmic::Cosm;
-    use crate::utils::rss_orbit_errors;
+#[cfg(test)]
+mod ut_kfest {
+    use crate::{md::StateParameter, od::estimate::KfEstimate, Spacecraft, GMAT_EARTH_GM};
+    use anise::{constants::frames::EARTH_J2000, prelude::Orbit};
     use hifitime::Epoch;
 
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
-    let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+    #[test]
+    fn test_estimate_from_disp() {
+        let eme2k = EARTH_J2000.with_mu_km3_s2(GMAT_EARTH_GM);
+        let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+        let initial_state = Spacecraft::builder()
+            .orbit(Orbit::keplerian(
+                22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k,
+            ))
+            .build();
 
-    let initial_estimate = KfEstimate::disperse_from_diag(
-        initial_state,
-        &[
-            (StateParameter::SMA, 1.1),
-            (StateParameter::Inclination, 0.0025),
-            (StateParameter::RAAN, 0.022),
-            (StateParameter::AoP, 0.02),
-        ],
-        Some(0),
-    );
+        let initial_estimate = KfEstimate::disperse_from_diag(
+            initial_state,
+            &[
+                (StateParameter::SMA, 1.1),
+                (StateParameter::Inclination, 0.0025),
+                (StateParameter::RAAN, 0.022),
+                (StateParameter::AoP, 0.02),
+            ],
+            Some(0),
+        );
 
-    let initial_state_dev = initial_estimate.nominal_state;
+        let initial_state_dev = initial_estimate.nominal_state;
 
-    let (init_rss_pos_km, init_rss_vel_km_s) = rss_orbit_errors(&initial_state, &initial_state_dev);
+        let (init_rss_pos_km, init_rss_vel_km_s, _) =
+            initial_state.rss(&initial_state_dev).unwrap();
 
-    let delta = initial_state - initial_state_dev;
+        let delta = (initial_state.orbit - initial_state_dev.orbit).unwrap();
 
-    println!("Truth initial state:\n{initial_state}\n{initial_state:x}");
-    println!("Filter initial state:\n{initial_state_dev}\n{initial_state_dev:x}");
-    println!("Initial state dev:\t{init_rss_pos_km:.3} km\t{init_rss_vel_km_s:.3} km/s\n{delta}",);
-    println!("covariance: {}", initial_estimate.covar);
+        println!("Truth initial state:\n{initial_state}\n{initial_state:x}");
+        println!("Filter initial state:\n{initial_state_dev}\n{initial_state_dev:x}");
+        println!(
+            "Initial state dev:\t{init_rss_pos_km:.3} km\t{init_rss_vel_km_s:.3} km/s\n{delta}",
+        );
+        println!("covariance: {}", initial_estimate.covar);
 
-    // Check that the error is in the square root of the covariance
-    assert!(delta.x_km < initial_estimate.covar[(0, 0)].sqrt());
-    assert!(delta.y_km < initial_estimate.covar[(1, 1)].sqrt());
-    assert!(delta.z_km < initial_estimate.covar[(2, 2)].sqrt());
-    assert!(delta.vx_km_s < initial_estimate.covar[(3, 3)].sqrt());
-    assert!(delta.vy_km_s < initial_estimate.covar[(4, 4)].sqrt());
-    assert!(delta.vz_km_s < initial_estimate.covar[(5, 5)].sqrt());
+        // Check that the error is in the square root of the covariance
+        assert!(delta.radius_km.x < initial_estimate.covar[(0, 0)].sqrt());
+        assert!(delta.radius_km.y < initial_estimate.covar[(1, 1)].sqrt());
+        assert!(delta.radius_km.z < initial_estimate.covar[(2, 2)].sqrt());
+        assert!(delta.velocity_km_s.x < initial_estimate.covar[(3, 3)].sqrt());
+        assert!(delta.velocity_km_s.y < initial_estimate.covar[(4, 4)].sqrt());
+        assert!(delta.velocity_km_s.z < initial_estimate.covar[(5, 5)].sqrt());
+    }
 }

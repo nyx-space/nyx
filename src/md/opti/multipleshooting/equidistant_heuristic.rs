@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -41,17 +41,17 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
         }
 
         // Compute the direction of the objective
-        let mut direction = xf.radius() - x0.orbit.radius();
+        let mut direction = xf.radius_km - x0.orbit.radius_km;
         if direction.norm() < 2e-16 {
             return Err(TargetingError::TargetsTooClose);
         }
         let distance_increment = direction.norm() / (node_count as f64);
-        let duration_increment = (xf.epoch() - x0.epoch()) / (node_count as f64);
+        let duration_increment = (xf.epoch - x0.epoch()) / (node_count as f64);
         direction /= direction.norm();
 
         // Build each node successively (includes xf)
         let mut nodes = Vec::with_capacity(node_count + 1);
-        let mut prev_node_radius = x0.orbit.radius();
+        let mut prev_node_radius = x0.orbit.radius_km;
         let mut prev_node_epoch = x0.epoch();
 
         for _ in 0..node_count {

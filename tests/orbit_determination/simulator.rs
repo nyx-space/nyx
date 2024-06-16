@@ -11,16 +11,23 @@ use std::env;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-#[test]
-fn continuous_tracking() {
+use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use rstest::*;
+use std::sync::Arc;
+
+#[fixture]
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
+}
+
+#[rstest]
+fn continuous_tracking(almanac: Arc<Almanac>) {
     // Test that continuous tracking
     let _ = pretty_env_logger::try_init();
 
-    // Load cosm
-    let cosm = Cosm::de438();
-
     // Dummy state
-    let orbit = Orbit::keplerian_altitude(
+    let orbit = Orbit::try_keplerian_altitude(
         500.0,
         1e-3,
         30.0,
@@ -28,12 +35,13 @@ fn continuous_tracking() {
         75.0,
         23.4,
         Epoch::from_str("2023-02-22T19:18:17.16 UTC").unwrap(),
-        cosm.frame("EME2000"),
-    );
+        almanac.frame_from_uid(EARTH_J2000).unwrap(),
+    )
+    .unwrap();
 
     // Generate a trajectory
-    let (_, trajectory) = Propagator::default(OrbitalDynamics::two_body())
-        .with(orbit)
+    let (_, trajectory) = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()))
+        .with(orbit.into(), almanac.clone())
         .for_duration_with_traj(1.5.days())
         .unwrap();
 
@@ -55,6 +63,7 @@ fn continuous_tracking() {
                 timestamp: true,
                 ..Default::default()
             },
+            almanac.clone(),
         )
         .unwrap();
 
@@ -89,12 +98,13 @@ fn continuous_tracking() {
     dbg!(&configs);
 
     // Build the tracking arc simulation to generate a "standard measurement".
-    let mut trk =
-        TrackingArcSim::<Orbit, RangeDoppler, _>::with_seed(devices, trajectory, configs, 12345)
-            .unwrap();
+    let mut trk = TrackingArcSim::<Spacecraft, RangeDoppler, _>::with_seed(
+        devices, trajectory, configs, 12345,
+    )
+    .unwrap();
 
-    trk.build_schedule(cosm.clone()).unwrap();
-    let arc = trk.generate_measurements(cosm).unwrap();
+    trk.build_schedule(almanac.clone()).unwrap();
+    let arc = trk.generate_measurements(almanac).unwrap();
 
     // And serialize to disk
     let path: PathBuf = [

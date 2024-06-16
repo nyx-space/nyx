@@ -1,5 +1,9 @@
 extern crate nyx_space as nyx;
 
+use anise::constants::celestial_objects::JUPITER_BARYCENTER;
+use anise::constants::celestial_objects::MOON;
+use anise::constants::celestial_objects::SUN;
+use anise::constants::frames::IAU_EARTH_FRAME;
 use nyx::od::noise::GaussMarkov;
 use nyx::od::simulator::TrackingArcSim;
 use nyx::od::simulator::TrkConfig;
@@ -8,18 +12,26 @@ use self::nyx::md::prelude::*;
 use self::nyx::od::prelude::*;
 
 // Extra testing imports
-use self::nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
 use self::nyx::propagators::RK4Fixed;
+use nyx::linalg::{Matrix2, SMatrix, SVector, Vector2};
 use std::collections::BTreeMap;
 
+use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use rstest::*;
+use std::sync::Arc;
+
+#[fixture]
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
+}
+
 #[allow(clippy::identity_op)]
-#[test]
-fn od_val_multi_body_ckf_perfect_stations() {
+#[rstest]
+fn od_val_multi_body_ckf_perfect_stations(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-
-    let iau_earth = cosm.frame("IAU Earth");
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     // Define the ground stations.
     let elevation_mask = 0.0;
@@ -65,40 +77,43 @@ fn od_val_multi_body_ckf_perfect_stations() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
-    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm.clone());
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
+    let orbital_dyn = OrbitalDynamics::point_masses(bodies);
     // Generate the truth data.
-    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
-    let mut prop = setup.with(initial_state);
+    let setup = Propagator::new::<RK4Fixed>(SpacecraftDynamics::new(orbital_dyn), opts);
+    let mut prop = setup.with(initial_state.into(), almanac.clone());
     let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
-    arc_sim.build_schedule(cosm.clone()).unwrap();
+    arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let prop_est = setup.with(initial_state.with_stm());
+    let prop_est = setup.with(Spacecraft::from(initial_state).with_stm(), almanac.clone());
     let covar_radius_km = 1.0e-3_f64.powi(2);
     let covar_velocity_km_s = 1.0e-6_f64.powi(2);
-    let init_covar = Matrix6::from_diagonal(&Vector6::new(
+    let init_covar = SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([
         covar_radius_km,
         covar_radius_km,
         covar_radius_km,
         covar_velocity_km_s,
         covar_velocity_km_s,
         covar_velocity_km_s,
-    ));
+        0.0,
+        0.0,
+        0.0,
+    ]));
 
     // Define the initial estimate
-    let initial_estimate = KfEstimate::from_covar(initial_state, init_covar);
+    let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise =
@@ -106,7 +121,7 @@ fn od_val_multi_body_ckf_perfect_stations() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::<_, _, RangeDoppler, _, _, _>::ckf(prop_est, ckf, None, cosm);
+    let mut odp = ODProcess::<_, _, RangeDoppler, _, _, _>::ckf(prop_est, ckf, None, almanac);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -146,7 +161,7 @@ fn od_val_multi_body_ckf_perfect_stations() {
     assert!(est.state_deviation().norm() < 2e-16);
     assert!(est.covar.norm() < 1e-5);
 
-    let delta = est.state() - final_truth;
+    let delta = (est.state().orbit - final_truth.orbit).unwrap();
     println!(
         "RMAG error = {:.2e} m\tVMAG error = {:.3e} mm/s",
         delta.rmag_km() * 1e3,
@@ -158,14 +173,12 @@ fn od_val_multi_body_ckf_perfect_stations() {
 }
 
 #[allow(clippy::identity_op)]
-#[test]
-fn multi_body_ckf_covar_map() {
+#[rstest]
+fn multi_body_ckf_covar_map(almanac: Arc<Almanac>) {
     // For this test, we're only enabling one station so we can check that the covariance inflates between visibility passes.
     let _ = pretty_env_logger::try_init();
 
-    let cosm = Cosm::de438();
-
-    let iau_earth = cosm.frame("IAU Earth");
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
     // Define the ground stations.
     let elevation_mask = 0.0;
     let dss13_goldstone = GroundStation::dss13_goldstone(
@@ -192,41 +205,44 @@ fn multi_body_ckf_covar_map() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = cosm.frame("EME2000");
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     // Generate the truth data on one thread.
-    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm.clone());
-    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
-    let mut prop = setup.with(initial_state);
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
+    let orbital_dyn = OrbitalDynamics::point_masses(bodies);
+    let setup = Propagator::new::<RK4Fixed>(SpacecraftDynamics::new(orbital_dyn), opts);
+    let mut prop = setup.with(initial_state.into(), almanac.clone());
 
     let (_, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
-    arc_sim.build_schedule(cosm.clone()).unwrap();
+    arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let prop_est = setup.with(initial_state.with_stm());
+    let prop_est = setup.with(Spacecraft::from(initial_state).with_stm(), almanac.clone());
     let covar_radius_km = 1.0e-3_f64.powi(2);
     let covar_velocity_km_s = 1.0e-6_f64.powi(2);
-    let init_covar = Matrix6::from_diagonal(&Vector6::new(
+    let init_covar = SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([
         covar_radius_km,
         covar_radius_km,
         covar_radius_km,
         covar_velocity_km_s,
         covar_velocity_km_s,
         covar_velocity_km_s,
-    ));
+        0.0,
+        0.0,
+        0.0,
+    ]));
 
     // Define the initial estimate
-    let initial_estimate = KfEstimate::from_covar(initial_state, init_covar);
+    let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise =
@@ -234,7 +250,7 @@ fn multi_body_ckf_covar_map() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, None, cosm);
+    let mut odp = ODProcess::ckf(prop_est, ckf, None, almanac.clone());
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -279,8 +295,8 @@ fn multi_body_ckf_covar_map() {
     // Test that we can generate a navigation trajectory and search it
     let nav_traj = odp.to_traj().unwrap();
     let aop_event = Event::apoapsis();
-    for found_event in nav_traj.find(&aop_event).unwrap() {
+    for found_event in nav_traj.find(&aop_event, almanac).unwrap() {
         println!("{:x}", found_event.state);
-        assert!((found_event.state.ta_deg() - 180.0).abs() < 1e-2)
+        assert!((found_event.state.orbit.ta_deg().unwrap() - 180.0).abs() < 1e-2)
     }
 }

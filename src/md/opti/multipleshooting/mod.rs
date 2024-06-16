@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anise::errors::{AlmanacError, PhysicsError};
 use snafu::Snafu;
 
 use crate::md::{trajectory::TrajError, TargetingError};
@@ -34,13 +35,21 @@ pub enum CostFunction {
     MinimumFuel,
 }
 
-#[derive(Debug, PartialEq, Snafu)]
+#[derive(Debug, Snafu)]
 pub enum MultipleShootingError {
     #[snafu(display("segment #{segment} encountered {source}"))]
     TargetingError {
         segment: usize,
         source: TargetingError,
     },
-    #[snafu(display("during a multiple shooting,  encountered {source}"))]
+    #[snafu(display("during a multiple shooting, encountered {source}"))]
     MultiShootTrajError { source: TrajError },
+    #[snafu(display("duration a multiple shoot, issue due to Almanac: {action} {source}"))]
+    MultiShootAlmanacError {
+        #[snafu(source(from(AlmanacError, Box::new)))]
+        source: Box<AlmanacError>,
+        action: &'static str,
+    },
+    #[snafu(display("duration a multiple shoot, physics issue:  {source}"))]
+    MultiShootPhysicsError { source: PhysicsError },
 }

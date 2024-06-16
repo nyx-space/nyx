@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -18,8 +18,7 @@
 
 use crate::cosmic::SPEED_OF_LIGHT_KMS;
 use crate::io::watermark::pq_writer;
-use crate::io::{duration_from_str, duration_to_str, ConfigError, ConfigRepr, Configurable};
-use crate::md::prelude::Cosm;
+use crate::io::{duration_from_str, duration_to_str, ConfigError, ConfigRepr};
 #[cfg(feature = "python")]
 use crate::python::pyo3utils::pyany_to_value;
 use crate::NyxError;
@@ -469,7 +468,7 @@ impl GaussMarkov {
             for item in as_list.iter() {
                 // Check that the item is a dictionary
                 let next: Self =
-                    serde_yaml::from_value(pyany_to_value(item)?).with_context(|_| ParseSnafu)?;
+                    serde_yaml::from_value(pyany_to_value(item)?).context(ParseSnafu)?;
                 selves.push(next);
             }
             Ok(selves)
@@ -533,25 +532,6 @@ impl GaussMarkov {
 }
 
 impl ConfigRepr for GaussMarkov {}
-
-impl Configurable for GaussMarkov {
-    type IntermediateRepr = Self;
-
-    fn from_config(
-        cfg: Self::IntermediateRepr,
-        _cosm: Arc<Cosm>,
-    ) -> Result<Self, crate::io::ConfigError>
-    where
-        Self: Sized,
-    {
-        Ok(cfg)
-    }
-
-    fn to_config(&self) -> Result<Self::IntermediateRepr, crate::io::ConfigError> {
-        let serded: Self::IntermediateRepr = *self;
-        Ok(serded)
-    }
-}
 
 #[test]
 fn fogm_test() {
