@@ -146,7 +146,7 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    needs: [check, tests, lints, audit]
+    needs: [check, tests, lints]
 
     if: github.ref_type == 'tag'
     steps:
