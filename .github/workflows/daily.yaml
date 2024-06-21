@@ -20,55 +20,18 @@ jobs:
               toolchain: stable
               components: rustfmt, clippy
     
-          - name: Install cargo-grcov
+          - name: Download data
             run: |
-              rustup component add llvm-tools-preview
-              cargo install grcov
-    
-          - name: Generate coverage report for unit tests
-            env:
-              RUSTFLAGS: "-Cinstrument-coverage"
-              LLVM_PROFILE_FILE: "target/coverage/nyx_space-%p-%m.profraw"
-            run: cargo test --lib && grcov . --branch --binary-path ./target/debug/ -t lcov -s . --keep-only 'src/*' > ${{ github.workspace }}/lcov-lib.txt
-        
-          - name: Generate coverage report for doc tests
-            env:
-                RUSTFLAGS: "-Cinstrument-coverage"
-                LLVM_PROFILE_FILE: "target/coverage/nyx_space-%p-%m.profraw"
-            run: cargo test --doc && grcov . --branch --binary-path ./target/debug/ -t lcov -s . --keep-only 'src/*' > ${{ github.workspace }}/lcov-docs.txt
-          
-          - name: Generate coverage report for cosmic integr. tests
-            env:
-              RUSTFLAGS: "-Cinstrument-coverage"
-              LLVM_PROFILE_FILE: "target/coverage/nyx_space-%p-%m.profraw"
-            run: cargo test -- cosmic && grcov . --branch --binary-path ./target/debug/ -t lcov -s . --keep-only 'src/*' > ${{ github.workspace }}/lcov-cosmic.txt
-          
-          - name: Generate coverage report for mission_design integr. tests
-            env:
-              RUSTFLAGS: "-Cinstrument-coverage"
-              LLVM_PROFILE_FILE: "target/coverage/nyx_space-%p-%m.profraw"
-            run: cargo test -- mission_design && grcov . --branch --binary-path ./target/debug/ -t lcov -s . --keep-only 'src/*' > ${{ github.workspace }}/lcov-mission_design.txt
-          
-          - name: Generate coverage report for OD integr. tests
-            env:
-              RUSTFLAGS: "-Cinstrument-coverage"
-              LLVM_PROFILE_FILE: "target/coverage/nyx_space-%p-%m.profraw"
-            run: cargo test -- orbit_determination::trackingarc orbit_determination::filtererrors orbit_determination::measurements orbit_determination::simulator orbit_determination::spacecraft && grcov . --branch --binary-path ./target/debug/ -t lcov -s . --keep-only 'src/*' > ${{ github.workspace }}/lcov-od.txt
-          
-          - name: Generate coverage report for propulsion integr. tests
-            env:
-              RUSTFLAGS: "-Cinstrument-coverage"
-              LLVM_PROFILE_FILE: "target/coverage/nyx_space-%p-%m.profraw"
-            run: cargo test -- propulsion && grcov . --branch --binary-path ./target/debug/ -t lcov -s . --keep-only 'src/*' > ${{ github.workspace }}/lcov-prop.txt
-          
-          - name: Generate coverage report for monte carlo integr. tests
-            env:
-              RUSTFLAGS: "-Cinstrument-coverage"
-              LLVM_PROFILE_FILE: "target/coverage/nyx_space-%p-%m.profraw"
-            run: cargo test -- test_monte_carlo_epoch && grcov . --branch --binary-path ./target/debug/ -t lcov -s . --keep-only 'src/*' > ${{ github.workspace }}/lcov-mc.txt
-    
-          - name: Upload coverage report
+              wget -O data/de440s.bsp http://public-data.nyxspace.com/anise/de440s.bsp
+              wget -O data/de440s.bsp http://public-data.nyxspace.com/anise/de438.bsp # GMAT validation cases
+              wget -O data/pck08.pca http://public-data.nyxspace.com/anise/v0.4/pck08.pca
+              wget -O data/earth_latest_high_prec.bpc http://public-data.nyxspace.com/anise/ci/earth_latest_high_prec-2023-09-08.bpc
+
+          - name: Generate full code coverage
+            run: cargo llvm-cov --lcov --output-path lcov.info
+          - name: Upload coverage to Codecov
             uses: codecov/codecov-action@v3
             with:
-              token: ${{ secrets.CODECOV_TOKEN }}
-              files: ${{ github.workspace }}/lcov-*.txt
+              token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
+              files: lcov.info
+              fail_ci_if_error: false
