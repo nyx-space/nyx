@@ -1,13 +1,42 @@
-### Effects
 
+# Summary
 
-### If this is a new feature or a bug fix ...
-- [ ] Yes, the branch I'm proposing to merge is called `issue-xyz` where `xyz` is the number of the issue.
+**Summarize the proposed changes**
 
-### If this change adds or modifies a validation case
-- [ ] No.
-- [ ] Yes and:
-  - I have coded up, or updated, an existing test case; and
-  - I have provided a GMAT script which confirms the result(s); and
-  - I have updated the `VALIDATION.md` file with the new error data between nyx and GMAT.
-  - I will specify the version of GMAT used for the validation.
+## Architectural Changes
+
+<!-- List any architectural changes made in this pull request, including any changes to the directory structure, file organization, or dependencies. -->
+
+No change
+
+## New Features
+
+<!-- List any new features added in this pull request, including any new tools or functionality. -->
+
+No change
+
+## Improvements
+
+<!-- List any improvements made in this pull request, including any performance optimizations, bug fixes, or other enhancements. -->
+
+No change
+
+## Bug Fixes
+
+<!-- List any bug fixes made in this pull request, including any issues that were resolved. -->
+
+No change
+
+## Testing and validation
+
+<!-- Please provide information on how the changes in this pull request were tested, including any new tests that were added or existing tests that were modified. -->
+
+**Detail the changes in tests, including new tests and validations**
+
+## Documentation
+
+<!-- Detail documentation changes if this pull request primarily deals with documentation. -->
+
+This PR does not primarily deal with documentation changes.
+
+<!-- Thank you for contributing to Nyx! -->

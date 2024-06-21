@@ -124,24 +124,16 @@ jobs:
           wget -O data/pck08.pca http://public-data.nyxspace.com/anise/v0.4/pck08.pca
           wget -O data/earth_latest_high_prec.bpc http://public-data.nyxspace.com/anise/ci/earth_latest_high_prec-2023-09-08.bpc
 
-      - name: Install cargo-grcov
-        run: |
-          rustup component add llvm-tools-preview
-          cargo install grcov
-
-      - name: Generate coverage report for unit tests
-        env:
-          RUSTFLAGS: "-Cinstrument-coverage"
-          LLVM_PROFILE_FILE: "target/coverage/nyx_space-%p-%m.profraw"
-        run: |
-          cargo test --lib
-          grcov . --binary-path ./target/debug/ -t lcov -s . --keep-only 'src/*' > lcov-lib.txt
-
-      - name: Upload coverage report
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Generate unit tests code coverage
+        run: cargo llvm-cov --lib --lcov --output-path lcov.info
+      - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./lcov-*.txt
+          token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
+          files: lcov.info
+          fail_ci_if_error: false
 
   release:
     name: Release
