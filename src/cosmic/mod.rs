@@ -26,7 +26,7 @@ use crate::errors::StateError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
 use crate::md::StateParameter;
-use crate::time::{Duration, Epoch};
+use crate::time::Epoch;
 use snafu::Snafu;
 use std::fmt;
 
@@ -36,11 +36,6 @@ pub trait TimeTagged {
     fn epoch(&self) -> Epoch;
     /// Set the Epoch
     fn set_epoch(&mut self, epoch: Epoch);
-
-    /// Shift this epoch by a duration (can be negative)
-    fn shift_by(&mut self, duration: Duration) {
-        self.set_epoch(self.epoch() + duration);
-    }
 }
 
 /// A trait for generate propagation and estimation state.
@@ -162,19 +157,12 @@ pub use self::bplane::*;
 mod spacecraft;
 pub use self::spacecraft::*;
 
-// Re-Export frames
-// mod frames;
-
-mod rotations;
-pub use self::rotations::*;
-
 /// The eclipse module allows finding eclipses and (conversely) visibility between a state and another one (e.g. a planet or the Sun).
 pub mod eclipse;
 
 /// Speed of light in meters per second
-pub const SPEED_OF_LIGHT: f64 = 299_792_458.0;
-/// Speed of light in kilometers per second
-pub const SPEED_OF_LIGHT_KMS: f64 = SPEED_OF_LIGHT / 1000.0;
+pub const SPEED_OF_LIGHT_M_S: f64 = SPEED_OF_LIGHT_KM_S * 1e3;
+pub use anise::constants::SPEED_OF_LIGHT_KM_S;
 
 /// Astronomical unit, in kilometers, according to the [IAU](https://www.iau.org/public/themes/measuring/).
 pub const AU: f64 = 149_597_870.700;

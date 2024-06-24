@@ -198,12 +198,13 @@ impl Traj<Spacecraft> {
                 warn!("[line: {}] Skipping covariance in OEM parsing", lno + 1);
                 parse = false;
             } else if parse {
-                // TODO(ANISE): Add error handling
                 let frame = Frame::from_name(
                     center_name.clone().unwrap().as_str(),
                     orient_name.clone().unwrap().as_str(),
                 )
-                .unwrap();
+                .map_err(|e| NyxError::CCSDS {
+                    msg: format!("frame error `{center_name:?} {orient_name:?}`: {e}"),
+                })?;
                 // Split the line into components
                 let parts: Vec<&str> = line.split_whitespace().collect();
 

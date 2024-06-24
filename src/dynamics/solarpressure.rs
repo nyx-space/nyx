@@ -18,7 +18,7 @@
 
 use super::{DynamicsAlmanacSnafu, DynamicsError, DynamicsPlanetarySnafu, ForceModel};
 use crate::cosmic::eclipse::EclipseLocator;
-use crate::cosmic::{Frame, Spacecraft, AU, SPEED_OF_LIGHT};
+use crate::cosmic::{Frame, Spacecraft, AU, SPEED_OF_LIGHT_M_S};
 use crate::linalg::{Const, Matrix3, Vector3};
 use anise::almanac::Almanac;
 use anise::constants::frames::SUN_J2000;
@@ -73,18 +73,12 @@ impl ForceModel for SolarPressure {
     fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
         let osc = ctx.orbit;
         // Compute the position of the Sun as seen from the spacecraft
-        // TODO(ANISE): I think this needs to be flipped as well!
         let r_sun = almanac
             .transform_to(ctx.orbit, self.e_loc.light_source, None)
             .context(DynamicsAlmanacSnafu {
                 action: "transforming state to vector seen from Sun",
             })?
             .radius_km;
-        // let r_sun = self
-        //     .e_loc
-        //     .cosm
-        //     .frame_chg(osc, self.e_loc.light_source)
-        //     .radius();
 
         let r_sun_unit = r_sun / r_sun.norm();
 
@@ -99,7 +93,7 @@ impl ForceModel for SolarPressure {
 
         let r_sun_au = r_sun.norm() / AU;
         // in N/(m^2)
-        let flux_pressure = (k * self.phi / SPEED_OF_LIGHT) * (1.0 / r_sun_au).powi(2);
+        let flux_pressure = (k * self.phi / SPEED_OF_LIGHT_M_S) * (1.0 / r_sun_au).powi(2);
 
         // Note the 1e-3 is to convert the SRP from m/s^2 to km/s^2
         Ok(1e-3 * ctx.srp.cr * ctx.srp.area_m2 * flux_pressure * r_sun_unit)
@@ -112,20 +106,13 @@ impl ForceModel for SolarPressure {
     ) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
         let osc = ctx.orbit;
 
-        // TODO(ANISE): I think this needs to be flipped as well!
+        // Compute the position of the Sun as seen from the spacecraft
         let r_sun = almanac
             .transform_to(ctx.orbit, self.e_loc.light_source, None)
             .context(DynamicsAlmanacSnafu {
                 action: "transforming state to vector seen from Sun",
             })?
             .radius_km;
-
-        // Compute the position of the Sun as seen from the spacecraft
-        // let r_sun = self
-        //     .e_loc
-        //     .cosm
-        //     .frame_chg(osc, self.e_loc.light_source)
-        //     .radius();
 
         let r_sun_d: Vector3<OHyperdual<f64, Const<9>>> = hyperspace_from_vector(&r_sun);
         let r_sun_unit = r_sun_d / norm(&r_sun_d);
@@ -144,7 +131,8 @@ impl ForceModel for SolarPressure {
         let inv_r_sun_au_p2 = inv_r_sun_au.powi(2);
         // in N/(m^2)
         let flux_pressure =
-            OHyperdual::<f64, Const<9>>::from_real(k * self.phi / SPEED_OF_LIGHT) * inv_r_sun_au_p2;
+            OHyperdual::<f64, Const<9>>::from_real(k * self.phi / SPEED_OF_LIGHT_M_S)
+                * inv_r_sun_au_p2;
 
         // Note the 1e-3 is to convert the SRP from m/s^2 to km/s^2
         let dual_force_scalar =

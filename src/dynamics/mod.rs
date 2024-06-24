@@ -44,9 +44,6 @@ pub use self::orbital::*;
 /// This module allows loading gravity models from [PDS](http://pds-geosciences.wustl.edu/), [EGM2008](http://earth-info.nga.mil/GandG/wgs84/gravitymod/egm2008/) and GMAT's own COF files.
 // pub mod gravity;
 
-/// The drag module handles drag in a very basic fashion. Do not use for high fidelity dynamics.
-// pub mod drag;
-
 /// The spacecraft module allows for simulation of spacecraft dynamics in general, including propulsion/maneuvers.
 pub mod spacecraft;
 pub use self::spacecraft::*;
@@ -61,7 +58,7 @@ pub mod deltavctrl;
 pub mod solarpressure;
 pub use self::solarpressure::*;
 
-/// Define drag models
+/// The drag module handles drag in a very basic fashion. Do not use for high fidelity dynamics.
 pub mod drag;
 pub use self::drag::*;
 
@@ -123,7 +120,7 @@ where
             + Allocator<OHyperdual<f64, Self::HyperdualSize>, <Self::StateType as State>::Size>,
         Owned<f64, Self::HyperdualSize>: Copy,
     {
-        unimplemented!()
+        Err(DynamicsError::StateTransitionMatrixUnset)
     }
 
     /// Optionally performs some final changes after each successful integration of the equations of motion.

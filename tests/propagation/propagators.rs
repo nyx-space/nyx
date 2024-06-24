@@ -127,7 +127,6 @@ fn regress_leo_day_adaptive(almanac: Arc<Almanac>) {
         );
         let mut prop = setup.with(init, almanac.clone());
         prop.for_duration(prop_time).unwrap();
-        // TODO(ANISE): This was a rel check!
         assert_orbit_eq_or_abs(
             &prop.state.orbit,
             &all_rslts[2],
@@ -451,7 +450,6 @@ fn gmat_val_leo_day_fixed(almanac: Arc<Almanac>) {
         );
         let mut prop = setup.with(init, almanac.clone());
         prop.for_duration(prop_time).unwrap();
-        // TODO(ANISE): This was a rel check!
         assert_orbit_eq_or_abs(
             &prop.state.orbit,
             &all_rslts[1],
