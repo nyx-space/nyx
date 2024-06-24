@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::cosmic::SPEED_OF_LIGHT_KMS;
+use crate::cosmic::SPEED_OF_LIGHT_KM_S;
 use crate::io::watermark::pq_writer;
 use crate::io::{duration_from_str, duration_to_str, ConfigError, ConfigRepr};
 #[cfg(feature = "python")]
@@ -219,7 +219,7 @@ impl GaussMarkov {
     ///
     /// Where c is the speed of light, B is the bandwidth in Hz, and the Pr/N0 is the signal-to-noise ratio.
     pub fn from_pr_n0(pr_n0: f64, bandwidth_hz: f64) -> Self {
-        let sigma = SPEED_OF_LIGHT_KMS / (2.0 * bandwidth_hz * (pr_n0).sqrt());
+        let sigma = SPEED_OF_LIGHT_KM_S / (2.0 * bandwidth_hz * (pr_n0).sqrt());
 
         Self::white_noise(sigma)
     }

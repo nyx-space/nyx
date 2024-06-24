@@ -62,17 +62,6 @@ impl OrbitalDynamics {
     pub fn from_model(accel_model: Arc<dyn AccelModel + Sync>) -> Self {
         Self::new(vec![accel_model])
     }
-
-    /// Add a model to the currently defined orbital dynamics
-    pub fn add_model(&mut self, accel_model: Arc<dyn AccelModel + Sync>) {
-        self.accel_models.push(accel_model);
-    }
-
-    /// Clone these dynamics and add a model to the currently defined orbital dynamics
-    pub fn with_model(mut self, accel_model: Arc<dyn AccelModel + Sync>) -> Self {
-        self.add_model(accel_model);
-        self
-    }
 }
 
 impl fmt::Display for OrbitalDynamics {
@@ -179,7 +168,6 @@ impl OrbitalDynamics {
     }
 }
 
-/// TODO(ANISE): Switch to Builder trait
 /// PointMasses model
 pub struct PointMasses {
     pub celestial_objects: Vec<i32>,

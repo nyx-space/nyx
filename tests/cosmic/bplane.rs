@@ -142,11 +142,10 @@ fn val_b_plane_gmat(almanac: Arc<Almanac>) {
     ];
 
     // Iterate through the truth data
-    // TODO(ANISE): Make this verification tighter after switching to ANISE
     for data in &datum {
         let eme2k_state = traj.at(data.epoch).unwrap().orbit;
         let state = almanac.transform_to(eme2k_state, MOON_J2000, None).unwrap();
-        // TODO(ANISE): The transformed state is _not_ hyperbolic indeed! Eccentricity is 0.17.
+        // NOTE: The transformed state is _not_ hyperbolic with de440s! Eccentricity is 0.17.
         // Compare with Cosm to understand why this state is no longer hyperbolic, the code looks to be identical.
         println!("EME2K = {}\nEME2K = {:x}", eme2k_state, eme2k_state);
         println!("STATE = {}\nSTATE = {:x}", state, state);

@@ -58,7 +58,7 @@ const NORM_ERR: f64 = 1e-4;
 #[cfg_attr(feature = "python", pyo3(module = "nyx_space.mission_design"))]
 pub struct SpacecraftDynamics {
     pub orbital_dyn: OrbitalDynamics,
-    // TODO(ANISE): Remove the force model generic OR find a way to serialize the name of what's loaded (BTreeMap with the name of the class to instantiate maybe?). Refer to DynamicsSerde as an example.
+    // TODO: https://github.com/nyx-space/nyx/issues/214
     pub force_models: Vec<Arc<dyn ForceModel>>,
     pub guid_law: Option<Arc<dyn GuidanceLaw>>,
     pub decrement_mass: bool,
@@ -120,18 +120,6 @@ impl SpacecraftDynamics {
         me
     }
 
-    /// Add a model to the currently defined spacecraft dynamics
-    pub fn add_model(&mut self, force_model: Arc<dyn ForceModel>) {
-        self.force_models.push(force_model);
-    }
-
-    /// Clone these dynamics and add a model to the currently defined orbital dynamics
-    pub fn with_model(self, force_model: Arc<dyn ForceModel>) -> Self {
-        let mut me = self;
-        me.add_model(force_model);
-        me
-    }
-
     /// A shortcut to spacecraft.guid_law if a guidance law is defined for these dynamics
     pub fn guidance_achieved(&self, state: &Spacecraft) -> Result<bool, GuidanceError> {
         match &self.guid_law {
@@ -145,26 +133,6 @@ impl SpacecraftDynamics {
         Self {
             orbital_dyn: self.orbital_dyn.clone(),
             guid_law: Some(guid_law),
-            force_models: self.force_models.clone(),
-            decrement_mass: self.decrement_mass,
-        }
-    }
-
-    /// Clone these spacecraft dynamics and update the control to the one provided.
-    pub fn with_guidance_law_no_decr(&self, guid_law: Arc<dyn GuidanceLaw>) -> Self {
-        Self {
-            orbital_dyn: self.orbital_dyn.clone(),
-            guid_law: Some(guid_law),
-            force_models: self.force_models.clone(),
-            decrement_mass: false,
-        }
-    }
-
-    /// Clone these spacecraft dynamics and remove any control model
-    pub fn without_guidance_law(&self) -> Self {
-        Self {
-            orbital_dyn: self.orbital_dyn.clone(),
-            guid_law: None,
             force_models: self.force_models.clone(),
             decrement_mass: self.decrement_mass,
         }

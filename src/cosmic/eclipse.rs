@@ -299,15 +299,7 @@ pub fn eclipse_state(
     // If the light source's radius is zero, just call the line of sight algorithm
 
     if ls_mean_eq_radius_km < f64::EPSILON {
-        // TODO(ANISE): I think I need the opposite data here! Hence the neg!
-        let observed = almanac.transform_to(observer, light_source, None)?;
-
-        // let observed = almanac.celestial_state(
-        //     &light_source.ephem_path(),
-        //     observer.epoch,
-        //     observer.frame,
-        //     LightTimeCalc::None,
-        // );
+        let observed = -almanac.transform_to(observer, light_source, None)?;
         return line_of_sight(observer, observed, eclipsing_body, almanac);
     }
 

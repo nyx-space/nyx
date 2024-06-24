@@ -252,7 +252,6 @@ impl GuidanceLaw for Mnvr {
                 Ok(0.0)
             }
         }
-        // self.thrust_lvl
     }
 
     fn next(&self, sc: &mut Spacecraft) {
