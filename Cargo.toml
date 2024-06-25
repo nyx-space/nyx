@@ -59,7 +59,7 @@ rayon = "1.6"
 lazy_static = "1.4.0"
 approx = "0.5"
 rand_pcg = "0.3"
-pyo3 = { version = "0.21", optional = true, features = ["extension-module"] }
+pyo3 = { version = "0.22", optional = true, features = ["extension-module"] }
 pyo3-log = { version = "0.10", optional = true }
 numpy = { version = "0.21", optional = true }
 indicatif = { version = "0.17", features = ["rayon"] }
