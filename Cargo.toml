@@ -33,7 +33,7 @@ maintenance = { status = "actively-developed" }
 gitlab = { repository = "nyx-space/nyx", branch = "master" }
 
 [dependencies]
-nalgebra = "=0.32"
+nalgebra = "=0.33"
 log = "0.4"
 hifitime = "4.0.0-alpha"
 anise = "0.4.0"
