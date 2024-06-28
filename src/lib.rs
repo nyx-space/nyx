@@ -67,7 +67,6 @@ pub mod polyfit;
 extern crate log;
 extern crate hifitime;
 extern crate nalgebra as na;
-extern crate prost_derive;
 
 /// Re-export of hifitime
 pub mod time {
