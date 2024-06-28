@@ -7,7 +7,7 @@ on:
 
 jobs:
   full-coverage:
-    name: Unit test and integration test coverage analysis
+    name: Cargo update and check
     runs-on: ubuntu-latest
 
     steps:
