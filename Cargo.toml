@@ -7,25 +7,25 @@ authors = ["Christopher Rabotin <christopher.rabotin@gmail.com>"]
 description = "A high-fidelity space mission toolkit, with orbit propagation, estimation and some systems engineering"
 homepage = "https://nyxspace.com"
 documentation = "https://docs.rs/nyx-space/"
-repository = "https://gitlab.com/nyx-space/nyx"
+repository = "https://github.com/nyx-space/nyx"
 keywords = ["space", "mission", "design", "orbit", "estimation"]
 categories = ["science", "simulation", "aerospace", "science::robotics"]
 readme = "README.md"
-license = "MPL-2.0"
+license = "AGPL-3.0-or-later"
 exclude = [
-    "tests/GMAT_scripts/*",
-    "examples",
-    "data/*.gz",
-    "data/*.png",
-    "data/od_plots/",
+    ".cargo/",
+    ".github/",
+    ".venv/",
+    ".vscode/",
+    "data/",
+    "output_data/",
+    "*.parquet",
+    "pyproject.toml",
+    "firebase.json",
+    ".dockerignore",
+    "Dockerfile*",
     "rustfmt.toml",
-    "de438s.xb",
-    "Pipfile*",
-    ".vscode/launch.json",
-    "*.kst",
-    "docs/*",
-    "*.bsp",
-    "data/tests/*",
+    "tests/GMAT_scripts/*",
 ]
 
 [badges]
