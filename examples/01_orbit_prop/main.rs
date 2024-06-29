@@ -169,16 +169,20 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // With the trajectory, let's build a few data products (we want to analyze something after all).
 
-    // 1. Export the trajectory data to an OEM and a CSV.
+    // 1. Export the trajectory as a CCSDS OEM version 2.0 file and as a parquet file, which includes the Keplerian orbital elements.
 
     trajectory.to_oem_file(
         "./01_cubesat_hf_prop.oem",
         ExportCfg::builder().step(Unit::Minute * 2).build(),
     )?;
 
-    // let orbit_trajectory = trajectory.downcast()
+    trajectory.to_parquet_with_cfg(
+        "./01_cubesat_hf_prop.parquet",
+        ExportCfg::builder().step(Unit::Minute * 2).build(),
+        almanac.clone(),
+    )?;
 
-    // 2. Compare the difference in the radial-intrack-cross frame between the high fidelity
+    // 2. Compare the difference in the radial-intrack-crosstrack frame between the high fidelity
     // and Keplerian propagation. The RIC frame is commonly used to compute the difference in position
     // and velocity of different spacecraft.
     // 3. Compute the azimuth, elevation, range, and range-rate data of that spacecraft as seen from Boulder, CO, USA.

@@ -26,6 +26,7 @@ exclude = [
     "Dockerfile*",
     "rustfmt.toml",
     "tests/GMAT_scripts/*",
+    "*.png",
 ]
 
 [badges]
