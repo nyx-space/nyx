@@ -26,6 +26,10 @@ Refer to [nyxspace.com](https://nyxspace.com) for a user guide, a show case, the
 // Allow confusable identifiers, as the code tries to use the literature's notation where possible.
 #![allow(confusable_idents)]
 
+#[macro_use]
+extern crate log;
+extern crate nalgebra as na;
+
 /// Provides all the propagators / integrators available in `nyx`.
 pub mod propagators;
 
@@ -62,11 +66,6 @@ pub mod mc;
 
 /// Polynomial and fitting module
 pub mod polyfit;
-
-#[macro_use]
-extern crate log;
-extern crate hifitime;
-extern crate nalgebra as na;
 
 /// Re-export of hifitime
 pub mod time {

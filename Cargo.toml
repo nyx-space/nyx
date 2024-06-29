@@ -96,3 +96,7 @@ name = "nyx_space"
 # For flamegraph -- https://github.com/flamegraph-rs/flamegraph
 linker = "/usr/bin/clang"
 rustflags = ["-Clink-arg=-fuse-ld=lld", "-Clink-arg=-Wl,--no-rosegment"]
+
+[[example]]
+name = "01_orbit_prop"
+path = "examples/01_orbit_prop/main.rs"

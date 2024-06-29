@@ -18,7 +18,7 @@
 
 use anise::astro::PhysicsResult;
 use anise::constants::frames::EARTH_J2000;
-pub use anise::prelude::{Almanac, Orbit};
+pub use anise::prelude::Orbit;
 
 use nalgebra::Vector3;
 use serde::{Deserialize, Serialize};
