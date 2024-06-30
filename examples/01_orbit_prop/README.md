@@ -14,15 +14,15 @@ Building in `release` mode will make the computation significantly faster. Speci
 ## Data products
 
 1. Export the trajectory as a CCSDS OEM version 2.0 file and as a parquet file, which includes the Keplerian orbital elements. This can be quickly analyzed and plotted in Python.
-2. Compare the difference in the radial-intrack-crosstrack frame between the high fidelity and two-body/Keplerian propagation. The RIC frame is commonly used to compute the difference in position and velocity of different spacecraft. Build a Dataframe from this data and print
+2. Compare the difference in the radial, in-track, cross-track frame between the high fidelity and two-body/Keplerian propagation. The RIC frame is commonly used to compute the difference in position and velocity of different spacecraft. Build a Dataframe from this data and print
 3. Build a Dataframe containing the azimuth, elevation, range, and range-rate data of that spacecraft as seen from Boulder, CO, USA. Print out when the spacecraft has an elevation of 15 degrees or above on the horizon.
 
 ## Force models
 
 The force models used here are akin to STK's "HPOP" propagator. Specifically, this example runs with the following models:
-- Point masses of the Earth, Moon, and Sun, where the gravitational parameters are sourced from NASA's [pck00011.tpc](https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/pck00011.tpc) file. The planetary ephemeris used is the DE440s.bsp, built by NASA as well.
+- Point masses of the Earth, Moon, and Sun, where the gravitational parameters are sourced from NASA's [pck00011.tpc](https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/pck00011.tpc) file (note that these differ slightly from GMAT's values). The planetary ephemeris used is the DE440s.bsp, provided by NASA as well.
 - Solar radiation pressure, with only the Earth as an eclipsing body
-- Spherical Harmonics of the Earth of order and degree 21x21, computed in the IAU Earth frame. The data comes from the JGM3 gravitational model, downloaded automatically using ANISE's `MetaFile` downloading and local caching mechanism.
+- Spherical Harmonics of the Earth of order and degree 21x21, computed in the IAU Earth frame. The data comes from the JGM3 gravitational model, downloaded automatically using ANISE's `MetaFile` downloading and local caching mechanism. This is the default gravity field model of GMAT.
 
 ## Quick analysis
 

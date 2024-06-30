@@ -27,27 +27,27 @@ fn main() -> Result<(), Box<dyn Error>> {
     pel::init();
     // Dynamics models require planetary constants and ephemerides to be defined.
     // Let's start by grabbing those by using ANISE's latest MetaAlmanac.
-    // This will automatically download the DE440s (or later) planetary ephemeris,
+    // This will automatically download the DE440s planetary ephemeris,
     // the daily-updated Earth Orientation Parameters, the high fidelity Moon orientation
     // parameters (for the Moon Mean Earth and Moon Principal Axes frames), and the PCK11
     // planetary constants kernels.
     // For details, refer to https://github.com/nyx-space/anise/blob/master/data/latest.dhall.
-    // Note that we place the Almanac into an Arc so we can clone it cheaply across threads.
+    // Note that we place the Almanac into an Arc so we can clone it cheaply and provide read-only
+    // references to many functions.
     let almanac = Arc::new(MetaAlmanac::latest().map_err(Box::new)?);
     // Define the orbit epoch
     let epoch = Epoch::from_gregorian_utc_hms(2024, 2, 29, 12, 13, 14);
 
-    // Define the orbit in Keplerian because it's easy to visualize.
+    // Define the orbit.
     // First we need to fetch the Earth J2000 from information from the Almanac.
     // This allows the frame to include the gravitational parameters and the shape of the Earth,
     // defined as a tri-axial ellipoid. Note that this shape can be changed manually or in the Almanac
     // by loading a different set of planetary constants.
     let earth_j2000 = almanac.frame_from_uid(EARTH_J2000)?;
 
-    // Define the orbit from its altitude.
     let orbit =
-        Orbit::try_keplerian_altitude(300.0, 0.015, 28.5, 65.2, 75.0, 0.0, epoch, earth_j2000)?;
-    // Print in in Keplerian format
+        Orbit::try_keplerian_altitude(300.0, 0.015, 68.5, 65.2, 75.0, 0.0, epoch, earth_j2000)?;
+    // Print in in Keplerian form.
     println!("{orbit:x}");
 
     // There are two ways to propagate an orbit. We can make a quick approximation assuming only two-body
@@ -57,9 +57,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let future_orbit_tb = orbit.at_epoch(epoch + Unit::Day * 3)?;
     println!("{future_orbit_tb:x}");
 
-    // Two body propagation relies solely on Kepler's laws, so none of the Keplerian orbital elements should
-    // have changed apart from the true anomaly.
-
+    // Two body propagation relies solely on Kepler's laws, so only the true anomaly will change.
     println!(
         "SMA changed by {:.3e} km",
         orbit.sma_km()? - future_orbit_tb.sma_km()?
@@ -100,14 +98,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         .build();
     println!("{sc:x}");
 
-    // Let's set up the spacecraft dynamics.
+    // Set up the spacecraft dynamics.
 
     // Specify that the orbital dynamics must account for the graviational pull of the Moon and the Sun.
     // The gravity of the Earth will also be accounted for since the spaceraft in an Earth orbit.
     let mut orbital_dyn = OrbitalDynamics::point_masses(vec![MOON, SUN]);
 
     // We want to include the spherical harmonics, so let's download the gravitational data from the Nyx Cloud.
-    // We're using the JGM3 model here because it's pretty lightweight but it is the default in GMAT.
+    // We're using the JGM3 model here, which is the default in GMAT.
     let mut jgm3_meta = MetaFile {
         uri: "http://public-data.nyxspace.com/nyx/models/JGM3.cof.gz".to_string(),
         crc32: Some(0xF446F027), // Specifying the CRC32 avoids redownloading it if it's cached.
@@ -115,8 +113,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     // And let's download it if we don't have it yet.
     jgm3_meta.process()?;
 
-    // Now let's build the spherical harmonics.
-    // The harmonics must be computed in the body fixed frame. We're using the long term prediction of the Earth body frame, IAU Earth.
+    // Build the spherical harmonics.
+    // The harmonics must be computed in the body fixed frame.
+    // We're using the long term prediction of the Earth centered Earth fixed frame, IAU Earth.
     let harmonics_21x21 = Harmonics::from_stor(
         almanac.frame_from_uid(IAU_EARTH_FRAME)?,
         HarmonicsMem::from_cof(&jgm3_meta.uri, 21, 21, true).unwrap(),
@@ -129,22 +128,26 @@ fn main() -> Result<(), Box<dyn Error>> {
     // for the eclipsing caused by the Earth.
     let srp_dyn = SolarPressure::default(EARTH_J2000, almanac.clone())?;
 
+    // Finalize setting up the dynamics, specifying the force models (orbital_dyn) separately from the
+    // acceleration models (SRP in this case). Use `from_models` to specify multiple accel models.
     let dynamics = SpacecraftDynamics::from_model(orbital_dyn, srp_dyn);
 
     println!("{dynamics}");
 
-    // Finally, let's propagate this orbit to the same epoch as above, and compute the differences.
+    // Finally, let's propagate this orbit to the same epoch as above.
+    // The first returned value is the spacecraft state at the final epoch.
+    // The second value is the full trajectory where the step size is variable step used by the propagator.
     let (future_sc, trajectory) = Propagator::default(dynamics)
         .with(sc, almanac.clone())
         .until_epoch_with_traj(future_orbit_tb.epoch)?;
 
     println!("=== High fidelity propagation ===");
     println!(
-        "SMA changed by {:.3e} km",
+        "SMA changed by {:.3} km",
         orbit.sma_km()? - future_sc.orbit.sma_km()?
     );
     println!(
-        "ECC changed by {:.3e}",
+        "ECC changed by {:.6}",
         orbit.ecc()? - future_sc.orbit.ecc()?
     );
     println!(
@@ -152,11 +155,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         orbit.inc_deg()? - future_sc.orbit.inc_deg()?
     );
     println!(
-        "RAAN changed by {:.3e} deg",
+        "RAAN changed by {:.3} deg",
         orbit.raan_deg()? - future_sc.orbit.raan_deg()?
     );
     println!(
-        "AOP changed by {:.3e} deg",
+        "AOP changed by {:.3} deg",
         orbit.aop_deg()? - future_sc.orbit.aop_deg()?
     );
     println!(
@@ -167,7 +170,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // We also have access to the full trajectory throughout the propagation.
     println!("{trajectory}");
 
-    // With the trajectory, let's build a few data products (we want to analyze something after all).
+    // With the trajectory, let's build a few data products.
 
     // 1. Export the trajectory as a CCSDS OEM version 2.0 file and as a parquet file, which includes the Keplerian orbital elements.
 
@@ -189,14 +192,15 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let boulder_station = GroundStation::from_point(
         "Boulder, CO, USA".to_string(),
-        40.014984,
-        -105.270546,
-        1655.0,
+        40.014984,   // latitude in degrees
+        -105.270546, // longitude in degrees
+        1.6550,      // altitude in kilometers
         almanac.frame_from_uid(IAU_EARTH_FRAME)?,
     );
 
     // We iterate over the trajectory, grabbing a state every two minutes.
     let mut offset_s = vec![];
+    let mut epoch_str = vec![];
     let mut ric_x_km = vec![];
     let mut ric_y_km = vec![];
     let mut ric_z_km = vec![];
@@ -210,14 +214,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut range_rate_km_s = vec![];
     for state in trajectory.every(Unit::Minute * 2) {
         // Try to compute the Keplerian/two body state just in time.
-        // This method sometimes fails to converge on an appropriate true anomaly
+        // This method occasionally fails to converge on an appropriate true anomaly
         // from the mean anomaly. If that happens, we just skip this state.
         // The high fidelity and Keplerian states diverge continuously, and we're curious
-        // about the divergence.
+        // about the divergence in this quick analysis.
         let this_epoch = state.epoch();
         match orbit.at_epoch(this_epoch) {
             Ok(tb_then) => {
                 offset_s.push((this_epoch - orbit.epoch).to_seconds());
+                epoch_str.push(format!("{this_epoch}"));
                 // Compute the two body state just in time.
                 let ric = state.orbit.ric_difference(&tb_then)?;
                 ric_x_km.push(ric.radius_km.x);
@@ -227,10 +232,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 ric_vy_km_s.push(ric.velocity_km_s.y);
                 ric_vz_km_s.push(ric.velocity_km_s.z);
 
-                // Compute the AER data
+                // Compute the AER data for each state.
                 let aer = almanac.azimuth_elevation_range_sez(
-                    boulder_station.to_orbit(this_epoch, &almanac)?,
                     state.orbit,
+                    boulder_station.to_orbit(this_epoch, &almanac)?,
                 )?;
                 azimuth_deg.push(aer.azimuth_deg);
                 elevation_deg.push(aer.elevation_deg);
@@ -241,8 +246,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         };
     }
 
+    // Build the data frames.
     let ric_df = df!(
         "Offset (s)" => offset_s.clone(),
+        "Epoch" => epoch_str.clone(),
         "RIC X (km)" => ric_x_km,
         "RIC Y (km)" => ric_y_km,
         "RIC Z (km)" => ric_z_km,
@@ -254,7 +261,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("RIC difference at start\n{}", ric_df.head(Some(10)));
     println!("RIC difference at end\n{}", ric_df.tail(Some(10)));
 
-    let aer_df = df!("Offset (s)" => offset_s.clone(),
+    let aer_df = df!(
+        "Offset (s)" => offset_s.clone(),
+        "Epoch" => epoch_str.clone(),
         "azimuth (deg)" => azimuth_deg,
         "elevation (deg)" => elevation_deg,
         "range (km)" => range_km,
