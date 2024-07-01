@@ -942,14 +942,7 @@ fn od_tb_ckf_map_covar(almanac: Arc<Almanac>) {
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp: ODProcess<
-        SpacecraftDynamics,
-        nyx::propagators::RSSCartesianStep,
-        RangeDoppler,
-        nalgebra::Const<3>,
-        Spacecraft,
-        KF<Spacecraft, nalgebra::Const<3>, nalgebra::Const<2>>,
-    > = ODProcess::ckf(prop_est, ckf, None, almanac);
+    let mut odp: SpacecraftODProcess = ODProcess::ckf(prop_est, ckf, None, almanac);
 
     odp.predict_for(30.seconds(), duration).unwrap();
 

@@ -15,11 +15,26 @@ Nyx is revolutionizing the field of flight dynamics engineering as a powerful, o
 
 # Documentation
 
-The documentation is currently being updated. If there's a specific use case you'd like to see, please [open a Github issue](https://github.com/nyx-space/nyx/issues/new?assignees=&labels=Documentation&projects=&template=documentation.md&title=) or [use the contact form](https://7ug5imdtt8v.typeform.com/to/neFvVW3p) directly.
+The documentation is currently being updated. If you have specific use cases you would like to see documented, please [open a Github issue](https://github.com/nyx-space/nyx/issues/new?assignees=&labels=Documentation&projects=&template=documentation.md&title=) or [use the contact form](https://7ug5imdtt8v.typeform.com/to/neFvVW3p).
+
+## Quick start
+
+### Rust
+
+To install Nyx, follow these steps:
+1. Clone the repository: `git clone https://github.com/nyx-space/nyx.git`
+2. Navigate to the directory: `cd nyx`
+3. Run any of the [examples](./examples/), e.g. `RUST_LOG=info cargo run --example 01_orbit_prop --release`
+
+### Python
+
+For Python projects, get started by installing the library via `pip`: `pip install nyx_space`.
+
+**Important:** The Python package has been temporarily disabled. Refer to <https://github.com/nyx-space/nyx/issues/311> for details.
 
 # License
 
-Nyx is provided under the AGPLv3 License. By using this software, you assume responsibility for adhering to the license. Refer to [the pricing page](https://nyxspace.com/pricing/) for an FAQ on the AGPLv3 license. Notably, any software that incorporates, links to, or depends on Nyx must also be released under the AGPLv3 license, even if you distribute an unmodified version of Nyx.
+Nyx is provided under the [AGPLv3 License](./LICENSE). By using this software, you assume responsibility for adhering to the license. Refer to [the pricing page](https://nyxspace.com/pricing/) for an FAQ on the AGPLv3 license. Notably, any software that incorporates, links to, or depends on Nyx must also be released under the AGPLv3 license, even if you distribute an unmodified version of Nyx.
 
 
 [cratesio-image]: https://img.shields.io/crates/v/nyx-space.svg
@@ -27,5 +42,7 @@ Nyx is provided under the AGPLv3 License. By using this software, you assume res
 [docsrs-image]: https://docs.rs/nyx-space/badge.svg
 [docsrs]: https://rustdoc.nyxspace.com/
 
-# Who am I?
-An GNC and flight dynamics engineer with a heavy background in software. I currently work for Rocket Lab USA as the lead flight dynamics engineer on both Blue Ghost lunar lander missions. -- Find me on [LinkedIn](https://www.linkedin.com/in/chrisrabotin/).
+# Author information
+> Chris Rabotin is a GNC and flight dynamics engineer with a heavy background in software.
+
+I currently work for Rocket Lab USA as the lead flight dynamics engineer on both Blue Ghost lunar lander missions. -- Find me on [LinkedIn](https://www.linkedin.com/in/chrisrabotin/).

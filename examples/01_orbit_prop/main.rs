@@ -92,7 +92,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .orbit(orbit)
         .dry_mass_kg(9.60)
         .srp(SrpConfig {
-            area_m2: 100e-4,
+            area_m2: 10e-4,
             cr: 1.1,
         })
         .build();

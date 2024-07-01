@@ -29,6 +29,8 @@ pub mod residual;
 pub use residual::Residual;
 pub mod kfestimate;
 pub use kfestimate::KfEstimate;
+mod sc_uncertainty;
+pub use sc_uncertainty::SpacecraftUncertainty;
 
 /// Stores an Estimate, as the result of a `time_update` or `measurement_update`.
 pub trait Estimate<T: State>

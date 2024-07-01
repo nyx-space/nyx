@@ -208,7 +208,7 @@ where
         fields.retain(|param| match self.first().value(*param) {
             Ok(_) => true,
             Err(_) => {
-                warn!("Removed unavailable field `{param}` from trajectory export",);
+                warn!("Removed unavailable field `{param}` from trajectory export");
                 false
             }
         });
