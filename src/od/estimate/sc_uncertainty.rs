@@ -59,6 +59,8 @@ pub struct SpacecraftUncertainty {
 
 impl SpacecraftUncertainty {
     /// Builds a Kalman filter estimate for a spacecraft state, ready to ingest into an OD Process.
+    ///
+    /// Note: this function will rotate from the provided local frame into the inertial frame with the same central body.
     pub fn to_estimate(&self) -> PhysicsResult<KfEstimate<Spacecraft>> {
         if self.x_km < 0.0
             || self.y_km < 0.0

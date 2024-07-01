@@ -145,4 +145,11 @@ pub enum MonteCarloError {
     StateError { source: StateError },
     #[snafu(display("for {param}, expected percentage between 0.0 and 1.0 but got {prct}"))]
     ParamPercentage { param: StateParameter, prct: f64 },
+    #[snafu(display(
+        "could {action} because none of the Monte Carlo {num_runs} runs were successful"
+    ))]
+    NoSuccessfulRuns {
+        action: &'static str,
+        num_runs: usize,
+    },
 }

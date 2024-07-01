@@ -15,14 +15,31 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
+
+use std::collections::HashMap;
+use std::error::Error;
+use std::fs::File;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+use crate::errors::{MonteCarloError, NoSuccessfulRunsSnafu, StateError};
+use crate::io::watermark::pq_writer;
+use crate::io::{ExportCfg, InputOutputError};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
+use crate::md::prelude::GuidanceMode;
 use crate::md::trajectory::{Interpolatable, Traj};
-use crate::md::StateParameter;
+use crate::md::{EventEvaluator, StateParameter};
 use crate::propagators::PropagationError;
-use crate::time::{Duration, Epoch};
-use crate::NyxError;
+use crate::time::{Duration, Epoch, TimeUnits};
+use anise::almanac::Almanac;
+use anise::constants::frames::EARTH_J2000;
+use arrow::array::{Array, Float64Builder, Int32Builder, StringBuilder};
+use arrow::datatypes::{DataType, Field, Schema};
+use arrow::record_batch::RecordBatch;
+use parquet::arrow::ArrowWriter;
 pub use rstats::Stats;
+use snafu::ensure;
 
 use super::DispersedState;
 
@@ -216,7 +233,7 @@ where
     }
 
     /// Returns the dispersion values of the requested state parameter
-    pub fn dispersion_values_of(&self, param: StateParameter) -> Result<Vec<f64>, NyxError> {
+    pub fn dispersion_values_of(&self, param: StateParameter) -> Result<Vec<f64>, MonteCarloError> {
         let mut report = Vec::with_capacity(self.runs.len());
         'run_loop: for run in &self.runs {
             for (dparam, val) in &run.dispersed_state.actual_dispersions {
@@ -226,11 +243,200 @@ where
                 }
             }
             // Oh, this parameter was not found!
-            return Err(NyxError::StateParameterUnavailable {
-                param,
-                msg: "not among dispersions of Monte Carlo setup".to_string(),
+            return Err(MonteCarloError::StateError {
+                source: StateError::Unavailable { param },
             });
         }
         Ok(report)
+    }
+
+    pub fn to_parquet<P: AsRef<Path>>(
+        &self,
+        path: P,
+        events: Option<Vec<&dyn EventEvaluator<S>>>,
+        cfg: ExportCfg,
+        almanac: Arc<Almanac>,
+    ) -> Result<PathBuf, Box<dyn Error>> {
+        let tick = Epoch::now().unwrap();
+        info!("Exporting Monte Carlo results to parquet file...");
+
+        // Grab the path here before we move stuff.
+        let path_buf = cfg.actual_path(path);
+
+        // Build the schema
+        let mut hdrs = vec![
+            Field::new("Epoch:Gregorian UTC", DataType::Utf8, false),
+            Field::new("Epoch:Gregorian TAI", DataType::Utf8, false),
+            Field::new("Epoch:TAI (s)", DataType::Float64, false),
+            Field::new("Monte Carlo Run Index", DataType::Int32, false),
+        ];
+
+        // Use the first successful run to build up some data shared for all
+        let mut frame = EARTH_J2000;
+        let mut fields = match cfg.fields {
+            Some(fields) => fields,
+            None => S::export_params(),
+        };
+
+        let mut start = None;
+        let mut end = None;
+
+        // Literally all of the states of all the successful runs.
+        let mut all_states: Vec<S> = vec![];
+        let mut run_indexes: Vec<i32> = vec![];
+
+        for run in &self.runs {
+            if let Ok(success) = &run.result {
+                if start.is_none() {
+                    // No need to check other states.
+                    frame = success.state.frame();
+
+                    // Check that we can retrieve this information
+                    fields.retain(|param| match success.state.value(*param) {
+                        Ok(_) => true,
+                        Err(_) => false,
+                    });
+
+                    start = Some(success.traj.first().epoch());
+                    end = Some(success.state.epoch());
+                }
+
+                // Build the states iterator.
+                let states =
+                    if cfg.start_epoch.is_some() || cfg.end_epoch.is_some() || cfg.step.is_some() {
+                        // Must interpolate the data!
+                        let start = cfg.start_epoch.unwrap_or_else(|| start.unwrap());
+                        let end = cfg.end_epoch.unwrap_or_else(|| end.unwrap());
+                        let step = cfg.step.unwrap_or_else(|| 1.minutes());
+                        success
+                            .traj
+                            .every_between(step, start, end)
+                            .collect::<Vec<S>>()
+                    } else {
+                        success.traj.states.to_vec()
+                    };
+                all_states.extend(states.iter());
+                run_indexes.push(run.index as i32);
+            }
+        }
+
+        ensure!(
+            start.is_some(),
+            NoSuccessfulRunsSnafu {
+                action: "export",
+                num_runs: self.runs.len()
+            }
+        );
+
+        let more_meta = Some(vec![(
+            "Frame".to_string(),
+            serde_dhall::serialize(&frame).to_string().map_err(|e| {
+                Box::new(InputOutputError::SerializeDhall {
+                    what: format!("frame `{frame}`"),
+                    err: e.to_string(),
+                })
+            })?,
+        )]);
+
+        for field in &fields {
+            hdrs.push(field.to_field(more_meta.clone()));
+        }
+
+        if let Some(events) = events.as_ref() {
+            for event in events {
+                let field = Field::new(format!("{event}"), DataType::Float64, false);
+                hdrs.push(field);
+            }
+        }
+
+        // Build the schema
+        let schema = Arc::new(Schema::new(hdrs));
+        let mut record: Vec<Arc<dyn Array>> = Vec::new();
+
+        // Build all of the records
+
+        // Epochs
+        let mut utc_epoch = StringBuilder::new();
+        let mut tai_epoch = StringBuilder::new();
+        let mut tai_s = Float64Builder::new();
+        let mut idx_col = Int32Builder::new();
+        for (sno, s) in all_states.iter().enumerate() {
+            utc_epoch.append_value(format!("{}", s.epoch()));
+            tai_epoch.append_value(format!("{:x}", s.epoch()));
+            tai_s.append_value(s.epoch().to_tai_seconds());
+            // Copy this a bunch of times because all columns must have the same length
+            // TODO: I need to keep track of when a new run actually start here!
+            idx_col.append_value(run_indexes[sno]);
+        }
+        record.push(Arc::new(utc_epoch.finish()));
+        record.push(Arc::new(tai_epoch.finish()));
+        record.push(Arc::new(tai_s.finish()));
+        record.push(Arc::new(idx_col.finish()));
+
+        // Add all of the fields
+        for field in fields {
+            if field == StateParameter::GuidanceMode {
+                let mut guid_mode = StringBuilder::new();
+                for s in &all_states {
+                    guid_mode
+                        .append_value(format!("{:?}", GuidanceMode::from(s.value(field).unwrap())));
+                }
+                record.push(Arc::new(guid_mode.finish()));
+            } else {
+                let mut data = Float64Builder::new();
+                for s in &all_states {
+                    data.append_value(s.value(field).unwrap());
+                }
+                record.push(Arc::new(data.finish()));
+            }
+        }
+
+        info!(
+            "Serialized {} states from {} to {}",
+            all_states.len(),
+            start.unwrap(),
+            end.unwrap()
+        );
+
+        // Add all of the evaluated events
+        if let Some(events) = events {
+            info!("Evaluating {} event(s)", events.len());
+            for event in events {
+                let mut data = Float64Builder::new();
+                for s in &all_states {
+                    data.append_value(event.eval(s, almanac.clone()).map_err(Box::new)?);
+                }
+                record.push(Arc::new(data.finish()));
+            }
+        }
+
+        // Serialize all of the devices and add that to the parquet file too.
+        let mut metadata = HashMap::new();
+        metadata.insert(
+            "Purpose".to_string(),
+            "Monte Carlo Trajectory data".to_string(),
+        );
+        if let Some(add_meta) = cfg.metadata {
+            for (k, v) in add_meta {
+                metadata.insert(k, v);
+            }
+        }
+
+        let props = pq_writer(Some(metadata));
+
+        let file = File::create(&path_buf)?;
+        let mut writer = ArrowWriter::try_new(file, schema.clone(), props).unwrap();
+
+        let batch = RecordBatch::try_new(schema, record)?;
+        writer.write(&batch)?;
+        writer.close()?;
+
+        // Return the path this was written to
+        let tock_time = Epoch::now().unwrap() - tick;
+        info!(
+            "Trajectory written to {} in {tock_time}",
+            path_buf.display()
+        );
+        Ok(path_buf)
     }
 }

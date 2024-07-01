@@ -9,20 +9,17 @@ use anise::{
         frames::{EARTH_J2000, MOON_J2000},
     },
 };
-use hifitime::{Epoch, TimeUnits, Unit};
-use log::warn;
+use hifitime::{TimeUnits, Unit};
 use nyx::{
-    cosmic::{Frame, MetaAlmanac, Orbit, SrpConfig},
-    dynamics::{
-        guidance::LocalFrame, Harmonics, OrbitalDynamics, SolarPressure, SpacecraftDynamics,
-    },
-    io::{gravity::HarmonicsMem, ExportCfg},
+    cosmic::{eclipse::EclipseLocator, Frame, MetaAlmanac, SrpConfig},
+    dynamics::{guidance::LocalFrame, OrbitalDynamics, SolarPressure, SpacecraftDynamics},
+    io::ExportCfg,
     linalg::{Matrix2, Vector2},
-    od::{prelude::KF, process::SpacecraftUncertainty, GroundStation, SpacecraftODProcess},
+    mc::MonteCarlo,
+    od::{prelude::KF, process::SpacecraftUncertainty, SpacecraftODProcess},
     propagators::Propagator,
     Spacecraft, State,
 };
-use polars::{df, series::ChunkCompare};
 
 use std::{error::Error, sync::Arc};
 
@@ -111,7 +108,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // All of the analysis will use this duration.
     let prediction_duration = 30.5 * Unit::Hour;
 
-    // Covariance mapping
+    // === Covariance mapping ===
     // For the covariance mapping / prediction, we'll use the common orbit determination approach.
     // This is done by setting up a spacecraft OD process, and predicting for the analysis duration.
 
@@ -119,13 +116,47 @@ fn main() -> Result<(), Box<dyn Error>> {
     let ckf = KF::no_snc(jwst_estimate, measurement_noise);
 
     // Build the propagation instance for the OD process.
-    let prop_est = setup.with(Spacecraft::from(jwst).with_stm(), almanac.clone());
-    let mut odp = SpacecraftODProcess::ckf(prop_est, ckf, None, almanac);
+    let prop = setup.with(Spacecraft::from(jwst).with_stm(), almanac.clone());
+    let mut odp = SpacecraftODProcess::ckf(prop, ckf, None, almanac.clone());
 
     // Define the prediction step, i.e. how often we want to know the covariance.
     let step = 1_i64.minutes();
     // Finally, predict, and export the trajectory with covariance to a parquet file.
     odp.predict_for(step, prediction_duration)?;
     odp.to_parquet("./02_jwst_covar_map.parquet", ExportCfg::default())?;
+
+    // === Monte Carlo framework ===
+    // Nyx comes with a complete multi-threaded Monte Carlo frame. It's blazing fast.
+
+    let my_mc = MonteCarlo::new(
+        jwst, // Nominal state
+        jwst_estimate.to_random_variable()?,
+        "02_jwst".to_string(), // Scenario name
+        None, // No specific seed specified, so one will be drawn from the computer's entropy.
+    );
+
+    let num_runs = 5_000;
+    let rslts = my_mc.run_until_epoch(
+        setup,
+        almanac.clone(),
+        jwst.epoch() + prediction_duration,
+        num_runs,
+    );
+
+    assert_eq!(rslts.runs.len(), num_runs);
+    // Finally, export these results, computing the eclipse percentage for all of these results.
+
+    // Set up the event evaluator, here it's the eclipse computation.
+    let eclipse_loc = EclipseLocator::cislunar(almanac.clone());
+    let umbra_event = eclipse_loc.to_umbra_event();
+    let penumbra_event = eclipse_loc.to_penumbra_event();
+
+    rslts.to_parquet(
+        "02_jwst_monte_carlo.parquet",
+        Some(vec![&umbra_event, &penumbra_event]),
+        ExportCfg::default(),
+        almanac,
+    )?;
+
     Ok(())
 }

@@ -31,8 +31,9 @@ fn test_monte_carlo_epoch(almanac: Arc<Almanac>) {
 
     // Build the state generator using a Gaussian distribution (you may use any distribution from rand_distr)
     // 5% error on SMA and 5% on Eccentricity
-    let generator = GaussianGenerator::from_std_dev_prcts(
-        Spacecraft::from(state),
+    let nominal_state = Spacecraft::from(state);
+    let random_state = GaussianGenerator::from_std_dev_prcts(
+        nominal_state,
         &[
             (StateParameter::SMA, 0.05),
             (StateParameter::Eccentricity, 0.05),
@@ -52,8 +53,9 @@ fn test_monte_carlo_epoch(almanac: Arc<Almanac>) {
     // Setup the Monte Carlo
 
     let my_mc = MonteCarlo {
-        generator,
-        seed: 0,
+        random_state,
+        nominal_state,
+        seed: Some(0),
         scenario: "test_monte_carlo_epoch".to_string(),
     };
 

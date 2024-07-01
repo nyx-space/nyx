@@ -207,10 +207,7 @@ where
         // Check that we can retrieve this information
         fields.retain(|param| match self.first().value(*param) {
             Ok(_) => true,
-            Err(_) => {
-                warn!("Removed unavailable field `{param}` from trajectory export");
-                false
-            }
+            Err(_) => false,
         });
 
         for field in &fields {
@@ -281,7 +278,6 @@ where
 
         // Add all of the evaluated events
         if let Some(events) = events {
-            // warn!("Adding events was removed when switching to ANISE");
             info!("Evaluating {} event(s)", events.len());
             for event in events {
                 let mut data = Float64Builder::new();

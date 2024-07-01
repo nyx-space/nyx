@@ -19,9 +19,9 @@
 use super::{Estimate, State};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, Matrix, OMatrix, OVector};
-use crate::mc::GaussianGenerator;
+use crate::mc::{GaussianGenerator, MultivariateNormal};
 use crate::md::StateParameter;
-use crate::Spacecraft;
+use crate::{NyxError, Spacecraft};
 use nalgebra::Const;
 use rand::SeedableRng;
 use rand_distr::Distribution;
@@ -143,6 +143,25 @@ impl KfEstimate<Spacecraft> {
             predicted: true,
             stm: OMatrix::<f64, Const<9>, Const<9>>::identity(),
         }
+    }
+
+    /// Builds a multivariate random variable from this estimate's nominal state and covariance, zero mean.
+    pub fn to_random_variable(&self) -> Result<MultivariateNormal<Spacecraft>, NyxError> {
+        MultivariateNormal::zero_mean(
+            self.nominal_state,
+            vec![
+                StateParameter::X,
+                StateParameter::Y,
+                StateParameter::Z,
+                StateParameter::VX,
+                StateParameter::VY,
+                StateParameter::VZ,
+                StateParameter::Cr,
+                StateParameter::Cd,
+                StateParameter::FuelMass,
+            ],
+            self.covar,
+        )
     }
 }
 
