@@ -146,7 +146,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     assert_eq!(rslts.runs.len(), num_runs);
     // Finally, export these results, computing the eclipse percentage for all of these results.
 
-    // Set up the event evaluator, here it's the eclipse computation.
+    // For all of the resulting trajectories, we'll want to compute the percentage of penumbra and umbra.
     let eclipse_loc = EclipseLocator::cislunar(almanac.clone());
     let umbra_event = eclipse_loc.to_umbra_event();
     let penumbra_event = eclipse_loc.to_penumbra_event();

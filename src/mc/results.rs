@@ -315,8 +315,11 @@ where
                     } else {
                         success.traj.states.to_vec()
                     };
+                // Mark all of these states as part of this run index.
+                for _ in 0..states.len() {
+                    run_indexes.push(run.index as i32);
+                }
                 all_states.extend(states.iter());
-                run_indexes.push(run.index as i32);
             }
         }
 
@@ -365,7 +368,6 @@ where
             tai_epoch.append_value(format!("{:x}", s.epoch()));
             tai_s.append_value(s.epoch().to_tai_seconds());
             // Copy this a bunch of times because all columns must have the same length
-            // TODO: I need to keep track of when a new run actually start here!
             idx_col.append_value(run_indexes[sno]);
         }
         record.push(Arc::new(utc_epoch.finish()));
