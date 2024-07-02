@@ -20,3 +20,13 @@ First, we'll use a _covariance mapping_ approach, whereby the covariance at some
 Then, we'll use the Monte Carlo framework of Nyx to propagate the initial spacecraft state after dispersions using all threads of the computer. Multi-threaded propagation is not common in other astrodynamics software.
 
 Finally, we'll check that the 3-sigma (i.e. 99.7%) covariance bounds of the covariance mapping approach matches the Monte Carlo results in terms of uncertainty in the state vector.
+
+## Analysis
+
+**Follow on work in [#327](https://github.com/nyx-space/nyx/issues/327).**
+
+![JWST MC X (km)](./jwst_mc_X_km.png)
+
+![JWST MC Y (km)](./jwst_mc_Y_km.png)
+
+![JWST MC Z (km)](./jwst_mc_Z_km.png)

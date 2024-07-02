@@ -441,9 +441,7 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
     // Check that the position and velocity estimates are present, along with the epochs
     assert!(df
         .columns([
-            "Epoch:Gregorian UTC",
-            "Epoch:Gregorian TAI",
-            "Epoch:TAI (s)",
+            "Epoch (UTC)",
             "x (km)",
             "y (km)",
             "z (km)",

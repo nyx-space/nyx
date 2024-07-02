@@ -166,9 +166,7 @@ def plot_ground_track(
 
     for name, (lat, long) in landmarks.items():
         print(f"Adding landmark {name} at lat={lat}, long={long}")
-        fig.add_trace(
-            go.Scattergeo(lon=[float(long)], lat=[float(lat)], name=name.strip())
-        )
+        fig.add_trace(go.Scattergeo(lon=[float(long)], lat=[float(lat)], name=name.strip()))
 
     fig.update_geos(
         lataxis_showgrid=True,
@@ -373,9 +371,7 @@ def plot_traj_errors(
                     col=col_i + 1,
                 )
             except KeyError:
-                raise KeyError(
-                    f"Rebuild the trajectory and export the RIC frame: missing `{col}`"
-                )
+                raise KeyError(f"Rebuild the trajectory and export the RIC frame: missing `{col}`")
         if vertical:
             col_i += 1
         else:

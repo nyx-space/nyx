@@ -161,7 +161,8 @@ impl EclipseLocator {
         Ok(state)
     }
 
-    /// Creates an umbra event from this eclipse locator
+    /// Creates an umbra event from this eclipse locator.
+    /// Evaluation of the event, returns 0.0 for umbra, 1.0 for visibility (no shadow) and some value in between for penumbra
     pub fn to_umbra_event(&self) -> UmbraEvent {
         UmbraEvent {
             e_loc: self.clone(),
@@ -169,6 +170,7 @@ impl EclipseLocator {
     }
 
     /// Creates a penumbra event from this eclipse locator
+    // Evaluation of the event, returns 0.0 for umbra, 1.0 for visibility (no shadow) and some value in between for penumbra
     pub fn to_penumbra_event(&self) -> PenumbraEvent {
         PenumbraEvent {
             e_loc: self.clone(),
@@ -188,7 +190,7 @@ impl fmt::Display for UmbraEvent {
 }
 
 impl EventEvaluator<Spacecraft> for UmbraEvent {
-    // Evaluation of the event, returns 0.0 for umbra, 1.0 for visibility and some value in between for penumbra
+    // Evaluation of the event, returns 0.0 for umbra, 1.0 for visibility (no shadow) and some value in between for penumbra
     fn eval(&self, sc: &Spacecraft, almanac: Arc<Almanac>) -> Result<f64, EventError> {
         match self
             .e_loc

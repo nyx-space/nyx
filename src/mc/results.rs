@@ -37,6 +37,7 @@ use anise::constants::frames::EARTH_J2000;
 use arrow::array::{Array, Float64Builder, Int32Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
+use hifitime::TimeScale;
 use parquet::arrow::ArrowWriter;
 pub use rstats::Stats;
 use snafu::ensure;
@@ -265,9 +266,7 @@ where
 
         // Build the schema
         let mut hdrs = vec![
-            Field::new("Epoch:Gregorian UTC", DataType::Utf8, false),
-            Field::new("Epoch:Gregorian TAI", DataType::Utf8, false),
-            Field::new("Epoch:TAI (s)", DataType::Float64, false),
+            Field::new("Epoch (UTC)", DataType::Utf8, false),
             Field::new("Monte Carlo Run Index", DataType::Int32, false),
         ];
 
@@ -360,19 +359,17 @@ where
 
         // Epochs
         let mut utc_epoch = StringBuilder::new();
-        let mut tai_epoch = StringBuilder::new();
-        let mut tai_s = Float64Builder::new();
         let mut idx_col = Int32Builder::new();
         for (sno, s) in all_states.iter().enumerate() {
-            utc_epoch.append_value(format!("{}", s.epoch()));
-            tai_epoch.append_value(format!("{:x}", s.epoch()));
-            tai_s.append_value(s.epoch().to_tai_seconds());
+            utc_epoch.append_value(format!(
+                "{}",
+                s.epoch().to_time_scale(TimeScale::UTC).to_isoformat()
+            ));
+
             // Copy this a bunch of times because all columns must have the same length
             idx_col.append_value(run_indexes[sno]);
         }
         record.push(Arc::new(utc_epoch.finish()));
-        record.push(Arc::new(tai_epoch.finish()));
-        record.push(Arc::new(tai_s.finish()));
         record.push(Arc::new(idx_col.finish()));
 
         // Add all of the fields

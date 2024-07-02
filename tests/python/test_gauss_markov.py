@@ -16,10 +16,7 @@ def test_fogm(plot=False):
 
     gm = GaussMarkov(tau=Unit.Hour * 24, sigma=5.6, steady_state=0.5)
     print(gm)
-    assert (
-        str(gm)
-        == "First order Gauss-Markov process with τ = 1 days, σ_b = 5.6, σ_q = 0.5"
-    )
+    assert str(gm) == "First order Gauss-Markov process with τ = 1 days, σ_b = 5.6, σ_q = 0.5"
     gm.simulate(str(outpath.joinpath("fogm.parquet")))
 
     # Read in the file
