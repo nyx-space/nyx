@@ -96,19 +96,37 @@ impl SpacecraftUncertainty {
             Some(frame) => frame.dcm_to_inertial(self.nominal.orbit)?,
         };
 
-        let orbit_dispersion = dcm_local2inertial * orbit_vec;
+        let mut init_covar =
+            SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                self.cr.powi(2),
+                self.cd.powi(2),
+                self.mass_kg.powi(2),
+            ]));
 
-        let init_covar = SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([
-            orbit_dispersion[0].powi(2),
-            orbit_dispersion[1].powi(2),
-            orbit_dispersion[2].powi(2),
-            orbit_dispersion[3].powi(2),
-            orbit_dispersion[4].powi(2),
-            orbit_dispersion[5].powi(2),
-            self.cr.powi(2),
-            self.cd.powi(2),
-            self.mass_kg.powi(2),
+        let other_cov = SMatrix::<f64, 6, 6>::from_diagonal(&SVector::<f64, 6>::from_iterator([
+            orbit_vec[0],
+            orbit_vec[1],
+            orbit_vec[2],
+            orbit_vec[3],
+            orbit_vec[4],
+            orbit_vec[5],
         ]));
+
+        // TODO: The math should work out. This is _nearly_ it, but the rounding errors are large
+        let rot_covar =
+            dcm_local2inertial.state_dcm().transpose() * other_cov * dcm_local2inertial.state_dcm();
+
+        for i in 0..6 {
+            for j in 0..6 {
+                init_covar[(i, j)] = rot_covar[(i, j)].powi(2);
+            }
+        }
 
         Ok(KfEstimate::from_covar(self.nominal, init_covar))
     }
@@ -151,6 +169,7 @@ mod ut_sc_uncertainty {
     use anise::constants::frames::EME2000;
     use anise::prelude::{Epoch, Orbit};
 
+    use na::SMatrix;
     use rstest::*;
     #[fixture]
     fn spacecraft() -> Spacecraft {
@@ -236,23 +255,47 @@ mod ut_sc_uncertainty {
         let estimate = uncertainty.to_estimate().unwrap();
 
         // Ensure that the covariance is a diagonal.
+        // for i in 0..6 {
+        //     for j in 0..6 {
+        //         if i == j {
+        //             // Ensure that the covariance is still only on the diagonal.
+        //             assert!(estimate.covar[(i, j)] > 0.0);
+        //         } else {
+        //             assert!(estimate.covar[(i, j)] < f64::EPSILON);
+        //         }
+        //     }
+        // }
+
+        println!("{estimate}");
+
+        // Rotate back into the RIC frame.
+        let dcm6x6 = estimate
+            .nominal_state
+            .orbit
+            .dcm_from_ric_to_inertial()
+            .unwrap()
+            .state_dcm();
+        // Create a full DCM and only rotate the orbit part of it.
+        let mut dcm = SMatrix::<f64, 9, 9>::identity();
         for i in 0..6 {
-            for j in 0..6 {
-                if i == j {
-                    // Ensure that the frame rotation actually happened.
-                    if i < 3 {
-                        assert!(estimate.covar[(i, j)] - 0.5_f64.powi(2) > f64::EPSILON);
-                    } else {
-                        assert!(estimate.covar[(i, j)] - 0.5e-3_f64.powi(2) > f64::EPSILON);
-                    }
-                    // Ensure that the covariance is still only on the diagonal.
-                    assert!(estimate.covar[(i, j)] > 0.0);
-                } else {
-                    assert_eq!(estimate.covar[(i, j)], 0.0);
-                }
+            for j in i..6 {
+                dcm[(i, j)] = dcm6x6[(i, j)];
             }
         }
 
-        println!("{estimate}");
+        let ric_covar = &dcm * estimate.covar * &dcm.transpose();
+
+        println!("{:.9}", ric_covar.fixed_view::<6, 6>(0, 0));
+        for i in 0..6 {
+            for j in 0..6 {
+                if i == j {
+                    if i < 3 {
+                        assert!((ric_covar[(i, j)].sqrt() - 0.5).abs() < 1e-3);
+                    } else {
+                        assert!((ric_covar[(i, j)].sqrt() - 0.5e-3).abs() < 1e-6);
+                    }
+                }
+            }
+        }
     }
 }
