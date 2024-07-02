@@ -118,7 +118,6 @@ impl SpacecraftUncertainty {
             orbit_vec[5],
         ]));
 
-        // TODO: The math should work out. This is _nearly_ it, but the rounding errors are large
         let rot_covar =
             dcm_local2inertial.state_dcm().transpose() * other_cov * dcm_local2inertial.state_dcm();
 
@@ -169,7 +168,6 @@ mod ut_sc_uncertainty {
     use anise::constants::frames::EME2000;
     use anise::prelude::{Epoch, Orbit};
 
-    use na::SMatrix;
     use rstest::*;
     #[fixture]
     fn spacecraft() -> Spacecraft {
@@ -226,8 +224,6 @@ mod ut_sc_uncertainty {
                 }
             }
         }
-
-        println!("{estimate}");
     }
 
     #[rstest]
@@ -254,45 +250,31 @@ mod ut_sc_uncertainty {
 
         let estimate = uncertainty.to_estimate().unwrap();
 
-        // Ensure that the covariance is a diagonal.
-        // for i in 0..6 {
-        //     for j in 0..6 {
-        //         if i == j {
-        //             // Ensure that the covariance is still only on the diagonal.
-        //             assert!(estimate.covar[(i, j)] > 0.0);
-        //         } else {
-        //             assert!(estimate.covar[(i, j)] < f64::EPSILON);
-        //         }
-        //     }
-        // }
-
         println!("{estimate}");
 
         // Rotate back into the RIC frame.
-        let dcm6x6 = estimate
+        let dcm_ric2inertial = estimate
             .nominal_state
             .orbit
             .dcm_from_ric_to_inertial()
             .unwrap()
             .state_dcm();
-        // Create a full DCM and only rotate the orbit part of it.
-        let mut dcm = SMatrix::<f64, 9, 9>::identity();
-        for i in 0..6 {
-            for j in i..6 {
-                dcm[(i, j)] = dcm6x6[(i, j)];
-            }
-        }
 
-        let ric_covar = &dcm * estimate.covar * &dcm.transpose();
+        // Build the matrix view of the orbit part of the covariance.
+        let orbit_cov = estimate.covar.fixed_view::<6, 6>(0, 0);
 
-        println!("{:.9}", ric_covar.fixed_view::<6, 6>(0, 0));
+        // Rotate back into the RIC frame
+        let ric_covar = &dcm_ric2inertial * orbit_cov * &dcm_ric2inertial.transpose();
+
+        println!("{:.9}", ric_covar);
         for i in 0..6 {
             for j in 0..6 {
                 if i == j {
+                    // We don't abs the data in the sqrt to ensure that the diag is positive.
                     if i < 3 {
-                        assert!((ric_covar[(i, j)].sqrt() - 0.5).abs() < 1e-3);
+                        assert!((ric_covar[(i, j)].sqrt() - 0.5).abs() < 1e-9);
                     } else {
-                        assert!((ric_covar[(i, j)].sqrt() - 0.5e-3).abs() < 1e-6);
+                        assert!((ric_covar[(i, j)].sqrt() - 0.5e-3).abs() < 1e-9);
                     }
                 }
             }
