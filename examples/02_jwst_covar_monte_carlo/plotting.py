@@ -101,3 +101,18 @@ if __name__ == "__main__":
             legend_title="Legend",
         )
         fig.show()
+
+    fig = go.Figure(
+        data=[
+            go.Scattergl(
+                x=df_mc["Epoch (UTC)"],
+                y=df_mc["sma (km)"],
+                mode="lines",
+                opacity=0.05,
+                showlegend=True,
+                name=f"[MC] SMA (km)",
+                text=df_mc["Monte Carlo Run Index"],
+            ),
+        ]
+    )
+    fig.show()

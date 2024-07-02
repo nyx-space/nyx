@@ -181,6 +181,7 @@ impl OrbitDual {
             StateParameter::SemiMinorAxis => {
                 Ok(self.semi_minor_axis().context(AstroPhysicsSnafu)?)
             }
+            StateParameter::TrueAnomaly => Ok(self.ta().context(AstroPhysicsSnafu)?),
             _ => Err(AstroError::PartialsUndefined),
         }
     }
