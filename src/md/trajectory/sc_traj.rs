@@ -16,21 +16,23 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anise::constants::orientations::J2000;
 use anise::prelude::{Almanac, Frame, Orbit};
-use hifitime::Epoch;
 use snafu::ResultExt;
 
 use super::TrajError;
 use super::{ExportCfg, Traj};
 use crate::cosmic::Spacecraft;
 use crate::errors::{FromAlmanacSnafu, NyxError};
+use crate::io::watermark::prj_name_ver;
 use crate::md::prelude::StateParameter;
 use crate::md::EventEvaluator;
-use crate::time::{Duration, TimeUnits};
+use crate::time::{Duration, Epoch, Format, Formatter, TimeUnits};
+use crate::State;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -134,13 +136,23 @@ impl Traj<Spacecraft> {
 
     /// Initialize a new spacecraft trajectory from the path to a CCSDS OEM file.
     ///
-    /// CCSDS OEM only contains the orbit information, so you must provide a template spacecraft since we'll upcast the orbit trajectory into a spacecraft trajectory.
-    pub fn from_oem_file<P: AsRef<Path>>(path: P, template: Spacecraft) -> Result<Self, NyxError> {
+    /// CCSDS OEM only contains the orbit information but Nyx builds spacecraft trajectories.
+    /// If not spacecraft template is provided, then a default massless spacecraft will be built.
+    pub fn from_oem_file<P: AsRef<Path>>(
+        path: P,
+        tpl_option: Option<Spacecraft>,
+    ) -> Result<Self, NyxError> {
         // Open the file
         let file = File::open(path).map_err(|e| NyxError::CCSDS {
             msg: format!("File opening error: {e}"),
         })?;
         let reader = BufReader::new(file);
+
+        let template = if tpl_option.is_none() {
+            Spacecraft::default()
+        } else {
+            tpl_option.unwrap()
+        };
 
         // Parse the Orbit Element messages
         let mut time_system = String::new();
@@ -246,5 +258,349 @@ impl Traj<Spacecraft> {
         traj.finalize();
 
         Ok(traj)
+    }
+
+    pub fn to_oem_file<P: AsRef<Path>>(
+        &self,
+        path: P,
+        cfg: ExportCfg,
+    ) -> Result<PathBuf, NyxError> {
+        if self.states.is_empty() {
+            return Err(NyxError::CCSDS {
+                msg: "Cannot export an empty trajectory to OEM".to_string(),
+            });
+        }
+        let tick = Epoch::now().unwrap();
+        info!("Exporting trajectory to CCSDS OEM file...");
+
+        // Grab the path here before we move stuff.
+        let path_buf = cfg.actual_path(path);
+
+        let metadata = cfg.metadata.unwrap_or_default();
+
+        let file = File::create(&path_buf).map_err(|e| NyxError::CCSDS {
+            msg: format!("File creation error: {e}"),
+        })?;
+        let mut writer = BufWriter::new(file);
+
+        let err_hdlr = |e| NyxError::CCSDS {
+            msg: format!("Could not write: {e}"),
+        };
+
+        // Build the states iterator -- this does require copying the current states but I can't either get a reference or a copy of all the states.
+        let states = if cfg.start_epoch.is_some() || cfg.end_epoch.is_some() || cfg.step.is_some() {
+            // Must interpolate the data!
+            let start = cfg.start_epoch.unwrap_or_else(|| self.first().epoch());
+            let end = cfg.end_epoch.unwrap_or_else(|| self.last().epoch());
+            let step = cfg.step.unwrap_or_else(|| 1.minutes());
+            self.every_between(step, start, end).collect()
+        } else {
+            self.states.to_vec()
+        };
+
+        // Epoch formmatter.
+        let iso8601_no_ts = Format::from_str("%Y-%m-%dT%H:%M:%S.%f").unwrap();
+
+        // Write mandatory metadata
+        writeln!(writer, "CCSDS_OMM_VERS = 2.0").map_err(err_hdlr)?;
+        writeln!(
+            writer,
+            "CREATION_DATE = {}",
+            Formatter::new(Epoch::now().unwrap(), iso8601_no_ts)
+        )
+        .map_err(err_hdlr)?;
+        writeln!(
+            writer,
+            "ORIGINATOR = {}\n",
+            metadata
+                .get("originator")
+                .unwrap_or(&"Nyx Space".to_string())
+        )
+        .map_err(err_hdlr)?;
+
+        writeln!(writer, "META_START").map_err(err_hdlr)?;
+        // Write optional metadata
+        if let Some(object_name) = metadata.get("object_name") {
+            writeln!(writer, "OBJECT_NAME = {}", object_name).map_err(err_hdlr)?;
+        } else if let Some(object_name) = &self.name {
+            writeln!(writer, "OBJECT_NAME = {}", object_name).map_err(err_hdlr)?;
+        }
+
+        let first_orbit = states[0].orbit;
+        let first_frame = first_orbit.frame;
+        let frame_str = format!(
+            "{first_frame:e} {}",
+            match first_frame.orientation_id {
+                J2000 => "ICRF".to_string(),
+                _ => format!("{first_frame:o}"),
+            }
+        );
+        let splt: Vec<&str> = frame_str.split(' ').collect();
+        let center = splt[0];
+        let ref_frame = frame_str.replace(center, " ");
+        writeln!(
+            writer,
+            "REF_FRAME = {}",
+            match ref_frame.trim() {
+                "J2000" => "ICRF",
+                _ => ref_frame.trim(),
+            }
+        )
+        .map_err(err_hdlr)?;
+
+        writeln!(writer, "CENTER_NAME = {center}",).map_err(err_hdlr)?;
+
+        writeln!(writer, "TIME_SYSTEM = {}", first_orbit.epoch.time_scale).map_err(err_hdlr)?;
+
+        writeln!(
+            writer,
+            "START_TIME = {}",
+            Formatter::new(states[0].epoch(), iso8601_no_ts)
+        )
+        .map_err(err_hdlr)?;
+        writeln!(
+            writer,
+            "USEABLE_START_TIME = {}",
+            Formatter::new(states[0].epoch(), iso8601_no_ts)
+        )
+        .map_err(err_hdlr)?;
+        writeln!(
+            writer,
+            "USEABLE_STOP_TIME = {}",
+            Formatter::new(states[states.len() - 1].epoch(), iso8601_no_ts)
+        )
+        .map_err(err_hdlr)?;
+        writeln!(
+            writer,
+            "STOP_TIME = {}",
+            Formatter::new(states[states.len() - 1].epoch(), iso8601_no_ts)
+        )
+        .map_err(err_hdlr)?;
+
+        writeln!(writer, "META_STOP\n").map_err(err_hdlr)?;
+
+        writeln!(
+            writer,
+            "COMMENT Generated by {} provided in AGPLv3 license -- https://nyxspace.com/\n",
+            prj_name_ver()
+        )
+        .map_err(err_hdlr)?;
+
+        for sc_state in &states {
+            let state = sc_state.orbit;
+            writeln!(
+                writer,
+                "{} {:E} {:E} {:E} {:E} {:E} {:E}",
+                Formatter::new(state.epoch, iso8601_no_ts),
+                state.radius_km.x,
+                state.radius_km.y,
+                state.radius_km.z,
+                state.velocity_km_s.x,
+                state.velocity_km_s.y,
+                state.velocity_km_s.z
+            )
+            .map_err(err_hdlr)?;
+        }
+
+        #[allow(clippy::writeln_empty_string)]
+        writeln!(writer, "").map_err(err_hdlr)?;
+
+        // Return the path this was written to
+        let tock_time = Epoch::now().unwrap() - tick;
+        info!(
+            "Trajectory written to {} in {tock_time}",
+            path_buf.display()
+        );
+        Ok(path_buf)
+    }
+}
+
+#[cfg(test)]
+mod ut_ccsds_oem {
+
+    use crate::md::prelude::{OrbitalDynamics, Propagator, SpacecraftDynamics};
+    use crate::time::{Epoch, TimeUnits};
+    use crate::Spacecraft;
+    use crate::{io::ExportCfg, md::prelude::Traj, Orbit};
+    use anise::almanac::Almanac;
+    use anise::constants::frames::MOON_J2000;
+    use pretty_env_logger;
+    use std::env;
+    use std::str::FromStr;
+    use std::sync::Arc;
+    use std::{collections::HashMap, path::PathBuf};
+
+    #[test]
+    fn test_load_oem_leo() {
+        // All three samples were taken from https://github.com/bradsease/oem/blob/main/tests/samples/real/
+        let path: PathBuf = [
+            env!("CARGO_MANIFEST_DIR"),
+            "data",
+            "tests",
+            "ccsds",
+            "oem",
+            "LEO_10s.oem",
+        ]
+        .iter()
+        .collect();
+
+        let _ = pretty_env_logger::try_init();
+
+        let traj: Traj<Spacecraft> = Traj::from_oem_file(path, None).unwrap();
+
+        // This trajectory has two duplicate epochs, which should be removed by the call to finalize()
+        assert_eq!(traj.states.len(), 361);
+        assert_eq!(traj.name.unwrap(), "TEST_OBJ".to_string());
+    }
+
+    #[test]
+    fn test_load_oem_meo() {
+        // All three samples were taken from https://github.com/bradsease/oem/blob/main/tests/samples/real/
+        let path: PathBuf = [
+            env!("CARGO_MANIFEST_DIR"),
+            "data",
+            "tests",
+            "ccsds",
+            "oem",
+            "MEO_60s.oem",
+        ]
+        .iter()
+        .collect();
+
+        let _ = pretty_env_logger::try_init();
+
+        let traj: Traj<Spacecraft> = Traj::from_oem_file(path, None).unwrap();
+
+        assert_eq!(traj.states.len(), 61);
+        assert_eq!(traj.name.unwrap(), "TEST_OBJ".to_string());
+    }
+
+    #[test]
+    fn test_load_oem_geo() {
+        use pretty_env_logger;
+        use std::env;
+
+        // All three samples were taken from https://github.com/bradsease/oem/blob/main/tests/samples/real/
+        let path: PathBuf = [
+            env!("CARGO_MANIFEST_DIR"),
+            "data",
+            "tests",
+            "ccsds",
+            "oem",
+            "GEO_20s.oem",
+        ]
+        .iter()
+        .collect();
+
+        let _ = pretty_env_logger::try_init();
+
+        let traj: Traj<Spacecraft> = Traj::from_oem_file(path, None).unwrap();
+
+        assert_eq!(traj.states.len(), 181);
+        assert_eq!(traj.name.as_ref().unwrap(), &"TEST_OBJ".to_string());
+
+        // Reexport this to CCSDS.
+        let cfg = ExportCfg::builder()
+            .timestamp(true)
+            .metadata(HashMap::from([
+                ("originator".to_string(), "Test suite".to_string()),
+                ("object_name".to_string(), "TEST_OBJ".to_string()),
+            ]))
+            .build();
+
+        let path: PathBuf = [
+            env!("CARGO_MANIFEST_DIR"),
+            "output_data",
+            "GEO_20s_rebuilt.oem",
+        ]
+        .iter()
+        .collect();
+
+        let out_path = traj.to_oem_file(path.clone(), cfg).unwrap();
+        // And reload, make sure we have the same data.
+        let traj_reloaded: Traj<Spacecraft> = Traj::from_oem_file(out_path, None).unwrap();
+
+        assert_eq!(traj_reloaded, traj);
+
+        // Now export after trimming one state on either end
+        let cfg = ExportCfg::builder()
+            .timestamp(true)
+            .metadata(HashMap::from([
+                ("originator".to_string(), "Test suite".to_string()),
+                ("object_name".to_string(), "TEST_OBJ".to_string()),
+            ]))
+            .step(20.seconds())
+            .start_epoch(traj.first().orbit.epoch + 1.seconds())
+            .end_epoch(traj.last().orbit.epoch - 1.seconds())
+            .build();
+        let out_path = traj.to_oem_file(path, cfg).unwrap();
+        // And reload, make sure we have the same data.
+        let traj_reloaded: Traj<Spacecraft> = Traj::from_oem_file(out_path, None).unwrap();
+
+        // Note that the number of states has changed because we interpolated with a step similar to the original one but
+        // we started with a different time.
+        assert_eq!(traj_reloaded.states.len(), traj.states.len() - 1);
+        assert_eq!(
+            traj_reloaded.first().orbit.epoch,
+            traj.first().orbit.epoch + 1.seconds()
+        );
+        // Note: because we used a fixed step, the last epoch is actually an offset of step size - end offset
+        // from the original trajectory
+        assert_eq!(
+            traj_reloaded.last().orbit.epoch,
+            traj.last().orbit.epoch - 19.seconds()
+        );
+    }
+
+    #[test]
+    fn test_moon_frame_long_prop() {
+        use std::path::PathBuf;
+
+        let manifest_dir =
+            PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string()));
+
+        let almanac = Almanac::new(
+            &manifest_dir
+                .clone()
+                .join("data/pck08.pca")
+                .to_string_lossy(),
+        )
+        .unwrap()
+        .load(&manifest_dir.join("data/de440s.bsp").to_string_lossy())
+        .unwrap();
+
+        let epoch = Epoch::from_str("2022-06-13T12:00:00").unwrap();
+        let orbit = Orbit::try_keplerian_altitude(
+            350.0,
+            0.02,
+            30.0,
+            45.0,
+            85.0,
+            0.0,
+            epoch,
+            almanac.frame_from_uid(MOON_J2000).unwrap(),
+        )
+        .unwrap();
+
+        let mut traj =
+            Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::two_body()))
+                .with(orbit.into(), Arc::new(almanac))
+                .for_duration_with_traj(45.days())
+                .unwrap()
+                .1;
+        // Set the name of this object
+        traj.name = Some("TEST_MOON_OBJ".to_string());
+
+        // Export CCSDS OEM file
+        let path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "output_data", "moon_45days.oem"]
+            .iter()
+            .collect();
+
+        let out_path = traj.to_oem_file(path, ExportCfg::default()).unwrap();
+
+        // And reload
+        let traj_reloaded: Traj<Spacecraft> = Traj::from_oem_file(out_path, None).unwrap();
+
+        assert_eq!(traj, traj_reloaded);
     }
 }

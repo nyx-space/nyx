@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::{Generator, Pcg64Mcg};
+use super::Pcg64Mcg;
 use crate::dynamics::Dynamics;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
@@ -31,6 +31,8 @@ use crate::time::{Duration, Epoch};
 use crate::State;
 use anise::almanac::Almanac;
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
+use log::info;
+use rand::SeedableRng;
 use rand_distr::Distribution;
 use rayon::prelude::ParallelIterator;
 use rayon::prelude::*;
@@ -43,7 +45,7 @@ use std::time::Instant as StdInstant;
 
 /// A Monte Carlo framework, automatically running on all threads via a thread pool. This framework is targeted toward analysis of time-continuous variables.
 /// One caveat of the design is that the trajectory is used for post processing, not each individual state. This may prevent some event switching from being shown in GNC simulations.
-pub struct MonteCarlo<S: Interpolatable, Distr: Distribution<f64> + Copy>
+pub struct MonteCarlo<S: Interpolatable, Distr: Distribution<DispersedState<S>>>
 where
     DefaultAllocator: Allocator<f64, S::Size>
         + Allocator<f64, S::Size, S::Size>
@@ -51,20 +53,34 @@ where
         + Allocator<usize, S::Size, S::Size>,
 {
     /// Seed of the [64bit PCG random number generator](https://www.pcg-random.org/index.html)
-    pub seed: u64,
+    pub seed: Option<u128>,
     /// Generator of states for the Monte Carlo run
-    pub generator: Generator<S, Distr>,
+    pub random_state: Distr,
     /// Name of this run, will be reflected in the progress bar and in the output structure
     pub scenario: String,
+    pub nominal_state: S,
 }
 
-impl<S: Interpolatable, Distr: Distribution<f64> + Copy> MonteCarlo<S, Distr>
+impl<S: Interpolatable, Distr: Distribution<DispersedState<S>>> MonteCarlo<S, Distr>
 where
     DefaultAllocator: Allocator<f64, S::Size>
         + Allocator<f64, S::Size, S::Size>
         + Allocator<f64, S::VecLength>
         + Allocator<usize, S::Size, S::Size>,
 {
+    pub fn new(
+        nominal_state: S,
+        random_variable: Distr,
+        scenario: String,
+        seed: Option<u128>,
+    ) -> Self {
+        Self {
+            random_state: random_variable,
+            seed,
+            scenario,
+            nominal_state,
+        }
+    }
     // Just the template for the progress bar
     fn progress_bar(&self, num_runs: usize) -> ProgressBar {
         let pb = ProgressBar::new(num_runs.try_into().unwrap());
@@ -126,7 +142,7 @@ where
         <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
     {
         // Generate the initial states
-        let init_states = self.generate_states(skip, num_runs);
+        let init_states = self.generate_states(skip, num_runs, self.seed);
         // Setup the progress bar
         let pb = self.progress_bar(num_runs);
         // Setup the thread friendly communication
@@ -135,6 +151,7 @@ where
         // Generate all states (must be done separately because the rng is not thread safe)
         #[cfg(not(target_arch = "wasm32"))]
         let start = StdInstant::now();
+
         init_states.par_iter().progress_with(pb).for_each_with(
             (prop, tx),
             |(prop, tx), (index, dispersed_state)| {
@@ -158,7 +175,7 @@ where
         #[cfg(not(target_arch = "wasm32"))]
         {
             let clock_time = StdInstant::now() - start;
-            println!(
+            info!(
                 "Propagated {} states in {}",
                 num_runs,
                 clock_time.as_secs_f64() * Unit::Second
@@ -220,7 +237,7 @@ where
         <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
     {
         // Generate the initial states
-        let init_states = self.generate_states(skip, num_runs);
+        let init_states = self.generate_states(skip, num_runs, self.seed);
         // Setup the progress bar
         let pb = self.progress_bar(num_runs);
         // Setup the thread friendly communication
@@ -253,7 +270,7 @@ where
         #[cfg(not(target_arch = "wasm32"))]
         {
             let clock_time = StdInstant::now() - start;
-            println!(
+            info!(
                 "Propagated {} states in {}",
                 num_runs,
                 clock_time.as_secs_f64() * Unit::Second
@@ -272,12 +289,20 @@ where
 
     /// Set up the seed and generate the states. This is useful for checking the generated states before running a large scale Monte Carlo.
     #[must_use = "Generated states for a Monte Carlo run must be used"]
-    pub fn generate_states(&self, skip: usize, num_runs: usize) -> Vec<(usize, DispersedState<S>)> {
+    pub fn generate_states(
+        &self,
+        skip: usize,
+        num_runs: usize,
+        seed: Option<u128>,
+    ) -> Vec<(usize, DispersedState<S>)> {
         // Setup the RNG
-        let rng = Pcg64Mcg::new(self.seed.into());
+        let rng = match seed {
+            Some(seed) => Pcg64Mcg::new(seed),
+            None => Pcg64Mcg::from_entropy(),
+        };
 
         // Generate the states, forcing the borrow as specified in the `sample_iter` docs.
-        (&self.generator)
+        (&self.random_state)
             .sample_iter(rng)
             .skip(skip)
             .take(num_runs)
@@ -286,7 +311,8 @@ where
     }
 }
 
-impl<S: Interpolatable, Distr: Distribution<f64> + Copy> fmt::Display for MonteCarlo<S, Distr>
+impl<S: Interpolatable, Distr: Distribution<DispersedState<S>>> fmt::Display
+    for MonteCarlo<S, Distr>
 where
     DefaultAllocator: Allocator<f64, S::Size>
         + Allocator<f64, S::Size, S::Size>
@@ -296,13 +322,14 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{} - Nyx Monte Carlo - seed: {}",
+            "{} - Nyx Monte Carlo - seed: {:?}",
             self.scenario, self.seed
         )
     }
 }
 
-impl<S: Interpolatable, Distr: Distribution<f64> + Copy> fmt::LowerHex for MonteCarlo<S, Distr>
+impl<S: Interpolatable, Distr: Distribution<DispersedState<S>>> fmt::LowerHex
+    for MonteCarlo<S, Distr>
 where
     DefaultAllocator: Allocator<f64, S::Size>
         + Allocator<f64, S::Size, S::Size>
@@ -313,7 +340,7 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "mc-data-{}-seed-{}",
+            "mc-data-{}-seed-{:?}",
             self.scenario.replace(' ', "-"),
             self.seed
         )

@@ -23,9 +23,14 @@ use crate::linalg::{Const, Matrix3, Vector3};
 use anise::almanac::Almanac;
 use anise::constants::frames::SUN_J2000;
 use hyperdual::{hyperspace_from_vector, linalg::norm, Float, OHyperdual};
+use log::warn;
 use snafu::ResultExt;
 use std::fmt;
 use std::sync::Arc;
+
+// Default solar flux in W/m^2
+#[allow(non_upper_case_globals)]
+pub const SOLAR_FLUX_W_m2: f64 = 1367.0;
 
 /// Computation of solar radiation pressure is based on STK: http://help.agi.com/stk/index.htm#gator/eq-solar.htm .
 #[derive(Clone)]
@@ -47,9 +52,21 @@ impl SolarPressure {
                     action: "planetary data from third body not loaded",
                 }
             })?,
-            shadow_bodies,
+            shadow_bodies: shadow_bodies
+                .iter()
+                .filter_map(|object| match almanac.frame_from_uid(object) {
+                    Ok(loaded_obj) => Some(loaded_obj),
+                    Err(e) => {
+                        warn!("when initializing SRP model for {object}, {e}");
+                        None
+                    }
+                })
+                .collect(),
         };
-        Ok(Self { phi: 1367.0, e_loc })
+        Ok(Self {
+            phi: SOLAR_FLUX_W_m2,
+            e_loc,
+        })
     }
 
     /// Accounts for the shadowing of only one body and will set the solar flux at 1 AU to: Phi = 1367.0
@@ -66,6 +83,14 @@ impl SolarPressure {
         let mut me = Self::default_raw(shadow_bodies, almanac)?;
         me.phi = flux_w_m2;
         Ok(Arc::new(me))
+    }
+
+    /// Solar radiation pressure force model accounting for the provided shadow bodies.
+    pub fn new(
+        shadow_bodies: Vec<Frame>,
+        almanac: Arc<Almanac>,
+    ) -> Result<Arc<Self>, DynamicsError> {
+        Ok(Arc::new(Self::default_raw(shadow_bodies, almanac)?))
     }
 }
 

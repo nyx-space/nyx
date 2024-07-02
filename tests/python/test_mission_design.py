@@ -109,7 +109,6 @@ def test_propagate():
     assert rebuilt_traj.first().epoch == epochs[1]
     assert rebuilt_traj.last().epoch == epochs[-2]
 
-
     # Export this trajectory with additional metadata and the events
     # Base path
     root = Path(__file__).joinpath("../../../").resolve()
@@ -190,9 +189,7 @@ def test_build_spacecraft():
 
     assert sc.srp() == srp
     assert sc.drag().area_m2 == 0.0
-    assert (
-        sc.drag().cd == 2.2
-    )  # Default value, but the area is zero, so it doesn't have any effect
+    assert sc.drag().cd == 2.2  # Default value, but the area is zero, so it doesn't have any effect
 
     # Using this spacecraft as a template, let's load an OEM file, convert it to Parquet, and ensure we can load it back in.
     # The orbit data will be overwritten with data from the OEM file.
@@ -293,9 +290,7 @@ def test_merge_traj():
 
     sc1 = Spacecraft.load(str(config_path.joinpath("spacecraft.yaml")))
 
-    dynamics = SpacecraftDynamics.load_named(
-        str(config_path.joinpath("dynamics.yaml"))
-    )["lofi"]
+    dynamics = SpacecraftDynamics.load_named(str(config_path.joinpath("dynamics.yaml")))["lofi"]
 
     # Check loading from the YAML read from Python
     with open(config_path.joinpath("dynamics.yaml")) as fh:

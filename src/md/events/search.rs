@@ -215,7 +215,7 @@ where
             });
         }
         let heuristic = (end_epoch - start_epoch) / 100;
-        info!("Searching for {event} with initial heuristic of {heuristic}",);
+        info!("Searching for {event} with initial heuristic of {heuristic}");
 
         let (sender, receiver) = channel();
 

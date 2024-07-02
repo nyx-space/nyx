@@ -93,19 +93,13 @@ def snx_to_groundstation(
                 continue
             elif parsing:
                 if line.startswith("-SITE/ID"):
-                    print(
-                        "Parsed {} ground stations from {}.".format(
-                            len(entries), snx_path
-                        )
-                    )
+                    print("Parsed {} ground stations from {}.".format(len(entries), snx_path))
                     break
                 elif line.startswith("*CODE"):
                     continue
                 else:
                     # Parse the data line
-                    kwrds = [
-                        line[idx : idx + klen].strip() for idx, klen in offsets.values()
-                    ]
+                    kwrds = [line[idx : idx + klen].strip() for idx, klen in offsets.values()]
                     # Create the YAML
                     this_entry = dict(zip(offsets.keys(), kwrds))
                     # Fix the latitude and longitude to be decimals
@@ -211,9 +205,7 @@ def basic_rinex(rnx_path, stations):
                 offset = Unit.Second * float(splt[-2])
                 esplt = splt[1:-4]
                 epoch = (
-                    Epoch(
-                        f"{esplt[0]}-{esplt[1]}-{esplt[2]} {esplt[3]}:{esplt[4]}:{esplt[5]} TAI"
-                    )
+                    Epoch(f"{esplt[0]}-{esplt[1]}-{esplt[2]} {esplt[3]}:{esplt[4]}:{esplt[5]} TAI")
                     + offset
                 )
                 action = "msr_start"
@@ -273,9 +265,7 @@ def prototype(gs_yaml, rnx_path, plot=True):
         if len(msrs) > 100 and plot:
             fig = go.Figure()
             fig.add_trace(
-                go.Scatter(
-                    x=time_offsets, y=c1_corr, mode="lines", name="C1 data (2 GHz)"
-                )
+                go.Scatter(x=time_offsets, y=c1_corr, mode="lines", name="C1 data (2 GHz)")
             )
             # Add τ
             fig.add_vline(
@@ -291,9 +281,7 @@ def prototype(gs_yaml, rnx_path, plot=True):
             # Plot the data itself too
             fig = go.Figure()
             fig.add_trace(
-                go.Scatter(
-                    x=time_offsets, y=c1_data, mode="lines", name="C1 data (2 GHz)"
-                )
+                go.Scatter(x=time_offsets, y=c1_data, mode="lines", name="C1 data (2 GHz)")
             )
             fig.update_layout(title=title)
             fig.show()

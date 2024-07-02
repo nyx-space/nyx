@@ -50,9 +50,7 @@ def diff_traj_parquet(path1: str, path2: str, step=Unit.Minute * 1) -> pd.DataFr
         # Try to be somewhat clever
         if path.lower().endswith(".oem"):
             # Load as OEM and build the parquet file
-            return TrajectoryLoader(
-                str(path), "oem", path[:-3] + "parquet"
-            ).to_orbit_traj()
+            return TrajectoryLoader(str(path), "oem", path[:-3] + "parquet").to_orbit_traj()
         else:
             return TrajectoryLoader(str(path), "parquet").to_orbit_traj()
 
@@ -65,9 +63,7 @@ def diff_traj_parquet(path1: str, path2: str, step=Unit.Minute * 1) -> pd.DataFr
 
     # Sample to build the data.
 
-    for epoch in TimeSeries(
-        traj1.first().epoch, traj1.last().epoch, step, inclusive=True
-    ):
+    for epoch in TimeSeries(traj1.first().epoch, traj1.last().epoch, step, inclusive=True):
         try:
             state1 = traj1.at(epoch)
             state2 = traj2.at(epoch)

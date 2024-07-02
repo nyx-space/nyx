@@ -85,7 +85,7 @@ where
 
         #[cfg(not(target_arch = "wasm32"))]
         let tick = Instant::now();
-        let log_progress = duration.abs() >= 2 * Unit::Minute;
+        let log_progress = duration.abs() >= 7 * Unit::Day;
 
         if log_progress {
             // Prevent the print spam for orbit determination cases

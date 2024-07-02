@@ -16,9 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::hifitime::Epoch;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OVector};
+use hifitime::Epoch;
 use std::fmt;
 
 /// Stores an Estimate, as the result of a `time_update` or `measurement_update`.

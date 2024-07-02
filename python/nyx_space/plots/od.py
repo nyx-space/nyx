@@ -32,6 +32,7 @@ from scipy.stats import norm
 
 from nyx_space.time import Epoch
 
+
 def plot_estimates(
     dfs,
     title,
@@ -102,11 +103,7 @@ def plot_estimates(
 
         # Check that the requested covariance frame exists
         frames = set(
-            [
-                re.search(r"\((.*?)\)", c).group(1)
-                for c in df.columns
-                if c.startswith("Covariance")
-            ]
+            [re.search(r"\((.*?)\)", c).group(1) for c in df.columns if c.startswith("Covariance")]
         )
         if cov_frame not in frames:
             raise ValueError(
@@ -131,9 +128,7 @@ def plot_estimates(
             else:
                 cov_col_name = f"{covar_col} ({cov_frame}) {cov_sigma}-sigma {cov_fmt}"
                 # Transform the current column
-                df[cov_col_name] = eval(f"np.{cov_fmt}")(
-                    df[f"{covar_col} ({cov_frame})"]
-                )
+                df[cov_col_name] = eval(f"np.{cov_fmt}")(df[f"{covar_col} ({cov_frame})"])
             covar[f"{covar_var}"] = cov_col_name
 
         plt_df = df
@@ -250,13 +245,9 @@ def plot_estimates(
 
     if msr_df is not None:
         # Plot the measurements on both plots
-        pos_fig = overlay_measurements(
-            pos_fig, msr_df, title, time_col_name, show=False
-        )
+        pos_fig = overlay_measurements(pos_fig, msr_df, title, time_col_name, show=False)
 
-        vel_fig = overlay_measurements(
-            vel_fig, msr_df, title, time_col_name, show=False
-        )
+        vel_fig = overlay_measurements(vel_fig, msr_df, title, time_col_name, show=False)
 
     if html_out:
         html_out = html_out.replace(".html", "_{}.html")
@@ -342,11 +333,7 @@ def plot_covar(
 
         # Check that the requested covariance frame exists
         frames = set(
-            [
-                re.search(r"\((.*?)\)", c).group(1)
-                for c in df.columns
-                if c.startswith("Covariance")
-            ]
+            [re.search(r"\((.*?)\)", c).group(1) for c in df.columns if c.startswith("Covariance")]
         )
         if cov_frame not in frames:
             raise ValueError(
@@ -457,13 +444,9 @@ def plot_covar(
 
     if msr_df is not None:
         # Plot the measurements on both plots
-        pos_fig = overlay_measurements(
-            pos_fig, msr_df, title, time_col_name, show=False
-        )
+        pos_fig = overlay_measurements(pos_fig, msr_df, title, time_col_name, show=False)
 
-        vel_fig = overlay_measurements(
-            vel_fig, msr_df, title, time_col_name, show=False
-        )
+        vel_fig = overlay_measurements(vel_fig, msr_df, title, time_col_name, show=False)
 
     if html_out:
         html_out = html_out.replace(".html", "_{}.html")
@@ -661,7 +644,9 @@ def plot_residuals(
             )
             # Add the 1-σ lines
             one_sig_color = colors["bright_green"]
-            one_sig_color = f"rgb({int(one_sig_color[0])}, {int(one_sig_color[1])}, {int(one_sig_color[2])})"
+            one_sig_color = (
+                f"rgb({int(one_sig_color[0])}, {int(one_sig_color[1])}, {int(one_sig_color[2])})"
+            )
             fig.add_hline(
                 y=mean + std,
                 line_dash="dot",
@@ -677,13 +662,9 @@ def plot_residuals(
 
             if msr_df is not None:
                 # Plot the measurements on both plots
-                fig = overlay_measurements(
-                    fig, msr_df, title, time_col_name, show=False
-                )
+                fig = overlay_measurements(fig, msr_df, title, time_col_name, show=False)
 
-            finalize_plot(
-                fig, title=f"{title} {col}", xtitle=x_title, copyright=copyright
-            )
+            finalize_plot(fig, title=f"{title} {col}", xtitle=x_title, copyright=copyright)
 
             plt_any = True
 
@@ -705,9 +686,7 @@ def plot_residuals(
         return rtn_plots
 
 
-def plot_residual_histogram(
-    df, title, kind="Prefit", copyright=None, html_out=None, show=True
-):
+def plot_residual_histogram(df, title, kind="Prefit", copyright=None, html_out=None, show=True):
     """
     Histogram of residuals
     """
@@ -748,6 +727,7 @@ def plot_residual_histogram(
 
             if show:
                 fig.show()
+
 
 def plot_measurements(
     df,

@@ -171,9 +171,7 @@ def plot_line(fig, df, x, y_name, color_name, xtitle, ytitle, title, copyright):
     Adds the trace for the provided X vs Y.
     """
 
-    plot_raw_line(
-        fig, x, df[y_name], y_name, color_name, xtitle, ytitle, title, copyright
-    )
+    plot_raw_line(fig, x, df[y_name], y_name, color_name, xtitle, ytitle, title, copyright)
 
 
 def plot_raw_line(fig, x, y, y_name, color_name, xtitle, ytitle, title, copyright=None):
