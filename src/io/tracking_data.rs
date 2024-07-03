@@ -108,7 +108,7 @@ impl DynamicTrackingArc {
         let mut rate_avail = false;
         for field in &reader.schema().fields {
             match field.name().as_str() {
-                "Epoch:TAI (s)" => has_epoch = true,
+                "Epoch (UTC)" => has_epoch = true,
                 "Tracking device" => has_tracking_dev = true,
                 "Range (km)" => range_avail = true,
                 "Doppler (km/s)" => rate_avail = true,
@@ -119,7 +119,7 @@ impl DynamicTrackingArc {
         ensure!(
             has_epoch,
             MissingDataSnafu {
-                which: "Epoch: TAI (s)"
+                which: "Epoch (UTC)"
             }
         );
 
@@ -185,10 +185,10 @@ impl DynamicTrackingArc {
                 .unwrap();
 
             let epochs = batch
-                .column_by_name("Epoch:TAI (s)")
+                .column_by_name("Epoch (UTC)")
                 .unwrap()
                 .as_any()
-                .downcast_ref::<Float64Array>()
+                .downcast_ref::<StringArray>()
                 .unwrap();
 
             // Now read the data depending on what we're deserializing as
@@ -213,7 +213,11 @@ impl DynamicTrackingArc {
                         arc.measurements.push((
                             tracking_device.value(i).to_string(),
                             Msr::from_observation(
-                                Epoch::from_tai_seconds(epochs.value(i)),
+                                Epoch::from_gregorian_str(epochs.value(i)).map_err(|e| {
+                                    InputOutputError::Inconsistency {
+                                        msg: format!("{e} when parsing epoch"),
+                                    }
+                                })?,
                                 OVector::<f64, Msr::MeasurementSize>::from_iterator([
                                     range_data.value(i),
                                     rate_data.value(i),
@@ -235,7 +239,11 @@ impl DynamicTrackingArc {
                         arc.measurements.push((
                             tracking_device.value(i).to_string(),
                             Msr::from_observation(
-                                Epoch::from_tdb_seconds(epochs.value(i)),
+                                Epoch::from_gregorian_str(epochs.value(i)).map_err(|e| {
+                                    InputOutputError::Inconsistency {
+                                        msg: format!("{e} when parsing epoch"),
+                                    }
+                                })?,
                                 OVector::<f64, Msr::MeasurementSize>::from_iterator([
                                     range_data.value(i)
                                 ]),
@@ -256,7 +264,11 @@ impl DynamicTrackingArc {
                         arc.measurements.push((
                             tracking_device.value(i).to_string(),
                             Msr::from_observation(
-                                Epoch::from_tdb_seconds(epochs.value(i)),
+                                Epoch::from_gregorian_str(epochs.value(i)).map_err(|e| {
+                                    InputOutputError::Inconsistency {
+                                        msg: format!("{e} when parsing epoch"),
+                                    }
+                                })?,
                                 OVector::<f64, Msr::MeasurementSize>::from_iterator([
                                     rate_data.value(i)
                                 ]),

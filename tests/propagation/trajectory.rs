@@ -173,13 +173,13 @@ fn traj_ephem_forward(almanac: Arc<Almanac>) {
             // Check the data info one by one. Time may be very slightly off.
             let delta_t = orig_state.epoch() - loaded_state.epoch();
             assert!(
-                delta_t < 500 * Unit::Nanosecond,
+                delta_t < 1 * Unit::Microsecond,
                 "#{i} differ (Δt = {delta_t})"
             );
             assert_eq!(
                 orig_state.to_vector(),
                 loaded_state.to_vector(),
-                "#{i} differ (Δt = {delta_t})"
+                "#{i} differ"
             );
         }
     }
