@@ -33,12 +33,15 @@ fn orbit_dual_test(almanac: Almanac) {
 
     let cart_dual = OrbitDual::from(cart);
     println!("{}", eme2k.mu_km3_s2().unwrap());
-    println!("|v| = {}", cart_dual.vmag());
-    println!("|v|^2 = {}", cart_dual.vmag().dual * cart_dual.vmag().dual);
+    println!("|v| = {}", cart_dual.vmag_km_s());
+    println!(
+        "|v|^2 = {}",
+        cart_dual.vmag_km_s().dual * cart_dual.vmag_km_s().dual
+    );
     println!("x = {}", cart_dual.x);
     println!("y = {}", cart_dual.y);
     println!("z = {}", cart_dual.z);
-    println!("\\xi = {}\n\n", cart_dual.energy().unwrap());
+    println!("\\xi = {}\n\n", cart_dual.energy_km2_s2().unwrap());
 
     // Now print the table
     let params = vec![
@@ -51,9 +54,9 @@ fn orbit_dual_test(almanac: Almanac) {
         StateParameter::Eccentricity,
         StateParameter::Energy,
         StateParameter::FlightPathAngle,
-        StateParameter::GeodeticHeight,
-        StateParameter::GeodeticLatitude,
-        StateParameter::GeodeticLongitude,
+        StateParameter::Height,
+        StateParameter::Latitude,
+        StateParameter::Longitude,
         StateParameter::Hmag,
         StateParameter::HX,
         StateParameter::HY,

@@ -591,17 +591,17 @@ impl State for Spacecraft {
                 .fpa_deg()
                 .context(AstroPhysicsSnafu)
                 .context(StateAstroSnafu { param }),
-            StateParameter::GeodeticHeight => self
+            StateParameter::Height => self
                 .orbit
                 .height_km()
                 .context(AstroPhysicsSnafu)
                 .context(StateAstroSnafu { param }),
-            StateParameter::GeodeticLatitude => self
+            StateParameter::Latitude => self
                 .orbit
                 .latitude_deg()
                 .context(AstroPhysicsSnafu)
                 .context(StateAstroSnafu { param }),
-            StateParameter::GeodeticLongitude => Ok(self.orbit.longitude_deg()),
+            StateParameter::Longitude => Ok(self.orbit.longitude_deg()),
             StateParameter::Hmag => self
                 .orbit
                 .hmag()

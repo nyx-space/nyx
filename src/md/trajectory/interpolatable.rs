@@ -132,9 +132,9 @@ impl Interpolatable for Spacecraft {
                             | StateParameter::VY
                             | StateParameter::VZ
                             | StateParameter::HyperbolicAnomaly
-                            | StateParameter::GeodeticHeight
-                            | StateParameter::GeodeticLatitude
-                            | StateParameter::GeodeticLongitude
+                            | StateParameter::Height
+                            | StateParameter::Latitude
+                            | StateParameter::Longitude
                     )
             })
             .collect::<Vec<StateParameter>>();

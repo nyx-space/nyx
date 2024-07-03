@@ -118,9 +118,9 @@ impl Traj<Spacecraft> {
         let mut cfg = ExportCfg::builder()
             .step(1.minutes())
             .fields(vec![
-                StateParameter::GeodeticLatitude,
-                StateParameter::GeodeticLongitude,
-                StateParameter::GeodeticHeight,
+                StateParameter::Latitude,
+                StateParameter::Longitude,
+                StateParameter::Height,
                 StateParameter::Rmag,
             ])
             .build();

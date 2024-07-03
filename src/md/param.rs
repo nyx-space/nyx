@@ -67,11 +67,11 @@ pub enum StateParameter {
     /// fuel mass in kilograms
     FuelMass,
     /// Geodetic height (km)
-    GeodeticHeight,
+    Height,
     /// Geodetic latitude (deg)
-    GeodeticLatitude,
+    Latitude,
     /// Geodetic longitude (deg)
-    GeodeticLongitude,
+    Longitude,
     /// Return the guidance mode of the spacecraft
     GuidanceMode,
     /// Orbital momentum
@@ -142,8 +142,8 @@ impl StateParameter {
             Self::AoL
             | Self::AoP
             | Self::Declination
-            | Self::GeodeticLatitude
-            | Self::GeodeticLongitude
+            | Self::Latitude
+            | Self::Longitude
             | Self::FlightPathAngle
             | Self::Inclination
             | Self::RightAscension
@@ -163,7 +163,7 @@ impl StateParameter {
             Self::ApoapsisRadius
             | Self::BdotR
             | Self::BdotT
-            | Self::GeodeticHeight
+            | Self::Height
             | Self::Hmag
             | Self::HX
             | Self::HY
@@ -218,8 +218,8 @@ impl StateParameter {
             Self::AoL
             | Self::AoP
             | Self::Declination
-            | Self::GeodeticLatitude
-            | Self::GeodeticLongitude
+            | Self::Latitude
+            | Self::Longitude
             | Self::FlightPathAngle
             | Self::Inclination
             | Self::RightAscension
@@ -237,7 +237,7 @@ impl StateParameter {
             Self::ApoapsisRadius
             | Self::BdotR
             | Self::BdotT
-            | Self::GeodeticHeight
+            | Self::Height
             | Self::Hmag
             | Self::HX
             | Self::HY
@@ -327,9 +327,9 @@ impl FromStr for StateParameter {
             "fpa" => Ok(Self::FlightPathAngle),
             "fuel_mass" => Ok(Self::FuelMass),
             "guidance_mode" | "mode" => Ok(Self::GuidanceMode),
-            "geodetic_height" => Ok(Self::GeodeticHeight),
-            "geodetic_latitude" => Ok(Self::GeodeticLatitude),
-            "geodetic_longitude" => Ok(Self::GeodeticLongitude),
+            "geodetic_height" => Ok(Self::Height),
+            "geodetic_latitude" => Ok(Self::Latitude),
+            "geodetic_longitude" => Ok(Self::Longitude),
             "ha" => Ok(Self::HyperbolicAnomaly),
             "hmag" => Ok(Self::Hmag),
             "hx" => Ok(Self::HX),
@@ -387,9 +387,9 @@ impl fmt::Display for StateParameter {
             Self::FlightPathAngle => "fpa",
             Self::FuelMass => "fuel_mass",
             Self::GuidanceMode => "guidance_mode",
-            Self::GeodeticHeight => "geodetic_height",
-            Self::GeodeticLatitude => "geodetic_latitude",
-            Self::GeodeticLongitude => "geodetic_longitude",
+            Self::Height => "geodetic_height",
+            Self::Latitude => "geodetic_latitude",
+            Self::Longitude => "geodetic_longitude",
             Self::HyperbolicAnomaly => "ha",
             Self::Hmag => "hmag",
             Self::HX => "hx",
@@ -453,9 +453,9 @@ mod ut_state_param {
             StateParameter::FlightPathAngle,
             StateParameter::FuelMass,
             StateParameter::GuidanceMode,
-            StateParameter::GeodeticHeight,
-            StateParameter::GeodeticLatitude,
-            StateParameter::GeodeticLongitude,
+            StateParameter::Height,
+            StateParameter::Latitude,
+            StateParameter::Longitude,
             StateParameter::HyperbolicAnomaly,
             StateParameter::Hmag,
             StateParameter::HX,
