@@ -148,11 +148,7 @@ impl Traj<Spacecraft> {
         })?;
         let reader = BufReader::new(file);
 
-        let template = if tpl_option.is_none() {
-            Spacecraft::default()
-        } else {
-            tpl_option.unwrap()
-        };
+        let template = tpl_option.unwrap_or_default();
 
         // Parse the Orbit Element messages
         let mut time_system = String::new();

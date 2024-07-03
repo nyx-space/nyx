@@ -140,20 +140,20 @@ impl fmt::Display for SpacecraftUncertainty {
                 _ => format!("{frame:?}"),
             },
         };
-        write!(f, "{}\n", self.nominal)?;
-        write!(
+        writeln!(f, "{}", self.nominal)?;
+        writeln!(
             f,
-            "{frame}  Σ_x = {} km  Σ_y = {} km  Σ_z = {} km\n",
+            "{frame}  Σ_x = {} km  Σ_y = {} km  Σ_z = {} km",
             self.x_km, self.y_km, self.z_km
         )?;
-        write!(
+        writeln!(
             f,
-            "{frame}  Σ_vx = {} km/s  Σ_vy = {} km/s  Σ_vz = {} km/s\n",
+            "{frame}  Σ_vx = {} km/s  Σ_vy = {} km/s  Σ_vz = {} km/s",
             self.vx_km_s, self.vy_km_s, self.vz_km_s
         )?;
-        write!(
+        writeln!(
             f,
-            "Σ_cr = {}  Σ_cd = {}  Σ_mass = {} kg\n",
+            "Σ_cr = {}  Σ_cd = {}  Σ_mass = {} kg",
             self.cr, self.cd, self.mass_kg
         )
     }
@@ -173,7 +173,8 @@ mod ut_sc_uncertainty {
     #[fixture]
     fn spacecraft() -> Spacecraft {
         let eme2k = EME2000.with_mu_km3_s2(GMAT_EARTH_GM);
-        let spacecraft = Spacecraft::builder()
+        
+        Spacecraft::builder()
             .orbit(Orbit::keplerian(
                 7000.0,
                 0.01,
@@ -184,8 +185,7 @@ mod ut_sc_uncertainty {
                 Epoch::from_gregorian_utc_hms(2024, 2, 29, 1, 2, 3),
                 eme2k,
             ))
-            .build();
-        spacecraft
+            .build()
     }
 
     #[rstest]

@@ -137,10 +137,7 @@ where
         // Epochs
         let mut utc_epoch = StringBuilder::new();
         for m in &measurements {
-            utc_epoch.append_value(format!(
-                "{}",
-                m.1.epoch().to_time_scale(TimeScale::UTC).to_isoformat()
-            ));
+            utc_epoch.append_value(&m.1.epoch().to_time_scale(TimeScale::UTC).to_isoformat());
         }
         record.push(Arc::new(utc_epoch.finish()));
 

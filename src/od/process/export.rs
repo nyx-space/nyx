@@ -268,10 +268,7 @@ where
         // Epochs
         let mut utc_epoch = StringBuilder::new();
         for s in &estimates {
-            utc_epoch.append_value(format!(
-                "{}",
-                s.epoch().to_time_scale(TimeScale::UTC).to_isoformat()
-            ));
+            utc_epoch.append_value(&s.epoch().to_time_scale(TimeScale::UTC).to_isoformat());
         }
         record.push(Arc::new(utc_epoch.finish()));
 
@@ -320,7 +317,7 @@ where
             let orbit_cov = cov.fixed_view::<6, 6>(0, 0);
 
             // Rotate back into the RIC frame
-            let ric_covar = &dcm_ric2inertial * orbit_cov * &dcm_ric2inertial.transpose();
+            let ric_covar = dcm_ric2inertial * orbit_cov * dcm_ric2inertial.transpose();
             ric_covariances.push(ric_covar);
         }
 

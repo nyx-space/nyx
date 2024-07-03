@@ -116,7 +116,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let ckf = KF::no_snc(jwst_estimate, measurement_noise);
 
     // Build the propagation instance for the OD process.
-    let prop = setup.with(Spacecraft::from(jwst).with_stm(), almanac.clone());
+    let prop = setup.with(jwst.with_stm(), almanac.clone());
     let mut odp = SpacecraftODProcess::ckf(prop, ckf, None, almanac.clone());
 
     // Define the prediction step, i.e. how often we want to know the covariance.

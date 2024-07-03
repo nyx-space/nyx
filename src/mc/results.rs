@@ -291,10 +291,7 @@ where
                     frame = success.state.frame();
 
                     // Check that we can retrieve this information
-                    fields.retain(|param| match success.state.value(*param) {
-                        Ok(_) => true,
-                        Err(_) => false,
-                    });
+                    fields.retain(|param| success.state.value(*param).is_ok());
 
                     start = Some(success.traj.first().epoch());
                     end = Some(success.state.epoch());
@@ -361,10 +358,7 @@ where
         let mut utc_epoch = StringBuilder::new();
         let mut idx_col = Int32Builder::new();
         for (sno, s) in all_states.iter().enumerate() {
-            utc_epoch.append_value(format!(
-                "{}",
-                s.epoch().to_time_scale(TimeScale::UTC).to_isoformat()
-            ));
+            utc_epoch.append_value(&s.epoch().to_time_scale(TimeScale::UTC).to_isoformat());
 
             // Copy this a bunch of times because all columns must have the same length
             idx_col.append_value(run_indexes[sno]);
