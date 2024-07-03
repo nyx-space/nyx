@@ -23,9 +23,9 @@ use crate::linalg::{DefaultAllocator, DimName};
 use crate::md::trajectory::Interpolatable;
 use crate::md::StateParameter;
 use crate::od::estimate::*;
-use crate::od::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::State;
+use crate::{od::*, Spacecraft};
 use arrow::array::{Array, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
@@ -45,22 +45,23 @@ impl<
         E: ErrorCtrl,
         Msr: Measurement,
         A: DimName,
-        S: EstimateFrom<D::StateType, Msr> + Interpolatable,
-        K: Filter<S, A, Msr::MeasurementSize>,
-    > ODProcess<'a, D, E, Msr, A, S, K>
+        // S: EstimateFrom<D::StateType, Msr> + Interpolatable,
+        K: Filter<Spacecraft, A, Msr::MeasurementSize>,
+    > ODProcess<'a, D, E, Msr, A, Spacecraft, K>
 where
-    D::StateType: Interpolatable + Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
+    D::StateType:
+        Interpolatable + Add<OVector<f64, <Spacecraft as State>::Size>, Output = D::StateType>,
     <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, S::Size>
-        + Allocator<f64, S::Size>
-        + Allocator<usize, S::Size, S::Size>
+        + Allocator<f64, Msr::MeasurementSize, <Spacecraft as State>::Size>
+        + Allocator<f64, <Spacecraft as State>::Size>
+        + Allocator<usize, <Spacecraft as State>::Size, <Spacecraft as State>::Size>
         + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, <D::StateType as State>::Size>
-        + Allocator<f64, Msr::MeasurementSize, <S as State>::Size>
+        + Allocator<f64, Msr::MeasurementSize, <Spacecraft as State>::Size>
         + Allocator<f64, <D::StateType as State>::Size, Msr::MeasurementSize>
-        + Allocator<f64, <S as State>::Size, Msr::MeasurementSize>
+        + Allocator<f64, <Spacecraft as State>::Size, Msr::MeasurementSize>
         + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
         + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::VecLength>
@@ -68,11 +69,12 @@ where
         + Allocator<f64, A, A>
         + Allocator<f64, <D::StateType as State>::Size, A>
         + Allocator<f64, A, <D::StateType as State>::Size>
-        + Allocator<f64, <S as State>::Size>
-        + Allocator<f64, <S as State>::VecLength>
-        + Allocator<f64, <S as State>::Size, <S as State>::Size>
-        + Allocator<f64, <S as State>::Size, A>
-        + Allocator<f64, A, <S as State>::Size>,
+        + Allocator<f64, <Spacecraft as State>::Size>
+        + Allocator<f64, <Spacecraft as State>::VecLength>
+        + Allocator<f64, <Spacecraft as State>::Size, <Spacecraft as State>::Size>
+        + Allocator<f64, <Spacecraft as State>::Size, A>
+        + Allocator<f64, A, <Spacecraft as State>::Size>,
+    Spacecraft: EstimateFrom<D::StateType, Msr>,
 {
     /// Store the estimates and residuals in a parquet file
     pub fn to_parquet<P: AsRef<Path>>(&self, path: P, cfg: ExportCfg) -> Result<PathBuf, ODError> {
@@ -121,7 +123,7 @@ where
 
         let mut fields = match cfg.fields {
             Some(fields) => fields,
-            None => S::export_params(),
+            None => Spacecraft::export_params(),
         };
 
         // Check that we can retrieve this information
@@ -170,7 +172,7 @@ where
             }
         }
 
-        let est_size = <S as State>::Size::dim();
+        let est_size = <Spacecraft as State>::Size::dim();
         assert!(
             est_size <= state_items.len(),
             "state of size {est_size} is not yet supported"

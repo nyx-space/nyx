@@ -23,9 +23,6 @@ use anise::{astro::PhysicsResult, errors::PhysicsError};
 use na::{SMatrix, SVector};
 use typed_builder::TypedBuilder;
 
-use crate::cosmic::AstroError;
-use crate::md::prelude::OrbitDual;
-use crate::md::StateParameter;
 use crate::{dynamics::guidance::LocalFrame, Spacecraft};
 
 use super::KfEstimate;
@@ -131,76 +128,6 @@ impl SpacecraftUncertainty {
         }
 
         Ok(KfEstimate::from_covar(self.nominal, init_covar))
-    }
-
-    /// Returns the 1-sigma uncertainty for a given parameter, in that parameter's unit
-    ///
-    /// This method uses the [OrbitDual] structure to compute the estimate in the hyperdual space
-    /// and rotate the nominal covariance into that space.
-    pub fn sigma_for(&self, param: StateParameter) -> Result<f64, AstroError> {
-        // Build the rotation matrix using Orbit Dual.
-        let mut rotmat = SMatrix::<f64, 1, 6>::zeros();
-        let orbit_dual = OrbitDual::from(self.nominal.orbit);
-
-        let xf_partial = orbit_dual.partial_for(param)?;
-        for (cno, val) in [
-            xf_partial.wtr_x(),
-            xf_partial.wtr_y(),
-            xf_partial.wtr_z(),
-            xf_partial.wtr_vx(),
-            xf_partial.wtr_vy(),
-            xf_partial.wtr_vz(),
-        ]
-        .iter()
-        .copied()
-        .enumerate()
-        {
-            rotmat[(0, cno)] = val;
-        }
-
-        // Build the estimate to have a covariance
-        let estimate = self.to_estimate().unwrap();
-
-        Ok((rotmat * estimate.covar.fixed_view::<6, 6>(0, 0) * rotmat.transpose())[(0, 0)].sqrt())
-    }
-
-    /// Returns the 6x6 covariance (i.e. square of the sigma/uncertainty) of the SMA, ECC, INC, RAAN, AOP, and True Anomaly.
-    pub fn keplerian_covar(&self) -> SMatrix<f64, 6, 6> {
-        // Build the rotation matrix using Orbit Dual.
-        let mut rotmat = SMatrix::<f64, 6, 6>::zeros();
-        let orbit_dual = OrbitDual::from(self.nominal.orbit);
-        for (pno, param) in [
-            StateParameter::SMA,
-            StateParameter::Eccentricity,
-            StateParameter::Inclination,
-            StateParameter::RAAN,
-            StateParameter::AoP,
-            StateParameter::TrueAnomaly,
-        ]
-        .iter()
-        .copied()
-        .enumerate()
-        {
-            let xf_partial = orbit_dual.partial_for(param).unwrap();
-            for (cno, val) in [
-                xf_partial.wtr_x(),
-                xf_partial.wtr_y(),
-                xf_partial.wtr_z(),
-                xf_partial.wtr_vx(),
-                xf_partial.wtr_vy(),
-                xf_partial.wtr_vz(),
-            ]
-            .iter()
-            .copied()
-            .enumerate()
-            {
-                rotmat[(pno, cno)] = val;
-            }
-        }
-        // Build the estimate to have a covariance
-        let estimate = self.to_estimate().unwrap();
-
-        rotmat * estimate.covar.fixed_view::<6, 6>(0, 0) * rotmat.transpose()
     }
 }
 
@@ -322,10 +249,14 @@ mod ut_sc_uncertainty {
 
         println!("{uncertainty}");
 
-        let sma_sigma_km = uncertainty.sigma_for(StateParameter::SMA).unwrap();
+        let estimate = uncertainty.to_estimate().unwrap();
+
+        println!("{estimate}");
+
+        let sma_sigma_km = estimate.sigma_for(StateParameter::SMA).unwrap();
         assert!((sma_sigma_km - 1.352808889337306).abs() < f64::EPSILON);
 
-        let covar_keplerian = uncertainty.keplerian_covar();
+        let covar_keplerian = estimate.keplerian_covar();
         for i in 1..=3 {
             let val = covar_keplerian[(i, i)].sqrt();
             assert!(val.abs() < 1e-1);
@@ -334,10 +265,6 @@ mod ut_sc_uncertainty {
             let val = covar_keplerian[(i, i)].sqrt();
             assert!(val.abs() < 0.8);
         }
-
-        let estimate = uncertainty.to_estimate().unwrap();
-
-        println!("{estimate}");
 
         // Rotate back into the RIC frame.
         let dcm_ric2inertial = estimate
