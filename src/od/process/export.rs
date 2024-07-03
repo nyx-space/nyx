@@ -135,32 +135,78 @@ where
         }
 
         let state_items = ["X", "Y", "Z", "Vx", "Vy", "Vz", "Cr", "Cd", "Mass"];
+        let state_units = [
+            "km", "km", "km", "km/s", "km/s", "km/s", "unitless", "unitless", "kg",
+        ];
+        let mut cov_units = vec![];
+
+        for i in 0..state_items.len() {
+            for j in i..state_items.len() {
+                let cov_unit = if i < 3 {
+                    if j < 3 {
+                        "km^2"
+                    } else if (3..6).contains(&j) {
+                        "km^2/s"
+                    } else if j == 8 {
+                        "km*kg"
+                    } else {
+                        "km"
+                    }
+                } else if (3..6).contains(&i) {
+                    if (3..6).contains(&j) {
+                        "km^2/s^2"
+                    } else if j == 8 {
+                        "km/s*kg"
+                    } else {
+                        "km/s"
+                    }
+                } else if i == 8 || j == 8 {
+                    "kg^2"
+                } else {
+                    "unitless"
+                };
+
+                cov_units.push(cov_unit);
+            }
+        }
+
         let est_size = <S as State>::Size::dim();
         assert!(
             est_size <= state_items.len(),
             "state of size {est_size} is not yet supported"
         );
 
-        let mut cov_hdrs = Vec::new();
-
+        let mut idx = 0;
         for i in 0..state_items.len() {
             for j in i..state_items.len() {
-                cov_hdrs.push(format!("Covariance {}{}", state_items[i], state_items[j]));
+                hdrs.push(Field::new(
+                    format!(
+                        "Covariance {}*{} ({frame:x}) ({})",
+                        state_items[i], state_items[j], cov_units[idx]
+                    ),
+                    DataType::Float64,
+                    false,
+                ));
+                idx += 1;
             }
         }
 
-        // Add the covariance in the integration frame
-        for hdr in &cov_hdrs {
+        // Add the uncertainty in the integration frame
+        for (i, coord) in state_items.iter().enumerate() {
             hdrs.push(Field::new(
-                format!("{hdr} ({frame:x})"),
+                format!("Sigma {coord} ({frame:x}) ({})", state_units[i]),
                 DataType::Float64,
                 false,
             ));
         }
 
-        // Add the covariance in the RIC frame
-        for hdr in &cov_hdrs {
-            hdrs.push(Field::new(format!("{hdr} (RIC)"), DataType::Float64, false));
+        // Add the position and velocity uncertainty in the RIC frame
+        for (i, coord) in state_items.iter().enumerate().take(6) {
+            hdrs.push(Field::new(
+                format!("Sigma {coord} (RIC) ({})", state_units[i]),
+                DataType::Float64,
+                false,
+            ));
         }
 
         // Add the fields of the residuals
@@ -235,6 +281,7 @@ where
             }
             record.push(Arc::new(data.finish()));
         }
+
         // Add the 1-sigma covariance in the integration frame
         for i in 0..est_size {
             for j in i..est_size {
@@ -245,37 +292,43 @@ where
                 record.push(Arc::new(data.finish()));
             }
         }
-        // Add the 1-sigma covariance in the RIC frame
+
+        // Add the sigma/uncertainty in the integration frame
+        for i in 0..est_size {
+            let mut data = Float64Builder::new();
+            for s in &estimates {
+                data.append_value(s.covar()[(i, i)].sqrt());
+            }
+            record.push(Arc::new(data.finish()));
+        }
+
+        // Add the sigma/uncertainty covariance in the RIC frame
         let mut ric_covariances = Vec::new();
 
         for s in &estimates {
-            let dcm6x6 = s
+            let dcm_ric2inertial = s
                 .state()
                 .orbit()
                 .dcm_from_ric_to_inertial()
                 .unwrap()
                 .state_dcm();
-            // Create a full DCM and only rotate the orbit part of it.
-            let mut dcm = OMatrix::<f64, S::Size, S::Size>::identity();
-            for i in 0..6 {
-                for j in i..6 {
-                    dcm[(i, j)] = dcm6x6[(i, j)];
-                }
-            }
-            let ric_covar = &dcm * s.covar() * &dcm.transpose();
 
+            // Build the matrix view of the orbit part of the covariance.
+            let cov = s.covar();
+            let orbit_cov = cov.fixed_view::<6, 6>(0, 0);
+
+            // Rotate back into the RIC frame
+            let ric_covar = &dcm_ric2inertial * orbit_cov * &dcm_ric2inertial.transpose();
             ric_covariances.push(ric_covar);
         }
 
         // Now store the RIC covariance data.
-        for i in 0..est_size {
-            for j in i..est_size {
-                let mut data = Float64Builder::new();
-                for cov in ric_covariances.iter().take(estimates.len()) {
-                    data.append_value(cov[(i, j)]);
-                }
-                record.push(Arc::new(data.finish()));
+        for i in 0..6 {
+            let mut data = Float64Builder::new();
+            for cov in ric_covariances.iter().take(estimates.len()) {
+                data.append_value(cov[(i, i)].sqrt());
             }
+            record.push(Arc::new(data.finish()));
         }
 
         // Finally, add the residuals.

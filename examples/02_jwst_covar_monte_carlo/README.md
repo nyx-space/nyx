@@ -66,10 +66,14 @@ INFO  nyx_space::mc::results             > Trajectory written to 02_jwst_monte_c
 
 ## Analysis
 
-**Follow on work in [#327](https://github.com/nyx-space/nyx/issues/327).**
-
 ![JWST MC X (km)](./jwst_mc_X_km.png)
 
 ![JWST MC Y (km)](./jwst_mc_Y_km.png)
 
 ![JWST MC Z (km)](./jwst_mc_Z_km.png)
+
+![JWST MC VX (km/s)](./jwst_mc_VX_km_s.png)
+
+![JWST MC VY (km/s)](./jwst_mc_VY_km_s.png)
+
+![JWST MC VZ (km/s)](./jwst_mc_VZ_km_s.png)

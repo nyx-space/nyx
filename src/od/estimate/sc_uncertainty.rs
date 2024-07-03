@@ -23,6 +23,8 @@ use anise::{astro::PhysicsResult, errors::PhysicsError};
 use na::{SMatrix, SVector};
 use typed_builder::TypedBuilder;
 
+use crate::md::prelude::OrbitDual;
+use crate::md::StateParameter;
 use crate::{dynamics::guidance::LocalFrame, Spacecraft};
 
 use super::KfEstimate;
@@ -128,6 +130,44 @@ impl SpacecraftUncertainty {
         }
 
         Ok(KfEstimate::from_covar(self.nominal, init_covar))
+    }
+
+    pub fn keplerian_covar(&self) -> SMatrix<f64, 6, 6> {
+        // Build the rotation matrix using Orbit Dual.
+        let mut rotmat = SMatrix::<f64, 6, 6>::zeros();
+        let orbit_dual = OrbitDual::from(self.nominal.orbit);
+        for (col, param) in [
+            StateParameter::SMA,
+            StateParameter::Eccentricity,
+            StateParameter::Inclination,
+            StateParameter::RAAN,
+            StateParameter::AoP,
+            StateParameter::TrueAnomaly,
+        ]
+        .iter()
+        .copied()
+        .enumerate()
+        {
+            let xf_partial = orbit_dual.partial_for(param).unwrap();
+            for (i, val) in [
+                xf_partial.wtr_x(),
+                xf_partial.wtr_y(),
+                xf_partial.wtr_z(),
+                xf_partial.wtr_vx(),
+                xf_partial.wtr_vy(),
+                xf_partial.wtr_vz(),
+            ]
+            .iter()
+            .enumerate()
+            {
+                rotmat[(col, i)] = *val;
+            }
+        }
+        // Build the estimate to have a covariance
+        let estimate = self.to_estimate().unwrap();
+
+        // rotmat * estimate.covar.fixed_view::<6, 6>(0, 0)
+        rotmat.transpose() * estimate.covar.fixed_view::<6, 6>(0, 0) * rotmat
     }
 }
 

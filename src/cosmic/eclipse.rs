@@ -127,10 +127,10 @@ pub struct EclipseLocator {
 impl fmt::Display for EclipseLocator {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let shadow_bodies: Vec<String> =
-            self.shadow_bodies.iter().map(|b| format!("{b}")).collect();
+            self.shadow_bodies.iter().map(|b| format!("{b:x}")).collect();
         write!(
             f,
-            "light-source: {}, shadows casted by: {}",
+            "light-source: {:x}, shadows casted by: {}",
             self.light_source,
             shadow_bodies.join(", ")
         )

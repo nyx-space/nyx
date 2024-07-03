@@ -13,7 +13,6 @@ if __name__ == "__main__":
     # Build the position plots
     for coord in ["X", "Y", "Z"]:
         col = coord.lower() + " (km)"
-        cov = coord + coord
         fig = go.Figure(
             data=[
                 go.Scattergl(
@@ -34,17 +33,17 @@ if __name__ == "__main__":
                 ),
                 go.Scattergl(
                     x=df_covar["Epoch (UTC)"],
-                    y=df_covar[col] + df_covar[f"Covariance {cov} (Earth J2000)"],
+                    y=df_covar[col] + 3.0*df_covar[f"Sigma {coord} (Earth J2000) (km)"],
                     mode="lines",
                     showlegend=True,
-                    name=coord + " (km) + Cov",
+                    name=coord + " (km) + 3-Σ",
                 ),
                 go.Scattergl(
                     x=df_covar["Epoch (UTC)"],
-                    y=df_covar[col] - df_covar[f"Covariance {cov} (Earth J2000)"],
+                    y=df_covar[col] - 3.0*df_covar[f"Sigma {coord} (Earth J2000) (km)"],
                     mode="lines",
                     showlegend=True,
-                    name=coord + " (km) - Cov",
+                    name=coord + " (km) - 3-Σ",
                 ),
             ]
         )
@@ -59,7 +58,6 @@ if __name__ == "__main__":
     # Build the velocity plots
     for coord in ["VX", "VY", "VZ"]:
         col = coord.lower() + " (km/s)"
-        cov = coord.capitalize() + coord.capitalize()
         fig = go.Figure(
             data=[
                 go.Scattergl(
@@ -80,17 +78,17 @@ if __name__ == "__main__":
                 ),
                 go.Scattergl(
                     x=df_covar["Epoch (UTC)"],
-                    y=df_covar[col] + df_covar[f"Covariance {cov} (Earth J2000)"],
+                    y=df_covar[col] + 3.0*df_covar[f"Sigma {coord.capitalize()} (Earth J2000) (km/s)"],
                     mode="lines",
                     showlegend=True,
-                    name=coord + " (km/s) + Cov",
+                    name=coord + " (km/s) + 3-Σ",
                 ),
                 go.Scattergl(
                     x=df_covar["Epoch (UTC)"],
-                    y=df_covar[col] - df_covar[f"Covariance {cov} (Earth J2000)"],
+                    y=df_covar[col] - 3.0*df_covar[f"Sigma {coord.capitalize()} (Earth J2000) (km/s)"],
                     mode="lines",
                     showlegend=True,
-                    name=coord + " (km/s) - Cov",
+                    name=coord + " (km/s) - 3-Σ",
                 ),
             ]
         )
