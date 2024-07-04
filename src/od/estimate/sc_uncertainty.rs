@@ -173,7 +173,7 @@ mod ut_sc_uncertainty {
     #[fixture]
     fn spacecraft() -> Spacecraft {
         let eme2k = EME2000.with_mu_km3_s2(GMAT_EARTH_GM);
-        
+
         Spacecraft::builder()
             .orbit(Orbit::keplerian(
                 7000.0,
