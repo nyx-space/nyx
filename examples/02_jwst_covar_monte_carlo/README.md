@@ -23,11 +23,12 @@ Finally, we'll check that the 3-sigma (i.e. 99.7%) covariance bounds of the cova
 
 ## Example run
 
-Nyx is **_blazing fast_**. The covariance mapping and the Monte Carlo runs of 5000 runs is executed in less than 30 seconds. Then it takes about 25 seconds to export all of the trajectory data into a ~61 MB parquet file.
+Nyx is **_blazing fast_**. The covariance mapping and the Monte Carlo runs of 5000 runs is executed in less than one minute. Then it takes about 41 seconds to export all of the trajectory data into a ~246 MB parquet file.
 
 ```sh
-Finished `release` profile [optimized] target(s) in 9.53s
- Running `target/release/examples/02_jwst`
+Compiling nyx-space v2.0.0-rc (/home/crabotin/Workspace/nyx-space/nyx)
+ Finished `release` profile [optimized] target(s) in 3.52s
+  Running `target/release/examples/02_jwst`
 INFO  anise::almanac::metaload::metafile > Saved https://naif.jpl.nasa.gov/pub/naif/JWST/kernels/spk/jwst_rec.bsp to /home/crabotin/.local/share/nyx-space/anise/jwst_rec.bsp (CRC32 = a8460057)
 INFO  anise::almanac::metaload::metafile > Using cached /home/crabotin/.local/share/nyx-space/anise/de440s.bsp
 INFO  anise::almanac::metaload::metafile > Using cached /home/crabotin/.local/share/nyx-space/anise/pck11.pca
@@ -35,7 +36,7 @@ INFO  anise::almanac::metaload::metafile > Discarding cached /home/crabotin/.loc
 INFO  anise::almanac::metaload::metafile > Saved http://public-data.nyxspace.com/anise/v0.4/moon_fk.epa to /home/crabotin/.local/share/nyx-space/anise/moon_fk.epa (CRC32 = b93ba21)
 INFO  anise::almanac::metaload::metafile > Discarding cached /home/crabotin/.local/share/nyx-space/anise/moon_pa_de440_200625.bpc - CRC32 differ (got 3454388861, config expected 1817759242)
 INFO  anise::almanac::metaload::metafile > Saved http://public-data.nyxspace.com/anise/moon_pa_de440_200625.bpc to /home/crabotin/.local/share/nyx-space/anise/moon_pa_de440_200625.bpc (CRC32 = cde5ca7d)
-INFO  anise::almanac::metaload::metafile > Saved https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/earth_latest_high_prec.bpc to /home/crabotin/.local/share/nyx-space/anise/earth_latest_high_prec.bpc (CRC32 = 1fbb5b72)
+INFO  anise::almanac::metaload::metafile > Saved https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/earth_latest_high_prec.bpc to /home/crabotin/.local/share/nyx-space/anise/earth_latest_high_prec.bpc (CRC32 = a74b6afd)
 INFO  anise::almanac                     > Loading almanac from /home/crabotin/.local/share/nyx-space/anise/de440s.bsp
 INFO  anise::almanac                     > Loading as DAF/SPK
 INFO  anise::almanac                     > Loading almanac from /home/crabotin/.local/share/nyx-space/anise/pck11.pca
@@ -53,34 +54,34 @@ RIC  Σ_x = 0.5 km  Σ_y = 0.3 km  Σ_z = 1.5 km
 RIC  Σ_vx = 0.0001 km/s  Σ_vy = 0.0006 km/s  Σ_vz = 0.003 km/s
 Σ_cr = 0  Σ_cd = 0  Σ_mass = 0 kg
 
-INFO  nyx_space::od::process             > Mapping covariance for 1 day 6 h 30 min with 1 min step
+INFO  nyx_space::od::process             > Mapping covariance for 6 days 12 h with 1 min step
 INFO  nyx_space::od::process::export     > Exporting orbit determination result to parquet file...
-INFO  nyx_space::od::process::export     > Serialized 1830 estimates and residuals
-INFO  nyx_space::od::process::export     > Orbit determination results written to ./02_jwst_covar_map.parquet in 259 ms 743 μs 488 ns
-INFO  nyx_space::mc::montecarlo          > Propagated 5000 states in 12 s 475 ms 70 μs 85 ns
+INFO  nyx_space::od::process::export     > Serialized 9360 estimates and residuals
+INFO  nyx_space::od::process::export     > Orbit determination results written to ./02_jwst_covar_map.parquet in 734 ms 125 μs 312 ns
+INFO  nyx_space::mc::montecarlo          > Propagated 5000 states in 58 s 792 ms 823 μs 694 ns
 INFO  nyx_space::mc::results             > Exporting Monte Carlo results to parquet file...
-INFO  nyx_space::mc::results             > Serialized 229888 states from 2024-06-24T00:01:09.184303103 ET to 2024-06-25T06:31:09.184303103 ET
+INFO  nyx_space::mc::results             > Serialized 1065006 states from 2024-06-24T00:01:09.184303103 ET to 2024-06-30T12:01:09.184303103 ET
 INFO  nyx_space::mc::results             > Evaluating 2 event(s)
-INFO  nyx_space::mc::results             > Trajectory written to 02_jwst_monte_carlo.parquet in 23 s 190 ms 416 μs 896 ns
+INFO  nyx_space::mc::results             > Trajectory written to 02_jwst_monte_carlo.parquet in 41 s 603 ms 696 μs 128 ns
 ```
 
 ## Analysis
 
+Overall, we can confirm that the 3-sigma covariance is a good approximation of the uncertainty. Notably, however, there are some dispersed trajectories whose Keplerian orbital elements are outside of the 3-sigma bound. This is probably due to the fact that Keplerian orbital elements are defined for orbits where there is a central body, but the James Webb Space Telescope is in a three body orbit, since it's near a Lagrange point.
+
 ### State uncertainties
 
 As expected from any orbit determination software, Nyx can output uncertainties in the state vector in the integration frame and in the RIC frame. **Note:** these plots look pretty linear, but that's because we're running a pure prediction filter and JWST is in a stable halo orbit.
+
+![JWST RIC position (km)](./plots/jwst_ric_position.png)
+
+![JWST RIC velocity (km/s)](./plots/jwst_ric_velocity.png)
 
 ![JWST MC X (km)](./plots/jwst_mc_X_km.png)
 
 ![JWST MC Y (km)](./plots/jwst_mc_Y_km.png)
 
 ![JWST MC Z (km)](./plots/jwst_mc_Z_km.png)
-
-![JWST MC VX (km/s)](./plots/jwst_mc_VX_km_s.png)
-
-![JWST MC VY (km/s)](./plots/jwst_mc_VY_km_s.png)
-
-![JWST MC VZ (km/s)](./plots/jwst_mc_VZ_km_s.png)
 
 ### Keplerian uncertainties
 

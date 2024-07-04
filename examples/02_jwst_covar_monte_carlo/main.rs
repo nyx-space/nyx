@@ -106,7 +106,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let setup = Propagator::default(dynamics);
 
     // All of the analysis will use this duration.
-    let prediction_duration = 30.5 * Unit::Hour;
+    let prediction_duration = 6.5 * Unit::Day;
 
     // === Covariance mapping ===
     // For the covariance mapping / prediction, we'll use the common orbit determination approach.
