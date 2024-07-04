@@ -19,7 +19,7 @@ First, we'll use a _covariance mapping_ approach, whereby the covariance at some
 
 Then, we'll use the Monte Carlo framework of Nyx to propagate the initial spacecraft state after dispersions using all threads of the computer. Multi-threaded propagation is not common in other astrodynamics software.
 
-Finally, we'll check that the 3-sigma (i.e. 99.7%) covariance bounds of the covariance mapping approach matches the Monte Carlo results in terms of uncertainty in the state vector.
+Finally, we'll check that the 3-sigma (i.e. 99.7%) covariance bounds of the covariance mapping approach matches the Monte Carlo results in terms of uncertainty in the state vector and in the Keplerian orbital elements.
 
 ## Example run
 
@@ -66,14 +66,57 @@ INFO  nyx_space::mc::results             > Trajectory written to 02_jwst_monte_c
 
 ## Analysis
 
-![JWST MC X (km)](./jwst_mc_X_km.png)
+### State uncertainties
 
-![JWST MC Y (km)](./jwst_mc_Y_km.png)
+As expected from any orbit determination software, Nyx can output uncertainties in the state vector in the integration frame and in the RIC frame. **Note:** these plots look pretty linear, but that's because we're running a pure prediction filter and JWST is in a stable halo orbit.
 
-![JWST MC Z (km)](./jwst_mc_Z_km.png)
+![JWST MC X (km)](./plots/jwst_mc_X_km.png)
 
-![JWST MC VX (km/s)](./jwst_mc_VX_km_s.png)
+![JWST MC Y (km)](./plots/jwst_mc_Y_km.png)
 
-![JWST MC VY (km/s)](./jwst_mc_VY_km_s.png)
+![JWST MC Z (km)](./plots/jwst_mc_Z_km.png)
 
-![JWST MC VZ (km/s)](./jwst_mc_VZ_km_s.png)
+![JWST MC VX (km/s)](./plots/jwst_mc_VX_km_s.png)
+
+![JWST MC VY (km/s)](./plots/jwst_mc_VY_km_s.png)
+
+![JWST MC VZ (km/s)](./plots/jwst_mc_VZ_km_s.png)
+
+### Keplerian uncertainties
+
+A few tools try to provide Keplerian uncertainties, but often fail to do so correctly (<small>I'm looking at you, ODTK</small>). Nyx rotates the covariance from its Cartesian form into the Keplerian state space by computing the partial derivatives of each requested parameter with respect to the nominal state. This computation is flawless because it uses automatic differentiation (via _hyperdual numbers_). As such, the OD export also includes all of the state computations supported in Nyx, including uncommon ones like the uncertainties in the energy of the orbit or in the true anomaly.
+
+The following columns are also provided as 1-sigma in the OD dataframe:
+- Sigma aol (deg)
+- Sigma c3 (km^2/s^2)
+- Sigma declin (deg)
+- Sigma ea (deg)
+- Sigma fpa (deg)
+- Sigma hmag (km)
+- Sigma hx (km)
+- Sigma hy (km)
+- Sigma hz (km)
+- Sigma ma (deg)
+- Sigma right_asc (deg)
+- Sigma rmag (km)
+- Sigma semi_parameter (km)
+- Sigma semi_minor (km)
+- Sigma tlong (deg)
+- Sigma vmag (km/s)
+- Sigma Cr (Earth J2000) (unitless)
+- Sigma Cd (Earth J2000) (unitless)
+- Sigma Mass (Earth J2000) (kg)
+
+![JWST SMA (km)](./plots/jwst_mc_sma_km.png)
+
+![JWST ECC](./plots/jwst_mc_ecc.png)
+
+![JWST Energy](./plots/jwst_mc_energy_km2_s2.png)
+
+![JWST INC (deg)](./plots/jwst_mc_inc_deg.png)
+
+![JWST RAAN (deg)](./plots/jwst_mc_raan_deg.png)
+
+![JWST AoP (deg)](./plots/jwst_mc_aop_deg.png)
+
+![JWST True Anomaly (deg)](./plots/jwst_mc_ta_deg.png)

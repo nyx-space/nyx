@@ -29,7 +29,9 @@ use crate::{od::*, Spacecraft};
 use arrow::array::{Array, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
+use filter::kalman::KF;
 use hifitime::TimeScale;
+use na::Const;
 use parquet::arrow::ArrowWriter;
 use snafu::prelude::*;
 use std::collections::HashMap;
@@ -45,9 +47,8 @@ impl<
         E: ErrorCtrl,
         Msr: Measurement,
         A: DimName,
-        // S: EstimateFrom<D::StateType, Msr> + Interpolatable,
-        K: Filter<Spacecraft, A, Msr::MeasurementSize>,
-    > ODProcess<'a, D, E, Msr, A, Spacecraft, K>
+        // K: Filter<Spacecraft, A, Msr::MeasurementSize>,
+    > ODProcess<'a, D, E, Msr, A, Spacecraft, KF<Spacecraft, A, Msr::MeasurementSize>>
 where
     D::StateType:
         Interpolatable + Add<OVector<f64, <Spacecraft as State>::Size>, Output = D::StateType>,
@@ -55,6 +56,7 @@ where
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, <Spacecraft as State>::Size>
+        + Allocator<f64, Const<1>, Msr::MeasurementSize>
         + Allocator<f64, <Spacecraft as State>::Size>
         + Allocator<usize, <Spacecraft as State>::Size, <Spacecraft as State>::Size>
         + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
@@ -136,6 +138,24 @@ where
             hdrs.push(field.to_field(more_meta.clone()));
         }
 
+        let mut sigma_fields = fields.clone();
+        // Check that we can retrieve this information
+        sigma_fields.retain(|param| {
+            !matches!(
+                param,
+                &StateParameter::X
+                    | &StateParameter::Y
+                    | &StateParameter::Z
+                    | &StateParameter::VX
+                    | &StateParameter::VY
+                    | &StateParameter::VZ
+            ) && self.estimates[0].sigma_for(*param).is_ok()
+        });
+
+        for field in &sigma_fields {
+            hdrs.push(field.to_cov_field(more_meta.clone()));
+        }
+
         let state_items = ["X", "Y", "Z", "Vx", "Vy", "Vz", "Cr", "Cd", "Mass"];
         let state_units = [
             "km", "km", "km", "km/s", "km/s", "km/s", "unitless", "unitless", "kg",
@@ -173,10 +193,6 @@ where
         }
 
         let est_size = <Spacecraft as State>::Size::dim();
-        assert!(
-            est_size <= state_items.len(),
-            "state of size {est_size} is not yet supported"
-        );
 
         let mut idx = 0;
         for i in 0..state_items.len() {
@@ -277,6 +293,15 @@ where
             let mut data = Float64Builder::new();
             for s in &estimates {
                 data.append_value(s.state().value(field).unwrap());
+            }
+            record.push(Arc::new(data.finish()));
+        }
+
+        // Add all of the 1-sigma uncertainties
+        for field in sigma_fields {
+            let mut data = Float64Builder::new();
+            for s in &estimates {
+                data.append_value(s.sigma_for(field).unwrap());
             }
             record.push(Arc::new(data.finish()));
         }

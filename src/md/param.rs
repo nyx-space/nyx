@@ -279,6 +279,16 @@ impl StateParameter {
 impl StateParameter {
     /// Returns the parquet field of this parameter
     pub(crate) fn to_field(self, more_meta: Option<Vec<(String, String)>>) -> Field {
+        self.to_field_generic(false, more_meta)
+    }
+
+    /// Returns the parquet field of this parameter
+    pub(crate) fn to_cov_field(self, more_meta: Option<Vec<(String, String)>>) -> Field {
+        self.to_field_generic(true, more_meta)
+    }
+
+    /// Returns the parquet field of this parameter
+    fn to_field_generic(self, is_sigma: bool, more_meta: Option<Vec<(String, String)>>) -> Field {
         let mut meta = HashMap::new();
         meta.insert("unit".to_string(), self.unit().to_string());
         if let Some(more_data) = more_meta {
@@ -288,7 +298,11 @@ impl StateParameter {
         }
 
         Field::new(
-            format!("{self}"),
+            if is_sigma {
+                format!("Sigma {self}")
+            } else {
+                format!("{self}")
+            },
             if self == Self::GuidanceMode {
                 DataType::Utf8
             } else {
