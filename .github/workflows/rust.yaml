@@ -81,6 +81,11 @@ jobs:
       - name: Doc Test
         run: cargo test --doc
 
+      - name: Run examples
+        run: |
+          cargo run --example 01_orbit_prop --release
+          cargo run --example 02_jwst --release
+
   lints:
     name: Lints
     runs-on: ubuntu-latest

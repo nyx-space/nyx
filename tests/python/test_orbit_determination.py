@@ -92,9 +92,7 @@ def test_filter_arc():
     # Generate the measurements
     print(arc_sim.generate_schedule())
     arc_sim.build_schedule()
-    msr_path = arc_sim.generate_measurements(
-        str(outpath.joinpath("./msr.parquet")), cfg
-    )
+    msr_path = arc_sim.generate_measurements(str(outpath.joinpath("./msr.parquet")), cfg)
     print(f"Saved {arc_sim} to {msr_path}")
 
     # Now let's filter this same data.
@@ -102,9 +100,7 @@ def test_filter_arc():
     arc = DynamicTrackingArc(msr_path)
 
     # Create the orbit estimate with the covariance diagonal (100 km on position and 1 km/s on velocity)
-    orbit_est = OrbitEstimate(
-        sc.orbit, covar=np.diag([100.0, 100.0, 100.0, 1.0, 1.0, 1.0])
-    )
+    orbit_est = OrbitEstimate(sc.orbit, covar=np.diag([100.0, 100.0, 100.0, 1.0, 1.0, 1.0]))
 
     # Check loading from the YAML read from Python
     with open(config_path.joinpath("orbit_estimates.yaml")) as fh:
@@ -146,7 +142,7 @@ def test_filter_arc():
         ekf_num_msr_trig,
         ekf_disable_time,
         snc_disable_time=Unit.Minute * 10.0,
-        snc_diagonals=[5e-12, 5e-12, 5e-12]
+        snc_diagonals=[5e-12, 5e-12, 5e-12],
     )
 
     print(f"Stored to {rslt_path}")
@@ -258,9 +254,7 @@ def test_one_way_msr():
     dynamics = SpacecraftDynamics.load_named(str(config_path.joinpath("dynamics.yaml")))
 
     # Load the devices
-    devices = GroundStation.load_many(
-        str(config_path.joinpath("./many_ground_stations.yaml"))
-    )
+    devices = GroundStation.load_many(str(config_path.joinpath("./many_ground_stations.yaml")))
     print(f"Loaded {devices}")
 
     # One way measurement
@@ -281,9 +275,7 @@ def test_one_way_msr():
         "elevation (deg)": [],
     }
     # Start by building a time series
-    ts = TimeSeries(
-        traj.first().epoch, traj.last().epoch, step=Unit.Minute * 30, inclusive=True
-    )
+    ts = TimeSeries(traj.first().epoch, traj.last().epoch, step=Unit.Minute * 30, inclusive=True)
     # And iterate over it
     for epoch in ts:
         orbit = traj.at(epoch).orbit

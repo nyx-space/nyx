@@ -87,7 +87,7 @@ impl BPlane {
         // let b_vec = orbit.semi_minor_axis()
         //     * ((1.0 - (1.0 / orbit.ecc()).powi(2)).sqrt() * e_hat
         //         - (1.0 / orbit.ecc() * n_hat));
-        let semi_minor_axis = orbit.semi_minor_axis().context(AstroPhysicsSnafu)?;
+        let semi_minor_axis = orbit.semi_minor_axis_km().context(AstroPhysicsSnafu)?;
 
         let b_vec = Vector3::new(
             semi_minor_axis.dual
@@ -125,7 +125,7 @@ impl BPlane {
                 param: StateParameter::BdotT,
             },
             ltof_s: OrbitPartial {
-                dual: b_vec.dot(&s_hat) / orbit.vmag().dual,
+                dual: b_vec.dot(&s_hat) / orbit.vmag_km_s().dual,
                 param: StateParameter::BLTOF,
             },
             str_dcm: str_rot,

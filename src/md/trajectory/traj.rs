@@ -31,6 +31,7 @@ use anise::almanac::Almanac;
 use arrow::array::{Array, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
+use hifitime::TimeScale;
 use parquet::arrow::ArrowWriter;
 use snafu::ResultExt;
 use std::collections::HashMap;
@@ -182,11 +183,7 @@ where
         let path_buf = cfg.actual_path(path);
 
         // Build the schema
-        let mut hdrs = vec![
-            Field::new("Epoch:Gregorian UTC", DataType::Utf8, false),
-            Field::new("Epoch:Gregorian TAI", DataType::Utf8, false),
-            Field::new("Epoch:TAI (s)", DataType::Float64, false),
-        ];
+        let mut hdrs = vec![Field::new("Epoch (UTC)", DataType::Utf8, false)];
 
         let frame = self.states[0].frame();
         let more_meta = Some(vec![(
@@ -205,13 +202,7 @@ where
         };
 
         // Check that we can retrieve this information
-        fields.retain(|param| match self.first().value(*param) {
-            Ok(_) => true,
-            Err(_) => {
-                warn!("Removed unavailable field `{param}` from trajectory export",);
-                false
-            }
-        });
+        fields.retain(|param| self.first().value(*param).is_ok());
 
         for field in &fields {
             hdrs.push(field.to_field(more_meta.clone()));
@@ -243,16 +234,10 @@ where
 
         // Epochs
         let mut utc_epoch = StringBuilder::new();
-        let mut tai_epoch = StringBuilder::new();
-        let mut tai_s = Float64Builder::new();
         for s in &states {
-            utc_epoch.append_value(format!("{}", s.epoch()));
-            tai_epoch.append_value(format!("{:x}", s.epoch()));
-            tai_s.append_value(s.epoch().to_tai_seconds());
+            utc_epoch.append_value(&s.epoch().to_time_scale(TimeScale::UTC).to_isoformat());
         }
         record.push(Arc::new(utc_epoch.finish()));
-        record.push(Arc::new(tai_epoch.finish()));
-        record.push(Arc::new(tai_s.finish()));
 
         // Add all of the fields
         for field in fields {
@@ -281,7 +266,6 @@ where
 
         // Add all of the evaluated events
         if let Some(events) = events {
-            // warn!("Adding events was removed when switching to ANISE");
             info!("Evaluating {} event(s)", events.len());
             for event in events {
                 let mut data = Float64Builder::new();
@@ -378,11 +362,7 @@ where
         let path_buf = cfg.actual_path(path);
 
         // Build the schema
-        let mut hdrs = vec![
-            Field::new("Epoch:Gregorian UTC", DataType::Utf8, false),
-            Field::new("Epoch:Gregorian TAI", DataType::Utf8, false),
-            Field::new("Epoch:TAI (s)", DataType::Float64, false),
-        ];
+        let mut hdrs = vec![Field::new("Epoch (UTC)", DataType::Utf8, false)];
 
         // Add the RIC headers
         for coord in ["x", "y", "z"] {
@@ -478,16 +458,10 @@ where
 
         // Epochs (both match for self and others)
         let mut utc_epoch = StringBuilder::new();
-        let mut tai_epoch = StringBuilder::new();
-        let mut tai_s = Float64Builder::new();
         for s in &self_states {
-            utc_epoch.append_value(format!("{}", s.epoch()));
-            tai_epoch.append_value(format!("{:x}", s.epoch()));
-            tai_s.append_value(s.epoch().to_tai_seconds());
+            utc_epoch.append_value(&s.epoch().to_time_scale(TimeScale::UTC).to_isoformat());
         }
         record.push(Arc::new(utc_epoch.finish()));
-        record.push(Arc::new(tai_epoch.finish()));
-        record.push(Arc::new(tai_s.finish()));
 
         // Add the RIC data
         for coord_no in 0..6 {

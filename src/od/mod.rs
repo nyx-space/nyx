@@ -59,6 +59,17 @@ pub use simulator::TrackingDeviceSim;
 /// Provides all state noise compensation functionality
 pub mod snc;
 
+/// A helper type for spacecraft orbit determination.
+pub type SpacecraftODProcess<'a> = self::process::ODProcess<
+    'a,
+    crate::md::prelude::SpacecraftDynamics,
+    crate::propagators::RSSCartesianStep,
+    msr::RangeDoppler,
+    nalgebra::Const<3>,
+    crate::Spacecraft,
+    filter::kalman::KF<crate::Spacecraft, nalgebra::Const<3>, nalgebra::Const<2>>,
+>;
+
 #[allow(unused_imports)]
 pub mod prelude {
     pub use super::estimate::*;

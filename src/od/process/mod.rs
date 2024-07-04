@@ -679,7 +679,7 @@ where
     /// Continuously predicts the trajectory until the provided end epoch, with covariance mapping at each step. In other words, this performs a time update.
     pub fn predict_until(&mut self, step: Duration, end_epoch: Epoch) -> Result<(), ODError> {
         let prop_time = end_epoch - self.kf.previous_estimate().epoch();
-        info!("Propagating for {prop_time} and mapping covariance",);
+        info!("Mapping covariance for {prop_time} with {step} step");
 
         loop {
             let mut epoch = self.prop.state.epoch();

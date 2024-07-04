@@ -234,7 +234,7 @@ fn line_of_nodes(almanac: Arc<Almanac>) {
 
     let period = state.period().unwrap();
 
-    let lon_event = Event::new(StateParameter::GeodeticLongitude, 0.0);
+    let lon_event = Event::new(StateParameter::Longitude, 0.0);
 
     let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
     let mut prop = setup.with(state.into(), almanac);
@@ -262,7 +262,7 @@ fn latitude(almanac: Arc<Almanac>) {
 
     let period = state.period().unwrap();
 
-    let lat_event = Event::new(StateParameter::GeodeticLatitude, 2.0);
+    let lat_event = Event::new(StateParameter::Latitude, 2.0);
 
     let setup = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
     let mut prop = setup.with(state.into(), almanac);

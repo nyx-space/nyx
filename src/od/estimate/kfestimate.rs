@@ -17,11 +17,14 @@
 */
 
 use super::{Estimate, State};
+use crate::cosmic::AstroError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, Matrix, OMatrix, OVector};
-use crate::mc::GaussianGenerator;
+use crate::mc::{GaussianGenerator, MultivariateNormal};
+use crate::md::prelude::OrbitDual;
 use crate::md::StateParameter;
-use crate::Spacecraft;
+use crate::{NyxError, Spacecraft};
+use na::SMatrix;
 use nalgebra::Const;
 use rand::SeedableRng;
 use rand_distr::Distribution;
@@ -143,6 +146,90 @@ impl KfEstimate<Spacecraft> {
             predicted: true,
             stm: OMatrix::<f64, Const<9>, Const<9>>::identity(),
         }
+    }
+
+    /// Builds a multivariate random variable from this estimate's nominal state and covariance, zero mean.
+    pub fn to_random_variable(&self) -> Result<MultivariateNormal<Spacecraft>, NyxError> {
+        MultivariateNormal::zero_mean(
+            self.nominal_state,
+            vec![
+                StateParameter::X,
+                StateParameter::Y,
+                StateParameter::Z,
+                StateParameter::VX,
+                StateParameter::VY,
+                StateParameter::VZ,
+                StateParameter::Cr,
+                StateParameter::Cd,
+                StateParameter::FuelMass,
+            ],
+            self.covar,
+        )
+    }
+
+    /// Returns the 1-sigma uncertainty for a given parameter, in that parameter's unit
+    ///
+    /// This method uses the [OrbitDual] structure to compute the estimate in the hyperdual space
+    /// and rotate the nominal covariance into that space.
+    pub fn sigma_for(&self, param: StateParameter) -> Result<f64, AstroError> {
+        // Build the rotation matrix using Orbit Dual.
+        let mut rotmat = SMatrix::<f64, 1, 6>::zeros();
+        let orbit_dual = OrbitDual::from(self.nominal_state.orbit);
+
+        let xf_partial = orbit_dual.partial_for(param)?;
+        for (cno, val) in [
+            xf_partial.wtr_x(),
+            xf_partial.wtr_y(),
+            xf_partial.wtr_z(),
+            xf_partial.wtr_vx(),
+            xf_partial.wtr_vy(),
+            xf_partial.wtr_vz(),
+        ]
+        .iter()
+        .copied()
+        .enumerate()
+        {
+            rotmat[(0, cno)] = val;
+        }
+
+        Ok((rotmat * self.covar.fixed_view::<6, 6>(0, 0) * rotmat.transpose())[(0, 0)].sqrt())
+    }
+
+    /// Returns the 6x6 covariance (i.e. square of the sigma/uncertainty) of the SMA, ECC, INC, RAAN, AOP, and True Anomaly.
+    pub fn keplerian_covar(&self) -> SMatrix<f64, 6, 6> {
+        // Build the rotation matrix using Orbit Dual.
+        let mut rotmat = SMatrix::<f64, 6, 6>::zeros();
+        let orbit_dual = OrbitDual::from(self.nominal_state.orbit);
+        for (pno, param) in [
+            StateParameter::SMA,
+            StateParameter::Eccentricity,
+            StateParameter::Inclination,
+            StateParameter::RAAN,
+            StateParameter::AoP,
+            StateParameter::TrueAnomaly,
+        ]
+        .iter()
+        .copied()
+        .enumerate()
+        {
+            let xf_partial = orbit_dual.partial_for(param).unwrap();
+            for (cno, val) in [
+                xf_partial.wtr_x(),
+                xf_partial.wtr_y(),
+                xf_partial.wtr_z(),
+                xf_partial.wtr_vx(),
+                xf_partial.wtr_vy(),
+                xf_partial.wtr_vz(),
+            ]
+            .iter()
+            .copied()
+            .enumerate()
+            {
+                rotmat[(pno, cno)] = val;
+            }
+        }
+
+        rotmat * self.covar.fixed_view::<6, 6>(0, 0) * rotmat.transpose()
     }
 }
 

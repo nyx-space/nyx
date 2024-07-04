@@ -17,6 +17,7 @@
 */
 
 use anise::frames::Frame;
+use arrow::array::StringArray;
 use arrow::{array::Float64Array, record_batch::RecordBatchReader};
 use hifitime::Epoch;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
@@ -127,7 +128,7 @@ impl TrajectoryLoader {
         })?;
 
         for field in &reader.schema().fields {
-            if field.name().as_str() == "Epoch:TAI (s)" {
+            if field.name().as_str() == "Epoch (UTC)" {
                 has_epoch = true;
             } else {
                 for potential_field in &mut found_fields {
@@ -156,7 +157,7 @@ impl TrajectoryLoader {
         ensure!(
             has_epoch,
             MissingDataSnafu {
-                which: "Epoch: TAI (s)"
+                which: "Epoch (UTC)"
             }
         );
 
@@ -207,10 +208,10 @@ impl TrajectoryLoader {
             let batch = maybe_batch.unwrap();
 
             let epochs = batch
-                .column_by_name("Epoch:TAI (s)")
+                .column_by_name("Epoch (UTC)")
                 .unwrap()
                 .as_any()
-                .downcast_ref::<Float64Array>()
+                .downcast_ref::<StringArray>()
                 .unwrap();
 
             let mut shared_data = vec![];
@@ -243,7 +244,11 @@ impl TrajectoryLoader {
             // Build the states
             for i in 0..batch.num_rows() {
                 let mut state = S::zeros();
-                state.set_epoch(Epoch::from_tai_seconds(epochs.value(i)));
+                state.set_epoch(Epoch::from_gregorian_str(epochs.value(i)).map_err(|e| {
+                    InputOutputError::Inconsistency {
+                        msg: format!("{e} when parsing epoch"),
+                    }
+                })?);
                 state.set_frame(frame.unwrap()); // We checked it was set above with an ensure! call
                 state.unset_stm(); // We don't have any STM data, so let's unset this.
 

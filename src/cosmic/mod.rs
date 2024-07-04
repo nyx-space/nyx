@@ -17,7 +17,7 @@
 */
 
 use anise::errors::{AlmanacError, PhysicsError};
-pub use anise::prelude::{Frame, Orbit};
+pub use anise::prelude::*;
 
 pub use crate::cosmic::{GuidanceMode, Spacecraft};
 use crate::dynamics::DynamicsError;
@@ -26,7 +26,6 @@ use crate::errors::StateError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
 use crate::md::StateParameter;
-use crate::time::Epoch;
 use snafu::Snafu;
 use std::fmt;
 

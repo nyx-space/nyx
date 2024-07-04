@@ -23,12 +23,15 @@ use crate::linalg::{DefaultAllocator, DimName};
 use crate::md::trajectory::Interpolatable;
 use crate::md::StateParameter;
 use crate::od::estimate::*;
-use crate::od::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::State;
+use crate::{od::*, Spacecraft};
 use arrow::array::{Array, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
+use filter::kalman::KF;
+use hifitime::TimeScale;
+use na::Const;
 use parquet::arrow::ArrowWriter;
 use snafu::prelude::*;
 use std::collections::HashMap;
@@ -44,22 +47,23 @@ impl<
         E: ErrorCtrl,
         Msr: Measurement,
         A: DimName,
-        S: EstimateFrom<D::StateType, Msr> + Interpolatable,
-        K: Filter<S, A, Msr::MeasurementSize>,
-    > ODProcess<'a, D, E, Msr, A, S, K>
+        // K: Filter<Spacecraft, A, Msr::MeasurementSize>,
+    > ODProcess<'a, D, E, Msr, A, Spacecraft, KF<Spacecraft, A, Msr::MeasurementSize>>
 where
-    D::StateType: Interpolatable + Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
+    D::StateType:
+        Interpolatable + Add<OVector<f64, <Spacecraft as State>::Size>, Output = D::StateType>,
     <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, S::Size>
-        + Allocator<f64, S::Size>
-        + Allocator<usize, S::Size, S::Size>
+        + Allocator<f64, Msr::MeasurementSize, <Spacecraft as State>::Size>
+        + Allocator<f64, Const<1>, Msr::MeasurementSize>
+        + Allocator<f64, <Spacecraft as State>::Size>
+        + Allocator<usize, <Spacecraft as State>::Size, <Spacecraft as State>::Size>
         + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, <D::StateType as State>::Size>
-        + Allocator<f64, Msr::MeasurementSize, <S as State>::Size>
+        + Allocator<f64, Msr::MeasurementSize, <Spacecraft as State>::Size>
         + Allocator<f64, <D::StateType as State>::Size, Msr::MeasurementSize>
-        + Allocator<f64, <S as State>::Size, Msr::MeasurementSize>
+        + Allocator<f64, <Spacecraft as State>::Size, Msr::MeasurementSize>
         + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
         + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::VecLength>
@@ -67,11 +71,12 @@ where
         + Allocator<f64, A, A>
         + Allocator<f64, <D::StateType as State>::Size, A>
         + Allocator<f64, A, <D::StateType as State>::Size>
-        + Allocator<f64, <S as State>::Size>
-        + Allocator<f64, <S as State>::VecLength>
-        + Allocator<f64, <S as State>::Size, <S as State>::Size>
-        + Allocator<f64, <S as State>::Size, A>
-        + Allocator<f64, A, <S as State>::Size>,
+        + Allocator<f64, <Spacecraft as State>::Size>
+        + Allocator<f64, <Spacecraft as State>::VecLength>
+        + Allocator<f64, <Spacecraft as State>::Size, <Spacecraft as State>::Size>
+        + Allocator<f64, <Spacecraft as State>::Size, A>
+        + Allocator<f64, A, <Spacecraft as State>::Size>,
+    Spacecraft: EstimateFrom<D::StateType, Msr>,
 {
     /// Store the estimates and residuals in a parquet file
     pub fn to_parquet<P: AsRef<Path>>(&self, path: P, cfg: ExportCfg) -> Result<PathBuf, ODError> {
@@ -102,11 +107,7 @@ where
         let path_buf = cfg.actual_path(path);
 
         // Build the schema
-        let mut hdrs = vec![
-            Field::new("Epoch:Gregorian UTC", DataType::Utf8, false),
-            Field::new("Epoch:Gregorian TAI", DataType::Utf8, false),
-            Field::new("Epoch:TAI (s)", DataType::Float64, false),
-        ];
+        let mut hdrs = vec![Field::new("Epoch (UTC)", DataType::Utf8, false)];
 
         let frame = self.estimates[0].state().frame();
 
@@ -124,49 +125,106 @@ where
 
         let mut fields = match cfg.fields {
             Some(fields) => fields,
-            None => S::export_params(),
+            None => Spacecraft::export_params(),
         };
 
         // Check that we can retrieve this information
         fields.retain(|param| match self.estimates[0].state().value(*param) {
             Ok(_) => param != &StateParameter::GuidanceMode,
-            Err(_) => {
-                warn!("Removed unavailable field `{param}` from orbit determination export",);
-                false
-            }
+            Err(_) => false,
         });
 
         for field in &fields {
             hdrs.push(field.to_field(more_meta.clone()));
         }
 
-        let state_items = ["X", "Y", "Z", "Vx", "Vy", "Vz", "Cr", "Cd", "Mass"];
-        let est_size = <S as State>::Size::dim();
-        assert!(
-            est_size <= state_items.len(),
-            "state of size {est_size} is not yet supported"
-        );
+        let mut sigma_fields = fields.clone();
+        // Check that we can retrieve this information
+        sigma_fields.retain(|param| {
+            !matches!(
+                param,
+                &StateParameter::X
+                    | &StateParameter::Y
+                    | &StateParameter::Z
+                    | &StateParameter::VX
+                    | &StateParameter::VY
+                    | &StateParameter::VZ
+            ) && self.estimates[0].sigma_for(*param).is_ok()
+        });
 
-        let mut cov_hdrs = Vec::new();
+        for field in &sigma_fields {
+            hdrs.push(field.to_cov_field(more_meta.clone()));
+        }
+
+        let state_items = ["X", "Y", "Z", "Vx", "Vy", "Vz", "Cr", "Cd", "Mass"];
+        let state_units = [
+            "km", "km", "km", "km/s", "km/s", "km/s", "unitless", "unitless", "kg",
+        ];
+        let mut cov_units = vec![];
 
         for i in 0..state_items.len() {
             for j in i..state_items.len() {
-                cov_hdrs.push(format!("Covariance {}{}", state_items[i], state_items[j]));
+                let cov_unit = if i < 3 {
+                    if j < 3 {
+                        "km^2"
+                    } else if (3..6).contains(&j) {
+                        "km^2/s"
+                    } else if j == 8 {
+                        "km*kg"
+                    } else {
+                        "km"
+                    }
+                } else if (3..6).contains(&i) {
+                    if (3..6).contains(&j) {
+                        "km^2/s^2"
+                    } else if j == 8 {
+                        "km/s*kg"
+                    } else {
+                        "km/s"
+                    }
+                } else if i == 8 || j == 8 {
+                    "kg^2"
+                } else {
+                    "unitless"
+                };
+
+                cov_units.push(cov_unit);
             }
         }
 
-        // Add the covariance in the integration frame
-        for hdr in &cov_hdrs {
+        let est_size = <Spacecraft as State>::Size::dim();
+
+        let mut idx = 0;
+        for i in 0..state_items.len() {
+            for j in i..state_items.len() {
+                hdrs.push(Field::new(
+                    format!(
+                        "Covariance {}*{} ({frame:x}) ({})",
+                        state_items[i], state_items[j], cov_units[idx]
+                    ),
+                    DataType::Float64,
+                    false,
+                ));
+                idx += 1;
+            }
+        }
+
+        // Add the uncertainty in the integration frame
+        for (i, coord) in state_items.iter().enumerate() {
             hdrs.push(Field::new(
-                format!("{hdr} ({frame:x})"),
+                format!("Sigma {coord} ({frame:x}) ({})", state_units[i]),
                 DataType::Float64,
                 false,
             ));
         }
 
-        // Add the covariance in the RIC frame
-        for hdr in &cov_hdrs {
-            hdrs.push(Field::new(format!("{hdr} (RIC)"), DataType::Float64, false));
+        // Add the position and velocity uncertainty in the RIC frame
+        for (i, coord) in state_items.iter().enumerate().take(6) {
+            hdrs.push(Field::new(
+                format!("Sigma {coord} (RIC) ({})", state_units[i]),
+                DataType::Float64,
+                false,
+            ));
         }
 
         // Add the fields of the residuals
@@ -211,7 +269,7 @@ where
 
                 for (estimate, residual) in self.estimates.iter().zip(self.residuals.iter()) {
                     if estimate.epoch() >= start && estimate.epoch() <= end {
-                        estimates.push(estimate.clone());
+                        estimates.push(*estimate);
                         residuals.push(residual.clone());
                     }
                 }
@@ -225,16 +283,10 @@ where
 
         // Epochs
         let mut utc_epoch = StringBuilder::new();
-        let mut tai_epoch = StringBuilder::new();
-        let mut tai_s = Float64Builder::new();
         for s in &estimates {
-            utc_epoch.append_value(format!("{}", s.epoch()));
-            tai_epoch.append_value(format!("{:x}", s.epoch()));
-            tai_s.append_value(s.epoch().to_tai_seconds());
+            utc_epoch.append_value(&s.epoch().to_time_scale(TimeScale::UTC).to_isoformat());
         }
         record.push(Arc::new(utc_epoch.finish()));
-        record.push(Arc::new(tai_epoch.finish()));
-        record.push(Arc::new(tai_s.finish()));
 
         // Add all of the fields
         for field in fields {
@@ -244,6 +296,16 @@ where
             }
             record.push(Arc::new(data.finish()));
         }
+
+        // Add all of the 1-sigma uncertainties
+        for field in sigma_fields {
+            let mut data = Float64Builder::new();
+            for s in &estimates {
+                data.append_value(s.sigma_for(field).unwrap());
+            }
+            record.push(Arc::new(data.finish()));
+        }
+
         // Add the 1-sigma covariance in the integration frame
         for i in 0..est_size {
             for j in i..est_size {
@@ -254,37 +316,43 @@ where
                 record.push(Arc::new(data.finish()));
             }
         }
-        // Add the 1-sigma covariance in the RIC frame
+
+        // Add the sigma/uncertainty in the integration frame
+        for i in 0..est_size {
+            let mut data = Float64Builder::new();
+            for s in &estimates {
+                data.append_value(s.covar()[(i, i)].sqrt());
+            }
+            record.push(Arc::new(data.finish()));
+        }
+
+        // Add the sigma/uncertainty covariance in the RIC frame
         let mut ric_covariances = Vec::new();
 
         for s in &estimates {
-            let dcm6x6 = s
+            let dcm_ric2inertial = s
                 .state()
                 .orbit()
                 .dcm_from_ric_to_inertial()
                 .unwrap()
                 .state_dcm();
-            // Create a full DCM and only rotate the orbit part of it.
-            let mut dcm = OMatrix::<f64, S::Size, S::Size>::identity();
-            for i in 0..6 {
-                for j in i..6 {
-                    dcm[(i, j)] = dcm6x6[(i, j)];
-                }
-            }
-            let ric_covar = &dcm * s.covar() * &dcm.transpose();
 
+            // Build the matrix view of the orbit part of the covariance.
+            let cov = s.covar();
+            let orbit_cov = cov.fixed_view::<6, 6>(0, 0);
+
+            // Rotate back into the RIC frame
+            let ric_covar = dcm_ric2inertial * orbit_cov * dcm_ric2inertial.transpose();
             ric_covariances.push(ric_covar);
         }
 
         // Now store the RIC covariance data.
-        for i in 0..est_size {
-            for j in i..est_size {
-                let mut data = Float64Builder::new();
-                for cov in ric_covariances.iter().take(estimates.len()) {
-                    data.append_value(cov[(i, j)]);
-                }
-                record.push(Arc::new(data.finish()));
+        for i in 0..6 {
+            let mut data = Float64Builder::new();
+            for cov in ric_covariances.iter().take(estimates.len()) {
+                data.append_value(cov[(i, i)].sqrt());
             }
+            record.push(Arc::new(data.finish()));
         }
 
         // Finally, add the residuals.

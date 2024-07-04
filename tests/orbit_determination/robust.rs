@@ -141,8 +141,8 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
 
     arc.to_parquet_simple(&path).unwrap();
 
-    // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
-    // We expect the estimated orbit to be _nearly_ perfect because we've removed SATURN_BARYCENTER from the estimated trajectory
+    // Now that we have the truth data, let"s start an OD with no noise at all and compute the estimates.
+    // We expect the estimated orbit to be _nearly_ perfect because we"ve removed SATURN_BARYCENTER from the estimated trajectory
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let estimator = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
     let setup = Propagator::new::<RK4Fixed>(estimator, opts);
@@ -161,7 +161,7 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
 
     let mut odp = ODProcess::ekf(prop_est, kf, trig, None, almanac);
 
-    // Let's filter and iterate on the initial subset of the arc to refine the initial estimate
+    // Let"s filter and iterate on the initial subset of the arc to refine the initial estimate
     let subset = arc.filter_by_offset(..3.hours());
     let remaining = arc.filter_by_offset(3.hours()..);
 
@@ -339,8 +339,8 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
 
     println!("{arc}");
 
-    // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
-    // We expect the estimated orbit to be _nearly_ perfect because we've removed SATURN_BARYCENTER from the estimated trajectory
+    // Now that we have the truth data, let"s start an OD with no noise at all and compute the estimates.
+    // We expect the estimated orbit to be _nearly_ perfect because we"ve removed SATURN_BARYCENTER from the estimated trajectory
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let estimator = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
     let setup = Propagator::default(estimator);
@@ -360,7 +360,7 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
     let mut odp = ODProcess::ekf(prop_est, kf, trig, None, almanac);
 
     // TODO: Fix the deserialization of the measurements such that they also deserialize the integration time.
-    // Without it, we're stuck having to rebuild them from scratch.
+    // Without it, we"re stuck having to rebuild them from scratch.
     // https://github.com/nyx-space/nyx/issues/140
 
     // Build the BTreeMap of devices from the vector using their names
@@ -441,9 +441,7 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
     // Check that the position and velocity estimates are present, along with the epochs
     assert!(df
         .columns([
-            "Epoch:Gregorian UTC",
-            "Epoch:Gregorian TAI",
-            "Epoch:TAI (s)",
+            "Epoch (UTC)",
             "x (km)",
             "y (km)",
             "z (km)",
@@ -456,54 +454,66 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
     // Check that the covariance in the integration frame is present
     assert!(df
         .columns([
-            "Covariance XX (Earth J2000)",
-            "Covariance XY (Earth J2000)",
-            "Covariance XZ (Earth J2000)",
-            "Covariance XVx (Earth J2000)",
-            "Covariance XVy (Earth J2000)",
-            "Covariance XVz (Earth J2000)",
-            "Covariance YY (Earth J2000)",
-            "Covariance YZ (Earth J2000)",
-            "Covariance YVx (Earth J2000)",
-            "Covariance YVy (Earth J2000)",
-            "Covariance YVz (Earth J2000)",
-            "Covariance ZZ (Earth J2000)",
-            "Covariance ZVx (Earth J2000)",
-            "Covariance ZVy (Earth J2000)",
-            "Covariance ZVz (Earth J2000)",
-            "Covariance VxVx (Earth J2000)",
-            "Covariance VxVy (Earth J2000)",
-            "Covariance VxVz (Earth J2000)",
-            "Covariance VyVy (Earth J2000)",
-            "Covariance VyVz (Earth J2000)",
-            "Covariance VzVz (Earth J2000)",
-        ])
-        .is_ok());
-
-    // Check that the covariance in the RIC frame is present
-    assert!(df
-        .columns([
-            "Covariance XX (RIC)",
-            "Covariance XY (RIC)",
-            "Covariance XZ (RIC)",
-            "Covariance XVx (RIC)",
-            "Covariance XVy (RIC)",
-            "Covariance XVz (RIC)",
-            "Covariance YY (RIC)",
-            "Covariance YZ (RIC)",
-            "Covariance YVx (RIC)",
-            "Covariance YVy (RIC)",
-            "Covariance YVz (RIC)",
-            "Covariance ZZ (RIC)",
-            "Covariance ZVx (RIC)",
-            "Covariance ZVy (RIC)",
-            "Covariance ZVz (RIC)",
-            "Covariance VxVx (RIC)",
-            "Covariance VxVy (RIC)",
-            "Covariance VxVz (RIC)",
-            "Covariance VyVy (RIC)",
-            "Covariance VyVz (RIC)",
-            "Covariance VzVz (RIC)",
+            "Covariance X*X (Earth J2000) (km^2)",
+            "Covariance X*Y (Earth J2000) (km^2)",
+            "Covariance X*Z (Earth J2000) (km^2)",
+            "Covariance X*Vx (Earth J2000) (km^2/s)",
+            "Covariance X*Vy (Earth J2000) (km^2/s)",
+            "Covariance X*Vz (Earth J2000) (km^2/s)",
+            "Covariance X*Cr (Earth J2000) (km)",
+            "Covariance X*Cd (Earth J2000) (km)",
+            "Covariance X*Mass (Earth J2000) (km*kg)",
+            "Covariance Y*Y (Earth J2000) (km^2)",
+            "Covariance Y*Z (Earth J2000) (km^2)",
+            "Covariance Y*Vx (Earth J2000) (km^2/s)",
+            "Covariance Y*Vy (Earth J2000) (km^2/s)",
+            "Covariance Y*Vz (Earth J2000) (km^2/s)",
+            "Covariance Y*Cr (Earth J2000) (km)",
+            "Covariance Y*Cd (Earth J2000) (km)",
+            "Covariance Y*Mass (Earth J2000) (km*kg)",
+            "Covariance Z*Z (Earth J2000) (km^2)",
+            "Covariance Z*Vx (Earth J2000) (km^2/s)",
+            "Covariance Z*Vy (Earth J2000) (km^2/s)",
+            "Covariance Z*Vz (Earth J2000) (km^2/s)",
+            "Covariance Z*Cr (Earth J2000) (km)",
+            "Covariance Z*Cd (Earth J2000) (km)",
+            "Covariance Z*Mass (Earth J2000) (km*kg)",
+            "Covariance Vx*Vx (Earth J2000) (km^2/s^2)",
+            "Covariance Vx*Vy (Earth J2000) (km^2/s^2)",
+            "Covariance Vx*Vz (Earth J2000) (km^2/s^2)",
+            "Covariance Vx*Cr (Earth J2000) (km/s)",
+            "Covariance Vx*Cd (Earth J2000) (km/s)",
+            "Covariance Vx*Mass (Earth J2000) (km/s*kg)",
+            "Covariance Vy*Vy (Earth J2000) (km^2/s^2)",
+            "Covariance Vy*Vz (Earth J2000) (km^2/s^2)",
+            "Covariance Vy*Cr (Earth J2000) (km/s)",
+            "Covariance Vy*Cd (Earth J2000) (km/s)",
+            "Covariance Vy*Mass (Earth J2000) (km/s*kg)",
+            "Covariance Vz*Vz (Earth J2000) (km^2/s^2)",
+            "Covariance Vz*Cr (Earth J2000) (km/s)",
+            "Covariance Vz*Cd (Earth J2000) (km/s)",
+            "Covariance Vz*Mass (Earth J2000) (km/s*kg)",
+            "Covariance Cr*Cr (Earth J2000) (unitless)",
+            "Covariance Cr*Cd (Earth J2000) (unitless)",
+            "Covariance Cr*Mass (Earth J2000) (kg^2)",
+            "Covariance Cd*Cd (Earth J2000) (unitless)",
+            "Covariance Cd*Mass (Earth J2000) (kg^2)",
+            "Covariance Mass*Mass (Earth J2000) (kg^2)",
+            "Sigma X (Earth J2000) (km)",
+            "Sigma Y (Earth J2000) (km)",
+            "Sigma Z (Earth J2000) (km)",
+            "Sigma Vx (Earth J2000) (km/s)",
+            "Sigma Vy (Earth J2000) (km/s)",
+            "Sigma Vz (Earth J2000) (km/s)",
+            "Sigma Cr (Earth J2000) (unitless)",
+            "Sigma Cd (Earth J2000) (unitless)",
+            "Sigma Mass (Earth J2000) (kg)",
+            "Sigma X (RIC) (km)",
+            "Sigma Y (RIC) (km)",
+            "Sigma Z (RIC) (km)",
+            "Sigma Vx (RIC) (km/s)",
+            "Sigma Vy (RIC) (km/s)",
+            "Sigma Vz (RIC) (km/s)",
         ])
         .is_ok());
 
