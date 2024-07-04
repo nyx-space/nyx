@@ -269,7 +269,7 @@ where
 
                 for (estimate, residual) in self.estimates.iter().zip(self.residuals.iter()) {
                     if estimate.epoch() >= start && estimate.epoch() <= end {
-                        estimates.push(estimate.clone());
+                        estimates.push(*estimate);
                         residuals.push(residual.clone());
                     }
                 }
