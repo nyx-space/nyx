@@ -49,14 +49,26 @@ fn filter_errors() {
     let sensitivity = SMatrix::<f64, 2, 9>::zeros();
 
     let mut ckf = KF::no_snc(initial_estimate, measurement_noise);
-    match ckf.measurement_update(Spacecraft::zeros().with_stm(), real_obs, computed_obs, None) {
+    match ckf.measurement_update(
+        Spacecraft::zeros().with_stm(),
+        real_obs,
+        computed_obs,
+        measurement_noise,
+        None,
+    ) {
         Ok(_) => panic!("expected the measurement update to fail"),
         Err(e) => {
             assert_eq!(e, ODError::SensitivityNotUpdated);
         }
     }
     ckf.update_h_tilde(sensitivity);
-    match ckf.measurement_update(Spacecraft::zeros().with_stm(), real_obs, computed_obs, None) {
+    match ckf.measurement_update(
+        Spacecraft::zeros().with_stm(),
+        real_obs,
+        computed_obs,
+        measurement_noise,
+        None,
+    ) {
         Ok(_) => panic!("expected the measurement update to fail"),
         Err(e) => {
             assert_eq!(e, ODError::SingularKalmanGain);

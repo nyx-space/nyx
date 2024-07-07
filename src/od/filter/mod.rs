@@ -24,7 +24,6 @@ use super::ODError;
 pub use crate::dynamics::Dynamics;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
-use crate::time::Epoch;
 pub use crate::{State, TimeTagged};
 pub mod kalman;
 
@@ -81,6 +80,7 @@ where
         nominal_state: T,
         real_obs: &OVector<f64, M>,
         computed_obs: &OVector<f64, M>,
+        measurement_noise: OMatrix<f64, M, M>,
         resid_ratio_check: Option<f64>,
     ) -> Result<(Self::Estimate, Residual<M>), ODError>;
 
@@ -92,7 +92,4 @@ where
 
     /// Sets the process noise matrix of the estimated state
     fn set_process_noise(&mut self, snc: SNC<A>);
-
-    /// Returns the measurement noise used at this given epoch
-    fn measurement_noise(&self, epoch: Epoch) -> &OMatrix<f64, M, M>;
 }

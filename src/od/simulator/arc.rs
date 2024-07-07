@@ -51,6 +51,7 @@ where
         + Allocator<f64, <MsrIn as State>::Size, <MsrIn as State>::Size>
         + Allocator<f64, <MsrIn as State>::VecLength>
         + Allocator<f64, Msr::MeasurementSize, <MsrIn as State>::Size>
+        + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize>,
 {
     /// Map of devices from their names.
@@ -77,6 +78,7 @@ where
         + Allocator<f64, <MsrIn as State>::Size, <MsrIn as State>::Size>
         + Allocator<f64, <MsrIn as State>::VecLength>
         + Allocator<f64, Msr::MeasurementSize, <MsrIn as State>::Size>
+        + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize>,
 {
     /// Build a new tracking arc simulator using the provided seeded random number generator.
@@ -265,6 +267,7 @@ where
         + Allocator<f64, <MsrIn as State>::Size, <MsrIn as State>::Size>
         + Allocator<f64, <MsrIn as State>::VecLength>
         + Allocator<f64, Msr::MeasurementSize, <MsrIn as State>::Size>
+        + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

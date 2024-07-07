@@ -201,10 +201,6 @@ where
 {
     type Estimate = KfEstimate<T>;
 
-    fn measurement_noise(&self, _epoch: Epoch) -> &OMatrix<f64, M, M> {
-        &self.measurement_noise
-    }
-
     /// Returns the previous estimate
     fn previous_estimate(&self) -> &Self::Estimate {
         &self.prev_estimate
@@ -300,6 +296,7 @@ where
         nominal_state: T,
         real_obs: &OVector<f64, M>,
         computed_obs: &OVector<f64, M>,
+        measurement_noise: OMatrix<f64, M, M>,
         resid_ratio_check: Option<f64>,
     ) -> Result<(Self::Estimate, Residual<M>), ODError> {
         if !self.h_tilde_updated {
@@ -382,7 +379,7 @@ where
         }
 
         // Compute the Kalman gain but first adding the measurement noise to H⋅P⋅H^T
-        let mut invertible_part = h_p_ht + &self.measurement_noise;
+        let mut invertible_part = h_p_ht + &measurement_noise;
         if !invertible_part.try_inverse_mut() {
             return Err(ODError::SingularKalmanGain);
         }
@@ -408,7 +405,7 @@ where
         let first_term = OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity()
             - &gain * &self.h_tilde;
         let covar = first_term * covar_bar * first_term.transpose()
-            + &gain * &self.measurement_noise * &gain.transpose();
+            + &gain * &measurement_noise * &gain.transpose();
 
         // And wrap up
         let estimate = KfEstimate {

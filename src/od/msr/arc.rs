@@ -55,7 +55,8 @@ where
 impl<Msr> Display for TrackingArc<Msr>
 where
     Msr: Measurement,
-    DefaultAllocator: Allocator<f64, Msr::MeasurementSize>,
+    DefaultAllocator: Allocator<f64, Msr::MeasurementSize>
+        + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -70,7 +71,8 @@ where
 impl<Msr> TrackingArc<Msr>
 where
     Msr: Measurement,
-    DefaultAllocator: Allocator<f64, Msr::MeasurementSize>,
+    DefaultAllocator: Allocator<f64, Msr::MeasurementSize>
+        + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>,
 {
     /// Store this tracking arc to a parquet file.
     pub fn to_parquet_simple<P: AsRef<Path> + Debug>(

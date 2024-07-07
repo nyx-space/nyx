@@ -590,6 +590,7 @@ where
                                     nominal_state,
                                     &msr.observation(),
                                     &computed_meas.observation(),
+                                    device.measurement_noise(epoch)?,
                                     resid_ratio_check,
                                 ) {
                                     Ok((estimate, residual)) => {
