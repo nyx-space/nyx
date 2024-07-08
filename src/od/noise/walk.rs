@@ -36,20 +36,20 @@ pub struct RandomWalk {
     pub prev_epoch: Option<Epoch>,
     /// Variance of the previous realization
     #[serde(skip)]
-    pub prev_variance: Option<f64>,
+    pub init_variance: Option<f64>,
 }
 
 impl Stochastics for RandomWalk {
     fn variance(&mut self, epoch: Epoch) -> f64 {
         let new_variance = if let Some(prev_epoch) = self.prev_epoch {
             let delta_t = (epoch - prev_epoch).to_seconds();
-            self.process_noise_per_s * delta_t + self.prev_variance.unwrap()
+            self.process_noise_per_s * delta_t + self.init_variance.unwrap()
         } else {
+            self.init_variance = Some(self.process_noise_per_s);
             self.process_noise_per_s
         };
         // XXX: Should the t0 always be updated?
         self.prev_epoch = Some(epoch);
-        self.prev_variance = Some(new_variance);
 
         new_variance
     }

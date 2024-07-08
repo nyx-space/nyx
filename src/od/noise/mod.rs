@@ -102,6 +102,9 @@ impl StochasticNoise {
         if let Some(wn) = &mut self.white_noise {
             variance += wn.variance(epoch);
         }
+        if let Some(gm) = &mut self.bias {
+            variance += gm.variance(epoch);
+        }
         variance
     }
 
@@ -290,6 +293,24 @@ mod ut_stochastics {
         .collect();
 
         let noise = StochasticNoise::default_range_km();
+
+        noise
+            .simulate(path, None, Some("kilometer".to_string()))
+            .unwrap();
+    }
+
+    #[test]
+    fn test_simulate_dsn_range_gm_only() {
+        let path: PathBuf = [
+            env!("CARGO_MANIFEST_DIR"),
+            "output_data",
+            "stochastics_dsn_range_gm_only.parquet",
+        ]
+        .iter()
+        .collect();
+
+        let mut noise = StochasticNoise::default_range_km();
+        noise.white_noise = None;
 
         noise
             .simulate(path, None, Some("kilometer".to_string()))
