@@ -29,6 +29,7 @@ def plot_gauss_markov(df, title="Gauss Markov Process", tau=None):
     # Grab the column
     try:
         col_name = [col for col in df.columns if "Bias" in col][0]
+        variance_name = [col for col in df.columns if "Variance" in col][0]
     except IndexError:
         raise ValueError("No bias column found in the provided data frame")
 
@@ -41,8 +42,6 @@ def plot_gauss_markov(df, title="Gauss Markov Process", tau=None):
         marginal_y="rug",
     )
 
-    # TODO: Consider adding the autocorrelation data for clarity
-
     if tau:
         fig.add_vline(
             x=tau,
@@ -52,6 +51,14 @@ def plot_gauss_markov(df, title="Gauss Markov Process", tau=None):
             row=1,
             col=1,
         )
+
+    fig = px.line(
+        df,
+        x="Delta Time (s)",
+        y=variance_name,
+        color="Run",
+        opacity=0.5,
+    )
 
     finalize_plot(fig, title=title)
 

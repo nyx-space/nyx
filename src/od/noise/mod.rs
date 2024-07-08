@@ -129,7 +129,6 @@ impl StochasticNoise {
 
         let num_runs = runs.unwrap_or(25);
 
-        let mut samples = Vec::with_capacity(num_runs as usize);
         let start = Epoch::now().unwrap();
         // Run until the steady state is clearly visible.
         let (step, end) = if let Some(gm) = self.bias {
@@ -138,11 +137,19 @@ impl StochasticNoise {
             (1.minutes(), start + 5.days())
         };
 
+        let capacity = ((end - start).to_seconds() / step.to_seconds()).ceil() as usize;
+
+        let mut samples = Vec::with_capacity(capacity);
+
         for run in 0..num_runs {
             let mut rng = Pcg64Mcg::from_entropy();
 
             let mut mdl = self;
             for epoch in TimeSeries::inclusive(start, end, step) {
+                if epoch > start + 6.hours() && epoch < start + 12.hours() {
+                    // Skip to see how the variance changes.
+                    continue;
+                }
                 let variance = mdl.variance(epoch);
                 let sample = mdl.sample(epoch, &mut rng);
                 samples.push(StochasticState {
