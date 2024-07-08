@@ -278,4 +278,21 @@ mod ut_stochastics {
             .simulate(path, None, Some("meter".to_string()))
             .unwrap();
     }
+
+    #[test]
+    fn test_simulate_dsn_range() {
+        let path: PathBuf = [
+            env!("CARGO_MANIFEST_DIR"),
+            "output_data",
+            "stochastics_dsn_range.parquet",
+        ]
+        .iter()
+        .collect();
+
+        let noise = StochasticNoise::default_range_km();
+
+        noise
+            .simulate(path, None, Some("kilometer".to_string()))
+            .unwrap();
+    }
 }
