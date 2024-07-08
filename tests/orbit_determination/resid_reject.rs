@@ -69,16 +69,16 @@ fn devices_n_configs(
     // Define the ground stations
     let mut dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
-        GaussMarkov::high_precision_range_km(),
-        GaussMarkov::high_precision_doppler_km_s(),
+        StochasticNoise::default_range_km(),
+        StochasticNoise::default_doppler_km_s(),
         iau_earth,
     );
     // Set the integration time so as to generate two way measurements
     dss65_madrid.integration_time = Some(60.seconds());
     let mut dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
-        GaussMarkov::high_precision_range_km(),
-        GaussMarkov::high_precision_doppler_km_s(),
+        StochasticNoise::default_range_km(),
+        StochasticNoise::default_doppler_km_s(),
         iau_earth,
     );
     dss34_canberra.integration_time = Some(60.seconds());
@@ -165,14 +165,11 @@ fn od_resid_reject_all_ckf_two_way(
     let setup = Propagator::new::<RK4Fixed>(estimator, PropOpts::with_fixed_step(10.seconds()));
     let prop_est = setup.with(initial_state_dev.with_stm(), almanac.clone());
 
-    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-
     // Define the process noise to assume an unmodeled acceleration on X, Y and Z in the ECI frame
     let sigma_q = 5e-10_f64.powi(2);
     let process_noise = SNC3::from_diagonal(2.minutes(), &[sigma_q, sigma_q, sigma_q]);
 
-    let kf = KF::new(initial_estimate, process_noise, measurement_noise);
+    let kf = KF::new(initial_estimate, process_noise);
 
     // ==> TEST <== //
     // We set up the rejection criteria to start after a single measurement and with a residual ratio of 3.0, i.e. within 3-sigmas.
@@ -182,10 +179,7 @@ fn od_resid_reject_all_ckf_two_way(
     let mut odp = ODProcess::ckf(
         prop_est,
         kf,
-        Some(FltResid {
-            min_accepted: 0, // Start the preprocessing filter at the first measurement because we try to filter everything out in this test
-            num_sigmas: 3.0,
-        }),
+        Some(ResidRejectCrit { num_sigmas: 3.0 }),
         almanac,
     );
 
@@ -240,16 +234,13 @@ fn od_resid_reject_default_ckf_two_way(
     let setup = Propagator::new::<RK4Fixed>(estimator, PropOpts::with_fixed_step(10.seconds()));
     let prop_est = setup.with(initial_state_dev.with_stm(), almanac.clone());
 
-    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-
     // Define the process noise to assume an unmodeled acceleration on X, Y and Z in the ECI frame
     let sigma_q = 5e-10_f64.powi(2);
     let process_noise = SNC3::from_diagonal(2.minutes(), &[sigma_q, sigma_q, sigma_q]);
 
-    let kf = KF::new(initial_estimate, process_noise, measurement_noise);
+    let kf = KF::new(initial_estimate, process_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, kf, Some(FltResid::default()), almanac);
+    let mut odp = ODProcess::ckf(prop_est, kf, Some(ResidRejectCrit::default()), almanac);
 
     // TODO: Fix the deserialization of the measurements such that they also deserialize the integration time.
     // Without it, we're stuck having to rebuild them from scratch.

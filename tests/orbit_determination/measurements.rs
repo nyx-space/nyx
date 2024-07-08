@@ -42,8 +42,8 @@ fn nil_measurement(almanac: Arc<Almanac>) {
         frame: eme2k,
         elevation_mask_deg: 0.0,
         timestamp_noise_s: None,
-        range_noise_km: Some(GaussMarkov::ZERO),
-        doppler_noise_km_s: Some(GaussMarkov::ZERO),
+        range_noise_km: Some(StochasticNoise::ZERO),
+        doppler_noise_km_s: Some(StochasticNoise::ZERO),
         integration_time: None,
         light_time_correction: false,
     };
@@ -110,8 +110,8 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
     let elevation_mask = 7.0; // in degrees
     let mut dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
         iau_earth,
     );
 

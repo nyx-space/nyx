@@ -6,13 +6,13 @@
     shape: null
   elevation_mask_deg: 5.0
   range_noise_km:
-    tau: 24 h
-    bias_sigma: 5.0e-3 # 5 m
-    steady_state_sigma: 0.1e-3 # 0.1 m
+    bias:
+      tau: 24 h
+      process_noise_per_s: 5.0e-3 # 5 m
   doppler_noise_km_s:
-    tau: 24 h
-    bias_sigma: 50.0e-6 # 5 cm/s
-    steady_state_sigma: 1.5e-6 # 0.15 cm/s
+    bias:
+      tau: 24 h
+      process_noise_per_s: 50.0e-6 # 5 cm/s
   light_time_correction: false
   latitude_deg: 2.3522
   longitude_deg: 48.8566
@@ -29,11 +29,11 @@
   height_km: 0.691750
   elevation_mask_deg: 5.0
   range_noise_km:
-    tau: 24 h
-    bias_sigma: 5.0e-3 # 5 m
-    steady_state_sigma: 0.1e-3 # 0.1 m
+    bias:
+      tau: 24 h
+      process_noise_per_s: 5.0e-3 # 5 m
   doppler_noise_km_s:
-    tau: 24 h
-    bias_sigma: 50.0e-6 # 5 cm/s
-    steady_state_sigma: 1.5e-6 # 0.15 cm/s
+    bias:
+      tau: 24 h
+      process_noise_per_s: 50.0e-6 # 5 cm/s
   light_time_correction: false

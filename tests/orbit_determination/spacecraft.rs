@@ -50,20 +50,20 @@ fn od_val_sc_mb_srp_reals_duals_models(almanac: Arc<Almanac>) {
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
         iau_earth,
     );
     let dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
         iau_earth,
     );
     let dss13_goldstone = GroundStation::dss13_goldstone(
         elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
         iau_earth,
     );
 
@@ -176,11 +176,7 @@ fn od_val_sc_mb_srp_reals_duals_models(almanac: Arc<Almanac>) {
     // Define the initial orbit estimate
     let initial_estimate = KfEstimate::from_covar(sc_init_est, init_covar);
 
-    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise =
-        Matrix2::from_diagonal(&Vector2::new(15e-3_f64.powi(2), 1e-5_f64.powi(2)));
-
-    let ckf = KF::no_snc(initial_estimate, measurement_noise);
+    let ckf = KF::no_snc(initial_estimate);
 
     let mut odp = ODProcess::ckf(prop_est, ckf, None, almanac);
 

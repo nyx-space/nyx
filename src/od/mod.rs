@@ -76,7 +76,7 @@ pub mod prelude {
     pub use super::filter::kalman::*;
     pub use super::ground_station::*;
     pub use super::msr::*;
-    pub use super::noise::GaussMarkov;
+    pub use super::noise::{walk::RandomWalk, GaussMarkov, StochasticNoise};
     pub use super::process::*;
     pub use super::simulator::TrackingArcSim;
     pub use super::simulator::*;

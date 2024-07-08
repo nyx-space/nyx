@@ -48,7 +48,7 @@ fn filter_errors() {
     let computed_obs = &Vector2::zeros();
     let sensitivity = SMatrix::<f64, 2, 9>::zeros();
 
-    let mut ckf = KF::no_snc(initial_estimate, measurement_noise);
+    let mut ckf = KF::no_snc(initial_estimate);
     match ckf.measurement_update(
         Spacecraft::zeros().with_stm(),
         real_obs,

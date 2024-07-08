@@ -51,14 +51,14 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
 
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
-        GaussMarkov::high_precision_range_km(),
-        GaussMarkov::high_precision_doppler_km_s(),
+        StochasticNoise::default_range_km(),
+        StochasticNoise::default_doppler_km_s(),
         iau_earth,
     );
     let dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
-        GaussMarkov::high_precision_range_km(),
-        GaussMarkov::high_precision_doppler_km_s(),
+        StochasticNoise::default_range_km(),
+        StochasticNoise::default_doppler_km_s(),
         iau_earth,
     );
 
@@ -148,14 +148,11 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
     let setup = Propagator::new::<RK4Fixed>(estimator, opts);
     let prop_est = setup.with(initial_state_dev.with_stm(), almanac.clone());
 
-    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-
     // Define the process noise to assume an unmodeled acceleration on X, Y and Z in the ECI frame
     let sigma_q = 5e-10_f64.powi(2);
     let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
 
-    let kf = KF::new(initial_estimate, process_noise, measurement_noise);
+    let kf = KF::new(initial_estimate, process_noise);
 
     let trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
 
@@ -262,16 +259,16 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
 
     let mut dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
-        GaussMarkov::high_precision_range_km(),
-        GaussMarkov::high_precision_doppler_km_s(),
+        StochasticNoise::default_range_km(),
+        StochasticNoise::default_doppler_km_s(),
         iau_earth,
     );
     // Set the integration time so as to generate two way measurements
     dss65_madrid.integration_time = Some(60.seconds());
     let mut dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
-        GaussMarkov::high_precision_range_km(),
-        GaussMarkov::high_precision_doppler_km_s(),
+        StochasticNoise::default_range_km(),
+        StochasticNoise::default_doppler_km_s(),
         iau_earth,
     );
     dss34_canberra.integration_time = Some(60.seconds());
@@ -346,14 +343,11 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
     let setup = Propagator::default(estimator);
     let prop_est = setup.with(initial_state_dev.with_stm(), almanac.clone());
 
-    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-
     // Define the process noise to assume an unmodeled acceleration on X, Y and Z in the ECI frame
     let sigma_q = 5e-10_f64.powi(2);
     let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
 
-    let kf = KF::new(initial_estimate, process_noise, measurement_noise);
+    let kf = KF::new(initial_estimate, process_noise);
 
     let trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
 

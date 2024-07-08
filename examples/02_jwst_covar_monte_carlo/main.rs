@@ -112,8 +112,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // For the covariance mapping / prediction, we'll use the common orbit determination approach.
     // This is done by setting up a spacecraft OD process, and predicting for the analysis duration.
 
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-    let ckf = KF::no_snc(jwst_estimate, measurement_noise);
+    let ckf = KF::no_snc(jwst_estimate);
 
     // Build the propagation instance for the OD process.
     let prop = setup.with(jwst.with_stm(), almanac.clone());

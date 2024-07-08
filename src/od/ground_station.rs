@@ -21,7 +21,7 @@ use anise::errors::AlmanacResult;
 use anise::prelude::{Almanac, Frame, Orbit};
 
 use super::msr::RangeDoppler;
-use super::noise::GaussMarkov;
+use super::noise::StochasticNoise;
 use super::{ODAlmanacSnafu, ODError, ODTrajSnafu, TrackingDeviceSim};
 use crate::errors::EventError;
 use crate::io::ConfigRepr;
@@ -61,11 +61,11 @@ pub struct GroundStation {
     /// Whether to correct for light travel time
     pub light_time_correction: bool,
     /// Noise on the timestamp of the measurement
-    pub timestamp_noise_s: Option<GaussMarkov>,
+    pub timestamp_noise_s: Option<StochasticNoise>,
     /// Noise on the range data of the measurement
-    pub range_noise_km: Option<GaussMarkov>,
+    pub range_noise_km: Option<StochasticNoise>,
     /// Noise on the Doppler data of the measurement
-    pub doppler_noise_km_s: Option<GaussMarkov>,
+    pub doppler_noise_km_s: Option<StochasticNoise>,
 }
 
 impl GroundStation {
@@ -95,8 +95,8 @@ impl GroundStation {
 
     pub fn dss65_madrid(
         elevation_mask: f64,
-        range_noise_km: GaussMarkov,
-        doppler_noise_km_s: GaussMarkov,
+        range_noise_km: StochasticNoise,
+        doppler_noise_km_s: StochasticNoise,
         iau_earth: Frame,
     ) -> Self {
         Self {
@@ -116,8 +116,8 @@ impl GroundStation {
 
     pub fn dss34_canberra(
         elevation_mask: f64,
-        range_noise_km: GaussMarkov,
-        doppler_noise_km_s: GaussMarkov,
+        range_noise_km: StochasticNoise,
+        doppler_noise_km_s: StochasticNoise,
         iau_earth: Frame,
     ) -> Self {
         Self {
@@ -137,8 +137,8 @@ impl GroundStation {
 
     pub fn dss13_goldstone(
         elevation_mask: f64,
-        range_noise_km: GaussMarkov,
-        doppler_noise_km_s: GaussMarkov,
+        range_noise_km: StochasticNoise,
+        doppler_noise_km_s: StochasticNoise,
         iau_earth: Frame,
     ) -> Self {
         Self {
@@ -193,17 +193,17 @@ impl GroundStation {
                 range_noise_km = self
                     .range_noise_km
                     .ok_or(ODError::NoiseNotConfigured { kind: "Range" })?
-                    .next_bias(epoch, rng);
+                    .sample(epoch, rng);
 
                 // Add the Doppler noise, or return an error if it's not configured.
                 doppler_noise_km_s = self
                     .doppler_noise_km_s
                     .ok_or(ODError::NoiseNotConfigured { kind: "Doppler" })?
-                    .next_bias(epoch, rng);
+                    .sample(epoch, rng);
 
                 // Only add the epoch noise if it's configured, it's valid to not have any noise on the clock.
                 if let Some(mut timestamp_noise) = self.timestamp_noise_s {
-                    timestamp_noise_s = timestamp_noise.next_bias(epoch, rng);
+                    timestamp_noise_s = timestamp_noise.sample(epoch, rng);
                 } else {
                     timestamp_noise_s = 0.0;
                 }
@@ -315,13 +315,13 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
     /// Returns the measurement noise of this ground station.
     ///
     /// # Methodology
-    /// Noises are modeled using a [GaussMarkov] process, defined by the sigma on the turn-on bias and on the steady state noise.
+    /// Noises are modeled using a [StochasticNoise] process, defined by the sigma on the turn-on bias and on the steady state noise.
     /// The measurement noise is computed assuming that all measurements are independent variables, i.e. the measurement matrix is
     /// a diagonal matrix. The first item in the diagonal is the range noise (in km), set to the square of the steady state sigma. The
     /// second item is the Doppler noise (in km/s), set to the square of the steady state sigma of that Gauss Markov process.
     fn measurement_noise(
-        &self,
-        _epoch: Epoch,
+        &mut self,
+        epoch: Epoch,
     ) -> Result<
         OMatrix<
             f64,
@@ -333,11 +333,11 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
         let range_noise_km = self
             .range_noise_km
             .ok_or(ODError::NoiseNotConfigured { kind: "Range" })?
-            .steady_state_sigma;
+            .variance(epoch);
         let doppler_noise_km_s = self
             .doppler_noise_km_s
             .ok_or(ODError::NoiseNotConfigured { kind: "Doppler" })?
-            .steady_state_sigma;
+            .variance(epoch);
 
         let mut msr_noises = OMatrix::<
             f64,
@@ -452,8 +452,14 @@ mod gs_ut {
             name: "Demo ground station".to_string(),
             frame: IAU_EARTH_FRAME,
             elevation_mask_deg: 5.0,
-            range_noise_km: Some(GaussMarkov::new(1.days(), 5e-3, 1e-4).unwrap()),
-            doppler_noise_km_s: Some(GaussMarkov::new(1.days(), 5e-5, 1.5e-6).unwrap()),
+            range_noise_km: Some(StochasticNoise {
+                bias: Some(GaussMarkov::new(1.days(), 5e-3).unwrap()),
+                ..Default::default()
+            }),
+            doppler_noise_km_s: Some(StochasticNoise {
+                bias: Some(GaussMarkov::new(1.days(), 5e-5).unwrap()),
+                ..Default::default()
+            }),
             latitude_deg: 2.3522,
             longitude_deg: 48.8566,
             height_km: 0.4,
@@ -492,8 +498,14 @@ mod gs_ut {
                 name: "Demo ground station".to_string(),
                 frame: IAU_EARTH_FRAME.with_mu_km3_s2(398600.435436096),
                 elevation_mask_deg: 5.0,
-                range_noise_km: Some(GaussMarkov::new(1.days(), 5e-3, 1e-4).unwrap()),
-                doppler_noise_km_s: Some(GaussMarkov::new(1.days(), 5e-5, 1.5e-6).unwrap()),
+                range_noise_km: Some(StochasticNoise {
+                    bias: Some(GaussMarkov::new(1.days(), 5e-3).unwrap()),
+                    ..Default::default()
+                }),
+                doppler_noise_km_s: Some(StochasticNoise {
+                    bias: Some(GaussMarkov::new(1.days(), 5e-5).unwrap()),
+                    ..Default::default()
+                }),
                 latitude_deg: 2.3522,
                 longitude_deg: 48.8566,
                 height_km: 0.4,
@@ -505,8 +517,14 @@ mod gs_ut {
                 name: "Canberra".to_string(),
                 frame: IAU_EARTH_FRAME.with_mu_km3_s2(398600.435436096),
                 elevation_mask_deg: 5.0,
-                range_noise_km: Some(GaussMarkov::new(1.days(), 5e-3, 1e-4).unwrap()),
-                doppler_noise_km_s: Some(GaussMarkov::new(1.days(), 5e-5, 1.5e-6).unwrap()),
+                range_noise_km: Some(StochasticNoise {
+                    bias: Some(GaussMarkov::new(1.days(), 5e-3).unwrap()),
+                    ..Default::default()
+                }),
+                doppler_noise_km_s: Some(StochasticNoise {
+                    bias: Some(GaussMarkov::new(1.days(), 5e-5).unwrap()),
+                    ..Default::default()
+                }),
                 latitude_deg: -35.398333,
                 longitude_deg: 148.981944,
                 height_km: 0.691750,

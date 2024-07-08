@@ -34,7 +34,7 @@ mod trigger;
 pub use trigger::EkfTrigger;
 mod rejectcrit;
 use self::msr::TrackingArc;
-pub use self::rejectcrit::FltResid;
+pub use self::rejectcrit::ResidRejectCrit;
 use std::collections::BTreeMap;
 use std::marker::PhantomData;
 use std::ops::Add;
@@ -83,7 +83,7 @@ pub struct ODProcess<
     pub residuals: Vec<Option<Residual<Msr::MeasurementSize>>>,
     pub ekf_trigger: Option<EkfTrigger>,
     /// Residual rejection criteria allows preventing bad measurements from affecting the estimation.
-    pub resid_crit: Option<FltResid>,
+    pub resid_crit: Option<ResidRejectCrit>,
     pub almanac: Arc<Almanac>,
     init_state: D::StateType,
     _marker: PhantomData<A>,
@@ -129,7 +129,7 @@ where
         prop: PropInstance<'a, D, E>,
         kf: K,
         ekf_trigger: Option<EkfTrigger>,
-        resid_crit: Option<FltResid>,
+        resid_crit: Option<ResidRejectCrit>,
         almanac: Arc<Almanac>,
     ) -> Self {
         let init_state = prop.state;
@@ -151,7 +151,7 @@ where
         prop: PropInstance<'a, D, E>,
         kf: K,
         trigger: EkfTrigger,
-        resid_crit: Option<FltResid>,
+        resid_crit: Option<ResidRejectCrit>,
         almanac: Arc<Almanac>,
     ) -> Self {
         let init_state = prop.state;
@@ -506,7 +506,7 @@ where
         // We'll build a trajectory of the estimated states. This will be used to compute the measurements.
         let mut traj: Traj<S> = Traj::new();
 
-        let mut msr_accepted_cnt = 0;
+        let mut msr_accepted_cnt: usize = 0;
 
         for (msr_cnt, (device_name, msr)) in measurements.iter().enumerate() {
             let next_msr_epoch = msr.epoch();
@@ -581,17 +581,12 @@ where
 
                                 self.kf.update_h_tilde(h_tilde);
 
-                                let resid_ratio_check = self
-                                    .resid_crit
-                                    .filter(|flt| msr_accepted_cnt >= flt.min_accepted)
-                                    .map(|flt| flt.num_sigmas);
-
                                 match self.kf.measurement_update(
                                     nominal_state,
                                     &msr.observation(),
                                     &computed_meas.observation(),
                                     device.measurement_noise(epoch)?,
-                                    resid_ratio_check,
+                                    self.resid_crit,
                                 ) {
                                     Ok((estimate, residual)) => {
                                         debug!("processed msr #{msr_cnt} @ {epoch}");
@@ -783,7 +778,7 @@ where
     pub fn ckf(
         prop: PropInstance<'a, D, E>,
         kf: K,
-        resid_crit: Option<FltResid>,
+        resid_crit: Option<ResidRejectCrit>,
         almanac: Arc<Almanac>,
     ) -> Self {
         let init_state = prop.state;

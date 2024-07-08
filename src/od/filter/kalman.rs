@@ -20,6 +20,7 @@ pub use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector, U3};
 pub use crate::od::estimate::{Estimate, KfEstimate, Residual};
+use crate::od::process::ResidRejectCrit;
 pub use crate::od::snc::SNC;
 use crate::od::{Filter, ODDynamicsSnafu, ODError, State};
 pub use crate::time::{Epoch, Unit};
@@ -53,8 +54,6 @@ where
 {
     /// The previous estimate used in the KF computations.
     pub prev_estimate: KfEstimate<T>,
-    /// Sets the Measurement noise (usually noted R)
-    pub measurement_noise: OMatrix<f64, M, M>,
     /// A sets of process noise (usually noted Q), must be ordered chronologically
     pub process_noise: Vec<SNC<A>>,
     /// Determines whether this KF should operate as a Conventional/Classical Kalman filter or an Extended Kalman Filter.
@@ -87,11 +86,7 @@ where
     <DefaultAllocator as Allocator<f64, <T as State>::Size, <T as State>::Size>>::Buffer: Copy,
 {
     /// Initializes this KF with an initial estimate, measurement noise, and one process noise
-    pub fn new(
-        initial_estimate: KfEstimate<T>,
-        process_noise: SNC<A>,
-        measurement_noise: OMatrix<f64, M, M>,
-    ) -> Self {
+    pub fn new(initial_estimate: KfEstimate<T>, process_noise: SNC<A>) -> Self {
         assert_eq!(
             A::dim() % 3,
             0,
@@ -104,7 +99,6 @@ where
 
         Self {
             prev_estimate: initial_estimate,
-            measurement_noise,
             process_noise: vec![process_noise],
             ekf: false,
             h_tilde: OMatrix::<f64, M, <T as State>::Size>::zeros(),
@@ -116,11 +110,7 @@ where
     /// Initializes this KF with an initial estimate, measurement noise, and several process noise
     /// WARNING: SNCs MUST be ordered chronologically! They will be selected automatically by walking
     /// the list of SNCs backward until one can be applied!
-    pub fn with_sncs(
-        initial_estimate: KfEstimate<T>,
-        process_noises: Vec<SNC<A>>,
-        measurement_noise: OMatrix<f64, M, M>,
-    ) -> Self {
+    pub fn with_sncs(initial_estimate: KfEstimate<T>, process_noises: Vec<SNC<A>>) -> Self {
         assert_eq!(
             A::dim() % 3,
             0,
@@ -134,7 +124,6 @@ where
 
         Self {
             prev_estimate: initial_estimate,
-            measurement_noise,
             process_noise: process_noises,
             ekf: false,
             h_tilde: OMatrix::<f64, M, <T as State>::Size>::zeros(),
@@ -164,10 +153,9 @@ where
     <DefaultAllocator as Allocator<f64, <T as State>::Size, <T as State>::Size>>::Buffer: Copy,
 {
     /// Initializes this KF without SNC
-    pub fn no_snc(initial_estimate: KfEstimate<T>, measurement_noise: OMatrix<f64, M, M>) -> Self {
+    pub fn no_snc(initial_estimate: KfEstimate<T>) -> Self {
         Self {
             prev_estimate: initial_estimate,
-            measurement_noise,
             process_noise: Vec::new(),
             ekf: false,
             h_tilde: OMatrix::<f64, M, <T as State>::Size>::zeros(),
@@ -297,7 +285,7 @@ where
         real_obs: &OVector<f64, M>,
         computed_obs: &OVector<f64, M>,
         measurement_noise: OMatrix<f64, M, M>,
-        resid_ratio_check: Option<f64>,
+        resid_rejection: Option<ResidRejectCrit>,
     ) -> Result<(Self::Estimate, Residual<M>), ODError> {
         if !self.h_tilde_updated {
             return Err(ODError::SensitivityNotUpdated);
@@ -367,14 +355,18 @@ where
         let ratio_mat = prefit.transpose() * &h_p_ht * &prefit;
         let ratio = ratio_mat[0];
 
-        if let Some(ratio_thresh) = resid_ratio_check {
-            if ratio > ratio_thresh {
-                warn!("{epoch} msr rejected: residual ratio {ratio:.3e} > {ratio_thresh}");
-                // Perform only a time update and return
-                let pred_est = self.time_update(nominal_state)?;
-                return Ok((pred_est, Residual::rejected(epoch, prefit, ratio)));
-            } else {
-                debug!("{epoch} msr accepted: residual ratio {ratio:.3e} < {ratio_thresh}");
+        if let Some(resid_reject) = resid_rejection {
+            for ii in 0..M::USIZE {
+                if prefit[ii] > measurement_noise[(ii, ii)].sqrt() * resid_reject.num_sigmas {
+                    warn!(
+                        "{epoch} msr rejected: residual ratio {:.3e} > {:.3e}",
+                        prefit[ii],
+                        measurement_noise[(ii, ii)] * resid_reject.num_sigmas
+                    );
+                    // Perform only a time update and return
+                    let pred_est = self.time_update(nominal_state)?;
+                    return Ok((pred_est, Residual::rejected(epoch, prefit, ratio)));
+                }
             }
         }
 

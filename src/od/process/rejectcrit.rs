@@ -34,16 +34,14 @@ use serde_derive::{Deserialize, Serialize};
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass)]
 #[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
-pub struct FltResid {
-    /// Minimum number of accepted measurements before applying the rejection criteria.
-    pub min_accepted: usize,
+pub struct ResidRejectCrit {
     /// Number of sigmas for a measurement to be considered an outlier.
     pub num_sigmas: f64,
 }
 
 #[cfg(feature = "python")]
 #[pymethods]
-impl FltResid {
+impl ResidRejectCrit {
     #[new]
     #[pyo3(text_signature = "(min_accepted=None, num_sigmas=None)")]
     fn py_new(min_accepted: Option<usize>, num_sigmas: Option<f64>) -> Self {
@@ -110,13 +108,12 @@ impl FltResid {
     }
 }
 
-impl Default for FltResid {
+impl Default for ResidRejectCrit {
+    /// By default, a prefit residual is rejected if it is greater the 5-sigma value of the measurement noise.
+    /// This corresponds to [1 chance in in 1,744,278](https://en.wikipedia.org/wiki/68%E2%80%9395%E2%80%9399.7_rule).
     fn default() -> Self {
-        Self {
-            min_accepted: 10,
-            num_sigmas: 3.0,
-        }
+        Self { num_sigmas: 5.0 }
     }
 }
 
-impl ConfigRepr for FltResid {}
+impl ConfigRepr for ResidRejectCrit {}

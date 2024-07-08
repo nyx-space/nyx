@@ -41,20 +41,20 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(almanac: Arc<Almanac>) {
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
         iau_earth,
     );
     let dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
         iau_earth,
     );
     let dss13_goldstone = GroundStation::dss13_goldstone(
         elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
         iau_earth,
     );
 
@@ -125,10 +125,7 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(almanac: Arc<Almanac>) {
     let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
     println!("initial estimate:\n{}", initial_estimate);
 
-    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-
-    let kf = KF::no_snc(initial_estimate, measurement_noise);
+    let kf = KF::no_snc(initial_estimate);
 
     let mut odp = ODProcess::ekf(
         prop_est,
@@ -197,20 +194,20 @@ fn od_tb_val_with_arc(almanac: Arc<Almanac>) {
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
         iau_earth,
     );
     let dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
         iau_earth,
     );
     let dss13_goldstone = GroundStation::dss13_goldstone(
         elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
         iau_earth,
     );
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
@@ -297,16 +294,13 @@ fn od_tb_val_with_arc(almanac: Arc<Almanac>) {
     let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
     println!("initial estimate:\n{}", initial_estimate);
 
-    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-
-    let kf = KF::no_snc(initial_estimate, measurement_noise);
+    let kf = KF::no_snc(initial_estimate);
 
     let mut odp = ODProcess::ekf(
         prop_est,
         kf,
         EkfTrigger::new(ekf_num_meas, ekf_disable_time),
-        Some(FltResid::default()),
+        Some(ResidRejectCrit::default()),
         almanac,
     );
 
@@ -380,20 +374,20 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(almanac: Arc<Almanac>) {
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
         iau_earth,
     );
     let dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
         iau_earth,
     );
     let dss13_goldstone = GroundStation::dss13_goldstone(
         elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
         iau_earth,
     );
 
@@ -468,10 +462,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(almanac: Arc<Almanac>) {
     // Define the initial orbit estimate
     let initial_estimate = KfEstimate::from_covar(initial_state_est, init_covar);
 
-    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-
-    let ckf = KF::no_snc(initial_estimate, measurement_noise);
+    let ckf = KF::no_snc(initial_estimate);
 
     let mut odp = ODProcess::ckf(prop_est, ckf, None, almanac);
 
@@ -613,20 +604,20 @@ fn od_tb_ckf_fixed_step_iteration_test(almanac: Arc<Almanac>) {
     let range_rate_noise = 0.001; // in km/s (or 1 meter per second of error)
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
         iau_earth,
     );
     let dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
         iau_earth,
     );
     let dss13_goldstone = GroundStation::dss13_goldstone(
         elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
         iau_earth,
     );
 
@@ -686,10 +677,7 @@ fn od_tb_ckf_fixed_step_iteration_test(almanac: Arc<Almanac>) {
     initial_state2.radius_km.z += 0.05;
     let initial_estimate = KfEstimate::from_covar(initial_state2.into(), init_covar);
 
-    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-
-    let ckf = KF::no_snc(initial_estimate, measurement_noise);
+    let ckf = KF::no_snc(initial_estimate);
 
     let mut odp = ODProcess::ckf(prop_est, ckf, None, almanac);
 
@@ -772,20 +760,20 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map(almanac: Arc<Almanac>) {
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
         iau_earth,
     );
     let dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
         iau_earth,
     );
     let dss13_goldstone = GroundStation::dss13_goldstone(
         elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
         iau_earth,
     );
 
@@ -843,14 +831,11 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map(almanac: Arc<Almanac>) {
     // Define the initial estimate
     let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
 
-    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-
     // Define the process noise to assume an unmodeled acceleration of 1e-3 km^2/s^2 on X, Y and Z in the ECI frame
     let sigma_q = 1e-8_f64.powi(2);
     let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
 
-    let ckf = KF::new(initial_estimate, process_noise, measurement_noise);
+    let ckf = KF::new(initial_estimate, process_noise);
 
     let mut odp = ODProcess::ckf(prop_est, ckf, None, almanac);
 
@@ -939,8 +924,7 @@ fn od_tb_ckf_map_covar(almanac: Arc<Almanac>) {
 
     let initial_estimate = KfEstimate::from_covar(Spacecraft::from(initial_state), init_covar);
 
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-    let ckf = KF::no_snc(initial_estimate, measurement_noise);
+    let ckf = KF::no_snc(initial_estimate);
 
     let mut odp: SpacecraftODProcess = ODProcess::ckf(prop_est, ckf, None, almanac);
 
@@ -984,20 +968,20 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect(almanac: Arc<Almanac>) {
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
         iau_earth,
     );
     let dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
         iau_earth,
     );
     let dss13_goldstone = GroundStation::dss13_goldstone(
         elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
         iau_earth,
     );
 
@@ -1058,10 +1042,7 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect(almanac: Arc<Almanac>) {
     // Define the initial estimate
     let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
 
-    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-
-    let ckf = KF::no_snc(initial_estimate, measurement_noise);
+    let ckf = KF::no_snc(initial_estimate);
 
     let mut odp = ODProcess::ckf(prop_est, ckf, None, almanac);
 
@@ -1113,20 +1094,20 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map(almanac: Arc<Alma
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
         iau_earth,
     );
     let dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
         iau_earth,
     );
     let dss13_goldstone = GroundStation::dss13_goldstone(
         elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
         iau_earth,
     );
 
@@ -1183,9 +1164,6 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map(almanac: Arc<Alma
     // Define the initial estimate
     let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
 
-    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-
     // Define the process noise to assume an unmodeled acceleration of 1e-3 km^2/s^2 on X, Y and Z in the ECI frame
     let sigma_q1 = 1e-7_f64.powi(2);
     let process_noise1 = SNC3::from_diagonal(2 * Unit::Day, &[sigma_q1, sigma_q1, sigma_q1]);
@@ -1199,11 +1177,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map(almanac: Arc<Alma
     );
     process_noise2.start_time = Some(dt + 36_000.0); // Start the second process noise 10 hours into the tracking pass
 
-    let ckf = KF::with_sncs(
-        initial_estimate,
-        vec![process_noise1, process_noise2],
-        measurement_noise,
-    );
+    let ckf = KF::with_sncs(initial_estimate, vec![process_noise1, process_noise2]);
 
     let mut odp = ODProcess::ckf(prop_est, ckf, None, almanac);
 

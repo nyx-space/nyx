@@ -76,7 +76,7 @@ where
 
     // Return the noise statistics of this tracking device at the requested epoch.
     fn measurement_noise(
-        &self,
+        &mut self,
         epoch: Epoch,
     ) -> Result<OMatrix<f64, Msr::MeasurementSize, Msr::MeasurementSize>, ODError>;
 }
