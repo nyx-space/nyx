@@ -14,7 +14,6 @@ use nyx::{
     cosmic::{eclipse::EclipseLocator, Frame, MetaAlmanac, SrpConfig},
     dynamics::{guidance::LocalFrame, OrbitalDynamics, SolarPressure, SpacecraftDynamics},
     io::ExportCfg,
-    linalg::{Matrix2, Vector2},
     mc::MonteCarlo,
     od::{prelude::KF, process::SpacecraftUncertainty, SpacecraftODProcess},
     propagators::Propagator,

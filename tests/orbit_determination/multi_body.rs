@@ -4,7 +4,6 @@ use anise::constants::celestial_objects::JUPITER_BARYCENTER;
 use anise::constants::celestial_objects::MOON;
 use anise::constants::celestial_objects::SUN;
 use anise::constants::frames::IAU_EARTH_FRAME;
-use nyx::od::noise::GaussMarkov;
 use nyx::od::simulator::TrackingArcSim;
 use nyx::od::simulator::TrkConfig;
 
@@ -13,7 +12,7 @@ use self::nyx::od::prelude::*;
 
 // Extra testing imports
 use self::nyx::propagators::RK4Fixed;
-use nyx::linalg::{Matrix2, SMatrix, SVector, Vector2};
+use nyx::linalg::{SMatrix, SVector};
 use std::collections::BTreeMap;
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};

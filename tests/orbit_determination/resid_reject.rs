@@ -3,17 +3,13 @@ use anise::constants::frames::{EARTH_J2000, IAU_EARTH_FRAME};
 use nyx_space::dynamics::guidance::LocalFrame;
 use pretty_env_logger::try_init;
 
-use rand::SeedableRng;
 use rand_distr::Distribution;
 use rand_pcg::Pcg64Mcg;
 use rstest::*;
 
 use nyx_space::cosmic::Orbit;
 use nyx_space::dynamics::orbital::OrbitalDynamics;
-use nyx_space::linalg::{Matrix2, Vector2};
 use nyx_space::md::prelude::*;
-use nyx_space::md::StateParameter;
-use nyx_space::od::noise::GaussMarkov;
 use nyx_space::od::prelude::*;
 use nyx_space::propagators::{PropOpts, Propagator, RK4Fixed};
 use nyx_space::time::{Epoch, TimeUnits};
@@ -298,12 +294,12 @@ fn od_resid_reject_default_ckf_two_way(
     .collect();
     odp.to_parquet(path, ExportCfg::timestamped()).unwrap();
 
-    let mut resid_count = 0;
-    for residual in odp.residuals.iter().flatten() {
-        if residual.rejected {
-            resid_count += 1;
-        }
-    }
+    // let mut resid_count = 0;
+    // for residual in odp.residuals.iter().flatten() {
+    //     if residual.rejected {
+    //         resid_count += 1;
+    //     }
+    // }
 
     // assert_eq!(resid_count, 0);
 

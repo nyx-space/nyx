@@ -5,7 +5,6 @@ use anise::constants::frames::IAU_EARTH_FRAME;
 use anise::constants::usual_planetary_constants::MEAN_EARTH_ANGULAR_VELOCITY_DEG_S;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::SpacecraftDynamics;
-use nyx::od::noise::GaussMarkov;
 use nyx::od::prelude::*;
 use nyx::time::Epoch;
 use nyx::{dynamics::OrbitalDynamics, propagators::Propagator};
