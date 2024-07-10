@@ -167,8 +167,8 @@ impl GaussMarkov {
 }
 
 impl Stochastics for GaussMarkov {
-    fn variance(&mut self, epoch: Epoch) -> f64 {
-        let new_variance = if let Some(prev_epoch) = self.prev_epoch {
+    fn variance(&self, epoch: Epoch) -> f64 {
+        if let Some(prev_epoch) = self.prev_epoch {
             let delta_t = (epoch - prev_epoch).to_seconds();
 
             let decay = (-2.0 * delta_t / self.tau.to_seconds()).exp();
@@ -178,9 +178,12 @@ impl Stochastics for GaussMarkov {
 
             decay * self.prev_variance.unwrap() + s_dt
         } else {
-            self.prev_epoch = Some(epoch);
             self.process_noise_per_s
-        };
+        }
+    }
+
+    fn update_variance(&mut self, epoch: Epoch) -> f64 {
+        let new_variance = self.variance(epoch);
         self.prev_epoch = Some(epoch);
         self.prev_variance = Some(new_variance);
 

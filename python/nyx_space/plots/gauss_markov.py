@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 import plotly.express as px
+import plotly.graph_objects as go
 
 from .utils import finalize_plot
 
@@ -52,14 +53,26 @@ def plot_gauss_markov(df, title="Gauss Markov Process", tau=None):
             col=1,
         )
 
-    fig = px.line(
-        df,
-        x="Delta Time (s)",
-        y=variance_name,
-        color="Run",
-        opacity=0.5,
-    )
+    for run in df["Run"].unique():
+        this_df = df[df["Run"] == run]
+        fig.add_trace(
+            go.Scatter(
+                x=this_df["Delta Time (s)"],
+                y=this_df[variance_name],
+                mode='lines',
+                name=f'Variance for {run}'
+            )
+        )
 
-    finalize_plot(fig, title=title)
+
+    # fig = px.line(
+    #     df,
+    #     x="Delta Time (s)",
+    #     y=variance_name,
+    #     color="Run",
+    #     opacity=0.5,
+    # )
+
+    # finalize_plot(fig, title=title)
 
     fig.show()

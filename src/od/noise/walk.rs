@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use hifitime::Epoch;
+use hifitime::{Duration, Epoch};
 use serde_derive::{Deserialize, Serialize};
 
 use super::Stochastics;
@@ -39,16 +39,41 @@ pub struct RandomWalk {
     pub init_variance: Option<f64>,
 }
 
+impl RandomWalk {
+    /// Initializes a new random walk stochastic noise model from the process noise and the integration time.
+    /// This will compute the process noise per second automatically.
+    pub fn new(process_noise: f64, integration_time: Duration) -> Self {
+        Self {
+            process_noise_per_s: process_noise / integration_time.to_seconds(),
+            ..Default::default()
+        }
+    }
+
+    /// Initializes a new random walk stochastic noise model from the provided process noise, assuming that the noise level
+    /// is fixed regardless of the integration time.
+    pub fn constant_white_noise(process_noise: f64) -> Self {
+        Self {
+            process_noise_per_s: process_noise,
+            ..Default::default()
+        }
+    }
+}
+
 impl Stochastics for RandomWalk {
-    fn variance(&mut self, epoch: Epoch) -> f64 {
-        let new_variance = if let Some(prev_epoch) = self.prev_epoch {
+    fn variance(&self, epoch: Epoch) -> f64 {
+        if let Some(prev_epoch) = self.prev_epoch {
             let delta_t = (epoch - prev_epoch).to_seconds();
             self.process_noise_per_s * delta_t + self.init_variance.unwrap()
         } else {
-            self.init_variance = Some(self.process_noise_per_s);
             self.process_noise_per_s
-        };
-        // XXX: Should the t0 always be updated?
+        }
+    }
+
+    fn update_variance(&mut self, epoch: Epoch) -> f64 {
+        let new_variance = self.variance(epoch);
+        if self.prev_epoch.is_none() {
+            self.init_variance = Some(new_variance);
+        }
         self.prev_epoch = Some(epoch);
 
         new_variance

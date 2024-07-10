@@ -39,12 +39,15 @@ use walk::RandomWalk;
 
 /// Trait for any kind of stochastic modeling, developing primarily for synthetic orbit determination measurements.
 pub trait Stochastics {
-    /// Return the variance of this stochastic noise model at a given time.
-    fn variance(&mut self, epoch: Epoch) -> f64;
+    /// Return the updated variance of this stochastic noise model at a given time.
+    fn update_variance(&mut self, epoch: Epoch) -> f64;
+
+    /// Return the previous variance of this stochastic noise model at a given time.
+    fn variance(&self, epoch: Epoch) -> f64;
 
     /// A sampler based on the variance.
     fn sample<R: Rng>(&mut self, epoch: Epoch, rng: &mut R) -> f64 {
-        rng.sample(Normal::new(0.0, self.variance(epoch)).unwrap())
+        rng.sample(Normal::new(0.0, self.update_variance(epoch)).unwrap())
     }
 }
 
@@ -93,16 +96,28 @@ impl StochasticNoise {
 
     /// Sample these stochastics
     pub fn sample<R: Rng>(&mut self, epoch: Epoch, rng: &mut R) -> f64 {
-        rng.sample(Normal::new(0.0, self.variance(epoch)).unwrap()) + self.constant.unwrap_or(0.0)
+        rng.sample(Normal::new(0.0, self.update_variance(epoch)).unwrap())
+            + self.constant.unwrap_or(0.0)
+    }
+
+    pub fn update_variance(&mut self, epoch: Epoch) -> f64 {
+        let mut variance = 0.0;
+        if let Some(wn) = &mut self.white_noise {
+            variance += wn.update_variance(epoch);
+        }
+        if let Some(gm) = &mut self.bias {
+            variance += gm.update_variance(epoch);
+        }
+        variance
     }
 
     /// Return the variance of these stochastics at a given time.
-    pub fn variance(&mut self, epoch: Epoch) -> f64 {
+    pub fn variance(&self, epoch: Epoch) -> f64 {
         let mut variance = 0.0;
-        if let Some(wn) = &mut self.white_noise {
+        if let Some(wn) = &self.white_noise {
             variance += wn.variance(epoch);
         }
-        if let Some(gm) = &mut self.bias {
+        if let Some(gm) = &self.bias {
             variance += gm.variance(epoch);
         }
         variance
@@ -130,12 +145,7 @@ impl StochasticNoise {
         let num_runs = runs.unwrap_or(25);
 
         let start = Epoch::now().unwrap();
-        // Run until the steady state is clearly visible.
-        let (step, end) = if let Some(gm) = self.bias {
-            (gm.tau / 100, start + gm.tau * 5)
-        } else {
-            (1.minutes(), start + 5.days())
-        };
+        let (step, end) = (1.minutes(), start + 1.days());
 
         let capacity = ((end - start).to_seconds() / step.to_seconds()).ceil() as usize;
 
