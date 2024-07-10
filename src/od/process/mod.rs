@@ -588,8 +588,10 @@ where
                                     device.measurement_noise(epoch)?,
                                     self.resid_crit,
                                 ) {
-                                    Ok((estimate, residual)) => {
+                                    Ok((estimate, mut residual)) => {
                                         debug!("processed msr #{msr_cnt} @ {epoch}");
+
+                                        residual.tracker = Some(device.name());
 
                                         if !residual.rejected {
                                             msr_accepted_cnt += 1;

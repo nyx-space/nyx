@@ -233,7 +233,7 @@ where
                     }
 
                     info!(
-                        "Generated {} measurements for {name} for {} tracking strands in {}",
+                        "Simulated {} measurements for {name} for {} tracking strands in {}",
                         measurements.len() - init_msr_count,
                         strands.len(),
                         (Epoch::now().unwrap() - tick).round(1.0_f64.milliseconds())

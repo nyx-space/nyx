@@ -357,15 +357,18 @@ where
 
         if let Some(resid_reject) = resid_rejection {
             for ii in 0..M::USIZE {
-                if prefit[ii] > measurement_noise[(ii, ii)].sqrt() * resid_reject.num_sigmas {
+                if prefit[ii] > measurement_noise[(ii, ii)] * resid_reject.num_sigmas {
                     warn!(
-                        "{epoch} msr rejected: residual ratio {:.3e} > {:.3e}",
+                        "{epoch} msr rejected: residual {:.3e} > {:.3e}",
                         prefit[ii],
                         measurement_noise[(ii, ii)] * resid_reject.num_sigmas
                     );
                     // Perform only a time update and return
                     let pred_est = self.time_update(nominal_state)?;
-                    return Ok((pred_est, Residual::rejected(epoch, prefit, ratio)));
+                    return Ok((
+                        pred_est,
+                        Residual::rejected(epoch, prefit, ratio, measurement_noise.diagonal()),
+                    ));
                 }
             }
         }
@@ -382,14 +385,17 @@ where
         let (state_hat, res) = if self.ekf {
             let state_hat = &gain * &prefit;
             let postfit = &prefit - (&self.h_tilde * state_hat);
-            (state_hat, Residual::new(epoch, prefit, postfit, ratio))
+            (
+                state_hat,
+                Residual::accepted(epoch, prefit, postfit, ratio, measurement_noise.diagonal()),
+            )
         } else {
             // Must do a time update first
             let state_bar = stm * self.prev_estimate.state_deviation;
             let postfit = &prefit - (&self.h_tilde * state_bar);
             (
                 state_bar + &gain * &postfit,
-                Residual::new(epoch, prefit, postfit, ratio),
+                Residual::accepted(epoch, prefit, postfit, ratio, measurement_noise.diagonal()),
             )
         };
 

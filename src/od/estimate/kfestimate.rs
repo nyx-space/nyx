@@ -303,7 +303,14 @@ where
         };
         let mut fmt_cov = Vec::with_capacity(dim);
         for i in 0..dim {
-            fmt_cov.push(format!("{:e}", &self.covar[(i, i)]));
+            let unit = if i < 3 {
+                "km"
+            } else if i < 6 {
+                "km/s"
+            } else {
+                ""
+            };
+            fmt_cov.push(format!("{:.6} {unit}", &self.covar[(i, i)]));
         }
         write!(
             f,
@@ -312,7 +319,7 @@ where
             &self.epoch(),
             self.within_3sigma(),
             &self.state(),
-            fmt_cov.join(",")
+            fmt_cov.join(", ")
         )
     }
 }

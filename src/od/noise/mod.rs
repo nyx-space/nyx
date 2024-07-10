@@ -108,6 +108,9 @@ impl StochasticNoise {
         if let Some(gm) = &mut self.bias {
             variance += gm.update_variance(epoch);
         }
+        if let Some(constant) = self.constant {
+            variance += constant;
+        }
         variance
     }
 
@@ -120,10 +123,13 @@ impl StochasticNoise {
         if let Some(gm) = &self.bias {
             variance += gm.variance(epoch);
         }
+        if let Some(constant) = self.constant {
+            variance += constant;
+        }
         variance
     }
 
-    /// Simulate a Gauss Markov model and store the bias in a parquet file.
+    /// Simulate the configured stochastic model and store the bias in a parquet file.
     /// Python: call as `simulate(path, runs=25, unit=None)` where the path is the output Parquet file, runs is the number of runs, and unit is the unit of the bias, reflected only in the headers of the parquet file.
     ///
     /// The unit is only used in the headers of the parquet file.
