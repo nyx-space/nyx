@@ -26,6 +26,8 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyType};
 #[cfg(feature = "python")]
 use pythonize::{depythonize, pythonize};
+use rand::Rng;
+use rand_distr::Normal;
 use serde_derive::{Deserialize, Serialize};
 #[cfg(feature = "python")]
 use std::collections::BTreeMap;
@@ -51,21 +53,21 @@ use super::Stochastics;
 pub struct GaussMarkov {
     /// The time constant, tau gives the correlation time, or the time over which the intensity of the time correlation will fade to 1/e of its prior value. (This is sometimes incorrectly referred to as the "half-life" of the process.)
     pub tau: Duration,
-    pub process_noise_per_s: f64,
+    pub process_noise: f64,
     /// Epoch of the previous realization, used to compute the time delta for the process noise.
     #[serde(skip)]
     pub prev_epoch: Option<Epoch>,
-    /// Variance of the previous realization
+    /// Sample of previous realization
     #[serde(skip)]
-    pub prev_variance: Option<f64>,
+    pub init_sample: Option<f64>,
 }
 
 impl fmt::Display for GaussMarkov {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "First order Gauss-Markov process with τ = {}, q = {}",
-            self.tau, self.process_noise_per_s
+            "First order Gauss-Markov process with τ = {}, σ = {}",
+            self.tau, self.process_noise
         )
     }
 }
@@ -74,8 +76,8 @@ impl GaussMarkov {
     /// Create a new first order Gauss-Markov process.
     /// # Arguments
     /// * `tau` - The time constant, tau gives the correlation time, or the time over which the intensity of the time correlation will fade to 1/e of its prior value.
-    /// * `process_noise_per_s` - process noise of the system, in units of the system measurement output per second.
-    pub fn new(tau: Duration, process_noise_per_s: f64) -> Result<Self, ConfigError> {
+    /// * `process_noise` - process noise of the system.
+    pub fn new(tau: Duration, process_noise: f64) -> Result<Self, ConfigError> {
         if tau <= Duration::ZERO {
             return Err(ConfigError::InvalidConfig {
                 msg: format!("tau must be positive but got {tau}"),
@@ -84,49 +86,17 @@ impl GaussMarkov {
 
         Ok(Self {
             tau,
-            process_noise_per_s,
-            prev_variance: None,
+            process_noise,
+            init_sample: None,
             prev_epoch: None,
         })
     }
 
-    // /// Return the next bias sample.
-    // pub fn sample<R: Rng>(&mut self, epoch: Epoch, rng: &mut R) -> f64 {
-    //     // Compute the delta time in seconds between the previous epoch and the sample epoch.
-    //     let dt_s = (match self.epoch {
-    //         None => Duration::ZERO,
-    //         Some(prev_epoch) => epoch - prev_epoch,
-    //     })
-    //     .to_seconds();
-    //     self.epoch = Some(epoch);
-
-    //     // If there is no bias, generate one using the standard deviation of the bias
-    //     if self.prev_variance.is_none() {
-    //         self.prev_variance =
-    //             Some(rng.sample(Normal::new(0.0, self.process_noise_per_s).unwrap()));
-    //     }
-
-    //     let decay = (-dt_s / self.tau.to_seconds()).exp();
-    //     let anti_decay = 1.0 - decay;
-
-    //     // The steady state contribution. This is the bias that the process will converge to as t approaches infinity.
-    //     let ss_contrib = rng.sample(Normal::new(0.0, self.steady_state_sigma).unwrap());
-
-    //     // let q_pp = 2.0 * self.tau.to_seconds() * self.steady_state_sigma.powi(2);
-
-    //     let bias = self.prev_variance.unwrap() * decay + ss_contrib * anti_decay;
-
-    //     self.prev_variance = Some(bias);
-
-    //     // Return the new bias
-    //     bias
-    // }
-
     /// Zero noise Gauss-Markov process.
     pub const ZERO: Self = Self {
         tau: Duration::MAX,
-        process_noise_per_s: 0.0,
-        prev_variance: None,
+        process_noise: 0.0,
+        init_sample: None,
         prev_epoch: None,
     };
 
@@ -135,8 +105,8 @@ impl GaussMarkov {
     pub fn default_range_km() -> Self {
         Self {
             tau: 1.minutes(),
-            process_noise_per_s: 1.0e-5, // 1 cm/s
-            prev_variance: None,
+            process_noise: 1.0e-5, // 1 cm/s
+            init_sample: None,
             prev_epoch: None,
         }
     }
@@ -146,14 +116,15 @@ impl GaussMarkov {
     pub fn default_doppler_km_s() -> Self {
         Self {
             tau: 20.minutes(),
-            process_noise_per_s: 5.0e-10, // 0.0005 mm/s^2
-            prev_variance: None,
+            process_noise: 5.0e-10, // 0.0005 mm/s^2
+            init_sample: None,
             prev_epoch: None,
         }
     }
 
     // Initializes a new Gauss Markov process as a time-uncorrelated white noise process, using only the Pr/N0 value and the bandwidth.
     // This returns a white noise sigma in kilometers.
+    // TODO: Move to Stochastics
     //
     // # Equation
     // σ = c / (2 * B * √(Pr/N0))
@@ -167,27 +138,36 @@ impl GaussMarkov {
 }
 
 impl Stochastics for GaussMarkov {
-    fn variance(&self, epoch: Epoch) -> f64 {
-        if let Some(prev_epoch) = self.prev_epoch {
-            let delta_t = (epoch - prev_epoch).to_seconds();
-
-            let decay = (-2.0 * delta_t / self.tau.to_seconds()).exp();
-            let anti_decay = 1.0 - decay;
-
-            let s_dt = 0.5 * self.process_noise_per_s * self.tau.to_seconds() * anti_decay;
-
-            decay * self.prev_variance.unwrap() + s_dt
-        } else {
-            self.process_noise_per_s
-        }
+    fn variance(&self, _epoch: Epoch) -> f64 {
+        self.process_noise.powi(2)
     }
 
-    fn update_variance(&mut self, epoch: Epoch) -> f64 {
-        let new_variance = self.variance(epoch);
+    /// Return the next bias sample.
+    fn sample<R: Rng>(&mut self, epoch: Epoch, rng: &mut R) -> f64 {
+        // Compute the delta time in seconds between the previous epoch and the sample epoch.
+        let dt_s = (match self.prev_epoch {
+            None => Duration::ZERO,
+            Some(prev_epoch) => epoch - prev_epoch,
+        })
+        .to_seconds();
         self.prev_epoch = Some(epoch);
-        self.prev_variance = Some(new_variance);
 
-        new_variance
+        // If there is no bias, generate one using the standard deviation of the bias
+        if self.init_sample.is_none() {
+            self.init_sample = Some(rng.sample(Normal::new(0.0, self.process_noise).unwrap()));
+        }
+
+        let decay = (-dt_s / self.tau.to_seconds()).exp();
+        let anti_decay = 1.0 - decay;
+
+        // The steady state contribution. This is the bias that the process will converge to as t approaches infinity.
+        let steady_noise = 0.5 * self.process_noise * self.tau.to_seconds() * anti_decay;
+        let ss_sample = rng.sample(Normal::new(0.0, steady_noise).unwrap());
+
+        let bias = self.init_sample.unwrap() * decay + ss_sample;
+
+        // Return the new bias
+        bias
     }
 }
 
@@ -198,8 +178,8 @@ impl Mul<f64> for GaussMarkov {
     fn mul(self, rhs: f64) -> Self::Output {
         Self {
             tau: self.tau,
-            process_noise_per_s: self.process_noise_per_s * rhs,
-            prev_variance: None,
+            process_noise: self.process_noise * rhs,
+            init_sample: None,
             prev_epoch: None,
         }
     }
@@ -476,9 +456,9 @@ mod ut_gm {
             models["range_noise_model"].tau,
             12.hours() + 159.milliseconds()
         );
-        assert_eq!(models["range_noise_model"].process_noise_per_s, 5.0e-3);
+        assert_eq!(models["range_noise_model"].process_noise, 5.0e-3);
 
         assert_eq!(models["doppler_noise_model"].tau, 11.hours() + 59.minutes());
-        assert_eq!(models["doppler_noise_model"].process_noise_per_s, 50.0e-6);
+        assert_eq!(models["doppler_noise_model"].process_noise, 50.0e-6);
     }
 }

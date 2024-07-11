@@ -143,17 +143,17 @@ impl fmt::Display for SpacecraftUncertainty {
         writeln!(f, "{}", self.nominal)?;
         writeln!(
             f,
-            "{frame}  Σ_x = {} km  Σ_y = {} km  Σ_z = {} km",
+            "{frame}  σ_x = {} km  σ_y = {} km  σ_z = {} km",
             self.x_km, self.y_km, self.z_km
         )?;
         writeln!(
             f,
-            "{frame}  Σ_vx = {} km/s  Σ_vy = {} km/s  Σ_vz = {} km/s",
+            "{frame}  σ_vx = {} km/s  σ_vy = {} km/s  σ_vz = {} km/s",
             self.vx_km_s, self.vy_km_s, self.vz_km_s
         )?;
         writeln!(
             f,
-            "Σ_cr = {}  Σ_cd = {}  Σ_mass = {} kg",
+            "σ_cr = {}  σ_cd = {}  σ_mass = {} kg",
             self.cr, self.cd, self.mass_kg
         )
     }

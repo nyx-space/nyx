@@ -39,16 +39,11 @@ use walk::RandomWalk;
 
 /// Trait for any kind of stochastic modeling, developing primarily for synthetic orbit determination measurements.
 pub trait Stochastics {
-    /// Return the updated variance of this stochastic noise model at a given time.
-    fn update_variance(&mut self, epoch: Epoch) -> f64;
-
-    /// Return the previous variance of this stochastic noise model at a given time.
+    /// Return the variance of this stochastic noise model at a given time.
     fn variance(&self, epoch: Epoch) -> f64;
 
-    /// A sampler based on the variance.
-    fn sample<R: Rng>(&mut self, epoch: Epoch, rng: &mut R) -> f64 {
-        rng.sample(Normal::new(0.0, self.update_variance(epoch)).unwrap())
-    }
+    /// Returns a new sample of these stochastics
+    fn sample<R: Rng>(&mut self, epoch: Epoch, rng: &mut R) -> f64;
 }
 
 /// Stochastic noise modeling used primarily for synthetic orbit determination measurements.
@@ -74,7 +69,7 @@ impl StochasticNoise {
     pub fn default_range_km() -> Self {
         Self {
             white_noise: Some(RandomWalk {
-                process_noise_per_s: 2.0e-3, // 2 m
+                process_noise: 2.0e-3, // 2 m
                 ..Default::default()
             }),
             bias: Some(GaussMarkov::default_range_km()),
@@ -86,7 +81,7 @@ impl StochasticNoise {
     pub fn default_doppler_km_s() -> Self {
         Self {
             white_noise: Some(RandomWalk {
-                process_noise_per_s: 0.3e-6, // 3 mm/s
+                process_noise: 0.3e-6, // 3 mm/s
                 ..Default::default()
             }),
             bias: Some(GaussMarkov::default_doppler_km_s()),
@@ -96,22 +91,17 @@ impl StochasticNoise {
 
     /// Sample these stochastics
     pub fn sample<R: Rng>(&mut self, epoch: Epoch, rng: &mut R) -> f64 {
-        rng.sample(Normal::new(0.0, self.update_variance(epoch)).unwrap())
-            + self.constant.unwrap_or(0.0)
-    }
-
-    pub fn update_variance(&mut self, epoch: Epoch) -> f64 {
-        let mut variance = 0.0;
+        let mut sample = 0.0;
         if let Some(wn) = &mut self.white_noise {
-            variance += wn.update_variance(epoch);
+            sample += wn.sample(epoch, rng)
         }
         if let Some(gm) = &mut self.bias {
-            variance += gm.update_variance(epoch);
+            sample += gm.sample(epoch, rng);
         }
         if let Some(constant) = self.constant {
-            variance += constant;
+            sample += rng.sample(Normal::new(0.0, constant).unwrap());
         }
-        variance
+        sample
     }
 
     /// Return the variance of these stochastics at a given time.
@@ -270,7 +260,7 @@ mod ut_stochastics {
 
         let noise = StochasticNoise {
             white_noise: Some(RandomWalk {
-                process_noise_per_s: 2.1,
+                process_noise: 2.1,
                 ..Default::default()
             }),
             ..Default::default()
@@ -293,7 +283,7 @@ mod ut_stochastics {
 
         let noise = StochasticNoise {
             white_noise: Some(RandomWalk {
-                process_noise_per_s: 2.1,
+                process_noise: 2.1,
                 ..Default::default()
             }),
             constant: Some(0.5),
