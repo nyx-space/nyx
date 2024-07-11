@@ -23,7 +23,6 @@ use arrow::record_batch::RecordBatch;
 use hifitime::{Epoch, TimeSeries, TimeUnits};
 use parquet::arrow::ArrowWriter;
 use rand::{Rng, SeedableRng};
-use rand_distr::Normal;
 use rand_pcg::Pcg64Mcg;
 use serde_derive::{Deserialize, Serialize};
 use std::error::Error;
@@ -32,10 +31,10 @@ use std::path::Path;
 use std::sync::Arc;
 
 pub mod gauss_markov;
-pub mod walk;
+pub mod white;
 
 pub use gauss_markov::GaussMarkov;
-use walk::RandomWalk;
+pub use white::WhiteNoise;
 
 /// Trait for any kind of stochastic modeling, developing primarily for synthetic orbit determination measurements.
 pub trait Stochastics {
@@ -51,9 +50,8 @@ pub trait Stochastics {
 /// This implementation distinguishes between the white noise model and the bias model. It also includes a constant offset.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct StochasticNoise {
-    pub white_noise: Option<RandomWalk>,
+    pub white_noise: Option<WhiteNoise>,
     pub bias: Option<GaussMarkov>,
-    pub constant: Option<f64>,
 }
 
 impl StochasticNoise {
@@ -61,31 +59,28 @@ impl StochasticNoise {
     pub const ZERO: Self = Self {
         white_noise: None,
         bias: None,
-        constant: None,
     };
 
     /// Default stochastic process of the Deep Space Network, as per DESCANSO Chapter 3, Table 3-3.
     /// Using the instrument bias as the white noise value, zero constant bias.
     pub fn default_range_km() -> Self {
         Self {
-            white_noise: Some(RandomWalk {
-                process_noise: 2.0e-3, // 2 m
+            white_noise: Some(WhiteNoise {
+                sigma: 2.0e-3, // 2 m
                 ..Default::default()
             }),
             bias: Some(GaussMarkov::default_range_km()),
-            constant: None,
         }
     }
 
     /// Default stochastic process of the Deep Space Network, using as per DESCANSO Chapter 3, Table 3-3 for the GM process.
     pub fn default_doppler_km_s() -> Self {
         Self {
-            white_noise: Some(RandomWalk {
-                process_noise: 0.3e-6, // 3 mm/s
+            white_noise: Some(WhiteNoise {
+                sigma: 3e-6, // 3 mm/s
                 ..Default::default()
             }),
             bias: Some(GaussMarkov::default_doppler_km_s()),
-            constant: None,
         }
     }
 
@@ -98,9 +93,6 @@ impl StochasticNoise {
         if let Some(gm) = &mut self.bias {
             sample += gm.sample(epoch, rng);
         }
-        if let Some(constant) = self.constant {
-            sample += rng.sample(Normal::new(0.0, constant).unwrap());
-        }
         sample
     }
 
@@ -108,15 +100,12 @@ impl StochasticNoise {
     pub fn variance(&self, epoch: Epoch) -> f64 {
         let mut variance = 0.0;
         if let Some(wn) = &self.white_noise {
-            variance += wn.variance(epoch);
+            variance += wn.variance(epoch).sqrt();
         }
         if let Some(gm) = &self.bias {
-            variance += gm.variance(epoch);
+            variance += gm.variance(epoch).sqrt();
         }
-        if let Some(constant) = self.constant {
-            variance += constant;
-        }
-        variance
+        variance.powi(2)
     }
 
     /// Simulate the configured stochastic model and store the bias in a parquet file.
@@ -130,14 +119,7 @@ impl StochasticNoise {
         path: P,
         runs: Option<u32>,
         unit: Option<String>,
-    ) -> Result<(), Box<dyn Error>> {
-        struct StochasticState {
-            run: u32,
-            dt_s: f64,
-            sample: f64,
-            variance: f64,
-        }
-
+    ) -> Result<Vec<StochasticState>, Box<dyn Error>> {
         let num_runs = runs.unwrap_or(25);
 
         let start = Epoch::now().unwrap();
@@ -205,15 +187,22 @@ impl StochasticNoise {
         writer.write(&batch)?;
         writer.close()?;
 
-        Ok(())
+        Ok(samples)
     }
+}
+
+pub struct StochasticState {
+    pub run: u32,
+    pub dt_s: f64,
+    pub sample: f64,
+    pub variance: f64,
 }
 
 #[cfg(test)]
 mod ut_stochastics {
     use std::path::PathBuf;
 
-    use super::{walk::RandomWalk, StochasticNoise};
+    use super::{white::WhiteNoise, StochasticNoise};
 
     #[test]
     fn test_simulate_zero() {
@@ -227,7 +216,9 @@ mod ut_stochastics {
 
         let noise = StochasticNoise::default();
 
-        noise.simulate(path, None, None).unwrap();
+        let rslts = noise.simulate(path, None, None).unwrap();
+        assert!(!rslts.is_empty());
+        assert!(rslts.iter().map(|rslt| rslt.sample).sum::<f64>().abs() < f64::EPSILON);
     }
 
     #[test]
@@ -241,58 +232,14 @@ mod ut_stochastics {
         .collect();
 
         let noise = StochasticNoise {
-            constant: Some(1.0),
+            white_noise: Some(WhiteNoise {
+                mean: 15.0,
+                sigma: 2.0,
+            }),
             ..Default::default()
         };
 
         noise.simulate(path, None, None).unwrap();
-    }
-
-    #[test]
-    fn test_simulate_wn_only() {
-        let path: PathBuf = [
-            env!("CARGO_MANIFEST_DIR"),
-            "output_data",
-            "stochastics_wn.parquet",
-        ]
-        .iter()
-        .collect();
-
-        let noise = StochasticNoise {
-            white_noise: Some(RandomWalk {
-                process_noise: 2.1,
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-
-        noise
-            .simulate(path, None, Some("meter".to_string()))
-            .unwrap();
-    }
-
-    #[test]
-    fn test_simulate_wn_constant() {
-        let path: PathBuf = [
-            env!("CARGO_MANIFEST_DIR"),
-            "output_data",
-            "stochastics_wn_and_constant.parquet",
-        ]
-        .iter()
-        .collect();
-
-        let noise = StochasticNoise {
-            white_noise: Some(RandomWalk {
-                process_noise: 2.1,
-                ..Default::default()
-            }),
-            constant: Some(0.5),
-            ..Default::default()
-        };
-
-        noise
-            .simulate(path, None, Some("meter".to_string()))
-            .unwrap();
     }
 
     #[test]

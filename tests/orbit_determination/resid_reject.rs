@@ -44,6 +44,8 @@ fn traj(epoch: Epoch, almanac: Arc<Almanac>) -> Traj<Spacecraft> {
         ))
         .build();
 
+    println!("{initial_state}");
+
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER, SATURN_BARYCENTER];
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
     let truth_setup = Propagator::dp78(

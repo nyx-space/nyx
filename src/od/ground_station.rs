@@ -344,8 +344,8 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
             <RangeDoppler as super::Measurement>::MeasurementSize,
             <RangeDoppler as super::Measurement>::MeasurementSize,
         >::zeros();
-        msr_noises[(0, 0)] = range_noise_km.powi(2);
-        msr_noises[(1, 1)] = doppler_noise_km_s.powi(2);
+        msr_noises[(0, 0)] = range_noise_km;
+        msr_noises[(1, 1)] = doppler_noise_km_s;
 
         Ok(msr_noises)
     }

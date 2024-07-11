@@ -105,7 +105,7 @@ impl GaussMarkov {
     pub fn default_range_km() -> Self {
         Self {
             tau: 1.minutes(),
-            process_noise: 1.0e-5, // 1 cm/s
+            process_noise: 60.0e-5,
             init_sample: None,
             prev_epoch: None,
         }
@@ -115,26 +115,12 @@ impl GaussMarkov {
     /// Used the Doppler value of 0.03 mm/s over a 60 second average.
     pub fn default_doppler_km_s() -> Self {
         Self {
-            tau: 20.minutes(),
-            process_noise: 5.0e-10, // 0.0005 mm/s^2
+            tau: 1.minutes(),
+            process_noise: 0.03e-6,
             init_sample: None,
             prev_epoch: None,
         }
     }
-
-    // Initializes a new Gauss Markov process as a time-uncorrelated white noise process, using only the Pr/N0 value and the bandwidth.
-    // This returns a white noise sigma in kilometers.
-    // TODO: Move to Stochastics
-    //
-    // # Equation
-    // σ = c / (2 * B * √(Pr/N0))
-    //
-    // Where c is the speed of light, B is the bandwidth in Hz, and the Pr/N0 is the signal-to-noise ratio.
-    // pub fn from_pr_n0(pr_n0: f64, bandwidth_hz: f64) -> Self {
-    //     let sigma = SPEED_OF_LIGHT_KM_S / (2.0 * bandwidth_hz * (pr_n0).sqrt());
-
-    //     Self::white_noise(sigma)
-    // }
 }
 
 impl Stochastics for GaussMarkov {

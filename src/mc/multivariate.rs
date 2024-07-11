@@ -156,6 +156,7 @@ where
     <S::Size as DimMin<S::Size>>::Output: DimName,
 {
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> DispersedState<S> {
+        // TODO: Switch to nalgebra-mvm
         // Generate the vector representing the state
         let x_rng = OVector::<f64, S::Size>::from_fn(|_, _| self.std_norm_distr.sample(rng));
         println!("{x_rng}\n{:.6}", self.sqrt_s_v);
