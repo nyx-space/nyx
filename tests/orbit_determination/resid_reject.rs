@@ -175,7 +175,8 @@ fn initial_estimate(traj: Traj<Spacecraft>) -> KfEstimate<Spacecraft> {
 }
 
 #[rstest]
-fn od_resid_reject_all_ckf_two_way(
+fn od_resid_reject_inflated_snc_ckf_two_way(
+    traj: Traj<Spacecraft>,
     tracking_arc: TrackingArc<RangeDoppler>,
     initial_estimate: KfEstimate<Spacecraft>,
     devices_n_configs: (Vec<GroundStation>, BTreeMap<String, TrkConfig>),
@@ -185,23 +186,22 @@ fn od_resid_reject_all_ckf_two_way(
 
     let initial_state_dev = initial_estimate.nominal_state;
 
-    // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
-    // We expect the estimated orbit to be _nearly_ perfect because we've removed SATURN_BARYCENTER from the estimated trajectory
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let estimator = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
     let setup = Propagator::new::<RK4Fixed>(estimator, PropOpts::with_fixed_step(10.seconds()));
     let prop_est = setup.with(initial_state_dev.with_stm(), almanac.clone());
 
     // Define the process noise to assume an unmodeled acceleration on X, Y and Z in the ECI frame
-    let sigma_q = 5e0_f64.powi(2);
+    let sigma_q = 5e-3_f64.powi(2);
     let process_noise = SNC3::from_diagonal(2.minutes(), &[sigma_q, sigma_q, sigma_q]);
 
     let kf = KF::new(initial_estimate, process_noise);
 
     // ==> TEST <== //
-    // We set up the rejection criteria to start after a single measurement and with a residual ratio of 3.0, i.e. within 3-sigmas.
-    // The initial dispersion is about 20388 km, so we none of the residuals will be within those 3-sigmas.
-    // Therefore, the test is to confirm that the ODP only performs time updates and zero measurement updates.
+    // We greatly inflate the SNC so that the covariance inflates tremendously. This leads to the
+    // measurement noise being tremendously inflated as well, but it also means that all of
+    // the measurements are accepted.
+    // So we end up with an excellent estimate but an unusably high covariance.
 
     let mut odp = ODProcess::ckf(
         prop_est,
@@ -227,19 +227,63 @@ fn od_resid_reject_all_ckf_two_way(
     )
     .unwrap();
 
-    for residual in odp.residuals.iter().flatten() {
-        assert!(residual.rejected, "{} was not rejected!", residual.epoch);
-    }
+    let path: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "output_data",
+        "resid_reject_inflated_snc.parquet",
+    ]
+    .iter()
+    .collect();
+    odp.to_parquet(path, ExportCfg::timestamped()).unwrap();
 
-    for estimate in odp.estimates.iter() {
-        assert!(
-            estimate.predicted,
-            "{} was not predicted!",
-            estimate.epoch()
-        );
-    }
+    let num_rejections = odp
+        .residuals
+        .iter()
+        .flatten()
+        .filter(|residual| residual.rejected)
+        .count();
 
-    // We don't check the estimation because it'll be bad since we rejected all the measurements.
+    assert!(num_rejections < 10, "oddly high rejections");
+
+    // Check that the final post-fit residual isn't too bad, and definitely much better than the prefit.
+    let est = &odp.estimates.last().unwrap();
+    let final_resid = &odp.residuals.last().unwrap().as_ref().unwrap();
+    let final_truth_state = traj.at(est.epoch()).unwrap();
+
+    println!("{final_resid}");
+
+    println!("Estimate:\n{}", est);
+    println!("Truth:\n{}", final_truth_state);
+    println!(
+        "Delta state with truth (epoch match: {}):\n{}",
+        final_truth_state.epoch() == est.epoch(),
+        (final_truth_state.orbit - est.state().orbit).unwrap()
+    );
+
+    assert_eq!(
+        final_truth_state.epoch(),
+        est.epoch(),
+        "time of final EST and TRUTH epochs differ"
+    );
+    let delta = (est.state().orbit - final_truth_state.orbit).unwrap();
+    println!(
+        "RMAG error = {:.6} m\tVMAG error = {:.6} m/s",
+        delta.rmag_km() * 1e3,
+        delta.vmag_km_s() * 1e3
+    );
+
+    assert!(
+        delta.rmag_km() < 15.0,
+        "Position error should be less than 15 km"
+    );
+    assert!(
+        delta.vmag_km_s() < 2e-3,
+        "Velocity error should be on meter per second level"
+    );
+
+    assert!(!final_resid.rejected, "final residual should be accepted");
+    assert!(final_resid.prefit.norm() > final_resid.postfit.norm());
+    assert!(final_resid.postfit.norm() < 1e-2);
 }
 
 #[rstest]
@@ -296,17 +340,17 @@ fn od_resid_reject_default_ckf_two_way(
     .collect();
     odp.to_parquet(path, ExportCfg::timestamped()).unwrap();
 
-    // let mut resid_count = 0;
-    // for residual in odp.residuals.iter().flatten() {
-    //     if residual.rejected {
-    //         resid_count += 1;
-    //     }
-    // }
+    let num_rejections = odp
+        .residuals
+        .iter()
+        .flatten()
+        .filter(|residual| residual.rejected)
+        .count();
 
-    // assert_eq!(resid_count, 0);
+    assert!(num_rejections > 220);
 
-    // Check that the covariance deflated
-    let est = &odp.estimates[odp.estimates.len() - 1];
+    // Check that the error is within the covariance.
+    let est = &odp.estimates.last().unwrap();
     let final_truth_state = traj.at(est.epoch()).unwrap();
 
     println!("Estimate:\n{}", est);
@@ -329,15 +373,11 @@ fn od_resid_reject_default_ckf_two_way(
         delta.vmag_km_s() * 1e3
     );
 
-    // We start with a 20 km error and with only 120 measurements, no iteration, and no extended KF, we achieve less than 500 meters of error.
-    // That's not bad!
+    assert!(delta.radius_km.x < est.covar[(0, 0)].sqrt());
+    assert!(delta.radius_km.y < est.covar[(1, 1)].sqrt());
+    assert!(delta.radius_km.z < est.covar[(2, 2)].sqrt());
 
-    assert!(
-        delta.rmag_km() < 0.6,
-        "Position error should be less than 500 meters"
-    );
-    assert!(
-        delta.vmag_km_s() < 1e-3,
-        "Velocity error should be on meter per second level"
-    );
+    assert!(delta.velocity_km_s.x < est.covar[(3, 3)].sqrt());
+    assert!(delta.velocity_km_s.y < est.covar[(4, 4)].sqrt());
+    assert!(delta.velocity_km_s.z < est.covar[(5, 5)].sqrt());
 }

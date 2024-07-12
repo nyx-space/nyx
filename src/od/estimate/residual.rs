@@ -105,7 +105,15 @@ where
     DefaultAllocator: Allocator<f64, M> + Allocator<usize, M>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Prefit {} Postfit {}", &self.prefit, &self.postfit)
+        write!(
+            f,
+            "Residual from {} at {}: ratio = {:.3}\nPrefit {} Postfit {}",
+            self.tracker.as_ref().unwrap_or(&"Unknown".to_string()),
+            self.epoch,
+            self.ratio,
+            &self.prefit,
+            &self.postfit
+        )
     }
 }
 
