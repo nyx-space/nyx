@@ -387,9 +387,9 @@ mod ut_gm {
         // I'm not sure how to correctly test this and open to ideas.
         let min_max = biases.minmax();
 
-        assert_eq!(biases.amean().unwrap(), 0.09422989888670787);
-        assert_eq!(min_max.min, 0.09368618104727605);
-        assert_eq!(min_max.max, 0.0947757142410022);
+        assert_eq!(biases.amean().unwrap(), 0.09373233290645445);
+        assert_eq!(min_max.max, 0.24067114622652647);
+        assert_eq!(min_max.min, -0.045552031890295525);
     }
 
     #[test]

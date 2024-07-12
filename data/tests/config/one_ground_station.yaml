@@ -11,9 +11,9 @@ height_km: 0.4
 range_noise_km:
   bias:
     tau: 24 h
-    process_noise_per_s: 5.0e-3 # 5 m
+    process_noise: 5.0e-3 # 5 m
 doppler_noise_km_s:
   bias:
     tau: 24 h
-    process_noise_per_s: 50.0e-6 # 5 cm/s
+    process_noise: 50.0e-6 # 5 cm/s
 light_time_correction: false
