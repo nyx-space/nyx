@@ -49,20 +49,20 @@ fn od_val_sc_mb_srp_reals_duals_models(almanac: Arc<Almanac>) {
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
-        StochasticNoise::ZERO,
-        StochasticNoise::ZERO,
+        StochasticNoise::MIN,
+        StochasticNoise::MIN,
         iau_earth,
     );
     let dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
-        StochasticNoise::ZERO,
-        StochasticNoise::ZERO,
+        StochasticNoise::MIN,
+        StochasticNoise::MIN,
         iau_earth,
     );
     let dss13_goldstone = GroundStation::dss13_goldstone(
         elevation_mask,
-        StochasticNoise::ZERO,
-        StochasticNoise::ZERO,
+        StochasticNoise::MIN,
+        StochasticNoise::MIN,
         iau_earth,
     );
 

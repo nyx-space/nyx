@@ -42,14 +42,14 @@ fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>) {
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
-        StochasticNoise::ZERO,
-        StochasticNoise::ZERO,
+        StochasticNoise::MIN,
+        StochasticNoise::MIN,
         iau_earth,
     );
     let dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
-        StochasticNoise::ZERO,
-        StochasticNoise::ZERO,
+        StochasticNoise::MIN,
+        StochasticNoise::MIN,
         iau_earth,
     );
 

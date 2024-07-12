@@ -36,20 +36,20 @@ fn od_val_multi_body_ckf_perfect_stations(almanac: Arc<Almanac>) {
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
-        StochasticNoise::ZERO,
-        StochasticNoise::ZERO,
+        StochasticNoise::MIN,
+        StochasticNoise::MIN,
         iau_earth,
     );
     let dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
-        StochasticNoise::ZERO,
-        StochasticNoise::ZERO,
+        StochasticNoise::MIN,
+        StochasticNoise::MIN,
         iau_earth,
     );
     let dss13_goldstone = GroundStation::dss13_goldstone(
         elevation_mask,
-        StochasticNoise::ZERO,
-        StochasticNoise::ZERO,
+        StochasticNoise::MIN,
+        StochasticNoise::MIN,
         iau_earth,
     );
 
@@ -178,8 +178,8 @@ fn multi_body_ckf_covar_map(almanac: Arc<Almanac>) {
     let elevation_mask = 0.0;
     let dss13_goldstone = GroundStation::dss13_goldstone(
         elevation_mask,
-        StochasticNoise::ZERO,
-        StochasticNoise::ZERO,
+        StochasticNoise::MIN,
+        StochasticNoise::MIN,
         iau_earth,
     );
     // Define the tracking configurations

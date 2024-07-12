@@ -347,6 +347,14 @@ where
 
         let h_tilde_t = &self.h_tilde.transpose();
         let h_p_ht = &self.h_tilde * covar_bar * h_tilde_t;
+        // Account for state uncertainty in the measurement noise. Equation 4.10 of ODTK MathSpec.
+        let r_k = &h_p_ht
+            + if measurement_noise.norm() > 0.0 {
+                measurement_noise
+            } else {
+                // Ensure that the measurement noise is never negative, or the Kalman gain is singular.
+                OMatrix::<f64, M, M>::from_diagonal_element(1e-9)
+            };
 
         // Compute observation deviation (usually marked as y_i)
         let prefit = real_obs - computed_obs;
@@ -357,7 +365,7 @@ where
 
         if let Some(resid_reject) = resid_rejection {
             for ii in 0..M::USIZE {
-                let reject_value = measurement_noise[(ii, ii)].sqrt() * resid_reject.num_sigmas;
+                let reject_value = r_k[(ii, ii)].sqrt() * 3.0;
                 if prefit[ii] > reject_value {
                     let (msr_type, unit) = match ii {
                         0 => ("range", "m"),
@@ -367,21 +375,21 @@ where
                     warn!(
                         "{msr_type} residual rejected @{epoch}: {:.3} {unit} > {reject_value:.3} {unit} ({:.3} + {}σ)",
                         prefit[ii] * 1e3,
-                        measurement_noise[(ii, ii)].sqrt() * 1e3,
+                        r_k[(ii, ii)].sqrt() * 1e3,
                         resid_reject.num_sigmas
                     );
                     // Perform only a time update and return
                     let pred_est = self.time_update(nominal_state)?;
                     return Ok((
                         pred_est,
-                        Residual::rejected(epoch, prefit, ratio, measurement_noise.diagonal()),
+                        Residual::rejected(epoch, prefit, ratio, r_k.diagonal()),
                     ));
                 }
             }
         }
 
         // Compute the Kalman gain but first adding the measurement noise to H⋅P⋅H^T
-        let mut invertible_part = h_p_ht + &measurement_noise;
+        let mut invertible_part = h_p_ht + &r_k;
         if !invertible_part.try_inverse_mut() {
             return Err(ODError::SingularKalmanGain);
         }
@@ -394,7 +402,7 @@ where
             let postfit = &prefit - (&self.h_tilde * state_hat);
             (
                 state_hat,
-                Residual::accepted(epoch, prefit, postfit, ratio, measurement_noise.diagonal()),
+                Residual::accepted(epoch, prefit, postfit, ratio, r_k.diagonal()),
             )
         } else {
             // Must do a time update first
@@ -402,15 +410,15 @@ where
             let postfit = &prefit - (&self.h_tilde * state_bar);
             (
                 state_bar + &gain * &postfit,
-                Residual::accepted(epoch, prefit, postfit, ratio, measurement_noise.diagonal()),
+                Residual::accepted(epoch, prefit, postfit, ratio, r_k.diagonal()),
             )
         };
 
         // Compute covariance (Joseph update)
         let first_term = OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity()
             - &gain * &self.h_tilde;
-        let covar = first_term * covar_bar * first_term.transpose()
-            + &gain * &measurement_noise * &gain.transpose();
+        let covar =
+            first_term * covar_bar * first_term.transpose() + &gain * &r_k * &gain.transpose();
 
         // And wrap up
         let estimate = KfEstimate {

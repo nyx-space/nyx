@@ -61,6 +61,15 @@ impl StochasticNoise {
         bias: None,
     };
 
+    /// The minimum stochastic noise process with a zero mean white noise of 1e-9.
+    pub const MIN: Self = Self {
+        white_noise: Some(WhiteNoise {
+            mean: 0.0,
+            sigma: 1e-6,
+        }),
+        bias: None,
+    };
+
     /// Default stochastic process of the Deep Space Network, as per DESCANSO Chapter 3, Table 3-3.
     /// Using the instrument bias as the white noise value, zero constant bias.
     pub fn default_range_km() -> Self {
