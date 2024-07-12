@@ -19,7 +19,7 @@ use std::path::PathBuf;
 
 #[fixture]
 fn epoch() -> Epoch {
-    Epoch::from_gregorian_tai_at_midnight(2023, 1, 1)
+    Epoch::from_gregorian_utc_at_midnight(2023, 1, 1)
 }
 
 #[fixture]

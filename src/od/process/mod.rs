@@ -637,10 +637,16 @@ where
 
                     let msr_prct = (10.0 * (msr_cnt as f64) / (num_msrs as f64)) as usize;
                     if !reported[msr_prct] {
-                        info!(
+                        let num_rejected = msr_cnt - msr_accepted_cnt.saturating_sub(1);
+                        let msg = format!(
                             "{:>3}% done ({msr_accepted_cnt:.0} measurements accepted, {:.0} rejected)",
-                            10 * msr_prct, msr_cnt - msr_accepted_cnt.saturating_sub(1)
+                            10 * msr_prct, num_rejected
                         );
+                        if msr_accepted_cnt < num_rejected {
+                            warn!("{msg}");
+                        } else {
+                            info!("{msg}");
+                        }
                         reported[msr_prct] = true;
                     }
 

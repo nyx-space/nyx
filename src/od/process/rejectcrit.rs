@@ -29,8 +29,12 @@ use pyo3::prelude::*;
 use pythonize::{depythonize, pythonize};
 use serde_derive::{Deserialize, Serialize};
 
-/// Reject measurements with a residual ratio greater than the provided sigmas values. Will only be turned used if at least min_accepted measurements have been processed so far.
-/// If unsure, use the default: `FltResid::default()` in Rust, and `FltResid()` in Python (i.e. construct without arguments).
+/// Reject measurements if the prefit is greater than the provided sigmas deviation from the measurement noise.
+///
+/// # Important
+/// Some software, like ODTK, processes each measurement as a scalar. Nyx processes the measurements together.
+/// As such, if the prefit on range is bad, then the Doppler measurement with the same time stamp will also be rejected.
+/// This leads to better convergence of the filter, and more appropriate results.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass)]
 #[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
@@ -109,10 +113,10 @@ impl ResidRejectCrit {
 }
 
 impl Default for ResidRejectCrit {
-    /// By default, a prefit residual is rejected if it is greater the 5-sigma value of the measurement noise.
-    /// This corresponds to [1 chance in in 1,744,278](https://en.wikipedia.org/wiki/68%E2%80%9395%E2%80%9399.7_rule).
+    /// By default, a measurement is rejected if its prefit residual is greater the 4-sigma value of the measurement noise at that time step.
+    /// This corresponds to [1 chance in in 15,787](https://en.wikipedia.org/wiki/68%E2%80%9395%E2%80%9399.7_rule).
     fn default() -> Self {
-        Self { num_sigmas: 5.0 }
+        Self { num_sigmas: 4.0 }
     }
 }
 

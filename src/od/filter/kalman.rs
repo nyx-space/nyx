@@ -365,20 +365,8 @@ where
 
         if let Some(resid_reject) = resid_rejection {
             for ii in 0..M::USIZE {
-                let reject_value = r_k[(ii, ii)].sqrt() * 3.0;
-                if prefit[ii] > reject_value {
-                    let (msr_type, unit) = match ii {
-                        0 => ("range", "m"),
-                        1 => ("doppler", "m/s"),
-                        _ => ("unknown", ""),
-                    };
-                    warn!(
-                        "{msr_type} residual rejected @{epoch}: {:.3} {unit} > {reject_value:.3} {unit} ({:.3} + {}σ)",
-                        prefit[ii] * 1e3,
-                        r_k[(ii, ii)].sqrt() * 1e3,
-                        resid_reject.num_sigmas
-                    );
-                    // Perform only a time update and return
+                if prefit[ii].abs() > r_k[(ii, ii)].sqrt() * resid_reject.num_sigmas {
+                    // Reject this whole measurement and perform only a time update
                     let pred_est = self.time_update(nominal_state)?;
                     return Ok((
                         pred_est,
