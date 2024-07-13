@@ -61,7 +61,7 @@ impl StochasticNoise {
         bias: None,
     };
 
-    /// The minimum stochastic noise process with a zero mean white noise of 1e-9.
+    /// The minimum stochastic noise process with a zero mean white noise of 1e-6.
     pub const MIN: Self = Self {
         white_noise: Some(WhiteNoise {
             mean: 0.0,

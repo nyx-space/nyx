@@ -348,13 +348,7 @@ where
         let h_tilde_t = &self.h_tilde.transpose();
         let h_p_ht = &self.h_tilde * covar_bar * h_tilde_t;
         // Account for state uncertainty in the measurement noise. Equation 4.10 of ODTK MathSpec.
-        let r_k = &h_p_ht
-            + if measurement_noise.norm() > 0.0 {
-                measurement_noise
-            } else {
-                // Ensure that the measurement noise is never negative, or the Kalman gain is singular.
-                OMatrix::<f64, M, M>::from_diagonal_element(1e-9)
-            };
+        let r_k = &h_p_ht + measurement_noise;
 
         // Compute observation deviation (usually marked as y_i)
         let prefit = real_obs - computed_obs;
