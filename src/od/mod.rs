@@ -204,4 +204,6 @@ pub enum ODError {
         source: Box<AlmanacError>,
         action: &'static str,
     },
+    #[snafu(display("not enough residuals to {action}"))]
+    ODNoResiduals { action: &'static str },
 }
