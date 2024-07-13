@@ -150,10 +150,7 @@ impl Stochastics for GaussMarkov {
         let steady_noise = 0.5 * self.process_noise * self.tau.to_seconds() * anti_decay;
         let ss_sample = rng.sample(Normal::new(0.0, steady_noise).unwrap());
 
-        let bias = self.init_sample.unwrap() * decay + ss_sample;
-
-        // Return the new bias
-        bias
+        self.init_sample.unwrap() * decay + ss_sample
     }
 }
 

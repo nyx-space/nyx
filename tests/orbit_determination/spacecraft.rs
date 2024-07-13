@@ -25,27 +25,36 @@ fn almanac() -> Arc<Almanac> {
     test_almanac_arcd()
 }
 
-#[allow(clippy::identity_op)]
-#[rstest]
-fn od_val_sc_mb_srp_reals_duals_models(almanac: Arc<Almanac>) {
-    /*
-     * This tests that the state transition matrix computation is correct when multiple celestial gravities and solar radiation pressure
-     * are added to the model.
-     *
-     * Specifically, the same dynamics are used for both the measurement generation and for the estimation.
-     * However, only the estimation generation propagates the STM. When STM propagation is enabled, the code will compute
-     * the dynamics using a hyperdual representation in 9 dimensions: 1 for the reals, 3 for the position partials,
-     * 3 for the velocity partials, 1 for the Cr partials and 1 for the Cd partials.
-     *
-     * Hence, if the filter state estimation is any different from the truth data, then it means that the equations of
-     * motion computed in hyperdual space differ from the ones computes in the reals.
-     *
-     * Thereby, this serves as a validation of the spacecraft dynamics and SRP duals implementation.
-     **/
-    let _ = pretty_env_logger::try_init();
-
+#[fixture]
+fn sim_devices(almanac: Arc<Almanac>) -> Vec<GroundStation> {
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
-    // Define the ground stations.
+    let elevation_mask = 0.0;
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
+        iau_earth,
+    );
+    let dss13_goldstone = GroundStation::dss13_goldstone(
+        elevation_mask,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
+        iau_earth,
+    );
+
+    vec![dss65_madrid, dss34_canberra, dss13_goldstone]
+}
+
+/// Devices for processing the measurement, noise may not be zero.
+#[fixture]
+fn proc_devices(almanac: Arc<Almanac>) -> Vec<GroundStation> {
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
@@ -66,6 +75,32 @@ fn od_val_sc_mb_srp_reals_duals_models(almanac: Arc<Almanac>) {
         iau_earth,
     );
 
+    vec![dss65_madrid, dss34_canberra, dss13_goldstone]
+}
+
+#[allow(clippy::identity_op)]
+#[rstest]
+fn od_val_sc_mb_srp_reals_duals_models(
+    almanac: Arc<Almanac>,
+    sim_devices: Vec<GroundStation>,
+    proc_devices: Vec<GroundStation>,
+) {
+    /*
+     * This tests that the state transition matrix computation is correct when multiple celestial gravities and solar radiation pressure
+     * are added to the model.
+     *
+     * Specifically, the same dynamics are used for both the measurement generation and for the estimation.
+     * However, only the estimation generation propagates the STM. When STM propagation is enabled, the code will compute
+     * the dynamics using a hyperdual representation in 9 dimensions: 1 for the reals, 3 for the position partials,
+     * 3 for the velocity partials, 1 for the Cr partials and 1 for the Cd partials.
+     *
+     * Hence, if the filter state estimation is any different from the truth data, then it means that the equations of
+     * motion computed in hyperdual space differ from the ones computes in the reals.
+     *
+     * Thereby, this serves as a validation of the spacecraft dynamics and SRP duals implementation.
+     **/
+    let _ = pretty_env_logger::try_init();
+
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let prop_time = 1 * Unit::Day;
 
@@ -78,11 +113,11 @@ fn od_val_sc_mb_srp_reals_duals_models(almanac: Arc<Almanac>) {
         }])
         .build();
 
-    configs.insert(dss65_madrid.name.clone(), cfg.clone());
-    configs.insert(dss34_canberra.name.clone(), cfg.clone());
-    configs.insert(dss13_goldstone.name.clone(), cfg);
+    for device in &sim_devices {
+        configs.insert(device.name.clone(), cfg.clone());
+    }
 
-    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+    let all_stations = sim_devices;
 
     // Define the propagator information.
     let step_size = 10.0 * Unit::Second;
@@ -142,10 +177,11 @@ fn od_val_sc_mb_srp_reals_duals_models(almanac: Arc<Almanac>) {
         .unwrap();
 
     // Simulate tracking data
-    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 0).unwrap();
     arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    let mut arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    arc.set_devices(proc_devices, configs).unwrap();
 
     arc.to_parquet_simple(path.with_file_name("sc_msr_arc.parquet"))
         .unwrap();
