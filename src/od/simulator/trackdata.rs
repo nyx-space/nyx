@@ -25,7 +25,7 @@ use rand_pcg::Pcg64Mcg;
 
 use crate::io::ConfigRepr;
 use crate::linalg::allocator::Allocator;
-use crate::linalg::DefaultAllocator;
+use crate::linalg::{DefaultAllocator, OMatrix};
 use crate::md::prelude::{Frame, Traj};
 use crate::md::trajectory::Interpolatable;
 use crate::od::{Measurement, ODError};
@@ -39,6 +39,7 @@ where
     DefaultAllocator: Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, MsrIn::Size>
         + Allocator<f64, MsrIn::Size, MsrIn::Size>
+        + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
         + Allocator<f64, MsrIn::VecLength>,
 {
     /// Returns the name of this tracking data simulator
@@ -72,4 +73,10 @@ where
         rng: Option<&mut Pcg64Mcg>,
         almanac: Arc<Almanac>,
     ) -> Result<Option<Msr>, ODError>;
+
+    // Return the noise statistics of this tracking device at the requested epoch.
+    fn measurement_noise(
+        &mut self,
+        epoch: Epoch,
+    ) -> Result<OMatrix<f64, Msr::MeasurementSize, Msr::MeasurementSize>, ODError>;
 }

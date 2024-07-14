@@ -8,8 +8,7 @@ use nyx::dynamics::orbital::{OrbitalDynamics, PointMasses};
 use nyx::dynamics::sph_harmonics::Harmonics;
 use nyx::dynamics::SpacecraftDynamics;
 use nyx::io::gravity::*;
-use nyx::linalg::{Matrix2, SMatrix, SVector, Vector2};
-use nyx::od::noise::GaussMarkov;
+use nyx::linalg::{SMatrix, SVector};
 use nyx::od::prelude::*;
 use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use nyx::utils::rss_orbit_errors;
@@ -43,14 +42,14 @@ fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>) {
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
+        StochasticNoise::MIN,
+        StochasticNoise::MIN,
         iau_earth,
     );
     let dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
+        StochasticNoise::MIN,
+        StochasticNoise::MIN,
         iau_earth,
     );
 
@@ -129,12 +128,9 @@ fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>) {
     let initial_estimate = KfEstimate::from_covar(initial_state_dev.into(), init_covar);
     println!("Initial estimate:\n{}", initial_estimate);
 
-    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-
     let sigma_q = 1e-7_f64.powi(2);
     let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
-    let kf = KF::new(initial_estimate, process_noise, measurement_noise);
+    let kf = KF::new(initial_estimate, process_noise);
 
     let mut odp = ODProcess::ckf(prop_est, kf, None, almanac);
 
@@ -274,14 +270,14 @@ fn xhat_dev_test_ekf_multi_body(almanac: Arc<Almanac>) {
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
-        GaussMarkov::high_precision_range_km(),
-        GaussMarkov::high_precision_doppler_km_s(),
+        StochasticNoise::default_range_km(),
+        StochasticNoise::default_doppler_km_s(),
         iau_earth,
     );
     let dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
-        GaussMarkov::high_precision_range_km(),
-        GaussMarkov::high_precision_doppler_km_s(),
+        StochasticNoise::default_range_km(),
+        StochasticNoise::default_doppler_km_s(),
         iau_earth,
     );
 
@@ -358,12 +354,9 @@ fn xhat_dev_test_ekf_multi_body(almanac: Arc<Almanac>) {
     let initial_estimate = KfEstimate::from_covar(initial_state_dev.into(), init_covar);
     println!("Initial estimate:\n{}", initial_estimate);
 
-    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-
     let sigma_q = 1e-8_f64.powi(2);
     let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
-    let kf = KF::new(initial_estimate, process_noise, measurement_noise);
+    let kf = KF::new(initial_estimate, process_noise);
 
     let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
@@ -447,14 +440,14 @@ fn xhat_dev_test_ekf_harmonics(almanac: Arc<Almanac>) {
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
-        GaussMarkov::high_precision_range_km(),
-        GaussMarkov::high_precision_doppler_km_s(),
+        StochasticNoise::default_range_km(),
+        StochasticNoise::default_doppler_km_s(),
         iau_earth,
     );
     let dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
-        GaussMarkov::high_precision_range_km(),
-        GaussMarkov::high_precision_doppler_km_s(),
+        StochasticNoise::default_range_km(),
+        StochasticNoise::default_doppler_km_s(),
         iau_earth,
     );
 
@@ -541,12 +534,9 @@ fn xhat_dev_test_ekf_harmonics(almanac: Arc<Almanac>) {
     let initial_estimate = KfEstimate::from_covar(initial_state_dev.into(), init_covar);
     println!("Initial estimate:\n{}", initial_estimate);
 
-    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-5, 1e-2));
-
     let sigma_q = 1e-7_f64.powi(2);
     let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
-    let kf = KF::new(initial_estimate, process_noise, measurement_noise);
+    let kf = KF::new(initial_estimate, process_noise);
 
     let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
@@ -613,14 +603,14 @@ fn xhat_dev_test_ekf_realistic(almanac: Arc<Almanac>) {
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
-        GaussMarkov::high_precision_range_km(),
-        GaussMarkov::high_precision_doppler_km_s(),
+        StochasticNoise::default_range_km(),
+        StochasticNoise::default_doppler_km_s(),
         iau_earth,
     );
     let dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
-        GaussMarkov::high_precision_range_km(),
-        GaussMarkov::high_precision_doppler_km_s(),
+        StochasticNoise::default_range_km(),
+        StochasticNoise::default_doppler_km_s(),
         iau_earth,
     );
 
@@ -696,10 +686,7 @@ fn xhat_dev_test_ekf_realistic(almanac: Arc<Almanac>) {
     let initial_estimate = KfEstimate::from_covar(initial_state_dev.into(), init_covar);
     println!("Initial estimate:\n{}", initial_estimate);
 
-    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-
-    let kf = KF::no_snc(initial_estimate, measurement_noise);
+    let kf = KF::no_snc(initial_estimate);
 
     let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
@@ -769,14 +756,14 @@ fn xhat_dev_test_ckf_smoother_multi_body(almanac: Arc<Almanac>) {
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
-        GaussMarkov::high_precision_range_km(),
-        GaussMarkov::high_precision_doppler_km_s(),
+        StochasticNoise::default_range_km(),
+        StochasticNoise::default_doppler_km_s(),
         iau_earth,
     );
     let dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
-        GaussMarkov::high_precision_range_km(),
-        GaussMarkov::high_precision_doppler_km_s(),
+        StochasticNoise::default_range_km(),
+        StochasticNoise::default_doppler_km_s(),
         iau_earth,
     );
 
@@ -851,10 +838,7 @@ fn xhat_dev_test_ckf_smoother_multi_body(almanac: Arc<Almanac>) {
     let initial_estimate = KfEstimate::from_covar(initial_state_dev.into(), init_covar);
     println!("Initial estimate:\n{}", initial_estimate);
 
-    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-
-    let kf = KF::no_snc(initial_estimate, measurement_noise);
+    let kf = KF::no_snc(initial_estimate);
 
     let mut odp = ODProcess::ckf(prop_est, kf, None, almanac);
 
@@ -1042,14 +1026,14 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body(almanac: Arc<Almanac>) {
     let elevation_mask = 10.0;
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
-        GaussMarkov::high_precision_range_km(),
-        GaussMarkov::high_precision_doppler_km_s(),
+        StochasticNoise::default_range_km(),
+        StochasticNoise::default_doppler_km_s(),
         iau_earth,
     );
     let dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
-        GaussMarkov::high_precision_range_km(),
-        GaussMarkov::high_precision_doppler_km_s(),
+        StochasticNoise::default_range_km(),
+        StochasticNoise::default_doppler_km_s(),
         iau_earth,
     );
 
@@ -1129,12 +1113,9 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body(almanac: Arc<Almanac>) {
     let initial_estimate = KfEstimate::from_covar(initial_state_dev.into(), init_covar);
     println!("Initial estimate:\n{}", initial_estimate);
 
-    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-5, 1e-2));
-
     let sigma_q = 1e-8_f64.powi(2);
     let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
-    let kf = KF::new(initial_estimate, process_noise, measurement_noise);
+    let kf = KF::new(initial_estimate, process_noise);
 
     let mut odp = ODProcess::ekf(
         prop_est,
@@ -1316,14 +1297,14 @@ fn xhat_dev_test_ckf_iteration_multi_body(almanac: Arc<Almanac>) {
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
-        GaussMarkov::high_precision_range_km(),
-        GaussMarkov::high_precision_doppler_km_s(),
+        StochasticNoise::default_range_km(),
+        StochasticNoise::default_doppler_km_s(),
         iau_earth,
     );
     let dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
-        GaussMarkov::high_precision_range_km(),
-        GaussMarkov::high_precision_doppler_km_s(),
+        StochasticNoise::default_range_km(),
+        StochasticNoise::default_doppler_km_s(),
         iau_earth,
     );
 
@@ -1398,10 +1379,7 @@ fn xhat_dev_test_ckf_iteration_multi_body(almanac: Arc<Almanac>) {
     let initial_estimate = KfEstimate::from_covar(initial_state_dev.into(), init_covar);
     println!("Initial estimate:\n{}", initial_estimate);
 
-    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-
-    let kf = KF::no_snc(initial_estimate, measurement_noise);
+    let kf = KF::no_snc(initial_estimate);
 
     let mut odp = ODProcess::ckf(prop_est, kf, None, almanac);
 

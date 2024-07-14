@@ -26,7 +26,7 @@ use crate::od::estimate::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::State;
 use crate::{od::*, Spacecraft};
-use arrow::array::{Array, Float64Builder, StringBuilder};
+use arrow::array::{Array, BooleanBuilder, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 use filter::kalman::KF;
@@ -243,8 +243,17 @@ where
                     .with_name(format!("Postfit residual: {}", f.name())),
             );
         }
+        for f in Msr::fields() {
+            msr_fields.push(
+                f.clone()
+                    .with_nullable(true)
+                    .with_name(format!("Measurement noise: {}", f.name())),
+            );
+        }
 
         msr_fields.push(Field::new("Residual ratio", DataType::Float64, true));
+        msr_fields.push(Field::new("Residual Rejected", DataType::Boolean, true));
+        msr_fields.push(Field::new("Tracker", DataType::Utf8, true));
 
         hdrs.append(&mut msr_fields);
 
@@ -380,11 +389,50 @@ where
             }
             record.push(Arc::new(data.finish()));
         }
+        // Measurement noise
+        for i in 0..Msr::MeasurementSize::dim() {
+            let mut data = Float64Builder::new();
+            for resid_opt in &residuals {
+                if let Some(resid) = resid_opt {
+                    data.append_value(resid.tracker_msr_noise[i]);
+                } else {
+                    data.append_null();
+                }
+            }
+            record.push(Arc::new(data.finish()));
+        }
         // Residual ratio (unique entry regardless of the size)
         let mut data = Float64Builder::new();
         for resid_opt in &residuals {
             if let Some(resid) = resid_opt {
                 data.append_value(resid.ratio);
+            } else {
+                data.append_null();
+            }
+        }
+        record.push(Arc::new(data.finish()));
+
+        // Residual acceptance (unique entry regardless of the size)
+        let mut data = BooleanBuilder::new();
+        for resid_opt in &residuals {
+            if let Some(resid) = resid_opt {
+                data.append_value(resid.rejected);
+            } else {
+                data.append_null();
+            }
+        }
+        record.push(Arc::new(data.finish()));
+
+        // Residual tracker (unique entry regardless of the size)
+        let mut data = StringBuilder::new();
+        for resid_opt in &residuals {
+            if let Some(resid) = resid_opt {
+                data.append_value(
+                    resid
+                        .tracker
+                        .clone()
+                        .unwrap_or("Undefined tracker".to_string()),
+                );
             } else {
                 data.append_null();
             }

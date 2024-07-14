@@ -69,11 +69,13 @@ where
         + Allocator<f64, S::Size, <S::Size as DimMin<S::Size>>::Output>
         + Allocator<f64, <S::Size as DimMin<S::Size>>::Output, S::Size>
         + Allocator<f64, <S::Size as DimSub<Const<1>>>::Output>
-        + Allocator<f64, S::Size, <S::Size as DimSub<Const<1>>>::Output>,
+        + Allocator<f64, S::Size, <S::Size as DimSub<Const<1>>>::Output>
+        + Allocator<(f64, usize), <S::Size as DimMin<S::Size>>::Output>,
     <DefaultAllocator as Allocator<f64, S::VecLength>>::Buffer: Send,
     S::Size: DimMin<S::Size>,
     <S::Size as DimMin<S::Size>>::Output: DimSub<Const<1>>,
     S::Size: DimSub<Const<1>>,
+    DefaultAllocator: Allocator<(usize, usize), <S::Size as na::DimMin<S::Size>>::Output>,
 {
     /// Creates a new Monte Carlos state generator from a mean and covariance which must be of the same size as the state vector
     /// The covariance must be positive semi definite. The algorithm is the one from numpy
@@ -96,7 +98,7 @@ where
             }
         };
 
-        let svd = cov.svd_unordered(false, true);
+        let svd = cov.svd(false, true);
         if svd.v_t.is_none() {
             return Err(NyxError::CovarianceMatrixNotPsd);
         }
@@ -154,8 +156,10 @@ where
     <S::Size as DimMin<S::Size>>::Output: DimName,
 {
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> DispersedState<S> {
+        // TODO: Switch to nalgebra-mvm
         // Generate the vector representing the state
         let x_rng = OVector::<f64, S::Size>::from_fn(|_, _| self.std_norm_distr.sample(rng));
+        println!("{x_rng}\n{:.6}", self.sqrt_s_v);
         let x = self.sqrt_s_v.transpose() * x_rng + &self.mean;
         let mut state = self.template;
 

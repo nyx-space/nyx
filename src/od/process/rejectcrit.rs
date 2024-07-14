@@ -29,21 +29,23 @@ use pyo3::prelude::*;
 use pythonize::{depythonize, pythonize};
 use serde_derive::{Deserialize, Serialize};
 
-/// Reject measurements with a residual ratio greater than the provided sigmas values. Will only be turned used if at least min_accepted measurements have been processed so far.
-/// If unsure, use the default: `FltResid::default()` in Rust, and `FltResid()` in Python (i.e. construct without arguments).
+/// Reject measurements if the prefit is greater than the provided sigmas deviation from the measurement noise.
+///
+/// # Important
+/// Some software, like ODTK, processes each measurement as a scalar. Nyx processes the measurements together.
+/// As such, if the prefit on range is bad, then the Doppler measurement with the same time stamp will also be rejected.
+/// This leads to better convergence of the filter, and more appropriate results.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass)]
 #[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
-pub struct FltResid {
-    /// Minimum number of accepted measurements before applying the rejection criteria.
-    pub min_accepted: usize,
+pub struct ResidRejectCrit {
     /// Number of sigmas for a measurement to be considered an outlier.
     pub num_sigmas: f64,
 }
 
 #[cfg(feature = "python")]
 #[pymethods]
-impl FltResid {
+impl ResidRejectCrit {
     #[new]
     #[pyo3(text_signature = "(min_accepted=None, num_sigmas=None)")]
     fn py_new(min_accepted: Option<usize>, num_sigmas: Option<f64>) -> Self {
@@ -110,13 +112,12 @@ impl FltResid {
     }
 }
 
-impl Default for FltResid {
+impl Default for ResidRejectCrit {
+    /// By default, a measurement is rejected if its prefit residual is greater the 4-sigma value of the measurement noise at that time step.
+    /// This corresponds to [1 chance in in 15,787](https://en.wikipedia.org/wiki/68%E2%80%9395%E2%80%9399.7_rule).
     fn default() -> Self {
-        Self {
-            min_accepted: 10,
-            num_sigmas: 3.0,
-        }
+        Self { num_sigmas: 4.0 }
     }
 }
 
-impl ConfigRepr for FltResid {}
+impl ConfigRepr for ResidRejectCrit {}

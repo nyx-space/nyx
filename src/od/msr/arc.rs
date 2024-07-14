@@ -29,6 +29,7 @@ use crate::io::{ConfigError, ExportCfg};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName};
 use crate::md::trajectory::Interpolatable;
+use crate::od::prelude::TrkConfig;
 use crate::od::{Measurement, TrackingDeviceSim};
 use crate::State;
 use arrow::array::{Array, Float64Builder, StringBuilder};
@@ -55,7 +56,8 @@ where
 impl<Msr> Display for TrackingArc<Msr>
 where
     Msr: Measurement,
-    DefaultAllocator: Allocator<f64, Msr::MeasurementSize>,
+    DefaultAllocator: Allocator<f64, Msr::MeasurementSize>
+        + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -70,7 +72,8 @@ where
 impl<Msr> TrackingArc<Msr>
 where
     Msr: Measurement,
-    DefaultAllocator: Allocator<f64, Msr::MeasurementSize>,
+    DefaultAllocator: Allocator<f64, Msr::MeasurementSize>
+        + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>,
 {
     /// Store this tracking arc to a parquet file.
     pub fn to_parquet_simple<P: AsRef<Path> + Debug>(
@@ -271,5 +274,49 @@ where
             measurements,
             device_cfg: self.device_cfg.clone(),
         }
+    }
+
+    /// If this tracking arc has devices that can be used to generate simulated measurements,
+    /// then this function can be used to rebuild said measurement devices
+    pub fn set_devices<MsrIn, D>(
+        &mut self,
+        devices: Vec<D>,
+        configs: BTreeMap<String, TrkConfig>,
+    ) -> Result<(), Box<dyn Error>>
+    where
+        MsrIn: Interpolatable,
+        D: TrackingDeviceSim<MsrIn, Msr>,
+        DefaultAllocator: Allocator<f64, <MsrIn as State>::Size>
+            + Allocator<f64, <MsrIn as State>::Size, <MsrIn as State>::Size>
+            + Allocator<f64, <MsrIn as State>::VecLength>,
+    {
+        let mut devices_map = BTreeMap::new();
+        let mut sampling_rates_ns = Vec::with_capacity(devices.len());
+        for device in devices {
+            if let Some(cfg) = configs.get(&device.name()) {
+                if let Err(e) = cfg.sanity_check() {
+                    warn!("Ignoring device {}: {e}", device.name());
+                    continue;
+                }
+                sampling_rates_ns.push(cfg.sampling.truncated_nanoseconds());
+            } else {
+                warn!(
+                    "Ignoring device {}: no associated tracking configuration",
+                    device.name()
+                );
+                continue;
+            }
+            devices_map.insert(device.name(), device);
+        }
+
+        if devices_map.is_empty() {
+            return Err(Box::new(ConfigError::InvalidConfig {
+                msg: "None of the devices are properly configured".to_string(),
+            }));
+        }
+
+        self.device_cfg = serde_yaml::to_string(&devices_map).unwrap();
+
+        Ok(())
     }
 }

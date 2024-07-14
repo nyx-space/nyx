@@ -19,12 +19,12 @@
 use self::kalman::Residual;
 
 use super::estimate::Estimate;
+use super::process::ResidRejectCrit;
 use super::snc::SNC;
 use super::ODError;
 pub use crate::dynamics::Dynamics;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
-use crate::time::Epoch;
 pub use crate::{State, TimeTagged};
 pub mod kalman;
 
@@ -75,13 +75,15 @@ where
     /// * `nominal_state`: the nominal state at which the observation was computed.
     /// * `real_obs`: the real observation that was measured.
     /// * `computed_obs`: the computed observation from the nominal state.
-    /// * `resid_ratio_check`: the ratio below which the measurement is considered to be valid.
+    /// * `measurement_noise`: the measurement noise associated with this time update.
+    /// * `resid_rejection`: the automatic residual rejection criteria, if enabled.
     fn measurement_update(
         &mut self,
         nominal_state: T,
         real_obs: &OVector<f64, M>,
         computed_obs: &OVector<f64, M>,
-        resid_ratio_check: Option<f64>,
+        measurement_noise: OMatrix<f64, M, M>,
+        resid_rejection: Option<ResidRejectCrit>,
     ) -> Result<(Self::Estimate, Residual<M>), ODError>;
 
     /// Returns whether the filter is an extended filter (e.g. EKF)
@@ -92,7 +94,4 @@ where
 
     /// Sets the process noise matrix of the estimated state
     fn set_process_noise(&mut self, snc: SNC<A>);
-
-    /// Returns the measurement noise used at this given epoch
-    fn measurement_noise(&self, epoch: Epoch) -> &OMatrix<f64, M, M>;
 }

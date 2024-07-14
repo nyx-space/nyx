@@ -34,7 +34,7 @@ mod trigger;
 pub use trigger::EkfTrigger;
 mod rejectcrit;
 use self::msr::TrackingArc;
-pub use self::rejectcrit::FltResid;
+pub use self::rejectcrit::ResidRejectCrit;
 use std::collections::BTreeMap;
 use std::marker::PhantomData;
 use std::ops::Add;
@@ -83,7 +83,7 @@ pub struct ODProcess<
     pub residuals: Vec<Option<Residual<Msr::MeasurementSize>>>,
     pub ekf_trigger: Option<EkfTrigger>,
     /// Residual rejection criteria allows preventing bad measurements from affecting the estimation.
-    pub resid_crit: Option<FltResid>,
+    pub resid_crit: Option<ResidRejectCrit>,
     pub almanac: Arc<Almanac>,
     init_state: D::StateType,
     _marker: PhantomData<A>,
@@ -129,7 +129,7 @@ where
         prop: PropInstance<'a, D, E>,
         kf: K,
         ekf_trigger: Option<EkfTrigger>,
-        resid_crit: Option<FltResid>,
+        resid_crit: Option<ResidRejectCrit>,
         almanac: Arc<Almanac>,
     ) -> Self {
         let init_state = prop.state;
@@ -151,7 +151,7 @@ where
         prop: PropInstance<'a, D, E>,
         kf: K,
         trigger: EkfTrigger,
-        resid_crit: Option<FltResid>,
+        resid_crit: Option<ResidRejectCrit>,
         almanac: Arc<Almanac>,
     ) -> Self {
         let init_state = prop.state;
@@ -506,7 +506,7 @@ where
         // We'll build a trajectory of the estimated states. This will be used to compute the measurements.
         let mut traj: Traj<S> = Traj::new();
 
-        let mut msr_accepted_cnt = 0;
+        let mut msr_accepted_cnt: usize = 0;
 
         for (msr_cnt, (device_name, msr)) in measurements.iter().enumerate() {
             let next_msr_epoch = msr.epoch();
@@ -581,19 +581,17 @@ where
 
                                 self.kf.update_h_tilde(h_tilde);
 
-                                let resid_ratio_check = self
-                                    .resid_crit
-                                    .filter(|flt| msr_accepted_cnt >= flt.min_accepted)
-                                    .map(|flt| flt.num_sigmas);
-
                                 match self.kf.measurement_update(
                                     nominal_state,
                                     &msr.observation(),
                                     &computed_meas.observation(),
-                                    resid_ratio_check,
+                                    device.measurement_noise(epoch)?,
+                                    self.resid_crit,
                                 ) {
-                                    Ok((estimate, residual)) => {
+                                    Ok((estimate, mut residual)) => {
                                         debug!("processed msr #{msr_cnt} @ {epoch}");
+
+                                        residual.tracker = Some(device.name());
 
                                         if !residual.rejected {
                                             msr_accepted_cnt += 1;
@@ -639,10 +637,16 @@ where
 
                     let msr_prct = (10.0 * (msr_cnt as f64) / (num_msrs as f64)) as usize;
                     if !reported[msr_prct] {
-                        info!(
+                        let num_rejected = msr_cnt - msr_accepted_cnt.saturating_sub(1);
+                        let msg = format!(
                             "{:>3}% done ({msr_accepted_cnt:.0} measurements accepted, {:.0} rejected)",
-                            10 * msr_prct, msr_cnt - msr_accepted_cnt.saturating_sub(1)
+                            10 * msr_prct, num_rejected
                         );
+                        if msr_accepted_cnt < num_rejected {
+                            warn!("{msg}");
+                        } else {
+                            info!("{msg}");
+                        }
                         reported[msr_prct] = true;
                     }
 
@@ -782,7 +786,7 @@ where
     pub fn ckf(
         prop: PropInstance<'a, D, E>,
         kf: K,
-        resid_crit: Option<FltResid>,
+        resid_crit: Option<ResidRejectCrit>,
         almanac: Arc<Almanac>,
     ) -> Self {
         let init_state = prop.state;

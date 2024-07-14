@@ -36,8 +36,12 @@ where
     pub postfit: OVector<f64, M>,
     /// The prefit residual ratio, i.e. `r' * (H*P*H')^-1 * r`, where `r` is the prefit residual, `H` is the sensitivity matrix, and `P` is the covariance matrix.
     pub ratio: f64,
+    /// The tracker measurement noise (variance)) for this tracker at this time.
+    pub tracker_msr_noise: OVector<f64, M>,
     /// Whether or not this was rejected
     pub rejected: bool,
+    /// Name of the tracker that caused this residual
+    pub tracker: Option<String>,
 }
 
 impl<M> Residual<M>
@@ -51,34 +55,46 @@ where
             epoch: Epoch::from_tai_seconds(0.0),
             prefit: OVector::<f64, M>::zeros(),
             postfit: OVector::<f64, M>::zeros(),
+            tracker_msr_noise: OVector::<f64, M>::zeros(),
             ratio: 0.0,
             rejected: true,
+            tracker: None,
         }
     }
 
     /// Flags a Residual as rejected.
-    pub fn rejected(epoch: Epoch, prefit: OVector<f64, M>, ratio: f64) -> Self {
+    pub fn rejected(
+        epoch: Epoch,
+        prefit: OVector<f64, M>,
+        ratio: f64,
+        tracker_msr_noise: OVector<f64, M>,
+    ) -> Self {
         Self {
             epoch,
             prefit,
             postfit: OVector::<f64, M>::zeros(),
             ratio,
+            tracker_msr_noise,
             rejected: true,
+            tracker: None,
         }
     }
 
-    pub fn new(
+    pub fn accepted(
         epoch: Epoch,
         prefit: OVector<f64, M>,
         postfit: OVector<f64, M>,
         ratio: f64,
+        tracker_msr_noise: OVector<f64, M>,
     ) -> Self {
         Self {
             epoch,
             prefit,
             postfit,
             ratio,
+            tracker_msr_noise,
             rejected: false,
+            tracker: None,
         }
     }
 }
@@ -89,7 +105,15 @@ where
     DefaultAllocator: Allocator<f64, M> + Allocator<usize, M>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Prefit {} Postfit {}", &self.prefit, &self.postfit)
+        write!(
+            f,
+            "Residual from {} at {}: ratio = {:.3}\nPrefit {} Postfit {}",
+            self.tracker.as_ref().unwrap_or(&"Unknown".to_string()),
+            self.epoch,
+            self.ratio,
+            &self.prefit,
+            &self.postfit
+        )
     }
 }
 

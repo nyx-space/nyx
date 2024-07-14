@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 import plotly.express as px
+import plotly.graph_objects as go
 
 from .utils import finalize_plot
 
@@ -29,6 +30,7 @@ def plot_gauss_markov(df, title="Gauss Markov Process", tau=None):
     # Grab the column
     try:
         col_name = [col for col in df.columns if "Bias" in col][0]
+        variance_name = [col for col in df.columns if "Variance" in col][0]
     except IndexError:
         raise ValueError("No bias column found in the provided data frame")
 
@@ -41,8 +43,6 @@ def plot_gauss_markov(df, title="Gauss Markov Process", tau=None):
         marginal_y="rug",
     )
 
-    # TODO: Consider adding the autocorrelation data for clarity
-
     if tau:
         fig.add_vline(
             x=tau,
@@ -53,6 +53,26 @@ def plot_gauss_markov(df, title="Gauss Markov Process", tau=None):
             col=1,
         )
 
-    finalize_plot(fig, title=title)
+    for run in df["Run"].unique():
+        this_df = df[df["Run"] == run]
+        fig.add_trace(
+            go.Scatter(
+                x=this_df["Delta Time (s)"],
+                y=this_df[variance_name],
+                mode='lines',
+                name=f'Variance for {run}'
+            )
+        )
+
+
+    # fig = px.line(
+    #     df,
+    #     x="Delta Time (s)",
+    #     y=variance_name,
+    #     color="Run",
+    #     opacity=0.5,
+    # )
+
+    # finalize_plot(fig, title=title)
 
     fig.show()

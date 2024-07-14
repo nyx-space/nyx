@@ -8,8 +8,7 @@ use nyx::dynamics::sph_harmonics::Harmonics;
 use nyx::dynamics::SpacecraftDynamics;
 use nyx::io::ConfigRepr;
 use nyx::io::{gravity::*, ExportCfg};
-use nyx::linalg::{Matrix2, SMatrix, SVector, Vector2};
-use nyx::od::noise::GaussMarkov;
+use nyx::linalg::{SMatrix, SVector};
 use nyx::od::prelude::*;
 use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use nyx::Spacecraft;
@@ -27,36 +26,72 @@ fn almanac() -> Arc<Almanac> {
     test_almanac_arcd()
 }
 
+#[fixture]
+fn sim_devices(almanac: Arc<Almanac>) -> Vec<GroundStation> {
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
+    let elevation_mask = 0.0;
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
+        iau_earth,
+    );
+    let dss13_goldstone = GroundStation::dss13_goldstone(
+        elevation_mask,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
+        iau_earth,
+    );
+
+    vec![dss65_madrid, dss34_canberra, dss13_goldstone]
+}
+
+/// Devices for processing the measurement, noise may not be zero.
+#[fixture]
+fn proc_devices(almanac: Arc<Almanac>) -> Vec<GroundStation> {
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
+    let elevation_mask = 0.0;
+    let dss65_madrid = GroundStation::dss65_madrid(
+        elevation_mask,
+        StochasticNoise::MIN,
+        StochasticNoise::MIN,
+        iau_earth,
+    );
+    let dss34_canberra = GroundStation::dss34_canberra(
+        elevation_mask,
+        StochasticNoise::MIN,
+        StochasticNoise::MIN,
+        iau_earth,
+    );
+    let dss13_goldstone = GroundStation::dss13_goldstone(
+        elevation_mask,
+        StochasticNoise::MIN,
+        StochasticNoise::MIN,
+        iau_earth,
+    );
+
+    vec![dss65_madrid, dss34_canberra, dss13_goldstone]
+}
+
 #[allow(clippy::identity_op)]
 #[rstest]
-fn od_tb_val_ekf_fixed_step_perfect_stations(almanac: Arc<Almanac>) {
+fn od_tb_val_ekf_fixed_step_perfect_stations(
+    almanac: Arc<Almanac>,
+    sim_devices: Vec<GroundStation>,
+    proc_devices: Vec<GroundStation>,
+) {
     let _ = pretty_env_logger::try_init();
-
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     // Define the ground stations.
     let ekf_num_meas = 100;
     // Set the disable time to be very low to test enable/disable sequence
     let ekf_disable_time = 5.0 * Unit::Second;
-    let elevation_mask = 0.0;
-    let dss65_madrid = GroundStation::dss65_madrid(
-        elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
-        iau_earth,
-    );
-    let dss34_canberra = GroundStation::dss34_canberra(
-        elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
-        iau_earth,
-    );
-    let dss13_goldstone = GroundStation::dss13_goldstone(
-        elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
-        iau_earth,
-    );
 
     // Load the tracking configurations
     let mut configs = BTreeMap::new();
@@ -72,11 +107,11 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(almanac: Arc<Almanac>) {
 
     let cfg = TrkConfig::load(trkconfig_yaml).unwrap();
 
-    configs.insert(dss65_madrid.name.clone(), cfg.clone());
-    configs.insert(dss34_canberra.name.clone(), cfg.clone());
-    configs.insert(dss13_goldstone.name.clone(), cfg);
+    for device in &sim_devices {
+        configs.insert(device.name.clone(), cfg.clone());
+    }
 
-    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+    let all_stations = sim_devices;
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -94,14 +129,14 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(almanac: Arc<Almanac>) {
 
     let mut prop = setup.with(initial_state.into(), almanac.clone());
     let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
+    println!("{}", final_truth);
 
     // Simulate tracking data
-    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 0).unwrap();
     arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
-
-    println!("{}", final_truth);
+    let mut arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    arc.set_devices(proc_devices, configs).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -125,10 +160,7 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(almanac: Arc<Almanac>) {
     let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
     println!("initial estimate:\n{}", initial_estimate);
 
-    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-
-    let kf = KF::no_snc(initial_estimate, measurement_noise);
+    let kf = KF::no_snc(initial_estimate);
 
     let mut odp = ODProcess::ekf(
         prop_est,
@@ -186,34 +218,18 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(almanac: Arc<Almanac>) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn od_tb_val_with_arc(almanac: Arc<Almanac>) {
+fn od_tb_val_with_arc(
+    almanac: Arc<Almanac>,
+    sim_devices: Vec<GroundStation>,
+    proc_devices: Vec<GroundStation>,
+) {
     let _ = pretty_env_logger::try_init();
-
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     // Define the ground stations.
     // Set the disable time to be very low to test enable/disable sequence
     let ekf_disable_time = 5.0 * Unit::Second;
-    let elevation_mask = 0.0;
-    let dss65_madrid = GroundStation::dss65_madrid(
-        elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
-        iau_earth,
-    );
-    let dss34_canberra = GroundStation::dss34_canberra(
-        elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
-        iau_earth,
-    );
-    let dss13_goldstone = GroundStation::dss13_goldstone(
-        elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
-        iau_earth,
-    );
-    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+
+    let all_stations = sim_devices;
 
     let ekf_num_meas = 100;
 
@@ -259,10 +275,11 @@ fn od_tb_val_with_arc(almanac: Arc<Almanac>) {
     let configs: BTreeMap<String, TrkConfig> = TrkConfig::load_named(trkconfig_yaml).unwrap();
 
     // Simulate tracking data of range and range rate
-    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 1).unwrap();
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 1).unwrap();
     arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    let mut arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    arc.set_devices(proc_devices, configs).unwrap();
 
     // And serialize to disk
     let path: PathBuf = [
@@ -297,16 +314,13 @@ fn od_tb_val_with_arc(almanac: Arc<Almanac>) {
     let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
     println!("initial estimate:\n{}", initial_estimate);
 
-    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-
-    let kf = KF::no_snc(initial_estimate, measurement_noise);
+    let kf = KF::no_snc(initial_estimate);
 
     let mut odp = ODProcess::ekf(
         prop_est,
         kf,
         EkfTrigger::new(ekf_num_meas, ekf_disable_time),
-        Some(FltResid::default()),
+        Some(ResidRejectCrit::default()),
         almanac,
     );
 
@@ -358,7 +372,11 @@ fn od_tb_val_with_arc(almanac: Arc<Almanac>) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn od_tb_val_ckf_fixed_step_perfect_stations(almanac: Arc<Almanac>) {
+fn od_tb_val_ckf_fixed_step_perfect_stations(
+    almanac: Arc<Almanac>,
+    sim_devices: Vec<GroundStation>,
+    proc_devices: Vec<GroundStation>,
+) {
     /*
      * This tests that the state transition matrix computation is correct with two body dynamics.
      *
@@ -374,29 +392,6 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(almanac: Arc<Almanac>) {
      **/
     let _ = pretty_env_logger::try_init();
 
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
-
-    // Define the ground stations.
-    let elevation_mask = 0.0;
-    let dss65_madrid = GroundStation::dss65_madrid(
-        elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
-        iau_earth,
-    );
-    let dss34_canberra = GroundStation::dss34_canberra(
-        elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
-        iau_earth,
-    );
-    let dss13_goldstone = GroundStation::dss13_goldstone(
-        elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
-        iau_earth,
-    );
-
     // Define the tracking configurations
     let cfg = TrkConfig::builder()
         .sampling(10.seconds())
@@ -404,11 +399,11 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(almanac: Arc<Almanac>) {
         .build();
 
     let mut configs = BTreeMap::new();
-    configs.insert(dss65_madrid.name.clone(), cfg.clone());
-    configs.insert(dss34_canberra.name.clone(), cfg.clone());
-    configs.insert(dss13_goldstone.name.clone(), cfg);
+    for device in &sim_devices {
+        configs.insert(device.name.clone(), cfg.clone());
+    }
 
-    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+    let all_stations = sim_devices;
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -429,10 +424,11 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(almanac: Arc<Almanac>) {
     let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
     // Simulate tracking data
-    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 0).unwrap();
     arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    let mut arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    arc.set_devices(proc_devices, configs).unwrap();
 
     // And serialize to disk
     let path: PathBuf = [
@@ -468,10 +464,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(almanac: Arc<Almanac>) {
     // Define the initial orbit estimate
     let initial_estimate = KfEstimate::from_covar(initial_state_est, init_covar);
 
-    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-
-    let ckf = KF::no_snc(initial_estimate, measurement_noise);
+    let ckf = KF::no_snc(initial_estimate);
 
     let mut odp = ODProcess::ckf(prop_est, ckf, None, almanac);
 
@@ -602,43 +595,26 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(almanac: Arc<Almanac>) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn od_tb_ckf_fixed_step_iteration_test(almanac: Arc<Almanac>) {
+fn od_tb_ckf_fixed_step_iteration_test(
+    almanac: Arc<Almanac>,
+    sim_devices: Vec<GroundStation>,
+    proc_devices: Vec<GroundStation>,
+) {
     let _ = pretty_env_logger::try_init();
 
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
-
     // Define the ground stations.
-    let elevation_mask = 0.0;
     let range_noise = 0.1; // in km (so 100 meters of error)
     let range_rate_noise = 0.001; // in km/s (or 1 meter per second of error)
-    let dss65_madrid = GroundStation::dss65_madrid(
-        elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
-        iau_earth,
-    );
-    let dss34_canberra = GroundStation::dss34_canberra(
-        elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
-        iau_earth,
-    );
-    let dss13_goldstone = GroundStation::dss13_goldstone(
-        elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
-        iau_earth,
-    );
 
     // Define the tracking configurations
     let cfg = TrkConfig::from_sample_rate(10.seconds());
 
     let mut configs = BTreeMap::new();
-    configs.insert(dss65_madrid.name.clone(), cfg.clone());
-    configs.insert(dss34_canberra.name.clone(), cfg.clone());
-    configs.insert(dss13_goldstone.name.clone(), cfg);
+    for device in &sim_devices {
+        configs.insert(device.name.clone(), cfg.clone());
+    }
 
-    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+    let all_stations = sim_devices;
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -657,10 +633,11 @@ fn od_tb_ckf_fixed_step_iteration_test(almanac: Arc<Almanac>) {
     let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
     // Simulate tracking data
-    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 0).unwrap();
     arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    let mut arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    arc.set_devices(proc_devices, configs).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -686,10 +663,7 @@ fn od_tb_ckf_fixed_step_iteration_test(almanac: Arc<Almanac>) {
     initial_state2.radius_km.z += 0.05;
     let initial_estimate = KfEstimate::from_covar(initial_state2.into(), init_covar);
 
-    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-
-    let ckf = KF::no_snc(initial_estimate, measurement_noise);
+    let ckf = KF::no_snc(initial_estimate);
 
     let mut odp = ODProcess::ckf(prop_est, ckf, None, almanac);
 
@@ -762,41 +736,22 @@ fn od_tb_ckf_fixed_step_iteration_test(almanac: Arc<Almanac>) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map(almanac: Arc<Almanac>) {
+fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map(
+    almanac: Arc<Almanac>,
+    sim_devices: Vec<GroundStation>,
+    proc_devices: Vec<GroundStation>,
+) {
     // Tests state noise compensation with covariance mapping
     let _ = pretty_env_logger::try_init();
-
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
-
-    // Define the ground stations.
-    let elevation_mask = 0.0;
-    let dss65_madrid = GroundStation::dss65_madrid(
-        elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
-        iau_earth,
-    );
-    let dss34_canberra = GroundStation::dss34_canberra(
-        elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
-        iau_earth,
-    );
-    let dss13_goldstone = GroundStation::dss13_goldstone(
-        elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
-        iau_earth,
-    );
 
     // Define the tracking configurations
     let mut configs = BTreeMap::new();
     let cfg = TrkConfig::from_sample_rate(10.seconds());
-    configs.insert(dss65_madrid.name.clone(), cfg.clone());
-    configs.insert(dss34_canberra.name.clone(), cfg.clone());
-    configs.insert(dss13_goldstone.name.clone(), cfg);
+    for device in &sim_devices {
+        configs.insert(device.name.clone(), cfg.clone());
+    }
 
-    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+    let all_stations = sim_devices;
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -815,10 +770,11 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map(almanac: Arc<Almanac>) {
     let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
     // Simulate tracking data
-    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 0).unwrap();
     arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    let mut arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    arc.set_devices(proc_devices, configs).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -843,14 +799,11 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map(almanac: Arc<Almanac>) {
     // Define the initial estimate
     let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
 
-    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-
     // Define the process noise to assume an unmodeled acceleration of 1e-3 km^2/s^2 on X, Y and Z in the ECI frame
     let sigma_q = 1e-8_f64.powi(2);
     let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
 
-    let ckf = KF::new(initial_estimate, process_noise, measurement_noise);
+    let ckf = KF::new(initial_estimate, process_noise);
 
     let mut odp = ODProcess::ckf(prop_est, ckf, None, almanac);
 
@@ -939,8 +892,7 @@ fn od_tb_ckf_map_covar(almanac: Arc<Almanac>) {
 
     let initial_estimate = KfEstimate::from_covar(Spacecraft::from(initial_state), init_covar);
 
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-    let ckf = KF::no_snc(initial_estimate, measurement_noise);
+    let ckf = KF::no_snc(initial_estimate);
 
     let mut odp: SpacecraftODProcess = ODProcess::ckf(prop_est, ckf, None, almanac);
 
@@ -974,41 +926,22 @@ fn od_tb_ckf_map_covar(almanac: Arc<Almanac>) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn od_tb_val_harmonics_ckf_fixed_step_perfect(almanac: Arc<Almanac>) {
+fn od_tb_val_harmonics_ckf_fixed_step_perfect(
+    almanac: Arc<Almanac>,
+    sim_devices: Vec<GroundStation>,
+    proc_devices: Vec<GroundStation>,
+) {
     // Tests state noise compensation with covariance mapping
     let _ = pretty_env_logger::try_init();
-
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
-
-    // Define the ground stations.
-    let elevation_mask = 0.0;
-    let dss65_madrid = GroundStation::dss65_madrid(
-        elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
-        iau_earth,
-    );
-    let dss34_canberra = GroundStation::dss34_canberra(
-        elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
-        iau_earth,
-    );
-    let dss13_goldstone = GroundStation::dss13_goldstone(
-        elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
-        iau_earth,
-    );
 
     // Define the tracking configurations
     let mut configs = BTreeMap::new();
     let cfg = TrkConfig::from_sample_rate(10.seconds());
-    configs.insert(dss65_madrid.name.clone(), cfg.clone());
-    configs.insert(dss34_canberra.name.clone(), cfg.clone());
-    configs.insert(dss13_goldstone.name.clone(), cfg);
+    for device in &sim_devices {
+        configs.insert(device.name.clone(), cfg.clone());
+    }
 
-    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+    let all_stations = sim_devices;
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -1030,10 +963,11 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect(almanac: Arc<Almanac>) {
     let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
     // Simulate tracking data
-    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 0).unwrap();
     arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    let mut arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    arc.set_devices(proc_devices, configs).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -1058,10 +992,7 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect(almanac: Arc<Almanac>) {
     // Define the initial estimate
     let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
 
-    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-
-    let ckf = KF::no_snc(initial_estimate, measurement_noise);
+    let ckf = KF::no_snc(initial_estimate);
 
     let mut odp = ODProcess::ckf(prop_est, ckf, None, almanac);
 
@@ -1103,41 +1034,22 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect(almanac: Arc<Almanac>) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map(almanac: Arc<Almanac>) {
+fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map(
+    almanac: Arc<Almanac>,
+    sim_devices: Vec<GroundStation>,
+    proc_devices: Vec<GroundStation>,
+) {
     // Tests state noise compensation with covariance mapping
     let _ = pretty_env_logger::try_init();
-
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
-
-    // Define the ground stations.
-    let elevation_mask = 0.0;
-    let dss65_madrid = GroundStation::dss65_madrid(
-        elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
-        iau_earth,
-    );
-    let dss34_canberra = GroundStation::dss34_canberra(
-        elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
-        iau_earth,
-    );
-    let dss13_goldstone = GroundStation::dss13_goldstone(
-        elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
-        iau_earth,
-    );
 
     // Define the tracking configurations
     let mut configs = BTreeMap::new();
     let cfg = TrkConfig::from_sample_rate(10.seconds());
-    configs.insert(dss65_madrid.name.clone(), cfg.clone());
-    configs.insert(dss34_canberra.name.clone(), cfg.clone());
-    configs.insert(dss13_goldstone.name.clone(), cfg);
+    for device in &sim_devices {
+        configs.insert(device.name.clone(), cfg.clone());
+    }
 
-    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+    let all_stations = sim_devices;
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -1155,10 +1067,11 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map(almanac: Arc<Alma
     let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
     // Simulate tracking data
-    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 0).unwrap();
     arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    let mut arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    arc.set_devices(proc_devices, configs).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -1183,9 +1096,6 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map(almanac: Arc<Alma
     // Define the initial estimate
     let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
 
-    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-
     // Define the process noise to assume an unmodeled acceleration of 1e-3 km^2/s^2 on X, Y and Z in the ECI frame
     let sigma_q1 = 1e-7_f64.powi(2);
     let process_noise1 = SNC3::from_diagonal(2 * Unit::Day, &[sigma_q1, sigma_q1, sigma_q1]);
@@ -1199,11 +1109,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map(almanac: Arc<Alma
     );
     process_noise2.start_time = Some(dt + 36_000.0); // Start the second process noise 10 hours into the tracking pass
 
-    let ckf = KF::with_sncs(
-        initial_estimate,
-        vec![process_noise1, process_noise2],
-        measurement_noise,
-    );
+    let ckf = KF::with_sncs(initial_estimate, vec![process_noise1, process_noise2]);
 
     let mut odp = ODProcess::ckf(prop_est, ckf, None, almanac);
 

@@ -5,7 +5,6 @@ use anise::constants::frames::IAU_EARTH_FRAME;
 use anise::constants::usual_planetary_constants::MEAN_EARTH_ANGULAR_VELOCITY_DEG_S;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::SpacecraftDynamics;
-use nyx::od::noise::GaussMarkov;
 use nyx::od::prelude::*;
 use nyx::time::Epoch;
 use nyx::{dynamics::OrbitalDynamics, propagators::Propagator};
@@ -42,8 +41,8 @@ fn nil_measurement(almanac: Arc<Almanac>) {
         frame: eme2k,
         elevation_mask_deg: 0.0,
         timestamp_noise_s: None,
-        range_noise_km: Some(GaussMarkov::ZERO),
-        doppler_noise_km_s: Some(GaussMarkov::ZERO),
+        range_noise_km: Some(StochasticNoise::MIN),
+        doppler_noise_km_s: Some(StochasticNoise::MIN),
         integration_time: None,
         light_time_correction: false,
     };
@@ -110,8 +109,8 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
     let elevation_mask = 7.0; // in degrees
     let mut dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
-        GaussMarkov::ZERO,
-        GaussMarkov::ZERO,
+        StochasticNoise::MIN,
+        StochasticNoise::MIN,
         iau_earth,
     );
 
