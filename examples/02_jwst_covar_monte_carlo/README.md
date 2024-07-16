@@ -47,12 +47,12 @@ INFO  anise::almanac                     > Loading almanac from /home/crabotin/.
 INFO  anise::almanac                     > Loading as DAF/PCK
 INFO  anise::almanac                     > Loading almanac from /home/crabotin/.local/share/nyx-space/anise/jwst_rec.bsp
 INFO  anise::almanac                     > Loading as DAF/SPK
-JWST defined from 2024-03-30T22:40:09.185653761 ET to 2024-06-24T00:01:09.184303103 ET
-[Earth J2000] 2024-06-24T00:01:09.184303103 ET	sma = 881064.546158 km	ecc = 0.989962	inc = 42.614418 deg	raan = 37.843422 deg	aop = 62.970831 deg	ta = 180.020951 deg
-total mass = 6200.000 kg @  [Earth J2000] 2024-06-24T00:01:09.184303103 ET	position = [76518.064167, -1396268.919369, -1057612.565026] km	velocity = [0.043331, 0.014876, -0.013649] km/s  Coast
-RIC  Σ_x = 0.5 km  Σ_y = 0.3 km  Σ_z = 1.5 km
-RIC  Σ_vx = 0.0001 km/s  Σ_vy = 0.0006 km/s  Σ_vz = 0.003 km/s
-Σ_cr = 0  Σ_cd = 0  Σ_mass = 0 kg
+JWST defined from 2024-04-13T22:40:09.185630849 ET to 2024-07-08T00:01:09.183912447 ET
+[Earth J2000] 2024-07-08T00:01:09.183912447 ET	sma = 876856.027357 km	ecc = 0.985029	inc = 52.340344 deg	raan = 310.126394 deg	aop = 130.798599 deg	ta = 180.103906 deg
+total mass = 6200.000 kg @  [Earth J2000] 2024-07-08T00:01:09.183912447 ET	position = [119901.070276, -1389299.665421, -1041369.150539] km	velocity = [0.045956, -0.013168, 0.034535] km/s  Coast
+RIC  σ_x = 0.5 km  σ_y = 0.3 km  σ_z = 1.5 km
+RIC  σ_vx = 0.0001 km/s  σ_vy = 0.0006 km/s  σ_vz = 0.003 km/s
+σ_cr = 0  σ_cd = 0  σ_mass = 0 kg
 
 INFO  nyx_space::od::process             > Mapping covariance for 6 days 12 h with 1 min step
 INFO  nyx_space::od::process::export     > Exporting orbit determination result to parquet file...
@@ -65,9 +65,11 @@ INFO  nyx_space::mc::results             > Evaluating 2 event(s)
 INFO  nyx_space::mc::results             > Trajectory written to 02_jwst_monte_carlo.parquet in 41 s 603 ms 696 μs 128 ns
 ```
 
+We then run `╰─(.venv) ⠠⠵ ipython examples/02_jwst_covar_monte_carlo/plotting.py` from the virtual environment, whose requirements are in the [requirements.txt](./requirements.txt)
+
 ## Analysis
 
-Overall, we can confirm that the 3-sigma covariance is a good approximation of the uncertainty. Notably, however, there are some dispersed trajectories whose Keplerian orbital elements are outside of the 3-sigma bound. This is probably due to the fact that Keplerian orbital elements are defined for orbits where there is a central body, but the James Webb Space Telescope is in a three body orbit, since it's near a Lagrange point.
+Overall, we can confirm that the 3-sigma covariance is a good approximation of the uncertainty. Notably, all of the dispersed trajectories fit (nearly) within the 3-σ bounds in the state space and in the Keplerian orbital element space. The rotation from the Keplerioan orbital element space into the Cartesian space is done by building the Jacobian from the desired Keplerian elements into the Cartesian space using hyperdual numbers (also called "automatic differentiation" in the machine learning world). This ensure that we don't lose any precision in the state space change, and that's shown to be the case in these plots.
 
 ### State uncertainties
 
@@ -82,6 +84,12 @@ As expected from any orbit determination software, Nyx can output uncertainties 
 ![JWST MC Y (km)](./plots/jwst_mc_Y_km.png)
 
 ![JWST MC Z (km)](./plots/jwst_mc_Z_km.png)
+
+![JWST MC VX (km/s)](./plots/jwst_mc_VX_km_s.png)
+
+![JWST MC VY (km/s)](./plots/jwst_mc_VY_km_s.png)
+
+![JWST MC VZ (km/s)](./plots/jwst_mc_VZ_km_s.png)
 
 ### Keplerian uncertainties
 

@@ -210,11 +210,11 @@ impl MultivariateNormal {
             return Err(Box::new(NyxError::CovarianceMatrixNotPsd));
         }
 
-        let sqrt_s = svd.singular_values.map(|x| x.sqrt());
-        let mut sqrt_s_v_t = svd.v_t.unwrap();
-
-        for (i, mut col) in sqrt_s_v_t.column_iter_mut().enumerate() {
-            col *= sqrt_s[i];
+        let s = svd.singular_values;
+        // Item by item multiplication
+        let mut sqrt_s_v = svd.v_t.unwrap().transpose();
+        for (i, mut col) in sqrt_s_v.column_iter_mut().enumerate() {
+            col *= s[i].sqrt();
         }
 
         let dispersions = vec![
@@ -260,7 +260,7 @@ impl MultivariateNormal {
             template,
             dispersions,
             mean,
-            sqrt_s_v: sqrt_s_v_t.transpose(),
+            sqrt_s_v,
             std_norm_distr: Normal::new(0.0, 1.0).unwrap(),
         })
     }
@@ -270,7 +270,7 @@ impl Distribution<DispersedState<Spacecraft>> for MultivariateNormal {
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> DispersedState<Spacecraft> {
         // Generate the vector representing the state
         let x_rng = SVector::<f64, 9>::from_fn(|_, _| self.std_norm_distr.sample(rng));
-        let x = self.sqrt_s_v.transpose() * x_rng + self.mean;
+        let x = self.sqrt_s_v * x_rng + self.mean;
         let mut state = self.template;
 
         let mut actual_dispersions = Vec::new();
