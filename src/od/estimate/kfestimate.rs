@@ -20,7 +20,7 @@ use super::{Estimate, State};
 use crate::cosmic::AstroError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, Matrix, OMatrix, OVector};
-use crate::mc::{GaussianGenerator, MultivariateNormal};
+use crate::mc::{MultivariateNormal, StateDispersion};
 use crate::md::prelude::OrbitDual;
 use crate::md::StateParameter;
 use crate::Spacecraft;
@@ -105,17 +105,16 @@ impl KfEstimate<Spacecraft> {
     /// *Limitation:* This method incorrectly assumes all parameters are statistically independent.
     pub fn disperse_from_diag(
         nominal_state: Spacecraft,
-        params: &[(StateParameter, f64)],
+        dispersions: Vec<StateDispersion>,
         seed: Option<u128>,
-    ) -> Self {
-        // Build a generator.
-        let gen = GaussianGenerator::from_3std_devs(nominal_state, params).unwrap();
+    ) -> Result<Self, Box<dyn Error>> {
+        let generator = MultivariateNormal::new(nominal_state, dispersions)?;
 
         let mut rng = match seed {
             Some(seed) => Pcg64Mcg::new(seed),
             None => Pcg64Mcg::from_entropy(),
         };
-        let dispersed_state = gen.sample(&mut rng);
+        let dispersed_state = generator.sample(&mut rng);
 
         // Compute the difference between both states
         let delta_orbit = (nominal_state.orbit - dispersed_state.state.orbit).unwrap();
@@ -139,14 +138,14 @@ impl KfEstimate<Spacecraft> {
         // Build the covar from the diagonal
         let covar = Matrix::from_diagonal(&diag);
 
-        Self {
+        Ok(Self {
             nominal_state: dispersed_state.state,
             state_deviation: OVector::<f64, Const<9>>::zeros(),
             covar,
             covar_bar: covar,
             predicted: true,
             stm: OMatrix::<f64, Const<9>, Const<9>>::identity(),
-        }
+        })
     }
 
     /// Builds a multivariate random variable from this estimate's nominal state and covariance, zero mean.
@@ -336,7 +335,10 @@ where
 
 #[cfg(test)]
 mod ut_kfest {
-    use crate::{md::StateParameter, od::estimate::KfEstimate, Spacecraft, GMAT_EARTH_GM};
+    use crate::{
+        mc::StateDispersion, md::StateParameter, od::estimate::KfEstimate, Spacecraft,
+        GMAT_EARTH_GM,
+    };
     use anise::{constants::frames::EARTH_J2000, prelude::Orbit};
     use hifitime::Epoch;
 
@@ -352,14 +354,18 @@ mod ut_kfest {
 
         let initial_estimate = KfEstimate::disperse_from_diag(
             initial_state,
-            &[
-                (StateParameter::SMA, 1.1),
-                (StateParameter::Inclination, 0.0025),
-                (StateParameter::RAAN, 0.022),
-                (StateParameter::AoP, 0.02),
+            vec![
+                StateDispersion::builder()
+                    .param(StateParameter::SMA)
+                    .std_dev(1.1)
+                    .build(),
+                StateDispersion::from_zero_mean(StateParameter::Inclination, 0.0025),
+                StateDispersion::from_zero_mean(StateParameter::RAAN, 0.022),
+                StateDispersion::from_zero_mean(StateParameter::AoP, 0.02),
             ],
             Some(0),
-        );
+        )
+        .unwrap();
 
         let initial_state_dev = initial_estimate.nominal_state;
 
