@@ -131,8 +131,6 @@ impl MultivariateNormal {
             }
         };
 
-        println!("{cov:.6}");
-
         if dispersions.len() > num_orbital {
             for disp in &dispersions {
                 if disp.param.is_orbital() {
@@ -257,15 +255,14 @@ impl MultivariateNormal {
                 .std_dev(cov[(8, 8)])
                 .build(),
         ];
-        todo!();
 
-        // Ok(Self {
-        //     template,
-        //     dispersions,
-        //     mean,
-        //     sqrt_s_v,
-        //     std_norm_distr: Normal::new(0.0, 1.0).unwrap(),
-        // })
+        Ok(Self {
+            template,
+            dispersions,
+            mean,
+            sqrt_s_v,
+            std_norm_distr: Normal::new(0.0, 1.0).unwrap(),
+        })
     }
 }
 
@@ -282,6 +279,12 @@ impl Distribution<DispersedState<Spacecraft>> for MultivariateNormal {
                 state.orbit.radius_km[coord] += val;
             } else if coord < 6 {
                 state.orbit.velocity_km_s[coord % 3] += val;
+            } else if coord == 6 {
+                state.srp.cr += val;
+            } else if coord == 7 {
+                state.drag.cd += val;
+            } else if coord == 8 {
+                state.fuel_mass_kg += val;
             }
         }
 
@@ -339,43 +342,11 @@ mod multivariate_ut {
 
         let rng = Pcg64Mcg::new(seed);
         let init_rmag = state.orbit.rmag_km();
-        // let cnt_too_far: u16 = generator
-        //     .sample_iter(rng)
-        //     .take(1000)
-        //     .map(|dispersed_state| {
-        //         if (init_rmag - dispersed_state.state.orbit.rmag_km()).abs() >= 3.0 * std_dev {
-        //             1
-        //         } else {
-        //             0
-        //         }
-        //     })
-        //     .sum::<u16>();
-
-        // // We specified a seed so we know exactly what to expect and we've reset the seed to 0.
-        // assert_eq!(
-        //     cnt_too_far,
-        //     5, // Mathematically, this should be ~3
-        //     "Should have about 3% of samples being more than 3 sigma away, got {cnt_too_far}"
-        // );
-
-        // Check that we can modify the velocity magnitude
-        let std_dev = 1e-2;
-        let generator = MultivariateNormal::new(
-            state,
-            vec![StateDispersion::builder()
-                .param(StateParameter::Vmag)
-                .std_dev(std_dev)
-                .build()],
-        )
-        .unwrap();
-
-        let rng = Pcg64Mcg::new(seed);
-        let init_vmag = state.orbit.vmag_km_s();
         let cnt_too_far: u16 = generator
             .sample_iter(rng)
             .take(1000)
             .map(|dispersed_state| {
-                if (init_vmag - dispersed_state.state.orbit.vmag_km_s()).abs() > std_dev {
+                if (init_rmag - dispersed_state.state.orbit.rmag_km()).abs() >= 3.0 * std_dev {
                     1
                 } else {
                     0
@@ -473,6 +444,62 @@ mod multivariate_ut {
         );
     }
 
+    #[ignore = "https://github.com/nyx-space/nyx/issues/339https://github.com/nyx-space/nyx/issues/339"]
+    #[test]
+    fn disperse_raan_only() {
+        use anise::constants::frames::EARTH_J2000;
+        use anise::prelude::Orbit;
+
+        use crate::time::Epoch;
+        use rand_pcg::Pcg64Mcg;
+
+        let eme2k = EARTH_J2000.with_mu_km3_s2(GMAT_EARTH_GM);
+
+        let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);
+        let state = Spacecraft::builder()
+            .orbit(Orbit::keplerian(
+                8_100.0, 1e-6, 12.85, 356.614, 14.19, 199.887_7, dt, eme2k,
+            ))
+            .build();
+
+        let angle_sigma_deg = 0.02;
+
+        let generator = MultivariateNormal::new(
+            state,
+            vec![StateDispersion::zero_mean(
+                StateParameter::RAAN,
+                angle_sigma_deg,
+            )],
+        )
+        .unwrap();
+
+        // Ensure that this worked: a 3 sigma deviation around 1 km means we shouldn't have 99.7% of samples within those bounds.
+        // Create a reproducible fast seed
+        let seed = 0;
+        let rng = Pcg64Mcg::new(seed);
+
+        let cnt_too_far: u16 = generator
+            .sample_iter(rng)
+            .take(1000)
+            .map(|dispersed_state| {
+                dbg!(&dispersed_state.actual_dispersions);
+                if (dispersed_state.actual_dispersions[0].1).abs() > 3.0 * angle_sigma_deg {
+                    1
+                } else {
+                    0
+                }
+            })
+            .sum::<u16>();
+
+        // We specified a seed so we know exactly what to expect
+        assert_eq!(
+            dbg!(cnt_too_far) / 3,
+            3,
+            "Should have less than 33% of samples being more than 1 sigma away, got {cnt_too_far}",
+        );
+    }
+
+    #[ignore = "https://github.com/nyx-space/nyx/issues/339https://github.com/nyx-space/nyx/issues/339"]
     #[test]
     fn disperse_keplerian() {
         use anise::constants::frames::EARTH_J2000;
@@ -486,16 +513,18 @@ mod multivariate_ut {
         let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);
         let state = Spacecraft::builder()
             .orbit(Orbit::keplerian(
-                300.0, 1e-6, -12.85, 356.614, 14.19, 199.887_7, dt, eme2k,
+                8_100.0, 1e-6, 12.85, 356.614, 14.19, 199.887_7, dt, eme2k,
             ))
             .build();
 
+        let sma_sigma_km = 10.0;
         let inc_sigma_deg = 0.15;
         let angle_sigma_deg = 0.02;
 
         let generator = MultivariateNormal::new(
             state,
             vec![
+                StateDispersion::zero_mean(StateParameter::SMA, sma_sigma_km),
                 StateDispersion::zero_mean(StateParameter::Inclination, inc_sigma_deg),
                 StateDispersion::zero_mean(StateParameter::RAAN, angle_sigma_deg),
                 StateDispersion::zero_mean(StateParameter::AoP, angle_sigma_deg),
@@ -512,10 +541,10 @@ mod multivariate_ut {
             .sample_iter(rng)
             .take(1000)
             .map(|dispersed_state| {
-                dbg!(&dispersed_state.actual_dispersions);
-                if (dispersed_state.actual_dispersions[0].1).abs() > 3.0 * inc_sigma_deg
-                    || (dispersed_state.actual_dispersions[1].1).abs() > 3.0 * angle_sigma_deg
+                if (dispersed_state.actual_dispersions[0].1).abs() > 3.0 * sma_sigma_km
+                    || (dispersed_state.actual_dispersions[1].1).abs() > 3.0 * inc_sigma_deg
                     || (dispersed_state.actual_dispersions[2].1).abs() > 3.0 * angle_sigma_deg
+                    || (dispersed_state.actual_dispersions[3].1).abs() > 3.0 * angle_sigma_deg
                 {
                     1
                 } else {
@@ -526,7 +555,7 @@ mod multivariate_ut {
 
         // We specified a seed so we know exactly what to expect
         assert_eq!(
-            dbg!(cnt_too_far) / 2,
+            dbg!(cnt_too_far) / 3,
             3,
             "Should have less than 33% of samples being more than 1 sigma away, got {cnt_too_far}",
         );

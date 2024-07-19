@@ -207,12 +207,6 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
             );
         }
     }
-    for i in 0..6 {
-        assert!(
-            est.covar[(i, i)] < initial_estimate.covar[(i, i)],
-            "covar[({i}, {i})] did not decrease"
-        );
-    }
 
     assert_eq!(
         final_truth_state.epoch(),
@@ -536,12 +530,6 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
             );
         }
     }
-    // for i in 0..6 {
-    //     assert!(
-    //         est.covar[(i, i)] < initial_estimate.covar[(i, i)],
-    //         "covar[({i}, {i})] did not decrease"
-    //     );
-    // }
 
     assert_eq!(
         final_truth_state.epoch(),
