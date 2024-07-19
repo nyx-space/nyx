@@ -36,8 +36,8 @@ fn test_monte_carlo_epoch(almanac: Arc<Almanac>) {
     let random_state = MultivariateNormal::new(
         nominal_state,
         vec![
-            StateDispersion::from_zero_mean(StateParameter::SMA, 0.05),
-            StateDispersion::from_zero_mean(StateParameter::Eccentricity, 0.05),
+            StateDispersion::zero_mean(StateParameter::SMA, 0.05),
+            StateDispersion::zero_mean(StateParameter::Eccentricity, 0.05),
         ],
     )
     .unwrap();

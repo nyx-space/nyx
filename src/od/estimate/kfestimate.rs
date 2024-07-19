@@ -359,9 +359,9 @@ mod ut_kfest {
                     .param(StateParameter::SMA)
                     .std_dev(1.1)
                     .build(),
-                StateDispersion::from_zero_mean(StateParameter::Inclination, 0.0025),
-                StateDispersion::from_zero_mean(StateParameter::RAAN, 0.022),
-                StateDispersion::from_zero_mean(StateParameter::AoP, 0.02),
+                StateDispersion::zero_mean(StateParameter::Inclination, 0.0025),
+                StateDispersion::zero_mean(StateParameter::RAAN, 0.022),
+                StateDispersion::zero_mean(StateParameter::AoP, 0.02),
             ],
             Some(0),
         )

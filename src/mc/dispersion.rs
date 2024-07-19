@@ -30,7 +30,7 @@ pub struct StateDispersion {
 }
 
 impl StateDispersion {
-    pub fn from_zero_mean(param: StateParameter, std_dev: f64) -> Self {
+    pub fn zero_mean(param: StateParameter, std_dev: f64) -> Self {
         Self {
             param,
             std_dev: Some(std_dev),
