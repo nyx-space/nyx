@@ -21,11 +21,12 @@ use std::iter::zip;
 
 use super::{DispersedState, StateDispersion};
 use crate::errors::StateError;
-use crate::md::prelude::OrbitDual;
-use crate::md::StateParameter;
+use crate::md::prelude::{BPlane, OrbitDual};
+use crate::md::{AstroSnafu, StateParameter};
 use crate::{pseudo_inverse, NyxError, Spacecraft, State};
 use na::{DMatrix, DVector, SMatrix, SVector};
 use rand_distr::{Distribution, Normal};
+use snafu::ResultExt;
 
 /// A multivariate state generator for Monte Carlo analyses. Ensures that the covariance is properly applied on all provided state variables.
 pub struct MultivariateNormal
@@ -56,6 +57,19 @@ impl MultivariateNormal {
         let mut cov = SMatrix::<f64, 6, 6>::zeros();
         let mut mean = SVector::<f64, 6>::zeros();
 
+        let orbit_dual = OrbitDual::from(template.orbit);
+        let mut b_plane = None;
+        for obj in &dispersions {
+            if obj.param.is_b_plane() {
+                b_plane = Some(
+                    BPlane::from_dual(orbit_dual)
+                        .context(AstroSnafu)
+                        .map_err(Box::new)?,
+                );
+                break;
+            }
+        }
+
         let num_orbital = dispersions
             .iter()
             .filter(|disp| disp.param.is_orbital())
@@ -63,27 +77,37 @@ impl MultivariateNormal {
 
         if num_orbital > 0 {
             // Build the rotation matrix from the orbital dispersions to the Cartesian state.
-            let mut inv_jac = DMatrix::from_element(num_orbital, 6, 0.0);
+            let mut jac = DMatrix::from_element(num_orbital, 6, 0.0);
             let mut covar = DMatrix::from_element(num_orbital, num_orbital, 0.0);
             let mut means = DVector::from_element(num_orbital, 0.0);
             let orbit_dual = OrbitDual::from(template.orbit);
             let mut rno = 0;
             for disp in &dispersions {
                 if disp.param.is_orbital() {
-                    let xf_partial = orbit_dual.partial_for(disp.param)?;
+                    let partial = if disp.param.is_b_plane() {
+                        match disp.param {
+                            StateParameter::BdotR => b_plane.unwrap().b_r,
+                            StateParameter::BdotT => b_plane.unwrap().b_t,
+                            StateParameter::BLTOF => b_plane.unwrap().ltof_s,
+                            _ => unreachable!(),
+                        }
+                    } else {
+                        orbit_dual.partial_for(disp.param).context(AstroSnafu)?
+                    };
+
                     for (cno, val) in [
-                        xf_partial.wtr_x(),
-                        xf_partial.wtr_y(),
-                        xf_partial.wtr_z(),
-                        xf_partial.wtr_vx(),
-                        xf_partial.wtr_vy(),
-                        xf_partial.wtr_vz(),
+                        partial.wtr_x(),
+                        partial.wtr_y(),
+                        partial.wtr_z(),
+                        partial.wtr_vx(),
+                        partial.wtr_vy(),
+                        partial.wtr_vz(),
                     ]
                     .iter()
                     .copied()
                     .enumerate()
                     {
-                        inv_jac[(rno, cno)] = val;
+                        jac[(rno, cno)] = val;
                     }
                     covar[(rno, rno)] = disp.std_dev.unwrap_or(0.0).powi(2);
                     means[rno] = disp.mean.unwrap_or(0.0);
@@ -94,19 +118,12 @@ impl MultivariateNormal {
             // Now that we have the Jacobian that rotates from the Cartesian elements to the dispersions parameters,
             // let's compute the inverse of this Jacobian to rotate from the dispersion params into the Cartesian elements.
 
-            let jac = pseudo_inverse!(&inv_jac)?;
-
-            println!("INV {inv_jac:.6}");
-            println!("JAC {jac:.6}");
-
-            // Try to rotate the state space
-            let kep = &inv_jac * template.orbit.to_cartesian_pos_vel();
-            println!("{kep}\n{:x}", template.orbit);
+            let jac_inv = pseudo_inverse!(&jac)?;
 
             // Rotate the orbital covariance back into the Cartesian state space, making this a 6x6.
-            let orbit_cov = &jac * &covar * jac.transpose();
+            let orbit_cov = &jac_inv * &covar * jac_inv.transpose();
             // Rotate the means into the Cartesian space
-            let cartesian_mean = jac * means;
+            let cartesian_mean = jac_inv * means;
 
             for ii in 0..6 {
                 for jj in 0..6 {
@@ -139,19 +156,6 @@ impl MultivariateNormal {
         }
 
         // At this point, the cov matrix is a 9x9 with all dispersions transformed into the Cartesian state space.
-
-        // Check that covariance is PSD by ensuring that all the eigenvalues are positive or nil
-        println!("{cov:.9}");
-        // match cov.eigenvalues() {
-        //     None => return Err(Box::new(NyxError::CovarianceMatrixNotPsd)),
-        //     Some(evals) => {
-        //         for eigenval in &evals {
-        //             if *eigenval < 0.0 {
-        //                 return Err(Box::new(NyxError::CovarianceMatrixNotPsd));
-        //             }
-        //         }
-        //     }
-        // };
 
         let svd = cov.svd(false, true);
         if svd.v_t.is_none() {
@@ -271,14 +275,23 @@ impl Distribution<DispersedState<Spacecraft>> for MultivariateNormal {
         // Generate the vector representing the state
         let x_rng = SVector::<f64, 6>::from_fn(|_, _| self.std_norm_distr.sample(rng));
         let x = self.sqrt_s_v * x_rng + self.mean;
+        dbg!(&x);
         let mut state = self.template;
 
+        // Set the new state data
+        for (coord, val) in x.iter().copied().enumerate() {
+            if coord < 3 {
+                state.orbit.radius_km[coord] += val;
+            } else if coord < 6 {
+                state.orbit.velocity_km_s[coord % 3] += val;
+            }
+        }
+
         let mut actual_dispersions = Vec::new();
-        for (delta, disp) in zip(&x, &self.dispersions) {
-            actual_dispersions.push((disp.param, *delta));
-            // We know this state can return something for this param
-            let cur_value = state.value(disp.param).unwrap();
-            state.set_value(disp.param, cur_value + delta).unwrap();
+        for disp in &self.dispersions {
+            // Compute the delta
+            let delta = self.template.value(disp.param).unwrap() - state.value(disp.param).unwrap();
+            actual_dispersions.push((disp.param, delta));
         }
 
         DispersedState {
@@ -475,7 +488,7 @@ mod multivariate_ut {
         let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);
         let state = Spacecraft::builder()
             .orbit(Orbit::keplerian(
-                8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k,
+                300.0, 1e-6, -12.85, 356.614, 14.19, 199.887_7, dt, eme2k,
             ))
             .build();
 
@@ -484,16 +497,10 @@ mod multivariate_ut {
 
         let generator = MultivariateNormal::new(
             state,
-            vec![
-                StateDispersion::builder()
-                    .param(StateParameter::SMA)
-                    .std_dev(sma_sigma_km)
-                    .build(),
-                // StateDispersion::builder()
-                //     .param(StateParameter::Inclination)
-                //     .std_dev(inc_sigma_deg)
-                //     .build(),
-            ],
+            vec![StateDispersion::builder()
+                .param(StateParameter::SMA)
+                .std_dev(sma_sigma_km)
+                .build()],
         )
         .unwrap();
 
@@ -502,15 +509,13 @@ mod multivariate_ut {
         let seed = 0;
         let rng = Pcg64Mcg::new(seed);
 
-        let init_sma = state.orbit.sma_km().unwrap();
-        let init_inc = state.orbit.inc_deg().unwrap();
         let cnt_too_far: u16 = generator
             .sample_iter(rng)
-            .take(1000)
+            .take(10)
             .map(|dispersed_state| {
-                if (init_sma - dispersed_state.state.orbit.sma_km().unwrap()).abs() > sma_sigma_km
-                    || (init_inc - dispersed_state.state.orbit.inc_deg().unwrap()).abs()
-                        > inc_sigma_deg
+                dbg!(&dispersed_state.actual_dispersions);
+                if (dispersed_state.actual_dispersions[0].1).abs() > 3.0 * sma_sigma_km
+                // || (dispersed_state.actual_dispersions[2].1).abs() > 3.0 * inc_sigma_deg
                 {
                     1
                 } else {
