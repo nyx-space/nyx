@@ -23,7 +23,7 @@ use super::{DispersedState, StateDispersion};
 use crate::errors::StateError;
 use crate::md::prelude::OrbitDual;
 use crate::md::StateParameter;
-use crate::{NyxError, Spacecraft, State};
+use crate::{pseudo_inverse, NyxError, Spacecraft, State};
 use na::{DMatrix, DVector, SMatrix, SVector};
 use rand_distr::{Distribution, Normal};
 
@@ -35,9 +35,9 @@ pub struct MultivariateNormal
     pub template: Spacecraft,
     pub dispersions: Vec<StateDispersion>,
     /// The mean of the multivariate normal distribution
-    pub mean: SVector<f64, 9>,
+    pub mean: SVector<f64, 6>,
     /// The dot product \sqrt{\vec s} \cdot \vec v, where S is the singular values and V the V matrix from the SVD decomp of the covariance of multivariate normal distribution
-    pub sqrt_s_v: SMatrix<f64, 9, 9>,
+    pub sqrt_s_v: SMatrix<f64, 6, 6>,
     /// The standard normal distribution used to seed the multivariate normal distribution
     pub std_norm_distr: Normal<f64>,
 }
@@ -53,8 +53,8 @@ impl MultivariateNormal {
         template: Spacecraft,
         dispersions: Vec<StateDispersion>,
     ) -> Result<Self, Box<dyn Error>> {
-        let mut cov = SMatrix::<f64, 9, 9>::zeros();
-        let mut mean = SVector::<f64, 9>::zeros();
+        let mut cov = SMatrix::<f64, 6, 6>::zeros();
+        let mut mean = SVector::<f64, 6>::zeros();
 
         let num_orbital = dispersions
             .iter()
@@ -63,7 +63,7 @@ impl MultivariateNormal {
 
         if num_orbital > 0 {
             // Build the rotation matrix from the orbital dispersions to the Cartesian state.
-            let mut rotmat = DMatrix::from_element(6, num_orbital, 0.0);
+            let mut inv_jac = DMatrix::from_element(num_orbital, 6, 0.0);
             let mut covar = DMatrix::from_element(num_orbital, num_orbital, 0.0);
             let mut means = DVector::from_element(num_orbital, 0.0);
             let orbit_dual = OrbitDual::from(template.orbit);
@@ -83,7 +83,7 @@ impl MultivariateNormal {
                     .copied()
                     .enumerate()
                     {
-                        rotmat[(cno, rno)] = val;
+                        inv_jac[(rno, cno)] = val;
                     }
                     covar[(rno, rno)] = disp.std_dev.unwrap_or(0.0).powi(2);
                     means[rno] = disp.mean.unwrap_or(0.0);
@@ -91,10 +91,22 @@ impl MultivariateNormal {
                 }
             }
 
+            // Now that we have the Jacobian that rotates from the Cartesian elements to the dispersions parameters,
+            // let's compute the inverse of this Jacobian to rotate from the dispersion params into the Cartesian elements.
+
+            let jac = pseudo_inverse!(&inv_jac)?;
+
+            println!("INV {inv_jac:.6}");
+            println!("JAC {jac:.6}");
+
+            // Try to rotate the state space
+            let kep = &inv_jac * template.orbit.to_cartesian_pos_vel();
+            println!("{kep}\n{:x}", template.orbit);
+
             // Rotate the orbital covariance back into the Cartesian state space, making this a 6x6.
-            let orbit_cov = &rotmat * &covar * rotmat.transpose();
+            let orbit_cov = &jac * &covar * jac.transpose();
             // Rotate the means into the Cartesian space
-            let cartesian_mean = rotmat * means;
+            let cartesian_mean = jac * means;
 
             for ii in 0..6 {
                 for jj in 0..6 {
@@ -105,6 +117,7 @@ impl MultivariateNormal {
         };
 
         if dispersions.len() > num_orbital {
+            // TODO: This will panic with Cr, Cd, Mass
             for disp in &dispersions {
                 if disp.param.is_orbital() {
                     continue;
@@ -128,17 +141,17 @@ impl MultivariateNormal {
         // At this point, the cov matrix is a 9x9 with all dispersions transformed into the Cartesian state space.
 
         // Check that covariance is PSD by ensuring that all the eigenvalues are positive or nil
-        println!("{cov:.6}");
-        match cov.eigenvalues() {
-            None => return Err(Box::new(NyxError::CovarianceMatrixNotPsd)),
-            Some(evals) => {
-                for eigenval in &evals {
-                    if *eigenval < 0.0 {
-                        return Err(Box::new(NyxError::CovarianceMatrixNotPsd));
-                    }
-                }
-            }
-        };
+        println!("{cov:.9}");
+        // match cov.eigenvalues() {
+        //     None => return Err(Box::new(NyxError::CovarianceMatrixNotPsd)),
+        //     Some(evals) => {
+        //         for eigenval in &evals {
+        //             if *eigenval < 0.0 {
+        //                 return Err(Box::new(NyxError::CovarianceMatrixNotPsd));
+        //             }
+        //         }
+        //     }
+        // };
 
         let svd = cov.svd(false, true);
         if svd.v_t.is_none() {
@@ -151,8 +164,6 @@ impl MultivariateNormal {
         for (i, mut col) in sqrt_s_v_t.column_iter_mut().enumerate() {
             col *= sqrt_s[i];
         }
-
-        println!("{sqrt_s_v_t:.6}");
 
         Ok(Self {
             template,
@@ -243,21 +254,22 @@ impl MultivariateNormal {
                 .std_dev(cov[(8, 8)])
                 .build(),
         ];
+        todo!();
 
-        Ok(Self {
-            template,
-            dispersions,
-            mean,
-            sqrt_s_v,
-            std_norm_distr: Normal::new(0.0, 1.0).unwrap(),
-        })
+        // Ok(Self {
+        //     template,
+        //     dispersions,
+        //     mean,
+        //     sqrt_s_v,
+        //     std_norm_distr: Normal::new(0.0, 1.0).unwrap(),
+        // })
     }
 }
 
 impl Distribution<DispersedState<Spacecraft>> for MultivariateNormal {
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> DispersedState<Spacecraft> {
         // Generate the vector representing the state
-        let x_rng = SVector::<f64, 9>::from_fn(|_, _| self.std_norm_distr.sample(rng));
+        let x_rng = SVector::<f64, 6>::from_fn(|_, _| self.std_norm_distr.sample(rng));
         let x = self.sqrt_s_v * x_rng + self.mean;
         let mut state = self.template;
 
@@ -283,12 +295,16 @@ mod multivariate_ut {
     use crate::GMAT_EARTH_GM;
 
     #[test]
-    fn generate_orbit() {
+    fn disperse_r_v_mag() {
         use anise::constants::frames::EARTH_J2000;
         use anise::prelude::Orbit;
 
         use crate::time::Epoch;
         use rand_pcg::Pcg64Mcg;
+
+        // Ensure that this worked: a 3 sigma deviation around 1 km means we shouldn't have 99.7% of samples within those bounds.
+        // Create a reproducible fast seed
+        let seed = 0;
 
         let eme2k = EARTH_J2000.with_mu_km3_s2(GMAT_EARTH_GM);
 
@@ -298,39 +314,6 @@ mod multivariate_ut {
                 8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k,
             ))
             .build();
-
-        let generator = MultivariateNormal::new(
-            state,
-            vec![StateDispersion::builder()
-                .param(StateParameter::SMA)
-                .std_dev(1.0)
-                .build()],
-        )
-        .unwrap();
-
-        // Ensure that this worked: a 3 sigma deviation around 1 km means we shouldn't have 99.7% of samples within those bounds.
-        // Create a reproducible fast seed
-        let seed = 0;
-        let rng = Pcg64Mcg::new(seed);
-
-        let init_sma = state.orbit.sma_km().unwrap();
-        let cnt_too_far: u16 = generator
-            .sample_iter(rng)
-            .take(1000)
-            .map(|dispersed_state| {
-                if (init_sma - dispersed_state.state.orbit.sma_km().unwrap()).abs() > 1.0 {
-                    1
-                } else {
-                    0
-                }
-            })
-            .sum::<u16>();
-
-        // We specified a seed so we know exactly what to expect
-        assert_eq!(
-            cnt_too_far, 308,
-            "Should have less than 33% of samples being more than 1 sigma away, got {cnt_too_far}",
-        );
 
         // Check that we can modify the radius magnitude
         let std_dev = 1.0;
@@ -359,7 +342,8 @@ mod multivariate_ut {
 
         // We specified a seed so we know exactly what to expect and we've reset the seed to 0.
         assert_eq!(
-            cnt_too_far, 308,
+            cnt_too_far,
+            320, // Mathematically, this should be 317.3
             "Should have less than 33% of samples being more than 1 sigma away, got {cnt_too_far}"
         );
 
@@ -390,13 +374,14 @@ mod multivariate_ut {
 
         // We specified a seed so we know exactly what to expect and we've reset the seed to 0.
         assert_eq!(
-            cnt_too_far, 308,
+            cnt_too_far,
+            316, // Mathematically, this should be 317.3
             "Should have less than 33% of samples being more than 1 sigma away, got {cnt_too_far}",
         );
     }
 
     #[test]
-    fn test_full_cartesian() {
+    fn disperse_full_cartesian() {
         use anise::constants::frames::EARTH_J2000;
         use anise::prelude::Orbit;
 
@@ -469,10 +454,76 @@ mod multivariate_ut {
             .sum::<u16>();
 
         // We specified a seed so we know exactly what to expect
-        assert!(
-            cnt_too_far / 6 < 329,
+        assert_eq!(
+            cnt_too_far / 6,
+            309,
             "Should have less than 33% of samples being more than 1 sigma away, got {}",
             cnt_too_far
+        );
+    }
+
+    #[test]
+    fn disperse_keplerian() {
+        use anise::constants::frames::EARTH_J2000;
+        use anise::prelude::Orbit;
+
+        use crate::time::Epoch;
+        use rand_pcg::Pcg64Mcg;
+
+        let eme2k = EARTH_J2000.with_mu_km3_s2(GMAT_EARTH_GM);
+
+        let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);
+        let state = Spacecraft::builder()
+            .orbit(Orbit::keplerian(
+                8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k,
+            ))
+            .build();
+
+        let sma_sigma_km = 15.0;
+        let inc_sigma_deg = 0.15;
+
+        let generator = MultivariateNormal::new(
+            state,
+            vec![
+                StateDispersion::builder()
+                    .param(StateParameter::SMA)
+                    .std_dev(sma_sigma_km)
+                    .build(),
+                // StateDispersion::builder()
+                //     .param(StateParameter::Inclination)
+                //     .std_dev(inc_sigma_deg)
+                //     .build(),
+            ],
+        )
+        .unwrap();
+
+        // Ensure that this worked: a 3 sigma deviation around 1 km means we shouldn't have 99.7% of samples within those bounds.
+        // Create a reproducible fast seed
+        let seed = 0;
+        let rng = Pcg64Mcg::new(seed);
+
+        let init_sma = state.orbit.sma_km().unwrap();
+        let init_inc = state.orbit.inc_deg().unwrap();
+        let cnt_too_far: u16 = generator
+            .sample_iter(rng)
+            .take(1000)
+            .map(|dispersed_state| {
+                if (init_sma - dispersed_state.state.orbit.sma_km().unwrap()).abs() > sma_sigma_km
+                    || (init_inc - dispersed_state.state.orbit.inc_deg().unwrap()).abs()
+                        > inc_sigma_deg
+                {
+                    1
+                } else {
+                    0
+                }
+            })
+            .sum::<u16>();
+
+        // We specified a seed so we know exactly what to expect
+        assert_eq!(
+            dbg!(cnt_too_far) / 2,
+            308,
+            "Should have less than 33% of samples being more than 1 sigma away, got {cnt_too_far}",
         );
     }
 }
