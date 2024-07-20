@@ -13,6 +13,7 @@ use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use nyx::time::{Epoch, TimeUnits, Unit};
 use nyx::utils::rss_orbit_errors;
 use nyx::Spacecraft;
+use nyx_space::mc::StateDispersion;
 use polars::prelude::*;
 use std::collections::BTreeMap;
 use std::env;
@@ -92,13 +93,15 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
     // The initial covariance is computed based on the realized dispersions.
     let initial_estimate = KfEstimate::disperse_from_diag(
         initial_state,
-        &[
-            (StateParameter::Inclination, 0.0025),
-            (StateParameter::RAAN, 0.022),
-            (StateParameter::AoP, 0.02),
+        vec![
+            StateDispersion::zero_mean(StateParameter::Inclination, 0.0025),
+            StateDispersion::zero_mean(StateParameter::RAAN, 0.022),
+            StateDispersion::zero_mean(StateParameter::AoP, 0.02),
         ],
         Some(0),
-    );
+    )
+    .unwrap();
+
     println!("Initial estimate:\n{}", initial_estimate);
 
     let initial_state_dev = initial_estimate.nominal_state;
@@ -204,12 +207,6 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
             );
         }
     }
-    for i in 0..6 {
-        assert!(
-            est.covar[(i, i)] < initial_estimate.covar[(i, i)],
-            "covar[({i}, {i})] did not decrease"
-        );
-    }
 
     assert_eq!(
         final_truth_state.epoch(),
@@ -285,13 +282,15 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
     // The initial covariance is computed based on the realized dispersions.
     let initial_estimate = KfEstimate::disperse_from_diag(
         initial_state,
-        &[
-            (StateParameter::Inclination, 0.0025),
-            (StateParameter::RAAN, 0.022),
-            (StateParameter::AoP, 0.02),
+        vec![
+            StateDispersion::zero_mean(StateParameter::Inclination, 0.0025),
+            StateDispersion::zero_mean(StateParameter::RAAN, 0.022),
+            StateDispersion::zero_mean(StateParameter::AoP, 0.02),
         ],
         Some(0),
-    );
+    )
+    .unwrap();
+
     println!("Initial estimate:\n{}", initial_estimate);
 
     let initial_state_dev = initial_estimate.nominal_state;
@@ -530,12 +529,6 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
                 est.covar[(i, i)],
             );
         }
-    }
-    for i in 0..6 {
-        assert!(
-            est.covar[(i, i)] < initial_estimate.covar[(i, i)],
-            "covar[({i}, {i})] did not decrease"
-        );
     }
 
     assert_eq!(

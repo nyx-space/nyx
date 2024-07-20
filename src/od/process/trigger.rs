@@ -27,7 +27,6 @@ use crate::State;
 /// An EkfTrigger on the number of measurements processed and a time between measurements.
 pub struct EkfTrigger {
     pub num_msrs: usize,
-    /// In seconds!
     pub disable_time: Duration,
     /// Set to the sigma number needed to switch to the EKF (cf. 68–95–99.7 rule). If number is negative, this is ignored.
     pub within_sigma: f64,

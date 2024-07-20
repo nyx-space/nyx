@@ -100,9 +100,9 @@ impl From<ConfigError> for NyxError {
 #[derive(Debug, PartialEq, Snafu)]
 #[snafu(visibility(pub(crate)))]
 pub enum StateError {
-    #[snafu(display("{param} is unavailable for this kind of state"))]
+    #[snafu(display("{param} is unavailable in this context"))]
     Unavailable { param: StateParameter },
-    #[snafu(display("{param} is read only for this kind of state"))]
+    #[snafu(display("{param} is read only in this context"))]
     ReadOnly { param: StateParameter },
     #[snafu(display("{param} computation caused {source}"))]
     StateAstroError {

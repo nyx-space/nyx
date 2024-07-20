@@ -16,23 +16,25 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use rand::prelude::*;
-use rand_distr::{Distribution, Normal, Uniform};
-pub use rand_pcg::Pcg64Mcg;
+use crate::md::StateParameter;
+use typed_builder::TypedBuilder;
 
-pub mod helpers;
-mod montecarlo;
+/// A dispersions configuration, allows specifying min/max bounds (by default, they are not set)
+#[derive(Copy, Clone, TypedBuilder)]
+pub struct StateDispersion {
+    pub param: StateParameter,
+    #[builder(default, setter(strip_option))]
+    pub mean: Option<f64>,
+    #[builder(default, setter(strip_option))]
+    pub std_dev: Option<f64>,
+}
 
-pub use montecarlo::MonteCarlo;
-
-mod dispersion;
-pub use dispersion::StateDispersion;
-
-mod generator;
-pub use generator::{DispersedState, Dispersion};
-
-mod multivariate;
-pub use multivariate::MultivariateNormal;
-
-mod results;
-pub use results::{Results, Stats};
+impl StateDispersion {
+    pub fn zero_mean(param: StateParameter, std_dev: f64) -> Self {
+        Self {
+            param,
+            std_dev: Some(std_dev),
+            mean: Some(0.0),
+        }
+    }
+}

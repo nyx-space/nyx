@@ -3,11 +3,11 @@ import plotly.graph_objs as go
 
 if __name__ == "__main__":
     df_mc = pl.read_parquet("./02_jwst_monte_carlo.parquet")
-    df_mc = df_mc.with_columns(pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f"))
+    df_mc = df_mc.with_columns(pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f")).sort("Epoch (UTC)", descending=False)
     print(df_mc.describe())
 
     df_covar = pl.read_parquet("./02_jwst_covar_map.parquet")
-    df_covar = df_covar.with_columns(pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f"))
+    df_covar = df_covar.with_columns(pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f")).sort("Epoch (UTC)", descending=False)
     print(df_covar.describe())
 
     # Build the position plots
@@ -18,7 +18,7 @@ if __name__ == "__main__":
                 go.Scattergl(
                     x=df_mc["Epoch (UTC)"],
                     y=df_mc[col],
-                    mode="lines",
+                    mode="markers",
                     opacity=0.05,
                     showlegend=True,
                     name=f"[MC] {coord} (km)",
@@ -63,7 +63,7 @@ if __name__ == "__main__":
                 go.Scattergl(
                     x=df_mc["Epoch (UTC)"],
                     y=df_mc[col],
-                    mode="lines",
+                    mode="markers",
                     opacity=0.05,
                     showlegend=True,
                     name=f"[MC] {coord} (km/s)",
@@ -156,7 +156,7 @@ if __name__ == "__main__":
                 go.Scattergl(
                     x=df_mc["Epoch (UTC)"],
                     y=df_mc[col],
-                    mode="lines",
+                    mode="markers",
                     opacity=0.05,
                     showlegend=True,
                     name=f"[MC] {col}",

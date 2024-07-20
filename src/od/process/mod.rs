@@ -336,6 +336,9 @@ where
             let cur_rms_num = (new_rms - previous_rms).abs();
             let cur_rel_rms = cur_rms_num / previous_rms;
             if cur_rel_rms < config.relative_tol || cur_rms_num < config.absolute_tol * best_rms {
+                if previous_rms < best_rms {
+                    best_rms = previous_rms;
+                }
                 info!("*****************");
                 info!("*** CONVERGED ***");
                 info!("*****************");

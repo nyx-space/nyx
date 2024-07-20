@@ -41,14 +41,8 @@ use std::path::{Path, PathBuf};
 
 use super::ODProcess;
 
-impl<
-        'a,
-        D: Dynamics,
-        E: ErrorCtrl,
-        Msr: Measurement,
-        A: DimName,
-        // K: Filter<Spacecraft, A, Msr::MeasurementSize>,
-    > ODProcess<'a, D, E, Msr, A, Spacecraft, KF<Spacecraft, A, Msr::MeasurementSize>>
+impl<'a, D: Dynamics, E: ErrorCtrl, Msr: Measurement, A: DimName>
+    ODProcess<'a, D, E, Msr, A, Spacecraft, KF<Spacecraft, A, Msr::MeasurementSize>>
 where
     D::StateType:
         Interpolatable + Add<OVector<f64, <Spacecraft as State>::Size>, Output = D::StateType>,

@@ -20,16 +20,17 @@ use super::{Estimate, State};
 use crate::cosmic::AstroError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, Matrix, OMatrix, OVector};
-use crate::mc::{GaussianGenerator, MultivariateNormal};
+use crate::mc::{MultivariateNormal, StateDispersion};
 use crate::md::prelude::OrbitDual;
 use crate::md::StateParameter;
-use crate::{NyxError, Spacecraft};
+use crate::Spacecraft;
 use na::SMatrix;
 use nalgebra::Const;
 use rand::SeedableRng;
 use rand_distr::Distribution;
 use rand_pcg::Pcg64Mcg;
 use std::cmp::PartialEq;
+use std::error::Error;
 use std::fmt;
 
 /// Kalman filter Estimate
@@ -101,20 +102,20 @@ impl KfEstimate<Spacecraft> {
     /// Generates an initial Kalman filter state estimate dispersed from the nominal state using the provided standard deviation parameters.
     ///
     /// The resulting estimate will have a diagonal covariance matrix constructed from the variances of each parameter.
-    /// *Limitation:* This method incorrectly assumes all parameters are statistically independent.
+    /// *Limitation:* This method may not work correctly for all Keplerian orbital elements, refer to
+    /// <https://github.com/nyx-space/nyx/issues/339> for details.
     pub fn disperse_from_diag(
         nominal_state: Spacecraft,
-        params: &[(StateParameter, f64)],
+        dispersions: Vec<StateDispersion>,
         seed: Option<u128>,
-    ) -> Self {
-        // Build a generator.
-        let gen = GaussianGenerator::from_3std_devs(nominal_state, params).unwrap();
+    ) -> Result<Self, Box<dyn Error>> {
+        let generator = MultivariateNormal::new(nominal_state, dispersions)?;
 
         let mut rng = match seed {
             Some(seed) => Pcg64Mcg::new(seed),
             None => Pcg64Mcg::from_entropy(),
         };
-        let dispersed_state = gen.sample(&mut rng);
+        let dispersed_state = generator.sample(&mut rng);
 
         // Compute the difference between both states
         let delta_orbit = (nominal_state.orbit - dispersed_state.state.orbit).unwrap();
@@ -138,32 +139,22 @@ impl KfEstimate<Spacecraft> {
         // Build the covar from the diagonal
         let covar = Matrix::from_diagonal(&diag);
 
-        Self {
+        Ok(Self {
             nominal_state: dispersed_state.state,
             state_deviation: OVector::<f64, Const<9>>::zeros(),
             covar,
             covar_bar: covar,
             predicted: true,
             stm: OMatrix::<f64, Const<9>, Const<9>>::identity(),
-        }
+        })
     }
 
     /// Builds a multivariate random variable from this estimate's nominal state and covariance, zero mean.
-    pub fn to_random_variable(&self) -> Result<MultivariateNormal<Spacecraft>, NyxError> {
-        MultivariateNormal::zero_mean(
+    pub fn to_random_variable(&self) -> Result<MultivariateNormal, Box<dyn Error>> {
+        MultivariateNormal::from_spacecraft_cov(
             self.nominal_state,
-            vec![
-                StateParameter::X,
-                StateParameter::Y,
-                StateParameter::Z,
-                StateParameter::VX,
-                StateParameter::VY,
-                StateParameter::VZ,
-                StateParameter::Cr,
-                StateParameter::Cd,
-                StateParameter::FuelMass,
-            ],
             self.covar,
+            self.state_deviation,
         )
     }
 
@@ -345,7 +336,10 @@ where
 
 #[cfg(test)]
 mod ut_kfest {
-    use crate::{md::StateParameter, od::estimate::KfEstimate, Spacecraft, GMAT_EARTH_GM};
+    use crate::{
+        mc::StateDispersion, md::StateParameter, od::estimate::KfEstimate, Spacecraft,
+        GMAT_EARTH_GM,
+    };
     use anise::{constants::frames::EARTH_J2000, prelude::Orbit};
     use hifitime::Epoch;
 
@@ -361,14 +355,18 @@ mod ut_kfest {
 
         let initial_estimate = KfEstimate::disperse_from_diag(
             initial_state,
-            &[
-                (StateParameter::SMA, 1.1),
-                (StateParameter::Inclination, 0.0025),
-                (StateParameter::RAAN, 0.022),
-                (StateParameter::AoP, 0.02),
+            vec![
+                StateDispersion::builder()
+                    .param(StateParameter::SMA)
+                    .std_dev(1.1)
+                    .build(),
+                StateDispersion::zero_mean(StateParameter::Inclination, 0.2),
+                StateDispersion::zero_mean(StateParameter::RAAN, 0.2),
+                StateDispersion::zero_mean(StateParameter::AoP, 0.2),
             ],
             Some(0),
-        );
+        )
+        .unwrap();
 
         let initial_state_dev = initial_estimate.nominal_state;
 
@@ -380,9 +378,9 @@ mod ut_kfest {
         println!("Truth initial state:\n{initial_state}\n{initial_state:x}");
         println!("Filter initial state:\n{initial_state_dev}\n{initial_state_dev:x}");
         println!(
-            "Initial state dev:\t{init_rss_pos_km:.3} km\t{init_rss_vel_km_s:.3} km/s\n{delta}",
+            "Initial state dev:\t{init_rss_pos_km:.6} km\t{init_rss_vel_km_s:.6} km/s\n{delta}",
         );
-        println!("covariance: {}", initial_estimate.covar);
+        println!("covariance: {:.6}", initial_estimate.covar);
 
         // Check that the error is in the square root of the covariance
         assert!(delta.radius_km.x < initial_estimate.covar[(0, 0)].sqrt());
