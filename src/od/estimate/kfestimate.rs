@@ -102,7 +102,8 @@ impl KfEstimate<Spacecraft> {
     /// Generates an initial Kalman filter state estimate dispersed from the nominal state using the provided standard deviation parameters.
     ///
     /// The resulting estimate will have a diagonal covariance matrix constructed from the variances of each parameter.
-    /// *Limitation:* This method incorrectly assumes all parameters are statistically independent.
+    /// *Limitation:* This method may not work correctly for all Keplerian orbital elements, refer to
+    /// <https://github.com/nyx-space/nyx/issues/339> for details.
     pub fn disperse_from_diag(
         nominal_state: Spacecraft,
         dispersions: Vec<StateDispersion>,
@@ -359,9 +360,9 @@ mod ut_kfest {
                     .param(StateParameter::SMA)
                     .std_dev(1.1)
                     .build(),
-                StateDispersion::zero_mean(StateParameter::Inclination, 0.0025),
-                StateDispersion::zero_mean(StateParameter::RAAN, 0.022),
-                StateDispersion::zero_mean(StateParameter::AoP, 0.02),
+                StateDispersion::zero_mean(StateParameter::Inclination, 0.2),
+                StateDispersion::zero_mean(StateParameter::RAAN, 0.2),
+                StateDispersion::zero_mean(StateParameter::AoP, 0.2),
             ],
             Some(0),
         )
@@ -377,9 +378,9 @@ mod ut_kfest {
         println!("Truth initial state:\n{initial_state}\n{initial_state:x}");
         println!("Filter initial state:\n{initial_state_dev}\n{initial_state_dev:x}");
         println!(
-            "Initial state dev:\t{init_rss_pos_km:.3} km\t{init_rss_vel_km_s:.3} km/s\n{delta}",
+            "Initial state dev:\t{init_rss_pos_km:.6} km\t{init_rss_vel_km_s:.6} km/s\n{delta}",
         );
-        println!("covariance: {}", initial_estimate.covar);
+        println!("covariance: {:.6}", initial_estimate.covar);
 
         // Check that the error is in the square root of the covariance
         assert!(delta.radius_km.x < initial_estimate.covar[(0, 0)].sqrt());

@@ -160,7 +160,7 @@ impl MultivariateNormal {
         }
 
         let sqrt_s = svd.singular_values.map(|x| x.sqrt());
-        let mut sqrt_s_v_t = svd.v_t.unwrap();
+        let mut sqrt_s_v_t = svd.v_t.unwrap().transpose();
 
         for (i, mut col) in sqrt_s_v_t.column_iter_mut().enumerate() {
             col *= sqrt_s[i];
@@ -170,7 +170,7 @@ impl MultivariateNormal {
             template,
             dispersions,
             mean,
-            sqrt_s_v: sqrt_s_v_t.transpose(),
+            sqrt_s_v: sqrt_s_v_t,
             std_norm_distr: Normal::new(0.0, 1.0).unwrap(),
         })
     }
@@ -309,7 +309,7 @@ mod multivariate_ut {
     use crate::GMAT_EARTH_GM;
 
     #[test]
-    fn disperse_r_v_mag() {
+    fn disperse_r_mag() {
         use anise::constants::frames::EARTH_J2000;
         use anise::prelude::Orbit;
 
@@ -357,7 +357,7 @@ mod multivariate_ut {
         // We specified a seed so we know exactly what to expect and we've reset the seed to 0.
         assert_eq!(
             cnt_too_far,
-            5, // Mathematically, this should be ~3
+            6, // Mathematically, this should be 3!
             "Should have about 3% of samples being more than 3 sigma away, got {cnt_too_far}"
         );
     }
@@ -439,12 +439,10 @@ mod multivariate_ut {
         assert_eq!(
             cnt_too_far / 6,
             312,
-            "Should have less than 33% of samples being more than 1 sigma away, got {}",
-            cnt_too_far
+            "Should have about 3% of samples being more than 3 sigma away, got {cnt_too_far}"
         );
     }
 
-    #[ignore = "https://github.com/nyx-space/nyx/issues/339https://github.com/nyx-space/nyx/issues/339"]
     #[test]
     fn disperse_raan_only() {
         use anise::constants::frames::EARTH_J2000;
@@ -462,7 +460,7 @@ mod multivariate_ut {
             ))
             .build();
 
-        let angle_sigma_deg = 0.02;
+        let angle_sigma_deg = 0.2;
 
         let generator = MultivariateNormal::new(
             state,
@@ -482,7 +480,17 @@ mod multivariate_ut {
             .sample_iter(rng)
             .take(1000)
             .map(|dispersed_state| {
-                dbg!(&dispersed_state.actual_dispersions);
+                // For all other orbital parameters, make sure that we have not changed things dramatically.
+                for param in [StateParameter::SMA, StateParameter::Inclination] {
+                    let orig = state.value(param).unwrap();
+                    let new = dispersed_state.state.value(param).unwrap();
+                    let prct_change = 100.0 * (orig - new).abs() / orig;
+                    assert!(
+                        prct_change < 5.0,
+                        "{param} changed by {prct_change:.3} % ({orig:.3e} -> {new:.3e})"
+                    );
+                }
+
                 if (dispersed_state.actual_dispersions[0].1).abs() > 3.0 * angle_sigma_deg {
                     1
                 } else {
@@ -492,14 +500,15 @@ mod multivariate_ut {
             .sum::<u16>();
 
         // We specified a seed so we know exactly what to expect
+        // Consider: https://github.com/nyx-space/nyx/issues/339
         assert_eq!(
-            dbg!(cnt_too_far) / 3,
-            3,
-            "Should have less than 33% of samples being more than 1 sigma away, got {cnt_too_far}",
+            cnt_too_far,
+            7, // This is about twice too high
+            "Should have about 3% of samples being more than 3 sigma away, got {cnt_too_far}"
         );
     }
 
-    #[ignore = "https://github.com/nyx-space/nyx/issues/339https://github.com/nyx-space/nyx/issues/339"]
+    #[ignore = "https://github.com/nyx-space/nyx/issues/339"]
     #[test]
     fn disperse_keplerian() {
         use anise::constants::frames::EARTH_J2000;
@@ -557,7 +566,7 @@ mod multivariate_ut {
         assert_eq!(
             dbg!(cnt_too_far) / 3,
             3,
-            "Should have less than 33% of samples being more than 1 sigma away, got {cnt_too_far}",
+            "Should have about 3% of samples being more than 3 sigma away, got {cnt_too_far}"
         );
     }
 }
