@@ -49,7 +49,8 @@ impl Ruggiero {
         Self::with_ηthresholds(objectives, &[0.0; 5], initial)
     }
 
-    /// Creates a new Ruggiero locally optimal control as an Arc
+    /// Creates a new Ruggiero locally optimal control with the provided efficiency threshold.
+    /// If the efficiency to correct the mapped orbital element is greater than the threshold, then the control law will be applied to this orbital element.
     /// Note: this returns an Arc so it can be plugged into the Spacecraft dynamics directly.
     pub fn with_ηthresholds(
         objectives: &[Objective],

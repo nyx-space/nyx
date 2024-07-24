@@ -52,6 +52,8 @@ where
     pub prop: &'a Propagator<'a, D, E>,
     /// Stores the details of the previous integration step
     pub details: IntegrationDetails,
+    /// Should progress reports be logged
+    pub log_progress: bool,
     pub(crate) almanac: Arc<Almanac>,
     pub(crate) step_size: Duration, // Stores the adapted step for the _next_ call
     pub(crate) fixed_step: bool,
@@ -66,6 +68,18 @@ where
         + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::VecLength>,
 {
+    /// Sets this instance to not log progress
+    pub fn quiet(mut self) -> Self {
+        self.log_progress = false;
+        self
+    }
+
+    /// Sets this instance to log progress
+    pub fn verbose(mut self) -> Self {
+        self.log_progress = true;
+        self
+    }
+
     /// Allows setting the step size of the propagator
     pub fn set_step(&mut self, step_size: Duration, fixed: bool) {
         self.step_size = step_size;
@@ -85,9 +99,10 @@ where
 
         #[cfg(not(target_arch = "wasm32"))]
         let tick = Instant::now();
-        let log_progress = duration.abs() >= 7 * Unit::Day;
+        #[cfg(not(target_arch = "wasm32"))]
+        let mut prev_tick = Instant::now();
 
-        if log_progress {
+        if self.log_progress {
             // Prevent the print spam for orbit determination cases
             info!("Propagating for {} until {}", duration, stop_time);
         }
@@ -111,7 +126,7 @@ where
                     // No propagation necessary
                     #[cfg(not(target_arch = "wasm32"))]
                     {
-                        if log_progress {
+                        if self.log_progress {
                             let tock: Duration = tick.elapsed().into();
                             debug!("Done in {}", tock);
                         }
@@ -141,7 +156,7 @@ where
 
                 #[cfg(not(target_arch = "wasm32"))]
                 {
-                    if log_progress {
+                    if self.log_progress {
                         let tock: Duration = tick.elapsed().into();
                         debug!("Done in {}", tock);
                     }
@@ -149,6 +164,22 @@ where
 
                 return Ok(self.state);
             } else {
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    if self.log_progress {
+                        let tock: Duration = prev_tick.elapsed().into();
+                        if tock.to_unit(Unit::Minute) > 1.0 {
+                            // Report status every minute
+                            let cur_epoch = self.state.epoch();
+                            let dur_to_go = (stop_time - cur_epoch).floor(Unit::Second * 1);
+                            info!(
+                                "Propagation in progress: current epoch {}, {} to go",
+                                cur_epoch, dur_to_go
+                            );
+                            prev_tick = Instant::now();
+                        }
+                    }
+                }
                 self.single_step()?;
                 // Publish to channel if provided
                 if let Some(ref chan) = maybe_tx_chan {

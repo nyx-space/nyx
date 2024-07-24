@@ -106,6 +106,7 @@ where
                 error: 0.0,
                 attempts: 1,
             },
+            log_progress: true,
             almanac,
             step_size: self.opts.init_step,
             fixed_step: self.opts.fixed_step,
