@@ -40,12 +40,8 @@ def plot_orbit_elements(
     for col in columns:
         name = col
 
-        # # Build the color for this data frame
-        # color = color_values[k % len(color_values)]
-        # color = f"rgb({int(color[0])}, {int(color[1])}, {int(color[2])})"
-
         fig.add_trace(
-            go.Scattergl(x=df["Epoch (UTC)"], y=df[col], name=name),  # , marker_color=color),
+            go.Scattergl(x=df["Epoch (UTC)"], y=df[col], name=name),
             row=row_i + 1,
             col=col_i + 1,
         )
