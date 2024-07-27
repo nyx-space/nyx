@@ -279,7 +279,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
                 let achieved = partial.real();
 
-                let (ok, param_err) = obj.assess_raw(achieved);
+                let (ok, param_err) = obj.assess_value(achieved);
                 if !ok {
                     converged = false;
                 }

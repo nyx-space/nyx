@@ -51,12 +51,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     let sc = Spacecraft::builder()
         .orbit(orbit)
         .dry_mass_kg(1000.0) // 1000 kg of dry mass
-        .fuel_mass_kg(1000.0) // 1500 kg of fuel, totalling 2.5 tons
+        .fuel_mass_kg(1000.0) // 1000 kg of fuel, totalling 2.0 tons
         .srp(SrpConfig::from_area(3.0 * 6.0)) // Assuming 1 kW/m^2 or 18 kW, giving a margin of 4.35 kW for on-propulsion consumption
         .thruster(Thruster {
+            // "NEXT-STEP" row in Table 2
             isp_s: 4435.0,
             thrust_N: 0.472,
-        }) // "NEXT-STEP" row in Table 2
+        })
         .mode(GuidanceMode::Thrust) // Start thrusting immediately.
         .build();
 

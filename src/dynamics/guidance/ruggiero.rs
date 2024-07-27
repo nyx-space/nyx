@@ -191,7 +191,7 @@ impl Ruggiero {
             .iter()
             .flatten()
             .map(|obj| {
-                let (ok, err) = obj.assess_raw(state.value(obj.parameter).unwrap());
+                let (ok, err) = obj.assess(state).unwrap();
                 format!(
                     "{} achieved: {}\t error = {:.5} {}",
                     obj,
@@ -221,7 +221,7 @@ impl GuidanceLaw for Ruggiero {
     fn achieved(&self, state: &Spacecraft) -> Result<bool, GuidanceError> {
         for obj in self.objectives.iter().flatten() {
             if !obj
-                .assess_raw(state.value(obj.parameter).context(GuidStateSnafu)?)
+                .assess_value(state.value(obj.parameter).context(GuidStateSnafu)?)
                 .0
             {
                 return Ok(false);
