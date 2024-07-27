@@ -60,13 +60,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         .mode(GuidanceMode::Thrust) // Start thrusting immediately.
         .build();
 
-    let prop_time = 140.0 * Unit::Day;
+    let prop_time = 120.0 * Unit::Day;
 
     // Define the guidance law -- we're just using a Ruggiero controller as demonstrated in AAS-2004-5089.
     let objectives = &[
         Objective::within_tolerance(StateParameter::SMA, 42_165.0, 20.0),
         Objective::within_tolerance(StateParameter::Eccentricity, 0.001, 5e-5),
-        Objective::within_tolerance(StateParameter::Inclination, 0.05, 5e-3),
+        // Objective::within_tolerance(StateParameter::Inclination, 0.05, 5e-3),
     ];
 
     // Define the efficiency thresholds for this controller
