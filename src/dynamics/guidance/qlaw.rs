@@ -120,12 +120,8 @@ impl QLaw {
             StateParameter::SMA => osc.sma_km()? - tgt_val,
             StateParameter::Inclination => osc.inc_deg()? - tgt_val,
             StateParameter::Eccentricity => osc.ecc()? - tgt_val,
-            StateParameter::AoP => (between_pm_180(osc.aop_deg()? - tgt_val).to_radians())
-                .cos()
-                .acos(),
-            StateParameter::RAAN => (between_pm_180(osc.raan_deg()? - tgt_val).to_radians())
-                .cos()
-                .acos(),
+            StateParameter::AoP => ((osc.aop_deg()? - tgt_val).to_radians()).cos().acos(),
+            StateParameter::RAAN => ((osc.raan_deg()? - tgt_val).to_radians()).cos().acos(),
             _ => unreachable!(),
         };
 
@@ -177,13 +173,233 @@ impl QLaw {
     /// >>> (ecc/ecc_xx).diff(ecc)
     /// e**2*h/(a*(1.0 - e**2)**2*(fh**2 + fr**2 + ft**2)**0.5) + h/(2*a*(1.0 - e**2)*(fh**2 + fr**2 + ft**2)**0.5
     /// ```
-    fn dq_doe(osc: &Orbit, param: StateParameter, thrust: f64) -> PhysicsResult<f64> {
+    fn dq_doe(self, osc: &Orbit, param: StateParameter, thrust: f64) -> PhysicsResult<f64> {
+        let inclinationWeight = 1.0;
+        let rightAscensionOfAscendingNodeWeight = 1.0;
+        let eccentricityWeight = 1.0;
+        let argumentOfPeriapsisWeight = 1.0;
+        let semiMajorAxisWeight = 1.0;
+        let periapsisWeight = 1.0;
+        let minimumPeriapsisRadius = 1.0;
+
+        let semiMajorAxisTarget = self.objectives[0].unwrap().desired_value;
+
+        let x0 = 1.0 / minimumPeriapsisRadius;
+        let x1 = osc.ecc()? - 1.0;
+        let x2 = x0 * x1;
+        let x3 = osc.ecc()? - self.objectives[1].unwrap().desired_value; // - eccentricityTarget; // TODO: Must not address directly the
+        let x4 = eccentricityWeight * x3.powi(2);
+        let x5 = 1.0 / osc.sma_km()?;
+        let x6 = osc.ecc()?.powi(2);
+        let x7 = x6 - 1.0;
+        let x8 = 1.0 / x7;
+        let x9 = x5 * x8;
+        let x10 = osc.sma_km()? - semiMajorAxisTarget;
+        let x11 = x10.powi(2);
+        let x12 = osc.sma_km()?.powi(-3);
+        let x13 = osc.ecc()? + 1.0;
+        let x14 = 1.0 / x13;
+        let x15 = (x10 / (parameters_.m * semiMajorAxisTarget)).powf(parameters_.n);
+        let x16 = x15 + 1.0;
+        let x17 = 1.0 / parameters_.r;
+        let x18 = x16.powf(x17);
+        let x19 = semiMajorAxisWeight * x12 * x14 * x18;
+        let x20 = x11 * x19;
+        let x21 = 4.0 * x9;
+        let x22 = osc.inc_deg()?.to_radians() - inclinationTarget;
+        let x23 = x22.powi(2);
+        let x24 = osc.aop_deg()?.to_radians().cos();
+        let x25 = x24.abs();
+        let x26 = osc.aop_deg()?.to_radians().sin();
+        let x27 = x26.powi(2);
+        let x28 = (-x27 * x6 + 1.0).sqrt();
+        let x29 = osc.ecc()? * x25 - x28;
+        let x30 = inclinationWeight * x29.powi(2);
+        let x31 = x23 * x30;
+        let x32 = x26.abs();
+        let x33 = x24.powi(2);
+        let x34 = (-x33 * x6 + 1.0).sqrt();
+        let x35 = osc.ecc()? * x32 - x34;
+        let x36 = std::pow(x35, 2.0);
+        let x37 = osc.raan_deg()?.to_radians() - rightAscensionOfAscendingNodeTarget.to_radians();
+        let x38 = x37.cos();
+        let x39 = x38.acos();
+        let x40 = std::pow(x39, 2.0);
+        let x41 = std::sin(osc.inc_deg()?);
+        let x42 = std::pow(x41, 2.0);
+        let x43 = rightAscensionOfAscendingNodeWeight * x40 * x42;
+        let x44 = x36 * x43;
+        let x45 = osc.sma_km()? * x7;
+        let x46 = std::pow(parameters_.b + 1.0, 2.0);
+        let x47 = 1.0 / x35;
+        let x48 = osc.inc_deg()?.to_radians().cos();
+        let x49 = x48.abs();
+        let x50 = parameters_.b * x49 / x41;
+        let x51 = 1.0 / osc.ecc()?;
+        let x52 = -x7;
+        let x53 = x52 / osc.ecc()?.powi(3);
+        let x54 = (0.14814814814814814 + x52.powi(2) / osc.ecc()?.powi(6)).sqrt();
+        let x55 = x53 + x54;
+        let x56 = 0.0_f64.max(-x53 + x54);
+        let x57 = x51 - 0.79370052598409979 * x55.powf(1.0 / 3.0)
+            + 0.79370052598409979 * x56.powf(1.0 / 3.0);
+        let x58 = -x57;
+        let x59 = x58.powi(2);
+        let x60 = x59 - 1.0;
+        let x61 = osc.sma_km()?.abs();
+        let x62 = x7.abs();
+        let x63 = x51 * x61 * x62;
+        let x64 = x45 * x47 * x50
+            + x63 * (x57.powi(2) - x60 * (1.0 + 1.0 / (-osc.ecc()? * x57 + 1.0)).powi(2),).sqrt();
+        let x65 = x64.powi(-2);
+        let x66 = osc.aop_deg()?.to_radians() - argumentOfPeriapsisTarget.to_radians();
+        let x67 = x66.cos();
+        let x68 = x67.acos();
+        let x69 = x68.powi(2);
+        let x70 = 4.0 * x69;
+        let x71 = periapsisWeight * (parameters_.k * (osc.sma_km()? * x2 + 1.0)).exp();
+        let x72 = parameters_.k
+            * x71
+            * (argumentOfPeriapsisWeight * x45 * x46 * x65 * x70
+                + x1 * x20
+                + x21 * x31
+                + x21 * x44
+                + x4 * x9);
+        let x73 = x71 + 1.0;
+        let x74 = osc.frame.mu_km3_s2()? * x4;
+        let x75 = osc.sma_km()?.powi(2);
+        let x76 = 1.0 / x52;
+        let x77 = x76 / x75;
+        let x78 = -x1;
+        let x79 = osc.frame.mu_km3_s2()? * x10 * x19 * x78;
+        let x80 = inclinationWeight * x23;
+        let x81 = 4.0 * osc.frame.mu_km3_s2()? * x77;
+        let x82 = osc.frame.mu_km3_s2()? * semiMajorAxisWeight * x11 * x18;
+        let x83 = -x35;
+        let x84 = x83.powi(2);
+        let x85 = x50 / x83;
+        let x86 = x52 * x85;
+        let x87 = -x60;
+        let x88 = osc.ecc()? * x58 + 1.0;
+        let x89 = 1.0 / x88;
+        let x90 = x89 + 1.0;
+        let x91 = x90.powi(2);
+        let x92 = (x59 + x87 * x91).sqrt();
+        let x93 = x51 * x52 / (x61 * x62 * x92);
+        let x94 = 2.0 * osc.sma_km()?;
+        let x95 = osc.frame.mu_km3_s2()? * osc.sma_km()?;
+        let x96 = x52 * x95;
+        let x97 = argumentOfPeriapsisWeight * x46 * x70;
+        let x98 = std::pow(aThrustAcceleration, -2.0);
+        let x99 = (1.0 / 4.0) * x98;
+        let x100 = osc.frame.mu_km3_s2()? * x9;
+        let x101 = 2.0 * osc.ecc()?;
+        let x102 = x7.powi(2);
+        let x103 = x5 / x102;
+        let x104 = osc.ecc()? * osc.frame.mu_km3_s2()?;
+        let x105 = 8.0 * x103 * x104;
+        let x106 = osc.ecc()? / x28;
+        let x107 = 8.0 * x100;
+        let x108 = osc.ecc()? / x34;
+        let x109 = x108 * x33 + x32;
+        let x110 = x35 * x43;
+        let x111 = x64.powi(-3);
+        let x112 = 1.0 / x6;
+        let x113 = 2.0 * x61 * x62 * x92;
+        let x114 = x112 * x52;
+        let x115 = (1.0 / 3.0) * x53 * (3.0 * x114 + 2.0) / x54;
+        let x116 = x112 * (1.0 - 1.0 * x6) + (2.0 / 3.0);
+        let x117 = x55.powf(-(2.0 / 3.0)) * (x115 + x116);
+        let x118 = x56.max(1e-15).powf(-(2.0 / 3.0)) * (-x115 + x116);
+        let x119 = -1.5874010519681996 * x117 - 1.5874010519681996 * x118 + 2.0;
+        let x120 = rightAscensionOfAscendingNodeWeight * x100 * x36;
+        let x121 = argumentOfPeriapsisWeight * x102 * x111 * x46 * x69 * x75;
+        let x122 = 2.0 * x73 * x98;
+        let x123 = x24 * (x108 * x26 - (((x26) > 0) - ((x26) < 0)));
+
+        let dQ_dSemiMajorAxis = -x99
+            * (osc.frame.mu_km3_s2()? * x2 * x72
+                + x73
+                    * (-parameters_.n * x15 * x17 * x79 / x16
+                        + x29.powi(2) * x80 * x81
+                        + x43 * x81 * x84
+                        + x74 * x77
+                        - 2.0 * x79
+                        - x96
+                            * x97
+                            * (x5 * x51 * x61 * x62 * x92
+                                - x86
+                                - x93 * x94 * (x52 * x59 + x87 * x90 * (x52 * x89 - x6 + 1.0)))
+                            / (osc.sma_km()? * x86 + x63 * x92).powi(3)
+                        + 3.0 * x14 * x78 * x82 / osc.sma_km()?.powi(4)));
+
+        let dQ_dEccentricity = -x99
+            * (x0 * x72 * x95
+                + x73
+                    * (2.0 * eccentricityWeight * x100 * x3 + osc.frame.mu_km3_s2()? * x20
+                        - x1 * x12 * x82 / x13.powi(2)
+                        - x101 * x103 * x74
+                        - x105 * x31
+                        - x105 * x44
+                        + x107 * x109 * x110
+                        + x107 * x29 * x80 * (x106 * x27 + x25)
+                        + x111
+                            * x97
+                            * (-x7 * x95).powf(3.0 / 2.0)
+                            * (-osc.sma_km()? * x101 * x85 + x109 * x50 * x52 * x94 / x84
+                                - x112 * x113
+                                + x113 * x76
+                                + x75
+                                    * x93
+                                    * (-4.0 * osc.ecc()? * x59 + x112 * x119 * x52 * x58
+                                        - x114 * x119 * x58 * x91
+                                        + 2.0
+                                            * x87
+                                            * x90
+                                            * (-x101 * x89 - x101
+                                                + x52
+                                                    * (-x51
+                                                        * (-0.79370052598409979 * x117
+                                                            - 0.79370052598409979 * x118
+                                                            + 1.0)
+                                                        + x57)
+                                                    / x88.powi(2))))
+                            / x96.sqrt()));
+
+        // let dQ_dInclination = -x122
+        //     * (osc.frame.mu_km3_s2()? * parameters_.b * x121 * x47 * ((((x48) > 0) - ((x48) < 0)) + x48 * x49 / x42)
+        //         + x100 * x22 * x30
+        //         + x120 * x40 * x41 * x48);
+
+        // let x124 = std::sin(x37) / std::sqrt(1.0 - std::pow(x38, 2.0));
+        // if (!x124.is_finite()) {
+        //     x124 = 0.0;
+        // }
+
+        // let dQ_dRightAscensionOfAscendingNode = -x120 * x122 * x39 * x42 * x124;
+
+        // let x125 = std::sin(x66) / std::sqrt(1.0 - std::pow(x67, 2.0));
+        // if (!x125.is_finite()) {
+        //     x125 = 0.0;
+        // }
+
+        // let dQ_dArgumentOfPeriapsis = -x122
+        //     * (argumentOfPeriapsisWeight * osc.frame.mu_km3_s2()? * osc.sma_km()?  * x46 * x65 * x68 * x7 * x125
+        //         + osc.ecc()?
+        //             * inclinationWeight
+        //             * osc.frame.mu_km3_s2()?
+        //             * x23
+        //             * x26
+        //             * x29
+        //             * x5
+        //             * x8
+        //             * (x106 * x24 - (((x24) > 0) - ((x24) < 0)))
+        //         - osc.ecc()?  * x100 * x110 * x123
+        //         - x104 * x121 * x123 * x50 / x36);
+
         match param {
-            StateParameter::SMA => Ok(-osc.frame.mu_km3_s2()? * (1.0 - osc.ecc()?)
-                / (2.0 * osc.sma_km()?.powi(3) * (1.0 + osc.ecc()?) * thrust)),
-            StateParameter::Eccentricity => Ok(osc.ecc()?.powi(2) * osc.hmag()?
-                / (osc.sma_km()? * (1.0 - osc.ecc()?.powi(2)).powi(2) * thrust)
-                + osc.hmag()? / (2.0 * osc.sma_km()? * (1.0 - osc.ecc()?.powi(2))) * thrust),
+            StateParameter::SMA => Ok(dQ_dSemiMajorAxis),
+            StateParameter::Eccentricity => Ok(dQ_dEccentricity),
             _ => unreachable!(),
         }
     }
@@ -320,7 +536,7 @@ impl GuidanceLaw for QLaw {
                 //         let alpha = num.atan2(denom);
                 //         steering += unit_vector_from_plane_angles(alpha, 0.0) * weight;
                 //     }
-                //     StateParameter::Inclination => {
+                //     StateParameter::Inclination  => {
                 //         let beta = half_pi.copysign(((osc.ta() + osc.aop_deg()).to_radians()).cos());
                 //         steering += unit_vector_from_plane_angles(0.0, beta) * weight;
                 //     }
