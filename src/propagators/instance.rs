@@ -172,10 +172,7 @@ where
                             // Report status every minute
                             let cur_epoch = self.state.epoch();
                             let dur_to_go = (stop_time - cur_epoch).floor(Unit::Second * 1);
-                            info!(
-                                "Propagation in progress: current epoch {}, {} to go",
-                                cur_epoch, dur_to_go
-                            );
+                            info!("\t... current epoch {}, remaing {}", cur_epoch, dur_to_go);
                             prev_tick = Instant::now();
                         }
                     }

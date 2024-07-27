@@ -184,6 +184,24 @@ impl Ruggiero {
                 .abs()
         }
     }
+
+    /// Returns whether the guidance law has achieved all goals
+    pub fn status(&self, state: &Spacecraft) -> Vec<String> {
+        self.objectives
+            .iter()
+            .flatten()
+            .map(|obj| {
+                let (ok, err) = obj.assess_raw(state.value(obj.parameter).unwrap());
+                format!(
+                    "{} achieved: {}\t error = {:.5} {}",
+                    obj,
+                    ok,
+                    err,
+                    obj.parameter.unit()
+                )
+            })
+            .collect::<Vec<String>>()
+    }
 }
 
 impl fmt::Display for Ruggiero {
@@ -322,13 +340,11 @@ impl GuidanceLaw for Ruggiero {
     // Either thrust full power or not at all
     fn throttle(&self, sc: &Spacecraft) -> Result<f64, GuidanceError> {
         if sc.mode() == GuidanceMode::Thrust {
-            for (i, obj) in self.objectives.iter().flatten().enumerate() {
-                let weight = self.weighting(obj, sc, self.ηthresholds[i]);
-                if weight.abs() > 0.0 {
-                    return Ok(1.0);
-                }
+            if self.direction(sc)?.norm() > 0.0 {
+                Ok(1.0)
+            } else {
+                Ok(0.0)
             }
-            Ok(0.0)
         } else {
             Ok(0.0)
         }

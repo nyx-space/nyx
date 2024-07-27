@@ -60,7 +60,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .mode(GuidanceMode::Thrust) // Start thrusting immediately.
         .build();
 
-    let prop_time = 120.0 * Unit::Day;
+    let prop_time = 140.0 * Unit::Day;
 
     // Define the guidance law -- we're just using a Ruggiero controller as demonstrated in AAS-2004-5089.
     let objectives = &[
@@ -70,8 +70,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     ];
 
     // Define the efficiency thresholds for this controller
-    let ηthresholds = [0.5, 0.5, 0.85];
+    let ηthresholds = [0.5, 0.75, 0.85];
     let ruggiero_ctrl = Ruggiero::with_ηthresholds(objectives, &ηthresholds, sc).unwrap();
+    println!("{ruggiero_ctrl}");
 
     // Define the high fidelity dynamics
 
@@ -112,9 +113,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("[qlaw_as_ruggiero_case_b] {:x}", orbit);
 
-    let (final_state, traj) = Propagator::default(sc_dynamics.clone())
-        .with(sc, almanac.clone())
-        .for_duration_with_traj(prop_time)?;
+    let (final_state, traj) = Propagator::default(
+        sc_dynamics.clone(),
+        // PropOpts::<RSSCartesianStep>::with_tolerance(1e-10),
+    )
+    .with(sc, almanac.clone())
+    .for_duration_with_traj(prop_time)?;
 
     let fuel_usage = sc.fuel_mass_kg - final_state.fuel_mass_kg;
     println!("[qlaw_as_ruggiero_case_b] {:x}", final_state.orbit);
@@ -122,6 +126,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Finally, export the results for analysis.
     traj.to_parquet_with_cfg("./03_geo_raise.parquet", ExportCfg::default(), almanac)?;
+
+    for status_line in ruggiero_ctrl.status(&final_state) {
+        println!("{status_line}");
+    }
 
     assert!(
         ruggiero_ctrl.achieved(&final_state).unwrap(),
