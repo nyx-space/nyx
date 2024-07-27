@@ -34,9 +34,6 @@ mod ruggiero;
 pub use ruggiero::{Objective, Ruggiero, StateParameter};
 use snafu::Snafu;
 
-mod qlaw;
-pub use qlaw::QLaw;
-
 use std::fmt;
 
 #[cfg(feature = "python")]

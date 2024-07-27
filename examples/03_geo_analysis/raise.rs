@@ -66,11 +66,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let objectives = &[
         Objective::within_tolerance(StateParameter::SMA, 42_165.0, 20.0),
         Objective::within_tolerance(StateParameter::Eccentricity, 0.001, 5e-5),
-        // Objective::within_tolerance(StateParameter::Inclination, 0.05, 5e-3),
+        Objective::within_tolerance(StateParameter::Inclination, 0.05, 5e-3),
     ];
 
     // Define the efficiency thresholds for this controller
-    let ηthresholds = [0.5, 0.75, 0.85];
+    let ηthresholds = [0.001, 0.001, 0.001];
     let ruggiero_ctrl = Ruggiero::with_ηthresholds(objectives, &ηthresholds, sc).unwrap();
     println!("{ruggiero_ctrl}");
 
