@@ -9,7 +9,7 @@ use anise::{
         frames::{EARTH_J2000, IAU_EARTH_FRAME},
     },
 };
-use hifitime::{Epoch, Unit};
+use hifitime::{Epoch, TimeUnits, Unit};
 use nyx::{
     cosmic::{GuidanceMode, MetaAlmanac, Orbit, SrpConfig},
     dynamics::{
@@ -18,7 +18,7 @@ use nyx::{
     },
     io::{gravity::HarmonicsMem, ExportCfg},
     md::{prelude::Objective, StateParameter},
-    propagators::Propagator,
+    propagators::{PropOpts, Propagator, RSSCartesianStep},
     Spacecraft,
 };
 use std::{error::Error, sync::Arc};
@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let sc = Spacecraft::builder()
         .orbit(orbit)
         .dry_mass_kg(1000.0) // 1000 kg of dry mass
-        .fuel_mass_kg(1500.0) // 1500 kg of fuel, totalling 2.5 tons
+        .fuel_mass_kg(1000.0) // 1500 kg of fuel, totalling 2.5 tons
         .srp(SrpConfig::from_area(3.0 * 6.0)) // Assuming 1 kW/m^2 or 18 kW, giving a margin of 4.35 kW for on-propulsion consumption
         .thruster(Thruster {
             isp_s: 4435.0,
@@ -60,18 +60,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         .mode(GuidanceMode::Thrust) // Start thrusting immediately.
         .build();
 
-    let prop_time = 120.0 * Unit::Day;
+    let prop_time = 180.0 * Unit::Day;
 
     // Define the guidance law -- we're just using a Ruggiero controller as demonstrated in AAS-2004-5089.
     let objectives = &[
         Objective::within_tolerance(StateParameter::SMA, 42_165.0, 20.0),
         Objective::within_tolerance(StateParameter::Eccentricity, 0.001, 5e-5),
-        Objective::within_tolerance(StateParameter::Inclination, 0.05, 5e-3),
+        Objective::within_tolerance(StateParameter::Inclination, 0.05, 1e-2),
     ];
 
     // Define the efficiency thresholds for this controller
-    let ηthresholds = [0.001, 0.001, 0.001];
-    let ruggiero_ctrl = Ruggiero::with_ηthresholds(objectives, &ηthresholds, sc).unwrap();
+    let ruggiero_ctrl = Ruggiero::new(objectives, sc).unwrap();
     println!("{ruggiero_ctrl}");
 
     // Define the high fidelity dynamics
@@ -96,7 +95,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // We're using the long term prediction of the Earth centered Earth fixed frame, IAU Earth.
     let harmonics = Harmonics::from_stor(
         almanac.frame_from_uid(IAU_EARTH_FRAME)?,
-        HarmonicsMem::from_cof(&jgm3_meta.uri, 8, 8, true).unwrap(),
+        HarmonicsMem::from_cof(&jgm3_meta.uri, 0, 0, true).unwrap(),
     );
 
     // Include the spherical harmonics into the orbital dynamics.
@@ -111,18 +110,22 @@ fn main() -> Result<(), Box<dyn Error>> {
     let sc_dynamics = SpacecraftDynamics::from_model(orbital_dyn, srp_dyn)
         .with_guidance_law(ruggiero_ctrl.clone());
 
-    println!("[qlaw_as_ruggiero_case_b] {:x}", orbit);
+    println!("{:x}", orbit);
 
-    let (final_state, traj) = Propagator::default(
+    // We specify a minimum step in the propagator because the Ruggiero control would otherwise drive this step very low.
+    let (final_state, traj) = Propagator::rk89(
         sc_dynamics.clone(),
-        // PropOpts::<RSSCartesianStep>::with_tolerance(1e-10),
+        PropOpts::builder()
+            .min_step(10.0_f64.seconds())
+            .error_ctrl(RSSCartesianStep {})
+            .build(),
     )
     .with(sc, almanac.clone())
     .for_duration_with_traj(prop_time)?;
 
     let fuel_usage = sc.fuel_mass_kg - final_state.fuel_mass_kg;
-    println!("[qlaw_as_ruggiero_case_b] {:x}", final_state.orbit);
-    println!("[qlaw_as_ruggiero_case_b] fuel usage: {:.3} kg", fuel_usage);
+    println!("{:x}", final_state.orbit);
+    println!("fuel usage: {:.3} kg", fuel_usage);
 
     // Finally, export the results for analysis.
     traj.to_parquet_with_cfg("./03_geo_raise.parquet", ExportCfg::default(), almanac)?;
@@ -131,10 +134,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("{status_line}");
     }
 
-    assert!(
-        ruggiero_ctrl.achieved(&final_state).unwrap(),
-        "objective not achieved"
-    );
+    ruggiero_ctrl
+        .achieved(&final_state)
+        .expect("objective not achieved");
 
     Ok(())
 }

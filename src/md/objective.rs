@@ -85,14 +85,15 @@ impl fmt::LowerHex for Objective {
 
         write!(
             f,
-            "{:?} → {:.prec$} ",
+            "{:?} → {:.prec$} {}",
             self.parameter,
             self.desired_value,
-            prec = max_obj_tol
+            self.parameter.unit(),
+            prec = max_obj_tol,
         )?;
 
         if self.tolerance.abs() < 1e-1 {
-            write!(f, "(± {:.1e})", self.tolerance)
+            write!(f, " (± {:.1e})", self.tolerance)
         } else {
             write!(f, " (± {:.2})", self.tolerance)
         }

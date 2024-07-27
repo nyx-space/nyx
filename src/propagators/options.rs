@@ -21,6 +21,7 @@ use std::fmt;
 use crate::time::{Duration, Unit};
 
 use super::{ErrorCtrl, RSSCartesianStep};
+use typed_builder::TypedBuilder;
 
 /// PropOpts stores the integrator options, including the minimum and maximum step sizes, and the
 /// max error size.
@@ -29,15 +30,22 @@ use super::{ErrorCtrl, RSSCartesianStep};
 /// methods. To use a fixed step integrator, initialize the options using `with_fixed_step`, and
 /// use whichever adaptive step integrator is desired.  For example, initializing an RK45 with
 /// fixed step options will lead to an RK4 being used instead of an RK45.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, TypedBuilder)]
+#[builder(doc)]
 pub struct PropOpts<E: ErrorCtrl> {
+    #[builder(default_code = "60.0 * Unit::Second")]
     pub init_step: Duration,
+    #[builder(default_code = "0.001 * Unit::Second")]
     pub min_step: Duration,
+    #[builder(default_code = "2700.0 * Unit::Second")]
     pub max_step: Duration,
+    #[builder(default = 1e-12)]
     pub tolerance: f64,
+    #[builder(default = 50)]
     pub attempts: u8,
+    #[builder(default = false)]
     pub fixed_step: bool,
-    pub _errctrl: E,
+    pub error_ctrl: E,
 }
 
 impl<E: ErrorCtrl> PropOpts<E> {
@@ -47,7 +55,7 @@ impl<E: ErrorCtrl> PropOpts<E> {
         min_step: Duration,
         max_step: Duration,
         tolerance: f64,
-        errctrl: E,
+        error_ctrl: E,
     ) -> Self {
         PropOpts {
             init_step: max_step,
@@ -56,16 +64,21 @@ impl<E: ErrorCtrl> PropOpts<E> {
             tolerance,
             attempts: 50,
             fixed_step: false,
-            _errctrl: errctrl,
+            error_ctrl,
         }
     }
 
-    pub fn with_adaptive_step_s(min_step: f64, max_step: f64, tolerance: f64, errctrl: E) -> Self {
+    pub fn with_adaptive_step_s(
+        min_step: f64,
+        max_step: f64,
+        tolerance: f64,
+        error_ctrl: E,
+    ) -> Self {
         Self::with_adaptive_step(
             min_step * Unit::Second,
             max_step * Unit::Second,
             tolerance,
-            errctrl,
+            error_ctrl,
         )
     }
 
@@ -116,7 +129,7 @@ impl PropOpts<RSSCartesianStep> {
             tolerance: 0.0,
             fixed_step: true,
             attempts: 0,
-            _errctrl: RSSCartesianStep {},
+            error_ctrl: RSSCartesianStep {},
         }
     }
 
@@ -151,7 +164,7 @@ impl Default for PropOpts<RSSCartesianStep> {
             tolerance: 1e-12,
             attempts: 50,
             fixed_step: false,
-            _errctrl: RSSCartesianStep {},
+            error_ctrl: RSSCartesianStep {},
         }
     }
 }

@@ -252,7 +252,7 @@ impl EventEvaluator<Spacecraft> for PenumbraEvent {
     fn epoch_precision(&self) -> Duration {
         0.1 * Unit::Second
     }
-    /// Finds the slightest penumbra within 2%(i.e. 98% in visibility)
+    /// Finds the slightest penumbra within 2% (i.e. 98% in visibility)
     fn value_precision(&self) -> f64 {
         0.02
     }

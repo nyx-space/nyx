@@ -206,7 +206,13 @@ impl Ruggiero {
 
 impl fmt::Display for Ruggiero {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Ruggiero with {} objectives", self.objectives.len())
+        let obj_msg = self
+            .objectives
+            .iter()
+            .flatten()
+            .map(|obj| format!("{obj}"))
+            .collect::<Vec<String>>();
+        write!(f, "Ruggiero Controller: \n {}", obj_msg.join("\n"))
     }
 }
 
@@ -355,12 +361,12 @@ impl GuidanceLaw for Ruggiero {
         if sc.mode() != GuidanceMode::Inhibit {
             if !self.achieved(sc).unwrap() {
                 if sc.mode() == GuidanceMode::Coast {
-                    info!("enabling steering: {:x}", sc.orbit);
+                    debug!("enabling steering: {:x}", sc.orbit);
                 }
                 sc.mut_mode(GuidanceMode::Thrust);
             } else {
                 if sc.mode() == GuidanceMode::Thrust {
-                    info!("disabling steering: {:x}", sc.orbit);
+                    debug!("disabling steering: {:x}", sc.orbit);
                 }
                 sc.mut_mode(GuidanceMode::Coast);
             }
