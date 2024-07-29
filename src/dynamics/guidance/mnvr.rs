@@ -25,9 +25,11 @@ use crate::linalg::Vector3;
 use crate::polyfit::CommonPolynomial;
 use crate::time::{Epoch, Unit};
 use crate::State;
+use anise::prelude::Almanac;
 use hifitime::{Duration, TimeUnits};
 use snafu::ResultExt;
 use std::fmt;
+use std::sync::Arc;
 
 /// Mnvr defined a single maneuver. Direction MUST be in the VNC frame (Velocity / Normal / Cross).
 /// It may be used with a maneuver scheduler.
@@ -254,7 +256,7 @@ impl GuidanceLaw for Mnvr {
         }
     }
 
-    fn next(&self, sc: &mut Spacecraft) {
+    fn next(&self, sc: &mut Spacecraft, _almanac: Arc<Almanac>) {
         let next_mode = if sc.epoch() >= self.start && sc.epoch() < self.end {
             GuidanceMode::Thrust
         } else {

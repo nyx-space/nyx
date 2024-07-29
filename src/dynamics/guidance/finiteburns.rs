@@ -1,3 +1,4 @@
+use anise::prelude::Almanac;
 /*
     Nyx, blazing fast astrodynamics
     Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
@@ -93,7 +94,7 @@ impl GuidanceLaw for FiniteBurns {
         }
     }
 
-    fn next(&self, sc: &mut Spacecraft) {
+    fn next(&self, sc: &mut Spacecraft, _almanac: Arc<Almanac>) {
         // Grab the last maneuver
         if let Some(last_mnvr) = self.mnvrs.last() {
             // If the last maneuver ends before the current epoch, switch back into coast

@@ -11,7 +11,10 @@ use anise::{
 };
 use hifitime::{Epoch, TimeUnits, Unit};
 use nyx::{
-    cosmic::{GuidanceMode, MetaAlmanac, Orbit, SrpConfig},
+    cosmic::{
+        eclipse::{EclipseLocator, EclipseState},
+        GuidanceMode, MetaAlmanac, Orbit, SrpConfig,
+    },
     dynamics::{
         guidance::{GuidanceLaw, Ruggiero, Thruster},
         Harmonics, OrbitalDynamics, SolarPressure, SpacecraftDynamics,
@@ -70,8 +73,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         Objective::within_tolerance(StateParameter::Inclination, 0.05, 1e-2),
     ];
 
-    // Define the efficiency thresholds for this controller
-    let ruggiero_ctrl = Ruggiero::new(objectives, sc).unwrap();
+    // Ensure that we only thrust if we have more than 20% illumination.
+    let ruggiero_ctrl =
+        Ruggiero::from_max_eclipse(objectives, sc, EclipseState::Penumbra(0.2)).unwrap();
     println!("{ruggiero_ctrl}");
 
     // Define the high fidelity dynamics
@@ -128,8 +132,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("{:x}", final_state.orbit);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
-    // Finally, export the results for analysis.
-    traj.to_parquet_with_cfg("./03_geo_raise.parquet", ExportCfg::default(), almanac)?;
+    // Finally, export the results for analysis, including the penumbra percentage throughout the orbit raise.
+    traj.to_parquet(
+        "./03_geo_raise.parquet",
+        Some(vec![
+            &EclipseLocator::cislunar(almanac.clone()).to_penumbra_event()
+        ]),
+        ExportCfg::default(),
+        almanac,
+    )?;
 
     for status_line in ruggiero_ctrl.status(&final_state) {
         println!("{status_line}");

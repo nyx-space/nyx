@@ -368,13 +368,13 @@ pub fn eclipse_state(
 
         let shadow_area = circ_seg_area(r_eb_prime, d1) + circ_seg_area(r_ls_prime, d2);
         if shadow_area.is_nan() {
-            warn!(
+            error!(
                 "Shadow area is NaN! Please file a bug with initial states, eclipsing bodies, etc."
             );
             return Ok(EclipseState::Umbra);
         }
         // Compute the nominal area of the light source
-        let nominal_area = std::f64::consts::PI * r_ls_prime.powi(2);
+        let nominal_area = core::f64::consts::PI * r_ls_prime.powi(2);
         // And return the percentage (between 0 and 1) of the eclipse.
         Ok(EclipseState::Penumbra(1.0 - shadow_area / nominal_area))
     } else {

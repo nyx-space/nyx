@@ -38,6 +38,9 @@ def build_sphere(size, num_points=500, opacity=1.0):
 
 def plot_traj(
     df: pl.DataFrame,
+    colored_by="fuel_mass (kg)",
+    color_descr="fuel mass (kg)",
+    scale=1.0
 ):
     """
     Plot a trajectory in 3D
@@ -69,9 +72,9 @@ def plot_traj(
             z=df["z (km)"],
             mode="lines",
             line=dict(
-                color=df["fuel_mass (kg)"],
+                color=df[colored_by]*scale,
                 colorscale="Viridis",
-                colorbar=dict(title="fuel mass (kg)"),
+                colorbar=dict(title=color_descr),
             ),
             name="GEO",
         )
@@ -85,4 +88,6 @@ def plot_traj(
 
 
 if __name__ == "__main__":
-    plot_traj(pl.read_parquet("03_geo_raise.parquet"))
+    df = pl.read_parquet("03_geo_raise.parquet")
+    plot_traj(df)
+    plot_traj(df, colored_by="penumbra event light-source: Sun J2000, shadows casted by: Earth J2000, Moon J2000", color_descr="Shadow %", scale=100.0)
