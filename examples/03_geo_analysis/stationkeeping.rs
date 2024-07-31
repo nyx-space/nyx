@@ -53,7 +53,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Set up the spacecraft dynamics like in the orbit raise example.
 
-    let prop_time = 60.0 * Unit::Day;
+    let prop_time = 30.0 * Unit::Day;
 
     // Define the guidance law -- we're just using a Ruggiero controller as demonstrated in AAS-2004-5089.
     let objectives = &[
@@ -88,14 +88,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Finally, let's use the Monte Carlo framework built into Nyx to propagate spacecraft.
 
     // Let's start by defining the dispersion.
-
     // The MultivariateNormal structure allows us to define the dispersions in any of the orbital parameters, but these are applied directly in the Cartesian state space.
+    // Note that additional validation on the MVN is in progress -- https://github.com/nyx-space/nyx/issues/339.
     let mc_rv = MultivariateNormal::new(
         sc,
-        vec![
-            StateDispersion::zero_mean(StateParameter::SMA, 3.0),
-            StateDispersion::zero_mean(StateParameter::Inclination, 0.05),
-        ],
+        vec![StateDispersion::zero_mean(StateParameter::SMA, 3.0)],
     )?;
 
     let my_mc = MonteCarlo::new(
@@ -114,7 +111,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .build(),
     );
 
-    let num_runs = 10;
+    let num_runs = 25;
     let rslts = my_mc.run_until_epoch(setup, almanac.clone(), sc.epoch() + prop_time, num_runs);
 
     assert_eq!(rslts.runs.len(), num_runs);

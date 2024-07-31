@@ -1,6 +1,6 @@
 # Geostationary spacecraft analysis
 
-GEO birds have specific station keeping requirements. In this preliminary study, we'll look at the drift rate inside the GEO box, the orbit raising from a GTO to a GEO orbit, and run a Monte Carlo of the station keeping requirements.
+GEO birds have specific station keeping requirements. In this preliminary study, we'll look at the drift rate inside the GEO box, the orbit raising from a GTO to a GEO orbit, and run a Monte Carlo of the station keeping requirements. All of this analysis is very preliminary, and any real-world mission would need much more thorough analysis.
 
 ## Drift
 
@@ -102,3 +102,25 @@ Looking edge-on shows how the inclination is changed over time.
 During the orbit raise, a low thrust vehicle will most likely not thrust when it's in the shadow. In this analysis, we specify that the vehicle should not thrust when it is in over 80% of penumbra, i.e. it can only generate _at most_ 20% of the power it would generate in full sunshine (depending on pointing of course).
 
 ![3D traj illumination](./plots/raise-3d-illumination.png)
+
+## Station keeping
+
+As previously mentioned, station keeping is required for a GEO slot. In the third program, we look at the use of the Monte Carlo framework in Nyx which uses the multivariate normal distribution structure. We distribute the SMA of 25 spacecraft, propagate them for a two week period in high fidelity, and ensure that they Ruggiero guidance law is enabled and tight around the GEO box. **The Monte Carlo capabilities of Nyx are better demonstrated in the [02 JWST](../02_jwst_covar_monte_carlo/README.md) example.**
+
+To run the [station keeping Monte Carlo](./stationkeeping.rs) example, just execute:
+```sh
+RUST_LOG=info cargo run --example 03_geo_sk --release
+```
+
+Over a two week period, this two-ton spacecraft would need roughly 0.8 kg of fuel (if using the _NEXT-STEP_ engine, cf. the comments in the drift analysis code) +/- 0.1 kg for station keeping.
+
+![Fuel mass](./plots/sk-fuel-mass.png)
+
+The inclination plot shows when the guidance law turns on, and shows that we maintain the constraint within the specified objectives.
+
+![Inclination](./plots/sk-inc.png)
+![Eccentricity](./plots/sk-ecc.png)
+
+### Further analysis
+
+Additional analysis would run this Monte Carlo for longer and with many more spacecraft (upward of 100), and crucially ensure that the Ruggiero guidance law bounds correspond to the GEO box. Subsequently, one should implement the Q-Law guidance law for more fuel economy. Finally, the analysis should also include a variation on the tightness of the box, especially if the vehicle is equipped with a variable thrust engine as one may wish to drift less out of the SK box and keep the engine at a lower thrust level, or vice versa.
