@@ -100,7 +100,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // We're using the long term prediction of the Earth centered Earth fixed frame, IAU Earth.
     let harmonics = Harmonics::from_stor(
         almanac.frame_from_uid(IAU_EARTH_FRAME)?,
-        HarmonicsMem::from_cof(&jgm3_meta.uri, 0, 0, true).unwrap(),
+        HarmonicsMem::from_cof(&jgm3_meta.uri, 8, 8, true).unwrap(),
     );
 
     // Include the spherical harmonics into the orbital dynamics.

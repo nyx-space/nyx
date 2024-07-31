@@ -41,6 +41,8 @@ In this analysis, we're assessing how quickly an arbitrary GEO bird would drift 
 
 The latitude and longitude drift quite rapidly out of this arbitrary box of +/- 0.1 degrees East/West and +/- 0.05 degrees North/South.
 
+_Note:_ the drift analysis below was done with a much lighter spacecraft than in the two other examples.
+
 ![Lat Long drift](./plots/drift-lat-long.png)
 
 ![Orbital elements drift](./plots/drift-orbital-elements-3-years.png)
