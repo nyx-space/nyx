@@ -43,7 +43,7 @@ fn rugg_sma(almanac: Arc<Almanac>) {
         1.0,
     )];
 
-    let guid_law = Ruggiero::new(objectives, orbit.into()).unwrap();
+    let guid_law = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
@@ -96,7 +96,7 @@ fn rugg_sma_regress_threshold(almanac: Arc<Almanac>) {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     for (threshold, expected_fuel_usage) in &[(0.9, 16.9), (0.0, 21.3)] {
-        let guid_law = Ruggiero::with_ηthresholds(objectives, &[*threshold], orbit.into()).unwrap();
+        let guid_law = Ruggiero::from_ηthresholds(objectives, &[*threshold], orbit.into()).unwrap();
         let sc_state =
             Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
@@ -147,7 +147,7 @@ fn rugg_sma_decr(almanac: Arc<Almanac>) {
         1.0,
     )];
 
-    let guid_law = Ruggiero::new(objectives, orbit.into()).unwrap();
+    let guid_law = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
@@ -202,7 +202,7 @@ fn rugg_inc(almanac: Arc<Almanac>) {
         5e-3,
     )];
 
-    let guid_law = Ruggiero::new(objectives, orbit.into()).unwrap();
+    let guid_law = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
@@ -258,7 +258,7 @@ fn rugg_inc_threshold(almanac: Arc<Almanac>) {
         5e-3,
     )];
 
-    let guid_law = Ruggiero::with_ηthresholds(objectives, &[0.9], orbit.into()).unwrap();
+    let guid_law = Ruggiero::from_ηthresholds(objectives, &[0.9], orbit.into()).unwrap();
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
@@ -313,7 +313,7 @@ fn rugg_inc_decr(almanac: Arc<Almanac>) {
         5e-3,
     )];
 
-    let guid_law = Ruggiero::new(objectives, orbit.into()).unwrap();
+    let guid_law = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
@@ -368,7 +368,7 @@ fn rugg_ecc(almanac: Arc<Almanac>) {
         5e-5,
     )];
 
-    let guid_law = Ruggiero::new(objectives, orbit.into()).unwrap();
+    let guid_law = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
@@ -424,7 +424,7 @@ fn rugg_ecc_regress_threshold(almanac: Arc<Almanac>) {
     )];
 
     for (threshold, expected_fuel_usage) in &[(0.9, 8.2), (0.0, 10.37)] {
-        let guid_law = Ruggiero::with_ηthresholds(objectives, &[*threshold], orbit.into()).unwrap();
+        let guid_law = Ruggiero::from_ηthresholds(objectives, &[*threshold], orbit.into()).unwrap();
 
         let sc_state =
             Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
@@ -478,7 +478,7 @@ fn rugg_ecc_decr(almanac: Arc<Almanac>) {
         5e-5,
     )];
 
-    let guid_law = Ruggiero::new(objectives, orbit.into()).unwrap();
+    let guid_law = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
@@ -535,7 +535,7 @@ fn rugg_aop(almanac: Arc<Almanac>) {
         5e-3,
     )];
 
-    let guid_law = Ruggiero::new(objectives, orbit.into()).unwrap();
+    let guid_law = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
@@ -591,7 +591,7 @@ fn rugg_aop_decr(almanac: Arc<Almanac>) {
         5e-3,
     )];
 
-    let guid_law = Ruggiero::new(objectives, orbit.into()).unwrap();
+    let guid_law = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
@@ -644,7 +644,7 @@ fn rugg_raan(almanac: Arc<Almanac>) {
     // Define the objectives
     let objectives = &[Objective::within_tolerance(StateParameter::RAAN, 5.0, 5e-5)];
 
-    let guid_law = Ruggiero::new(objectives, orbit.into()).unwrap();
+    let guid_law = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
@@ -696,7 +696,7 @@ fn rugg_raan_regress_threshold(almanac: Arc<Almanac>) {
     let objectives = &[Objective::within_tolerance(StateParameter::RAAN, 5.0, 5e-5)];
 
     for (threshold, expected_fuel_usage) in &[(0.9, 14.787), (0.0, 22.189)] {
-        let guid_law = Ruggiero::with_ηthresholds(objectives, &[*threshold], orbit.into()).unwrap();
+        let guid_law = Ruggiero::from_ηthresholds(objectives, &[*threshold], orbit.into()).unwrap();
 
         let sc_state =
             Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);

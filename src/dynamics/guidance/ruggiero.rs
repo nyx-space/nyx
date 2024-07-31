@@ -16,12 +16,14 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anise::prelude::Almanac;
 use snafu::ResultExt;
 
 use super::{
     unit_vector_from_plane_angles, GuidStateSnafu, GuidanceError, GuidanceLaw, GuidanceMode,
     GuidancePhysicsSnafu, NyxError, Orbit, Spacecraft, Vector3,
 };
+use crate::cosmic::eclipse::{EclipseLocator, EclipseState};
 pub use crate::md::objective::Objective;
 pub use crate::md::StateParameter;
 use crate::State;
@@ -36,6 +38,8 @@ pub struct Ruggiero {
     pub objectives: [Option<Objective>; 5],
     /// Stores the minimum efficiency to correct a given orbital element, defaults to zero (i.e. always correct)
     pub ηthresholds: [f64; 5],
+    /// If define, coast until vehicle is out of the provided eclipse state.
+    pub max_eclipse: Option<EclipseState>,
     init_state: Spacecraft,
 }
 
@@ -45,13 +49,14 @@ pub struct Ruggiero {
 impl Ruggiero {
     /// Creates a new Ruggiero locally optimal control as an Arc
     /// Note: this returns an Arc so it can be plugged into the Spacecraft dynamics directly.
-    pub fn new(objectives: &[Objective], initial: Spacecraft) -> Result<Arc<Self>, NyxError> {
-        Self::with_ηthresholds(objectives, &[0.0; 5], initial)
+    pub fn simple(objectives: &[Objective], initial: Spacecraft) -> Result<Arc<Self>, NyxError> {
+        Self::from_ηthresholds(objectives, &[0.0; 5], initial)
     }
 
-    /// Creates a new Ruggiero locally optimal control as an Arc
+    /// Creates a new Ruggiero locally optimal control with the provided efficiency threshold.
+    /// If the efficiency to correct the mapped orbital element is greater than the threshold, then the control law will be applied to this orbital element.
     /// Note: this returns an Arc so it can be plugged into the Spacecraft dynamics directly.
-    pub fn with_ηthresholds(
+    pub fn from_ηthresholds(
         objectives: &[Objective],
         ηthresholds: &[f64],
         initial: Spacecraft,
@@ -100,7 +105,59 @@ impl Ruggiero {
             objectives: objs,
             init_state: initial,
             ηthresholds: eff,
+            max_eclipse: None,
         }))
+    }
+
+    /// Creates a new Ruggiero locally optimal control as an Arc
+    /// Note: this returns an Arc so it can be plugged into the Spacecraft dynamics directly.
+    pub fn from_max_eclipse(
+        objectives: &[Objective],
+        initial: Spacecraft,
+        max_eclipse: EclipseState,
+    ) -> Result<Arc<Self>, NyxError> {
+        let mut objs: [Option<Objective>; 5] = [None, None, None, None, None];
+        let eff: [f64; 5] = [0.0; 5];
+        if objectives.len() > 5 || objectives.is_empty() {
+            return Err(NyxError::GuidanceConfigError {
+                msg: format!(
+                    "Must provide between 1 and 5 objectives (included), provided {}",
+                    objectives.len()
+                ),
+            });
+        }
+
+        for (i, obj) in objectives.iter().enumerate() {
+            if [
+                StateParameter::SMA,
+                StateParameter::Eccentricity,
+                StateParameter::Inclination,
+                StateParameter::RAAN,
+                StateParameter::AoP,
+            ]
+            .contains(&obj.parameter)
+            {
+                objs[i] = Some(*obj);
+            } else {
+                return Err(NyxError::GuidanceConfigError {
+                    msg: format!("Objective {} not supported in Ruggerio", obj.parameter),
+                });
+            }
+        }
+        for i in 0..objectives.len() {
+            objs[i] = Some(objectives[i]);
+        }
+        Ok(Arc::new(Self {
+            objectives: objs,
+            init_state: initial,
+            ηthresholds: eff,
+            max_eclipse: Some(max_eclipse),
+        }))
+    }
+
+    /// Sets the maximum eclipse during which we can thrust.
+    pub fn set_max_eclipse(&mut self, max_eclipse: EclipseState) {
+        self.max_eclipse = Some(max_eclipse);
     }
 
     /// Returns the efficiency η ∈ [0; 1] of correcting a specific orbital element at the provided osculating orbit
@@ -183,11 +240,40 @@ impl Ruggiero {
                 .abs()
         }
     }
+
+    /// Returns whether the guidance law has achieved all goals
+    pub fn status(&self, state: &Spacecraft) -> Vec<String> {
+        self.objectives
+            .iter()
+            .flatten()
+            .map(|obj| {
+                let (ok, err) = obj.assess(state).unwrap();
+                format!(
+                    "{} achieved: {}\t error = {:.5} {}",
+                    obj,
+                    ok,
+                    err,
+                    obj.parameter.unit()
+                )
+            })
+            .collect::<Vec<String>>()
+    }
 }
 
 impl fmt::Display for Ruggiero {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Ruggiero with {} objectives", self.objectives.len())
+        let obj_msg = self
+            .objectives
+            .iter()
+            .flatten()
+            .map(|obj| format!("{obj}"))
+            .collect::<Vec<String>>();
+        write!(
+            f,
+            "Ruggiero Controller (max eclipse: {:?}): \n {}",
+            self.max_eclipse,
+            obj_msg.join("\n")
+        )
     }
 }
 
@@ -196,7 +282,7 @@ impl GuidanceLaw for Ruggiero {
     fn achieved(&self, state: &Spacecraft) -> Result<bool, GuidanceError> {
         for obj in self.objectives.iter().flatten() {
             if !obj
-                .assess_raw(state.value(obj.parameter).context(GuidStateSnafu)?)
+                .assess_value(state.value(obj.parameter).context(GuidStateSnafu)?)
                 .0
             {
                 return Ok(false);
@@ -321,29 +407,40 @@ impl GuidanceLaw for Ruggiero {
     // Either thrust full power or not at all
     fn throttle(&self, sc: &Spacecraft) -> Result<f64, GuidanceError> {
         if sc.mode() == GuidanceMode::Thrust {
-            for (i, obj) in self.objectives.iter().flatten().enumerate() {
-                let weight = self.weighting(obj, sc, self.ηthresholds[i]);
-                if weight.abs() > 0.0 {
-                    return Ok(1.0);
-                }
+            if self.direction(sc)?.norm() > 0.0 {
+                Ok(1.0)
+            } else {
+                Ok(0.0)
             }
-            Ok(0.0)
         } else {
             Ok(0.0)
         }
     }
 
     /// Update the state for the next iteration
-    fn next(&self, sc: &mut Spacecraft) {
+    fn next(&self, sc: &mut Spacecraft, almanac: Arc<Almanac>) {
         if sc.mode() != GuidanceMode::Inhibit {
             if !self.achieved(sc).unwrap() {
-                if sc.mode() == GuidanceMode::Coast {
-                    info!("enabling steering: {:x}", sc.orbit);
+                // Check eclipse state if applicable.
+                if let Some(max_eclipse) = self.max_eclipse {
+                    let locator = EclipseLocator::cislunar(almanac.clone());
+                    if locator
+                        .compute(sc.orbit, almanac)
+                        .expect("cannot compute eclipse")
+                        > max_eclipse
+                    {
+                        // Coast in eclipse
+                        sc.mode = GuidanceMode::Coast;
+                    } else {
+                        sc.mode = GuidanceMode::Thrust;
+                    }
+                } else if sc.mode() == GuidanceMode::Coast {
+                    debug!("enabling steering: {:x}", sc.orbit);
                 }
                 sc.mut_mode(GuidanceMode::Thrust);
             } else {
                 if sc.mode() == GuidanceMode::Thrust {
-                    info!("disabling steering: {:x}", sc.orbit);
+                    debug!("disabling steering: {:x}", sc.orbit);
                 }
                 sc.mut_mode(GuidanceMode::Coast);
             }
@@ -367,7 +464,7 @@ fn ruggiero_weight() {
         Objective::within_tolerance(StateParameter::Eccentricity, 0.01, 5e-5),
     ];
 
-    let ruggiero = Ruggiero::new(objectives, sc).unwrap();
+    let ruggiero = Ruggiero::simple(objectives, sc).unwrap();
     // 7301.597157 201.699933 0.176016 -0.202974 7.421233 0.006476 298.999726
     let osc = Orbit::new(
         7_303.253_461_441_64f64,

@@ -55,7 +55,7 @@ fn qlaw_as_ruggiero_case_a(almanac: Arc<Almanac>) {
         Event::within_tolerance(StateParameter::Eccentricity, 0.01, 5e-5),
     ];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit.into()).unwrap();
+    let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
     let dry_mass = 1.0;
     let fuel_mass = 299.0;
@@ -117,7 +117,7 @@ fn qlaw_as_ruggiero_case_b(almanac: Arc<Almanac>) {
         Objective::within_tolerance(StateParameter::Inclination, 0.05, 5e-3),
     ];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit.into()).unwrap();
+    let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
     let fuel_mass = 1999.9;
     let dry_mass = 0.1;
@@ -172,7 +172,7 @@ fn qlaw_as_ruggiero_case_c(almanac: Arc<Almanac>) {
         Objective::within_tolerance(StateParameter::Eccentricity, 0.7, 5e-5),
     ];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit.into()).unwrap();
+    let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
     let fuel_mass = 299.9;
     let dry_mass = 0.1;
@@ -230,7 +230,7 @@ fn qlaw_as_ruggiero_case_d(almanac: Arc<Almanac>) {
         Objective::within_tolerance(StateParameter::RAAN, 360.0 - 90.0, 5e-3),
     ];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit.into()).unwrap();
+    let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
@@ -290,7 +290,7 @@ fn qlaw_as_ruggiero_case_e(almanac: Arc<Almanac>) {
         Objective::within_tolerance(StateParameter::AoP, 180.0, 5e-3),
     ];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit.into()).unwrap();
+    let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
     let fuel_mass = 1999.9;
     let dry_mass = 0.1;
@@ -346,7 +346,7 @@ fn qlaw_as_ruggiero_case_f(almanac: Arc<Almanac>) {
 
     let objectives = &[Objective::new(StateParameter::Eccentricity, 0.15)];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit.into()).unwrap();
+    let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
@@ -406,7 +406,7 @@ fn ruggiero_iepc_2011_102(almanac: Arc<Almanac>) {
         Objective::within_tolerance(StateParameter::Eccentricity, 0.011, 5e-5),
     ];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit.into()).unwrap();
+    let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;

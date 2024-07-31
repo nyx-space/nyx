@@ -237,7 +237,7 @@ impl Dynamics for SpacecraftDynamics {
     fn finally(
         &self,
         next_state: Self::StateType,
-        _almanac: Arc<Almanac>,
+        almanac: Arc<Almanac>,
     ) -> Result<Self::StateType, DynamicsError> {
         if next_state.fuel_mass_kg < 0.0 {
             error!("negative fuel mass at {}", next_state.epoch());
@@ -249,7 +249,7 @@ impl Dynamics for SpacecraftDynamics {
         if let Some(guid_law) = &self.guid_law {
             let mut state = next_state;
             // Update the control mode
-            guid_law.next(&mut state);
+            guid_law.next(&mut state, almanac.clone());
             Ok(state)
         } else {
             Ok(next_state)

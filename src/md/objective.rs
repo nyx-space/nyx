@@ -17,7 +17,7 @@
 */
 
 use super::StateParameter;
-use crate::cosmic::OrbitPartial;
+use crate::{errors::StateError, Spacecraft, State};
 use std::fmt;
 
 /// Defines a state parameter event finder
@@ -59,13 +59,13 @@ impl Objective {
     }
 
     /// Returns whether this objective has been achieved, and the associated parameter error.
-    pub fn assess(&self, achieved: OrbitPartial) -> (bool, f64) {
-        self.assess_raw(achieved.real())
+    pub fn assess(&self, achieved: &Spacecraft) -> Result<(bool, f64), StateError> {
+        Ok(self.assess_value(achieved.value(self.parameter)?))
     }
 
     /// Returns whether this objective has been achieved, and the associated parameter error.
     /// Warning: the parameter `achieved` must be in the same unit as the objective.
-    pub fn assess_raw(&self, achieved: f64) -> (bool, f64) {
+    pub fn assess_value(&self, achieved: f64) -> (bool, f64) {
         let param_err =
             self.multiplicative_factor * (self.desired_value - achieved) + self.additive_factor;
 
@@ -85,14 +85,15 @@ impl fmt::LowerHex for Objective {
 
         write!(
             f,
-            "{:?} → {:.prec$} ",
+            "{:?} → {:.prec$} {}",
             self.parameter,
             self.desired_value,
-            prec = max_obj_tol
+            self.parameter.unit(),
+            prec = max_obj_tol,
         )?;
 
         if self.tolerance.abs() < 1e-1 {
-            write!(f, "(± {:.1e})", self.tolerance)
+            write!(f, " (± {:.1e})", self.tolerance)
         } else {
             write!(f, " (± {:.2})", self.tolerance)
         }

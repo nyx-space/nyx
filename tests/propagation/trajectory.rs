@@ -270,7 +270,7 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
         5e-3,
     )];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit.into()).unwrap();
+    let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
     // Build the spacecraft state
     let fuel_mass = 67.0;
@@ -301,7 +301,7 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
 
     for mut sc_state in traj.every(1 * Unit::Day) {
         // We need to evaluate the mode of this state because the trajectory does not store discrete information
-        ruggiero_ctrl.next(&mut sc_state);
+        ruggiero_ctrl.next(&mut sc_state, almanac.clone());
         if sc_state.mode() != prev_mode {
             println!(
                 "Mode changed from {:?} to {:?} @ {}",
@@ -316,7 +316,7 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
     for epoch in TimeSeries::inclusive(start_dt, start_dt + prop_time, 1 * Unit::Day) {
         // Note: the `evaluate` function will return a Result which prevents a panic if you request something out of the ephemeris
         let mut sc_state = traj.at(epoch).unwrap();
-        ruggiero_ctrl.next(&mut sc_state);
+        ruggiero_ctrl.next(&mut sc_state, almanac.clone());
         if sc_state.mode() != prev_mode {
             println!(
                 "Mode changed from {:?} to {:?} @ {}",

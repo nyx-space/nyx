@@ -244,7 +244,7 @@ impl EventEvaluator<Spacecraft> for PenumbraEvent {
         {
             EclipseState::Umbra => Ok(0.0),
             EclipseState::Visibilis => Ok(1.0),
-            EclipseState::Penumbra(val) => Ok(val - 1.0),
+            EclipseState::Penumbra(val) => Ok(val),
         }
     }
 
@@ -252,7 +252,7 @@ impl EventEvaluator<Spacecraft> for PenumbraEvent {
     fn epoch_precision(&self) -> Duration {
         0.1 * Unit::Second
     }
-    /// Finds the slightest penumbra within 2%(i.e. 98% in visibility)
+    /// Finds the slightest penumbra within 2% (i.e. 98% in visibility)
     fn value_precision(&self) -> f64 {
         0.02
     }
@@ -368,13 +368,13 @@ pub fn eclipse_state(
 
         let shadow_area = circ_seg_area(r_eb_prime, d1) + circ_seg_area(r_ls_prime, d2);
         if shadow_area.is_nan() {
-            warn!(
+            error!(
                 "Shadow area is NaN! Please file a bug with initial states, eclipsing bodies, etc."
             );
             return Ok(EclipseState::Umbra);
         }
         // Compute the nominal area of the light source
-        let nominal_area = std::f64::consts::PI * r_ls_prime.powi(2);
+        let nominal_area = core::f64::consts::PI * r_ls_prime.powi(2);
         // And return the percentage (between 0 and 1) of the eclipse.
         Ok(EclipseState::Penumbra(1.0 - shadow_area / nominal_area))
     } else {

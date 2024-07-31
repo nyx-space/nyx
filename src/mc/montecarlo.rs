@@ -251,6 +251,7 @@ where
             |(arc_prop, tx), (index, dispersed_state)| {
                 let result = arc_prop
                     .with(dispersed_state.state, almanac.clone())
+                    .quiet()
                     .until_epoch_with_traj(end_epoch);
 
                 // Build a single run result
