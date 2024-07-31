@@ -244,7 +244,7 @@ impl EventEvaluator<Spacecraft> for PenumbraEvent {
         {
             EclipseState::Umbra => Ok(0.0),
             EclipseState::Visibilis => Ok(1.0),
-            EclipseState::Penumbra(val) => Ok(val - 1.0),
+            EclipseState::Penumbra(val) => Ok(val),
         }
     }
 

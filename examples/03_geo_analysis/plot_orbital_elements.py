@@ -1,4 +1,4 @@
-from datetime import datetime
+import argparse
 import polars as pl
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
@@ -53,4 +53,10 @@ def plot_orbit_elements(
 
 
 if __name__ == "__main__":
-    plot_orbit_elements(pl.read_parquet("03_geo_raise.parquet"))
+    parser = argparse.ArgumentParser(description="3D traj plotter")
+    parser.add_argument("pq", type=str, help="Path to the parquet file")
+    args = parser.parse_args()
+    
+    df = pl.read_parquet(args.pq)
+
+    plot_orbit_elements(df)

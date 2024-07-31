@@ -3,12 +3,6 @@ import plotly.graph_objs as go
 from plotly.subplots import make_subplots
 
 if __name__ == "__main__":
-    df_prop = pl.read_parquet("./03_geo_hf_prop.parquet")
-    df_prop = df_prop.with_columns(
-        pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f")
-    ).sort("Epoch (UTC)", descending=False)
-    print(df_prop.describe())
-
     df_lla = pl.read_parquet("./03_geo_lla.parquet")
     df_lla = df_lla.with_columns(
         pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f")

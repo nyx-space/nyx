@@ -158,7 +158,7 @@ where
                 {
                     if self.log_progress {
                         let tock: Duration = tick.elapsed().into();
-                        debug!("Done in {}", tock);
+                        info!("\t... done in {}", tock);
                     }
                 }
 

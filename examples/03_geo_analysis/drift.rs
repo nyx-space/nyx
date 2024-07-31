@@ -6,12 +6,12 @@ use anise::{
     almanac::metaload::MetaFile,
     constants::{
         celestial_objects::{MOON, SUN},
-        frames::{EARTH_J2000, IAU_EARTH_FRAME},
+        frames::{EARTH_J2000, IAU_EARTH_FRAME, MOON_J2000},
     },
 };
 use hifitime::{Epoch, Unit};
 use nyx::{
-    cosmic::{MetaAlmanac, Orbit, SrpConfig},
+    cosmic::{eclipse::EclipseLocator, MetaAlmanac, Orbit, SrpConfig},
     dynamics::{Harmonics, OrbitalDynamics, SolarPressure, SpacecraftDynamics},
     io::{gravity::HarmonicsMem, ExportCfg},
     propagators::Propagator,
@@ -95,8 +95,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     orbital_dyn.accel_models.push(harmonics_21x21);
 
     // We define the solar radiation pressure, using the default solar flux and accounting only
-    // for the eclipsing caused by the Earth.
-    let srp_dyn = SolarPressure::default(EARTH_J2000, almanac.clone())?;
+    // for the eclipsing caused by the Earth and Moon.
+    let srp_dyn = SolarPressure::new(vec![EARTH_J2000, MOON_J2000], almanac.clone())?;
 
     // Finalize setting up the dynamics, specifying the force models (orbital_dyn) separately from the
     // acceleration models (SRP in this case). Use `from_models` to specify multiple accel models.
@@ -109,7 +109,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // The second value is the full trajectory where the step size is variable step used by the propagator.
     let (future_sc, trajectory) = Propagator::default(dynamics)
         .with(sc, almanac.clone())
-        .until_epoch_with_traj(epoch + Unit::Day * 60.0)?;
+        .until_epoch_with_traj(epoch + Unit::Century * 0.03)?;
 
     println!("=== High fidelity propagation ===");
     println!(
@@ -140,22 +140,24 @@ fn main() -> Result<(), Box<dyn Error>> {
     // We also have access to the full trajectory throughout the propagation.
     println!("{trajectory}");
 
+    println!("Spacecraft params after 3 years without active control:\n{future_sc:x}");
+
     // With the trajectory, let's build a few data products.
 
-    // 1. Export the trajectory as a CCSDS OEM version 2.0 file and as a parquet file, which includes the Keplerian orbital elements.
+    // 1. Export the trajectory as a parquet file, which includes the Keplerian orbital elements.
 
-    let analysis_step = Unit::Minute * 30;
+    let analysis_step = Unit::Minute * 5;
 
-    trajectory.to_parquet_with_cfg(
+    trajectory.to_parquet(
         "./03_geo_hf_prop.parquet",
+        Some(vec![
+            &EclipseLocator::cislunar(almanac.clone()).to_penumbra_event()
+        ]),
         ExportCfg::builder().step(analysis_step).build(),
         almanac.clone(),
     )?;
 
-    // 2. Compare the difference in the radial-intrack-crosstrack frame between the high fidelity
-    // and Keplerian propagation. The RIC frame is commonly used to compute the difference in position
-    // and velocity of different spacecraft.
-    // 3. Compute the azimuth, elevation, range, and range-rate data of that spacecraft as seen from Boulder, CO, USA.
+    // 2. Compute the latitude, longitude, and altitude throughout the trajectory by rotating the spacecraft position into the Earth body fixed frame.
 
     // We iterate over the trajectory, grabbing a state every two minutes.
     let mut offset_s = vec![];

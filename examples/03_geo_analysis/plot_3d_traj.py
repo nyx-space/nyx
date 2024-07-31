@@ -1,3 +1,4 @@
+import argparse
 from datetime import datetime
 import polars as pl
 import plotly.graph_objs as go
@@ -88,6 +89,10 @@ def plot_traj(
 
 
 if __name__ == "__main__":
-    df = pl.read_parquet("03_geo_raise.parquet")
+    parser = argparse.ArgumentParser(description="3D traj plotter")
+    parser.add_argument("pq", type=str, help="Path to the parquet file")
+    args = parser.parse_args()
+    
+    df = pl.read_parquet(args.pq)
     plot_traj(df)
-    plot_traj(df, colored_by="penumbra event light-source: Sun J2000, shadows casted by: Earth J2000, Moon J2000", color_descr="Shadow %", scale=100.0)
+    plot_traj(df, colored_by="penumbra event light-source: Sun J2000, shadows casted by: Earth J2000, Moon J2000", color_descr="Illumination %", scale=100.0)

@@ -113,3 +113,7 @@ path = "examples/03_geo_analysis/drift.rs"
 [[example]]
 name = "03_geo_raise"
 path = "examples/03_geo_analysis/raise.rs"
+
+[[example]]
+name = "03_geo_sk"
+path = "examples/03_geo_analysis/stationkeeping.rs"
