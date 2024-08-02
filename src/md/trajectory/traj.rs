@@ -235,7 +235,7 @@ where
         // Epochs
         let mut utc_epoch = StringBuilder::new();
         for s in &states {
-            utc_epoch.append_value(&s.epoch().to_time_scale(TimeScale::UTC).to_isoformat());
+            utc_epoch.append_value(s.epoch().to_time_scale(TimeScale::UTC).to_isoformat());
         }
         record.push(Arc::new(utc_epoch.finish()));
 
@@ -459,7 +459,7 @@ where
         // Epochs (both match for self and others)
         let mut utc_epoch = StringBuilder::new();
         for s in &self_states {
-            utc_epoch.append_value(&s.epoch().to_time_scale(TimeScale::UTC).to_isoformat());
+            utc_epoch.append_value(s.epoch().to_time_scale(TimeScale::UTC).to_isoformat());
         }
         record.push(Arc::new(utc_epoch.finish()));
 

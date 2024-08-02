@@ -358,7 +358,7 @@ where
         let mut utc_epoch = StringBuilder::new();
         let mut idx_col = Int32Builder::new();
         for (sno, s) in all_states.iter().enumerate() {
-            utc_epoch.append_value(&s.epoch().to_time_scale(TimeScale::UTC).to_isoformat());
+            utc_epoch.append_value(s.epoch().to_time_scale(TimeScale::UTC).to_isoformat());
 
             // Copy this a bunch of times because all columns must have the same length
             idx_col.append_value(run_indexes[sno]);
