@@ -12,7 +12,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: stable
+          toolchain: nightly
       - run: cargo doc --no-deps -Zunstable-options -Zrustdoc-scrape-examples
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
