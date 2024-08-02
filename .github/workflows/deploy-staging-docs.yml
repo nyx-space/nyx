@@ -18,16 +18,23 @@ jobs:
         run: |
           declare -A example_map
           example_map["01_orbit_prop"]="01_orbit_prop"
-          example_map["02_jwst_covar_monte_carlo"]="02_jwst"
-          example_map["03_geo_analysis"]="03_geo_raise"
+          example_map["02_jwst"]="02_jwst_covar_monte_carlo"
+          
+          declare -A special_cases
+          special_cases["03_geo_analysis"]="03_geo_raise 03_geo_drift 03_geo_sk"
           
           for example_dir in examples/*; do
             example_name=$(basename $example_dir)
             if [ -d "$example_dir/plots" ]; then
-              doc_name=${example_map[$example_name]}
-              if [ -n "$doc_name" ]; then
+              if [ -n "${example_map[$example_name]}" ]; then
+                doc_name=${example_map[$example_name]}
                 mkdir -p target/doc/$doc_name/plots
                 cp -r $example_dir/plots/* target/doc/$doc_name/plots/
+              elif [ -n "${special_cases[$example_name]}" ]; then
+                for target_folder in ${special_cases[$example_name]}; do
+                  mkdir -p target/doc/$target_folder/plots
+                  cp -r $example_dir/plots/* target/doc/$target_folder/plots/
+                done
               else
                 echo "No mapping found for $example_name"
               fi
