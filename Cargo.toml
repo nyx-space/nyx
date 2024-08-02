@@ -98,22 +98,30 @@ name = "nyx_space"
 linker = "/usr/bin/clang"
 rustflags = ["-Clink-arg=-fuse-ld=lld", "-Clink-arg=-Wl,--no-rosegment"]
 
+[package.metadata.docs.rs]
+cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
+
 [[example]]
 name = "01_orbit_prop"
 path = "examples/01_orbit_prop/main.rs"
+doc-scrape-examples = true
 
 [[example]]
 name = "02_jwst"
 path = "examples/02_jwst_covar_monte_carlo/main.rs"
+doc-scrape-examples = true
 
 [[example]]
 name = "03_geo_drift"
 path = "examples/03_geo_analysis/drift.rs"
+doc-scrape-examples = true
 
 [[example]]
 name = "03_geo_raise"
 path = "examples/03_geo_analysis/raise.rs"
+doc-scrape-examples = true
 
 [[example]]
 name = "03_geo_sk"
 path = "examples/03_geo_analysis/stationkeeping.rs"
+doc-scrape-examples = true

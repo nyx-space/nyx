@@ -41,7 +41,7 @@ pub struct OrbitalDynamics {
 }
 
 impl OrbitalDynamics {
-    /// Initialize point mass dynamics given the EXB IDs and a Cosm
+    /// Initializes the point masses gravities with the provided list of bodies
     pub fn point_masses(celestial_objects: Vec<i32>) -> Self {
         // Create the point masses
         Self::new(vec![PointMasses::new(celestial_objects)])
@@ -176,7 +176,7 @@ pub struct PointMasses {
 }
 
 impl PointMasses {
-    /// Initializes the multibody point mass dynamics with the provided list of bodies
+    /// Initializes the point masses gravities with the provided list of bodies
     pub fn new(celestial_objects: Vec<i32>) -> Arc<Self> {
         Arc::new(Self {
             celestial_objects,
@@ -184,7 +184,7 @@ impl PointMasses {
         })
     }
 
-    /// Initializes the multibody point mass dynamics with the provided list of bodies, and accounting for some light time correction
+    /// Initializes the point masses gravities with the provided list of bodies, and accounting for some light time correction
     pub fn with_correction(celestial_objects: Vec<i32>, correction: Aberration) -> Self {
         Self {
             celestial_objects,

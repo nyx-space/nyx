@@ -83,11 +83,11 @@ jobs:
 
       - name: Run examples
         run: |
-          cargo run --example 01_orbit_prop --release
-          cargo run --example 02_jwst --release
-          cargo run --example 03_geo_drift --release
-          cargo run --example 03_geo_raise --release
-          cargo run --example 03_geo_sk --release
+          cargo build --example 01_orbit_prop --release
+          cargo build --example 02_jwst --release
+          cargo build --example 03_geo_drift --release
+          cargo build --example 03_geo_raise --release
+          cargo build --example 03_geo_sk --release
 
   lints:
     name: Lints

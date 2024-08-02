@@ -171,9 +171,9 @@ impl ErrorCtrl for RSSStep {
 /// > This is a more stringent error control method than [`rss_step`] that is often used as the default in other software such as STK.
 /// > If you set [the] accuracy to a very small number, 1e-13 for example, and set the error control to [`rss_step`], integrator
 /// > performance will be poor, for little if any improvement in the accuracy of the orbit integration.
-/// For more best practices of these integrators (which clone those in GMAT), please refer to the
-/// [GMAT reference](https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/doc/help/src/Resource_NumericalIntegrators.xml#L1292).
-/// (Source)[https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/ODEModel.cpp#L3004]
+/// > For more best practices of these integrators (which clone those in GMAT), please refer to the
+/// > [GMAT reference](https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/doc/help/src/Resource_NumericalIntegrators.xml#L1292).
+/// > (Source)[https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/ODEModel.cpp#L3004]
 #[derive(Clone, Copy)]
 #[allow(clippy::upper_case_acronyms)]
 pub struct RSSState;

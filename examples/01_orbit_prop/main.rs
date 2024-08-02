@@ -1,3 +1,4 @@
+#![doc = include_str!("./README.md")]
 extern crate log;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger as pel;
