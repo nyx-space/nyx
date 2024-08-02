@@ -16,11 +16,21 @@ jobs:
       - run: cargo doc --no-deps --examples -Z rustdoc-scrape-examples
       - name: Copy plots directories
         run: |
+          declare -A example_map
+          example_map["01_orbit_prop"]="01_orbit_prop"
+          example_map["02_jwst_covar_monte_carlo"]="02_jwst"
+          example_map["03_geo_analysis"]="03_geo_raise"
+          
           for example_dir in examples/*; do
+            example_name=$(basename $example_dir)
             if [ -d "$example_dir/plots" ]; then
-              example_name=$(basename $example_dir)
-              mkdir -p target/doc/$example_name/plots
-              cp -r $example_dir/plots/* target/doc/$example_name/plots/
+              doc_name=${example_map[$example_name]}
+              if [ -n "$doc_name" ]; then
+                mkdir -p target/doc/$doc_name/plots
+                cp -r $example_dir/plots/* target/doc/$doc_name/plots/
+              else
+                echo "No mapping found for $example_name"
+              fi
             fi
           done
       - uses: FirebaseExtended/action-hosting-deploy@v0

@@ -294,8 +294,8 @@ impl TrackingArcSim<Spacecraft, RangeDoppler, GroundStation> {
     /// 5. Build each of these as "tracking strands" for this tracking device.
     /// 6. Organize all of the built tracking strands chronologically.
     /// 7. Iterate through all of the strands:
-    /// 7.a. if that tracker is marked as `Greedy` and it ends after the start of the next strand, change the start date of the next strand.
-    /// 7.b. if that tracker is marked as `Eager` and it ends after the start of the next strand, change the end date of the current strand.
+    ///    7.a. if that tracker is marked as `Greedy` and it ends after the start of the next strand, change the start date of the next strand.
+    ///    7.b. if that tracker is marked as `Eager` and it ends after the start of the next strand, change the end date of the current strand.
     pub fn generate_schedule(
         &self,
         almanac: Arc<Almanac>,
