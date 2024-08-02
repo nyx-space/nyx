@@ -15,7 +15,16 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly
-      - run: cargo doc --no-deps -Zunstable-options -Zrustdoc-scrape-examples
+      - run: cargo doc --no-deps --examples -Z rustdoc-scrape-examples
+      - name: Copy plots directories
+        run: |
+          for example_dir in examples/*; do
+            if [ -d "$example_dir/plots" ]; then
+              example_name=$(basename $example_dir)
+              mkdir -p target/doc/$example_name/plots
+              cp -r $example_dir/plots/* target/doc/$example_name/plots/
+            fi
+          done
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'

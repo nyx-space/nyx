@@ -28,10 +28,10 @@ The force models used here are akin to STK's "HPOP" propagator. Specifically, th
 
 In two body propagation, all orbital elements remain constant apart from the true anomaly. In real life, the oblateness of the Earth causes the right ascension of the ascending node to drift with time (red line below). The other force models also affect the overall orbit.
 
-![RAAN, AOP, INC over time](./cubesat-angles-v-time.png)
+![RAAN, AOP, INC over time](./plots/cubesat-angles-v-time.png)
 
-![SMA (km) over time](./cubesat-sma-v-time.png)
+![SMA (km) over time](./plots/cubesat-sma-v-time.png)
 
-![ECC over time](./cubesat-ecc-v-time.png)
+![ECC over time](./plots/cubesat-ecc-v-time.png)
 
 _Note_: These plots were generated with an SRP area of that was ten times larger than the correct value, hence you may notice slightly different Keplerian orbital elements, notably for the change in the shape of the orbit.
