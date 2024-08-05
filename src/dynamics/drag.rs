@@ -24,7 +24,7 @@ use super::{
     DynamicsAlmanacSnafu, DynamicsAstroSnafu, DynamicsError, DynamicsPlanetarySnafu, ForceModel,
 };
 use crate::cosmic::{AstroError, AstroPhysicsSnafu, Frame, Spacecraft};
-use crate::linalg::{Matrix3, Vector3};
+use crate::linalg::{Matrix4x3, Vector3};
 use std::fmt;
 use std::sync::Arc;
 
@@ -60,6 +60,10 @@ impl fmt::Display for ConstantDrag {
 }
 
 impl ForceModel for ConstantDrag {
+    fn estimation_index(&self) -> Option<usize> {
+        Some(8)
+    }
+
     fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
         let osc = almanac
             .transform_to(ctx.orbit, self.drag_frame, None)
@@ -76,7 +80,7 @@ impl ForceModel for ConstantDrag {
         &self,
         _osc_ctx: &Spacecraft,
         _almanac: Arc<Almanac>,
-    ) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
+    ) -> Result<(Vector3<f64>, Matrix4x3<f64>), DynamicsError> {
         Err(DynamicsError::DynamicsAstro {
             source: AstroError::PartialsUndefined,
         })
@@ -135,6 +139,10 @@ impl fmt::Display for Drag {
 }
 
 impl ForceModel for Drag {
+    fn estimation_index(&self) -> Option<usize> {
+        Some(8)
+    }
+
     fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
         let integration_frame = ctx.orbit.frame;
 
@@ -227,7 +235,7 @@ impl ForceModel for Drag {
         &self,
         _osc_ctx: &Spacecraft,
         _almanac: Arc<Almanac>,
-    ) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
+    ) -> Result<(Vector3<f64>, Matrix4x3<f64>), DynamicsError> {
         Err(DynamicsError::DynamicsAstro {
             source: AstroError::PartialsUndefined,
         })

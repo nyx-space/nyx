@@ -19,7 +19,7 @@
 use super::{DynamicsAlmanacSnafu, DynamicsError, DynamicsPlanetarySnafu, ForceModel};
 use crate::cosmic::eclipse::EclipseLocator;
 use crate::cosmic::{Frame, Spacecraft, AU, SPEED_OF_LIGHT_M_S};
-use crate::linalg::{Const, Matrix3, Vector3};
+use crate::linalg::{Const, Matrix4x3, Vector3};
 use anise::almanac::Almanac;
 use anise::constants::frames::SUN_J2000;
 use hyperdual::{hyperspace_from_vector, linalg::norm, Float, OHyperdual};
@@ -95,6 +95,10 @@ impl SolarPressure {
 }
 
 impl ForceModel for SolarPressure {
+    fn estimation_index(&self) -> Option<usize> {
+        Some(7)
+    }
+
     fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
         let osc = ctx.orbit;
         // Compute the position of the Sun as seen from the spacecraft
@@ -128,7 +132,7 @@ impl ForceModel for SolarPressure {
         &self,
         ctx: &Spacecraft,
         almanac: Arc<Almanac>,
-    ) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
+    ) -> Result<(Vector3<f64>, Matrix4x3<f64>), DynamicsError> {
         let osc = ctx.orbit;
 
         // Compute the position of the Sun as seen from the spacecraft
@@ -145,7 +149,7 @@ impl ForceModel for SolarPressure {
         // Compute the shadowing factor.
         let k: f64 = self
             .e_loc
-            .compute(osc, almanac)
+            .compute(osc, almanac.clone())
             .context(DynamicsAlmanacSnafu {
                 action: "solar radiation pressure computation",
             })?
@@ -169,13 +173,19 @@ impl ForceModel for SolarPressure {
 
         // Extract result into Vector6 and Matrix6
         let mut dx = Vector3::zeros();
-        let mut grad = Matrix3::zeros();
+        let mut grad = Matrix4x3::zeros();
         for i in 0..3 {
             dx[i] += dual_force[i].real();
             // NOTE: Although the hyperdual state is of size 7, we're only setting the values up to 3 (Matrix3)
             for j in 0..3 {
                 grad[(i, j)] += dual_force[i][j + 1];
             }
+        }
+
+        // Compute the partial wrt to Cr.
+        let wrt_cr = self.eom(ctx, almanac)?;
+        for j in 0..3 {
+            grad[(3, j)] = wrt_cr[j];
         }
 
         Ok((dx, grad))

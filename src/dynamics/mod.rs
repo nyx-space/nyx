@@ -18,7 +18,7 @@
 
 use crate::cosmic::{AstroError, Orbit};
 use crate::linalg::allocator::Allocator;
-use crate::linalg::{DefaultAllocator, DimName, Matrix3, OMatrix, OVector, Vector3};
+use crate::linalg::{DefaultAllocator, DimName, Matrix3, Matrix4x3, OMatrix, OVector, Vector3};
 use crate::State;
 use anise::almanac::planetary::PlanetaryDataError;
 use anise::almanac::Almanac;
@@ -139,16 +139,20 @@ where
 ///
 /// Examples include Solar Radiation Pressure, drag, etc., i.e. forces which do not need to save the current state, only act on it.
 pub trait ForceModel: Send + Sync + fmt::Display {
+    /// If a parameter of this force model is stored in the spacecraft state, then this function should return the index where this parameter is being affected
+    fn estimation_index(&self) -> Option<usize>;
+
     /// Defines the equations of motion for this force model from the provided osculating state.
     fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError>;
 
     /// Force models must implement their partials, although those will only be called if the propagation requires the
     /// computation of the STM. The `osc_ctx` is the osculating context, i.e. it changes for each sub-step of the integrator.
+    /// The last row corresponds to the partials of the parameter of this force model wrt the position, i.e. this only applies to conservative forces.
     fn dual_eom(
         &self,
         osc_ctx: &Spacecraft,
         almanac: Arc<Almanac>,
-    ) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError>;
+    ) -> Result<(Vector3<f64>, Matrix4x3<f64>), DynamicsError>;
 }
 
 /// The `AccelModel` trait handles immutable dynamics which return an acceleration. Those can be added directly to Orbital Dynamics for example.

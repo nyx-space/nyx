@@ -281,8 +281,8 @@ impl Dynamics for SpacecraftDynamics {
                     d_x[i] = *val;
                 }
 
-                for (i, val) in stm_dt.iter().enumerate() {
-                    d_x[i + <Spacecraft as State>::Size::dim()] = *val;
+                for (i, val) in stm_dt.iter().copied().enumerate() {
+                    d_x[i + <Spacecraft as State>::Size::dim()] = val;
                 }
             }
             None => {
@@ -291,9 +291,10 @@ impl Dynamics for SpacecraftDynamics {
                     .orbital_dyn
                     .eom(&osc_sc.orbit, almanac.clone())?
                     .iter()
+                    .copied()
                     .enumerate()
                 {
-                    d_x[i] = *val;
+                    d_x[i] = val;
                 }
 
                 // Apply the force models for non STM propagation
@@ -414,6 +415,13 @@ impl Dynamics for SpacecraftDynamics {
                 for j in 1..4 {
                     grad[(i + 3, j - 1)] += model_grad[(i, j - 1)] / total_mass;
                 }
+            }
+            // Add this force model's estimation if applicable.
+            if let Some(idx) = model.estimation_index() {
+                for j in 0..3 {
+                    grad[(idx, j)] += model_grad[(3, j)] / total_mass;
+                }
+                // d_x[idx] = 1.0;
             }
         }
 

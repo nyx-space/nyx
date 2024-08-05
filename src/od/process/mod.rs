@@ -156,7 +156,7 @@ where
     ) -> Self {
         let init_state = prop.state;
         Self {
-            prop,
+            prop: prop.quiet(),
             kf,
             estimates: Vec::with_capacity(10_000),
             residuals: Vec::with_capacity(10_000),
@@ -794,7 +794,7 @@ where
     ) -> Self {
         let init_state = prop.state;
         Self {
-            prop,
+            prop: prop.quiet(),
             kf,
             estimates: Vec::with_capacity(10_000),
             residuals: Vec::with_capacity(10_000),
