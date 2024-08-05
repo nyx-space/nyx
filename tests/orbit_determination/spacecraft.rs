@@ -296,26 +296,14 @@ fn od_val_sc_srp_estimation(
     let _ = pretty_env_logger::try_init();
 
     let epoch = Epoch::from_gregorian_utc_at_noon(2024, 2, 29);
-    let prop_time = 1 * Unit::Day;
-
-    // Define the tracking configurations
-    let mut configs = BTreeMap::new();
-    let cfg = TrkConfig::builder()
-        .strands(vec![Strand {
-            start: epoch,
-            end: epoch + prop_time,
-        }])
-        .build();
-
-    for device in &sim_devices {
-        configs.insert(device.name.clone(), cfg.clone());
-    }
-
-    let all_stations = sim_devices;
 
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    // Using a GTO because Cr estimation will be more obvious.
+    // let initial_orbit = Orbit::keplerian(24505.9, 0.725, 7.05, 0.0, 0.0, 0.0, epoch, eme2k);
     let initial_orbit = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, epoch, eme2k);
+    // let prop_time = initial_orbit.period().unwrap() * 0.5;
+    let prop_time = 1 * Unit::Day;
 
     let dry_mass_kg = 100.0; // in kg
 
@@ -354,6 +342,21 @@ fn od_val_sc_srp_estimation(
 
     traj.to_parquet_simple(path.clone(), almanac.clone())
         .unwrap();
+
+    // Define the tracking configurations
+    let mut configs = BTreeMap::new();
+    let cfg = TrkConfig::builder()
+        .strands(vec![Strand {
+            start: epoch,
+            end: epoch + prop_time,
+        }])
+        .build();
+
+    for device in &sim_devices {
+        configs.insert(device.name.clone(), cfg.clone());
+    }
+
+    let all_stations = sim_devices;
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 120).unwrap();

@@ -61,7 +61,7 @@ impl fmt::Display for ConstantDrag {
 
 impl ForceModel for ConstantDrag {
     fn estimation_index(&self) -> Option<usize> {
-        Some(8)
+        Some(7)
     }
 
     fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {

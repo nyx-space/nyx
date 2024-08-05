@@ -96,7 +96,7 @@ impl SolarPressure {
 
 impl ForceModel for SolarPressure {
     fn estimation_index(&self) -> Option<usize> {
-        Some(7)
+        Some(6)
     }
 
     fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
@@ -183,7 +183,7 @@ impl ForceModel for SolarPressure {
         }
 
         // Compute the partial wrt to Cr.
-        let wrt_cr = self.eom(ctx, almanac)?;
+        let wrt_cr = self.eom(ctx, almanac)? / ctx.srp.cr;
         for j in 0..3 {
             grad[(3, j)] = wrt_cr[j];
         }

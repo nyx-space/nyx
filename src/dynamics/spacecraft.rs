@@ -412,19 +412,19 @@ impl Dynamics for SpacecraftDynamics {
                 // Add the velocity changes
                 d_x[i + 3] += model_frc[i] / total_mass;
                 // Add the velocity partials
-                for j in 1..4 {
-                    grad[(i + 3, j - 1)] += model_grad[(i, j - 1)] / total_mass;
+                for j in 0..3 {
+                    grad[(i + 3, j)] += model_grad[(i, j)] / total_mass;
                 }
             }
             // Add this force model's estimation if applicable.
             if let Some(idx) = model.estimation_index() {
                 for j in 0..3 {
-                    grad[(idx, j)] += model_grad[(3, j)] / total_mass;
+                    grad[(j, idx)] += model_grad[(3, j)] / total_mass;
                 }
-                // d_x[idx] = 1.0;
             }
         }
 
+        // println!("{grad:.6e}");
         Ok((d_x, grad))
     }
 }
