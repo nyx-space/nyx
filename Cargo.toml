@@ -79,7 +79,7 @@ toml = "0.8.14"
 
 [dev-dependencies]
 polars = { version = "0.41.2", features = ["parquet"] }
-rstest = "0.21.0"
+rstest = "0.22.0"
 pretty_env_logger = "0.5"
 
 [build-dependencies]
