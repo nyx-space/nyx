@@ -164,6 +164,11 @@ impl EstimateFrom<Spacecraft, RangeDoppler> for Spacecraft {
         let m22 = delta_v.y / ρ - ρ_dot * delta_r.y / ρ.powi(2);
         let m23 = delta_v.z / ρ - ρ_dot * delta_r.z / ρ.powi(2);
 
+        let stm = receiver.stm.unwrap();
+        let ρ_wrt_cr = stm[(6, 0)] * m11 + stm[(6, 1)] * m12 + stm[(6, 2)] * m13;
+
+        let ρ_dot_wrt_cr = stm[(6, 0)] * m21 + stm[(6, 1)] * m22 + stm[(6, 2)] * m23;
+
         let items = &[
             m11, m12, m13, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, m21, m22, m23, m11, m12, m13, 0.0, 0.0,
             0.0,

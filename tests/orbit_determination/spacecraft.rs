@@ -300,8 +300,8 @@ fn od_val_sc_srp_estimation(
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     // Using a GTO because Cr estimation will be more obvious.
-    // let initial_orbit = Orbit::keplerian(24505.9, 0.725, 7.05, 0.0, 0.0, 0.0, epoch, eme2k);
-    let initial_orbit = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, epoch, eme2k);
+    let initial_orbit = Orbit::keplerian(24505.9, 0.725, 7.05, 0.0, 0.0, 0.0, epoch, eme2k);
+    // let initial_orbit = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, epoch, eme2k);
     // let prop_time = initial_orbit.period().unwrap() * 0.5;
     let prop_time = 1 * Unit::Day;
 

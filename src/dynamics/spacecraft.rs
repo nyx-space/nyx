@@ -419,12 +419,16 @@ impl Dynamics for SpacecraftDynamics {
             // Add this force model's estimation if applicable.
             if let Some(idx) = model.estimation_index() {
                 for j in 0..3 {
-                    grad[(j, idx)] += model_grad[(3, j)] / total_mass;
+                    // XXX: When using (idx, j) and the H is zeroed, there is a very small change in the estimation of the Cr: 1.49999857 instead of 1.5
+                    // When using (j, idx) and H is zeroed, there is a HUGE change in Cr.
+                    // So obviously the former is _more_ correct. But I would expect that the estimation behaves no differently when H is zeroed
+                    // because it means that there is no contribution of that measurement to the Cr value.
+                    grad[(idx, j + 3)] += total_mass / model_grad[(3, j)];
                 }
+                // println!("{grad:e}");
             }
         }
 
-        // println!("{grad:.6e}");
         Ok((d_x, grad))
     }
 }
