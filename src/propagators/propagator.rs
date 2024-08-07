@@ -34,10 +34,10 @@ use crate::State;
 #[derive(Clone, Debug)]
 pub struct Propagator<'a, D: Dynamics, E: ErrorCtrl>
 where
-    DefaultAllocator: Allocator< <D::StateType as State>::Size>
-        + Allocator< <D::StateType as State>::Size, <D::StateType as State>::Size>
+    DefaultAllocator: Allocator<<D::StateType as State>::Size>
         + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator< <D::StateType as State>::VecLength>,
+        + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<<D::StateType as State>::VecLength>,
 {
     pub dynamics: D, // Stores the dynamics used. *Must* use this to get the latest values
     pub opts: PropOpts<E>, // Stores the integration options (tolerance, min/max step, init step, etc.)
@@ -50,10 +50,10 @@ where
 /// The `Propagator` trait defines the functions of a propagator and of an event tracker.
 impl<'a, D: Dynamics, E: ErrorCtrl> Propagator<'a, D, E>
 where
-    DefaultAllocator: Allocator< <D::StateType as State>::Size>
-        + Allocator< <D::StateType as State>::Size, <D::StateType as State>::Size>
+    DefaultAllocator: Allocator<<D::StateType as State>::Size>
         + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator< <D::StateType as State>::VecLength>,
+        + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<<D::StateType as State>::VecLength>,
 {
     /// Each propagator must be initialized with `new` which stores propagator information.
     pub fn new<T: RK>(dynamics: D, opts: PropOpts<E>) -> Self {
@@ -117,10 +117,10 @@ where
 
 impl<'a, D: Dynamics> Propagator<'a, D, RSSCartesianStep>
 where
-    DefaultAllocator: Allocator< <D::StateType as State>::Size>
-        + Allocator< <D::StateType as State>::Size, <D::StateType as State>::Size>
+    DefaultAllocator: Allocator<<D::StateType as State>::Size>
         + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator< <D::StateType as State>::VecLength>,
+        + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<<D::StateType as State>::VecLength>,
 {
     /// Default propagator is an RK89 with the default PropOpts.
     pub fn default(dynamics: D) -> Self {

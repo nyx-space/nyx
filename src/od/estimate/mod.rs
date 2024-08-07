@@ -36,9 +36,9 @@ pub use sc_uncertainty::SpacecraftUncertainty;
 pub trait Estimate<T: State>
 where
     Self: Clone + PartialEq + Sized + fmt::Display,
-    DefaultAllocator: Allocator< <T as State>::Size>
-        + Allocator< <T as State>::Size, <T as State>::Size>
-        + Allocator< <T as State>::VecLength>,
+    DefaultAllocator: Allocator<<T as State>::Size>
+        + Allocator<<T as State>::Size, <T as State>::Size>
+        + Allocator<<T as State>::VecLength>,
 {
     /// An empty estimate. This is useful if wanting to store an estimate outside the scope of a filtering loop.
     fn zeros(state: T) -> Self;
@@ -93,9 +93,9 @@ where
 pub trait NavSolution<T>: Estimate<Spacecraft>
 where
     T: State,
-    DefaultAllocator: Allocator< <T as State>::Size>
-        + Allocator< <T as State>::Size, <T as State>::Size>
-        + Allocator< <T as State>::VecLength>,
+    DefaultAllocator: Allocator<<T as State>::Size>
+        + Allocator<<T as State>::Size, <T as State>::Size>
+        + Allocator<<T as State>::VecLength>,
 {
     fn orbital_state(&self) -> Orbit;
     /// Returns the nominal state as computed by the dynamics

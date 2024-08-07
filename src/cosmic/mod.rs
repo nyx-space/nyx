@@ -42,9 +42,8 @@ pub trait TimeTagged {
 pub trait State: Default + Copy + PartialEq + fmt::Display + fmt::LowerExp + Send + Sync
 where
     Self: Sized,
-    DefaultAllocator: Allocator< Self::Size>
-        + Allocator< Self::Size, Self::Size>
-        + Allocator< Self::VecLength>,
+    DefaultAllocator:
+        Allocator<Self::Size> + Allocator<Self::Size, Self::Size> + Allocator<Self::VecLength>,
 {
     /// Size of the state and its STM
     type Size: DimName;
@@ -85,7 +84,7 @@ where
         vector: &OVector<f64, Self::VecLength>,
     ) -> Self
     where
-        DefaultAllocator: Allocator< Self::VecLength>,
+        DefaultAllocator: Allocator<Self::VecLength>,
     {
         self.set(self.epoch() + delta_t_s, vector);
         self

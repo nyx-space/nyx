@@ -34,16 +34,16 @@ where
     A: DimName,
     M: DimName,
     T: State,
-    DefaultAllocator: Allocator< M>
-        + Allocator< <T as State>::Size>
-        + Allocator< <T as State>::VecLength>
-        + Allocator< A>
-        + Allocator< M, M>
-        + Allocator< M, <T as State>::Size>
-        + Allocator< <T as State>::Size, <T as State>::Size>
-        + Allocator< A, A>
-        + Allocator< <T as State>::Size, A>
-        + Allocator< A, <T as State>::Size>,
+    DefaultAllocator: Allocator<M>
+        + Allocator<<T as State>::Size>
+        + Allocator<<T as State>::VecLength>
+        + Allocator<A>
+        + Allocator<M, M>
+        + Allocator<M, <T as State>::Size>
+        + Allocator<<T as State>::Size, <T as State>::Size>
+        + Allocator<A, A>
+        + Allocator<<T as State>::Size, A>
+        + Allocator<A, <T as State>::Size>,
 {
     type Estimate: Estimate<T>;
 

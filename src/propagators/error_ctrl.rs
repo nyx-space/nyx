@@ -39,7 +39,7 @@ where
         cur_state: &OVector<f64, N>,
     ) -> f64
     where
-        DefaultAllocator: Allocator< N>;
+        DefaultAllocator: Allocator<N>;
 }
 
 /// A largest error control which effectively computes the largest error at each component
@@ -58,7 +58,7 @@ impl ErrorCtrl for LargestError {
         cur_state: &OVector<f64, N>,
     ) -> f64
     where
-        DefaultAllocator: Allocator< N>,
+        DefaultAllocator: Allocator<N>,
     {
         let state_delta = candidate - cur_state;
         let mut max_err = 0.0;
@@ -90,7 +90,7 @@ impl ErrorCtrl for LargestStep {
         cur_state: &OVector<f64, N>,
     ) -> f64
     where
-        DefaultAllocator: Allocator< N>,
+        DefaultAllocator: Allocator<N>,
     {
         let state_delta = candidate - cur_state;
         let mut mag = 0.0f64;
@@ -120,7 +120,7 @@ impl ErrorCtrl for LargestState {
         cur_state: &OVector<f64, N>,
     ) -> f64
     where
-        DefaultAllocator: Allocator< N>,
+        DefaultAllocator: Allocator<N>,
     {
         let sum_state = candidate + cur_state;
         let mut mag = 0.0f64;
@@ -153,7 +153,7 @@ impl ErrorCtrl for RSSStep {
         cur_state: &OVector<f64, N>,
     ) -> f64
     where
-        DefaultAllocator: Allocator< N>,
+        DefaultAllocator: Allocator<N>,
     {
         let mag = (candidate - cur_state).norm();
         let err = error_est.norm();
@@ -184,7 +184,7 @@ impl ErrorCtrl for RSSState {
         cur_state: &OVector<f64, N>,
     ) -> f64
     where
-        DefaultAllocator: Allocator< N>,
+        DefaultAllocator: Allocator<N>,
     {
         let mag = 0.5 * (candidate + cur_state).norm();
         let err = error_est.norm();
@@ -208,7 +208,7 @@ impl ErrorCtrl for RSSCartesianState {
         cur_state: &OVector<f64, N>,
     ) -> f64
     where
-        DefaultAllocator: Allocator< N>,
+        DefaultAllocator: Allocator<N>,
     {
         if N::dim() >= 6 {
             let err_radius = RSSState::estimate::<U3>(
@@ -251,7 +251,7 @@ impl ErrorCtrl for RSSCartesianStep {
         cur_state: &OVector<f64, N>,
     ) -> f64
     where
-        DefaultAllocator: Allocator< N>,
+        DefaultAllocator: Allocator<N>,
     {
         if N::dim() >= 6 {
             let err_radius = RSSStep::estimate::<U3>(
@@ -283,7 +283,7 @@ impl ErrorCtrl for RSSCartesianStepStm {
         cur_state: &OVector<f64, N>,
     ) -> f64
     where
-        DefaultAllocator: Allocator< N>,
+        DefaultAllocator: Allocator<N>,
     {
         let err_radius = RSSStep::estimate::<U3>(
             &error_est.fixed_rows::<3>(0).into_owned(),

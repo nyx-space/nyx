@@ -36,11 +36,11 @@ pub trait TrackingDeviceSim<MsrIn, Msr>: ConfigRepr
 where
     MsrIn: Interpolatable,
     Msr: Measurement,
-    DefaultAllocator: Allocator< Msr::MeasurementSize>
-        + Allocator< MsrIn::Size>
-        + Allocator< MsrIn::Size, MsrIn::Size>
-        + Allocator< Msr::MeasurementSize, Msr::MeasurementSize>
-        + Allocator< MsrIn::VecLength>,
+    DefaultAllocator: Allocator<Msr::MeasurementSize>
+        + Allocator<MsrIn::Size>
+        + Allocator<MsrIn::Size, MsrIn::Size>
+        + Allocator<Msr::MeasurementSize, Msr::MeasurementSize>
+        + Allocator<MsrIn::VecLength>,
 {
     /// Returns the name of this tracking data simulator
     fn name(&self) -> String;

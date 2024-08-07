@@ -99,9 +99,8 @@ impl TrajectoryLoader {
     pub fn to_traj<S>(&self) -> Result<Traj<S>, InputOutputError>
     where
         S: Interpolatable,
-        DefaultAllocator: Allocator< S::VecLength>
-            + Allocator< S::Size>
-            + Allocator< S::Size, S::Size>,
+        DefaultAllocator:
+            Allocator<S::VecLength> + Allocator<S::Size> + Allocator<S::Size, S::Size>,
     {
         // Check the schema
         let mut has_epoch = false; // Required
