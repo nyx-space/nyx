@@ -58,10 +58,7 @@ impl Dispersion<Normal<f64>> {
 #[derive(Clone)]
 pub struct DispersedState<S: State>
 where
-    DefaultAllocator: Allocator<f64, S::Size>
-        + Allocator<f64, S::Size, S::Size>
-        + Allocator<usize, S::Size, S::Size>
-        + Allocator<f64, S::VecLength>,
+    DefaultAllocator: Allocator<S::Size> + Allocator<S::Size, S::Size> + Allocator<S::VecLength>,
 {
     /// The dispersed state
     pub state: S,

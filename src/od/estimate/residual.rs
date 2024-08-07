@@ -26,7 +26,7 @@ use std::fmt;
 pub struct Residual<M>
 where
     M: DimName,
-    DefaultAllocator: Allocator<f64, M>,
+    DefaultAllocator: Allocator<M>,
 {
     /// Date time of this Residual
     pub epoch: Epoch,
@@ -47,7 +47,7 @@ where
 impl<M> Residual<M>
 where
     M: DimName,
-    DefaultAllocator: Allocator<f64, M>,
+    DefaultAllocator: Allocator<M>,
 {
     /// An empty estimate. This is useful if wanting to store an estimate outside the scope of a filtering loop.
     pub fn zeros() -> Self {
@@ -102,7 +102,7 @@ where
 impl<M> fmt::Display for Residual<M>
 where
     M: DimName,
-    DefaultAllocator: Allocator<f64, M> + Allocator<usize, M>,
+    DefaultAllocator: Allocator<M> + Allocator<M>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -120,7 +120,7 @@ where
 impl<M> fmt::LowerExp for Residual<M>
 where
     M: DimName,
-    DefaultAllocator: Allocator<f64, M> + Allocator<usize, M>,
+    DefaultAllocator: Allocator<M> + Allocator<M>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Prefit {:e} Postfit {:e}", &self.prefit, &self.postfit)

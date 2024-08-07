@@ -33,9 +33,8 @@ use enum_iterator::all;
 pub trait Interpolatable: State
 where
     Self: Sized,
-    DefaultAllocator: Allocator<f64, Self::Size>
-        + Allocator<f64, Self::Size, Self::Size>
-        + Allocator<f64, Self::VecLength>,
+    DefaultAllocator:
+        Allocator<Self::Size> + Allocator<Self::Size, Self::Size> + Allocator<Self::VecLength>,
 {
     /// Interpolates a new state at the provided epochs given a slice of states.
     fn interpolate(self, epoch: Epoch, states: &[Self]) -> Result<Self, InterpolationError>;

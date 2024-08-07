@@ -47,8 +47,7 @@ use std::sync::Arc;
 #[derive(Clone, PartialEq)]
 pub struct Traj<S: Interpolatable>
 where
-    DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+    DefaultAllocator: Allocator<S::VecLength> + Allocator<S::Size> + Allocator<S::Size, S::Size>,
 {
     /// Optionally name this trajectory
     pub name: Option<String>,
@@ -58,8 +57,7 @@ where
 
 impl<S: Interpolatable> Traj<S>
 where
-    DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+    DefaultAllocator: Allocator<S::VecLength> + Allocator<S::Size> + Allocator<S::Size, S::Size>,
 {
     pub fn new() -> Self {
         Self {
@@ -518,8 +516,7 @@ where
 
 impl<S: Interpolatable> ops::Add for Traj<S>
 where
-    DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+    DefaultAllocator: Allocator<S::VecLength> + Allocator<S::Size> + Allocator<S::Size, S::Size>,
 {
     type Output = Result<Traj<S>, NyxError>;
 
@@ -531,8 +528,7 @@ where
 
 impl<S: Interpolatable> ops::Add<&Traj<S>> for &Traj<S>
 where
-    DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+    DefaultAllocator: Allocator<S::VecLength> + Allocator<S::Size> + Allocator<S::Size, S::Size>,
 {
     type Output = Result<Traj<S>, NyxError>;
 
@@ -578,8 +574,7 @@ where
 
 impl<S: Interpolatable> ops::AddAssign<&Traj<S>> for Traj<S>
 where
-    DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+    DefaultAllocator: Allocator<S::VecLength> + Allocator<S::Size> + Allocator<S::Size, S::Size>,
 {
     /// Attempt to add two trajectories together and assign it to `self`
     ///
@@ -593,8 +588,7 @@ where
 
 impl<S: Interpolatable> fmt::Display for Traj<S>
 where
-    DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+    DefaultAllocator: Allocator<S::VecLength> + Allocator<S::Size> + Allocator<S::Size, S::Size>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.states.is_empty() {
@@ -621,8 +615,7 @@ where
 
 impl<S: Interpolatable> fmt::Debug for Traj<S>
 where
-    DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+    DefaultAllocator: Allocator<S::VecLength> + Allocator<S::Size> + Allocator<S::Size, S::Size>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{self}",)
@@ -631,8 +624,7 @@ where
 
 impl<S: Interpolatable> Default for Traj<S>
 where
-    DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+    DefaultAllocator: Allocator<S::VecLength> + Allocator<S::Size> + Allocator<S::Size, S::Size>,
 {
     fn default() -> Self {
         Self::new()

@@ -47,11 +47,8 @@ use super::DispersedState;
 /// A structure storing the result of a single Monte Carlo run
 pub struct Run<S: Interpolatable, R>
 where
-    DefaultAllocator: Allocator<f64, S::Size>
-        + Allocator<f64, S::Size, S::Size>
-        + Allocator<usize, S::Size, S::Size>
-        + Allocator<f64, S::VecLength>,
-    <DefaultAllocator as Allocator<f64, S::VecLength>>::Buffer: Send,
+    DefaultAllocator: Allocator<S::Size> + Allocator<S::Size, S::Size> + Allocator<S::VecLength>,
+    <DefaultAllocator as Allocator<S::VecLength>>::Buffer<f64>: Send,
 {
     /// The index of this run
     pub index: usize,
@@ -64,11 +61,8 @@ where
 /// A structure of Monte Carlo results
 pub struct Results<S: Interpolatable, R>
 where
-    DefaultAllocator: Allocator<f64, S::Size>
-        + Allocator<f64, S::Size, S::Size>
-        + Allocator<usize, S::Size, S::Size>
-        + Allocator<f64, S::VecLength>,
-    <DefaultAllocator as Allocator<f64, S::VecLength>>::Buffer: Send,
+    DefaultAllocator: Allocator<S::Size> + Allocator<S::Size, S::Size> + Allocator<S::VecLength>,
+    <DefaultAllocator as Allocator<S::VecLength>>::Buffer<f64>: Send,
 {
     /// Raw data from each run, sorted by run index for O(1) access to each run
     pub runs: Vec<Run<S, R>>,
@@ -79,11 +73,8 @@ where
 /// A structure that stores the result of a propagation segment of a Monte Carlo.
 pub struct PropResult<S: Interpolatable>
 where
-    DefaultAllocator: Allocator<f64, S::Size>
-        + Allocator<f64, S::Size, S::Size>
-        + Allocator<usize, S::Size, S::Size>
-        + Allocator<f64, S::VecLength>,
-    <DefaultAllocator as Allocator<f64, S::VecLength>>::Buffer: Send,
+    DefaultAllocator: Allocator<S::Size> + Allocator<S::Size, S::Size> + Allocator<S::VecLength>,
+    <DefaultAllocator as Allocator<S::VecLength>>::Buffer<f64>: Send,
 {
     pub state: S,
     pub traj: Traj<S>,
@@ -91,11 +82,8 @@ where
 
 impl<S: Interpolatable> Results<S, PropResult<S>>
 where
-    DefaultAllocator: Allocator<f64, S::Size>
-        + Allocator<f64, S::Size, S::Size>
-        + Allocator<usize, S::Size, S::Size>
-        + Allocator<f64, S::VecLength>,
-    <DefaultAllocator as Allocator<f64, S::VecLength>>::Buffer: Send,
+    DefaultAllocator: Allocator<S::Size> + Allocator<S::Size, S::Size> + Allocator<S::VecLength>,
+    <DefaultAllocator as Allocator<S::VecLength>>::Buffer<f64>: Send,
 {
     /// Returns the value of the requested state parameter for all trajectories from `start` to `end` every `step` and
     /// using the value of `value_if_run_failed` if set and skipping that run if the run failed

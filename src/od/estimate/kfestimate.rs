@@ -37,13 +37,12 @@ use std::fmt;
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct KfEstimate<T: State>
 where
-    DefaultAllocator: Allocator<f64, <T as State>::Size>
-        + Allocator<f64, <T as State>::Size, <T as State>::Size>
-        + Allocator<usize, <T as State>::Size>
-        + Allocator<f64, <T as State>::VecLength>
-        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
-    <DefaultAllocator as Allocator<f64, <T as State>::Size>>::Buffer: Copy,
-    <DefaultAllocator as Allocator<f64, <T as State>::Size, <T as State>::Size>>::Buffer: Copy,
+    DefaultAllocator: Allocator<<T as State>::Size>
+        + Allocator<<T as State>::Size, <T as State>::Size>
+        + Allocator<<T as State>::Size>
+        + Allocator<<T as State>::VecLength>,
+    <DefaultAllocator as Allocator<<T as State>::Size>>::Buffer<f64>: Copy,
+    <DefaultAllocator as Allocator<<T as State>::Size, <T as State>::Size>>::Buffer<f64>: Copy,
 {
     /// The estimated state
     pub nominal_state: T,
@@ -61,13 +60,12 @@ where
 
 impl<T: State> KfEstimate<T>
 where
-    DefaultAllocator: Allocator<f64, <T as State>::Size>
-        + Allocator<f64, <T as State>::Size, <T as State>::Size>
-        + Allocator<usize, <T as State>::Size>
-        + Allocator<f64, <T as State>::VecLength>
-        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
-    <DefaultAllocator as Allocator<f64, <T as State>::Size>>::Buffer: Copy,
-    <DefaultAllocator as Allocator<f64, <T as State>::Size, <T as State>::Size>>::Buffer: Copy,
+    DefaultAllocator: Allocator<<T as State>::Size>
+        + Allocator<<T as State>::Size, <T as State>::Size>
+        + Allocator<<T as State>::Size>
+        + Allocator<<T as State>::VecLength>,
+    <DefaultAllocator as Allocator<<T as State>::Size>>::Buffer<f64>: Copy,
+    <DefaultAllocator as Allocator<<T as State>::Size, <T as State>::Size>>::Buffer<f64>: Copy,
 {
     /// Initializes a new filter estimate from the nominal state (not dispersed) and the full covariance
     pub fn from_covar(
@@ -226,13 +224,12 @@ impl KfEstimate<Spacecraft> {
 
 impl<T: State> Estimate<T> for KfEstimate<T>
 where
-    DefaultAllocator: Allocator<f64, <T as State>::Size>
-        + Allocator<f64, <T as State>::Size, <T as State>::Size>
-        + Allocator<usize, <T as State>::Size>
-        + Allocator<f64, <T as State>::VecLength>
-        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
-    <DefaultAllocator as Allocator<f64, <T as State>::Size>>::Buffer: Copy,
-    <DefaultAllocator as Allocator<f64, <T as State>::Size, <T as State>::Size>>::Buffer: Copy,
+    DefaultAllocator: Allocator<<T as State>::Size>
+        + Allocator<<T as State>::Size, <T as State>::Size>
+        + Allocator<<T as State>::Size>
+        + Allocator<<T as State>::VecLength>,
+    <DefaultAllocator as Allocator<<T as State>::Size>>::Buffer<f64>: Copy,
+    <DefaultAllocator as Allocator<<T as State>::Size, <T as State>::Size>>::Buffer<f64>: Copy,
 {
     fn zeros(nominal_state: T) -> Self {
         Self {
@@ -277,13 +274,12 @@ where
 
 impl<T: State> fmt::Display for KfEstimate<T>
 where
-    DefaultAllocator: Allocator<f64, <T as State>::Size>
-        + Allocator<f64, <T as State>::Size, <T as State>::Size>
-        + Allocator<usize, <T as State>::Size>
-        + Allocator<f64, <T as State>::VecLength>
-        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
-    <DefaultAllocator as Allocator<f64, <T as State>::Size>>::Buffer: Copy,
-    <DefaultAllocator as Allocator<f64, <T as State>::Size, <T as State>::Size>>::Buffer: Copy,
+    DefaultAllocator: Allocator<<T as State>::Size>
+        + Allocator<<T as State>::Size, <T as State>::Size>
+        + Allocator<<T as State>::Size>
+        + Allocator<<T as State>::VecLength>,
+    <DefaultAllocator as Allocator<<T as State>::Size>>::Buffer<f64>: Copy,
+    <DefaultAllocator as Allocator<<T as State>::Size, <T as State>::Size>>::Buffer<f64>: Copy,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let dim = <T as State>::Size::dim();
@@ -317,13 +313,12 @@ where
 
 impl<T: State> fmt::LowerExp for KfEstimate<T>
 where
-    DefaultAllocator: Allocator<f64, <T as State>::Size>
-        + Allocator<f64, <T as State>::Size, <T as State>::Size>
-        + Allocator<usize, <T as State>::Size>
-        + Allocator<f64, <T as State>::VecLength>
-        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
-    <DefaultAllocator as Allocator<f64, <T as State>::Size>>::Buffer: Copy,
-    <DefaultAllocator as Allocator<f64, <T as State>::Size, <T as State>::Size>>::Buffer: Copy,
+    DefaultAllocator: Allocator<<T as State>::Size>
+        + Allocator<<T as State>::Size, <T as State>::Size>
+        + Allocator<<T as State>::Size>
+        + Allocator<<T as State>::VecLength>,
+    <DefaultAllocator as Allocator<<T as State>::Size>>::Buffer<f64>: Copy,
+    <DefaultAllocator as Allocator<<T as State>::Size, <T as State>::Size>>::Buffer<f64>: Copy,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(

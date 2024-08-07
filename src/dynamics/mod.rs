@@ -23,7 +23,7 @@ use crate::State;
 use anise::almanac::planetary::PlanetaryDataError;
 use anise::almanac::Almanac;
 use anise::errors::AlmanacError;
-use hyperdual::{OHyperdual, Owned};
+use hyperdual::Owned;
 use snafu::Snafu;
 
 use std::fmt;
@@ -75,9 +75,9 @@ pub use self::sph_harmonics::*;
 #[allow(clippy::type_complexity)]
 pub trait Dynamics: Clone + Sync + Send
 where
-    DefaultAllocator: Allocator<f64, <Self::StateType as State>::Size>
-        + Allocator<f64, <Self::StateType as State>::VecLength>
-        + Allocator<f64, <Self::StateType as State>::Size, <Self::StateType as State>::Size>,
+    DefaultAllocator: Allocator<<Self::StateType as State>::Size>
+        + Allocator<<Self::StateType as State>::VecLength>
+        + Allocator<<Self::StateType as State>::Size, <Self::StateType as State>::Size>,
 {
     /// The state of the associated hyperdual state, almost always StateType + U1
     type HyperdualSize: DimName;
@@ -96,7 +96,7 @@ where
         almanac: Arc<Almanac>,
     ) -> Result<OVector<f64, <Self::StateType as State>::VecLength>, DynamicsError>
     where
-        DefaultAllocator: Allocator<f64, <Self::StateType as State>::VecLength>;
+        DefaultAllocator: Allocator<<Self::StateType as State>::VecLength>;
 
     /// Defines the equations of motion for Dual numbers for these dynamics.
     /// _All_ dynamics need to allow for automatic differentiation. However, if differentiation is not supported,
@@ -114,10 +114,9 @@ where
         DynamicsError,
     >
     where
-        DefaultAllocator: Allocator<f64, Self::HyperdualSize>
-            + Allocator<f64, <Self::StateType as State>::Size>
-            + Allocator<f64, <Self::StateType as State>::Size, <Self::StateType as State>::Size>
-            + Allocator<OHyperdual<f64, Self::HyperdualSize>, <Self::StateType as State>::Size>,
+        DefaultAllocator: Allocator<Self::HyperdualSize>
+            + Allocator<<Self::StateType as State>::Size>
+            + Allocator<<Self::StateType as State>::Size, <Self::StateType as State>::Size>,
         Owned<f64, Self::HyperdualSize>: Copy,
     {
         Err(DynamicsError::StateTransitionMatrixUnset)

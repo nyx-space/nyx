@@ -132,7 +132,7 @@ pub fn is_diagonal(m: &Matrix3<f64>) -> bool {
 /// [Chemical Process Dynamics and Controls (Woolf)](https://eng.libretexts.org/Bookshelves/Industrial_and_Systems_Engineering/Book%3A_Chemical_Process_Dynamics_and_Controls_(Woolf)/10%3A_Dynamical_Systems_Analysis/10.04%3A_Using_eigenvalues_and_eigenvectors_to_find_stability_and_solve_ODEs#Summary_of_Eigenvalue_Graphs)
 pub fn are_eigenvalues_stable<N: DimName>(eigenvalues: OVector<Complex<f64>, N>) -> bool
 where
-    DefaultAllocator: Allocator<Complex<f64>, N>,
+    DefaultAllocator: Allocator<N>,
 {
     eigenvalues.iter().all(|ev| ev.re <= 0.0)
 }
@@ -500,7 +500,7 @@ fn test_projv() {
 /// A f64 value representing the RSS state error.
 pub fn rss_errors<N: DimName>(prop_err: &OVector<f64, N>, cur_state: &OVector<f64, N>) -> f64
 where
-    DefaultAllocator: Allocator<f64, N>,
+    DefaultAllocator: Allocator<N>,
 {
     prop_err
         .iter()

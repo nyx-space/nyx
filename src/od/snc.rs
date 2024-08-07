@@ -32,7 +32,7 @@ pub type SNC6 = SNC<U6>;
 #[allow(clippy::upper_case_acronyms)]
 pub struct SNC<A: DimName>
 where
-    DefaultAllocator: Allocator<f64, A> + Allocator<f64, A, A>,
+    DefaultAllocator: Allocator<A> + Allocator<A, A>,
 {
     /// Time at which this SNC starts to become applicable
     pub start_time: Option<Epoch>,
@@ -51,7 +51,7 @@ where
 impl<A> fmt::Debug for SNC<A>
 where
     A: DimName,
-    DefaultAllocator: Allocator<f64, A> + Allocator<f64, A, A>,
+    DefaultAllocator: Allocator<A> + Allocator<A, A>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut fmt_cov = Vec::with_capacity(A::dim());
@@ -80,7 +80,7 @@ where
 impl<A> fmt::Display for SNC<A>
 where
     A: DimName,
-    DefaultAllocator: Allocator<f64, A> + Allocator<f64, A, A>,
+    DefaultAllocator: Allocator<A> + Allocator<A, A>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{self:?}")
@@ -89,7 +89,7 @@ where
 
 impl<A: DimName> SNC<A>
 where
-    DefaultAllocator: Allocator<f64, A> + Allocator<f64, A, A>,
+    DefaultAllocator: Allocator<A> + Allocator<A, A>,
 {
     /// Initialize a state noise compensation structure from the diagonal values
     pub fn from_diagonal(disable_time: Duration, values: &[f64]) -> Self {

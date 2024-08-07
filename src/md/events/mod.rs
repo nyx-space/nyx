@@ -35,8 +35,7 @@ use std::sync::Arc;
 /// A trait to specify how a specific event must be evaluated.
 pub trait EventEvaluator<S: State>: fmt::Display + Send + Sync
 where
-    DefaultAllocator:
-        Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size> + Allocator<f64, S::VecLength>,
+    DefaultAllocator: Allocator<S::Size> + Allocator<S::Size, S::Size> + Allocator<S::VecLength>,
 {
     // Evaluation of event crossing, must return whether the condition happened between between both states.
     fn eval_crossing(
