@@ -52,26 +52,25 @@ pub struct ODProcess<
     K: Filter<S, A, Msr::MeasurementSize>,
 > where
     D::StateType: Interpolatable + Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
-    <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
-    DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
-        + Allocator<f64, <S as State>::Size>
-        + Allocator<f64, <S as State>::VecLength>
-        + Allocator<f64, <D::StateType as State>::VecLength>
-        + Allocator<f64, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, S::Size>
-        + Allocator<f64, S::Size>
-        + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::Size, Msr::MeasurementSize>
-        + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<f64, <S as State>::Size, <S as State>::Size>
-        + Allocator<f64, A>
-        + Allocator<f64, A, A>
-        + Allocator<f64, <D::StateType as State>::Size, A>
-        + Allocator<f64, A, <D::StateType as State>::Size>
-        + Allocator<f64, <S as State>::Size, A>
-        + Allocator<f64, A, <S as State>::Size>,
+    <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
+    DefaultAllocator: Allocator<<D::StateType as State>::Size>
+        + Allocator<<S as State>::Size>
+        + Allocator<<S as State>::VecLength>
+        + Allocator<<D::StateType as State>::VecLength>
+        + Allocator<Msr::MeasurementSize>
+        + Allocator<Msr::MeasurementSize, S::Size>
+        + Allocator<S::Size>
+        + Allocator<Msr::MeasurementSize, Msr::MeasurementSize>
+        + Allocator<Msr::MeasurementSize, <D::StateType as State>::Size>
+        + Allocator<<D::StateType as State>::Size, Msr::MeasurementSize>
+        + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<<S as State>::Size, <S as State>::Size>
+        + Allocator<A>
+        + Allocator<A, A>
+        + Allocator<<D::StateType as State>::Size, A>
+        + Allocator<A, <D::StateType as State>::Size>
+        + Allocator<<S as State>::Size, A>
+        + Allocator<A, <S as State>::Size>,
 {
     /// PropInstance used for the estimation
     pub prop: PropInstance<'a, D, E>,
@@ -100,29 +99,27 @@ impl<
     > ODProcess<'a, D, E, Msr, A, S, K>
 where
     D::StateType: Interpolatable + Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
-    <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
-    DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
-        + Allocator<f64, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, S::Size>
-        + Allocator<f64, S::Size>
-        + Allocator<usize, S::Size, S::Size>
-        + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, <D::StateType as State>::Size>
-        + Allocator<f64, Msr::MeasurementSize, <S as State>::Size>
-        + Allocator<f64, <D::StateType as State>::Size, Msr::MeasurementSize>
-        + Allocator<f64, <S as State>::Size, Msr::MeasurementSize>
-        + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::VecLength>
-        + Allocator<f64, A>
-        + Allocator<f64, A, A>
-        + Allocator<f64, <D::StateType as State>::Size, A>
-        + Allocator<f64, A, <D::StateType as State>::Size>
-        + Allocator<f64, <S as State>::Size>
-        + Allocator<f64, <S as State>::VecLength>
-        + Allocator<f64, <S as State>::Size, <S as State>::Size>
-        + Allocator<f64, <S as State>::Size, A>
-        + Allocator<f64, A, <S as State>::Size>,
+    <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
+    DefaultAllocator: Allocator<<D::StateType as State>::Size>
+        + Allocator<Msr::MeasurementSize>
+        + Allocator<Msr::MeasurementSize, S::Size>
+        + Allocator<S::Size>
+        + Allocator<Msr::MeasurementSize, Msr::MeasurementSize>
+        + Allocator<Msr::MeasurementSize, <D::StateType as State>::Size>
+        + Allocator<Msr::MeasurementSize, <S as State>::Size>
+        + Allocator<<D::StateType as State>::Size, Msr::MeasurementSize>
+        + Allocator<<S as State>::Size, Msr::MeasurementSize>
+        + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<<D::StateType as State>::VecLength>
+        + Allocator<A>
+        + Allocator<A, A>
+        + Allocator<<D::StateType as State>::Size, A>
+        + Allocator<A, <D::StateType as State>::Size>
+        + Allocator<<S as State>::Size>
+        + Allocator<<S as State>::VecLength>
+        + Allocator<<S as State>::Size, <S as State>::Size>
+        + Allocator<<S as State>::Size, A>
+        + Allocator<A, <S as State>::Size>,
 {
     /// Initialize a new orbit determination process with an optional trigger to switch from a CKF to an EKF.
     pub fn new(
@@ -732,7 +729,7 @@ where
     /// Builds the navigation trajectory for the estimated state only
     pub fn to_traj(&self) -> Result<Traj<S>, NyxError>
     where
-        DefaultAllocator: Allocator<f64, <S as State>::VecLength>,
+        DefaultAllocator: Allocator<<S as State>::VecLength>,
         S: Interpolatable,
     {
         if self.estimates.is_empty() {
@@ -763,28 +760,27 @@ impl<
     > ODProcess<'a, D, E, Msr, A, S, K>
 where
     D::StateType: Interpolatable + Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
-    <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
-    DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::VecLength>
-        + Allocator<f64, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, S::Size>
-        + Allocator<f64, S::Size>
-        + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::Size, Msr::MeasurementSize>
-        + Allocator<f64, <S as State>::Size, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, <S as State>::Size>
-        + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<f64, <S as State>::Size>
-        + Allocator<f64, <S as State>::VecLength>
-        + Allocator<f64, <S as State>::Size, <S as State>::Size>
-        + Allocator<f64, A>
-        + Allocator<f64, A, A>
-        + Allocator<f64, <D::StateType as State>::Size, A>
-        + Allocator<f64, A, <D::StateType as State>::Size>
-        + Allocator<f64, <S as State>::Size, A>
-        + Allocator<f64, A, <S as State>::Size>,
+    <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
+    DefaultAllocator: Allocator<<D::StateType as State>::Size>
+        + Allocator<<D::StateType as State>::VecLength>
+        + Allocator<Msr::MeasurementSize>
+        + Allocator<Msr::MeasurementSize, S::Size>
+        + Allocator<S::Size>
+        + Allocator<Msr::MeasurementSize, Msr::MeasurementSize>
+        + Allocator<Msr::MeasurementSize, <D::StateType as State>::Size>
+        + Allocator<<D::StateType as State>::Size, Msr::MeasurementSize>
+        + Allocator<<S as State>::Size, Msr::MeasurementSize>
+        + Allocator<Msr::MeasurementSize, <S as State>::Size>
+        + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<<S as State>::Size>
+        + Allocator<<S as State>::VecLength>
+        + Allocator<<S as State>::Size, <S as State>::Size>
+        + Allocator<A>
+        + Allocator<A, A>
+        + Allocator<<D::StateType as State>::Size, A>
+        + Allocator<A, <D::StateType as State>::Size>
+        + Allocator<<S as State>::Size, A>
+        + Allocator<A, <S as State>::Size>,
 {
     pub fn ckf(
         prop: PropInstance<'a, D, E>,

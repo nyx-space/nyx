@@ -50,9 +50,9 @@ impl EkfTrigger {
     pub fn enable_ekf<T: State, E>(&mut self, est: &E) -> bool
     where
         E: Estimate<T>,
-        DefaultAllocator: Allocator<f64, <T as State>::Size>
-            + Allocator<f64, <T as State>::VecLength>
-            + Allocator<f64, <T as State>::Size, <T as State>::Size>,
+        DefaultAllocator: Allocator<<T as State>::Size>
+            + Allocator<<T as State>::VecLength>
+            + Allocator<<T as State>::Size, <T as State>::Size>,
     {
         if self.inhibit {
             return false;

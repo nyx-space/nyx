@@ -24,7 +24,7 @@ use crate::time::TimeSeries;
 pub struct TrajIterator<'a, S: Interpolatable>
 where
     DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+        Allocator< S::VecLength> + Allocator< S::Size> + Allocator< S::Size, S::Size>,
 {
     pub time_series: TimeSeries,
     /// A shared pointer to the original trajectory.
@@ -34,7 +34,7 @@ where
 impl<S: Interpolatable> Iterator for TrajIterator<'_, S>
 where
     DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+        Allocator< S::VecLength> + Allocator< S::Size> + Allocator< S::Size, S::Size>,
 {
     type Item = S;
 

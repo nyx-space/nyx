@@ -151,7 +151,7 @@ impl EstimateFrom<Spacecraft, RangeDoppler> for Spacecraft {
     ) -> OMatrix<f64, <RangeDoppler as Measurement>::MeasurementSize, Self::Size>
     where
         DefaultAllocator:
-            Allocator<f64, <RangeDoppler as Measurement>::MeasurementSize, Self::Size>,
+            Allocator< <RangeDoppler as Measurement>::MeasurementSize, Self::Size>,
     {
         let delta_r = receiver.orbit.radius_km - transmitter.radius_km;
         let delta_v = receiver.orbit.velocity_km_s - transmitter.velocity_km_s;

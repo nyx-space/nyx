@@ -46,30 +46,29 @@ impl<'a, D: Dynamics, E: ErrorCtrl, Msr: Measurement, A: DimName>
 where
     D::StateType:
         Interpolatable + Add<OVector<f64, <Spacecraft as State>::Size>, Output = D::StateType>,
-    <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
-    DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
-        + Allocator<f64, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, <Spacecraft as State>::Size>
-        + Allocator<f64, Const<1>, Msr::MeasurementSize>
-        + Allocator<f64, <Spacecraft as State>::Size>
-        + Allocator<usize, <Spacecraft as State>::Size, <Spacecraft as State>::Size>
-        + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, <D::StateType as State>::Size>
-        + Allocator<f64, Msr::MeasurementSize, <Spacecraft as State>::Size>
-        + Allocator<f64, <D::StateType as State>::Size, Msr::MeasurementSize>
-        + Allocator<f64, <Spacecraft as State>::Size, Msr::MeasurementSize>
-        + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::VecLength>
-        + Allocator<f64, A>
-        + Allocator<f64, A, A>
-        + Allocator<f64, <D::StateType as State>::Size, A>
-        + Allocator<f64, A, <D::StateType as State>::Size>
-        + Allocator<f64, <Spacecraft as State>::Size>
-        + Allocator<f64, <Spacecraft as State>::VecLength>
-        + Allocator<f64, <Spacecraft as State>::Size, <Spacecraft as State>::Size>
-        + Allocator<f64, <Spacecraft as State>::Size, A>
-        + Allocator<f64, A, <Spacecraft as State>::Size>,
+    <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
+    DefaultAllocator: Allocator<<D::StateType as State>::Size>
+        + Allocator<Msr::MeasurementSize>
+        + Allocator<Msr::MeasurementSize, <Spacecraft as State>::Size>
+        + Allocator<Const<1>, Msr::MeasurementSize>
+        + Allocator<<Spacecraft as State>::Size>
+        + Allocator<<Spacecraft as State>::Size, <Spacecraft as State>::Size>
+        + Allocator<Msr::MeasurementSize, Msr::MeasurementSize>
+        + Allocator<Msr::MeasurementSize, <D::StateType as State>::Size>
+        + Allocator<Msr::MeasurementSize, <Spacecraft as State>::Size>
+        + Allocator<<D::StateType as State>::Size, Msr::MeasurementSize>
+        + Allocator<<Spacecraft as State>::Size, Msr::MeasurementSize>
+        + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<<D::StateType as State>::VecLength>
+        + Allocator<A>
+        + Allocator<A, A>
+        + Allocator<<D::StateType as State>::Size, A>
+        + Allocator<A, <D::StateType as State>::Size>
+        + Allocator<<Spacecraft as State>::Size>
+        + Allocator<<Spacecraft as State>::VecLength>
+        + Allocator<<Spacecraft as State>::Size, <Spacecraft as State>::Size>
+        + Allocator<<Spacecraft as State>::Size, A>
+        + Allocator<A, <Spacecraft as State>::Size>,
     Spacecraft: EstimateFrom<D::StateType, Msr>,
 {
     /// Store the estimates and residuals in a parquet file

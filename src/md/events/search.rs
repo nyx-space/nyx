@@ -33,7 +33,7 @@ use std::sync::Arc;
 impl<S: Interpolatable> Traj<S>
 where
     DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+        Allocator< S::VecLength> + Allocator< S::Size> + Allocator< S::Size, S::Size>,
 {
     /// Find the exact state where the request event happens. The event function is expected to be monotone in the provided interval because we find the event using a Brent solver.
     #[allow(clippy::identity_op)]

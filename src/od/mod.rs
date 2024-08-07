@@ -98,12 +98,12 @@ pub trait Measurement: Copy + TimeTagged {
     /// Initializes a new measurement from the provided data.
     fn from_observation(epoch: Epoch, obs: OVector<f64, Self::MeasurementSize>) -> Self
     where
-        DefaultAllocator: Allocator<f64, Self::MeasurementSize>;
+        DefaultAllocator: Allocator<Self::MeasurementSize>;
 
     /// Returns the measurement/observation as a vector.
     fn observation(&self) -> OVector<f64, Self::MeasurementSize>
     where
-        DefaultAllocator: Allocator<f64, Self::MeasurementSize>;
+        DefaultAllocator: Allocator<Self::MeasurementSize>;
 }
 
 /// The Estimate trait defines the interface that is the opposite of a `SolveFor`.
@@ -115,12 +115,12 @@ pub trait Measurement: Copy + TimeTagged {
 pub trait EstimateFrom<O: State, M: Measurement>
 where
     Self: State,
-    DefaultAllocator: Allocator<f64, <O as State>::Size>
-        + Allocator<f64, <O as State>::VecLength>
-        + Allocator<f64, <O as State>::Size, <O as State>::Size>
-        + Allocator<f64, Self::Size>
-        + Allocator<f64, Self::VecLength>
-        + Allocator<f64, Self::Size, Self::Size>,
+    DefaultAllocator: Allocator<<O as State>::Size>
+        + Allocator<<O as State>::VecLength>
+        + Allocator<<O as State>::Size, <O as State>::Size>
+        + Allocator<Self::Size>
+        + Allocator<Self::VecLength>
+        + Allocator<Self::Size, Self::Size>,
 {
     /// From the state extract the state to be estimated
     fn extract(from: O) -> Self;
@@ -137,7 +137,7 @@ where
         transmitter: Orbit,
     ) -> OMatrix<f64, M::MeasurementSize, Self::Size>
     where
-        DefaultAllocator: Allocator<f64, M::MeasurementSize, Self::Size>;
+        DefaultAllocator: Allocator<M::MeasurementSize, Self::Size>;
 }
 
 /// A generic implementation of EstimateFrom for any State that is also a Measurement, e.g. if there is a direct observation of the full state.
@@ -146,12 +146,12 @@ impl<O> EstimateFrom<O, O> for O
 where
     O: State + Measurement,
     Self: State,
-    DefaultAllocator: Allocator<f64, <O as State>::Size>
-        + Allocator<f64, <O as State>::VecLength>
-        + Allocator<f64, <O as State>::Size, <O as State>::Size>
-        + Allocator<f64, Self::Size>
-        + Allocator<f64, Self::VecLength>
-        + Allocator<f64, Self::Size, Self::Size>,
+    DefaultAllocator: Allocator<<O as State>::Size>
+        + Allocator<<O as State>::VecLength>
+        + Allocator<<O as State>::Size, <O as State>::Size>
+        + Allocator<Self::Size>
+        + Allocator<Self::VecLength>
+        + Allocator<Self::Size, Self::Size>,
 {
     fn extract(from: O) -> Self {
         from
@@ -163,7 +163,7 @@ where
         _transmitter: Orbit,
     ) -> OMatrix<f64, <O as Measurement>::MeasurementSize, Self::Size>
     where
-        DefaultAllocator: Allocator<f64, <O as Measurement>::MeasurementSize, Self::Size>,
+        DefaultAllocator: Allocator<<O as Measurement>::MeasurementSize, Self::Size>,
     {
         OMatrix::<f64, O::MeasurementSize, Self::Size>::identity()
     }

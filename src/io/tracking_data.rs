@@ -89,7 +89,7 @@ impl DynamicTrackingArc {
     pub fn to_tracking_arc<Msr>(&self) -> Result<TrackingArc<Msr>, InputOutputError>
     where
         Msr: Measurement,
-        DefaultAllocator: Allocator<f64, Msr::MeasurementSize>,
+        DefaultAllocator: Allocator< Msr::MeasurementSize>,
     {
         // Read the file since we closed it earlier
         let file = File::open(&self.path).context(StdIOSnafu {

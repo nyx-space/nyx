@@ -368,8 +368,7 @@ impl fmt::Display for GroundStation {
 
 impl<S: Interpolatable> EventEvaluator<S> for &GroundStation
 where
-    DefaultAllocator:
-        Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size> + Allocator<f64, S::VecLength>,
+    DefaultAllocator: Allocator<S::Size> + Allocator<S::Size, S::Size> + Allocator<S::VecLength>,
 {
     /// Compute the elevation in the SEZ frame. This call will panic if the frame of the input state does not match that of the ground station.
     fn eval(&self, rx_gs_frame: &S, almanac: Arc<Almanac>) -> Result<f64, EventError> {

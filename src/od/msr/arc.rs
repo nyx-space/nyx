@@ -45,7 +45,7 @@ use parquet::arrow::ArrowWriter;
 pub struct TrackingArc<Msr>
 where
     Msr: Measurement,
-    DefaultAllocator: Allocator<f64, Msr::MeasurementSize>,
+    DefaultAllocator: Allocator< Msr::MeasurementSize>,
 {
     /// The YAML configuration to set up these devices
     pub device_cfg: String,
@@ -56,8 +56,8 @@ where
 impl<Msr> Display for TrackingArc<Msr>
 where
     Msr: Measurement,
-    DefaultAllocator: Allocator<f64, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>,
+    DefaultAllocator: Allocator< Msr::MeasurementSize>
+        + Allocator< Msr::MeasurementSize, Msr::MeasurementSize>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -72,8 +72,8 @@ where
 impl<Msr> TrackingArc<Msr>
 where
     Msr: Measurement,
-    DefaultAllocator: Allocator<f64, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>,
+    DefaultAllocator: Allocator< Msr::MeasurementSize>
+        + Allocator< Msr::MeasurementSize, Msr::MeasurementSize>,
 {
     /// Store this tracking arc to a parquet file.
     pub fn to_parquet_simple<P: AsRef<Path> + Debug>(
@@ -223,9 +223,9 @@ where
     where
         MsrIn: Interpolatable,
         D: TrackingDeviceSim<MsrIn, Msr>,
-        DefaultAllocator: Allocator<f64, <MsrIn as State>::Size>
-            + Allocator<f64, <MsrIn as State>::Size, <MsrIn as State>::Size>
-            + Allocator<f64, <MsrIn as State>::VecLength>,
+        DefaultAllocator: Allocator< <MsrIn as State>::Size>
+            + Allocator< <MsrIn as State>::Size, <MsrIn as State>::Size>
+            + Allocator< <MsrIn as State>::VecLength>,
     {
         let devices = D::loads_named(&self.device_cfg)?;
 
@@ -286,9 +286,9 @@ where
     where
         MsrIn: Interpolatable,
         D: TrackingDeviceSim<MsrIn, Msr>,
-        DefaultAllocator: Allocator<f64, <MsrIn as State>::Size>
-            + Allocator<f64, <MsrIn as State>::Size, <MsrIn as State>::Size>
-            + Allocator<f64, <MsrIn as State>::VecLength>,
+        DefaultAllocator: Allocator< <MsrIn as State>::Size>
+            + Allocator< <MsrIn as State>::Size, <MsrIn as State>::Size>
+            + Allocator< <MsrIn as State>::VecLength>,
     {
         let mut devices_map = BTreeMap::new();
         let mut sampling_rates_ns = Vec::with_capacity(devices.len());

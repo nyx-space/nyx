@@ -50,7 +50,7 @@ pub enum EventEdge {
 pub struct EventDetails<S: Interpolatable>
 where
     DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+        Allocator< S::VecLength> + Allocator< S::Size> + Allocator< S::Size, S::Size>,
 {
     /// The state of the trajectory at the found event.
     pub state: S,
@@ -71,7 +71,7 @@ where
 impl<S: Interpolatable> EventDetails<S>
 where
     DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+        Allocator< S::VecLength> + Allocator< S::Size> + Allocator< S::Size, S::Size>,
 {
     /// Generates detailed information about an event at a specific epoch in a trajectory.
     ///
@@ -149,7 +149,7 @@ where
 impl<S: Interpolatable> fmt::Display for EventDetails<S>
 where
     DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+        Allocator< S::VecLength> + Allocator< S::Size> + Allocator< S::Size, S::Size>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let prev_fmt = match self.prev_value {
@@ -174,7 +174,7 @@ where
 pub struct EventArc<S: Interpolatable>
 where
     DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+        Allocator< S::VecLength> + Allocator< S::Size> + Allocator< S::Size, S::Size>,
 {
     pub rise: EventDetails<S>,
     pub fall: EventDetails<S>,
@@ -183,7 +183,7 @@ where
 impl<S: Interpolatable> fmt::Display for EventArc<S>
 where
     DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+        Allocator< S::VecLength> + Allocator< S::Size> + Allocator< S::Size, S::Size>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(

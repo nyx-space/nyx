@@ -36,7 +36,6 @@ use rand::SeedableRng;
 use rand_distr::Distribution;
 use rayon::prelude::ParallelIterator;
 use rayon::prelude::*;
-use std::f64;
 use std::fmt;
 use std::sync::mpsc::channel;
 use std::sync::Arc;
@@ -47,10 +46,7 @@ use std::time::Instant as StdInstant;
 /// One caveat of the design is that the trajectory is used for post processing, not each individual state. This may prevent some event switching from being shown in GNC simulations.
 pub struct MonteCarlo<S: Interpolatable, Distr: Distribution<DispersedState<S>>>
 where
-    DefaultAllocator: Allocator<f64, S::Size>
-        + Allocator<f64, S::Size, S::Size>
-        + Allocator<f64, S::VecLength>
-        + Allocator<usize, S::Size, S::Size>,
+    DefaultAllocator: Allocator<S::Size> + Allocator<S::Size, S::Size> + Allocator<S::VecLength>,
 {
     /// Seed of the [64bit PCG random number generator](https://www.pcg-random.org/index.html)
     pub seed: Option<u128>,
@@ -63,10 +59,7 @@ where
 
 impl<S: Interpolatable, Distr: Distribution<DispersedState<S>>> MonteCarlo<S, Distr>
 where
-    DefaultAllocator: Allocator<f64, S::Size>
-        + Allocator<f64, S::Size, S::Size>
-        + Allocator<f64, S::VecLength>
-        + Allocator<usize, S::Size, S::Size>,
+    DefaultAllocator: Allocator<S::Size> + Allocator<S::Size, S::Size> + Allocator<S::VecLength>,
 {
     pub fn new(
         nominal_state: S,
@@ -109,11 +102,10 @@ where
         D: Dynamics<StateType = S>,
         E: ErrorCtrl,
         F: EventEvaluator<S>,
-        DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
-            + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
-            + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
-            + Allocator<f64, <D::StateType as State>::VecLength>,
-        <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+        DefaultAllocator: Allocator<<D::StateType as State>::Size>
+            + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
+            + Allocator<<D::StateType as State>::VecLength>,
+        <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
     {
         self.resume_run_until_nth_event(prop, almanac, 0, max_duration, event, trigger, num_runs)
     }
@@ -135,11 +127,10 @@ where
         D: Dynamics<StateType = S>,
         E: ErrorCtrl,
         F: EventEvaluator<S>,
-        DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
-            + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
-            + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
-            + Allocator<f64, <D::StateType as State>::VecLength>,
-        <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+        DefaultAllocator: Allocator<<D::StateType as State>::Size>
+            + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
+            + Allocator<<D::StateType as State>::VecLength>,
+        <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
     {
         // Generate the initial states
         let init_states = self.generate_states(skip, num_runs, self.seed);
@@ -207,11 +198,10 @@ where
     where
         D: Dynamics<StateType = S>,
         E: ErrorCtrl,
-        DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
-            + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
-            + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
-            + Allocator<f64, <D::StateType as State>::VecLength>,
-        <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+        DefaultAllocator: Allocator<<D::StateType as State>::Size>
+            + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
+            + Allocator<<D::StateType as State>::VecLength>,
+        <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
     {
         self.resume_run_until_epoch(prop, almanac, 0, end_epoch, num_runs)
     }
@@ -230,11 +220,10 @@ where
     where
         D: Dynamics<StateType = S>,
         E: ErrorCtrl,
-        DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
-            + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
-            + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
-            + Allocator<f64, <D::StateType as State>::VecLength>,
-        <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+        DefaultAllocator: Allocator<<D::StateType as State>::Size>
+            + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
+            + Allocator<<D::StateType as State>::VecLength>,
+        <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
     {
         // Generate the initial states
         let init_states = self.generate_states(skip, num_runs, self.seed);
@@ -315,10 +304,7 @@ where
 impl<S: Interpolatable, Distr: Distribution<DispersedState<S>>> fmt::Display
     for MonteCarlo<S, Distr>
 where
-    DefaultAllocator: Allocator<f64, S::Size>
-        + Allocator<f64, S::Size, S::Size>
-        + Allocator<f64, S::VecLength>
-        + Allocator<usize, S::Size, S::Size>,
+    DefaultAllocator: Allocator<S::Size> + Allocator<S::Size, S::Size> + Allocator<S::VecLength>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -332,10 +318,7 @@ where
 impl<S: Interpolatable, Distr: Distribution<DispersedState<S>>> fmt::LowerHex
     for MonteCarlo<S, Distr>
 where
-    DefaultAllocator: Allocator<f64, S::Size>
-        + Allocator<f64, S::Size, S::Size>
-        + Allocator<f64, S::VecLength>
-        + Allocator<usize, S::Size, S::Size>,
+    DefaultAllocator: Allocator<S::Size> + Allocator<S::Size, S::Size> + Allocator<S::VecLength>,
 {
     /// Returns a filename friendly name
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

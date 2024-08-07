@@ -37,20 +37,18 @@ where
     A: DimName,
     M: DimName,
     T: State,
-    DefaultAllocator: Allocator<f64, M>
-        + Allocator<f64, <T as State>::Size>
-        + Allocator<f64, <T as State>::VecLength>
-        + Allocator<f64, A>
-        + Allocator<f64, M, M>
-        + Allocator<f64, M, <T as State>::Size>
-        + Allocator<f64, <T as State>::Size, <T as State>::Size>
-        + Allocator<f64, A, A>
-        + Allocator<f64, <T as State>::Size, A>
-        + Allocator<f64, A, <T as State>::Size>
-        + Allocator<usize, <T as State>::Size>
-        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
-    <DefaultAllocator as Allocator<f64, <T as State>::Size>>::Buffer: Copy,
-    <DefaultAllocator as Allocator<f64, <T as State>::Size, <T as State>::Size>>::Buffer: Copy,
+    DefaultAllocator: Allocator<M>
+        + Allocator<<T as State>::Size>
+        + Allocator<<T as State>::VecLength>
+        + Allocator<A>
+        + Allocator<M, M>
+        + Allocator<M, <T as State>::Size>
+        + Allocator<<T as State>::Size, <T as State>::Size>
+        + Allocator<A, A>
+        + Allocator<<T as State>::Size, A>
+        + Allocator<A, <T as State>::Size>,
+    <DefaultAllocator as Allocator<<T as State>::Size>>::Buffer<f64>: Copy,
+    <DefaultAllocator as Allocator<<T as State>::Size, <T as State>::Size>>::Buffer<f64>: Copy,
 {
     /// The previous estimate used in the KF computations.
     pub prev_estimate: KfEstimate<T>,
@@ -69,21 +67,19 @@ where
     A: DimName,
     M: DimName,
     T: State,
-    DefaultAllocator: Allocator<f64, M>
-        + Allocator<f64, <T as State>::Size>
-        + Allocator<f64, <T as State>::VecLength>
-        + Allocator<f64, A>
-        + Allocator<f64, M, M>
-        + Allocator<f64, M, <T as State>::Size>
-        + Allocator<f64, <T as State>::Size, M>
-        + Allocator<f64, <T as State>::Size, <T as State>::Size>
-        + Allocator<f64, A, A>
-        + Allocator<f64, <T as State>::Size, A>
-        + Allocator<f64, A, <T as State>::Size>
-        + Allocator<usize, <T as State>::Size>
-        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
-    <DefaultAllocator as Allocator<f64, <T as State>::Size>>::Buffer: Copy,
-    <DefaultAllocator as Allocator<f64, <T as State>::Size, <T as State>::Size>>::Buffer: Copy,
+    DefaultAllocator: Allocator<M>
+        + Allocator<<T as State>::Size>
+        + Allocator<<T as State>::VecLength>
+        + Allocator<A>
+        + Allocator<M, M>
+        + Allocator<M, <T as State>::Size>
+        + Allocator<<T as State>::Size, M>
+        + Allocator<<T as State>::Size, <T as State>::Size>
+        + Allocator<A, A>
+        + Allocator<<T as State>::Size, A>
+        + Allocator<A, <T as State>::Size>,
+    <DefaultAllocator as Allocator<<T as State>::Size>>::Buffer<f64>: Copy,
+    <DefaultAllocator as Allocator<<T as State>::Size, <T as State>::Size>>::Buffer<f64>: Copy,
 {
     /// Initializes this KF with an initial estimate, measurement noise, and one process noise
     pub fn new(initial_estimate: KfEstimate<T>, process_noise: SNC<A>) -> Self {
@@ -137,20 +133,18 @@ impl<T, M> KF<T, U3, M>
 where
     M: DimName,
     T: State,
-    DefaultAllocator: Allocator<f64, M>
-        + Allocator<f64, <T as State>::Size>
-        + Allocator<f64, <T as State>::VecLength>
-        + Allocator<f64, M, M>
-        + Allocator<f64, M, <T as State>::Size>
-        + Allocator<f64, <T as State>::Size, M>
-        + Allocator<f64, <T as State>::Size, <T as State>::Size>
-        + Allocator<f64, U3, U3>
-        + Allocator<f64, <T as State>::Size, U3>
-        + Allocator<f64, U3, <T as State>::Size>
-        + Allocator<usize, <T as State>::Size>
-        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
-    <DefaultAllocator as Allocator<f64, <T as State>::Size>>::Buffer: Copy,
-    <DefaultAllocator as Allocator<f64, <T as State>::Size, <T as State>::Size>>::Buffer: Copy,
+    DefaultAllocator: Allocator<M>
+        + Allocator<<T as State>::Size>
+        + Allocator<<T as State>::VecLength>
+        + Allocator<M, M>
+        + Allocator<M, <T as State>::Size>
+        + Allocator<<T as State>::Size, M>
+        + Allocator<<T as State>::Size, <T as State>::Size>
+        + Allocator<U3, U3>
+        + Allocator<<T as State>::Size, U3>
+        + Allocator<U3, <T as State>::Size>,
+    <DefaultAllocator as Allocator<<T as State>::Size>>::Buffer<f64>: Copy,
+    <DefaultAllocator as Allocator<<T as State>::Size, <T as State>::Size>>::Buffer<f64>: Copy,
 {
     /// Initializes this KF without SNC
     pub fn no_snc(initial_estimate: KfEstimate<T>) -> Self {
@@ -170,22 +164,20 @@ where
     A: DimName,
     M: DimName,
     T: State,
-    DefaultAllocator: Allocator<f64, M>
-        + Allocator<f64, <T as State>::Size>
-        + Allocator<f64, <T as State>::VecLength>
-        + Allocator<f64, A>
-        + Allocator<f64, M, M>
-        + Allocator<f64, M, <T as State>::Size>
-        + Allocator<f64, <T as State>::Size, M>
-        + Allocator<f64, <T as State>::Size, <T as State>::Size>
-        + Allocator<f64, A, A>
-        + Allocator<f64, <T as State>::Size, A>
-        + Allocator<f64, A, <T as State>::Size>
-        + Allocator<usize, <T as State>::Size>
-        + Allocator<usize, <T as State>::Size, <T as State>::Size>
-        + Allocator<f64, na::Const<1>, M>,
-    <DefaultAllocator as Allocator<f64, <T as State>::Size>>::Buffer: Copy,
-    <DefaultAllocator as Allocator<f64, <T as State>::Size, <T as State>::Size>>::Buffer: Copy,
+    DefaultAllocator: Allocator<M>
+        + Allocator<<T as State>::Size>
+        + Allocator<<T as State>::VecLength>
+        + Allocator<A>
+        + Allocator<M, M>
+        + Allocator<M, <T as State>::Size>
+        + Allocator<<T as State>::Size, M>
+        + Allocator<<T as State>::Size, <T as State>::Size>
+        + Allocator<A, A>
+        + Allocator<<T as State>::Size, A>
+        + Allocator<A, <T as State>::Size>
+        + Allocator<na::Const<1>, M>,
+    <DefaultAllocator as Allocator<<T as State>::Size>>::Buffer<f64>: Copy,
+    <DefaultAllocator as Allocator<<T as State>::Size, <T as State>::Size>>::Buffer<f64>: Copy,
 {
     type Estimate = KfEstimate<T>;
 

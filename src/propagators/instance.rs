@@ -41,10 +41,9 @@ use std::time::Instant;
 /// details of the previous step, and the set of coefficients used for the monomorphic instance.
 pub struct PropInstance<'a, D: Dynamics, E: ErrorCtrl>
 where
-    DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::VecLength>,
+    DefaultAllocator: Allocator<<D::StateType as State>::Size>
+        + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<<D::StateType as State>::VecLength>,
 {
     /// The state of this propagator instance
     pub state: D::StateType,
@@ -63,10 +62,9 @@ where
 
 impl<'a, D: Dynamics, E: ErrorCtrl> PropInstance<'a, D, E>
 where
-    DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::VecLength>,
+    DefaultAllocator: Allocator<<D::StateType as State>::Size>
+        + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<<D::StateType as State>::VecLength>,
 {
     /// Sets this instance to not log progress
     pub fn quiet(mut self) -> Self {
@@ -226,7 +224,7 @@ where
         duration: Duration,
     ) -> Result<(D::StateType, Traj<D::StateType>), PropagationError>
     where
-        <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+        <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
         D::StateType: Interpolatable,
     {
         let end_state;
@@ -260,7 +258,7 @@ where
         end_time: Epoch,
     ) -> Result<(D::StateType, Traj<D::StateType>), PropagationError>
     where
-        <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+        <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
         D::StateType: Interpolatable,
     {
         let duration: Duration = end_time - self.state.epoch();
@@ -275,7 +273,7 @@ where
         event: &F,
     ) -> Result<(D::StateType, Traj<D::StateType>), PropagationError>
     where
-        <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+        <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
         D::StateType: Interpolatable,
     {
         self.until_nth_event(max_duration, event, 0)
@@ -290,7 +288,7 @@ where
         trigger: usize,
     ) -> Result<(D::StateType, Traj<D::StateType>), PropagationError>
     where
-        <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+        <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
         D::StateType: Interpolatable,
     {
         info!("Searching for {}", event);
