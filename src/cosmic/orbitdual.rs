@@ -303,7 +303,7 @@ impl OrbitDual {
         .cross(&self.hvec());
         let aop = (n.dot(&self.evec()?) / (norm(&n) * self.ecc()?.dual)).acos();
         if aop.is_nan() {
-            error!("AoP is NaN");
+            warn!("AoP is NaN");
             Ok(OrbitPartial {
                 dual: OHyperdual::from(0.0),
                 param: StateParameter::AoP,

@@ -14,6 +14,7 @@ use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use nyx::time::{Epoch, TimeUnits, Unit};
 use nyx_space::cosmic::SrpConfig;
 use nyx_space::dynamics::guidance::LocalFrame;
+use nyx_space::propagators::RSSCartesianStep;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
@@ -131,8 +132,6 @@ fn od_val_sc_mb_srp_reals_duals_models(
 
     let dry_mass_kg = 100.0; // in kg
     let sc_area = 5.0; // m^2
-
-    // Generate the truth data on one thread.
 
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
@@ -300,14 +299,13 @@ fn od_val_sc_srp_estimation(
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     // Using a GTO because Cr estimation will be more obvious.
-    let initial_orbit = Orbit::keplerian(24505.9, 0.725, 7.05, 0.0, 0.0, 0.0, epoch, eme2k);
+    let initial_orbit = Orbit::keplerian(24505.9, 0.725, 7.05, 0.0, 0.0, 0.0, epoch, eme2k); // --> Bad estimation without Cr
+
     // let initial_orbit = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, epoch, eme2k);
     // let prop_time = initial_orbit.period().unwrap() * 0.5;
     let prop_time = 1 * Unit::Day;
 
     let dry_mass_kg = 100.0; // in kg
-
-    // Generate the truth data on one thread.
 
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
@@ -327,7 +325,13 @@ fn od_val_sc_srp_estimation(
         .dry_mass_kg(dry_mass_kg)
         .build();
 
-    let setup = Propagator::default(sc_dynamics);
+    let setup = Propagator::dp78(
+        sc_dynamics,
+        PropOpts::builder()
+            .max_step(1.minutes())
+            .error_ctrl(RSSCartesianStep {})
+            .build(),
+    );
     let mut prop = setup.with(sc_truth, almanac.clone());
     let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
@@ -368,16 +372,17 @@ fn od_val_sc_srp_estimation(
     arc.to_parquet_simple(path.with_file_name("sc_srp_msr_arc.parquet"))
         .unwrap();
 
-    let sc_init_est = Spacecraft::builder()
-        .orbit(initial_orbit)
-        .srp(SrpConfig {
-            cr: 1.5, // Using a different value.
-            area_m2: 25.0,
-        })
-        .dry_mass_kg(dry_mass_kg)
-        .build()
-        .with_stm();
+    // let sc_init_est = Spacecraft::builder()
+    //     .orbit(initial_orbit)
+    //     .srp(SrpConfig {
+    //         cr: truth_cr, // Using a different value.
+    //         area_m2: 9.0,
+    //     })
+    //     .dry_mass_kg(dry_mass_kg)
+    //     .build()
+    //     .with_stm();
 
+    let sc_init_est = sc_truth.with_stm();
     // Use the same setup as earlier
     let prop_est = setup.with(sc_init_est, almanac.clone());
 
@@ -387,9 +392,9 @@ fn od_val_sc_srp_estimation(
         .x_km(1.0)
         .y_km(1.0)
         .z_km(1.0)
-        .vx_km_s(0.5e-2)
-        .vy_km_s(0.5e-2)
-        .vz_km_s(0.5e-2)
+        .vx_km_s(0.5e-1)
+        .vy_km_s(0.5e-1)
+        .vz_km_s(0.5e-1)
         .cr(0.1)
         .build();
 
@@ -401,16 +406,23 @@ fn od_val_sc_srp_estimation(
     let mut odp = ODProcess::ckf(prop_est, ckf, None, almanac);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
+    // odp.predict_until(1 * Unit::Minute, arc.measurements.last().unwrap().1.epoch)
+    //     .unwrap();
 
     odp.to_parquet(
         path.with_file_name("sc_od_with_srp.parquet"),
-        ExportCfg::timestamped(),
+        ExportCfg::default(),
     )
     .unwrap();
 
     let est = odp.estimates.last().unwrap();
 
-    println!("FINAL:\n\t{est}\n\tCr = {}", est.state().srp.cr);
+    println!(
+        "FINAL:\n\t{est}\n{:x}\tCr = {}\nEXP:\t{:x}",
+        est.state().orbit,
+        est.state().srp.cr,
+        final_truth.orbit
+    );
 
     let delta = (est.state().orbit - final_truth.orbit).unwrap();
     println!(
