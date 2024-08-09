@@ -296,7 +296,6 @@ where
         let epoch = nominal_state.epoch();
 
         let mut covar_bar = stm * self.prev_estimate.covar * stm.transpose();
-        let mut snc_used = false;
         // Try to apply an SNC, if applicable
         for (i, snc) in self.process_noise.iter().enumerate().rev() {
             if let Some(snc_matrix) = snc.to_matrix(epoch) {
@@ -335,14 +334,9 @@ where
                 }
                 // Let's add the process noise
                 covar_bar += &gamma * snc_matrix * &gamma.transpose();
-                snc_used = true;
                 // And break so we don't add any more process noise
                 break;
             }
-        }
-
-        if !snc_used {
-            debug!("@{} No SNC", epoch);
         }
 
         let h_tilde_t = &self.h_tilde.transpose();

@@ -299,11 +299,10 @@ fn od_val_sc_srp_estimation(
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     // Using a GTO because Cr estimation will be more obvious.
-    let initial_orbit = Orbit::keplerian(24505.9, 0.725, 7.05, 0.0, 0.0, 0.0, epoch, eme2k); // --> Bad estimation without Cr
+    let initial_orbit = Orbit::keplerian(24505.9, 0.725, 7.05, 0.0, 0.0, 0.0, epoch, eme2k);
 
     // let initial_orbit = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, epoch, eme2k);
-    // let prop_time = initial_orbit.period().unwrap() * 0.5;
-    let prop_time = 1 * Unit::Day;
+    let prop_time = initial_orbit.period().unwrap() * 5;
 
     let dry_mass_kg = 100.0; // in kg
 
@@ -320,10 +319,12 @@ fn od_val_sc_srp_estimation(
         .orbit(initial_orbit)
         .srp(SrpConfig {
             cr: truth_cr,
-            area_m2: 25.0,
+            area_m2: 100.0,
         })
         .dry_mass_kg(dry_mass_kg)
         .build();
+
+    println!("{sc_truth}");
 
     let setup = Propagator::dp78(
         sc_dynamics,
@@ -333,7 +334,7 @@ fn od_val_sc_srp_estimation(
             .build(),
     );
     let mut prop = setup.with(sc_truth, almanac.clone());
-    let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
+    let (_, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
     // Test the exporting of a spacecraft trajectory
     let path: PathBuf = [
@@ -363,7 +364,8 @@ fn od_val_sc_srp_estimation(
     let all_stations = sim_devices;
 
     // Simulate tracking data
-    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 120).unwrap();
+    let mut arc_sim =
+        TrackingArcSim::with_seed(all_stations, traj.clone(), configs.clone(), 120).unwrap();
     arc_sim.build_schedule(almanac.clone()).unwrap();
 
     let mut arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
@@ -372,17 +374,16 @@ fn od_val_sc_srp_estimation(
     arc.to_parquet_simple(path.with_file_name("sc_srp_msr_arc.parquet"))
         .unwrap();
 
-    // let sc_init_est = Spacecraft::builder()
-    //     .orbit(initial_orbit)
-    //     .srp(SrpConfig {
-    //         cr: truth_cr, // Using a different value.
-    //         area_m2: 9.0,
-    //     })
-    //     .dry_mass_kg(dry_mass_kg)
-    //     .build()
-    //     .with_stm();
+    let sc_init_est = Spacecraft::builder()
+        .orbit(initial_orbit)
+        .srp(SrpConfig {
+            cr: 1.5,
+            area_m2: 100.0,
+        })
+        .dry_mass_kg(dry_mass_kg)
+        .build()
+        .with_stm();
 
-    let sc_init_est = sc_truth.with_stm();
     // Use the same setup as earlier
     let prop_est = setup.with(sc_init_est, almanac.clone());
 
@@ -395,19 +396,27 @@ fn od_val_sc_srp_estimation(
         .vx_km_s(0.5e-1)
         .vy_km_s(0.5e-1)
         .vz_km_s(0.5e-1)
-        .cr(0.1)
+        .cr(0.2)
         .build();
 
     // Define the initial orbit estimate
     let initial_estimate = sc.to_estimate().unwrap();
 
-    let ckf = KF::no_snc(initial_estimate);
+    // let ckf = KF::no_snc(initial_estimate);
+    let ckf = KF::new(
+        initial_estimate,
+        SNC3::from_diagonal(2 * Unit::Minute, &[1e-12, 1e-12, 1e-12]),
+    );
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, None, almanac);
+    let mut odp = ODProcess::ekf(
+        prop_est,
+        ckf,
+        EkfTrigger::new(30, Unit::Minute * 2),
+        None,
+        almanac,
+    );
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
-    // odp.predict_until(1 * Unit::Minute, arc.measurements.last().unwrap().1.epoch)
-    //     .unwrap();
 
     odp.to_parquet(
         path.with_file_name("sc_od_with_srp.parquet"),
@@ -417,16 +426,19 @@ fn od_val_sc_srp_estimation(
 
     let est = odp.estimates.last().unwrap();
 
+    let truth = traj.at(est.epoch()).unwrap();
+
     println!(
-        "FINAL:\n\t{est}\n{:x}\tCr = {}\nEXP:\t{:x}",
+        "FINAL:\n\t{est}\n{:x}\nCr = {} +/-{}\nEXP:\t{:x}",
         est.state().orbit,
         est.state().srp.cr,
-        final_truth.orbit
+        est.covar()[(6, 6)].sqrt(),
+        truth.orbit
     );
 
-    let delta = (est.state().orbit - final_truth.orbit).unwrap();
+    let delta = (est.state().orbit - truth.orbit).unwrap();
     println!(
-        "RMAG error = {:.2e} m\tVMAG error = {:.3e} mm/s",
+        "RMAG error = {:.6} m\tVMAG error = {:.6} mm/s",
         delta.rmag_km() * 1e3,
         delta.vmag_km_s() * 1e6
     );
