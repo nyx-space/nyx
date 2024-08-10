@@ -38,6 +38,8 @@ pub struct SolarPressure {
     /// solar flux at 1 AU, in W/m^2
     pub phi: f64,
     pub e_loc: EclipseLocator,
+    /// Set to true to estimate the coefficient of reflectivity
+    pub estimate: bool,
 }
 
 impl SolarPressure {
@@ -66,12 +68,23 @@ impl SolarPressure {
         Ok(Self {
             phi: SOLAR_FLUX_W_m2,
             e_loc,
+            estimate: true,
         })
     }
 
     /// Accounts for the shadowing of only one body and will set the solar flux at 1 AU to: Phi = 1367.0
     pub fn default(shadow_body: Frame, almanac: Arc<Almanac>) -> Result<Arc<Self>, DynamicsError> {
         Ok(Arc::new(Self::default_raw(vec![shadow_body], almanac)?))
+    }
+
+    /// Accounts for the shadowing of only one body and will set the solar flux at 1 AU to: Phi = 1367.0
+    pub fn default_no_estimation(
+        shadow_body: Frame,
+        almanac: Arc<Almanac>,
+    ) -> Result<Arc<Self>, DynamicsError> {
+        let mut srp = Self::default_raw(vec![shadow_body], almanac)?;
+        srp.estimate = false;
+        Ok(Arc::new(srp))
     }
 
     /// Must provide the flux in W/m^2
@@ -96,7 +109,11 @@ impl SolarPressure {
 
 impl ForceModel for SolarPressure {
     fn estimation_index(&self) -> Option<usize> {
-        Some(6)
+        if self.estimate {
+            Some(6)
+        } else {
+            None
+        }
     }
 
     fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {

@@ -47,6 +47,8 @@ pub struct ConstantDrag {
     pub rho: f64,
     /// Geoid causing the drag
     pub drag_frame: Frame,
+    /// Set to true to estimate the coefficient of drag
+    pub estimate: bool,
 }
 
 impl fmt::Display for ConstantDrag {
@@ -61,7 +63,11 @@ impl fmt::Display for ConstantDrag {
 
 impl ForceModel for ConstantDrag {
     fn estimation_index(&self) -> Option<usize> {
-        Some(7)
+        if self.estimate {
+            Some(7)
+        } else {
+            None
+        }
     }
 
     fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
@@ -94,6 +100,8 @@ pub struct Drag {
     pub density: AtmDensity,
     /// Frame to compute the drag in
     pub drag_frame: Frame,
+    /// Set to true to estimate the coefficient of drag
+    pub estimate: bool,
 }
 
 impl Drag {
@@ -110,6 +118,7 @@ impl Drag {
                     action: "planetary data from third body not loaded",
                 }
             })?,
+            estimate: false,
         }))
     }
 
@@ -124,6 +133,7 @@ impl Drag {
                     action: "planetary data from third body not loaded",
                 }
             })?,
+            estimate: false,
         }))
     }
 }
@@ -140,7 +150,11 @@ impl fmt::Display for Drag {
 
 impl ForceModel for Drag {
     fn estimation_index(&self) -> Option<usize> {
-        Some(8)
+        if self.estimate {
+            Some(7)
+        } else {
+            None
+        }
     }
 
     fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
