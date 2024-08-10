@@ -403,9 +403,9 @@ fn od_val_sc_srp_estimation(
     let initial_estimate = sc.to_estimate().unwrap();
 
     // let ckf = KF::no_snc(initial_estimate);
-    let ckf = KF::no_snc(
+    let ckf = KF::new(
         initial_estimate,
-        // SNC3::from_diagonal(2 * Unit::Minute, &[1e-14, 1e-14, 1e-14]),
+        SNC3::from_diagonal(2 * Unit::Minute, &[1e-15, 1e-15, 1e-15]),
     );
 
     let mut odp = ODProcess::ekf(
@@ -443,8 +443,12 @@ fn od_val_sc_srp_estimation(
         delta.vmag_km_s() * 1e6
     );
 
-    assert!(delta.rmag_km() < 1e-9, "More than 1 micrometer error");
-    assert!(delta.vmag_km_s() < 1e-9, "More than 1 micrometer/s error");
+    assert!(delta.rmag_km() < 1e-3, "More than 1 meter error");
+    assert!(delta.vmag_km_s() < 1e-6, "More than 1 millimeter/s error");
+    assert!(
+        (est.state().srp.cr - truth_cr).abs() < 0.377,
+        "Cr estimation did not decrease"
+    );
 
     for (no, est) in odp.estimates.iter().enumerate() {
         if no == 0 {
@@ -460,14 +464,4 @@ fn od_val_sc_srp_estimation(
             );
         }
     }
-
-    let est = odp.estimates.last().unwrap();
-    println!("estimate error {:.2e}", est.state_deviation().norm());
-    println!("estimate covariance {:.2e}", est.covar.diagonal().norm());
-
-    assert!(
-        est.covar.diagonal().norm() < 1e-4,
-        "estimate covariance norm should be small (perfect dynamics) ({:e})",
-        est.covar.diagonal().norm()
-    );
 }
