@@ -497,7 +497,7 @@ impl State for Spacecraft {
         self.orbit.epoch = epoch;
         self.orbit.radius_km = radius_km;
         self.orbit.velocity_km_s = vel_km_s;
-        self.srp.cr = sc_state[6];
+        self.srp.cr = sc_state[6].clamp(0.0, 2.0);
         self.drag.cd = sc_state[7];
         self.fuel_mass_kg = sc_state[8];
     }
@@ -788,7 +788,7 @@ impl Add<OVector<f64, Const<9>>> for Spacecraft {
 
         self.orbit.radius_km += radius_km;
         self.orbit.velocity_km_s += vel_km_s;
-        self.srp.cr += other[6];
+        self.srp.cr = (self.srp.cr + other[6]).clamp(0.0, 2.0);
         self.drag.cd += other[7];
         self.fuel_mass_kg += other[8];
 

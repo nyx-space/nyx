@@ -288,7 +288,6 @@ where
         let epoch = nominal_state.epoch();
 
         let mut covar_bar = stm * self.prev_estimate.covar * stm.transpose();
-        let mut snc_used = false;
         // Try to apply an SNC, if applicable
         for (i, snc) in self.process_noise.iter().enumerate().rev() {
             if let Some(snc_matrix) = snc.to_matrix(epoch) {
@@ -327,14 +326,9 @@ where
                 }
                 // Let's add the process noise
                 covar_bar += &gamma * snc_matrix * &gamma.transpose();
-                snc_used = true;
                 // And break so we don't add any more process noise
                 break;
             }
-        }
-
-        if !snc_used {
-            debug!("@{} No SNC", epoch);
         }
 
         let h_tilde_t = &self.h_tilde.transpose();
@@ -363,12 +357,12 @@ where
         }
 
         // Compute the Kalman gain but first adding the measurement noise to H⋅P⋅H^T
-        let mut invertible_part = h_p_ht + &r_k;
-        if !invertible_part.try_inverse_mut() {
+        let mut innovation_covar = h_p_ht + &r_k;
+        if !innovation_covar.try_inverse_mut() {
             return Err(ODError::SingularKalmanGain);
         }
 
-        let gain = covar_bar * h_tilde_t * &invertible_part;
+        let gain = covar_bar * h_tilde_t * &innovation_covar;
 
         // Compute the state estimate
         let (state_hat, res) = if self.ekf {

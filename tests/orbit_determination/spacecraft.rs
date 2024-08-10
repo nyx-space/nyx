@@ -12,6 +12,9 @@ use nyx::md::{Event, StateParameter};
 use nyx::od::prelude::*;
 use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use nyx::time::{Epoch, TimeUnits, Unit};
+use nyx_space::cosmic::SrpConfig;
+use nyx_space::dynamics::guidance::LocalFrame;
+use nyx_space::propagators::RSSCartesianStep;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
@@ -129,8 +132,6 @@ fn od_val_sc_mb_srp_reals_duals_models(
 
     let dry_mass_kg = 100.0; // in kg
     let sc_area = 5.0; // m^2
-
-    // Generate the truth data on one thread.
 
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
@@ -276,4 +277,191 @@ fn od_val_sc_mb_srp_reals_duals_models(
 
     assert!(delta.rmag_km() < 1e-9, "More than 1 micrometer error");
     assert!(delta.vmag_km_s() < 1e-9, "More than 1 micrometer/s error");
+}
+
+#[allow(clippy::identity_op)]
+#[rstest]
+fn od_val_sc_srp_estimation(
+    almanac: Arc<Almanac>,
+    sim_devices: Vec<GroundStation>,
+    proc_devices: Vec<GroundStation>,
+) {
+    /*
+     * This tests that we can correctly estimate the solar radiation pressure.
+     *
+     * The truth data is generated with a specific value of the Cr and then the filter is initialized with another value.
+     * We expect that the estimation eventually converges onto the truth value.
+     **/
+    let _ = pretty_env_logger::try_init();
+
+    let epoch = Epoch::from_gregorian_utc_at_noon(2024, 2, 29);
+
+    // Define state information.
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    // Using a GTO because Cr estimation will be more obvious.
+    let initial_orbit = Orbit::keplerian(24505.9, 0.725, 7.05, 0.0, 0.0, 0.0, epoch, eme2k);
+
+    // let initial_orbit = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, epoch, eme2k);
+    let prop_time = initial_orbit.period().unwrap() * 5;
+
+    let dry_mass_kg = 100.0; // in kg
+
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
+    let orbital_dyn = OrbitalDynamics::point_masses(bodies);
+    let sc_dynamics = SpacecraftDynamics::from_model(
+        orbital_dyn,
+        SolarPressure::default(eme2k, almanac.clone()).unwrap(),
+    );
+
+    let truth_cr = 1.123;
+
+    let sc_truth = Spacecraft::builder()
+        .orbit(initial_orbit)
+        .srp(SrpConfig {
+            cr: truth_cr,
+            area_m2: 100.0,
+        })
+        .dry_mass_kg(dry_mass_kg)
+        .build();
+
+    println!("{sc_truth}");
+
+    let setup = Propagator::dp78(
+        sc_dynamics,
+        PropOpts::builder()
+            .max_step(1.minutes())
+            .error_ctrl(RSSCartesianStep {})
+            .build(),
+    );
+    let mut prop = setup.with(sc_truth, almanac.clone());
+    let (_, traj) = prop.for_duration_with_traj(prop_time).unwrap();
+
+    // Test the exporting of a spacecraft trajectory
+    let path: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "output_data",
+        "sc_srp_truth.parquet",
+    ]
+    .iter()
+    .collect();
+
+    traj.to_parquet_simple(path.clone(), almanac.clone())
+        .unwrap();
+
+    // Define the tracking configurations
+    let mut configs = BTreeMap::new();
+    let cfg = TrkConfig::builder()
+        .strands(vec![Strand {
+            start: epoch,
+            end: epoch + prop_time,
+        }])
+        .build();
+
+    for device in &sim_devices {
+        configs.insert(device.name.clone(), cfg.clone());
+    }
+
+    let all_stations = sim_devices;
+
+    // Simulate tracking data
+    let mut arc_sim =
+        TrackingArcSim::with_seed(all_stations, traj.clone(), configs.clone(), 120).unwrap();
+    arc_sim.build_schedule(almanac.clone()).unwrap();
+
+    let mut arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    arc.set_devices(proc_devices, configs).unwrap();
+
+    arc.to_parquet_simple(path.with_file_name("sc_srp_msr_arc.parquet"))
+        .unwrap();
+
+    let sc_init_est = Spacecraft::builder()
+        .orbit(initial_orbit)
+        .srp(SrpConfig {
+            cr: 1.5,
+            area_m2: 100.0,
+        })
+        .dry_mass_kg(dry_mass_kg)
+        .build()
+        .with_stm();
+
+    // Use the same setup as earlier
+    let prop_est = setup.with(sc_init_est, almanac.clone());
+
+    let sc = SpacecraftUncertainty::builder()
+        .nominal(sc_init_est)
+        .frame(LocalFrame::RIC)
+        .x_km(1.0)
+        .y_km(1.0)
+        .z_km(1.0)
+        .vx_km_s(0.5e-1)
+        .vy_km_s(0.5e-1)
+        .vz_km_s(0.5e-1)
+        .cr(0.2)
+        .build();
+
+    // Define the initial orbit estimate
+    let initial_estimate = sc.to_estimate().unwrap();
+
+    // let ckf = KF::no_snc(initial_estimate);
+    let ckf = KF::new(
+        initial_estimate,
+        SNC3::from_diagonal(2 * Unit::Minute, &[1e-15, 1e-15, 1e-15]),
+    );
+
+    let mut odp = ODProcess::ekf(
+        prop_est,
+        ckf,
+        EkfTrigger::new(30, Unit::Minute * 2),
+        None,
+        almanac,
+    );
+
+    odp.process_arc::<GroundStation>(&arc).unwrap();
+
+    odp.to_parquet(
+        path.with_file_name("sc_od_with_srp.parquet"),
+        ExportCfg::default(),
+    )
+    .unwrap();
+
+    let est = odp.estimates.last().unwrap();
+
+    let truth = traj.at(est.epoch()).unwrap();
+
+    println!(
+        "FINAL:\n\t{est}\n{:x}\nCr = {} +/-{}\nEXP:\t{:x}",
+        est.state().orbit,
+        est.state().srp.cr,
+        est.covar()[(6, 6)].sqrt(),
+        truth.orbit
+    );
+
+    let delta = (est.state().orbit - truth.orbit).unwrap();
+    println!(
+        "RMAG error = {:.6} m\tVMAG error = {:.6} mm/s",
+        delta.rmag_km() * 1e3,
+        delta.vmag_km_s() * 1e6
+    );
+
+    assert!(delta.rmag_km() < 1e-3, "More than 1 meter error");
+    assert!(delta.vmag_km_s() < 1e-6, "More than 1 millimeter/s error");
+    assert!(
+        (est.state().srp.cr - truth_cr).abs() < (1.5 - truth_cr),
+        "Cr estimation did not improve"
+    );
+
+    for (no, est) in odp.estimates.iter().enumerate() {
+        if no == 0 {
+            // Skip the first estimate which is the initial estimate provided by user
+            continue;
+        }
+        for i in 0..6 {
+            assert!(
+                est.covar[(i, i)] >= 0.0,
+                "covar diagonal element negative @ [{}, {}]",
+                i,
+                i
+            );
+        }
+    }
 }

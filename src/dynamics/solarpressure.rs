@@ -19,7 +19,7 @@
 use super::{DynamicsAlmanacSnafu, DynamicsError, DynamicsPlanetarySnafu, ForceModel};
 use crate::cosmic::eclipse::EclipseLocator;
 use crate::cosmic::{Frame, Spacecraft, AU, SPEED_OF_LIGHT_M_S};
-use crate::linalg::{Const, Matrix3, Vector3};
+use crate::linalg::{Const, Matrix4x3, Vector3};
 use anise::almanac::Almanac;
 use anise::constants::frames::SUN_J2000;
 use hyperdual::{hyperspace_from_vector, linalg::norm, Float, OHyperdual};
@@ -38,6 +38,8 @@ pub struct SolarPressure {
     /// solar flux at 1 AU, in W/m^2
     pub phi: f64,
     pub e_loc: EclipseLocator,
+    /// Set to true to estimate the coefficient of reflectivity
+    pub estimate: bool,
 }
 
 impl SolarPressure {
@@ -66,12 +68,23 @@ impl SolarPressure {
         Ok(Self {
             phi: SOLAR_FLUX_W_m2,
             e_loc,
+            estimate: true,
         })
     }
 
     /// Accounts for the shadowing of only one body and will set the solar flux at 1 AU to: Phi = 1367.0
     pub fn default(shadow_body: Frame, almanac: Arc<Almanac>) -> Result<Arc<Self>, DynamicsError> {
         Ok(Arc::new(Self::default_raw(vec![shadow_body], almanac)?))
+    }
+
+    /// Accounts for the shadowing of only one body and will set the solar flux at 1 AU to: Phi = 1367.0
+    pub fn default_no_estimation(
+        shadow_body: Frame,
+        almanac: Arc<Almanac>,
+    ) -> Result<Arc<Self>, DynamicsError> {
+        let mut srp = Self::default_raw(vec![shadow_body], almanac)?;
+        srp.estimate = false;
+        Ok(Arc::new(srp))
     }
 
     /// Must provide the flux in W/m^2
@@ -95,6 +108,14 @@ impl SolarPressure {
 }
 
 impl ForceModel for SolarPressure {
+    fn estimation_index(&self) -> Option<usize> {
+        if self.estimate {
+            Some(6)
+        } else {
+            None
+        }
+    }
+
     fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
         let osc = ctx.orbit;
         // Compute the position of the Sun as seen from the spacecraft
@@ -128,7 +149,7 @@ impl ForceModel for SolarPressure {
         &self,
         ctx: &Spacecraft,
         almanac: Arc<Almanac>,
-    ) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
+    ) -> Result<(Vector3<f64>, Matrix4x3<f64>), DynamicsError> {
         let osc = ctx.orbit;
 
         // Compute the position of the Sun as seen from the spacecraft
@@ -145,7 +166,7 @@ impl ForceModel for SolarPressure {
         // Compute the shadowing factor.
         let k: f64 = self
             .e_loc
-            .compute(osc, almanac)
+            .compute(osc, almanac.clone())
             .context(DynamicsAlmanacSnafu {
                 action: "solar radiation pressure computation",
             })?
@@ -169,13 +190,19 @@ impl ForceModel for SolarPressure {
 
         // Extract result into Vector6 and Matrix6
         let mut dx = Vector3::zeros();
-        let mut grad = Matrix3::zeros();
+        let mut grad = Matrix4x3::zeros();
         for i in 0..3 {
             dx[i] += dual_force[i].real();
             // NOTE: Although the hyperdual state is of size 7, we're only setting the values up to 3 (Matrix3)
             for j in 0..3 {
                 grad[(i, j)] += dual_force[i][j + 1];
             }
+        }
+
+        // Compute the partial wrt to Cr.
+        let wrt_cr = self.eom(ctx, almanac)? / ctx.srp.cr;
+        for j in 0..3 {
+            grad[(3, j)] = wrt_cr[j];
         }
 
         Ok((dx, grad))
