@@ -365,12 +365,12 @@ where
         }
 
         // Compute the Kalman gain but first adding the measurement noise to H⋅P⋅H^T
-        let mut invertible_part = h_p_ht + &r_k;
-        if !invertible_part.try_inverse_mut() {
+        let mut innovation_covar = h_p_ht + &r_k;
+        if !innovation_covar.try_inverse_mut() {
             return Err(ODError::SingularKalmanGain);
         }
 
-        let gain = covar_bar * h_tilde_t * &invertible_part;
+        let gain = covar_bar * h_tilde_t * &innovation_covar;
 
         // Compute the state estimate
         let (state_hat, res) = if self.ekf {
