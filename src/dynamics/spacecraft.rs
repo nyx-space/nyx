@@ -419,11 +419,8 @@ impl Dynamics for SpacecraftDynamics {
             // Add this force model's estimation if applicable.
             if let Some(idx) = model.estimation_index() {
                 for j in 0..3 {
-                    grad[(idx, j)] += model_grad[(3, j)] / total_mass;
+                    grad[(j + 3, idx)] += model_grad[(3, j)] / total_mass;
                 }
-                // grad[(idx, j)] += model_grad[(3, j)] / total_mass;
-                // Cr = 1.4999976638233514 +/-0.20000001212152405
-                // RMAG error = 0.815728 m VMAG error = 1.346671 mm/s
             }
         }
 
