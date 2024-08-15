@@ -1,0 +1,23 @@
+DSS-65 Madrid:
+  scheduler:
+    handoff: Eager
+    cadence: Continuous
+    min_samples: 10
+    sample_alignment: 10 s
+  sampling: 1 min
+
+DSS-34 Canberra:
+  scheduler:
+    handoff: Eager
+    cadence: Continuous
+    min_samples: 10
+    sample_alignment: 10 s
+  sampling: 1 min
+
+DSS-13 Goldstone:
+  scheduler:
+    handoff: Eager
+    cadence: Continuous
+    min_samples: 10
+    sample_alignment: 10 s
+  sampling: 1 min

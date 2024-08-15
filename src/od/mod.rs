@@ -26,6 +26,7 @@ use crate::propagators::PropagationError;
 use crate::time::Epoch;
 use crate::Orbit;
 pub use crate::{State, TimeTagged};
+use anise::almanac::planetary::PlanetaryDataError;
 use anise::errors::AlmanacError;
 use hifitime::Duration;
 use snafu::prelude::Snafu;
@@ -202,6 +203,12 @@ pub enum ODError {
     ODAlmanac {
         #[snafu(source(from(AlmanacError, Box::new)))]
         source: Box<AlmanacError>,
+        action: &'static str,
+    },
+    #[snafu(display("OD failed due to planetary data in Almanac: {action} {source}"))]
+    ODPlanetaryData {
+        #[snafu(source(from(PlanetaryDataError, Box::new)))]
+        source: Box<PlanetaryDataError>,
         action: &'static str,
     },
     #[snafu(display("not enough residuals to {action}"))]

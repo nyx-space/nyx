@@ -126,3 +126,8 @@ doc-scrape-examples = true
 name = "03_geo_sk"
 path = "examples/03_geo_analysis/stationkeeping.rs"
 doc-scrape-examples = true
+
+[[example]]
+name = "04_lro_od"
+path = "examples/04_lro_od/main.rs"
+doc-scrape-examples = true

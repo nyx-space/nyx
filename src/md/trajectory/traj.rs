@@ -599,7 +599,7 @@ where
                 f,
                 "Trajectory {}in {} from {} to {} ({}, or {:.3} s) [{} states]",
                 match &self.name {
-                    Some(name) => format!("of {name}"),
+                    Some(name) => format!("of {name} "),
                     None => String::new(),
                 },
                 self.first().frame(),
