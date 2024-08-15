@@ -7,7 +7,7 @@ use anise::{
     almanac::metaload::MetaFile,
     constants::{
         celestial_objects::{EARTH, SUN},
-        frames::{EARTH_J2000, MOON_J2000, MOON_PA_FRAME},
+        frames::{EARTH_J2000, IAU_MOON_FRAME, MOON_J2000, MOON_PA_FRAME},
     },
 };
 use hifitime::{Epoch, TimeUnits, Unit};
@@ -21,7 +21,7 @@ use nyx::{
     od::{
         msr::RangeDoppler,
         prelude::{TrackingArcSim, TrkConfig, KF},
-        process::{EkfTrigger, IterationConf, ODProcess, SpacecraftUncertainty},
+        process::{IterationConf, ODProcess, SpacecraftUncertainty},
         snc::SNC3,
         GroundStation,
     },
@@ -152,10 +152,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Build the spherical harmonics.
     // The harmonics must be computed in the body fixed frame.
-    // We're using the long term prediction of the Earth centered Earth fixed frame, IAU Earth.
+    // We're using the long term prediction of the Moon principal axes frame.
+    let moon_pa_frame = MOON_PA_FRAME.with_orient(31008);
+    // let moon_pa_frame = IAU_MOON_FRAME;
     let sph_harmonics = Harmonics::from_stor(
-        almanac.frame_from_uid(MOON_PA_FRAME.with_orient(31008))?,
-        HarmonicsMem::from_shadr(&jggrx_meta.uri, 200, 200, true)?,
+        almanac.frame_from_uid(moon_pa_frame)?,
+        HarmonicsMem::from_shadr(&jggrx_meta.uri, 500, 500, true)?,
     );
 
     // Include the spherical harmonics into the orbital dynamics.
@@ -196,18 +198,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let initial_estimate = sc.to_estimate()?;
 
+    // Until https://github.com/nyx-space/nyx/issues/351, we need to specify the SNC in the acceleration of the Moon J2000 frame.
     let kf = KF::new(
         initial_estimate,
-        SNC3::from_diagonal(2 * Unit::Minute, &[1e-14, 1e-14, 1e-14]),
+        SNC3::from_diagonal(2 * Unit::Minute, &[1e-13, 1e-13, 1e-13]),
     );
 
-    let mut odp = ODProcess::ekf(
-        setup.with(sc_seed, almanac.clone()),
-        kf,
-        EkfTrigger::new(30_000, Unit::Minute * 2),
-        None,
-        almanac,
-    );
+    let mut odp = ODProcess::ckf(setup.with(sc_seed, almanac.clone()), kf, None, almanac);
 
     odp.process_arc::<GroundStation>(&arc)?;
     // Let's run a smoother just to see that the filter won't run it if the RSS error is small.
