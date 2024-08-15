@@ -363,12 +363,16 @@ where
         let mut hdrs = vec![Field::new("Epoch (UTC)", DataType::Utf8, false)];
 
         // Add the RIC headers
-        for coord in ["x", "y", "z"] {
+        for coord in ["X", "Y", "Z"] {
             let mut meta = HashMap::new();
             meta.insert("unit".to_string(), "km".to_string());
 
-            let field = Field::new(format!("delta_{coord}_ric (km)"), DataType::Float64, false)
-                .with_metadata(meta);
+            let field = Field::new(
+                format!("Delta {coord} (RIC) (km)"),
+                DataType::Float64,
+                false,
+            )
+            .with_metadata(meta);
 
             hdrs.push(field);
         }
@@ -378,7 +382,7 @@ where
             meta.insert("unit".to_string(), "km/s".to_string());
 
             let field = Field::new(
-                format!("delta_v{coord}_ric (km/s)"),
+                format!("Delta V{coord} (RIC) (km/s)"),
                 DataType::Float64,
                 false,
             )

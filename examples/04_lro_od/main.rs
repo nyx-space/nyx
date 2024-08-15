@@ -155,7 +155,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // We're using the long term prediction of the Earth centered Earth fixed frame, IAU Earth.
     let sph_harmonics = Harmonics::from_stor(
         almanac.frame_from_uid(MOON_PA_FRAME.with_orient(31008))?,
-        HarmonicsMem::from_shadr(&jggrx_meta.uri, 21, 21, true)?,
+        HarmonicsMem::from_shadr(&jggrx_meta.uri, 200, 200, true)?,
     );
 
     // Include the spherical harmonics into the orbital dynamics.
@@ -198,7 +198,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let kf = KF::new(
         initial_estimate,
-        SNC3::from_diagonal(2 * Unit::Minute, &[1e-15, 1e-15, 1e-15]),
+        SNC3::from_diagonal(2 * Unit::Minute, &[1e-14, 1e-14, 1e-14]),
     );
 
     let mut odp = ODProcess::ekf(
@@ -215,7 +215,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     odp.to_parquet("./04_lro_od_results.parquet", ExportCfg::default())?;
 
-    // Let's check the state difference.
+    // In our case, we have the truth trajectory from NASA.
+    // So we can compute the RIC state difference between the real LRO ephem and what we've just estimated.
+    // Export the OD trajectory first.
+    let od_trajectory = odp.to_traj()?;
+    // Build the RIC difference.
+    od_trajectory.ric_diff_to_parquet(
+        &trajectory,
+        "./04_lro_od_truth_error.parquet",
+        ExportCfg::default(),
+    )?;
 
     Ok(())
 }
