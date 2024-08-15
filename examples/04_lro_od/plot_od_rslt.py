@@ -33,18 +33,21 @@ if __name__ == "__main__":
     px.line(df, x="Epoch (UTC)", y=["cr", "Cr + Sigma", "Cr - Sigma"]).show()
 
     # Load the RIC diff.
-    df_ric = pl.read_parquet("./04_lro_od_truth_error.parquet")
-    df_ric = df_ric.with_columns(
-        pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f")
-    ).sort("Epoch (UTC)", descending=False)
-    # Plot the RIC difference
-    px.line(
-        df_ric,
-        x="Epoch (UTC)",
-        y=["Delta X (RIC) (km)", "Delta Y (RIC) (km)", "Delta Z (RIC) (km)"],
-    ).show()
-    px.line(
-        df_ric,
-        x="Epoch (UTC)",
-        y=["Delta Vx (RIC) (km/s)", "Delta Vy (RIC) (km/s)", "Delta Vz (RIC) (km/s)"],
-    ).show()
+    for fname, errname in [("04_lro_od_truth_error", "OD vs Flown"), ("04_lro_od_sim_error", "OD vs Sim"), ("04_lro_sim_truth_error", "Sim vs Flown")]:
+        df_ric = pl.read_parquet(f"./{fname}.parquet")
+        df_ric = df_ric.with_columns(
+            pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f")
+        ).sort("Epoch (UTC)", descending=False)
+        # Plot the RIC difference
+        px.line(
+            df_ric,
+            x="Epoch (UTC)",
+            y=["Delta X (RIC) (km)", "Delta Y (RIC) (km)", "Delta Z (RIC) (km)"],
+            title=f"Position error with {errname} ({fname})"
+        ).show()
+        px.line(
+            df_ric,
+            x="Epoch (UTC)",
+            y=["Delta Vx (RIC) (km/s)", "Delta Vy (RIC) (km/s)", "Delta Vz (RIC) (km/s)"],
+            title=f"Velocity error with {errname} ({fname})"
+        ).show()

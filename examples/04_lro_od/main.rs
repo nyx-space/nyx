@@ -26,7 +26,7 @@ use nyx::{
         GroundStation,
     },
     propagators::Propagator,
-    Orbit, Spacecraft,
+    Orbit, Spacecraft, State,
 };
 
 use std::{collections::BTreeMap, error::Error, path::PathBuf, str::FromStr, sync::Arc};
@@ -61,6 +61,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     // To query the Almanac, we need to build the LRO frame in the J2000 orientation in our case.
     // Inspecting the LRO BSP in the ANISE GUI shows us that NASA has assigned ID -85 to LRO.
     let lro_frame = Frame::from_ephem_j2000(-85);
+
+    // We also use a different gravitational parameter for the Moon to have a better estimation
+
     // To build the trajectory we need to provide a spacecraft template.
     let sc_template = Spacecraft::builder()
         .dry_mass_kg(1018.0) // Launch masses
@@ -74,7 +77,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .build();
     // Now we can build the trajectory from the BSP file.
     // We'll arbitrarily set the tracking arc to 48 hours with a one minute time step.
-    let trajectory = Traj::from_bsp(
+    let traj_as_flown = Traj::from_bsp(
         lro_frame,
         MOON_J2000,
         almanac.clone(),
@@ -86,7 +89,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Some("LRO".to_string()),
     )?;
 
-    println!("{trajectory}");
+    println!("{traj_as_flown}");
 
     // Load the Deep Space Network ground stations.
     // Nyx allows you to build these at runtime but it's pretty static so we can just load them from YAML.
@@ -117,7 +120,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Build the tracking arc simulation to generate a "standard measurement".
     let mut trk = TrackingArcSim::<Spacecraft, RangeDoppler, _>::with_seed(
         devices,
-        trajectory.clone(),
+        traj_as_flown.clone(),
         configs,
         12345,
     )?;
@@ -164,8 +167,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // We define the solar radiation pressure, using the default solar flux and accounting only
     // for the eclipsing caused by the Earth and Moon.
     // Note that by default, enabling the SolarPressure model will also enable the estimation of the coefficient of reflectivity.
-    let srp_dyn =
-        SolarPressure::default_no_estimation(vec![EARTH_J2000, MOON_J2000], almanac.clone())?;
+    let srp_dyn = SolarPressure::new(vec![EARTH_J2000, MOON_J2000], almanac.clone())?;
 
     // Finalize setting up the dynamics, specifying the force models (orbital_dyn) separately from the
     // acceleration models (SRP in this case). Use `from_models` to specify multiple accel models.
@@ -179,7 +181,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // For an OD arc, we need to start with an initial estimate and covariance.
     // The ephem published by NASA does not include the covariance. Instead, we'll make one up!
 
-    let sc_seed = trajectory.first().with_stm();
+    let sc_seed = traj_as_flown.first().with_stm();
 
     let sc = SpacecraftUncertainty::builder()
         .nominal(sc_seed)
@@ -200,11 +202,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Until https://github.com/nyx-space/nyx/issues/351, we need to specify the SNC in the acceleration of the Moon J2000 frame.
     let kf = KF::new(
         initial_estimate,
-        SNC3::from_diagonal(2 * Unit::Minute, &[1e-16, 1e-16, 1e-16]),
+        SNC3::from_diagonal(2 * Unit::Minute, &[1e-15, 1e-15, 1e-15]),
     );
 
     // We'll set up the OD process to reject measurements whose residuals are mover than 4 sigmas away from what we expect.
-    let mut odp = ODProcess::ckf(setup.with(sc_seed, almanac.clone()), kf, None, almanac);
+    let mut odp = ODProcess::ckf(
+        setup.with(sc_seed, almanac.clone()),
+        kf,
+        None,
+        almanac.clone(),
+    );
 
     odp.process_arc::<GroundStation>(&arc)?;
     // Let's run a smoother just to see that the filter won't run it if the RSS error is small.
@@ -218,8 +225,26 @@ fn main() -> Result<(), Box<dyn Error>> {
     let od_trajectory = odp.to_traj()?;
     // Build the RIC difference.
     od_trajectory.ric_diff_to_parquet(
-        &trajectory,
+        &traj_as_flown,
         "./04_lro_od_truth_error.parquet",
+        ExportCfg::default(),
+    )?;
+
+    // For reference, let's build the trajectory with Nyx's models from that LRO state.
+    let (_, traj_as_sim) = setup
+        .with(*traj_as_flown.first(), almanac.clone())
+        .until_epoch_with_traj(traj_as_flown.last().epoch())?;
+
+    // Build the RIC differences.
+    od_trajectory.ric_diff_to_parquet(
+        &traj_as_sim,
+        "./04_lro_od_sim_error.parquet",
+        ExportCfg::default(),
+    )?;
+
+    traj_as_sim.ric_diff_to_parquet(
+        &traj_as_flown,
+        "./04_lro_sim_truth_error.parquet",
         ExportCfg::default(),
     )?;
 

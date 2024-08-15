@@ -507,6 +507,7 @@ where
         let mut traj: Traj<S> = Traj::new();
 
         let mut msr_accepted_cnt: usize = 0;
+        let tick = Epoch::now().unwrap();
 
         for (msr_cnt, (device_name, msr)) in measurements.iter().enumerate() {
             let next_msr_epoch = msr.epoch();
@@ -639,7 +640,7 @@ where
                     if !reported[msr_prct] {
                         let num_rejected = msr_cnt - msr_accepted_cnt.saturating_sub(1);
                         let msg = format!(
-                            "{:>3}% done ({msr_accepted_cnt:.0} measurements accepted, {:.0} rejected)",
+                            "{:>3}% done - {msr_accepted_cnt:.0} measurements accepted, {:.0} rejected",
                             10 * msr_prct, num_rejected
                         );
                         if msr_accepted_cnt < num_rejected {
@@ -671,8 +672,9 @@ where
 
         // Always report the 100% mark
         if !reported[10] {
+            let tock_time = Epoch::now().unwrap() - tick;
             info!(
-                "100% done ({msr_accepted_cnt:.0} measurements accepted, {:.0} rejected)",
+                "100% done - {msr_accepted_cnt:.0} measurements accepted, {:.0} rejected (done in {tock_time})",
                 num_msrs - msr_accepted_cnt
             );
         }
