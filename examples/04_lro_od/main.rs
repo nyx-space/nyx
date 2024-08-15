@@ -6,8 +6,8 @@ extern crate pretty_env_logger as pel;
 use anise::{
     almanac::metaload::MetaFile,
     constants::{
-        celestial_objects::{EARTH, SUN},
-        frames::{EARTH_J2000, IAU_MOON_FRAME, MOON_J2000, MOON_PA_FRAME},
+        celestial_objects::{EARTH, JUPITER_BARYCENTER, SUN},
+        frames::{EARTH_J2000, MOON_J2000, MOON_PA_FRAME},
     },
 };
 use hifitime::{Epoch, TimeUnits, Unit};
@@ -114,8 +114,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let configs: BTreeMap<String, TrkConfig> = TrkConfig::load_named(trkconfg_yaml)?;
 
-    dbg!(&configs);
-
     // Build the tracking arc simulation to generate a "standard measurement".
     let mut trk = TrackingArcSim::<Spacecraft, RangeDoppler, _>::with_seed(
         devices,
@@ -139,7 +137,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Specify that the orbital dynamics must account for the graviational pull of the Earth and the Sun.
     // The gravity of the Moon will also be accounted for since the spaceraft in a lunar orbit.
-    let mut orbital_dyn = OrbitalDynamics::point_masses(vec![EARTH, SUN]);
+    let mut orbital_dyn = OrbitalDynamics::point_masses(vec![EARTH, SUN, JUPITER_BARYCENTER]);
 
     // We want to include the spherical harmonics, so let's download the gravitational data from the Nyx Cloud.
     // We're using the GRAIL JGGRX model.
@@ -157,7 +155,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // let moon_pa_frame = IAU_MOON_FRAME;
     let sph_harmonics = Harmonics::from_stor(
         almanac.frame_from_uid(moon_pa_frame)?,
-        HarmonicsMem::from_shadr(&jggrx_meta.uri, 500, 500, true)?,
+        HarmonicsMem::from_shadr(&jggrx_meta.uri, 80, 80, true)?,
     );
 
     // Include the spherical harmonics into the orbital dynamics.
@@ -166,7 +164,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     // We define the solar radiation pressure, using the default solar flux and accounting only
     // for the eclipsing caused by the Earth and Moon.
     // Note that by default, enabling the SolarPressure model will also enable the estimation of the coefficient of reflectivity.
-    let srp_dyn = SolarPressure::new(vec![EARTH_J2000, MOON_J2000], almanac.clone())?;
+    let srp_dyn =
+        SolarPressure::default_no_estimation(vec![EARTH_J2000, MOON_J2000], almanac.clone())?;
 
     // Finalize setting up the dynamics, specifying the force models (orbital_dyn) separately from the
     // acceleration models (SRP in this case). Use `from_models` to specify multiple accel models.
@@ -201,9 +200,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Until https://github.com/nyx-space/nyx/issues/351, we need to specify the SNC in the acceleration of the Moon J2000 frame.
     let kf = KF::new(
         initial_estimate,
-        SNC3::from_diagonal(2 * Unit::Minute, &[1e-13, 1e-13, 1e-13]),
+        SNC3::from_diagonal(2 * Unit::Minute, &[1e-16, 1e-16, 1e-16]),
     );
 
+    // We'll set up the OD process to reject measurements whose residuals are mover than 4 sigmas away from what we expect.
     let mut odp = ODProcess::ckf(setup.with(sc_seed, almanac.clone()), kf, None, almanac);
 
     odp.process_arc::<GroundStation>(&arc)?;
