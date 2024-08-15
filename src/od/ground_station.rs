@@ -256,23 +256,25 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
                 }
 
                 // If the frame of the trajectory is different from that of the ground station, then check that there is no eclipse.
-                if !self.frame.ephem_origin_match(rx_0.frame()) {
-                    let observer = self.to_orbit(rx_0.orbit.epoch, &almanac).unwrap();
-                    if line_of_sight(
-                        observer,
-                        rx_0.orbit,
-                        almanac
-                            .frame_from_uid(rx_0.frame())
-                            .context(ODPlanetaryDataSnafu {
-                                action: "computing line of sight",
-                            })?,
-                        &almanac,
-                    )
-                    .context(ODAlmanacSnafu {
-                        action: "computing line of sight",
-                    })? == EclipseState::Umbra
-                    {
-                        return Ok(None);
+                for rx in [rx_0, rx_1] {
+                    if !self.frame.ephem_origin_match(rx.frame()) {
+                        let observer = self.to_orbit(rx.orbit.epoch, &almanac).unwrap();
+                        if line_of_sight(
+                            observer,
+                            rx.orbit,
+                            almanac
+                                .frame_from_uid(rx.frame())
+                                .context(ODPlanetaryDataSnafu {
+                                    action: "computing line of sight",
+                                })?,
+                            &almanac,
+                        )
+                        .context(ODAlmanacSnafu {
+                            action: "computing line of sight",
+                        })? == EclipseState::Umbra
+                        {
+                            return Ok(None);
+                        }
                     }
                 }
 
@@ -311,6 +313,26 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
             .context(ODAlmanacSnafu {
                 action: "computing AER",
             })?;
+
+        if !self.frame.ephem_origin_match(rx.frame()) {
+            let observer = self.to_orbit(rx.orbit.epoch, &almanac).unwrap();
+            if line_of_sight(
+                observer,
+                rx.orbit,
+                almanac
+                    .frame_from_uid(rx.frame())
+                    .context(ODPlanetaryDataSnafu {
+                        action: "computing line of sight",
+                    })?,
+                &almanac,
+            )
+            .context(ODAlmanacSnafu {
+                action: "computing line of sight",
+            })? == EclipseState::Umbra
+            {
+                return Ok(None);
+            }
+        }
 
         if aer.elevation_deg >= self.elevation_mask_deg {
             // Only update the noises if the measurement is valid.

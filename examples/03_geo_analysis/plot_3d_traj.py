@@ -1,8 +1,6 @@
 import argparse
-from datetime import datetime
 import polars as pl
 import plotly.graph_objs as go
-from plotly.subplots import make_subplots
 import numpy as np
 
 
