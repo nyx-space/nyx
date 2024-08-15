@@ -6,25 +6,27 @@ extern crate pretty_env_logger as pel;
 use anise::{
     almanac::metaload::MetaFile,
     constants::{
-        celestial_objects::{JUPITER_BARYCENTER, MOON, SUN},
-        frames::{EARTH_J2000, MOON_J2000},
+        celestial_objects::{EARTH, SUN},
+        frames::{EARTH_J2000, MOON_J2000, MOON_PA_FRAME},
     },
 };
 use hifitime::{Epoch, TimeUnits, Unit};
 use nyx::{
-    cosmic::{eclipse::EclipseLocator, Aberration, Frame, MetaAlmanac, SrpConfig},
-    dynamics::{guidance::LocalFrame, OrbitalDynamics, SolarPressure, SpacecraftDynamics},
+    cosmic::{Aberration, Frame, MetaAlmanac, SrpConfig},
+    dynamics::{
+        guidance::LocalFrame, Harmonics, OrbitalDynamics, SolarPressure, SpacecraftDynamics,
+    },
     io::{ConfigRepr, ExportCfg},
-    mc::MonteCarlo,
-    md::prelude::Traj,
+    md::prelude::{HarmonicsMem, Traj},
     od::{
         msr::RangeDoppler,
         prelude::{TrackingArcSim, TrkConfig, KF},
-        process::SpacecraftUncertainty,
-        GroundStation, SpacecraftODProcess,
+        process::{EkfTrigger, IterationConf, ODProcess, SpacecraftUncertainty},
+        snc::SNC3,
+        GroundStation,
     },
     propagators::Propagator,
-    Orbit, Spacecraft, State,
+    Orbit, Spacecraft,
 };
 
 use std::{collections::BTreeMap, error::Error, path::PathBuf, str::FromStr, sync::Arc};
@@ -78,8 +80,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         almanac.clone(),
         sc_template,
         5.seconds(),
-        Some(Epoch::from_str("2024-01-01 00:00:00 UTC").unwrap()),
-        Some(Epoch::from_str("2024-01-03 00:00:00 UTC").unwrap()),
+        Some(Epoch::from_str("2024-01-01 00:00:00 UTC")?),
+        Some(Epoch::from_str("2024-01-03 00:00:00 UTC")?),
         Aberration::LT,
         Some("LRO".to_string()),
     )?;
@@ -97,7 +99,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     .iter()
     .collect();
 
-    let devices = GroundStation::load_many(ground_station_file).unwrap();
+    let devices = GroundStation::load_many(ground_station_file)?;
 
     // Typical OD software requires that you specify your own tracking schedule or you'll have overlapping measurements.
     // Nyx can build a tracking schedule for you based on the first station with access.
@@ -110,22 +112,110 @@ fn main() -> Result<(), Box<dyn Error>> {
     .iter()
     .collect();
 
-    let configs: BTreeMap<String, TrkConfig> = TrkConfig::load_named(trkconfg_yaml).unwrap();
+    let configs: BTreeMap<String, TrkConfig> = TrkConfig::load_named(trkconfg_yaml)?;
 
     dbg!(&configs);
 
     // Build the tracking arc simulation to generate a "standard measurement".
     let mut trk = TrackingArcSim::<Spacecraft, RangeDoppler, _>::with_seed(
-        devices, trajectory, configs, 12345,
-    )
-    .unwrap();
+        devices,
+        trajectory.clone(),
+        configs,
+        12345,
+    )?;
 
-    trk.build_schedule(almanac.clone()).unwrap();
-    let arc = trk.generate_measurements(almanac).unwrap();
+    trk.build_schedule(almanac.clone())?;
+    let arc = trk.generate_measurements(almanac.clone())?;
     // Save the simulated tracking data
     arc.to_parquet_simple("./04_lro_simulated_tracking.parquet")?;
 
+    // We'll note that in our case, we have continuous coverage of LRO when the vehicle is not behind the Moon.
     println!("{arc}");
+
+    // Now that we have simulated measurement, we'll run the orbit determination.
+
+    // First, we need to set up the propagator used in the OD.
+    // Set up the spacecraft dynamics.
+
+    // Specify that the orbital dynamics must account for the graviational pull of the Earth and the Sun.
+    // The gravity of the Moon will also be accounted for since the spaceraft in a lunar orbit.
+    let mut orbital_dyn = OrbitalDynamics::point_masses(vec![EARTH, SUN]);
+
+    // We want to include the spherical harmonics, so let's download the gravitational data from the Nyx Cloud.
+    // We're using the GRAIL JGGRX model.
+    let mut jggrx_meta = MetaFile {
+        uri: "http://public-data.nyxspace.com/nyx/models/Luna_jggrx_1500e_sha.tab.gz".to_string(),
+        crc32: Some(0x6bcacda8), // Specifying the CRC32 avoids redownloading it if it's cached.
+    };
+    // And let's download it if we don't have it yet.
+    jggrx_meta.process()?;
+
+    // Build the spherical harmonics.
+    // The harmonics must be computed in the body fixed frame.
+    // We're using the long term prediction of the Earth centered Earth fixed frame, IAU Earth.
+    let sph_harmonics = Harmonics::from_stor(
+        almanac.frame_from_uid(MOON_PA_FRAME.with_orient(31008))?,
+        HarmonicsMem::from_shadr(&jggrx_meta.uri, 21, 21, true)?,
+    );
+
+    // Include the spherical harmonics into the orbital dynamics.
+    orbital_dyn.accel_models.push(sph_harmonics);
+
+    // We define the solar radiation pressure, using the default solar flux and accounting only
+    // for the eclipsing caused by the Earth and Moon.
+    // Note that by default, enabling the SolarPressure model will also enable the estimation of the coefficient of reflectivity.
+    let srp_dyn = SolarPressure::new(vec![EARTH_J2000, MOON_J2000], almanac.clone())?;
+
+    // Finalize setting up the dynamics, specifying the force models (orbital_dyn) separately from the
+    // acceleration models (SRP in this case). Use `from_models` to specify multiple accel models.
+    let dynamics = SpacecraftDynamics::from_model(orbital_dyn, srp_dyn);
+
+    println!("{dynamics}");
+
+    // Now we can build the propagator.
+    let setup = Propagator::default_dp78(dynamics);
+
+    // For an OD arc, we need to start with an initial estimate and covariance.
+    // The ephem published by NASA does not include the covariance. Instead, we'll make one up!
+
+    let sc_seed = trajectory.first().with_stm();
+
+    let sc = SpacecraftUncertainty::builder()
+        .nominal(sc_seed)
+        .frame(LocalFrame::RIC)
+        .x_km(1.0)
+        .y_km(1.0)
+        .z_km(1.0)
+        .vx_km_s(0.5e-1)
+        .vy_km_s(0.5e-1)
+        .vz_km_s(0.5e-1)
+        .cr(0.2)
+        .build();
+
+    println!("{sc}");
+
+    let initial_estimate = sc.to_estimate()?;
+
+    let kf = KF::new(
+        initial_estimate,
+        SNC3::from_diagonal(2 * Unit::Minute, &[1e-15, 1e-15, 1e-15]),
+    );
+
+    let mut odp = ODProcess::ekf(
+        setup.with(sc_seed, almanac.clone()),
+        kf,
+        EkfTrigger::new(30_000, Unit::Minute * 2),
+        None,
+        almanac,
+    );
+
+    odp.process_arc::<GroundStation>(&arc)?;
+    // Let's run a smoother just to see that the filter won't run it if the RSS error is small.
+    odp.iterate_arc::<GroundStation>(&arc, IterationConf::once())?;
+
+    odp.to_parquet("./04_lro_od_results.parquet", ExportCfg::default())?;
+
+    // Let's check the state difference.
 
     Ok(())
 }

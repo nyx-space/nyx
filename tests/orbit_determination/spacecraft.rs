@@ -402,7 +402,6 @@ fn od_val_sc_srp_estimation(
     // Define the initial orbit estimate
     let initial_estimate = sc.to_estimate().unwrap();
 
-    // let ckf = KF::no_snc(initial_estimate);
     let ckf = KF::new(
         initial_estimate,
         SNC3::from_diagonal(2 * Unit::Minute, &[1e-15, 1e-15, 1e-15]),
