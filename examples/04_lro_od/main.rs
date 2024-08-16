@@ -34,26 +34,23 @@ use std::{collections::BTreeMap, error::Error, path::PathBuf, str::FromStr, sync
 fn main() -> Result<(), Box<dyn Error>> {
     pel::init();
     // Dynamics models require planetary constants and ephemerides to be defined.
-    // Let's start by grabbing those by using ANISE's latest MetaAlmanac.
-    // For details, refer to https://github.com/nyx-space/anise/blob/master/data/latest.dhall.
-
-    // Download the latest (of time of writing) LRO definitive ephemeris from the public Nyx Space cloud.
-    // Note that the original file is in _big endian_ format, and my machine is little endian, so I've used the
-    // `bingo` tool from https://naif.jpl.nasa.gov/naif/utilities_PC_Linux_64bit.html to convert the original file
-    // to little endian and upload it to the cloud.
-    // Refer to https://naif.jpl.nasa.gov/pub/naif/pds/data/lro-l-spice-6-v1.0/lrosp_1000/data/spk/?C=M;O=D for original file.
-    let mut lro_def_ephem = MetaFile {
-        uri: "http://public-data.nyxspace.com/nyx/examples/lrorg_2023349_2024075_v01_LE.bsp"
-            .to_string(),
-        crc32: Some(0xe76ce3b5),
-    };
-    lro_def_ephem.process()?;
+    // Let's start by grabbing those by using ANISE's MetaAlmanac.
+    // We're using the DE421 planetary ephemerides because that's what the LRO folder says they use.
+    let meta: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "examples",
+        "04_lro_od",
+        "lro-dynamics.dhall",
+    ]
+    .iter()
+    .collect();
 
     // Load this ephem in the general Almanac we're using for this analysis.
     let almanac = Arc::new(
-        MetaAlmanac::latest()
+        MetaAlmanac::new(meta.to_string_lossy().to_string())
             .map_err(Box::new)?
-            .load_from_metafile(lro_def_ephem)?,
+            .process()
+            .map_err(Box::new)?,
     );
 
     // Orbit determination requires a Trajectory structure, which can be saved as parquet file.
@@ -202,7 +199,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Until https://github.com/nyx-space/nyx/issues/351, we need to specify the SNC in the acceleration of the Moon J2000 frame.
     let kf = KF::new(
         initial_estimate,
-        SNC3::from_diagonal(2 * Unit::Minute, &[1e-15, 1e-15, 1e-15]),
+        SNC3::from_diagonal(2 * Unit::Minute, &[5e-15, 5e-15, 5e-15]),
     );
 
     // We'll set up the OD process to reject measurements whose residuals are mover than 4 sigmas away from what we expect.
