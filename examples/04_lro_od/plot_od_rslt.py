@@ -39,16 +39,47 @@ if __name__ == "__main__":
         df_ric = df_ric.with_columns(
             pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f")
         ).sort("Epoch (UTC)", descending=False)
+        # Compute the range and range rate columns
+        df_ric = df_ric.with_columns(
+            [
+                (
+                    (
+                        pl.col("Delta X (RIC) (km)") ** 2
+                        + pl.col("Delta Y (RIC) (km)") ** 2
+                        + pl.col("Delta Z (RIC) (km)") ** 2
+                    )
+                    ** 0.5
+                ).alias("RIC Range (km)"),
+                (
+                    (
+                        pl.col("Delta Vx (RIC) (km/s)") ** 2
+                        + pl.col("Delta Vy (RIC) (km/s)") ** 2
+                        + pl.col("Delta Vz (RIC) (km/s)") ** 2
+                    )
+                    ** 0.5
+                ).alias("RIC Range Rate (km/s)"),
+            ]
+        )
+
+        print(f"== {errname} ({fname}) ==")
+        print(df_ric["RIC Range (km)"].describe())
+        print(df_ric["RIC Range Rate (km/s)"].describe())
+
         # Plot the RIC difference
         px.line(
             df_ric,
             x="Epoch (UTC)",
-            y=["Delta X (RIC) (km)", "Delta Y (RIC) (km)", "Delta Z (RIC) (km)"],
-            title=f"Position error with {errname} ({fname})"
+            y=["Delta X (RIC) (km)", "Delta Y (RIC) (km)", "Delta Z (RIC) (km)", "RIC Range (km)"],
+            title=f"Position error with {errname} ({fname})",
         ).show()
         px.line(
             df_ric,
             x="Epoch (UTC)",
-            y=["Delta Vx (RIC) (km/s)", "Delta Vy (RIC) (km/s)", "Delta Vz (RIC) (km/s)"],
-            title=f"Velocity error with {errname} ({fname})"
+            y=[
+                "Delta Vx (RIC) (km/s)",
+                "Delta Vy (RIC) (km/s)",
+                "Delta Vz (RIC) (km/s)",
+                "RIC Range Rate (km/s)",
+            ],
+            title=f"Velocity error with {errname} ({fname})",
         ).show()

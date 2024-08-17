@@ -7,7 +7,7 @@ use anise::{
     almanac::metaload::MetaFile,
     constants::{
         celestial_objects::{
-            EARTH, JUPITER_BARYCENTER, SATURN_BARYCENTER, SOLAR_SYSTEM_BARYCENTER, SUN,
+            EARTH, JUPITER_BARYCENTER, MOON, SATURN_BARYCENTER, SOLAR_SYSTEM_BARYCENTER, SUN,
         },
         frames::{EARTH_J2000, MOON_J2000, MOON_PA_FRAME, SSB_J2000},
     },
@@ -37,23 +37,35 @@ fn main() -> Result<(), Box<dyn Error>> {
     pel::init();
     // Dynamics models require planetary constants and ephemerides to be defined.
     // Let's start by grabbing those by using ANISE's MetaAlmanac.
-    // We're using the DE421 planetary ephemerides because that's what the LRO folder says they use.
-    let meta: PathBuf = [
-        env!("CARGO_MANIFEST_DIR"),
-        "examples",
-        "04_lro_od",
-        "lro-dynamics.dhall",
-    ]
-    .iter()
-    .collect();
+
+    let data_folder: PathBuf = [env!("CARGO_MANIFEST_DIR"), "examples", "04_lro_od"]
+        .iter()
+        .collect();
+
+    let meta = data_folder.join("lro-dynamics.dhall");
 
     // Load this ephem in the general Almanac we're using for this analysis.
-    let almanac = Arc::new(
-        MetaAlmanac::new(meta.to_string_lossy().to_string())
-            .map_err(Box::new)?
-            .process()
-            .map_err(Box::new)?,
-    );
+    let mut almanac = MetaAlmanac::new(meta.to_string_lossy().to_string())
+        .map_err(Box::new)?
+        .process()
+        .map_err(Box::new)?;
+
+    let mut moon_pc = almanac.planetary_data.get_by_id(MOON)?;
+    moon_pc.mu_km3_s2 = 4902.74987;
+    almanac.planetary_data.set_by_id(MOON, moon_pc)?;
+
+    let mut earth_pc = almanac.planetary_data.get_by_id(EARTH)?;
+    earth_pc.mu_km3_s2 = 398600.436;
+    almanac.planetary_data.set_by_id(EARTH, earth_pc)?;
+
+    // Save this new kernel for reuse.
+    // In an operational context, this would be part of the "Lock" process, and should not change throughout the mission.
+    almanac
+        .planetary_data
+        .save_as(&data_folder.join("lro-specific.pca"), true)?;
+
+    // Lock the almanac (an Arc is a read only structure).
+    let almanac = Arc::new(almanac);
 
     // Orbit determination requires a Trajectory structure, which can be saved as parquet file.
     // In our case, the trajectory comes from the BSP file, so we need to build a Trajectory from the almanac directly.
@@ -156,7 +168,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // let moon_pa_frame = IAU_MOON_FRAME;
     let sph_harmonics = Harmonics::from_stor(
         almanac.frame_from_uid(moon_pa_frame)?,
-        HarmonicsMem::from_shadr(&jggrx_meta.uri, 200, 200, true)?,
+        HarmonicsMem::from_shadr(&jggrx_meta.uri, 80, 80, true)?,
     );
 
     // Include the spherical harmonics into the orbital dynamics.
@@ -228,12 +240,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     //     ExportCfg::default(),
     // )?;
 
-    let mut first_state = *traj_as_flown.first();
-    first_state.orbit.frame = first_state.orbit.frame.with_mu_km3_s2(4902.74987);
-
     // For reference, let's build the trajectory with Nyx's models from that LRO state.
-    let (last_as_sim, traj_as_sim) = setup
-        .with(first_state, almanac.clone())
+    let (_, traj_as_sim) = setup
+        .with(*traj_as_flown.first(), almanac.clone())
         .until_epoch_with_traj(traj_as_flown.last().epoch())?;
 
     // Build the RIC differences.
@@ -242,15 +251,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     //     "./04_lro_od_sim_error.parquet",
     //     ExportCfg::default(),
     // )?;
-
-    let ric_diff = last_as_sim
-        .orbit
-        .ric_difference(&traj_as_flown.last().orbit)?;
-    println!(
-        "{ric_diff} => {:.3} m\t{:.3} m/s",
-        ric_diff.rmag_km() * 1e3,
-        ric_diff.vmag_km_s() * 1e3,
-    );
 
     traj_as_sim.ric_diff_to_parquet(
         &traj_as_flown,

@@ -38,8 +38,10 @@ When using the GRAIL gravity model JGGRX 250x250 with the SRP configured with a 
 
 Since the velocity is the time derivative of the position, and since the error in the velocity is almost exclusively in the radial direction (i.e. from the spacecraft to the center of the Moon), the primary hypothesis is that the error is due to the gravity parameter of the Moon. In other words, the mass of the Moon used by LRO when they publish their ephemeris is different from the latest and greatest provided in [`gm_de440.tpc`](https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/gm_de440.tpc), used by ANISE.
 
-**In fact, after dozens of simulations using a secant method, we find that the gravity parameter that leads to the least error is 4902.74987 km^3/s^2**. This is surpringly far from the nominal value of 4902.800066163796 km^2/s^3. Other parameters that I've fiddled with include changing the GRAIL gravity field to an older version, changing the degree and order of the gravity field, changing the value of the coefficient of reflectivity, enabling the point mass gravity of the Saturn system barycenter, changing the body fixed frame of the gravity field to the Moon ME frame (which should only be used for cartography), and swapping the DE421 for the DE440 planetary ephemerides.
+**In fact, after dozens of simulations using a secant method, we find that the gravity parameter that leads to the least error is 4902.74987 km^3/s^2**. This is surpringly far from the nominal value of 4902.800066163796 km^2/s^3. Other parameters that I've fiddled with include changing the GRAIL gravity field to an older version, changing the degree and order of the gravity field, changing the value of the coefficient of reflectivity, enabling the point mass gravity of the Saturn system barycenter, changing the body fixed frame of the gravity field to the Moon ME frame (which should only be used for cartography), and swapping the DE421 for the DE440 planetary ephemerides. Using the DE403 Earth gravity parameter of 398600.436 km^2/s^3 also decreases the error.
 
-![New Lunar GM Pos error](./plots/sim-lunar-gm-ric-pos-err.png)
+Post model tuning, we reach a reasonable error with an average range error of 175 meters and an average velocity error of 0.1 m/s.
 
-![New Lunar GM Vel error](./plots/sim-lunar-gm-ric-vel-err.png)
+![New Lunar GM Pos error](./plots/sim-new-pc-ric-pos-err.png)
+
+![New Lunar GM Vel error](./plots/sim-new-pc-ric-vel-err.png)
