@@ -40,7 +40,51 @@ Since the velocity is the time derivative of the position, and since the error i
 
 **In fact, after dozens of simulations using a secant method, we find that the gravity parameter that leads to the least error is 4902.74987 km^3/s^2**. This is surpringly far from the nominal value of 4902.800066163796 km^2/s^3. Other parameters that I've fiddled with include changing the GRAIL gravity field to an older version, changing the degree and order of the gravity field, changing the value of the coefficient of reflectivity, enabling the point mass gravity of the Saturn system barycenter, changing the body fixed frame of the gravity field to the Moon ME frame (which should only be used for cartography), and swapping the DE421 for the DE440 planetary ephemerides. Using the DE403 Earth gravity parameter of 398600.436 km^2/s^3 also decreases the error.
 
-Post model tuning, we reach a reasonable error with an average range error of 175 meters and an average velocity error of 0.1 m/s.
+## Dynamical models
+
+- Solar radiation pressure: **Cr 0.96**
+- Point mass gravity forces from the central object, **Moon: GM = 4902.74987 km^3/s^2** and other celestial objects whose force is relevant, namely Earth (**GM = 398600.436 km^3/s^**), Sun, and Jupiter;
+- Moon gravity field GRAIL model JGGRX with the Moon Principal Axes frames (MOON PA) in 80x80 (degree x order)
+
+After model tuning, we reach a reasonable error with an average range error of 175 meters and an average velocity error of 0.116 m/s.
+
+```
+== Sim vs Flown (04_lro_sim_truth_error) ==
+RIC Range (km)
+shape: (9, 2)
+┌────────────┬──────────┐
+│ statistic  ┆ value    │
+│ ---        ┆ ---      │
+│ str        ┆ f64      │
+╞════════════╪══════════╡
+│ count      ┆ 2881.0   │
+│ null_count ┆ 0.0      │
+│ mean       ┆ 0.175464 │
+│ std        ┆ 0.100212 │
+│ min        ┆ 0.0      │
+│ 25%        ┆ 0.091487 │
+│ 50%        ┆ 0.168715 │
+│ 75%        ┆ 0.263027 │
+│ max        ┆ 0.37063  │
+└────────────┴──────────┘
+RIC Range Rate (km/s)
+shape: (9, 2)
+┌────────────┬──────────┐
+│ statistic  ┆ value    │
+│ ---        ┆ ---      │
+│ str        ┆ f64      │
+╞════════════╪══════════╡
+│ count      ┆ 2881.0   │
+│ null_count ┆ 0.0      │
+│ mean       ┆ 0.000116 │
+│ std        ┆ 0.000039 │
+│ min        ┆ 0.0      │
+│ 25%        ┆ 0.000092 │
+│ 50%        ┆ 0.000118 │
+│ 75%        ┆ 0.000145 │
+│ max        ┆ 0.000195 │
+└────────────┴──────────┘
+```
 
 ![New Lunar GM Pos error](./plots/sim-new-pc-ric-pos-err.png)
 
