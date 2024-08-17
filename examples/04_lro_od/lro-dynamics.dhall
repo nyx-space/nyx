@@ -1,6 +1,6 @@
 -- Default Almanac
 { files =
-  [ { crc32 = Some 1551416339
+  [ { crc32 = Some 1551416339 -- 0x6f2456aa
     , uri = "http://public-data.nyxspace.com/anise/de421.bsp"
     }
   , { crc32 = Some 2182330089

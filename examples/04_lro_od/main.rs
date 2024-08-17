@@ -6,8 +6,10 @@ extern crate pretty_env_logger as pel;
 use anise::{
     almanac::metaload::MetaFile,
     constants::{
-        celestial_objects::{EARTH, JUPITER_BARYCENTER, SUN},
-        frames::{EARTH_J2000, MOON_J2000, MOON_PA_FRAME},
+        celestial_objects::{
+            EARTH, JUPITER_BARYCENTER, SATURN_BARYCENTER, SOLAR_SYSTEM_BARYCENTER, SUN,
+        },
+        frames::{EARTH_J2000, MOON_J2000, MOON_PA_FRAME, SSB_J2000},
     },
 };
 use hifitime::{Epoch, TimeUnits, Unit};
@@ -25,7 +27,7 @@ use nyx::{
         snc::SNC3,
         GroundStation,
     },
-    propagators::Propagator,
+    propagators::{PropOpts, Propagator},
     Orbit, Spacecraft, State,
 };
 
@@ -68,7 +70,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .srp(SrpConfig {
             // SRP configuration is arbitrary, but we will be estimating it anyway.
             area_m2: 3.9 * 2.7,
-            cr: 0.9,
+            cr: 0.96,
         })
         .orbit(Orbit::zero(MOON_J2000)) // Setting a zero orbit here because it's just a template
         .build();
@@ -114,21 +116,20 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let configs: BTreeMap<String, TrkConfig> = TrkConfig::load_named(trkconfg_yaml)?;
 
-    // Build the tracking arc simulation to generate a "standard measurement".
-    let mut trk = TrackingArcSim::<Spacecraft, RangeDoppler, _>::with_seed(
-        devices,
-        traj_as_flown.clone(),
-        configs,
-        12345,
-    )?;
+    // // Build the tracking arc simulation to generate a "standard measurement".
+    // let mut trk = TrackingArcSim::<Spacecraft, RangeDoppler, _>::new(
+    //     devices,
+    //     traj_as_flown.clone(),
+    //     configs,
+    // )?;
 
-    trk.build_schedule(almanac.clone())?;
-    let arc = trk.generate_measurements(almanac.clone())?;
-    // Save the simulated tracking data
-    arc.to_parquet_simple("./04_lro_simulated_tracking.parquet")?;
+    // trk.build_schedule(almanac.clone())?;
+    // let arc = trk.generate_measurements(almanac.clone())?;
+    // // Save the simulated tracking data
+    // arc.to_parquet_simple("./04_lro_simulated_tracking.parquet")?;
 
-    // We'll note that in our case, we have continuous coverage of LRO when the vehicle is not behind the Moon.
-    println!("{arc}");
+    // // We'll note that in our case, we have continuous coverage of LRO when the vehicle is not behind the Moon.
+    // println!("{arc}");
 
     // Now that we have simulated measurement, we'll run the orbit determination.
 
@@ -155,7 +156,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // let moon_pa_frame = IAU_MOON_FRAME;
     let sph_harmonics = Harmonics::from_stor(
         almanac.frame_from_uid(moon_pa_frame)?,
-        HarmonicsMem::from_shadr(&jggrx_meta.uri, 80, 80, true)?,
+        HarmonicsMem::from_shadr(&jggrx_meta.uri, 200, 200, true)?,
     );
 
     // Include the spherical harmonics into the orbital dynamics.
@@ -178,66 +179,78 @@ fn main() -> Result<(), Box<dyn Error>> {
     // For an OD arc, we need to start with an initial estimate and covariance.
     // The ephem published by NASA does not include the covariance. Instead, we'll make one up!
 
-    let sc_seed = traj_as_flown.first().with_stm();
+    // let sc_seed = traj_as_flown.first().with_stm();
 
-    let sc = SpacecraftUncertainty::builder()
-        .nominal(sc_seed)
-        .frame(LocalFrame::RIC)
-        .x_km(1.0)
-        .y_km(1.0)
-        .z_km(1.0)
-        .vx_km_s(0.5e-1)
-        .vy_km_s(0.5e-1)
-        .vz_km_s(0.5e-1)
-        .cr(0.2)
-        .build();
+    // let sc = SpacecraftUncertainty::builder()
+    //     .nominal(sc_seed)
+    //     .frame(LocalFrame::RIC)
+    //     .x_km(1.0)
+    //     .y_km(1.0)
+    //     .z_km(1.0)
+    //     .vx_km_s(0.5e-1)
+    //     .vy_km_s(0.5e-1)
+    //     .vz_km_s(0.5e-1)
+    //     .cr(0.2)
+    //     .build();
 
-    println!("{sc}");
+    // println!("{sc}");
 
-    let initial_estimate = sc.to_estimate()?;
+    // let initial_estimate = sc.to_estimate()?;
 
-    // Until https://github.com/nyx-space/nyx/issues/351, we need to specify the SNC in the acceleration of the Moon J2000 frame.
-    let kf = KF::new(
-        initial_estimate,
-        SNC3::from_diagonal(2 * Unit::Minute, &[5e-15, 5e-15, 5e-15]),
-    );
+    // // Until https://github.com/nyx-space/nyx/issues/351, we need to specify the SNC in the acceleration of the Moon J2000 frame.
+    // let kf = KF::new(
+    //     initial_estimate,
+    //     SNC3::from_diagonal(2 * Unit::Minute, &[5e-15, 5e-15, 5e-15]),
+    // );
 
-    // We'll set up the OD process to reject measurements whose residuals are mover than 4 sigmas away from what we expect.
-    let mut odp = ODProcess::ckf(
-        setup.with(sc_seed, almanac.clone()),
-        kf,
-        None,
-        almanac.clone(),
-    );
+    // // We'll set up the OD process to reject measurements whose residuals are mover than 4 sigmas away from what we expect.
+    // let mut odp = ODProcess::ckf(
+    //     setup.with(sc_seed, almanac.clone()),
+    //     kf,
+    //     None,
+    //     almanac.clone(),
+    // );
 
-    odp.process_arc::<GroundStation>(&arc)?;
-    // Let's run a smoother just to see that the filter won't run it if the RSS error is small.
-    odp.iterate_arc::<GroundStation>(&arc, IterationConf::once())?;
+    // odp.process_arc::<GroundStation>(&arc)?;
+    // // Let's run a smoother just to see that the filter won't run it if the RSS error is small.
+    // odp.iterate_arc::<GroundStation>(&arc, IterationConf::once())?;
 
-    odp.to_parquet("./04_lro_od_results.parquet", ExportCfg::default())?;
+    // odp.to_parquet("./04_lro_od_results.parquet", ExportCfg::default())?;
 
-    // In our case, we have the truth trajectory from NASA.
-    // So we can compute the RIC state difference between the real LRO ephem and what we've just estimated.
-    // Export the OD trajectory first.
-    let od_trajectory = odp.to_traj()?;
-    // Build the RIC difference.
-    od_trajectory.ric_diff_to_parquet(
-        &traj_as_flown,
-        "./04_lro_od_truth_error.parquet",
-        ExportCfg::default(),
-    )?;
+    // // In our case, we have the truth trajectory from NASA.
+    // // So we can compute the RIC state difference between the real LRO ephem and what we've just estimated.
+    // // Export the OD trajectory first.
+    // let od_trajectory = odp.to_traj()?;
+    // // Build the RIC difference.
+    // od_trajectory.ric_diff_to_parquet(
+    //     &traj_as_flown,
+    //     "./04_lro_od_truth_error.parquet",
+    //     ExportCfg::default(),
+    // )?;
+
+    let mut first_state = *traj_as_flown.first();
+    first_state.orbit.frame = first_state.orbit.frame.with_mu_km3_s2(4902.74987);
 
     // For reference, let's build the trajectory with Nyx's models from that LRO state.
-    let (_, traj_as_sim) = setup
-        .with(*traj_as_flown.first(), almanac.clone())
+    let (last_as_sim, traj_as_sim) = setup
+        .with(first_state, almanac.clone())
         .until_epoch_with_traj(traj_as_flown.last().epoch())?;
 
     // Build the RIC differences.
-    od_trajectory.ric_diff_to_parquet(
-        &traj_as_sim,
-        "./04_lro_od_sim_error.parquet",
-        ExportCfg::default(),
-    )?;
+    // od_trajectory.ric_diff_to_parquet(
+    //     &traj_as_sim,
+    //     "./04_lro_od_sim_error.parquet",
+    //     ExportCfg::default(),
+    // )?;
+
+    let ric_diff = last_as_sim
+        .orbit
+        .ric_difference(&traj_as_flown.last().orbit)?;
+    println!(
+        "{ric_diff} => {:.3} m\t{:.3} m/s",
+        ric_diff.rmag_km() * 1e3,
+        ric_diff.vmag_km_s() * 1e3,
+    );
 
     traj_as_sim.ric_diff_to_parquet(
         &traj_as_flown,
