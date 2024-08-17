@@ -6,13 +6,13 @@
     shape: null
   elevation_mask_deg: 5.0
   range_noise_km:
-    bias:
-      tau: 24 h
-      process_noise: 5.0e-3 # 5 m
+    white_noise:
+      mean: 0.0
+      sigma: 5.0e-3 # 5 m
   doppler_noise_km_s:
-    bias:
-      tau: 24 h
-      process_noise: 50.0e-6 # 5 cm/s
+    white_noise:
+      mean: 0.0
+      sigma: 50.0e-6 # 5 cm/s
   light_time_correction: false
   latitude_deg: 40.427222
   longitude_deg: 4.250556
@@ -29,13 +29,13 @@
   height_km: 0.691750
   elevation_mask_deg: 5.0
   range_noise_km:
-    bias:
-      tau: 24 h
-      process_noise: 5.0e-3 # 5 m
+    white_noise:
+      mean: 0.0
+      sigma: 5.0e-3 # 5 m
   doppler_noise_km_s:
-    bias:
-      tau: 24 h
-      process_noise: 50.0e-6 # 5 cm/s
+    white_noise:
+      mean: 0.0
+      sigma: 50.0e-6 # 5 cm/s
   light_time_correction: false
 
 - name: DSS-13 Goldstone
@@ -49,11 +49,11 @@
   height_km: 1.071149
   elevation_mask_deg: 5.0
   range_noise_km:
-    bias:
-      tau: 24 h
-      process_noise: 5.0e-3 # 5 m
+    white_noise:
+      mean: 0.0
+      sigma: 5.0e-3 # 5 m
   doppler_noise_km_s:
-    bias:
-      tau: 24 h
-      process_noise: 50.0e-6 # 5 cm/s
+    white_noise:
+      mean: 0.0
+      sigma: 50.0e-6 # 5 cm/s
   light_time_correction: false

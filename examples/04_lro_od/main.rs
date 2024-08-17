@@ -21,7 +21,7 @@ use nyx::{
     od::{
         msr::RangeDoppler,
         prelude::{TrackingArcSim, TrkConfig, KF},
-        process::{IterationConf, ODProcess, SpacecraftUncertainty},
+        process::{IterationConf, ODProcess, ResidRejectCrit, SpacecraftUncertainty},
         snc::SNC3,
         GroundStation,
     },
@@ -210,14 +210,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Until https://github.com/nyx-space/nyx/issues/351, we need to specify the SNC in the acceleration of the Moon J2000 frame.
     let kf = KF::new(
         initial_estimate,
-        SNC3::from_diagonal(2 * Unit::Minute, &[5e-15, 5e-15, 5e-15]),
+        SNC3::from_diagonal(2 * Unit::Minute, &[5e-16, 5e-16, 5e-16]),
     );
 
     // We'll set up the OD process to reject measurements whose residuals are mover than 4 sigmas away from what we expect.
     let mut odp = ODProcess::ckf(
         setup.with(sc_seed, almanac.clone()),
         kf,
-        None,
+        Some(ResidRejectCrit::default()),
         almanac.clone(),
     );
 

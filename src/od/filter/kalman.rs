@@ -340,7 +340,11 @@ where
         let prefit = real_obs - computed_obs;
 
         // Compute the prefit ratio
-        let ratio_mat = prefit.transpose() * &h_p_ht * &prefit;
+        let r_k_inv = r_k
+            .clone()
+            .try_inverse()
+            .ok_or(ODError::SingularKalmanGain)?;
+        let ratio_mat = prefit.transpose() * r_k_inv * &prefit;
         let ratio = ratio_mat[0];
 
         if let Some(resid_reject) = resid_rejection {
