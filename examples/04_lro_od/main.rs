@@ -21,18 +21,26 @@ use nyx::{
     od::{
         msr::RangeDoppler,
         prelude::{TrackingArcSim, TrkConfig, KF},
-        process::{IterationConf, ODProcess, ResidRejectCrit, SpacecraftUncertainty},
+        process::{Estimate, ODProcess, ResidRejectCrit, SpacecraftUncertainty},
         snc::SNC3,
         GroundStation,
     },
     propagators::Propagator,
     Orbit, Spacecraft, State,
 };
+use rand::SeedableRng;
+use rand_distr::Distribution;
+use rand_pcg::Pcg64Mcg;
 
 use std::{collections::BTreeMap, error::Error, path::PathBuf, str::FromStr, sync::Arc};
 
 fn main() -> Result<(), Box<dyn Error>> {
     pel::init();
+
+    // ====================== //
+    // === ALMANAC SET UP === //
+    // ====================== //
+
     // Dynamics models require planetary constants and ephemerides to be defined.
     // Let's start by grabbing those by using ANISE's MetaAlmanac.
 
@@ -100,50 +108,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("{traj_as_flown}");
 
-    // Load the Deep Space Network ground stations.
-    // Nyx allows you to build these at runtime but it's pretty static so we can just load them from YAML.
-    let ground_station_file: PathBuf = [
-        env!("CARGO_MANIFEST_DIR"),
-        "examples",
-        "04_lro_od",
-        "dsn-network.yaml",
-    ]
-    .iter()
-    .collect();
+    // ====================== //
+    // === MODEL MATCHING === //
+    // ====================== //
 
-    let devices = GroundStation::load_many(ground_station_file)?;
-
-    // Typical OD software requires that you specify your own tracking schedule or you'll have overlapping measurements.
-    // Nyx can build a tracking schedule for you based on the first station with access.
-    let trkconfg_yaml: PathBuf = [
-        env!("CARGO_MANIFEST_DIR"),
-        "examples",
-        "04_lro_od",
-        "tracking-cfg.yaml",
-    ]
-    .iter()
-    .collect();
-
-    let configs: BTreeMap<String, TrkConfig> = TrkConfig::load_named(trkconfg_yaml)?;
-
-    // Build the tracking arc simulation to generate a "standard measurement".
-    let mut trk = TrackingArcSim::<Spacecraft, RangeDoppler, _>::new(
-        devices,
-        traj_as_flown.clone(),
-        configs,
-    )?;
-
-    trk.build_schedule(almanac.clone())?;
-    let arc = trk.generate_measurements(almanac.clone())?;
-    // Save the simulated tracking data
-    arc.to_parquet_simple("./04_lro_simulated_tracking.parquet")?;
-
-    // We'll note that in our case, we have continuous coverage of LRO when the vehicle is not behind the Moon.
-    println!("{arc}");
-
-    // Now that we have simulated measurement, we'll run the orbit determination.
-
-    // First, we need to set up the propagator used in the OD.
     // Set up the spacecraft dynamics.
 
     // Specify that the orbital dynamics must account for the graviational pull of the Earth and the Sun.
@@ -184,46 +152,151 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("{dynamics}");
 
     // Now we can build the propagator.
-    let setup = Propagator::default_dp78(dynamics);
+    let setup = Propagator::default_dp78(dynamics.clone());
 
-    // For an OD arc, we need to start with an initial estimate and covariance.
-    // The ephem published by NASA does not include the covariance. Instead, we'll make one up!
+    // For reference, let's build the trajectory with Nyx's models from that LRO state.
+    let (sim_final, traj_as_sim) = setup
+        .with(*traj_as_flown.first(), almanac.clone())
+        .until_epoch_with_traj(traj_as_flown.last().epoch())?;
 
-    let sc_seed = traj_as_flown.first().with_stm();
+    println!("SIM INIT:  {:x}", traj_as_flown.first());
+    println!("SIM FINAL: {sim_final:x}");
+    // Compute RIC difference between SIM and LRO ephem
+    let sim_lro_delta = sim_final
+        .orbit
+        .ric_difference(&traj_as_flown.last().orbit)?;
+    println!("{traj_as_sim}");
+    println!("SIM v LRO - RIC Position: {}", sim_lro_delta.radius_km);
+    println!("SIM v LRO - RIC Velocity: {}", sim_lro_delta.velocity_km_s);
 
+    traj_as_sim.ric_diff_to_parquet(
+        &traj_as_flown,
+        "./04_lro_sim_truth_error.parquet",
+        ExportCfg::default(),
+    )?;
+
+    // ==================== //
+    // === OD SIMULATOR === //
+    // ==================== //
+
+    // After quite some time trying to exactly match the model, we still end up with an oscillatory difference on the order of 150 meters between the propagated state
+    // and the truth LRO state.
+
+    // Therefore, we will actually run an estimation from a dispersed LRO state.
+    // The sc_seed is the true LRO state from the BSP.
+    let sc_seed = *traj_as_flown.first();
+
+    // Build an uncertainty using the LRO OD paper stats of 18 meters in the Radial direction
     let sc = SpacecraftUncertainty::builder()
         .nominal(sc_seed)
         .frame(LocalFrame::RIC)
-        .x_km(1.0)
-        .y_km(1.0)
-        .z_km(1.0)
-        .vx_km_s(0.5e-1)
-        .vy_km_s(0.5e-1)
-        .vz_km_s(0.5e-1)
+        .x_km(0.008)
+        .y_km(0.005)
+        .z_km(0.005)
+        .vx_km_s(0.5e-6)
+        .vy_km_s(0.5e-6)
+        .vz_km_s(0.5e-6)
         .cr(0.2)
         .build();
 
-    println!("{sc}");
+    println!("== UNCERTAINTY ==\n{sc}");
 
-    let initial_estimate = sc.to_estimate()?;
+    // Build the filter initial estimate, which we will reuse in the filter.
+    let sc_estimate = sc.to_estimate()?;
 
-    // Until https://github.com/nyx-space/nyx/issues/351, we need to specify the SNC in the acceleration of the Moon J2000 frame.
+    // Now let's sample from this distribution by building the multivariate random variable from this estimate ...
+    let state_rv = sc_estimate.to_random_variable()?;
+    // ... and sampling from this distribution.
+    // This ensures that the trajectory from which we generate the states is not identical to the initial state of the filter.
+    let sim_state = state_rv.sample(&mut Pcg64Mcg::from_entropy());
+
+    let setup = Propagator::default_dp78(dynamics);
+    let (od_final_state, od_truth_traj) = setup
+        .with(sim_state.state, almanac.clone())
+        .until_epoch_with_traj(traj_as_flown.last().epoch())?;
+
+    println!("OD INIT:  {:x}", sim_state.state);
+    println!("OD FINAL: {od_final_state:x}");
+    println!("{od_truth_traj}");
+
+    // Load the Deep Space Network ground stations.
+    // Nyx allows you to build these at runtime but it's pretty static so we can just load them from YAML.
+    let ground_station_file: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "examples",
+        "04_lro_od",
+        "dsn-network.yaml",
+    ]
+    .iter()
+    .collect();
+
+    let devices = GroundStation::load_many(ground_station_file)?;
+
+    // Typical OD software requires that you specify your own tracking schedule or you'll have overlapping measurements.
+    // Nyx can build a tracking schedule for you based on the first station with access.
+    let trkconfg_yaml: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "examples",
+        "04_lro_od",
+        "tracking-cfg.yaml",
+    ]
+    .iter()
+    .collect();
+
+    let configs: BTreeMap<String, TrkConfig> = TrkConfig::load_named(trkconfg_yaml)?;
+
+    // Build the tracking arc simulation to generate a "standard measurement".
+    let mut trk = TrackingArcSim::<Spacecraft, RangeDoppler, _>::new(
+        devices,
+        od_truth_traj.clone(),
+        configs,
+    )?;
+
+    trk.build_schedule(almanac.clone())?;
+    let arc = trk.generate_measurements(almanac.clone())?;
+    // Save the simulated tracking data
+    arc.to_parquet_simple("./04_lro_simulated_tracking.parquet")?;
+
+    // We'll note that in our case, we have continuous coverage of LRO when the vehicle is not behind the Moon.
+    println!("{arc}");
+
+    // Now that we have simulated measurements, we'll run the orbit determination.
+
+    // ===================== //
+    // === OD ESTIMATION === //
+    // ===================== //
+
+    let initial_estimate = sc_estimate * 3.0;
+    println!("== FILTER STATE ==\n{sc_seed:x}\n{sc_seed}");
+    println!(
+        "== SIM TRUTH ==\n{:x}\n{}",
+        sim_state.state, sim_state.state
+    );
+
+    let ric_err = sim_state
+        .state
+        .orbit
+        .ric_difference(&sc_estimate.state().orbit)?;
+    println!("RIC Position: {}", ric_err.radius_km);
+    println!("RIC Velocity: {}", ric_err.velocity_km_s);
+
     let kf = KF::new(
+        // Increase the initial covariance to account for larger deviation.
         initial_estimate,
-        SNC3::from_diagonal(2 * Unit::Minute, &[5e-16, 5e-16, 5e-16]),
+        // Until https://github.com/nyx-space/nyx/issues/351, we need to specify the SNC in the acceleration of the Moon J2000 frame.
+        SNC3::from_diagonal(10 * Unit::Minute, &[1e-14, 1e-14, 1e-14]),
     );
 
     // We'll set up the OD process to reject measurements whose residuals are mover than 4 sigmas away from what we expect.
     let mut odp = ODProcess::ckf(
-        setup.with(sc_seed, almanac.clone()),
+        setup.with(sc_estimate.state().with_stm(), almanac.clone()),
         kf,
-        Some(ResidRejectCrit::default()),
+        None,
+        // Some(ResidRejectCrit::default()),
         almanac.clone(),
     );
 
     odp.process_arc::<GroundStation>(&arc)?;
-    // Let's run a smoother just to see that the filter won't run it if the RSS error is small.
-    odp.iterate_arc::<GroundStation>(&arc, IterationConf::once())?;
 
     odp.to_parquet("./04_lro_od_results.parquet", ExportCfg::default())?;
 
@@ -233,26 +306,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let od_trajectory = odp.to_traj()?;
     // Build the RIC difference.
     od_trajectory.ric_diff_to_parquet(
-        &traj_as_flown,
+        &od_truth_traj,
         "./04_lro_od_truth_error.parquet",
-        ExportCfg::default(),
-    )?;
-
-    // For reference, let's build the trajectory with Nyx's models from that LRO state.
-    let (_, traj_as_sim) = setup
-        .with(*traj_as_flown.first(), almanac.clone())
-        .until_epoch_with_traj(traj_as_flown.last().epoch())?;
-
-    // Build the RIC differences.
-    // od_trajectory.ric_diff_to_parquet(
-    //     &traj_as_sim,
-    //     "./04_lro_od_sim_error.parquet",
-    //     ExportCfg::default(),
-    // )?;
-
-    traj_as_sim.ric_diff_to_parquet(
-        &traj_as_flown,
-        "./04_lro_sim_truth_error.parquet",
         ExportCfg::default(),
     )?;
 

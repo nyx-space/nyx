@@ -25,13 +25,24 @@ if __name__ == "__main__":
         )
     )
 
+    # Plot the residual ratios and whether they were accepted.
+    px.scatter(df, x="Epoch (UTC)", y="Residual ratio", color="Residual Rejected").show()
+
+    df_resid_ok = df.filter(df["Residual Rejected"] == False)
+
     # Plot the measurement residuals and their noises.
     for msr in ["Range (km)", "Doppler (km/s)"]:
         y_cols = [
             f"{col}: {msr}"
-            for col in ["Prefit residual", "Measurement noise 3-Sigma", "Postfit residual"]
+            for col in ["Prefit residual", "Postfit residual", "Measurement noise 3-Sigma"]
         ]
-        px.scatter(df, x="Epoch (UTC)", y=y_cols).show()
+        fig = px.scatter(df_resid_ok, x="Epoch (UTC)", y=y_cols)
+        fig.update_traces(
+            mode="lines",
+            selector=dict(name=f"Measurement noise 3-Sigma: {msr}"),
+            connectgaps=True,
+        )
+        fig.show()
 
     # Plot the RIC uncertainty
     px.line(
@@ -44,17 +55,13 @@ if __name__ == "__main__":
         y=["Sigma Vx (RIC) (km/s)", "Sigma Vy (RIC) (km/s)", "Sigma Vz (RIC) (km/s)"],
     ).show()
 
-    # Plot the residual ratios
-    px.scatter(df, x="Epoch (UTC)", y="Residual ratio").show()
-
     # Plot the Cr estimation
     px.line(df, x="Epoch (UTC)", y=["cr", "Cr + Sigma", "Cr - Sigma"]).show()
 
     # Load the RIC diff.
     for fname, errname in [
-        ("04_lro_od_truth_error", "OD vs Flown"),
-        ("04_lro_od_sim_error", "OD vs Sim"),
-        ("04_lro_sim_truth_error", "Sim vs Flown"),
+        ("04_lro_od_truth_error", "OD vs Simulator"),
+        ("04_lro_sim_truth_error", "Sim vs Flown (model matching)"),
     ]:
         df_ric = pl.read_parquet(f"./{fname}.parquet")
         df_ric = df_ric.with_columns(

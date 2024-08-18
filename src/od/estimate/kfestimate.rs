@@ -32,6 +32,7 @@ use rand_pcg::Pcg64Mcg;
 use std::cmp::PartialEq;
 use std::error::Error;
 use std::fmt;
+use std::ops::Mul;
 
 /// Kalman filter Estimate
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -326,6 +327,23 @@ where
             "=== PREDICTED: {} ===\nEstState {:e} Covariance {:e}\n=====================",
             &self.predicted, &self.state_deviation, &self.covar
         )
+    }
+}
+
+impl<T: State> Mul<f64> for KfEstimate<T>
+where
+    DefaultAllocator: Allocator<<T as State>::Size>
+        + Allocator<<T as State>::Size, <T as State>::Size>
+        + Allocator<<T as State>::Size>
+        + Allocator<<T as State>::VecLength>,
+    <DefaultAllocator as Allocator<<T as State>::Size>>::Buffer<f64>: Copy,
+    <DefaultAllocator as Allocator<<T as State>::Size, <T as State>::Size>>::Buffer<f64>: Copy,
+{
+    type Output = Self;
+
+    fn mul(mut self, rhs: f64) -> Self::Output {
+        self.covar *= rhs;
+        self
     }
 }
 
