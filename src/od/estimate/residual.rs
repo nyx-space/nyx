@@ -34,7 +34,9 @@ where
     pub prefit: OVector<f64, M>,
     /// The postfit residual in the units of the measurement type
     pub postfit: OVector<f64, M>,
-    /// The prefit residual ratio, i.e. `r' * (H*P*H')^-1 * r`, where `r` is the prefit residual, `H` is the sensitivity matrix, and `P` is the covariance matrix.
+    /// The prefit residual ratio computed as the Mahalanobis distance, i.e. it is always positive
+    /// and computed as `r' * (H*P*H')^-1 * r`, where `r` is the prefit residual, `H` is the sensitivity matrix, and `P` is the covariance matrix.
+    /// To assess the performance, look at the Chi Square distribution for the number of measurements, e.g. 2 for range and range-rate.
     pub ratio: f64,
     /// The tracker measurement noise (variance)) for this tracker at this time.
     pub tracker_msr_noise: OVector<f64, M>,

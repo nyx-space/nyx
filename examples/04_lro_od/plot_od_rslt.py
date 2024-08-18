@@ -1,4 +1,7 @@
 import polars as pl
+from scipy.stats import chi2
+import numpy as np
+import plotly.graph_objects as go
 import plotly.express as px
 
 if __name__ == "__main__":
@@ -35,6 +38,26 @@ if __name__ == "__main__":
             ),
         ]
     )
+
+    # == Residual plots ==
+    # Nyx uses the Mahalanobis distance for the residual ratios, so we test the goodness using the Chi Square distribution.
+    freedoms = 2 # Two degrees of freedoms for the range and the range rate.
+    x_chi = np.linspace(chi2.ppf(0.01, freedoms), chi2.ppf(0.99, freedoms), 100)
+    y_chi = chi2.pdf(x_chi, freedoms)
+    scale_factor = df["Residual ratio"].len() / 100.0
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=x_chi, y=y_chi * scale_factor, mode="lines", name="chi2 pdf"))
+    fig.add_trace(go.Histogram(x=df["Residual ratio"], nbinsx=100))
+    fig.show()
+
+    px.histogram(
+        df,
+        x="Residual ratio",
+        color="Tracker",
+        marginal="rug",  # can be `box`, `violin`
+        hover_data=df.columns,
+    ).show()
 
     # Plot the residual ratios and whether they were accepted.
     px.scatter(df, x="Epoch (UTC)", y="Residual ratio", color="Residual Rejected").show()

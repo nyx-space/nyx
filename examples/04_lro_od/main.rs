@@ -313,7 +313,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut odp = ODProcess::ckf(
         setup.with(sc_estimate.state().with_stm(), almanac.clone()),
         kf,
-        // None,
         Some(ResidRejectCrit::default()),
         almanac.clone(),
     );
