@@ -586,7 +586,7 @@ where
                                     nominal_state,
                                     &msr.observation(),
                                     &computed_meas.observation(),
-                                    device.measurement_noise(epoch)?,
+                                    device.measurement_covar(epoch)?,
                                     self.resid_crit,
                                 ) {
                                     Ok((estimate, mut residual)) => {

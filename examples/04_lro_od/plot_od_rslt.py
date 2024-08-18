@@ -9,20 +9,31 @@ if __name__ == "__main__":
     )
     # Add the Cr + Sigma Cr column
     df = df.with_columns(
-        (pl.col("cr") + pl.col("Sigma Cr (Moon J2000) (unitless)")).alias("Cr + Sigma")
+        [
+            (pl.col("cr") + pl.col("Sigma Cr (Moon J2000) (unitless)")).alias("Cr + Sigma"),
+            (pl.col("cr") - pl.col("Sigma Cr (Moon J2000) (unitless)")).alias("Cr - Sigma"),
+        ]
+    )
+    # Add the +/- 3 sigmas on measurement noise
+    df = df.with_columns(
+        [
+            (3.0 * pl.col("Measurement noise: Range (km)")).alias(
+                "Measurement noise 3-Sigma: Range (km)"
+            ),
+            (-3.0 * pl.col("Measurement noise: Range (km)")).alias(
+                "Measurement noise -3-Sigma: Range (km)"
+            ),
+        ]
     )
     df = df.with_columns(
-        (pl.col("cr") - pl.col("Sigma Cr (Moon J2000) (unitless)")).alias("Cr - Sigma")
-    )
-    df = df.with_columns(
-        (3.0 * pl.col("Measurement noise: Range (km)")).alias(
-            "Measurement noise 3-Sigma: Range (km)"
-        )
-    )
-    df = df.with_columns(
-        (3.0 * pl.col("Measurement noise: Doppler (km/s)")).alias(
-            "Measurement noise 3-Sigma: Doppler (km/s)"
-        )
+        [
+            (3.0 * pl.col("Measurement noise: Doppler (km/s)")).alias(
+                "Measurement noise 3-Sigma: Doppler (km/s)"
+            ),
+            (-3.0 * pl.col("Measurement noise: Doppler (km/s)")).alias(
+                "Measurement noise -3-Sigma: Doppler (km/s)"
+            ),
+        ]
     )
 
     # Plot the residual ratios and whether they were accepted.
@@ -34,13 +45,25 @@ if __name__ == "__main__":
     for msr in ["Range (km)", "Doppler (km/s)"]:
         y_cols = [
             f"{col}: {msr}"
-            for col in ["Prefit residual", "Postfit residual", "Measurement noise 3-Sigma"]
+            for col in [
+                "Prefit residual",
+                "Postfit residual",
+                "Measurement noise 3-Sigma",
+                "Measurement noise -3-Sigma",
+            ]
         ]
         fig = px.scatter(df_resid_ok, x="Epoch (UTC)", y=y_cols)
         fig.update_traces(
             mode="lines",
             selector=dict(name=f"Measurement noise 3-Sigma: {msr}"),
             connectgaps=True,
+            line=dict(dash="dash", color="black"),
+        )
+        fig.update_traces(
+            mode="lines",
+            selector=dict(name=f"Measurement noise -3-Sigma: {msr}"),
+            connectgaps=True,
+            line=dict(dash="dash", color="black"),
         )
         fig.show()
 

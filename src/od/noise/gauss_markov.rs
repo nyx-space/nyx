@@ -124,7 +124,7 @@ impl GaussMarkov {
 }
 
 impl Stochastics for GaussMarkov {
-    fn variance(&self, _epoch: Epoch) -> f64 {
+    fn covariance(&self, _epoch: Epoch) -> f64 {
         self.process_noise.powi(2)
     }
 

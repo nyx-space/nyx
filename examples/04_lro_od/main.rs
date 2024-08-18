@@ -21,7 +21,7 @@ use nyx::{
     od::{
         msr::RangeDoppler,
         prelude::{TrackingArcSim, TrkConfig, KF},
-        process::{Estimate, ODProcess, ResidRejectCrit, SpacecraftUncertainty},
+        process::{Estimate, NavSolution, ODProcess, ResidRejectCrit, SpacecraftUncertainty},
         snc::SNC3,
         GroundStation,
     },
@@ -166,8 +166,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         .orbit
         .ric_difference(&traj_as_flown.last().orbit)?;
     println!("{traj_as_sim}");
-    println!("SIM v LRO - RIC Position: {}", sim_lro_delta.radius_km);
-    println!("SIM v LRO - RIC Velocity: {}", sim_lro_delta.velocity_km_s);
+    println!(
+        "SIM v LRO - RIC Position (m): {:.3}",
+        sim_lro_delta.radius_km * 1e3
+    );
+    println!(
+        "SIM v LRO - RIC Velocity (m/s): {:.3}",
+        sim_lro_delta.velocity_km_s * 1e3
+    );
 
     traj_as_sim.ric_diff_to_parquet(
         &traj_as_flown,
@@ -190,13 +196,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let sc = SpacecraftUncertainty::builder()
         .nominal(sc_seed)
         .frame(LocalFrame::RIC)
-        .x_km(0.008)
-        .y_km(0.005)
-        .z_km(0.005)
+        .x_km(0.001)
+        .y_km(0.001)
+        .z_km(0.001)
         .vx_km_s(0.5e-6)
         .vy_km_s(0.5e-6)
         .vz_km_s(0.5e-6)
-        .cr(0.2)
         .build();
 
     println!("== UNCERTAINTY ==\n{sc}");
@@ -266,8 +271,24 @@ fn main() -> Result<(), Box<dyn Error>> {
     // === OD ESTIMATION === //
     // ===================== //
 
-    let initial_estimate = sc_estimate * 3.0;
-    println!("== FILTER STATE ==\n{sc_seed:x}\n{sc_seed}");
+    // Let's increase the original covariance by a large factor.
+    // let initial_estimate = sc_estimate * 1_000.0;
+
+    let sc = SpacecraftUncertainty::builder()
+        .nominal(sc_seed)
+        .frame(LocalFrame::RIC)
+        .x_km(0.5)
+        .y_km(0.5)
+        .z_km(0.5)
+        .vx_km_s(5e-3)
+        .vy_km_s(5e-3)
+        .vz_km_s(5e-3)
+        .build();
+
+    // Build the filter initial estimate, which we will reuse in the filter.
+    let initial_estimate = sc.to_estimate()?;
+
+    println!("== FILTER STATE ==\n{sc_seed:x}\n{initial_estimate}");
     println!(
         "== SIM TRUTH ==\n{:x}\n{}",
         sim_state.state, sim_state.state
@@ -276,9 +297,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let ric_err = sim_state
         .state
         .orbit
-        .ric_difference(&sc_estimate.state().orbit)?;
-    println!("RIC Position: {}", ric_err.radius_km);
-    println!("RIC Velocity: {}", ric_err.velocity_km_s);
+        .ric_difference(&initial_estimate.state().orbit)?;
+    println!("== RIC at start ==");
+    println!("RIC Position (m): {}", ric_err.radius_km * 1e3);
+    println!("RIC Velocity (m/s): {}", ric_err.velocity_km_s * 1e3);
 
     let kf = KF::new(
         // Increase the initial covariance to account for larger deviation.
@@ -291,12 +313,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut odp = ODProcess::ckf(
         setup.with(sc_estimate.state().with_stm(), almanac.clone()),
         kf,
-        None,
-        // Some(ResidRejectCrit::default()),
+        // None,
+        Some(ResidRejectCrit::default()),
         almanac.clone(),
     );
 
     odp.process_arc::<GroundStation>(&arc)?;
+
+    let ric_err = od_truth_traj
+        .at(odp.estimates.last().unwrap().epoch())?
+        .orbit
+        .ric_difference(&odp.estimates.last().unwrap().orbital_state())?;
+    println!("== RIC at end ==");
+    println!("RIC Position (m): {}", ric_err.radius_km * 1e3);
+    println!("RIC Velocity (m/s): {}", ric_err.velocity_km_s * 1e3);
 
     odp.to_parquet("./04_lro_od_results.parquet", ExportCfg::default())?;
 

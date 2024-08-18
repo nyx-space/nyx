@@ -67,14 +67,14 @@ where
         epoch: Epoch,
         prefit: OVector<f64, M>,
         ratio: f64,
-        tracker_msr_noise: OVector<f64, M>,
+        tracker_msr_covar: OVector<f64, M>,
     ) -> Self {
         Self {
             epoch,
             prefit,
             postfit: OVector::<f64, M>::zeros(),
             ratio,
-            tracker_msr_noise,
+            tracker_msr_noise: tracker_msr_covar.map(|x| x.sqrt()),
             rejected: true,
             tracker: None,
         }
@@ -85,14 +85,14 @@ where
         prefit: OVector<f64, M>,
         postfit: OVector<f64, M>,
         ratio: f64,
-        tracker_msr_noise: OVector<f64, M>,
+        tracker_msr_covar: OVector<f64, M>,
     ) -> Self {
         Self {
             epoch,
             prefit,
             postfit,
             ratio,
-            tracker_msr_noise,
+            tracker_msr_noise: tracker_msr_covar.map(|x| x.sqrt()),
             rejected: false,
             tracker: None,
         }

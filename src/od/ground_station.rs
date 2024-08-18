@@ -361,7 +361,7 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
     /// The measurement noise is computed assuming that all measurements are independent variables, i.e. the measurement matrix is
     /// a diagonal matrix. The first item in the diagonal is the range noise (in km), set to the square of the steady state sigma. The
     /// second item is the Doppler noise (in km/s), set to the square of the steady state sigma of that Gauss Markov process.
-    fn measurement_noise(
+    fn measurement_covar(
         &mut self,
         epoch: Epoch,
     ) -> Result<
@@ -372,22 +372,22 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
         >,
         ODError,
     > {
-        let range_noise_km = self
+        let range_noise_km2 = self
             .range_noise_km
             .ok_or(ODError::NoiseNotConfigured { kind: "Range" })?
-            .variance(epoch);
-        let doppler_noise_km_s = self
+            .covariance(epoch);
+        let doppler_noise_km2_s2 = self
             .doppler_noise_km_s
             .ok_or(ODError::NoiseNotConfigured { kind: "Doppler" })?
-            .variance(epoch);
+            .covariance(epoch);
 
         let mut msr_noises = OMatrix::<
             f64,
             <RangeDoppler as super::Measurement>::MeasurementSize,
             <RangeDoppler as super::Measurement>::MeasurementSize,
         >::zeros();
-        msr_noises[(0, 0)] = range_noise_km;
-        msr_noises[(1, 1)] = doppler_noise_km_s;
+        msr_noises[(0, 0)] = range_noise_km2;
+        msr_noises[(1, 1)] = doppler_noise_km2_s2;
 
         Ok(msr_noises)
     }

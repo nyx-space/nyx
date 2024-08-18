@@ -75,14 +75,14 @@ where
     /// * `nominal_state`: the nominal state at which the observation was computed.
     /// * `real_obs`: the real observation that was measured.
     /// * `computed_obs`: the computed observation from the nominal state.
-    /// * `measurement_noise`: the measurement noise associated with this time update.
+    /// * `measurement_covar`: the measurement covariance associated with this time update (i./e. the square of the standard deviation)
     /// * `resid_rejection`: the automatic residual rejection criteria, if enabled.
     fn measurement_update(
         &mut self,
         nominal_state: T,
         real_obs: &OVector<f64, M>,
         computed_obs: &OVector<f64, M>,
-        measurement_noise: OMatrix<f64, M, M>,
+        measurement_covar: OMatrix<f64, M, M>,
         resid_rejection: Option<ResidRejectCrit>,
     ) -> Result<(Self::Estimate, Residual<M>), ODError>;
 

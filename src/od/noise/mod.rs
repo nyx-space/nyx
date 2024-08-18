@@ -39,7 +39,7 @@ pub use white::WhiteNoise;
 /// Trait for any kind of stochastic modeling, developing primarily for synthetic orbit determination measurements.
 pub trait Stochastics {
     /// Return the variance of this stochastic noise model at a given time.
-    fn variance(&self, epoch: Epoch) -> f64;
+    fn covariance(&self, epoch: Epoch) -> f64;
 
     /// Returns a new sample of these stochastics
     fn sample<R: Rng>(&mut self, epoch: Epoch, rng: &mut R) -> f64;
@@ -105,16 +105,16 @@ impl StochasticNoise {
         sample
     }
 
-    /// Return the variance of these stochastics at a given time.
-    pub fn variance(&self, epoch: Epoch) -> f64 {
+    /// Return the covariance of these stochastics at a given time.
+    pub fn covariance(&self, epoch: Epoch) -> f64 {
         let mut variance = 0.0;
         if let Some(wn) = &self.white_noise {
-            variance += wn.variance(epoch).sqrt();
+            variance += wn.covariance(epoch);
         }
         if let Some(gm) = &self.bias {
-            variance += gm.variance(epoch).sqrt();
+            variance += gm.covariance(epoch);
         }
-        variance.powi(2)
+        variance
     }
 
     /// Simulate the configured stochastic model and store the bias in a parquet file.
@@ -147,7 +147,7 @@ impl StochasticNoise {
                     // Skip to see how the variance changes.
                     continue;
                 }
-                let variance = mdl.variance(epoch);
+                let variance = mdl.covariance(epoch);
                 let sample = mdl.sample(epoch, &mut rng);
                 samples.push(StochasticState {
                     run,

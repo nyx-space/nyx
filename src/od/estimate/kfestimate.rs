@@ -342,7 +342,7 @@ where
     type Output = Self;
 
     fn mul(mut self, rhs: f64) -> Self::Output {
-        self.covar *= rhs;
+        self.covar *= rhs.powi(2);
         self
     }
 }

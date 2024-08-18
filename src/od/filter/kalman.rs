@@ -276,7 +276,7 @@ where
         nominal_state: T,
         real_obs: &OVector<f64, M>,
         computed_obs: &OVector<f64, M>,
-        measurement_noise: OMatrix<f64, M, M>,
+        measurement_covar: OMatrix<f64, M, M>,
         resid_rejection: Option<ResidRejectCrit>,
     ) -> Result<(Self::Estimate, Residual<M>), ODError> {
         if !self.h_tilde_updated {
@@ -334,29 +334,24 @@ where
         let h_tilde_t = &self.h_tilde.transpose();
         let h_p_ht = &self.h_tilde * covar_bar * h_tilde_t;
         // Account for state uncertainty in the measurement noise. Equation 4.10 of ODTK MathSpec.
-        let r_k = &h_p_ht + measurement_noise;
+        let r_k = &h_p_ht + measurement_covar;
 
         // Compute observation deviation (usually marked as y_i)
         let prefit = real_obs - computed_obs;
 
-        // Compute the prefit ratio
-        let r_k_inv = r_k
-            .clone()
-            .try_inverse()
-            .ok_or(ODError::SingularKalmanGain)?;
+        // Compute the prefit ratio for the automatic rejection
+        let r_k_inv = r_k.clone().try_inverse().ok_or(ODError::SingularNoiseRk)?;
         let ratio_mat = prefit.transpose() * r_k_inv * &prefit;
-        let ratio = ratio_mat[0];
+        let ratio = ratio_mat[0].sqrt();
 
         if let Some(resid_reject) = resid_rejection {
-            for ii in 0..M::USIZE {
-                if prefit[ii].abs() > r_k[(ii, ii)].sqrt() * resid_reject.num_sigmas {
-                    // Reject this whole measurement and perform only a time update
-                    let pred_est = self.time_update(nominal_state)?;
-                    return Ok((
-                        pred_est,
-                        Residual::rejected(epoch, prefit, ratio, r_k.diagonal()),
-                    ));
-                }
+            if ratio > resid_reject.num_sigmas {
+                // Reject this whole measurement and perform only a time update
+                let pred_est = self.time_update(nominal_state)?;
+                return Ok((
+                    pred_est,
+                    Residual::rejected(epoch, prefit, ratio, r_k.diagonal()),
+                ));
             }
         }
 
