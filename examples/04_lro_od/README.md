@@ -1,10 +1,10 @@
 # Orbit Determination of the Lunar Reconnaissance Orbiter
 
-**Spacecraft operations require high fidelity modeling of the orbital dynamics and high fidelity orbit determination. We will prove that the LRO team can use Nyx for its orbit determination.**
+**Spacecraft operations require high fidelity modeling of the orbital dynamics and high fidelity orbit determination. This example demonstrates that the LRO team could effectively use Nyx for orbit determination.**
 
 In this example, you'll learn how to use an "as-flown" (_definitive_) SPICE BSP ephemeris file to simulate orbit determination measurements from ground stations. Then, you'll learn how to set up an orbit determination process in Nyx with high fidelity Moon dynamics and estimate the state of LRO. Finally, you'll learn how to compare two ephemerides in the Radial, In-track, Cross-track (RIC) frame.
 
-**Jump to [results](#results)**
+**Jump to the [results](#results)**
 
 To run this example, just execute:
 ```sh
@@ -24,7 +24,7 @@ The original ephemeris file by NASA is in _big endian_ format, and my machine (l
 For this preliminary analysis, we'll configure the dynamical models taking inspiration from the 2015 paper by Slojkowski et al. [Orbit Determination For The Lunar Reconnaissance Orbiter Using
 An Extended Kalman Filter](https://ntrs.nasa.gov/api/citations/20150019754/downloads/20150019754.pdf). In this paper, the LRO team compares the OD solution between GTDS and AGI/Ansys ODTK. We will be performing the same analysis but with Nyx!
 
-Cislunar propagation involves a handful of decently well determined forces, so we can use these directly in Nyx:
+Cislunar propagation involves several well-determined forces, which can be directly used in Nyx:
 
 - Solar radiation pressure;
 - Point mass gravity forces from the central object (Moon) and other celestial objects whose force is relevant, namely Earth, Sun, Jupiter, maybe Saturn;
@@ -45,7 +45,7 @@ Since the velocity is the time derivative of the position, and since the error i
 ## Dynamical models
 
 - Solar radiation pressure: **Cr 0.96**
-- Point mass gravity forces from the central object, **Moon: GM = 4902.74987 km^3/s^2** and other celestial objects whose force is relevant, namely Earth (**GM = 398600.436 km^3/s^**), Sun, and Jupiter;
+- Point mass gravity forces from the central object, **Moon: GM = 4902.74987 km^2/s^3** and other celestial objects whose force is relevant, namely Earth (**GM = 398600.436 km^3/s^**), Sun, and Jupiter;
 - Moon gravity field GRAIL model JGGRX with the Moon Principal Axes frames (MOON PA) in 80x80 (degree x order)
 
 After model tuning, we reach a reasonable error with an average range error of 175 meters and an average velocity error of 0.116 m/s.
@@ -96,7 +96,7 @@ shape: (9, 2)
 
 ## Ground network
 
-For this example, we simulate measurements from three of the Deep Space Network ground stations: Canberra, Australia; Madrid, Spain; and Goldstone, CA, USA. Nyx allows configuration of ground stations using a YAML input file, cf. [`dsn-network`](./dsn-network.yaml): these are configured as unbiased white noise ground stations where the standard deviation of the white noise is taken directly from the JPL DESCANSO series. The stochastic modeling in Nyx supports first order Gauss Markov processes and biased white noise.
+For this example, we simulate measurements from three of the Deep Space Network ground stations: Canberra, Australia; Madrid, Spain; and Goldstone, CA, USA. Nyx allows configuration of ground stations using a YAML input file, cf. [`dsn-network`](./dsn-network.yaml). These are configured as unbiased white noise ground stations where the standard deviation of the white noise is taken directly from the JPL DESCANSO series. The stochastic modeling in Nyx supports first order Gauss Markov processes and biased white noise.
 
 In this simulation, we are generating geometric one-way range and Doppler measurements. Nyx supports all of the aberration computations provided by ANISE (and validated against SPICE).
 
@@ -115,7 +115,7 @@ To prepare for a mission, flight dynamics engineers must simulate a tracking sch
 The tracking scheduler will start by finding the exact times when the vehicle comes in view, using the embedded event finder on an elevation event.
 
 ```log
-INFO  nyx_space::md::events::search      > Searching for DSS-13 Goldstone (lat.: 35.2472 deg    long.: 243.2050 deg    alt.: 1071.149 m) [Earth IAU_EARTH (μ = 398600.435436096 km^3/s^2)] with initial heuristic of 14 min 24 s
+ INFO  nyx_space::md::events::search      > Searching for DSS-13 Goldstone (lat.: 35.2472 deg    long.: 243.2050 deg    alt.: 1071.149 m) [Earth IAU_EARTH (μ = 398600.435436096 km^3/s^2)] with initial heuristic of 14 min 24 s
  INFO  nyx_space::md::events::search      > Event DSS-13 Goldstone (lat.: 35.2472 deg    long.: 243.2050 deg    alt.: 1071.149 m) [Earth IAU_EARTH (μ = 398600.435436096 km^3/s^2)] found 2 times from 2024-01-01T05:49:54.697010810 UTC until 2024-01-01T18:08:53.555326604 UTC
  INFO  nyx_space::od::simulator::arc      > Built 1 tracking strands for DSS-13 Goldstone
  INFO  nyx_space::od::simulator::arc      > Building schedule for DSS-34 Canberra
@@ -152,11 +152,26 @@ Nyx will not generate measurements if the vehicle is obstructed by a celestial o
 
 ## Filter set up
 
-The OD filter uses the same dynamics as those used in the [model matching](#preliminary-analysis-matching-dynamical-models) section above.
+The OD filter uses the [dynamics determined above](#dynamical-models) after the [model matching](#preliminary-analysis-matching-dynamical-models) analysis.
 
 However, as seen in the model matching section, there remains a difference in the modeling of the orbital dynamics between Nyx and the published LRO ephemeris. This causes an oscillation of roughly 250 meters of range in the RIC frame. In the LRO orbit determination paper, the authors mention that GTDS is a batch least squares estimator, whereas this example uses a Kalman filter. To account for the modeling difference, we bump up the state noise compensation of the filter to `1e-11` km/s^2, or approximately 0.6 cm/s over a 10 minute span. This causes the covariance to increase when there are no measurements to accomodate for the small but accumulating modeling differences.
 
-The filter is configured with the default automatic residual rejection of Nyx whereby any residual ratio greater than 4 sigmas causes the measurement to be rejected.
+The filter is configured with the default automatic residual rejection of Nyx whereby any residual ratio greater than 4 sigmas causes the measurement to be rejected. If the residual ratio exceeds this threshold, the measurement is considered an outlier and is rejected by the filter. This process helps to prevent measurements with large errors from negatively impacting the orbit determination solution.
+
+```log
+ INFO  nyx_space::od::process             > Navigation propagating for a total of 1 day with step size 1 min
+ INFO  nyx_space::od::process             > Processing 994 measurements with covariance mapping
+ INFO  nyx_space::od::process             >  10% done - 101 measurements accepted, 0 rejected
+ INFO  nyx_space::od::process             >  20% done - 200 measurements accepted, 0 rejected
+ INFO  nyx_space::od::process             >  30% done - 300 measurements accepted, 0 rejected
+ INFO  nyx_space::od::process             >  40% done - 394 measurements accepted, 5 rejected
+ INFO  nyx_space::od::process             >  50% done - 489 measurements accepted, 9 rejected
+ INFO  nyx_space::od::process             >  60% done - 586 measurements accepted, 12 rejected
+ INFO  nyx_space::od::process             >  70% done - 677 measurements accepted, 20 rejected
+ INFO  nyx_space::od::process             >  80% done - 767 measurements accepted, 30 rejected
+ INFO  nyx_space::od::process             >  90% done - 863 measurements accepted, 33 rejected
+ INFO  nyx_space::od::process             > 100% done - 955 measurements accepted, 39 rejected (done in 17 s 267 ms 50 μs 496 ns)
+```
 
 # Results
 
@@ -203,3 +218,7 @@ In our case, we have the true definitive ephemeris of LRO. Hence, we can compare
 ![RIC OD vs truth pos err](./plots/od-vs-truth-ric-pos-err.png)
 
 ![RIC OD vs truth vel err](./plots/od-vs-truth-ric-vel-err.png)
+
+# Conclusion
+
+The successful orbit determination of the Lunar Reconnaissance Orbiter using Nyx validates its capability as a reliable tool for precise orbit estimation in low lunar orbits, which are known for their highly dynamic nature. This validation opens up opportunities for using Nyx in future lunar missions, potentially reducing the reliance on other orbit determination software.

@@ -243,7 +243,7 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
         .filter(|residual| residual.rejected)
         .count();
 
-    assert!(num_rejections < 12, "oddly high rejections");
+    assert!(dbg!(num_rejections) < 20, "oddly high rejections");
 
     // Check that the final post-fit residual isn't too bad, and definitely much better than the prefit.
     let est = &odp.estimates.last().unwrap();

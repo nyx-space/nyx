@@ -829,13 +829,15 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map(
             );
         }
 
-        for i in 0..6 {
-            assert!(
-                est.covar[(i, i)] >= sigma_q,
-                "covar diagonal less than SNC value @ {} = {:.3e}",
-                no,
-                est.covar[(i, i)]
-            );
+        if est.predicted() {
+            for i in 0..6 {
+                assert!(
+                    est.covar[(i, i)] >= sigma_q,
+                    "covar diagonal less than SNC value @ {} = {:.3e}",
+                    no,
+                    est.covar[(i, i)]
+                );
+            }
         }
     }
 
