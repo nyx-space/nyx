@@ -10,13 +10,6 @@ if __name__ == "__main__":
     df = df.with_columns(pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f")).sort(
         "Epoch (UTC)", descending=False
     )
-    # Add the Cr + Sigma Cr column
-    df = df.with_columns(
-        [
-            (pl.col("cr") + pl.col("Sigma Cr (Moon J2000) (unitless)")).alias("Cr + Sigma"),
-            (pl.col("cr") - pl.col("Sigma Cr (Moon J2000) (unitless)")).alias("Cr - Sigma"),
-        ]
-    )
     # Add the +/- 3 sigmas on measurement noise
     df = df.with_columns(
         [
@@ -44,11 +37,16 @@ if __name__ == "__main__":
     freedoms = 2 # Two degrees of freedoms for the range and the range rate.
     x_chi = np.linspace(chi2.ppf(0.01, freedoms), chi2.ppf(0.99, freedoms), 100)
     y_chi = chi2.pdf(x_chi, freedoms)
-    scale_factor = df["Residual ratio"].len() / 100.0
+
+    # Compute the scaling factor
+    hist = np.histogram(df["Residual ratio"].fill_null(0.0), bins=50)[0]
+    max_hist = max(hist[1:]) # Ignore the bin of zeros
+    max_chi2_pdf = max(y_chi)
+    scale_factor = max_hist / max_chi2_pdf
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=x_chi, y=y_chi * scale_factor, mode="lines", name="chi2 pdf"))
-    fig.add_trace(go.Histogram(x=df["Residual ratio"], nbinsx=100))
+    fig.add_trace(go.Scatter(x=x_chi, y=y_chi * scale_factor, mode="lines", name="Scaled Chi-Squared"))
+    fig.add_trace(go.Histogram(x=df["Residual ratio"], nbinsx=100, name="Residuals"))
     fig.show()
 
     px.histogram(
@@ -101,12 +99,9 @@ if __name__ == "__main__":
         y=["Sigma Vx (RIC) (km/s)", "Sigma Vy (RIC) (km/s)", "Sigma Vz (RIC) (km/s)"],
     ).show()
 
-    # Plot the Cr estimation
-    px.line(df, x="Epoch (UTC)", y=["cr", "Cr + Sigma", "Cr - Sigma"]).show()
-
     # Load the RIC diff.
     for fname, errname in [
-        ("04_lro_od_truth_error", "OD vs Simulator"),
+        ("04_lro_od_truth_error", "OD vs Flown"),
         ("04_lro_sim_truth_error", "Sim vs Flown (model matching)"),
     ]:
         df_ric = pl.read_parquet(f"./{fname}.parquet")

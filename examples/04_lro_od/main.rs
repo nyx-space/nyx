@@ -196,12 +196,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let sc = SpacecraftUncertainty::builder()
         .nominal(sc_seed)
         .frame(LocalFrame::RIC)
-        .x_km(0.001)
-        .y_km(0.001)
-        .z_km(0.001)
-        .vx_km_s(0.5e-6)
-        .vy_km_s(0.5e-6)
-        .vz_km_s(0.5e-6)
+        .x_km(0.01)
+        .y_km(0.01)
+        .z_km(0.01)
+        .vx_km_s(0.01e-3)
+        .vy_km_s(0.01e-3)
+        .vz_km_s(0.01e-3)
         .build();
 
     println!("== UNCERTAINTY ==\n{sc}");
@@ -253,7 +253,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Build the tracking arc simulation to generate a "standard measurement".
     let mut trk = TrackingArcSim::<Spacecraft, RangeDoppler, _>::new(
         devices,
-        od_truth_traj.clone(),
+        traj_as_flown.clone(),
         configs,
     )?;
 
@@ -270,9 +270,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     // ===================== //
     // === OD ESTIMATION === //
     // ===================== //
-
-    // Let's increase the original covariance by a large factor.
-    // let initial_estimate = sc_estimate * 1_000.0;
 
     let sc = SpacecraftUncertainty::builder()
         .nominal(sc_seed)
@@ -306,7 +303,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Increase the initial covariance to account for larger deviation.
         initial_estimate,
         // Until https://github.com/nyx-space/nyx/issues/351, we need to specify the SNC in the acceleration of the Moon J2000 frame.
-        SNC3::from_diagonal(10 * Unit::Minute, &[1e-14, 1e-14, 1e-14]),
+        SNC3::from_diagonal(10 * Unit::Minute, &[5e-11, 5e-11, 5e-11]),
     );
 
     // We'll set up the OD process to reject measurements whose residuals are mover than 4 sigmas away from what we expect.
@@ -319,7 +316,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     odp.process_arc::<GroundStation>(&arc)?;
 
-    let ric_err = od_truth_traj
+    let ric_err = traj_as_flown
         .at(odp.estimates.last().unwrap().epoch())?
         .orbit
         .ric_difference(&odp.estimates.last().unwrap().orbital_state())?;
@@ -335,7 +332,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let od_trajectory = odp.to_traj()?;
     // Build the RIC difference.
     od_trajectory.ric_diff_to_parquet(
-        &od_truth_traj,
+        &traj_as_flown,
         "./04_lro_od_truth_error.parquet",
         ExportCfg::default(),
     )?;
