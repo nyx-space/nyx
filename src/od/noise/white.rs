@@ -68,7 +68,7 @@ impl WhiteNoise {
 }
 
 impl Stochastics for WhiteNoise {
-    fn variance(&self, _epoch: Epoch) -> f64 {
+    fn covariance(&self, _epoch: Epoch) -> f64 {
         self.sigma.powi(2)
     }
 

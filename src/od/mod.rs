@@ -26,6 +26,7 @@ use crate::propagators::PropagationError;
 use crate::time::Epoch;
 use crate::Orbit;
 pub use crate::{State, TimeTagged};
+use anise::almanac::planetary::PlanetaryDataError;
 use anise::errors::AlmanacError;
 use hifitime::Duration;
 use snafu::prelude::Snafu;
@@ -190,6 +191,8 @@ pub enum ODError {
     SensitivityNotUpdated,
     #[snafu(display("Kalman gain is singular"))]
     SingularKalmanGain,
+    #[snafu(display("Noise matrix is singular"))]
+    SingularNoiseRk,
     #[snafu(display("{kind} noise not configured"))]
     NoiseNotConfigured { kind: &'static str },
     #[snafu(display("during an OD encountered {source}"))]
@@ -202,6 +205,12 @@ pub enum ODError {
     ODAlmanac {
         #[snafu(source(from(AlmanacError, Box::new)))]
         source: Box<AlmanacError>,
+        action: &'static str,
+    },
+    #[snafu(display("OD failed due to planetary data in Almanac: {action} {source}"))]
+    ODPlanetaryData {
+        #[snafu(source(from(PlanetaryDataError, Box::new)))]
+        source: Box<PlanetaryDataError>,
         action: &'static str,
     },
     #[snafu(display("not enough residuals to {action}"))]

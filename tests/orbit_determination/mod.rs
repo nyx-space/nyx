@@ -71,7 +71,7 @@ fn filter_errors() {
     ) {
         Ok(_) => panic!("expected the measurement update to fail"),
         Err(e) => {
-            assert_eq!(e, ODError::SingularKalmanGain);
+            assert_eq!(e, ODError::SingularNoiseRk);
         }
     }
 }

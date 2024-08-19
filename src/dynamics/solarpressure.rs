@@ -79,10 +79,10 @@ impl SolarPressure {
 
     /// Accounts for the shadowing of only one body and will set the solar flux at 1 AU to: Phi = 1367.0
     pub fn default_no_estimation(
-        shadow_body: Frame,
+        shadow_bodies: Vec<Frame>,
         almanac: Arc<Almanac>,
     ) -> Result<Arc<Self>, DynamicsError> {
-        let mut srp = Self::default_raw(vec![shadow_body], almanac)?;
+        let mut srp = Self::default_raw(shadow_bodies, almanac)?;
         srp.estimate = false;
         Ok(Arc::new(srp))
     }

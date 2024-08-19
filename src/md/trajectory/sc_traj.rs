@@ -16,8 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anise::astro::Aberration;
 use anise::constants::orientations::J2000;
+use anise::errors::AlmanacError;
 use anise::prelude::{Almanac, Frame, Orbit};
+use hifitime::TimeSeries;
 use snafu::ResultExt;
 
 use super::TrajError;
@@ -40,6 +43,41 @@ use std::sync::Arc;
 use std::time::Instant;
 
 impl Traj<Spacecraft> {
+    /// Builds a new trajectory built from the SPICE BSP (SPK) file loaded in the provided Almanac, provided the start and stop epochs.
+    ///
+    /// If the start and stop epochs are not provided, then the full domain of the trajectory will be used.
+    pub fn from_bsp(
+        target_frame: Frame,
+        observer_frame: Frame,
+        almanac: Arc<Almanac>,
+        sc_template: Spacecraft,
+        step: Duration,
+        start_epoch: Option<Epoch>,
+        end_epoch: Option<Epoch>,
+        ab_corr: Option<Aberration>,
+        name: Option<String>,
+    ) -> Result<Self, AlmanacError> {
+        let (domain_start, domain_end) =
+            almanac
+                .spk_domain(target_frame.ephemeris_id)
+                .map_err(|e| AlmanacError::Ephemeris {
+                    action: "could not fetch domain",
+                    source: Box::new(e),
+                })?;
+
+        let start_epoch = start_epoch.unwrap_or(domain_start);
+        let end_epoch = end_epoch.unwrap_or(domain_end);
+
+        let time_series = TimeSeries::inclusive(start_epoch, end_epoch, step);
+        let mut states = Vec::with_capacity(time_series.len());
+        for epoch in time_series {
+            let orbit = almanac.transform(target_frame, observer_frame, epoch, ab_corr)?;
+
+            states.push(sc_template.with_orbit(orbit));
+        }
+
+        Ok(Self { name, states })
+    }
     /// Allows converting the source trajectory into the (almost) equivalent trajectory in another frame
     #[allow(clippy::map_clone)]
     pub fn to_frame(&self, new_frame: Frame, almanac: Arc<Almanac>) -> Result<Self, NyxError> {
@@ -127,11 +165,6 @@ impl Traj<Spacecraft> {
         cfg.metadata = metadata;
 
         traj.to_parquet(path, events, cfg, almanac)
-    }
-
-    /// Convert this spacecraft trajectory into an Orbit trajectory, loosing all references to the spacecraft
-    pub fn downcast(&self) -> Self {
-        unimplemented!()
     }
 
     /// Initialize a new spacecraft trajectory from the path to a CCSDS OEM file.

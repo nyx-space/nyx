@@ -22,7 +22,8 @@ use anise::prelude::{Almanac, Frame, Orbit};
 
 use super::msr::RangeDoppler;
 use super::noise::StochasticNoise;
-use super::{ODAlmanacSnafu, ODError, ODTrajSnafu, TrackingDeviceSim};
+use super::{ODAlmanacSnafu, ODError, ODPlanetaryDataSnafu, ODTrajSnafu, TrackingDeviceSim};
+use crate::cosmic::eclipse::{line_of_sight, EclipseState};
 use crate::errors::EventError;
 use crate::io::ConfigRepr;
 use crate::md::prelude::{Interpolatable, Traj};
@@ -157,11 +158,9 @@ impl GroundStation {
     }
 
     /// Computes the azimuth and elevation of the provided object seen from this ground station, both in degrees.
-    /// Also returns the ground station's orbit in the frame of the receiver
+    /// This is a shortcut to almanac.azimuth_elevation_range_sez.
     pub fn azimuth_elevation_of(&self, rx: Orbit, almanac: &Almanac) -> AlmanacResult<AzElRange> {
-        almanac
-            .clone()
-            .azimuth_elevation_range_sez(rx, self.to_orbit(rx.epoch, almanac).unwrap())
+        almanac.azimuth_elevation_range_sez(rx, self.to_orbit(rx.epoch, almanac).unwrap())
     }
 
     /// Return this ground station as an orbit in its current frame
@@ -256,6 +255,29 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
                     return Ok(None);
                 }
 
+                // If the frame of the trajectory is different from that of the ground station, then check that there is no eclipse.
+                for rx in [rx_0, rx_1] {
+                    if !self.frame.ephem_origin_match(rx.frame()) {
+                        let observer = self.to_orbit(rx.orbit.epoch, &almanac).unwrap();
+                        if line_of_sight(
+                            observer,
+                            rx.orbit,
+                            almanac
+                                .frame_from_uid(rx.frame())
+                                .context(ODPlanetaryDataSnafu {
+                                    action: "computing line of sight",
+                                })?,
+                            &almanac,
+                        )
+                        .context(ODAlmanacSnafu {
+                            action: "computing line of sight",
+                        })? == EclipseState::Umbra
+                        {
+                            return Ok(None);
+                        }
+                    }
+                }
+
                 // Noises are computed at the midpoint of the integration time.
                 let (timestamp_noise_s, range_noise_km, doppler_noise_km_s) =
                     self.noises(epoch - integration_time * 0.5, rng)?;
@@ -292,6 +314,26 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
                 action: "computing AER",
             })?;
 
+        if !self.frame.ephem_origin_match(rx.frame()) {
+            let observer = self.to_orbit(rx.orbit.epoch, &almanac).unwrap();
+            if line_of_sight(
+                observer,
+                rx.orbit,
+                almanac
+                    .frame_from_uid(rx.frame())
+                    .context(ODPlanetaryDataSnafu {
+                        action: "computing line of sight",
+                    })?,
+                &almanac,
+            )
+            .context(ODAlmanacSnafu {
+                action: "computing line of sight",
+            })? == EclipseState::Umbra
+            {
+                return Ok(None);
+            }
+        }
+
         if aer.elevation_deg >= self.elevation_mask_deg {
             // Only update the noises if the measurement is valid.
             let (timestamp_noise_s, range_noise_km, doppler_noise_km_s) =
@@ -319,7 +361,7 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
     /// The measurement noise is computed assuming that all measurements are independent variables, i.e. the measurement matrix is
     /// a diagonal matrix. The first item in the diagonal is the range noise (in km), set to the square of the steady state sigma. The
     /// second item is the Doppler noise (in km/s), set to the square of the steady state sigma of that Gauss Markov process.
-    fn measurement_noise(
+    fn measurement_covar(
         &mut self,
         epoch: Epoch,
     ) -> Result<
@@ -330,22 +372,22 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
         >,
         ODError,
     > {
-        let range_noise_km = self
+        let range_noise_km2 = self
             .range_noise_km
             .ok_or(ODError::NoiseNotConfigured { kind: "Range" })?
-            .variance(epoch);
-        let doppler_noise_km_s = self
+            .covariance(epoch);
+        let doppler_noise_km2_s2 = self
             .doppler_noise_km_s
             .ok_or(ODError::NoiseNotConfigured { kind: "Doppler" })?
-            .variance(epoch);
+            .covariance(epoch);
 
         let mut msr_noises = OMatrix::<
             f64,
             <RangeDoppler as super::Measurement>::MeasurementSize,
             <RangeDoppler as super::Measurement>::MeasurementSize,
         >::zeros();
-        msr_noises[(0, 0)] = range_noise_km;
-        msr_noises[(1, 1)] = doppler_noise_km_s;
+        msr_noises[(0, 0)] = range_noise_km2;
+        msr_noises[(1, 1)] = doppler_noise_km2_s2;
 
         Ok(msr_noises)
     }

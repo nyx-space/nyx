@@ -38,7 +38,7 @@ where
     pub start_time: Option<Epoch>,
     /// Specify the frame of this SNC -- CURRENTLY UNIMPLEMENTED
     pub frame: Option<Frame>,
-    /// Enables state noise compensation (process noise) only be applied if the time between measurements is less than the disable_time amount in seconds
+    /// Enables state noise compensation (process noise) only be applied if the time between measurements is less than the disable_time
     pub disable_time: Duration,
     // Stores the initial epoch when the SNC is requested, needed for decay. Kalman filter will edit this automatically.
     pub init_epoch: Option<Epoch>,

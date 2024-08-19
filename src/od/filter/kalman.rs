@@ -276,7 +276,7 @@ where
         nominal_state: T,
         real_obs: &OVector<f64, M>,
         computed_obs: &OVector<f64, M>,
-        measurement_noise: OMatrix<f64, M, M>,
+        measurement_covar: OMatrix<f64, M, M>,
         resid_rejection: Option<ResidRejectCrit>,
     ) -> Result<(Self::Estimate, Residual<M>), ODError> {
         if !self.h_tilde_updated {
@@ -287,72 +287,29 @@ where
 
         let epoch = nominal_state.epoch();
 
-        let mut covar_bar = stm * self.prev_estimate.covar * stm.transpose();
-        // Try to apply an SNC, if applicable
-        for (i, snc) in self.process_noise.iter().enumerate().rev() {
-            if let Some(snc_matrix) = snc.to_matrix(epoch) {
-                // Check if we're using another SNC than the one before
-                if self.prev_used_snc != i {
-                    info!("Switched to {}-th {}", i, snc);
-                    self.prev_used_snc = i;
-                }
-
-                // Let's compute the Gamma matrix, an approximation of the time integral
-                // which assumes that the acceleration is constant between these two measurements.
-                let mut gamma = OMatrix::<f64, <T as State>::Size, A>::zeros();
-                let delta_t = (epoch - self.prev_estimate.epoch()).to_seconds();
-                for blk in 0..A::dim() / 3 {
-                    for i in 0..3 {
-                        let idx_i = i + A::dim() * blk;
-                        let idx_j = i + 3 * blk;
-                        let idx_k = i + 3 + A::dim() * blk;
-                        // For first block
-                        // (0, 0) (1, 1) (2, 2) <=> \Delta t^2/2
-                        // (3, 0) (4, 1) (5, 2) <=> \Delta t
-                        // Second block
-                        // (6, 3) (7, 4) (8, 5) <=> \Delta t^2/2
-                        // (9, 3) (10, 4) (11, 5) <=> \Delta t
-                        // * \Delta t^2/2
-                        // (i, i) when blk = 0
-                        // (i + A::dim() * blk, i + 3) when blk = 1
-                        // (i + A::dim() * blk, i + 3 * blk)
-                        // * \Delta t
-                        // (i + 3, i) when blk = 0
-                        // (i + 3, i + 9) when blk = 1 (and I think i + 12 + 3)
-                        // (i + 3 + A::dim() * blk, i + 3 * blk)
-                        gamma[(idx_i, idx_j)] = delta_t.powi(2) / 2.0;
-                        gamma[(idx_k, idx_j)] = delta_t;
-                    }
-                }
-                // Let's add the process noise
-                covar_bar += &gamma * snc_matrix * &gamma.transpose();
-                // And break so we don't add any more process noise
-                break;
-            }
-        }
+        let covar_bar = stm * self.prev_estimate.covar * stm.transpose();
 
         let h_tilde_t = &self.h_tilde.transpose();
         let h_p_ht = &self.h_tilde * covar_bar * h_tilde_t;
         // Account for state uncertainty in the measurement noise. Equation 4.10 of ODTK MathSpec.
-        let r_k = &h_p_ht + measurement_noise;
+        let r_k = &h_p_ht + measurement_covar;
 
         // Compute observation deviation (usually marked as y_i)
         let prefit = real_obs - computed_obs;
 
-        // Compute the prefit ratio
-        let ratio_mat = prefit.transpose() * &h_p_ht * &prefit;
-        let ratio = ratio_mat[0];
+        // Compute the prefit ratio for the automatic rejection
+        let r_k_inv = r_k.clone().try_inverse().ok_or(ODError::SingularNoiseRk)?;
+        let ratio_mat = prefit.transpose() * r_k_inv * &prefit;
+        let ratio = ratio_mat[0].sqrt();
 
         if let Some(resid_reject) = resid_rejection {
-            for ii in 0..M::USIZE {
-                if prefit[ii].abs() > r_k[(ii, ii)].sqrt() * resid_reject.num_sigmas {
-                    // Reject this whole measurement and perform only a time update
-                    let pred_est = self.time_update(nominal_state)?;
-                    return Ok((
-                        pred_est,
-                        Residual::rejected(epoch, prefit, ratio, r_k.diagonal()),
-                    ));
-                }
+            if ratio > resid_reject.num_sigmas {
+                // Reject this whole measurement and perform only a time update
+                let pred_est = self.time_update(nominal_state)?;
+                return Ok((
+                    pred_est,
+                    Residual::rejected(epoch, prefit, ratio, r_k.diagonal()),
+                ));
             }
         }
 
