@@ -27,6 +27,7 @@ exclude = [
     "rustfmt.toml",
     "tests/GMAT_scripts/*",
     "*.png",
+    "*.pca",
 ]
 
 [badges]

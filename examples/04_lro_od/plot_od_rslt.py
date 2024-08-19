@@ -46,7 +46,7 @@ if __name__ == "__main__":
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=x_chi, y=y_chi * scale_factor, mode="lines", name="Scaled Chi-Squared"))
-    fig.add_trace(go.Histogram(x=df["Residual ratio"], nbinsx=100, name="Residuals"))
+    fig.add_trace(go.Histogram(x=df["Residual ratio"], nbinsx=100, name="Residual ratios"))
     fig.show()
 
     px.histogram(

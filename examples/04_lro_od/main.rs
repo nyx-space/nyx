@@ -28,9 +28,6 @@ use nyx::{
     propagators::Propagator,
     Orbit, Spacecraft, State,
 };
-use rand::SeedableRng;
-use rand_distr::Distribution;
-use rand_pcg::Pcg64Mcg;
 
 use std::{collections::BTreeMap, error::Error, path::PathBuf, str::FromStr, sync::Arc};
 
@@ -79,8 +76,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Inspecting the LRO BSP in the ANISE GUI shows us that NASA has assigned ID -85 to LRO.
     let lro_frame = Frame::from_ephem_j2000(-85);
 
-    // We also use a different gravitational parameter for the Moon to have a better estimation
-
     // To build the trajectory we need to provide a spacecraft template.
     let sc_template = Spacecraft::builder()
         .dry_mass_kg(1018.0) // Launch masses
@@ -101,7 +96,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         sc_template,
         5.seconds(),
         Some(Epoch::from_str("2024-01-01 00:00:00 UTC")?),
-        Some(Epoch::from_str("2024-01-03 00:00:00 UTC")?),
+        Some(Epoch::from_str("2024-01-02 00:00:00 UTC")?),
         Aberration::LT,
         Some("LRO".to_string()),
     )?;
@@ -192,38 +187,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     // The sc_seed is the true LRO state from the BSP.
     let sc_seed = *traj_as_flown.first();
 
-    // Build an uncertainty using the LRO OD paper stats of 18 meters in the Radial direction
-    let sc = SpacecraftUncertainty::builder()
-        .nominal(sc_seed)
-        .frame(LocalFrame::RIC)
-        .x_km(0.01)
-        .y_km(0.01)
-        .z_km(0.01)
-        .vx_km_s(0.01e-3)
-        .vy_km_s(0.01e-3)
-        .vz_km_s(0.01e-3)
-        .build();
-
-    println!("== UNCERTAINTY ==\n{sc}");
-
-    // Build the filter initial estimate, which we will reuse in the filter.
-    let sc_estimate = sc.to_estimate()?;
-
-    // Now let's sample from this distribution by building the multivariate random variable from this estimate ...
-    let state_rv = sc_estimate.to_random_variable()?;
-    // ... and sampling from this distribution.
-    // This ensures that the trajectory from which we generate the states is not identical to the initial state of the filter.
-    let sim_state = state_rv.sample(&mut Pcg64Mcg::from_entropy());
-
-    let setup = Propagator::default_dp78(dynamics);
-    let (od_final_state, od_truth_traj) = setup
-        .with(sim_state.state, almanac.clone())
-        .until_epoch_with_traj(traj_as_flown.last().epoch())?;
-
-    println!("OD INIT:  {:x}", sim_state.state);
-    println!("OD FINAL: {od_final_state:x}");
-    println!("{od_truth_traj}");
-
     // Load the Deep Space Network ground stations.
     // Nyx allows you to build these at runtime but it's pretty static so we can just load them from YAML.
     let ground_station_file: PathBuf = [
@@ -286,29 +249,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     let initial_estimate = sc.to_estimate()?;
 
     println!("== FILTER STATE ==\n{sc_seed:x}\n{initial_estimate}");
-    println!(
-        "== SIM TRUTH ==\n{:x}\n{}",
-        sim_state.state, sim_state.state
-    );
-
-    let ric_err = sim_state
-        .state
-        .orbit
-        .ric_difference(&initial_estimate.state().orbit)?;
-    println!("== RIC at start ==");
-    println!("RIC Position (m): {}", ric_err.radius_km * 1e3);
-    println!("RIC Velocity (m/s): {}", ric_err.velocity_km_s * 1e3);
 
     let kf = KF::new(
         // Increase the initial covariance to account for larger deviation.
         initial_estimate,
         // Until https://github.com/nyx-space/nyx/issues/351, we need to specify the SNC in the acceleration of the Moon J2000 frame.
-        SNC3::from_diagonal(10 * Unit::Minute, &[5e-11, 5e-11, 5e-11]),
+        SNC3::from_diagonal(10 * Unit::Minute, &[1e-11, 1e-11, 1e-11]),
     );
 
     // We'll set up the OD process to reject measurements whose residuals are mover than 4 sigmas away from what we expect.
     let mut odp = ODProcess::ckf(
-        setup.with(sc_estimate.state().with_stm(), almanac.clone()),
+        setup.with(initial_estimate.state().with_stm(), almanac.clone()),
         kf,
         Some(ResidRejectCrit::default()),
         almanac.clone(),

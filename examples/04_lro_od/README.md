@@ -4,6 +4,8 @@
 
 In this example, you'll learn how to use an "as-flown" (_definitive_) SPICE BSP ephemeris file to simulate orbit determination measurements from ground stations. Then, you'll learn how to set up an orbit determination process in Nyx with high fidelity Moon dynamics and estimate the state of LRO. Finally, you'll learn how to compare two ephemerides in the Radial, In-track, Cross-track (RIC) frame.
 
+**Jump to [results](#results)**
+
 To run this example, just execute:
 ```sh
 RUST_LOG=info cargo run --example 04_lro_od --release
@@ -11,7 +13,7 @@ RUST_LOG=info cargo run --example 04_lro_od --release
 
 Building in `release` mode will make the computation significantly faster. Specifying `RUST_LOG=info` will allow you to see all of the information messages happening in ANISE and Nyx throughout the execution of the program.
 
-Throughout this analysis, we'll be focusing on an arbitrarily chosen period of two days.
+Throughout this analysis, we'll be focusing on an arbitrarily chosen period of one day started on 2024-01-01 at midnight UTC.
 
 # Preliminary analysis: matching dynamical models
 
@@ -89,3 +91,115 @@ shape: (9, 2)
 ![New Lunar GM Pos error](./plots/sim-new-pc-ric-pos-err.png)
 
 ![New Lunar GM Vel error](./plots/sim-new-pc-ric-vel-err.png)
+
+# Orbit determination set up
+
+## Ground network
+
+For this example, we simulate measurements from three of the Deep Space Network ground stations: Canberra, Australia; Madrid, Spain; and Goldstone, CA, USA. Nyx allows configuration of ground stations using a YAML input file, cf. [`dsn-network`](./dsn-network.yaml): these are configured as unbiased white noise ground stations where the standard deviation of the white noise is taken directly from the JPL DESCANSO series. The stochastic modeling in Nyx supports first order Gauss Markov processes and biased white noise.
+
+In this simulation, we are generating geometric one-way range and Doppler measurements. Nyx supports all of the aberration computations provided by ANISE (and validated against SPICE).
+
+## Tracking schedule
+
+To prepare for a mission, flight dynamics engineers must simulate a tracking schedule and determine, through trial and error, how much tracking is required throughout the different orbital regimes of the mission. Unlike most orbit determination software, Nyx provides a "schedule generator" for simulation. Refer to [`tracking-cfg.yaml`](./tracking-cfg.yaml) for the tracking configuration. In short, this feature allows engineers to configure the following key inputs to a schedule:
+
+- how to deal with overlapping measurements: greedy, eager, or overlap.
+    - Greedy: when two stations overlap, the one which was previously tracking will continue until the vehicle is no longer in sight
+    - Earger: when two stations overlap, the new tracker will start tracking instead of the previous one
+    - Overlap: both stations may track and generate tracking data at the same time.
+- how many minimum samples are needed for this pass to be included: this prevents very short passes;
+- are the measurements taken exactly at a round number of seconds;
+- what is the sampling rate of this ground station.
+
+The tracking scheduler will start by finding the exact times when the vehicle comes in view, using the embedded event finder on an elevation event.
+
+```log
+INFO  nyx_space::md::events::search      > Searching for DSS-13 Goldstone (lat.: 35.2472 deg    long.: 243.2050 deg    alt.: 1071.149 m) [Earth IAU_EARTH (μ = 398600.435436096 km^3/s^2)] with initial heuristic of 14 min 24 s
+ INFO  nyx_space::md::events::search      > Event DSS-13 Goldstone (lat.: 35.2472 deg    long.: 243.2050 deg    alt.: 1071.149 m) [Earth IAU_EARTH (μ = 398600.435436096 km^3/s^2)] found 2 times from 2024-01-01T05:49:54.697010810 UTC until 2024-01-01T18:08:53.555326604 UTC
+ INFO  nyx_space::od::simulator::arc      > Built 1 tracking strands for DSS-13 Goldstone
+ INFO  nyx_space::od::simulator::arc      > Building schedule for DSS-34 Canberra
+ INFO  nyx_space::md::trajectory::sc_traj > Converted trajectory from Moon J2000 (μ = 4902.74987 km^3/s^2, radius = 1737.4 km) to Earth IAU_EARTH (μ = 398600.435436096 km^3/s^2) in 220 ms: Trajectory in Earth IAU_EARTH (μ = 398600.436 km^3/s^2, eq. radius = 6378.1366 km, polar radius = 6356.7519 km, f = 0.0033528131084554717) from 2024-01-01T00:00:00 UTC to 2024-01-02T00:00:00 UTC (1 day, or 86400.000 s) [17281 states]
+ INFO  nyx_space::md::events::search      > Searching for DSS-34 Canberra (lat.: -35.3983 deg    long.: 148.9819 deg    alt.: 691.750 m) [Earth IAU_EARTH (μ = 398600.435436096 km^3/s^2)] with initial heuristic of 14 min 24 s
+ INFO  nyx_space::md::events::search      > Event DSS-34 Canberra (lat.: -35.3983 deg    long.: 148.9819 deg    alt.: 691.750 m) [Earth IAU_EARTH (μ = 398600.435436096 km^3/s^2)] found 2 times from 2024-01-01T13:19:29.424409217 UTC until 2024-01-01T23:47:35.676704956 UTC
+ INFO  nyx_space::od::simulator::arc      > Built 1 tracking strands for DSS-34 Canberra
+ INFO  nyx_space::od::simulator::arc      > Building schedule for DSS-65 Madrid
+ INFO  nyx_space::md::trajectory::sc_traj > Converted trajectory from Moon J2000 (μ = 4902.74987 km^3/s^2, radius = 1737.4 km) to Earth IAU_EARTH (μ = 398600.435436096 km^3/s^2) in 220 ms: Trajectory in Earth IAU_EARTH (μ = 398600.436 km^3/s^2, eq. radius = 6378.1366 km, polar radius = 6356.7519 km, f = 0.0033528131084554717) from 2024-01-01T00:00:00 UTC to 2024-01-02T00:00:00 UTC (1 day, or 86400.000 s) [17281 states]
+ INFO  nyx_space::md::events::search      > Searching for DSS-65 Madrid (lat.: 40.4272 deg    long.: 4.2506 deg    alt.: 834.939 m) [Earth IAU_EARTH (μ = 398600.435436096 km^3/s^2)] with initial heuristic of 14 min 24 s
+ INFO  nyx_space::md::events::search      > Event DSS-65 Madrid (lat.: 40.4272 deg    long.: 4.2506 deg    alt.: 834.939 m) [Earth IAU_EARTH (μ = 398600.435436096 km^3/s^2)] found 2 times from 2024-01-01T09:59:19.297494580 UTC until 2024-01-01T22:19:56.653993644 UTC
+ INFO  nyx_space::od::simulator::arc      > Built 2 tracking strands for DSS-65 Madrid
+ INFO  nyx_space::od::simulator::arc      > DSS-65 Madrid configured as Greedy, so DSS-13 Goldstone now starts on 2024-01-01T10:00:20 UTC
+ INFO  nyx_space::od::simulator::arc      > DSS-13 Goldstone configured as Greedy, so DSS-34 Canberra now starts on 2024-01-01T18:09:50 UTC
+ INFO  nyx_space::od::simulator::arc      > DSS-34 Canberra now hands off to DSS-65 Madrid on 2024-01-01T22:19:00 UTC because it's configured as Eager
+ INFO  nyx_space::od::simulator::arc      > Simulated 319 measurements for DSS-13 Goldstone for 1 tracking strands in 13 ms
+ INFO  nyx_space::od::simulator::arc      > Simulated 185 measurements for DSS-34 Canberra for 1 tracking strands in 7 ms
+ INFO  nyx_space::od::simulator::arc      > Simulated 490 measurements for DSS-65 Madrid for 2 tracking strands in 18 ms
+ INFO  nyx_space::od::msr::arc            > Serialized 994 measurements from {"DSS-34 Canberra", "DSS-13 Goldstone", "DSS-65 Madrid"} to ./04_lro_simulated_tracking.parquet
+994 measurements from {"DSS-13 Goldstone", "DSS-65 Madrid", "DSS-34 Canberra"}
+```
+
+## Tracking arc
+
+In this simulation, we use the official ephemeris to generate simulated measurements. In other words, we don't simulate a new ephemeris. **This serves as a validation of the orbit estimation in low lunar orbits,** the most dynamical of the cislunar orbits.
+
+Nyx will not generate measurements if the vehicle is obstructed by a celestial object, in this case, the obstruction is the presence of the Moon itself.
+
+![Schedule](./plots/msr-schedule.png)
+
+![Range (km)](./plots/msr-range.png)
+
+![Doppler (km/s)](./plots/msr-doppler.png)
+
+## Filter set up
+
+The OD filter uses the same dynamics as those used in the [model matching](#preliminary-analysis-matching-dynamical-models) section above.
+
+However, as seen in the model matching section, there remains a difference in the modeling of the orbital dynamics between Nyx and the published LRO ephemeris. This causes an oscillation of roughly 250 meters of range in the RIC frame. In the LRO orbit determination paper, the authors mention that GTDS is a batch least squares estimator, whereas this example uses a Kalman filter. To account for the modeling difference, we bump up the state noise compensation of the filter to `1e-11` km/s^2, or approximately 0.6 cm/s over a 10 minute span. This causes the covariance to increase when there are no measurements to accomodate for the small but accumulating modeling differences.
+
+The filter is configured with the default automatic residual rejection of Nyx whereby any residual ratio greater than 4 sigmas causes the measurement to be rejected.
+
+# Results
+
+**Nyx provides a good estimation of the orbit of the Lunar Reconnaissance Orbiter, matching the LRO team's desired uncertainty of 800 meters when tracking the vehicle,** despite modeling and filtering differences between GTDS and Nyx. As discussed in the [filter setup](#filter-set-up) section just above, we've had to increase the state noise compensation to account for [oscillating modeling differences]((#preliminary-analysis-matching-dynamical-models)) between Nyx and the LRO definitive ephemeris.
+
+![RIC Covar Position](./plots/covar-ric-pos.png)
+
+![RIC Covar Velocity](./plots/covar-ric-vel.png)
+
+## Residual ratios
+
+One of the key metrics to determine whether an OD result is correct is to look at the residual ratios. Some orbit determination software, like ODTK (as specified in their MathSpec), treats all measurements as scalars. This could be problematic because the order in which the measurements are processed at each time step will lead to variations in the covariance. For example, if there is an excellent range measurement and an average Doppler measurement for that same time step, then the state covariance will decrease and that greater model filter confidence may cause the Doppler measurement to be rejected. _Instead_, Nyx treats all simultaneous measurements simultaneously, ensuring that the order in which each measurement is processed is not a concern. This mathematically correct approach leads to the loss of the sign of the residual because the ratio is computed as `y_k^T * R_k^{-1} * y_k`, where `y_k` is prefit residual (using the nomenclature from the [Nyx Kalman filter MathSpec](https://nyxspace.com/nyxspace/MathSpec/orbit_determination/kalman/?utm_source=github-lro-rr)). **Therefore, the goodness test of the residual ratios is Chi Square test** with a degree of freedom of 2 (range and Doppler).
+
+We can see that nearly all of the residuals are within the Chi Square distribution, although the tail-end of 4 sigmas is larger than it should be. This is entirely due to the models not matching perfectly, as can be seen in the plot of the residuals rejected over time: the further we are from the start of the OD track, the more measurements are rejected.
+
+![Chi-Squared](./plots/resid-chi-square.png)
+
+![Rejection](./plots/resid-rejections.png)
+
+![Per tracker](./plots/resid-per-tracker.png)
+
+## Measurement residuals
+
+Another key metric is whether the residuals fit well within the expected measurement noise. As in ODTK, Nyx varies the measurement noise with the state covariance.
+
+### Range residuals
+
+The following plots show an auto-scaled and a zoomed-in version of the range residuals over time because the state covariance rises with the state noise compensation, causing the auto-scaling to hide the fun details, namely that the oscillatory nature of the modeling difference shows up in the prefit residuals but that the filter adequately corrects its own knowledge with each accepted measurement. The values on this plot is in km as indicated by the legend.
+
+![Range resid auto](./plots/range-resid.png)
+
+![Range resid zoom](./plots/range-resid-zoom.png)
+
+### Doppler residuals
+
+The Doppler residuals look great with the automatic zoom because the modeling differences are small but accumulating velocity errors. The values on this plot is in km/s as indicated by the legend.
+
+![Doopler resid](./plots/doppler-resid.png)
+
+## Verification
+
+In our case, we have the true definitive ephemeris of LRO. Hence, we can compare the difference between the orbit determination results in Nyx and the definitive ephemeris in the RIC frame. **The OD results are slightly better than a pure propagation of the orbit with the modeling error.** The couple of singularities in the RIC plot are common interpolation artifacts which crop up especially when computing the RIC differences, and are not actual state differences.
+
+![RIC OD vs truth pos err](./plots/od-vs-truth-ric-pos-err.png)
+
+![RIC OD vs truth vel err](./plots/od-vs-truth-ric-vel-err.png)
