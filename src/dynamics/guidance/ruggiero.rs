@@ -23,7 +23,7 @@ use super::{
     unit_vector_from_plane_angles, GuidStateSnafu, GuidanceError, GuidanceLaw, GuidanceMode,
     GuidancePhysicsSnafu, NyxError, Orbit, Spacecraft, Vector3,
 };
-use crate::cosmic::eclipse::{EclipseLocator, EclipseState};
+use crate::cosmic::eclipse::EclipseLocator;
 pub use crate::md::objective::Objective;
 pub use crate::md::StateParameter;
 use crate::State;
@@ -32,14 +32,14 @@ use std::fmt;
 use std::sync::Arc;
 
 /// Ruggiero defines the closed loop guidance law from IEPC 2011-102
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Default)]
 pub struct Ruggiero {
     /// Stores the objectives
     pub objectives: [Option<Objective>; 5],
     /// Stores the minimum efficiency to correct a given orbital element, defaults to zero (i.e. always correct)
     pub ηthresholds: [f64; 5],
     /// If define, coast until vehicle is out of the provided eclipse state.
-    pub max_eclipse: Option<EclipseState>,
+    pub max_eclipse_prct: Option<f64>,
     init_state: Spacecraft,
 }
 
@@ -105,7 +105,7 @@ impl Ruggiero {
             objectives: objs,
             init_state: initial,
             ηthresholds: eff,
-            max_eclipse: None,
+            max_eclipse_prct: None,
         }))
     }
 
@@ -114,7 +114,7 @@ impl Ruggiero {
     pub fn from_max_eclipse(
         objectives: &[Objective],
         initial: Spacecraft,
-        max_eclipse: EclipseState,
+        max_eclipse: f64,
     ) -> Result<Arc<Self>, NyxError> {
         let mut objs: [Option<Objective>; 5] = [None, None, None, None, None];
         let eff: [f64; 5] = [0.0; 5];
@@ -151,13 +151,13 @@ impl Ruggiero {
             objectives: objs,
             init_state: initial,
             ηthresholds: eff,
-            max_eclipse: Some(max_eclipse),
+            max_eclipse_prct: Some(max_eclipse),
         }))
     }
 
     /// Sets the maximum eclipse during which we can thrust.
-    pub fn set_max_eclipse(&mut self, max_eclipse: EclipseState) {
-        self.max_eclipse = Some(max_eclipse);
+    pub fn set_max_eclipse(&mut self, max_eclipse: f64) {
+        self.max_eclipse_prct = Some(max_eclipse);
     }
 
     /// Returns the efficiency η ∈ [0; 1] of correcting a specific orbital element at the provided osculating orbit
@@ -270,8 +270,11 @@ impl fmt::Display for Ruggiero {
             .collect::<Vec<String>>();
         write!(
             f,
-            "Ruggiero Controller (max eclipse: {:?}): \n {}",
-            self.max_eclipse,
+            "Ruggiero Controller (max eclipse: {}): \n {}",
+            match self.max_eclipse_prct {
+                Some(eclp) => format!("{eclp}"),
+                None => "None".to_string(),
+            },
             obj_msg.join("\n")
         )
     }
@@ -422,11 +425,12 @@ impl GuidanceLaw for Ruggiero {
         if sc.mode() != GuidanceMode::Inhibit {
             if !self.achieved(sc).unwrap() {
                 // Check eclipse state if applicable.
-                if let Some(max_eclipse) = self.max_eclipse {
+                if let Some(max_eclipse) = self.max_eclipse_prct {
                     let locator = EclipseLocator::cislunar(almanac.clone());
                     if locator
                         .compute(sc.orbit, almanac)
                         .expect("cannot compute eclipse")
+                        .percentage
                         > max_eclipse
                     {
                         // Coast in eclipse

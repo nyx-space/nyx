@@ -82,7 +82,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         crc32: Some(0xF446F027), // Specifying the CRC32 avoids redownloading it if it's cached.
     };
     // And let's download it if we don't have it yet.
-    jgm3_meta.process()?;
+    jgm3_meta.process(true)?;
 
     // Build the spherical harmonics.
     // The harmonics must be computed in the body fixed frame.

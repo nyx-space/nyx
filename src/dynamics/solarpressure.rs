@@ -135,7 +135,7 @@ impl ForceModel for SolarPressure {
             .context(DynamicsAlmanacSnafu {
                 action: "solar radiation pressure computation",
             })?
-            .into();
+            .factor();
 
         let r_sun_au = r_sun.norm() / AU;
         // in N/(m^2)
@@ -170,7 +170,7 @@ impl ForceModel for SolarPressure {
             .context(DynamicsAlmanacSnafu {
                 action: "solar radiation pressure computation",
             })?
-            .into();
+            .factor();
 
         let r_sun_au = norm(&r_sun_d) / AU;
         let inv_r_sun_au = OHyperdual::<f64, Const<9>>::from_real(1.0) / (r_sun_au);

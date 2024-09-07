@@ -250,7 +250,7 @@ impl AccelModel for Harmonics {
         // As discussed with Sai, if the Earth was spinning faster, would the acceleration due to the harmonics be any different?
         // No. Therefore, we do not need to account for the transport theorem here.
         let dcm = almanac
-            .rotate_from_to(self.compute_frame, osc.frame, osc.epoch)
+            .rotate(self.compute_frame, osc.frame, osc.epoch)
             .context(OrientationSnafu {
                 action: "transform state dcm",
             })
@@ -373,7 +373,7 @@ impl AccelModel for Harmonics {
         }
 
         let dcm = almanac
-            .rotate_from_to(self.compute_frame, osc.frame, osc.epoch)
+            .rotate(self.compute_frame, osc.frame, osc.epoch)
             .context(OrientationSnafu {
                 action: "transform state dcm",
             })

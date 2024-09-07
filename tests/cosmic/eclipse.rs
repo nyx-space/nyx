@@ -1,8 +1,9 @@
 extern crate nyx_space as nyx;
 
+use anise::astro::Occultation;
 use anise::constants::celestial_objects::{JUPITER_BARYCENTER, SUN};
 use anise::constants::frames::SUN_J2000;
-use nyx::cosmic::eclipse::{EclipseLocator, EclipseState};
+use nyx::cosmic::eclipse::EclipseLocator;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::SpacecraftDynamics;
@@ -52,14 +53,18 @@ fn leo_sun_earth_eclipses(almanac: Arc<Almanac>) {
     };
 
     // Receive the states on the main thread.
-    let mut prev_eclipse_state = EclipseState::Umbra;
+    let mut prev_eclipse_state: Option<Occultation> = None;
     let mut cnt_changes = 0;
     while let Ok(rx_state) = truth_rx.recv() {
         let new_eclipse_state = e_loc.compute(rx_state.orbit, almanac.clone()).unwrap();
-        if new_eclipse_state != prev_eclipse_state {
-            println!("{:.6} now in {:?}", rx_state.orbit.epoch, new_eclipse_state);
-            prev_eclipse_state = new_eclipse_state;
-            cnt_changes += 1;
+        if let Some(prev_state) = prev_eclipse_state {
+            if new_eclipse_state.percentage != prev_state.percentage {
+                println!("{:.6} now in {}", rx_state.orbit.epoch, new_eclipse_state);
+                prev_eclipse_state = Some(new_eclipse_state);
+                cnt_changes += 1;
+            }
+        } else {
+            prev_eclipse_state = Some(new_eclipse_state);
         }
     }
 
@@ -100,16 +105,20 @@ fn geo_sun_earth_eclipses(almanac: Arc<Almanac>) {
     };
 
     // Receive the states on the main thread.
-    let mut prev_eclipse_state = EclipseState::Umbra;
+    let mut prev_eclipse_state: Option<Occultation> = None;
     let mut cnt_changes = 0;
     while let Ok(rx_state) = truth_rx.recv() {
         let new_eclipse_state = e_loc.compute(rx_state.orbit, almanac.clone()).unwrap();
-        if new_eclipse_state != prev_eclipse_state {
-            println!("{:.6} now in {:?}", rx_state.orbit.epoch, new_eclipse_state);
-            prev_eclipse_state = new_eclipse_state;
-            cnt_changes += 1;
+        if let Some(prev_state) = prev_eclipse_state {
+            if new_eclipse_state.percentage != prev_state.percentage {
+                println!("{:.6} now in {}", rx_state.orbit.epoch, new_eclipse_state);
+                prev_eclipse_state = Some(new_eclipse_state);
+                cnt_changes += 1;
+            }
+        } else {
+            prev_eclipse_state = Some(new_eclipse_state);
         }
     }
 
-    assert_eq!(cnt_changes, 15, "wrong number of eclipse state changes");
+    assert_eq!(cnt_changes, 14, "wrong number of eclipse state changes");
 }
