@@ -128,14 +128,17 @@ impl ForceModel for SolarPressure {
 
         let r_sun_unit = r_sun / r_sun.norm();
 
-        // Compute the shaddowing factor.
-        let k: f64 = self
+        // ANISE returns the occultation percentage (or factor), which is the opposite as the illumination factor.
+        let occult = self
             .e_loc
             .compute(osc, almanac)
             .context(DynamicsAlmanacSnafu {
                 action: "solar radiation pressure computation",
             })?
             .factor();
+
+        // Compute the illumination factor.
+        let k: f64 = (occult - 1.0).abs();
 
         let r_sun_au = r_sun.norm() / AU;
         // in N/(m^2)
@@ -163,14 +166,17 @@ impl ForceModel for SolarPressure {
         let r_sun_d: Vector3<OHyperdual<f64, Const<9>>> = hyperspace_from_vector(&r_sun);
         let r_sun_unit = r_sun_d / norm(&r_sun_d);
 
-        // Compute the shadowing factor.
-        let k: f64 = self
+        // ANISE returns the occultation percentage (or factor), which is the opposite as the illumination factor.
+        let occult = self
             .e_loc
             .compute(osc, almanac.clone())
             .context(DynamicsAlmanacSnafu {
                 action: "solar radiation pressure computation",
             })?
             .factor();
+
+        // Compute the illumination factor.
+        let k: f64 = (occult - 1.0).abs();
 
         let r_sun_au = norm(&r_sun_d) / AU;
         let inv_r_sun_au = OHyperdual::<f64, Const<9>>::from_real(1.0) / (r_sun_au);
