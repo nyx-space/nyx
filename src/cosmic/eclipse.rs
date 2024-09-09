@@ -111,11 +111,13 @@ impl fmt::Display for UmbraEvent {
 impl EventEvaluator<Spacecraft> for UmbraEvent {
     // Evaluation of the event
     fn eval(&self, sc: &Spacecraft, almanac: Arc<Almanac>) -> Result<f64, EventError> {
-        Ok(self
+        let occult = self
             .e_loc
             .compute(sc.orbit, almanac)
             .context(EventAlmanacSnafu)?
-            .factor())
+            .factor();
+
+        Ok((occult - 1.0).abs())
         // match self
         //     .e_loc
         //     .compute(sc.orbit, almanac)
@@ -158,11 +160,13 @@ impl fmt::Display for PenumbraEvent {
 
 impl EventEvaluator<Spacecraft> for PenumbraEvent {
     fn eval(&self, sc: &Spacecraft, almanac: Arc<Almanac>) -> Result<f64, EventError> {
-        Ok(self
+        let occult = self
             .e_loc
             .compute(sc.orbit, almanac)
             .context(EventAlmanacSnafu)?
-            .factor())
+            .factor();
+
+        Ok((occult - 1.0).abs())
     }
 
     /// Stop searching when the time has converged to less than 0.1 seconds

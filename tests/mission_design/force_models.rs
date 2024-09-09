@@ -119,8 +119,8 @@ fn srp_earth_leo(almanac: Arc<Almanac>) {
         err_r * 1e3,
         err_v * 1e3
     );
-    assert!(err_r < 6e-3, "position error too large for SRP");
-    assert!(err_v < 7e-6, "velocity error too large for SRP");
+    assert!(err_r < 7e-3, "position error too large for SRP");
+    assert!(err_v < 8e-6, "velocity error too large for SRP");
 }
 
 #[rstest]

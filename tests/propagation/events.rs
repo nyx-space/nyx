@@ -42,6 +42,10 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
     let mut prop = setup.with(state.into(), almanac.clone());
     let (_, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
+    println!("Initial state {state:x}");
+
+    println!("{traj}");
+
     // Find all of the events
     for e in &events {
         let found_events = traj.find(e, almanac.clone()).unwrap();
@@ -113,6 +117,7 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
 
     let pretty = umbra_events
         .iter()
+        .skip(1)
         .fold(String::new(), |mut output, orbit_event| {
             let orbit = orbit_event.state.orbit;
             let _ = writeln!(
