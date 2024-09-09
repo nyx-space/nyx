@@ -2,6 +2,7 @@ extern crate nyx_space as nyx;
 use std::{fmt::Write, sync::Arc};
 
 use anise::{
+    astro::Occultation,
     constants::frames::{EARTH_J2000, IAU_EARTH_FRAME, SUN_J2000},
     prelude::Almanac,
 };
@@ -15,7 +16,7 @@ fn almanac() -> Arc<Almanac> {
 
 #[rstest]
 fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
-    use nyx::cosmic::eclipse::{EclipseLocator, EclipseState};
+    use nyx::cosmic::eclipse::EclipseLocator;
     use nyx::md::prelude::*;
     use nyx::od::GroundStation;
 
@@ -41,6 +42,10 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
     let mut prop = setup.with(state.into(), almanac.clone());
     let (_, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
+    println!("Initial state {state:x}");
+
+    println!("{traj}");
+
     // Find all of the events
     for e in &events {
         let found_events = traj.find(e, almanac.clone()).unwrap();
@@ -64,7 +69,7 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
     };
 
     // Adding this print to confirm that the penumbra calculation continuously increases and then decreases.
-    let mut e_state = EclipseState::Umbra;
+    let mut e_state: Option<Occultation> = None;
     // Also see what is the max elevation of this spacecraft over the Grand Canyon
     let gc = GroundStation::from_point(
         "Grand Canyon".to_string(),
@@ -79,13 +84,19 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
     let mut max_dt = dt;
     for state in traj.every(10 * Unit::Second) {
         let new_e_state = e_loc.compute(state.orbit, almanac.clone()).unwrap();
-        if e_state != new_e_state {
-            println!("{:x}\t{}", state, new_e_state);
-            e_state = new_e_state;
+        if let Some(prev_state) = e_state {
+            if prev_state.percentage != new_e_state.percentage {
+                println!("{:x}\t{}", state, new_e_state);
+                e_state = Some(new_e_state);
+            }
+        } else {
+            e_state = Some(new_e_state);
         }
 
         // Compute the elevation
-        let aer = gc.azimuth_elevation_of(state.orbit, &almanac).unwrap();
+        let aer = gc
+            .azimuth_elevation_of(state.orbit, None, &almanac)
+            .unwrap();
         let elevation = aer.elevation_deg;
         if elevation > max_el {
             max_el = elevation;
@@ -106,6 +117,7 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
 
     let pretty = umbra_events
         .iter()
+        .skip(1)
         .fold(String::new(), |mut output, orbit_event| {
             let orbit = orbit_event.state.orbit;
             let _ = writeln!(

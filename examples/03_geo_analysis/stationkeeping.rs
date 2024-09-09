@@ -12,10 +12,7 @@ use anise::{
 };
 use hifitime::{Epoch, TimeUnits, Unit};
 use nyx::{
-    cosmic::{
-        eclipse::{EclipseLocator, EclipseState},
-        GuidanceMode, MetaAlmanac, Orbit, SrpConfig,
-    },
+    cosmic::{eclipse::EclipseLocator, GuidanceMode, MetaAlmanac, Orbit, SrpConfig},
     dynamics::{
         guidance::{Ruggiero, Thruster},
         Harmonics, OrbitalDynamics, SolarPressure, SpacecraftDynamics,
@@ -63,7 +60,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Objective::within_tolerance(StateParameter::Inclination, 0.05, 1e-2),
     ];
 
-    let ruggiero_ctrl = Ruggiero::from_max_eclipse(objectives, sc, EclipseState::Penumbra(0.2))?;
+    let ruggiero_ctrl = Ruggiero::from_max_eclipse(objectives, sc, 0.2)?;
     println!("{ruggiero_ctrl}");
 
     let mut orbital_dyn = OrbitalDynamics::point_masses(vec![MOON, SUN]);
@@ -72,7 +69,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         uri: "http://public-data.nyxspace.com/nyx/models/JGM3.cof.gz".to_string(),
         crc32: Some(0xF446F027), // Specifying the CRC32 avoids redownloading it if it's cached.
     };
-    jgm3_meta.process()?;
+    jgm3_meta.process(true)?;
 
     let harmonics = Harmonics::from_stor(
         almanac.frame_from_uid(IAU_EARTH_FRAME)?,

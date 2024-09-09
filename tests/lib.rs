@@ -56,7 +56,7 @@ pub fn test_almanac_gmat_arcd() -> Arc<Almanac> {
         uri: "http://public-data.nyxspace.com/anise/de438.bsp".to_string(),
         crc32: Some(1111895644),
     };
-    de438.process().unwrap();
+    de438.process(true).unwrap();
 
     let mut almanac = test_almanac();
     almanac = almanac.load(&de438.uri).unwrap();

@@ -50,7 +50,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Load this ephem in the general Almanac we're using for this analysis.
     let mut almanac = MetaAlmanac::new(meta.to_string_lossy().to_string())
         .map_err(Box::new)?
-        .process()
+        .process(true)
         .map_err(Box::new)?;
 
     let mut moon_pc = almanac.planetary_data.get_by_id(MOON)?;
@@ -120,7 +120,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         crc32: Some(0x6bcacda8), // Specifying the CRC32 avoids redownloading it if it's cached.
     };
     // And let's download it if we don't have it yet.
-    jggrx_meta.process()?;
+    jggrx_meta.process(true)?;
 
     // Build the spherical harmonics.
     // The harmonics must be computed in the body fixed frame.
