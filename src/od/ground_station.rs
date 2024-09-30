@@ -16,14 +16,13 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use anise::astro::{AzElRange, PhysicsResult};
+use anise::astro::{Aberration, AzElRange, PhysicsResult};
 use anise::errors::AlmanacResult;
 use anise::prelude::{Almanac, Frame, Orbit};
 
 use super::msr::RangeDoppler;
 use super::noise::StochasticNoise;
-use super::{ODAlmanacSnafu, ODError, ODPlanetaryDataSnafu, ODTrajSnafu, TrackingDeviceSim};
-use crate::cosmic::eclipse::{line_of_sight, EclipseState};
+use super::{ODAlmanacSnafu, ODError, ODTrajSnafu, TrackingDeviceSim};
 use crate::errors::EventError;
 use crate::io::ConfigRepr;
 use crate::md::prelude::{Interpolatable, Traj};
@@ -159,8 +158,23 @@ impl GroundStation {
 
     /// Computes the azimuth and elevation of the provided object seen from this ground station, both in degrees.
     /// This is a shortcut to almanac.azimuth_elevation_range_sez.
-    pub fn azimuth_elevation_of(&self, rx: Orbit, almanac: &Almanac) -> AlmanacResult<AzElRange> {
-        almanac.azimuth_elevation_range_sez(rx, self.to_orbit(rx.epoch, almanac).unwrap())
+    pub fn azimuth_elevation_of(
+        &self,
+        rx: Orbit,
+        obstructing_body: Option<Frame>,
+        almanac: &Almanac,
+    ) -> AlmanacResult<AzElRange> {
+        let ab_corr = if self.light_time_correction {
+            Aberration::LT
+        } else {
+            Aberration::NONE
+        };
+        almanac.azimuth_elevation_range_sez(
+            rx,
+            self.to_orbit(rx.epoch, almanac).unwrap(),
+            obstructing_body,
+            ab_corr,
+        )
     }
 
     /// Return this ground station as an orbit in its current frame
@@ -234,16 +248,22 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
                 let rx_0 = traj.at(epoch - integration_time).context(ODTrajSnafu)?;
                 let rx_1 = traj.at(epoch).context(ODTrajSnafu)?;
 
-                let aer_t0 =
-                    self.azimuth_elevation_of(rx_0.orbit, &almanac)
-                        .context(ODAlmanacSnafu {
-                            action: "computing AER",
-                        })?;
-                let aer_t1 =
-                    self.azimuth_elevation_of(rx_1.orbit, &almanac)
-                        .context(ODAlmanacSnafu {
-                            action: "computing AER",
-                        })?;
+                let obstructing_body = if !self.frame.ephem_origin_match(rx_0.frame()) {
+                    Some(rx_0.frame())
+                } else {
+                    None
+                };
+
+                let aer_t0 = self
+                    .azimuth_elevation_of(rx_0.orbit, obstructing_body, &almanac)
+                    .context(ODAlmanacSnafu {
+                        action: "computing AER",
+                    })?;
+                let aer_t1 = self
+                    .azimuth_elevation_of(rx_1.orbit, obstructing_body, &almanac)
+                    .context(ODAlmanacSnafu {
+                        action: "computing AER",
+                    })?;
 
                 if aer_t0.elevation_deg < self.elevation_mask_deg
                     || aer_t1.elevation_deg < self.elevation_mask_deg
@@ -253,29 +273,6 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
                         self.name, self.elevation_mask_deg, aer_t0.elevation_deg, aer_t1.elevation_deg
                     );
                     return Ok(None);
-                }
-
-                // If the frame of the trajectory is different from that of the ground station, then check that there is no eclipse.
-                for rx in [rx_0, rx_1] {
-                    if !self.frame.ephem_origin_match(rx.frame()) {
-                        let observer = self.to_orbit(rx.orbit.epoch, &almanac).unwrap();
-                        if line_of_sight(
-                            observer,
-                            rx.orbit,
-                            almanac
-                                .frame_from_uid(rx.frame())
-                                .context(ODPlanetaryDataSnafu {
-                                    action: "computing line of sight",
-                                })?,
-                            &almanac,
-                        )
-                        .context(ODAlmanacSnafu {
-                            action: "computing line of sight",
-                        })? == EclipseState::Umbra
-                        {
-                            return Ok(None);
-                        }
-                    }
                 }
 
                 // Noises are computed at the midpoint of the integration time.
@@ -308,31 +305,17 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
         rng: Option<&mut Pcg64Mcg>,
         almanac: Arc<Almanac>,
     ) -> Result<Option<RangeDoppler>, ODError> {
+        let obstructing_body = if !self.frame.ephem_origin_match(rx.frame()) {
+            Some(rx.frame())
+        } else {
+            None
+        };
+
         let aer = self
-            .azimuth_elevation_of(rx.orbit, &almanac)
+            .azimuth_elevation_of(rx.orbit, obstructing_body, &almanac)
             .context(ODAlmanacSnafu {
                 action: "computing AER",
             })?;
-
-        if !self.frame.ephem_origin_match(rx.frame()) {
-            let observer = self.to_orbit(rx.orbit.epoch, &almanac).unwrap();
-            if line_of_sight(
-                observer,
-                rx.orbit,
-                almanac
-                    .frame_from_uid(rx.frame())
-                    .context(ODPlanetaryDataSnafu {
-                        action: "computing line of sight",
-                    })?,
-                &almanac,
-            )
-            .context(ODAlmanacSnafu {
-                action: "computing line of sight",
-            })? == EclipseState::Umbra
-            {
-                return Ok(None);
-            }
-        }
 
         if aer.elevation_deg >= self.elevation_mask_deg {
             // Only update the noises if the measurement is valid.

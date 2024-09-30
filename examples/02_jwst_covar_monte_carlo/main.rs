@@ -35,13 +35,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         uri: "https://naif.jpl.nasa.gov/pub/naif/JWST/kernels/spk/jwst_rec.bsp".to_string(),
         crc32: None,
     };
-    latest_jwst_ephem.process()?;
+    latest_jwst_ephem.process(true)?;
 
     // Load this ephem in the general Almanac we're using for this analysis.
     let almanac = Arc::new(
         MetaAlmanac::latest()
             .map_err(Box::new)?
-            .load_from_metafile(latest_jwst_ephem)?,
+            .load_from_metafile(latest_jwst_ephem, true)?,
     );
 
     // By loading this ephemeris file in the ANISE GUI or ANISE CLI, we can find the NAIF ID of the JWST

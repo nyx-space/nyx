@@ -67,8 +67,8 @@ fn srp_earth_full_vis(almanac: Arc<Almanac>) {
         err_r * 1e3,
         err_v * 1e3
     );
-    assert!(err_r < 5e-3, "position error too large for SRP");
-    assert!(err_v < 1e-7, "velocity error too large for SRP");
+    assert!(err_r < 5e-4, "position error too large for SRP");
+    assert!(err_v < 9e-8, "velocity error too large for SRP");
 }
 
 #[rstest]
@@ -119,8 +119,8 @@ fn srp_earth_leo(almanac: Arc<Almanac>) {
         err_r * 1e3,
         err_v * 1e3
     );
-    assert!(err_r < 3e-1, "position error too large for SRP");
-    assert!(err_v < 5e-4, "velocity error too large for SRP");
+    assert!(err_r < 7e-3, "position error too large for SRP");
+    assert!(err_v < 8e-6, "velocity error too large for SRP");
 }
 
 #[rstest]
@@ -173,8 +173,8 @@ fn srp_earth_meo_ecc_inc(almanac: Arc<Almanac>) {
         err_r * 1e3,
         err_v * 1e3
     );
-    assert!(err_r < 5e-2, "position error too large for SRP");
-    assert!(err_v < 2e-5, "velocity error too large for SRP");
+    assert!(err_r < 2e-3, "position error too large for SRP");
+    assert!(err_v < 1e-6, "velocity error too large for SRP");
 
     // Compare the case with the hyperdual EOMs (computation uses another part of the code)
     let mut prop = setup.with(sc.with_stm(), almanac);

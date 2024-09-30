@@ -12,10 +12,7 @@ use anise::{
 };
 use hifitime::{Epoch, TimeUnits, Unit};
 use nyx::{
-    cosmic::{
-        eclipse::{EclipseLocator, EclipseState},
-        GuidanceMode, MetaAlmanac, Orbit, SrpConfig,
-    },
+    cosmic::{eclipse::EclipseLocator, GuidanceMode, MetaAlmanac, Orbit, SrpConfig},
     dynamics::{
         guidance::{GuidanceLaw, Ruggiero, Thruster},
         Harmonics, OrbitalDynamics, SolarPressure, SpacecraftDynamics,
@@ -75,8 +72,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     ];
 
     // Ensure that we only thrust if we have more than 20% illumination.
-    let ruggiero_ctrl =
-        Ruggiero::from_max_eclipse(objectives, sc, EclipseState::Penumbra(0.2)).unwrap();
+    let ruggiero_ctrl = Ruggiero::from_max_eclipse(objectives, sc, 0.2).unwrap();
     println!("{ruggiero_ctrl}");
 
     // Define the high fidelity dynamics
@@ -94,7 +90,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         crc32: Some(0xF446F027), // Specifying the CRC32 avoids redownloading it if it's cached.
     };
     // And let's download it if we don't have it yet.
-    jgm3_meta.process()?;
+    jgm3_meta.process(true)?;
 
     // Build the spherical harmonics.
     // The harmonics must be computed in the body fixed frame.
