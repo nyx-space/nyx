@@ -4,7 +4,7 @@ extern crate nyx_space as nyx;
 use self::nyx::cosmic::{GuidanceMode, Orbit, Spacecraft};
 use self::nyx::dynamics::guidance::{Objective, Ruggiero, StateParameter, Thruster};
 use self::nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
-use self::nyx::propagators::{PropOpts, Propagator};
+use self::nyx::propagators::{IntegratorOptions, Propagator};
 use self::nyx::time::{Epoch, Unit};
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
@@ -57,7 +57,7 @@ fn rugg_sma(almanac: Arc<Almanac>) {
     let final_state = Propagator::new(
         sc.clone(),
         IntegratorMethod::RungeKutta4,
-        PropOpts::with_fixed_step(10.0 * Unit::Second),
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
     )
     .with(sc_state, almanac)
     .for_duration(prop_time)
@@ -110,7 +110,7 @@ fn rugg_sma_regress_threshold(almanac: Arc<Almanac>) {
         let final_state = Propagator::new(
             sc.clone(),
             IntegratorMethod::RungeKutta4,
-            PropOpts::with_fixed_step(10.0 * Unit::Second),
+            IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
         )
         .with(sc_state, almanac.clone())
         .for_duration(prop_time)
@@ -167,7 +167,7 @@ fn rugg_sma_decr(almanac: Arc<Almanac>) {
     let final_state = Propagator::new(
         sc.clone(),
         IntegratorMethod::RungeKutta4,
-        PropOpts::with_fixed_step(10.0 * Unit::Second),
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
     )
     .with(sc_state, almanac)
     .for_duration(prop_time)
@@ -225,7 +225,7 @@ fn rugg_inc(almanac: Arc<Almanac>) {
     let final_state = Propagator::new(
         sc.clone(),
         IntegratorMethod::RungeKutta4,
-        PropOpts::with_fixed_step(10.0 * Unit::Second),
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
     )
     .with(sc_state, almanac)
     .for_duration(prop_time)
@@ -284,7 +284,7 @@ fn rugg_inc_threshold(almanac: Arc<Almanac>) {
     let final_state = Propagator::new(
         sc.clone(),
         IntegratorMethod::RungeKutta4,
-        PropOpts::with_fixed_step(10.0 * Unit::Second),
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
     )
     .with(sc_state, almanac)
     .for_duration(prop_time)
@@ -342,7 +342,7 @@ fn rugg_inc_decr(almanac: Arc<Almanac>) {
     let final_state = Propagator::new(
         sc.clone(),
         IntegratorMethod::RungeKutta4,
-        PropOpts::with_fixed_step(10.0 * Unit::Second),
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
     )
     .with(sc_state, almanac)
     .for_duration(prop_time)
@@ -400,7 +400,7 @@ fn rugg_ecc(almanac: Arc<Almanac>) {
     let final_state = Propagator::new(
         sc.clone(),
         IntegratorMethod::RungeKutta4,
-        PropOpts::with_fixed_step(10.0 * Unit::Second),
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
     )
     .with(sc_state, almanac)
     .for_duration(prop_time)
@@ -457,7 +457,7 @@ fn rugg_ecc_regress_threshold(almanac: Arc<Almanac>) {
         let final_state = Propagator::new(
             sc.clone(),
             IntegratorMethod::RungeKutta4,
-            PropOpts::with_fixed_step(10.0 * Unit::Second),
+            IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
         )
         .with(sc_state, almanac.clone())
         .for_duration(prop_time)
@@ -516,7 +516,7 @@ fn rugg_ecc_decr(almanac: Arc<Almanac>) {
     let final_state = Propagator::new(
         sc.clone(),
         IntegratorMethod::RungeKutta4,
-        PropOpts::with_fixed_step(10.0 * Unit::Second),
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
     )
     .with(sc_state, almanac)
     .for_duration(prop_time)
@@ -576,7 +576,7 @@ fn rugg_aop(almanac: Arc<Almanac>) {
     let final_state = Propagator::new(
         sc.clone(),
         IntegratorMethod::RungeKutta4,
-        PropOpts::with_fixed_step(10.0 * Unit::Second),
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
     )
     .with(sc_state, almanac)
     .for_duration(prop_time)
@@ -635,7 +635,7 @@ fn rugg_aop_decr(almanac: Arc<Almanac>) {
     let final_state = Propagator::new(
         sc.clone(),
         IntegratorMethod::RungeKutta4,
-        PropOpts::with_fixed_step(10.0 * Unit::Second),
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
     )
     .with(sc_state, almanac)
     .for_duration(prop_time)
@@ -691,7 +691,7 @@ fn rugg_raan(almanac: Arc<Almanac>) {
     let setup = Propagator::new(
         sc.clone(),
         IntegratorMethod::RungeKutta4,
-        PropOpts::with_fixed_step(10.0 * Unit::Second),
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
     );
     let mut prop = setup.with(sc_state, almanac.clone());
     let (final_state, traj) = prop.for_duration_with_traj(prop_time).unwrap();
@@ -744,7 +744,7 @@ fn rugg_raan_regress_threshold(almanac: Arc<Almanac>) {
         let final_state = Propagator::new(
             sc.clone(),
             IntegratorMethod::RungeKutta4,
-            PropOpts::with_fixed_step(10.0 * Unit::Second),
+            IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
         )
         .with(sc_state, almanac.clone())
         .for_duration(prop_time)

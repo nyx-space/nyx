@@ -16,7 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::error_ctrl::ErrorCtrl;
 use super::{DynamicsSnafu, IntegrationDetails, PropagationError, Propagator};
 use crate::dynamics::Dynamics;
 use crate::linalg::allocator::Allocator;
@@ -39,7 +38,7 @@ use std::time::Instant;
 /// A Propagator allows propagating a set of dynamics forward or backward in time.
 /// It is an EventTracker, without any event tracking. It includes the options, the integrator
 /// details of the previous step, and the set of coefficients used for the monomorphic instance.
-pub struct PropInstance<'a, D: Dynamics, E: ErrorCtrl>
+pub struct PropInstance<'a, D: Dynamics>
 where
     DefaultAllocator: Allocator<<D::StateType as State>::Size>
         + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
@@ -48,7 +47,7 @@ where
     /// The state of this propagator instance
     pub state: D::StateType,
     /// The propagator setup (kind, stages, etc.)
-    pub prop: &'a Propagator<D, E>,
+    pub prop: &'a Propagator<D>,
     /// Stores the details of the previous integration step
     pub details: IntegrationDetails,
     /// Should progress reports be logged
@@ -60,7 +59,7 @@ where
     pub(crate) k: Vec<OVector<f64, <D::StateType as State>::VecLength>>,
 }
 
-impl<'a, D: Dynamics, E: ErrorCtrl> PropInstance<'a, D, E>
+impl<'a, D: Dynamics> PropInstance<'a, D>
 where
     DefaultAllocator: Allocator<<D::StateType as State>::Size>
         + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
@@ -388,7 +387,11 @@ where
                 return Ok(((self.details.step), next_state));
             } else {
                 // Compute the error estimate.
-                self.details.error = E::estimate(&error_est, &next_state, state_vec);
+                self.details.error =
+                    self.prop
+                        .opts
+                        .error_ctrl
+                        .estimate(&error_est, &next_state, state_vec);
                 if self.details.error <= self.prop.opts.tolerance
                     || step_size <= self.prop.opts.min_step.to_seconds()
                     || self.details.attempts >= self.prop.opts.attempts

@@ -10,7 +10,7 @@ use nyx::io::ConfigRepr;
 use nyx::io::{gravity::*, ExportCfg};
 use nyx::linalg::{SMatrix, SVector};
 use nyx::od::prelude::*;
-use nyx::propagators::{PropOpts, Propagator};
+use nyx::propagators::{IntegratorOptions, Propagator};
 use nyx::Spacecraft;
 use nyx_space::propagators::IntegratorMethod;
 use std::collections::BTreeMap;
@@ -117,7 +117,7 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
-    let opts = PropOpts::with_fixed_step(step_size);
+    let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
@@ -249,7 +249,7 @@ fn od_tb_val_with_arc(
     let setup = Propagator::new(
         orbital_dyn,
         IntegratorMethod::RungeKutta4,
-        PropOpts::with_fixed_step_s(10.0),
+        IntegratorOptions::with_fixed_step_s(10.0),
     );
 
     let mut prop = setup.with(initial_state.into(), almanac.clone());
@@ -413,7 +413,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
-    let opts = PropOpts::with_fixed_step(step_size);
+    let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
@@ -624,7 +624,7 @@ fn od_tb_ckf_fixed_step_iteration_test(
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
-    let opts = PropOpts::with_fixed_step(step_size);
+    let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
@@ -761,7 +761,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map(
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
-    let opts = PropOpts::with_fixed_step(step_size);
+    let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
@@ -881,7 +881,7 @@ fn od_tb_ckf_map_covar(almanac: Arc<Almanac>) {
     let setup = Propagator::new(
         SpacecraftDynamics::new(OrbitalDynamics::two_body()),
         IntegratorMethod::RungeKutta4,
-        PropOpts::with_fixed_step(step_size),
+        IntegratorOptions::with_fixed_step(step_size),
     );
     let prop_est = setup.with(Spacecraft::from(initial_state).with_stm(), almanac.clone());
     let covar_radius_km = 1.0e-3;
@@ -954,7 +954,7 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect(
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
-    let opts = PropOpts::with_fixed_step(step_size);
+    let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
@@ -1062,7 +1062,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map(
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
-    let opts = PropOpts::with_fixed_step(step_size);
+    let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();

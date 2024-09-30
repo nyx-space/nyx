@@ -119,7 +119,7 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
     // Define the propagator information.
     let prop_time = 12 * Unit::Hour;
     let step_size = 10.0 * Unit::Second;
-    let opts = PropOpts::with_fixed_step(step_size);
+    let opts = IntegratorOptions::with_fixed_step(step_size);
 
     let setup = Propagator::new(
         SpacecraftDynamics::new(OrbitalDynamics::point_masses(vec![EARTH, MOON, SUN])),

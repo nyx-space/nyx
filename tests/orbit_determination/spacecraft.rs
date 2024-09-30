@@ -10,11 +10,11 @@ use nyx::linalg::{SMatrix, SVector};
 use nyx::md::trajectory::ExportCfg;
 use nyx::md::{Event, StateParameter};
 use nyx::od::prelude::*;
-use nyx::propagators::{PropOpts, Propagator};
+use nyx::propagators::{IntegratorOptions, Propagator};
 use nyx::time::{Epoch, TimeUnits, Unit};
 use nyx_space::cosmic::SrpConfig;
 use nyx_space::dynamics::guidance::LocalFrame;
-use nyx_space::propagators::{IntegratorMethod, RSSCartesianStep};
+use nyx_space::propagators::{ErrorControl, IntegratorMethod};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
@@ -124,7 +124,7 @@ fn od_val_sc_mb_srp_reals_duals_models(
 
     // Define the propagator information.
     let step_size = 10.0 * Unit::Second;
-    let opts = PropOpts::with_fixed_step(step_size);
+    let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
@@ -328,9 +328,9 @@ fn od_val_sc_srp_estimation(
 
     let setup = Propagator::dp78(
         sc_dynamics,
-        PropOpts::builder()
+        IntegratorOptions::builder()
             .max_step(1.minutes())
-            .error_ctrl(RSSCartesianStep {})
+            .error_ctrl(ErrorControl::RSSCartesianStep)
             .build(),
     );
     let mut prop = setup.with(sc_truth, almanac.clone());

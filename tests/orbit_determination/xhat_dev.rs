@@ -10,7 +10,7 @@ use nyx::dynamics::SpacecraftDynamics;
 use nyx::io::gravity::*;
 use nyx::linalg::{SMatrix, SVector};
 use nyx::od::prelude::*;
-use nyx::propagators::{PropOpts, Propagator};
+use nyx::propagators::{IntegratorOptions, Propagator};
 use nyx::utils::rss_orbit_errors;
 use nyx::Spacecraft;
 use nyx_space::propagators::IntegratorMethod;
@@ -71,7 +71,7 @@ fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>) {
     // Define the propagator information.
     let prop_time = 0.01 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
-    let opts = PropOpts::with_fixed_step(step_size);
+    let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
@@ -299,7 +299,7 @@ fn xhat_dev_test_ekf_multi_body(almanac: Arc<Almanac>) {
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
-    let opts = PropOpts::with_fixed_step(step_size);
+    let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
@@ -469,7 +469,7 @@ fn xhat_dev_test_ekf_harmonics(almanac: Arc<Almanac>) {
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
-    let opts = PropOpts::with_fixed_step(step_size);
+    let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
@@ -632,7 +632,7 @@ fn xhat_dev_test_ekf_realistic(almanac: Arc<Almanac>) {
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
-    let opts = PropOpts::with_fixed_step(step_size);
+    let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
@@ -784,7 +784,7 @@ fn xhat_dev_test_ckf_smoother_multi_body(almanac: Arc<Almanac>) {
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
-    let opts = PropOpts::with_fixed_step(step_size);
+    let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
@@ -1054,7 +1054,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body(almanac: Arc<Almanac>) {
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
-    let opts = PropOpts::with_fixed_step(step_size);
+    let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
@@ -1325,7 +1325,7 @@ fn xhat_dev_test_ckf_iteration_multi_body(almanac: Arc<Almanac>) {
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
-    let opts = PropOpts::with_fixed_step(step_size);
+    let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();

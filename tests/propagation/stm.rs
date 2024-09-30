@@ -35,7 +35,7 @@ fn stm_fixed_step(almanac: Arc<Almanac>) {
     let prop = Propagator::new(
         SpacecraftDynamics::new(OrbitalDynamics::two_body()),
         IntegratorMethod::RungeKutta4,
-        PropOpts::with_fixed_step(10 * Unit::Second),
+        IntegratorOptions::with_fixed_step(10 * Unit::Second),
     );
 
     // First test is in mostly linear regime (low eccentricity)

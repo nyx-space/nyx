@@ -24,7 +24,7 @@ use crate::mc::results::{PropResult, Results, Run};
 use crate::mc::DispersedState;
 use crate::md::trajectory::Interpolatable;
 use crate::md::EventEvaluator;
-use crate::propagators::{ErrorCtrl, Propagator};
+use crate::propagators::Propagator;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::time::Unit;
 use crate::time::{Duration, Epoch};
@@ -89,9 +89,9 @@ where
 
     /// Generate states and propagate each independently until a specific event is found `trigger` times.
     #[allow(clippy::needless_lifetimes)]
-    pub fn run_until_nth_event<D, E, F>(
+    pub fn run_until_nth_event<D, F>(
         self,
-        prop: Propagator<D, E>,
+        prop: Propagator<D>,
         almanac: Arc<Almanac>,
         max_duration: Duration,
         event: &F,
@@ -100,7 +100,7 @@ where
     ) -> Results<S, PropResult<S>>
     where
         D: Dynamics<StateType = S>,
-        E: ErrorCtrl,
+
         F: EventEvaluator<S>,
         DefaultAllocator: Allocator<<D::StateType as State>::Size>
             + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
@@ -113,9 +113,9 @@ where
     /// Generate states and propagate each independently until a specific event is found `trigger` times.
     #[must_use = "Monte Carlo result must be used"]
     #[allow(clippy::needless_lifetimes)]
-    pub fn resume_run_until_nth_event<D, E, F>(
+    pub fn resume_run_until_nth_event<D, F>(
         &self,
-        prop: Propagator<D, E>,
+        prop: Propagator<D>,
         almanac: Arc<Almanac>,
         skip: usize,
         max_duration: Duration,
@@ -125,7 +125,7 @@ where
     ) -> Results<S, PropResult<S>>
     where
         D: Dynamics<StateType = S>,
-        E: ErrorCtrl,
+
         F: EventEvaluator<S>,
         DefaultAllocator: Allocator<<D::StateType as State>::Size>
             + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
@@ -188,16 +188,16 @@ where
     /// Generate states and propagate each independently until a specific event is found `trigger` times.
     #[must_use = "Monte Carlo result must be used"]
     #[allow(clippy::needless_lifetimes)]
-    pub fn run_until_epoch<D, E>(
+    pub fn run_until_epoch<D>(
         self,
-        prop: Propagator<D, E>,
+        prop: Propagator<D>,
         almanac: Arc<Almanac>,
         end_epoch: Epoch,
         num_runs: usize,
     ) -> Results<S, PropResult<S>>
     where
         D: Dynamics<StateType = S>,
-        E: ErrorCtrl,
+
         DefaultAllocator: Allocator<<D::StateType as State>::Size>
             + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
             + Allocator<<D::StateType as State>::VecLength>,
@@ -209,9 +209,9 @@ where
     /// Resumes a Monte Carlo run by skipping the first `skip` items, generating states only after that, and propagate each independently until the specified epoch.
     #[must_use = "Monte Carlo result must be used"]
     #[allow(clippy::needless_lifetimes)]
-    pub fn resume_run_until_epoch<D, E>(
+    pub fn resume_run_until_epoch<D>(
         &self,
-        prop: Propagator<D, E>,
+        prop: Propagator<D>,
         almanac: Arc<Almanac>,
         skip: usize,
         end_epoch: Epoch,
@@ -219,7 +219,7 @@ where
     ) -> Results<S, PropResult<S>>
     where
         D: Dynamics<StateType = S>,
-        E: ErrorCtrl,
+
         DefaultAllocator: Allocator<<D::StateType as State>::Size>
             + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
             + Allocator<<D::StateType as State>::VecLength>,

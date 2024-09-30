@@ -101,7 +101,7 @@ fn od_val_multi_body_ckf_perfect_stations(
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
-    let opts = PropOpts::with_fixed_step(step_size);
+    let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
@@ -149,7 +149,7 @@ fn od_val_multi_body_ckf_perfect_stations(
 
     let ckf = KF::no_snc(initial_estimate);
 
-    let mut odp = ODProcess::<_, _, RangeDoppler, _, _, _>::ckf(prop_est, ckf, None, almanac);
+    let mut odp = ODProcess::<_, RangeDoppler, _, _, _>::ckf(prop_est, ckf, None, almanac);
 
     odp.process_arc::<GroundStation>(&arc).unwrap();
 
@@ -227,7 +227,7 @@ fn multi_body_ckf_covar_map(
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
-    let opts = PropOpts::with_fixed_step(step_size);
+    let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();

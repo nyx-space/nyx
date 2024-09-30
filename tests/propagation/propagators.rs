@@ -5,7 +5,7 @@ use hifitime::JD_J2000;
 use nyx::cosmic::{assert_orbit_eq_or_abs, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::SpacecraftDynamics;
-use nyx::propagators::error_ctrl::RSSCartesianState;
+use nyx::propagators::error_ctrl::ErrorControl;
 use nyx::time::{Epoch, Unit};
 use nyx::utils::rss_orbit_errors;
 use nyx::{propagators::*, Spacecraft};
@@ -56,7 +56,12 @@ fn regress_leo_day_adaptive(almanac: Arc<Almanac>) {
     let setup = Propagator::new(
         dynamics.clone(),
         IntegratorMethod::CashKarp45,
-        PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSCartesianState {}),
+        IntegratorOptions::with_adaptive_step(
+            min_step,
+            max_step,
+            accuracy,
+            ErrorControl::RSSCartesianState,
+        ),
     );
     let mut prop = setup.with(init, almanac.clone());
     prop.for_duration(prop_time).unwrap();
@@ -146,7 +151,12 @@ fn gmat_val_leo_day_adaptive(almanac: Arc<Almanac>) {
         let setup = Propagator::new(
             dynamics.clone(),
             IntegratorMethod::DormandPrince45,
-            PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSCartesianState {}),
+            IntegratorOptions::with_adaptive_step(
+                min_step,
+                max_step,
+                accuracy,
+                ErrorControl::RSSCartesianState,
+            ),
         );
         let mut prop = setup.with(init, almanac.clone());
         prop.for_duration(prop_time).unwrap();
@@ -198,7 +208,12 @@ fn gmat_val_leo_day_adaptive(almanac: Arc<Almanac>) {
         let setup = Propagator::new(
             dynamics.clone(),
             IntegratorMethod::Verner56,
-            PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSCartesianState {}),
+            IntegratorOptions::with_adaptive_step(
+                min_step,
+                max_step,
+                accuracy,
+                ErrorControl::RSSCartesianState,
+            ),
         );
         let mut prop = setup.with(init, almanac.clone());
         prop.for_duration(prop_time).unwrap();
@@ -227,7 +242,12 @@ fn gmat_val_leo_day_adaptive(almanac: Arc<Almanac>) {
     {
         let setup = Propagator::dp78(
             dynamics.clone(),
-            PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSCartesianState {}),
+            IntegratorOptions::with_adaptive_step(
+                min_step,
+                max_step,
+                accuracy,
+                ErrorControl::RSSCartesianState,
+            ),
         );
         let mut prop = setup.with(init, almanac.clone());
         prop.for_duration(prop_time).unwrap();
@@ -255,7 +275,12 @@ fn gmat_val_leo_day_adaptive(almanac: Arc<Almanac>) {
     {
         let setup = Propagator::rk89(
             dynamics,
-            PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSCartesianState {}),
+            IntegratorOptions::with_adaptive_step(
+                min_step,
+                max_step,
+                accuracy,
+                ErrorControl::RSSCartesianState,
+            ),
         );
         let mut prop = setup.with(init, almanac.clone());
         prop.for_duration(prop_time).unwrap();
@@ -355,7 +380,7 @@ fn gmat_val_leo_day_fixed(almanac: Arc<Almanac>) {
         let setup = Propagator::new(
             dynamics.clone(),
             IntegratorMethod::RungeKutta4,
-            PropOpts::with_fixed_step(1.0 * Unit::Second),
+            IntegratorOptions::with_fixed_step(1.0 * Unit::Second),
         );
         let mut prop = setup.with(init, almanac.clone());
         prop.for_duration(prop_time).unwrap();
@@ -382,7 +407,7 @@ fn gmat_val_leo_day_fixed(almanac: Arc<Almanac>) {
         let setup = Propagator::new(
             dynamics.clone(),
             IntegratorMethod::Verner56,
-            PropOpts::with_fixed_step(10.0 * Unit::Second),
+            IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
         );
         let mut prop = setup.with(init, almanac.clone());
         prop.for_duration(prop_time).unwrap();
@@ -404,7 +429,7 @@ fn gmat_val_leo_day_fixed(almanac: Arc<Almanac>) {
         let setup = Propagator::new(
             dynamics.clone(),
             IntegratorMethod::DormandPrince45,
-            PropOpts::with_fixed_step(10.0 * Unit::Second),
+            IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
         );
         let mut prop = setup.with(init, almanac.clone());
         prop.for_duration(prop_time).unwrap();
@@ -421,7 +446,7 @@ fn gmat_val_leo_day_fixed(almanac: Arc<Almanac>) {
         let setup = Propagator::new(
             dynamics.clone(),
             IntegratorMethod::DormandPrince78,
-            PropOpts::with_fixed_step(10.0 * Unit::Second),
+            IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
         );
         let mut prop = setup.with(init, almanac.clone());
         prop.for_duration(prop_time).unwrap();
@@ -435,7 +460,10 @@ fn gmat_val_leo_day_fixed(almanac: Arc<Almanac>) {
     }
 
     {
-        let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step(10.0 * Unit::Second));
+        let setup = Propagator::rk89(
+            dynamics,
+            IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
+        );
         let mut prop = setup.with(init, almanac.clone());
         prop.for_duration(prop_time).unwrap();
         assert_eq!(prop.state.orbit, all_rslts[4], "two body prop failed");

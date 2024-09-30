@@ -9,7 +9,7 @@ use nyx::dynamics::SpacecraftDynamics;
 use nyx::io::ExportCfg;
 use nyx::md::StateParameter;
 use nyx::od::prelude::*;
-use nyx::propagators::{PropOpts, Propagator};
+use nyx::propagators::{IntegratorOptions, Propagator};
 use nyx::time::{Epoch, TimeUnits, Unit};
 use nyx::utils::rss_orbit_errors;
 use nyx::Spacecraft;
@@ -80,7 +80,7 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
-    let opts = PropOpts::with_fixed_step(step_size);
+    let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();

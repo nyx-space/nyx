@@ -11,7 +11,7 @@ use nyx_space::cosmic::Orbit;
 use nyx_space::dynamics::orbital::OrbitalDynamics;
 use nyx_space::md::prelude::*;
 use nyx_space::od::prelude::*;
-use nyx_space::propagators::{IntegratorMethod, PropOpts, Propagator};
+use nyx_space::propagators::{IntegratorMethod, IntegratorOptions, Propagator};
 use nyx_space::time::{Epoch, TimeUnits};
 use nyx_space::utils::rss_orbit_errors;
 use std::collections::BTreeMap;
@@ -50,7 +50,7 @@ fn traj(epoch: Epoch, almanac: Arc<Almanac>) -> Traj<Spacecraft> {
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
     let truth_setup = Propagator::dp78(
         SpacecraftDynamics::new(orbital_dyn),
-        PropOpts::with_max_step(step_size),
+        IntegratorOptions::with_max_step(step_size),
     );
     let (_, traj) = truth_setup
         .with(initial_state, almanac)
@@ -191,7 +191,7 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
     let setup = Propagator::new(
         estimator,
         IntegratorMethod::RungeKutta4,
-        PropOpts::with_fixed_step(10.seconds()),
+        IntegratorOptions::with_fixed_step(10.seconds()),
     );
     let prop_est = setup.with(initial_state_dev.with_stm(), almanac.clone());
 
@@ -309,7 +309,7 @@ fn od_resid_reject_default_ckf_two_way(
     let setup = Propagator::new(
         estimator,
         IntegratorMethod::RungeKutta4,
-        PropOpts::with_fixed_step(10.seconds()),
+        IntegratorOptions::with_fixed_step(10.seconds()),
     );
     let prop_est = setup.with(initial_state_dev.with_stm(), almanac.clone());
 

@@ -20,7 +20,7 @@ use std::fmt;
 
 use crate::time::{Duration, Unit};
 
-use super::{ErrorCtrl, RSSCartesianStep};
+use super::ErrorControl;
 use typed_builder::TypedBuilder;
 
 /// PropOpts stores the integrator options, including the minimum and maximum step sizes, and the
@@ -32,7 +32,7 @@ use typed_builder::TypedBuilder;
 /// fixed step options will lead to an RK4 being used instead of an RK45.
 #[derive(Clone, Copy, Debug, TypedBuilder)]
 #[builder(doc)]
-pub struct PropOpts<E: ErrorCtrl> {
+pub struct IntegratorOptions {
     #[builder(default_code = "60.0 * Unit::Second")]
     pub init_step: Duration,
     #[builder(default_code = "0.001 * Unit::Second")]
@@ -45,19 +45,20 @@ pub struct PropOpts<E: ErrorCtrl> {
     pub attempts: u8,
     #[builder(default = false)]
     pub fixed_step: bool,
-    pub error_ctrl: E,
+    pub error_ctrl: ErrorControl,
+    // TODO(now): Add an optional central body that will swap central bodies on init
 }
 
-impl<E: ErrorCtrl> PropOpts<E> {
+impl IntegratorOptions {
     /// `with_adaptive_step` initializes an `PropOpts` such that the integrator is used with an
     ///  adaptive step size. The number of attempts is currently fixed to 50 (as in GMAT).
     pub fn with_adaptive_step(
         min_step: Duration,
         max_step: Duration,
         tolerance: f64,
-        error_ctrl: E,
+        error_ctrl: ErrorControl,
     ) -> Self {
-        PropOpts {
+        IntegratorOptions {
             init_step: max_step,
             min_step,
             max_step,
@@ -72,7 +73,7 @@ impl<E: ErrorCtrl> PropOpts<E> {
         min_step: f64,
         max_step: f64,
         tolerance: f64,
-        error_ctrl: E,
+        error_ctrl: ErrorControl,
     ) -> Self {
         Self::with_adaptive_step(
             min_step * Unit::Second,
@@ -80,6 +81,40 @@ impl<E: ErrorCtrl> PropOpts<E> {
             tolerance,
             error_ctrl,
         )
+    }
+
+    /// `with_fixed_step` initializes an `PropOpts` such that the integrator is used with a fixed
+    ///  step size.
+    pub fn with_fixed_step(step: Duration) -> Self {
+        IntegratorOptions {
+            init_step: step,
+            min_step: step,
+            max_step: step,
+            tolerance: 0.0,
+            fixed_step: true,
+            attempts: 0,
+            error_ctrl: ErrorControl::RSSCartesianStep,
+        }
+    }
+
+    pub fn with_fixed_step_s(step: f64) -> Self {
+        Self::with_fixed_step(step * Unit::Second)
+    }
+
+    /// Returns the default options with a specific tolerance.
+    #[allow(clippy::field_reassign_with_default)]
+    pub fn with_tolerance(tolerance: f64) -> Self {
+        let mut opts = Self::default();
+        opts.tolerance = tolerance;
+        opts
+    }
+
+    /// Creates a propagator with the provided max step, and sets the initial step to that value as well.
+    #[allow(clippy::field_reassign_with_default)]
+    pub fn with_max_step(max_step: Duration) -> Self {
+        let mut opts = Self::default();
+        opts.set_max_step(max_step);
+        opts
     }
 
     /// Returns a string with the information about these options
@@ -104,7 +139,7 @@ impl<E: ErrorCtrl> PropOpts<E> {
     }
 }
 
-impl<E: ErrorCtrl> fmt::Display for PropOpts<E> {
+impl fmt::Display for IntegratorOptions {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.fixed_step {
             write!(f, "fixed step: {:e}", self.min_step,)
@@ -118,74 +153,36 @@ impl<E: ErrorCtrl> fmt::Display for PropOpts<E> {
     }
 }
 
-impl PropOpts<RSSCartesianStep> {
-    /// `with_fixed_step` initializes an `PropOpts` such that the integrator is used with a fixed
-    ///  step size.
-    pub fn with_fixed_step(step: Duration) -> Self {
-        PropOpts {
-            init_step: step,
-            min_step: step,
-            max_step: step,
-            tolerance: 0.0,
-            fixed_step: true,
-            attempts: 0,
-            error_ctrl: RSSCartesianStep {},
-        }
-    }
-
-    pub fn with_fixed_step_s(step: f64) -> Self {
-        Self::with_fixed_step(step * Unit::Second)
-    }
-
-    /// Returns the default options with a specific tolerance.
-    #[allow(clippy::field_reassign_with_default)]
-    pub fn with_tolerance(tolerance: f64) -> Self {
-        let mut opts = Self::default();
-        opts.tolerance = tolerance;
-        opts
-    }
-
-    /// Creates a propagator with the provided max step, and sets the initial step to that value as well.
-    #[allow(clippy::field_reassign_with_default)]
-    pub fn with_max_step(max_step: Duration) -> Self {
-        let mut opts = Self::default();
-        opts.set_max_step(max_step);
-        opts
-    }
-}
-
-impl Default for PropOpts<RSSCartesianStep> {
+impl Default for IntegratorOptions {
     /// `default` returns the same default options as GMAT.
-    fn default() -> PropOpts<RSSCartesianStep> {
-        PropOpts {
+    fn default() -> IntegratorOptions {
+        IntegratorOptions {
             init_step: 60.0 * Unit::Second,
             min_step: 0.001 * Unit::Second,
             max_step: 2700.0 * Unit::Second,
             tolerance: 1e-12,
             attempts: 50,
             fixed_step: false,
-            error_ctrl: RSSCartesianStep {},
+            error_ctrl: ErrorControl::RSSCartesianStep,
         }
     }
 }
 
 #[test]
 fn test_options() {
-    use super::error_ctrl::RSSStep;
-
-    let opts = PropOpts::with_fixed_step_s(1e-1);
+    let opts = IntegratorOptions::with_fixed_step_s(1e-1);
     assert_eq!(opts.min_step, 1e-1 * Unit::Second);
     assert_eq!(opts.max_step, 1e-1 * Unit::Second);
     assert!(opts.tolerance.abs() < f64::EPSILON);
     assert!(opts.fixed_step);
 
-    let opts = PropOpts::with_adaptive_step_s(1e-2, 10.0, 1e-12, RSSStep {});
+    let opts = IntegratorOptions::with_adaptive_step_s(1e-2, 10.0, 1e-12, ErrorControl::RSSStep);
     assert_eq!(opts.min_step, 1e-2 * Unit::Second);
     assert_eq!(opts.max_step, 10.0 * Unit::Second);
     assert!((opts.tolerance - 1e-12).abs() < f64::EPSILON);
     assert!(!opts.fixed_step);
 
-    let opts: PropOpts<RSSCartesianStep> = Default::default();
+    let opts: IntegratorOptions = Default::default();
     assert_eq!(opts.init_step, 60.0 * Unit::Second);
     assert_eq!(opts.min_step, 0.001 * Unit::Second);
     assert_eq!(opts.max_step, 2700.0 * Unit::Second);
@@ -193,7 +190,7 @@ fn test_options() {
     assert_eq!(opts.attempts, 50);
     assert!(!opts.fixed_step);
 
-    let opts = PropOpts::with_max_step(1.0 * Unit::Second);
+    let opts = IntegratorOptions::with_max_step(1.0 * Unit::Second);
     assert_eq!(opts.init_step, 1.0 * Unit::Second);
     assert_eq!(opts.min_step, 0.001 * Unit::Second);
     assert_eq!(opts.max_step, 1.0 * Unit::Second);

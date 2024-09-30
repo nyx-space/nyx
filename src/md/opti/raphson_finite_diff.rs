@@ -26,7 +26,6 @@ use crate::md::{prelude::*, AstroSnafu, GuidanceSnafu, UnderdeterminedProblemSna
 use crate::md::{PropSnafu, StateParameter};
 pub use crate::md::{Variable, Vary};
 use crate::polyfit::CommonPolynomial;
-use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::pseudo_inverse;
 use hifitime::TimeUnits;
 use rayon::prelude::*;
@@ -34,7 +33,7 @@ use snafu::{ensure, ResultExt};
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
-impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
+impl<'a, const V: usize, const O: usize> Optimizer<'a, V, O> {
     /// Differential correction using finite differencing
     #[allow(clippy::comparison_chain)]
     pub fn try_achieve_fd(

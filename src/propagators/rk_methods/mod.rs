@@ -19,6 +19,9 @@
 mod rk;
 use std::str::FromStr;
 
+use serde::Deserialize;
+use serde::Serialize;
+
 use crate::io::ConfigError;
 
 pub use self::rk::*;
@@ -31,7 +34,7 @@ use super::PropagationError;
 
 /// The `RK` trait defines a Runge Kutta integrator.
 #[allow(clippy::upper_case_acronyms)]
-pub trait RK
+trait RK
 where
     Self: Sized,
 {
@@ -54,7 +57,7 @@ where
 
 /// Enum of supported integration methods, all of which are part of the Runge Kutta family of ordinary differential equation (ODE) solvers.
 /// Nomenclature: X-Y means that this is an X order solver with a Y order error correction step.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum IntegratorMethod {
     /// Runge Kutta 8-9 is the recommended integrator for most application.
     RungeKutta89,

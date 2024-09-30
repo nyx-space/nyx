@@ -25,13 +25,12 @@ use crate::linalg::{DMatrix, SVector};
 use crate::md::{prelude::*, PropSnafu, UnderdeterminedProblemSnafu};
 use crate::md::{AstroSnafu, StateParameter};
 pub use crate::md::{Variable, Vary};
-use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::pseudo_inverse;
 use crate::utils::are_eigenvalues_stable;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
-impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
+impl<'a, const V: usize, const O: usize> Optimizer<'a, V, O> {
     /// Differential correction using hyperdual numbers for the objectives
     #[allow(clippy::comparison_chain)]
     pub fn try_achieve_dual(

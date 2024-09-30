@@ -36,7 +36,7 @@ pub mod prelude {
     pub use crate::dynamics::{Dynamics, NyxError};
     pub use crate::io::gravity::HarmonicsMem;
     pub use crate::md::objective::Objective;
-    pub use crate::propagators::{PropOpts, Propagator};
+    pub use crate::propagators::{IntegratorOptions, Propagator};
     pub use crate::time::{Duration, Epoch, TimeUnits, Unit};
     pub use crate::Spacecraft;
     pub use crate::{State, TimeTagged};

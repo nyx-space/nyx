@@ -7,7 +7,7 @@ use self::nyx::cosmic::{GuidanceMode, Orbit, Spacecraft};
 use self::nyx::dynamics::guidance::{Objective, Ruggiero, Thruster};
 use self::nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
 use self::nyx::md::{Event, StateParameter};
-use self::nyx::propagators::{PropOpts, Propagator};
+use self::nyx::propagators::{IntegratorOptions, Propagator};
 use self::nyx::time::{Epoch, Unit};
 
 /// NOTE: Herein shows the difference between the QLaw and Ruggiero (and other control laws).
@@ -70,7 +70,7 @@ fn qlaw_as_ruggiero_case_a(almanac: Arc<Almanac>) {
     let setup = Propagator::new(
         sc.clone(),
         IntegratorMethod::RungeKutta4,
-        PropOpts::with_fixed_step(10.0 * Unit::Second),
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
     );
     let mut prop = setup.with(sc_state, almanac.clone());
     let (final_state, traj) = prop.for_duration_with_traj(prop_time).unwrap();
@@ -135,7 +135,7 @@ fn qlaw_as_ruggiero_case_b(almanac: Arc<Almanac>) {
     let final_state = Propagator::new(
         sc.clone(),
         IntegratorMethod::RungeKutta4,
-        PropOpts::with_fixed_step(10.0 * Unit::Second),
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
     )
     .with(sc_state, almanac)
     .for_duration(prop_time)
@@ -193,7 +193,7 @@ fn qlaw_as_ruggiero_case_c(almanac: Arc<Almanac>) {
     let final_state = Propagator::new(
         sc.clone(),
         IntegratorMethod::RungeKutta4,
-        PropOpts::with_fixed_step(10.0 * Unit::Second),
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
     )
     .with(sc_state, almanac)
     .for_duration(prop_time)
@@ -254,7 +254,7 @@ fn qlaw_as_ruggiero_case_d(almanac: Arc<Almanac>) {
     let final_state = Propagator::new(
         sc.clone(),
         IntegratorMethod::RungeKutta4,
-        PropOpts::with_fixed_step(10.0 * Unit::Second),
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
     )
     .with(sc_state, almanac)
     .for_duration(prop_time)
@@ -317,7 +317,7 @@ fn qlaw_as_ruggiero_case_e(almanac: Arc<Almanac>) {
     let final_state = Propagator::new(
         sc.clone(),
         IntegratorMethod::RungeKutta4,
-        PropOpts::with_fixed_step(10.0 * Unit::Second),
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
     )
     .with(sc_state, almanac)
     .for_duration(prop_time)
@@ -376,7 +376,7 @@ fn qlaw_as_ruggiero_case_f(almanac: Arc<Almanac>) {
     let setup = Propagator::new(
         sc.clone(),
         IntegratorMethod::RungeKutta4,
-        PropOpts::with_fixed_step(10.0 * Unit::Second),
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
     );
     let (final_state, traj) = setup
         .with(sc_state, almanac.clone())
@@ -439,7 +439,7 @@ fn ruggiero_iepc_2011_102(almanac: Arc<Almanac>) {
     let final_state = Propagator::new(
         sc.clone(),
         IntegratorMethod::RungeKutta4,
-        PropOpts::with_fixed_step(10.0 * Unit::Second),
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
     )
     .with(sc_state, almanac)
     .for_duration(prop_time)

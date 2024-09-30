@@ -20,7 +20,7 @@ use nyx::{
     io::{gravity::HarmonicsMem, ExportCfg},
     mc::{MonteCarlo, MultivariateNormal, StateDispersion},
     md::{prelude::Objective, StateParameter},
-    propagators::{PropOpts, Propagator, RSSCartesianStep},
+    propagators::{ErrorControl, IntegratorOptions, Propagator},
     Spacecraft, State,
 };
 use std::{error::Error, sync::Arc};
@@ -103,9 +103,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Build the propagator setup.
     let setup = Propagator::rk89(
         sc_dynamics.clone(),
-        PropOpts::builder()
+        IntegratorOptions::builder()
             .min_step(10.0_f64.seconds())
-            .error_ctrl(RSSCartesianStep {})
+            .error_ctrl(ErrorControl::RSSCartesianStep)
             .build(),
     );
 
