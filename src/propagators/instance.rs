@@ -17,7 +17,7 @@
 */
 
 use super::{DynamicsSnafu, IntegrationDetails, PropagationError, Propagator};
-use crate::dynamics::Dynamics;
+use crate::dynamics::{Dynamics, DynamicsAlmanacSnafu};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, OVector};
 use crate::md::trajectory::{Interpolatable, Traj};
@@ -94,11 +94,6 @@ where
         }
         let stop_time = self.state.epoch() + duration;
 
-        #[cfg(not(target_arch = "wasm32"))]
-        let tick = Instant::now();
-        #[cfg(not(target_arch = "wasm32"))]
-        let mut prev_tick = Instant::now();
-
         if self.log_progress {
             // Prevent the print spam for orbit determination cases
             info!("Propagating for {} until {}", duration, stop_time);
@@ -114,6 +109,39 @@ where
         if backprop {
             self.step_size = -self.step_size; // Invert the step size
         }
+
+        // Transform the state if needed
+        let mut original_frame = None;
+        if let Some(integration_frame) = self.prop.opts.integration_frame {
+            if integration_frame != self.state.orbit().frame {
+                original_frame = Some(self.state.orbit().frame);
+                let mut new_orbit = self
+                    .almanac
+                    .transform_to(self.state.orbit(), integration_frame, None)
+                    .context(DynamicsAlmanacSnafu {
+                        action: "transforming state into desired integration frame",
+                    })
+                    .context(DynamicsSnafu)?;
+                // If the integration frame has parameters, we set them here.
+                if let Some(mu_km3_s2) = integration_frame.mu_km3_s2 {
+                    new_orbit.frame.mu_km3_s2 = Some(mu_km3_s2);
+                }
+                // If the integration frame has parameters, we set them here.
+                if let Some(shape) = integration_frame.shape {
+                    new_orbit.frame.shape = Some(shape);
+                }
+                if self.log_progress {
+                    info!("State transformed to the integration frame {integration_frame}");
+                }
+                self.state.set_orbit(new_orbit);
+            }
+        }
+
+        #[cfg(not(target_arch = "wasm32"))]
+        let tick = Instant::now();
+        #[cfg(not(target_arch = "wasm32"))]
+        let mut prev_tick = Instant::now();
+
         loop {
             let epoch = self.state.epoch();
             if (!backprop && epoch + self.step_size > stop_time)
@@ -128,6 +156,19 @@ where
                             debug!("Done in {}", tock);
                         }
                     }
+
+                    // Rotate back if needed
+                    if let Some(original_frame) = original_frame {
+                        let new_orbit = self
+                            .almanac
+                            .transform_to(self.state.orbit(), original_frame, None)
+                            .context(DynamicsAlmanacSnafu {
+                                action: "transforming state from desired integration frame",
+                            })
+                            .context(DynamicsSnafu)?;
+                        self.state.set_orbit(new_orbit);
+                    }
+
                     return Ok(self.state);
                 }
                 // Take one final step of exactly the needed duration until the stop time
@@ -157,6 +198,18 @@ where
                         let tock: Duration = tick.elapsed().into();
                         info!("\t... done in {}", tock);
                     }
+                }
+
+                // Rotate back if needed
+                if let Some(original_frame) = original_frame {
+                    let new_orbit = self
+                        .almanac
+                        .transform_to(self.state.orbit(), original_frame, None)
+                        .context(DynamicsAlmanacSnafu {
+                            action: "transforming state from desired integration frame",
+                        })
+                        .context(DynamicsSnafu)?;
+                    self.state.set_orbit(new_orbit);
                 }
 
                 return Ok(self.state);

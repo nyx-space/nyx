@@ -25,7 +25,7 @@ use snafu::prelude::*;
 
 pub mod prelude {
     pub use super::{
-        optimizer::*,
+        targeter::*,
         trajectory::{ExportCfg, Interpolatable, Traj},
         Event, ScTraj, StateParameter,
     };
@@ -52,7 +52,7 @@ pub use events::{Event, EventEvaluator};
 
 pub mod objective;
 pub mod opti;
-pub use opti::optimizer;
+pub use opti::targeter;
 pub type ScTraj = trajectory::Traj<Spacecraft>;
 // pub type Ephemeris = trajectory::Traj<Orbit>;
 

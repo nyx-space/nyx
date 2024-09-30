@@ -3,7 +3,7 @@ extern crate nyx_space as nyx;
 use anise::constants::celestial_objects::JUPITER_BARYCENTER;
 use anise::constants::celestial_objects::MOON;
 use anise::constants::celestial_objects::SUN;
-use nyx::md::optimizer::*;
+use nyx::md::targeter::*;
 use nyx::md::prelude::*;
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
@@ -43,7 +43,7 @@ fn tgt_sma_from_apo(almanac: Arc<Almanac>) {
     // Define the objective
     let objectives = [Objective::new(StateParameter::SMA, xf_desired_sma)];
 
-    let tgt = Optimizer::delta_v(&setup, objectives);
+    let tgt = Targeter::delta_v(&setup, objectives);
 
     println!("{}", tgt);
 
@@ -103,7 +103,7 @@ fn tgt_sma_from_peri_fd(almanac: Arc<Almanac>) {
     // Define the objective
     let objectives = [Objective::new(StateParameter::SMA, xf_desired_sma)];
 
-    let tgt = Optimizer::delta_v(&setup, objectives);
+    let tgt = Targeter::delta_v(&setup, objectives);
 
     println!("{}", tgt);
 
@@ -161,7 +161,7 @@ fn tgt_hd_sma_from_peri(almanac: Arc<Almanac>) {
     // Define the objective
     let objectives = [Objective::new(StateParameter::SMA, xf_desired_sma)];
 
-    let mut tgt = Optimizer::delta_v(&setup, objectives);
+    let mut tgt = Targeter::delta_v(&setup, objectives);
     tgt.iterations = 5;
 
     println!("{}", tgt);
@@ -268,7 +268,7 @@ fn tgt_ecc_from_apo(almanac: Arc<Almanac>) {
 
     let xf_desired_ecc = 0.4;
 
-    let tgt = Optimizer::new(
+    let tgt = Targeter::new(
         &setup,
         [
             Variable {
@@ -342,7 +342,7 @@ fn tgt_ecc_from_peri(almanac: Arc<Almanac>) {
 
     let xf_desired_ecc = 0.4;
 
-    let tgt = Optimizer::new(
+    let tgt = Targeter::new(
         &setup,
         [
             Variable {
@@ -416,7 +416,7 @@ fn tgt_raan_from_apo(almanac: Arc<Almanac>) {
     // Define the objective
     let objectives = [Objective::new(StateParameter::RAAN, xf_desired_raan)];
 
-    let tgt = Optimizer::delta_v(&setup, objectives);
+    let tgt = Targeter::delta_v(&setup, objectives);
 
     println!("{}", tgt);
 
@@ -469,7 +469,7 @@ fn tgt_raan_from_peri(almanac: Arc<Almanac>) {
     // Define the objective
     let objectives = [Objective::new(StateParameter::RAAN, xf_desired_raan)];
 
-    let tgt = Optimizer::new(
+    let tgt = Targeter::new(
         &setup,
         [
             Variable {
@@ -543,7 +543,7 @@ fn tgt_aop_from_apo(almanac: Arc<Almanac>) {
     // Define the objective
     let objectives = [Objective::new(StateParameter::AoP, xf_desired_aop)];
 
-    let tgt = Optimizer::delta_v(&setup, objectives);
+    let tgt = Targeter::delta_v(&setup, objectives);
 
     println!("{}", tgt);
 
@@ -596,7 +596,7 @@ fn tgt_aop_from_peri(almanac: Arc<Almanac>) {
     // Define the objective
     let objectives = [Objective::new(StateParameter::AoP, xf_desired_aop)];
 
-    let tgt = Optimizer::delta_v(&setup, objectives);
+    let tgt = Targeter::delta_v(&setup, objectives);
 
     println!("{}", tgt);
 

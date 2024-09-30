@@ -21,16 +21,17 @@ use std::fmt;
 use crate::time::{Duration, Unit};
 
 use super::ErrorControl;
+use anise::frames::Frame;
+use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
-/// PropOpts stores the integrator options, including the minimum and maximum step sizes, and the
-/// max error size.
+/// Stores the integrator options, including the minimum and maximum step sizes, and the central body to perform the integration.
 ///
 /// Note that different step sizes and max errors are only used for adaptive
 /// methods. To use a fixed step integrator, initialize the options using `with_fixed_step`, and
 /// use whichever adaptive step integrator is desired.  For example, initializing an RK45 with
 /// fixed step options will lead to an RK4 being used instead of an RK45.
-#[derive(Clone, Copy, Debug, TypedBuilder)]
+#[derive(Clone, Copy, Debug, TypedBuilder, Serialize, Deserialize, PartialEq)]
 #[builder(doc)]
 pub struct IntegratorOptions {
     #[builder(default_code = "60.0 * Unit::Second")]
@@ -45,8 +46,12 @@ pub struct IntegratorOptions {
     pub attempts: u8,
     #[builder(default = false)]
     pub fixed_step: bool,
+    #[builder(default)]
     pub error_ctrl: ErrorControl,
-    // TODO(now): Add an optional central body that will swap central bodies on init
+    /// If a frame is specified and the propagator state is in a different frame, it it changed to this frame prior to integration.
+    /// Note, when setting this, it's recommended to call `strip` on the Frame.
+    #[builder(default, setter(strip_option))]
+    pub integration_frame: Option<Frame>,
 }
 
 impl IntegratorOptions {
@@ -66,6 +71,7 @@ impl IntegratorOptions {
             attempts: 50,
             fixed_step: false,
             error_ctrl,
+            integration_frame: None,
         }
     }
 
@@ -94,6 +100,7 @@ impl IntegratorOptions {
             fixed_step: true,
             attempts: 0,
             error_ctrl: ErrorControl::RSSCartesianStep,
+            integration_frame: None,
         }
     }
 
@@ -164,37 +171,55 @@ impl Default for IntegratorOptions {
             attempts: 50,
             fixed_step: false,
             error_ctrl: ErrorControl::RSSCartesianStep,
+            integration_frame: None,
         }
     }
 }
 
-#[test]
-fn test_options() {
-    let opts = IntegratorOptions::with_fixed_step_s(1e-1);
-    assert_eq!(opts.min_step, 1e-1 * Unit::Second);
-    assert_eq!(opts.max_step, 1e-1 * Unit::Second);
-    assert!(opts.tolerance.abs() < f64::EPSILON);
-    assert!(opts.fixed_step);
+#[cfg(test)]
+mod ut_integr_opts {
+    use hifitime::Unit;
 
-    let opts = IntegratorOptions::with_adaptive_step_s(1e-2, 10.0, 1e-12, ErrorControl::RSSStep);
-    assert_eq!(opts.min_step, 1e-2 * Unit::Second);
-    assert_eq!(opts.max_step, 10.0 * Unit::Second);
-    assert!((opts.tolerance - 1e-12).abs() < f64::EPSILON);
-    assert!(!opts.fixed_step);
+    use crate::propagators::{ErrorControl, IntegratorOptions};
 
-    let opts: IntegratorOptions = Default::default();
-    assert_eq!(opts.init_step, 60.0 * Unit::Second);
-    assert_eq!(opts.min_step, 0.001 * Unit::Second);
-    assert_eq!(opts.max_step, 2700.0 * Unit::Second);
-    assert!((opts.tolerance - 1e-12).abs() < f64::EPSILON);
-    assert_eq!(opts.attempts, 50);
-    assert!(!opts.fixed_step);
+    #[test]
+    fn test_options() {
+        let opts = IntegratorOptions::with_fixed_step_s(1e-1);
+        assert_eq!(opts.min_step, 1e-1 * Unit::Second);
+        assert_eq!(opts.max_step, 1e-1 * Unit::Second);
+        assert!(opts.tolerance.abs() < f64::EPSILON);
+        assert!(opts.fixed_step);
 
-    let opts = IntegratorOptions::with_max_step(1.0 * Unit::Second);
-    assert_eq!(opts.init_step, 1.0 * Unit::Second);
-    assert_eq!(opts.min_step, 0.001 * Unit::Second);
-    assert_eq!(opts.max_step, 1.0 * Unit::Second);
-    assert!((opts.tolerance - 1e-12).abs() < f64::EPSILON);
-    assert_eq!(opts.attempts, 50);
-    assert!(!opts.fixed_step);
+        let opts =
+            IntegratorOptions::with_adaptive_step_s(1e-2, 10.0, 1e-12, ErrorControl::RSSStep);
+        assert_eq!(opts.min_step, 1e-2 * Unit::Second);
+        assert_eq!(opts.max_step, 10.0 * Unit::Second);
+        assert!((opts.tolerance - 1e-12).abs() < f64::EPSILON);
+        assert!(!opts.fixed_step);
+
+        let opts: IntegratorOptions = Default::default();
+        assert_eq!(opts.init_step, 60.0 * Unit::Second);
+        assert_eq!(opts.min_step, 0.001 * Unit::Second);
+        assert_eq!(opts.max_step, 2700.0 * Unit::Second);
+        assert!((opts.tolerance - 1e-12).abs() < f64::EPSILON);
+        assert_eq!(opts.attempts, 50);
+        assert!(!opts.fixed_step);
+
+        let opts = IntegratorOptions::with_max_step(1.0 * Unit::Second);
+        assert_eq!(opts.init_step, 1.0 * Unit::Second);
+        assert_eq!(opts.min_step, 0.001 * Unit::Second);
+        assert_eq!(opts.max_step, 1.0 * Unit::Second);
+        assert!((opts.tolerance - 1e-12).abs() < f64::EPSILON);
+        assert_eq!(opts.attempts, 50);
+        assert!(!opts.fixed_step);
+    }
+
+    #[test]
+    fn test_serde() {
+        let opts = IntegratorOptions::default();
+        let serialized = toml::to_string(&opts).unwrap();
+        println!("{serialized}");
+        let deserd: IntegratorOptions = toml::from_str(&serialized).unwrap();
+        assert_eq!(deserd, opts);
+    }
 }

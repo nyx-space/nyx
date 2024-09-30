@@ -172,6 +172,7 @@ pub trait AccelModel: Send + Sync + fmt::Display {
 
 /// Stores dynamical model errors
 #[derive(Debug, PartialEq, Snafu)]
+#[snafu(visibility(pub(crate)))]
 pub enum DynamicsError {
     /// Fuel exhausted at the provided spacecraft state
     #[snafu(display("fuel exhausted at {sc}"))]

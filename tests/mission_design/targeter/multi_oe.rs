@@ -2,7 +2,7 @@ extern crate nyx_space as nyx;
 
 // use nyx::dynamics::guidance::Mnvr;
 use nyx::dynamics::guidance::Thruster;
-use nyx::md::optimizer::*;
+use nyx::md::targeter::*;
 use nyx::md::prelude::*;
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
@@ -40,7 +40,7 @@ fn tgt_c3_decl(almanac: Arc<Almanac>) {
         Objective::within_tolerance(StateParameter::C3, -5.0, 0.5),
     ];
 
-    let tgt = Optimizer::delta_v(&setup, objectives);
+    let tgt = Targeter::delta_v(&setup, objectives);
 
     println!("{}", tgt);
 
@@ -106,7 +106,7 @@ fn conv_tgt_sma_ecc(almanac: Arc<Almanac>) {
         Objective::within_tolerance(StateParameter::SMA, 8100.0, 0.1),
     ];
 
-    let tgt = Optimizer::new(
+    let tgt = Targeter::new(
         &setup,
         [
             Variable {
@@ -209,7 +209,7 @@ fn tgt_hd_sma_ecc(almanac: Arc<Almanac>) {
         Objective::within_tolerance(StateParameter::SMA, 8100.0, 0.1),
     ];
 
-    let tgt = Optimizer::new(
+    let tgt = Targeter::new(
         &setup,
         [
             Variable {

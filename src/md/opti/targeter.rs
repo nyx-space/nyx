@@ -30,11 +30,9 @@ use std::fmt;
 
 use super::solution::TargeterSolution;
 
-// TODO(now): rename to Differential Controller
-
 /// An optimizer structure with V control variables and O objectives.
 #[derive(Clone)]
-pub struct Optimizer<'a, const V: usize, const O: usize> {
+pub struct Targeter<'a, const V: usize, const O: usize> {
     /// The propagator setup (kind, stages, etc.)
     pub prop: &'a Propagator<SpacecraftDynamics>,
     /// The list of objectives of this targeter
@@ -50,7 +48,7 @@ pub struct Optimizer<'a, const V: usize, const O: usize> {
     pub iterations: usize,
 }
 
-impl<'a, const V: usize, const O: usize> fmt::Display for Optimizer<'a, V, O> {
+impl<'a, const V: usize, const O: usize> fmt::Display for Targeter<'a, V, O> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut objmsg = String::from("");
         for obj in &self.objectives {
@@ -66,7 +64,7 @@ impl<'a, const V: usize, const O: usize> fmt::Display for Optimizer<'a, V, O> {
     }
 }
 
-impl<'a, const O: usize> Optimizer<'a, 3, O> {
+impl<'a, const O: usize> Targeter<'a, 3, O> {
     /// Create a new Targeter which will apply an impulsive delta-v correction.
     pub fn delta_v(prop: &'a Propagator<SpacecraftDynamics>, objectives: [Objective; O]) -> Self {
         Self {
@@ -116,7 +114,7 @@ impl<'a, const O: usize> Optimizer<'a, 3, O> {
     }
 }
 
-impl<'a, const O: usize> Optimizer<'a, 4, O> {
+impl<'a, const O: usize> Targeter<'a, 4, O> {
     /// Create a new Targeter which will apply a continuous thrust for the whole duration of the segment
     pub fn thrust_dir(
         prop: &'a Propagator<SpacecraftDynamics>,
@@ -138,7 +136,7 @@ impl<'a, const O: usize> Optimizer<'a, 4, O> {
     }
 }
 
-impl<'a, const O: usize> Optimizer<'a, 7, O> {
+impl<'a, const O: usize> Targeter<'a, 7, O> {
     /// Create a new Targeter which will apply a continuous thrust for the whole duration of the segment
     pub fn thrust_dir_rate(
         prop: &'a Propagator<SpacecraftDynamics>,
@@ -163,7 +161,7 @@ impl<'a, const O: usize> Optimizer<'a, 7, O> {
     }
 }
 
-impl<'a, const O: usize> Optimizer<'a, 10, O> {
+impl<'a, const O: usize> Targeter<'a, 10, O> {
     /// Create a new Targeter which will apply a continuous thrust for the whole duration of the segment
     pub fn thrust_profile(
         prop: &'a Propagator<SpacecraftDynamics>,
@@ -191,7 +189,7 @@ impl<'a, const O: usize> Optimizer<'a, 10, O> {
     }
 }
 
-impl<'a, const V: usize, const O: usize> Optimizer<'a, V, O> {
+impl<'a, const V: usize, const O: usize> Targeter<'a, V, O> {
     /// Create a new Targeter which will apply an impulsive delta-v correction.
     pub fn new(
         prop: &'a Propagator<SpacecraftDynamics>,

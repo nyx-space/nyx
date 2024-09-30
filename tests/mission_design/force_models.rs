@@ -1,5 +1,6 @@
 extern crate nyx_space as nyx;
 
+use anise::constants::frames::MOON_J2000;
 use nyx::cosmic::{Orbit, Spacecraft};
 use nyx::dynamics::{Drag, OrbitalDynamics, SolarPressure, SpacecraftDynamics};
 use nyx::linalg::Vector6;
@@ -8,6 +9,7 @@ use nyx::time::{Epoch, Unit};
 use nyx::utils::rss_orbit_vec_errors;
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use nyx_space::md::prelude::Interpolatable;
 use rstest::*;
 use std::sync::Arc;
 
@@ -150,7 +152,7 @@ fn srp_earth_meo_ecc_inc(almanac: Arc<Almanac>) {
 
     let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 16.0);
 
-    let setup = Propagator::default(sc_dyn);
+    let setup = Propagator::default(sc_dyn.clone());
     let mut prop = setup.with(sc, almanac.clone());
     let final_state = prop.for_duration(prop_time).unwrap();
 
@@ -175,6 +177,39 @@ fn srp_earth_meo_ecc_inc(almanac: Arc<Almanac>) {
     );
     assert!(err_r < 2e-3, "position error too large for SRP");
     assert!(err_v < 1e-6, "velocity error too large for SRP");
+
+    // Test that we can specify an integration frame in the options and that the result is the same.
+    // Note that we also test here that we're setting the GM and shape of the integration frame as defined
+    // and not just grabbing that data from the almanac.
+    let orbit = almanac.transform_to(orbit, MOON_J2000, None).unwrap();
+    println!("{:x}", orbit);
+
+    let sc_moon = Spacecraft::from_srp_defaults(orbit, dry_mass, 16.0);
+
+    let mut setup_moon = Propagator::default(sc_dyn);
+    setup_moon.opts.integration_frame = Some(eme2k);
+    let mut prop = setup_moon.with(sc_moon, almanac.clone());
+    let final_moon_state = prop.for_duration(prop_time).unwrap();
+    assert!(
+        final_moon_state.frame().ephem_origin_match(MOON_J2000),
+        "expected a result in the Moon frame"
+    );
+    println!("{}", final_moon_state);
+
+    let final_earth_orbit = almanac
+        .transform_to(final_moon_state.orbit, EARTH_J2000, None)
+        .unwrap();
+
+    let (fw_err_r, fw_err_v) =
+        rss_orbit_vec_errors(&final_earth_orbit.to_cartesian_pos_vel(), &rslt);
+    println!(
+        "Error accumulated in ecc+inc MEO (with penumbras) over {} after integration frame swap: {:.6} m \t{:.6} m/s",
+        prop_time,
+        fw_err_r * 1e3,
+        fw_err_v * 1e3
+    );
+    assert!(dbg!((fw_err_r - err_r).abs() / err_r) < 1e-9);
+    assert!(dbg!((fw_err_v - err_v).abs() / err_v) < 1e-12);
 
     // Compare the case with the hyperdual EOMs (computation uses another part of the code)
     let mut prop = setup.with(sc.with_stm(), almanac);

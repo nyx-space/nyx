@@ -22,7 +22,7 @@ pub use super::CostFunction;
 use super::{MultipleShootingError, TargetingSnafu};
 use crate::linalg::{DMatrix, DVector, SVector};
 use crate::md::opti::solution::TargeterSolution;
-use crate::md::optimizer::Optimizer;
+use crate::md::targeter::Targeter;
 use crate::md::{prelude::*, TargetingError};
 use crate::pseudo_inverse;
 use crate::{Orbit, Spacecraft};
@@ -81,7 +81,7 @@ impl<'a, T: MultishootNode<OT>, const VT: usize, const OT: usize> MultipleShooti
                 /* ***
                  ** 1. Solve the delta-v differential corrector between each node
                  ** *** */
-                let tgt = Optimizer {
+                let tgt = Targeter {
                     prop: self.prop,
                     objectives: self.targets[i].into(),
                     variables: self.variables,
@@ -125,7 +125,7 @@ impl<'a, T: MultishootNode<OT>, const VT: usize, const OT: usize> MultipleShooti
                      ** Note that because the first initial_state is x0, the i-th "initial state"
                      ** is the initial state to reach the i-th node.
                      ** *** */
-                    let inner_tgt_a = Optimizer::delta_v(self.prop, next_node);
+                    let inner_tgt_a = Targeter::delta_v(self.prop, next_node);
                     let inner_sol_a = inner_tgt_a
                         .try_achieve_dual(
                             initial_states[i],
@@ -151,7 +151,7 @@ impl<'a, T: MultishootNode<OT>, const VT: usize, const OT: usize> MultipleShooti
                     /* ***
                      ** 2.C. Rerun the targeter from the new state at the perturbed node to the next unpertubed node
                      ** *** */
-                    let inner_tgt_b = Optimizer::delta_v(self.prop, self.targets[i + 1].into());
+                    let inner_tgt_b = Targeter::delta_v(self.prop, self.targets[i + 1].into());
                     let inner_sol_b = inner_tgt_b
                         .try_achieve_dual(
                             inner_sol_a.achieved_state,
@@ -241,7 +241,7 @@ impl<'a, T: MultishootNode<OT>, const VT: usize, const OT: usize> MultipleShooti
 
                 for (i, node) in self.targets.iter().enumerate() {
                     // Run the unpertubed targeter
-                    let tgt = Optimizer::delta_v(self.prop, (*node).into());
+                    let tgt = Targeter::delta_v(self.prop, (*node).into());
                     let sol = tgt
                         .try_achieve_dual(
                             initial_states[i],
@@ -355,8 +355,8 @@ impl<T: MultishootNode<O>, const O: usize> MultipleShootingSolution<T, O> {
     ) -> Result<Vec<ScTraj>, MultipleShootingError> {
         let mut trajz = Vec::with_capacity(self.nodes.len());
 
-        for (i, node) in self.nodes.iter().enumerate() {
-            let (_, traj) = Optimizer::delta_v(prop, (*node).into())
+        for (i, node) in self.nodes.iter().copied().enumerate() {
+            let (_, traj) = Targeter::delta_v(prop, node.into())
                 .apply_with_traj(&self.solutions[i], almanac.clone())
                 .context(TargetingSnafu { segment: i })?;
             trajz.push(traj);

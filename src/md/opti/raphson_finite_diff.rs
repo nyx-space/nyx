@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::optimizer::Optimizer;
+use super::targeter::Targeter;
 use super::solution::TargeterSolution;
 use crate::cosmic::{AstroAlmanacSnafu, AstroPhysicsSnafu};
 use crate::dynamics::guidance::{GuidanceError, LocalFrame, Mnvr};
@@ -33,7 +33,7 @@ use snafu::{ensure, ResultExt};
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
-impl<'a, const V: usize, const O: usize> Optimizer<'a, V, O> {
+impl<'a, const V: usize, const O: usize> Targeter<'a, V, O> {
     /// Differential correction using finite differencing
     #[allow(clippy::comparison_chain)]
     pub fn try_achieve_fd(

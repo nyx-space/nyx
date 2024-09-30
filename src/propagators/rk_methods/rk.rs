@@ -19,7 +19,7 @@
 use super::RK;
 
 /// `CashKarp45` is a [Runge Kutta Cash Karp integrator](https://en.wikipedia.org/wiki/Cash%E2%80%93Karp_method).
-pub struct CashKarp45 {}
+pub(crate) struct CashKarp45 {}
 
 impl RK for CashKarp45 {
     const ORDER: u8 = 5;
@@ -61,7 +61,7 @@ impl RK for CashKarp45 {
 ///
 /// If initialized with an `PropOpts.with_adaptive_step`, the variable step will **not** be taken into consideration.
 #[allow(clippy::upper_case_acronyms)]
-pub struct RK4Fixed {}
+pub(crate) struct RK4Fixed {}
 
 impl RK for RK4Fixed {
     const ORDER: u8 = 4;
@@ -86,7 +86,7 @@ const SQRT6: f64 = 2.449_489_742_783_178;
 ///
 /// Coefficients taken from GMAT `src/base/propagator/RungeKutta89.cpp`.
 #[allow(clippy::upper_case_acronyms)]
-pub struct RK89 {}
+pub(crate) struct RK89 {}
 
 impl RK for RK89 {
     const ORDER: u8 = 9;

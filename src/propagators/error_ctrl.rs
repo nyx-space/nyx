@@ -186,6 +186,12 @@ impl ErrorControl {
     }
 }
 
+impl Default for ErrorControl {
+    fn default() -> Self {
+        Self::RSSCartesianStep
+    }
+}
+
 /// An RSS step error control which effectively computes the L2 norm of the provided Vector of size 3
 ///
 /// Note that this error controller should be preferably be used only with slices of a state with the same units.

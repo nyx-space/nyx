@@ -24,11 +24,11 @@ use serde::Serialize;
 
 use crate::io::ConfigError;
 
-pub use self::rk::*;
+use self::rk::*;
 mod dormand;
-pub use self::dormand::*;
+use self::dormand::*;
 mod verner;
-pub use self::verner::*;
+use self::verner::*;
 
 use super::PropagationError;
 
