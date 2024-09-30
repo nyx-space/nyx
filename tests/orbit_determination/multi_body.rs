@@ -6,12 +6,12 @@ use anise::constants::celestial_objects::SUN;
 use anise::constants::frames::IAU_EARTH_FRAME;
 use nyx::od::simulator::TrackingArcSim;
 use nyx::od::simulator::TrkConfig;
+use nyx_space::propagators::IntegratorMethod;
 
 use self::nyx::md::prelude::*;
 use self::nyx::od::prelude::*;
 
 // Extra testing imports
-use self::nyx::propagators::RK4Fixed;
 use nyx::linalg::{SMatrix, SVector};
 use std::collections::BTreeMap;
 
@@ -111,7 +111,11 @@ fn od_val_multi_body_ckf_perfect_stations(
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
     // Generate the truth data.
-    let setup = Propagator::new::<RK4Fixed>(SpacecraftDynamics::new(orbital_dyn), opts);
+    let setup = Propagator::new(
+        SpacecraftDynamics::new(orbital_dyn),
+        IntegratorMethod::RungeKutta4,
+        opts,
+    );
     let mut prop = setup.with(initial_state.into(), almanac.clone());
     let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
@@ -233,7 +237,11 @@ fn multi_body_ckf_covar_map(
     // Generate the truth data on one thread.
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
-    let setup = Propagator::new::<RK4Fixed>(SpacecraftDynamics::new(orbital_dyn), opts);
+    let setup = Propagator::new(
+        SpacecraftDynamics::new(orbital_dyn),
+        IntegratorMethod::RungeKutta4,
+        opts,
+    );
     let mut prop = setup.with(initial_state.into(), almanac.clone());
 
     let (_, traj) = prop.for_duration_with_traj(prop_time).unwrap();

@@ -53,8 +53,9 @@ fn energy_conservation(almanac: Arc<Almanac>) {
         eme2k,
     );
 
-    let rk89_final = Propagator::new::<RK89>(
+    let rk89_final = Propagator::new(
         SpacecraftDynamics::new(OrbitalDynamics::two_body()),
+        IntegratorMethod::RungeKutta89,
         PropOpts::default(),
     )
     .with(Spacecraft::from(start_state), almanac.clone())
@@ -74,8 +75,9 @@ fn energy_conservation(almanac: Arc<Almanac>) {
     }
     println!();
 
-    let dp78_final = Propagator::new::<Dormand78>(
+    let dp78_final = Propagator::new(
         SpacecraftDynamics::new(OrbitalDynamics::two_body()),
+        IntegratorMethod::DormandPrince78,
         PropOpts::default(),
     )
     .with(start_state.into(), almanac)
@@ -1196,7 +1198,11 @@ fn val_cislunar_dynamics(almanac_gmat: Arc<Almanac>) {
     );
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(vec![EARTH, SUN, MOON]));
-    let setup = Propagator::new::<RK4Fixed>(dynamics, PropOpts::with_fixed_step_s(0.5));
+    let setup = Propagator::new(
+        dynamics,
+        IntegratorMethod::RungeKutta4,
+        PropOpts::with_fixed_step_s(0.5),
+    );
     let mut prop = setup.with(state.into(), almanac);
     prop.for_duration(prop_time).unwrap();
 

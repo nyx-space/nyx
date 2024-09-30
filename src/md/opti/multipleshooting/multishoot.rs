@@ -47,7 +47,7 @@ pub struct MultipleShooting<
     const OT: usize,
 > {
     /// The propagator setup (kind, stages, etc.)
-    pub prop: &'a Propagator<'a, SpacecraftDynamics, E>,
+    pub prop: &'a Propagator<SpacecraftDynamics, E>,
     /// List of nodes of the optimal trajectory
     pub targets: Vec<T>,
     /// Starting point, must be a spacecraft equipped with a thruster
@@ -357,9 +357,9 @@ impl<T: MultishootNode<O>, const O: usize> fmt::Display for MultipleShootingSolu
 impl<T: MultishootNode<O>, const O: usize> MultipleShootingSolution<T, O> {
     /// Allows building the trajectories between different nodes
     /// This will rebuild the targeters and apply the solutions sequentially
-    pub fn build_trajectories<'a, E: ErrorCtrl>(
+    pub fn build_trajectories<E: ErrorCtrl>(
         &self,
-        prop: &'a Propagator<'a, SpacecraftDynamics, E>,
+        prop: &Propagator<SpacecraftDynamics, E>,
         almanac: Arc<Almanac>,
     ) -> Result<Vec<ScTraj>, MultipleShootingError> {
         let mut trajz = Vec::with_capacity(self.nodes.len());

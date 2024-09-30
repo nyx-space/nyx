@@ -4,10 +4,11 @@ extern crate nyx_space as nyx;
 use self::nyx::cosmic::{GuidanceMode, Orbit, Spacecraft};
 use self::nyx::dynamics::guidance::{Objective, Ruggiero, StateParameter, Thruster};
 use self::nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
-use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
+use self::nyx::propagators::{PropOpts, Propagator};
 use self::nyx::time::{Epoch, Unit};
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use nyx_space::propagators::IntegratorMethod;
 use rstest::*;
 use std::sync::Arc;
 
@@ -53,11 +54,14 @@ fn rugg_sma(almanac: Arc<Almanac>) {
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
     println!("[rugg_sma] {:x}", orbit);
 
-    let final_state =
-        Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state, almanac)
-            .for_duration(prop_time)
-            .unwrap();
+    let final_state = Propagator::new(
+        sc.clone(),
+        IntegratorMethod::RungeKutta4,
+        PropOpts::with_fixed_step(10.0 * Unit::Second),
+    )
+    .with(sc_state, almanac)
+    .for_duration(prop_time)
+    .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_sma] {:x}", final_state.orbit);
@@ -103,11 +107,14 @@ fn rugg_sma_regress_threshold(almanac: Arc<Almanac>) {
         let sc = SpacecraftDynamics::from_guidance_law(OrbitalDynamics::two_body(), guid_law);
         println!("[rugg_sma_regress] {:x}", orbit);
 
-        let final_state =
-            Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-                .with(sc_state, almanac.clone())
-                .for_duration(prop_time)
-                .unwrap();
+        let final_state = Propagator::new(
+            sc.clone(),
+            IntegratorMethod::RungeKutta4,
+            PropOpts::with_fixed_step(10.0 * Unit::Second),
+        )
+        .with(sc_state, almanac.clone())
+        .for_duration(prop_time)
+        .unwrap();
 
         let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
         println!("[rugg_sma_regress] {:x}", final_state.orbit);
@@ -157,11 +164,14 @@ fn rugg_sma_decr(almanac: Arc<Almanac>) {
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
     println!("[rugg_sma_decr] {:x}", orbit);
 
-    let final_state =
-        Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state, almanac)
-            .for_duration(prop_time)
-            .unwrap();
+    let final_state = Propagator::new(
+        sc.clone(),
+        IntegratorMethod::RungeKutta4,
+        PropOpts::with_fixed_step(10.0 * Unit::Second),
+    )
+    .with(sc_state, almanac)
+    .for_duration(prop_time)
+    .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_sma_decr] {:x}", final_state.orbit);
@@ -212,11 +222,14 @@ fn rugg_inc(almanac: Arc<Almanac>) {
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
     println!("[rugg_inc] {:x}", orbit);
 
-    let final_state =
-        Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state, almanac)
-            .for_duration(prop_time)
-            .unwrap();
+    let final_state = Propagator::new(
+        sc.clone(),
+        IntegratorMethod::RungeKutta4,
+        PropOpts::with_fixed_step(10.0 * Unit::Second),
+    )
+    .with(sc_state, almanac)
+    .for_duration(prop_time)
+    .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_inc] {:x}", final_state.orbit);
@@ -268,11 +281,14 @@ fn rugg_inc_threshold(almanac: Arc<Almanac>) {
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
     println!("[rugg_inc_threshold] {:x}", orbit);
 
-    let final_state =
-        Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state, almanac)
-            .for_duration(prop_time)
-            .unwrap();
+    let final_state = Propagator::new(
+        sc.clone(),
+        IntegratorMethod::RungeKutta4,
+        PropOpts::with_fixed_step(10.0 * Unit::Second),
+    )
+    .with(sc_state, almanac)
+    .for_duration(prop_time)
+    .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_inc_threshold] {:x}", final_state.orbit);
@@ -323,11 +339,14 @@ fn rugg_inc_decr(almanac: Arc<Almanac>) {
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
     println!("[rugg_inc_decr] {:x}", orbit);
 
-    let final_state =
-        Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state, almanac)
-            .for_duration(prop_time)
-            .unwrap();
+    let final_state = Propagator::new(
+        sc.clone(),
+        IntegratorMethod::RungeKutta4,
+        PropOpts::with_fixed_step(10.0 * Unit::Second),
+    )
+    .with(sc_state, almanac)
+    .for_duration(prop_time)
+    .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_inc_decr] {:x}", final_state.orbit);
@@ -378,11 +397,14 @@ fn rugg_ecc(almanac: Arc<Almanac>) {
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
     println!("[rugg_ecc] {:x}", orbit);
 
-    let final_state =
-        Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state, almanac)
-            .for_duration(prop_time)
-            .unwrap();
+    let final_state = Propagator::new(
+        sc.clone(),
+        IntegratorMethod::RungeKutta4,
+        PropOpts::with_fixed_step(10.0 * Unit::Second),
+    )
+    .with(sc_state, almanac)
+    .for_duration(prop_time)
+    .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_ecc] {:x}", final_state.orbit);
@@ -432,11 +454,14 @@ fn rugg_ecc_regress_threshold(almanac: Arc<Almanac>) {
         let sc = SpacecraftDynamics::from_guidance_law(OrbitalDynamics::two_body(), guid_law);
         println!("[rugg_ecc_regress] {:x}", orbit);
 
-        let final_state =
-            Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-                .with(sc_state, almanac.clone())
-                .for_duration(prop_time)
-                .unwrap();
+        let final_state = Propagator::new(
+            sc.clone(),
+            IntegratorMethod::RungeKutta4,
+            PropOpts::with_fixed_step(10.0 * Unit::Second),
+        )
+        .with(sc_state, almanac.clone())
+        .for_duration(prop_time)
+        .unwrap();
 
         let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
         println!("[rugg_ecc_regress] {:x}", final_state.orbit);
@@ -488,11 +513,14 @@ fn rugg_ecc_decr(almanac: Arc<Almanac>) {
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
     println!("[rugg_ecc_decr] {:x}", orbit);
 
-    let final_state =
-        Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state, almanac)
-            .for_duration(prop_time)
-            .unwrap();
+    let final_state = Propagator::new(
+        sc.clone(),
+        IntegratorMethod::RungeKutta4,
+        PropOpts::with_fixed_step(10.0 * Unit::Second),
+    )
+    .with(sc_state, almanac)
+    .for_duration(prop_time)
+    .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_ecc_decr] {:x}", final_state.orbit);
@@ -545,11 +573,14 @@ fn rugg_aop(almanac: Arc<Almanac>) {
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
     println!("[rugg_aop] {:x}", orbit);
 
-    let final_state =
-        Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state, almanac)
-            .for_duration(prop_time)
-            .unwrap();
+    let final_state = Propagator::new(
+        sc.clone(),
+        IntegratorMethod::RungeKutta4,
+        PropOpts::with_fixed_step(10.0 * Unit::Second),
+    )
+    .with(sc_state, almanac)
+    .for_duration(prop_time)
+    .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_aop] {:x}", final_state.orbit);
@@ -601,11 +632,14 @@ fn rugg_aop_decr(almanac: Arc<Almanac>) {
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
     println!("[rugg_aop_decr] {:x}", orbit);
 
-    let final_state =
-        Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state, almanac)
-            .for_duration(prop_time)
-            .unwrap();
+    let final_state = Propagator::new(
+        sc.clone(),
+        IntegratorMethod::RungeKutta4,
+        PropOpts::with_fixed_step(10.0 * Unit::Second),
+    )
+    .with(sc_state, almanac)
+    .for_duration(prop_time)
+    .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_aop_decr] {:x}", final_state.orbit);
@@ -654,8 +688,11 @@ fn rugg_raan(almanac: Arc<Almanac>) {
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
     println!("[rugg_raan] {:x}", orbit);
 
-    let setup =
-        Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second));
+    let setup = Propagator::new(
+        sc.clone(),
+        IntegratorMethod::RungeKutta4,
+        PropOpts::with_fixed_step(10.0 * Unit::Second),
+    );
     let mut prop = setup.with(sc_state, almanac.clone());
     let (final_state, traj) = prop.for_duration_with_traj(prop_time).unwrap();
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
@@ -704,11 +741,14 @@ fn rugg_raan_regress_threshold(almanac: Arc<Almanac>) {
         let sc = SpacecraftDynamics::from_guidance_law(OrbitalDynamics::two_body(), guid_law);
         println!("[rugg_raan_regress] {:x}", orbit);
 
-        let final_state =
-            Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-                .with(sc_state, almanac.clone())
-                .for_duration(prop_time)
-                .unwrap();
+        let final_state = Propagator::new(
+            sc.clone(),
+            IntegratorMethod::RungeKutta4,
+            PropOpts::with_fixed_step(10.0 * Unit::Second),
+        )
+        .with(sc_state, almanac.clone())
+        .for_duration(prop_time)
+        .unwrap();
 
         let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
         println!("[rugg_raan_regress] {:x}", final_state.orbit);

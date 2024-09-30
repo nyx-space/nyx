@@ -8,6 +8,7 @@ use nyx::dynamics::SpacecraftDynamics;
 use nyx::od::prelude::*;
 use nyx::time::Epoch;
 use nyx::{dynamics::OrbitalDynamics, propagators::Propagator};
+use nyx_space::propagators::IntegratorMethod;
 use rand::SeedableRng;
 use rand_pcg::Pcg64Mcg;
 
@@ -78,7 +79,6 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
     use self::nyx::cosmic::Orbit;
     use self::nyx::md::prelude::*;
     use self::nyx::od::prelude::*;
-    use self::nyx::propagators::RK4Fixed;
     use std::str::FromStr;
 
     let cislunar1 = Orbit::cartesian(
@@ -121,8 +121,9 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
     let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
-    let setup = Propagator::new::<RK4Fixed>(
+    let setup = Propagator::new(
         SpacecraftDynamics::new(OrbitalDynamics::point_masses(vec![EARTH, MOON, SUN])),
+        IntegratorMethod::RungeKutta4,
         opts,
     );
 

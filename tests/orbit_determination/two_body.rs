@@ -10,8 +10,9 @@ use nyx::io::ConfigRepr;
 use nyx::io::{gravity::*, ExportCfg};
 use nyx::linalg::{SMatrix, SVector};
 use nyx::od::prelude::*;
-use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
+use nyx::propagators::{PropOpts, Propagator};
 use nyx::Spacecraft;
+use nyx_space::propagators::IntegratorMethod;
 use std::collections::BTreeMap;
 use std::env;
 use std::path::PathBuf;
@@ -125,7 +126,7 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(
 
     // We're sharing both the propagator and the dynamics.
     let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
-    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
+    let setup = Propagator::new(orbital_dyn, IntegratorMethod::RungeKutta4, opts);
 
     let mut prop = setup.with(initial_state.into(), almanac.clone());
     let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
@@ -245,7 +246,11 @@ fn od_tb_val_with_arc(
 
     // We're sharing both the propagator and the dynamics.
     let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
-    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, PropOpts::with_fixed_step_s(10.0));
+    let setup = Propagator::new(
+        orbital_dyn,
+        IntegratorMethod::RungeKutta4,
+        PropOpts::with_fixed_step_s(10.0),
+    );
 
     let mut prop = setup.with(initial_state.into(), almanac.clone());
     let (final_truth, traj) = prop.for_duration_with_traj(duration).unwrap();
@@ -418,7 +423,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
     // Generate the truth data on one thread.
     let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
-    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
+    let setup = Propagator::new(orbital_dyn, IntegratorMethod::RungeKutta4, opts);
     let mut prop = setup.with(initial_state.into(), almanac.clone());
 
     let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
@@ -627,7 +632,7 @@ fn od_tb_ckf_fixed_step_iteration_test(
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
-    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
+    let setup = Propagator::new(orbital_dyn, IntegratorMethod::RungeKutta4, opts);
 
     let mut prop = setup.with(initial_state.into(), almanac.clone());
     let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
@@ -764,7 +769,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map(
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
-    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
+    let setup = Propagator::new(orbital_dyn, IntegratorMethod::RungeKutta4, opts);
 
     let mut prop = setup.with(initial_state.into(), almanac.clone());
     let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
@@ -873,8 +878,9 @@ fn od_tb_ckf_map_covar(almanac: Arc<Almanac>) {
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
 
-    let setup = Propagator::new::<RK4Fixed>(
+    let setup = Propagator::new(
         SpacecraftDynamics::new(OrbitalDynamics::two_body()),
+        IntegratorMethod::RungeKutta4,
         PropOpts::with_fixed_step(step_size),
     );
     let prop_est = setup.with(Spacecraft::from(initial_state).with_stm(), almanac.clone());
@@ -959,7 +965,7 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect(
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm);
     let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::from_model(harmonics));
-    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
+    let setup = Propagator::new(orbital_dyn, IntegratorMethod::RungeKutta4, opts);
 
     let mut prop = setup.with(initial_state.into(), almanac.clone());
     let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
@@ -1064,7 +1070,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map(
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
-    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
+    let setup = Propagator::new(orbital_dyn, IntegratorMethod::RungeKutta4, opts);
     let mut prop = setup.with(initial_state.into(), almanac.clone());
     let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 

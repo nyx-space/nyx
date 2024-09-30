@@ -42,7 +42,7 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
         node_count: usize,
         angular_velocity_deg_s: f64,
         body_frame: Frame,
-        prop: &'a Propagator<'a, SpacecraftDynamics, E>,
+        prop: &'a Propagator<SpacecraftDynamics, E>,
         almanac: Arc<Almanac>,
     ) -> Result<Self, MultipleShootingError> {
         if node_count < 3 {

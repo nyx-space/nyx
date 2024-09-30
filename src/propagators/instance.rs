@@ -48,7 +48,7 @@ where
     /// The state of this propagator instance
     pub state: D::StateType,
     /// The propagator setup (kind, stages, etc.)
-    pub prop: &'a Propagator<'a, D, E>,
+    pub prop: &'a Propagator<D, E>,
     /// Stores the details of the previous integration step
     pub details: IntegrationDetails,
     /// Should progress reports be logged
@@ -342,14 +342,14 @@ where
                 .context(DynamicsSnafu)?;
             self.k[0] = ki;
             let mut a_idx: usize = 0;
-            for i in 0..(self.prop.stages - 1) {
+            for i in 0..(self.prop.method.stages() - 1) {
                 // Let's compute the c_i by summing the relevant items from the list of coefficients.
                 // \sum_{j=1}^{i-1} a_ij  ∀ i ∈ [2, s]
                 let mut ci: f64 = 0.0;
                 // The wi stores the a_{s1} * k_1 + a_{s2} * k_2 + ... + a_{s, s-1} * k_{s-1} +
                 let mut wi = OVector::<f64, <D::StateType as State>::VecLength>::from_element(0.0);
                 for kj in &self.k[0..i + 1] {
-                    let a_ij = self.prop.a_coeffs[a_idx];
+                    let a_ij = self.prop.method.a_coeffs()[a_idx];
                     ci += a_ij;
                     wi += a_ij * kj;
                     a_idx += 1;
@@ -374,9 +374,9 @@ where
             let mut error_est =
                 OVector::<f64, <D::StateType as State>::VecLength>::from_element(0.0);
             for (i, ki) in self.k.iter().enumerate() {
-                let b_i = self.prop.b_coeffs[i];
+                let b_i = self.prop.method.b_coeffs()[i];
                 if !self.fixed_step {
-                    let b_i_star = self.prop.b_coeffs[i + self.prop.stages];
+                    let b_i_star = self.prop.method.b_coeffs()[i + self.prop.method.stages()];
                     error_est += step_size * (b_i - b_i_star) * ki;
                 }
                 next_state += step_size * b_i * ki;
@@ -407,7 +407,7 @@ where
                         let proposed_step = 0.9
                             * step_size
                             * (self.prop.opts.tolerance / self.details.error)
-                                .powf(1.0 / f64::from(self.prop.order));
+                                .powf(1.0 / f64::from(self.prop.method.order()));
                         step_size = if proposed_step > self.prop.opts.max_step.to_seconds() {
                             self.prop.opts.max_step.to_seconds()
                         } else {
@@ -424,7 +424,7 @@ where
                     let proposed_step = 0.9
                         * step_size
                         * (self.prop.opts.tolerance / self.details.error)
-                            .powf(1.0 / f64::from(self.prop.order - 1));
+                            .powf(1.0 / f64::from(self.prop.method.order() - 1));
                     step_size = if proposed_step < self.prop.opts.min_step.to_seconds() {
                         self.prop.opts.min_step.to_seconds()
                     } else {

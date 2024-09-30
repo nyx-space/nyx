@@ -10,11 +10,11 @@ use nyx::linalg::{SMatrix, SVector};
 use nyx::md::trajectory::ExportCfg;
 use nyx::md::{Event, StateParameter};
 use nyx::od::prelude::*;
-use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
+use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, TimeUnits, Unit};
 use nyx_space::cosmic::SrpConfig;
 use nyx_space::dynamics::guidance::LocalFrame;
-use nyx_space::propagators::RSSCartesianStep;
+use nyx_space::propagators::{IntegratorMethod, RSSCartesianStep};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
@@ -142,7 +142,7 @@ fn od_val_sc_mb_srp_reals_duals_models(
 
     let sc_init_state = Spacecraft::from_srp_defaults(initial_state, dry_mass_kg, sc_area);
 
-    let setup = Propagator::new::<RK4Fixed>(sc_dynamics, opts);
+    let setup = Propagator::new(sc_dynamics, IntegratorMethod::RungeKutta4, opts);
     let mut prop = setup.with(sc_init_state, almanac.clone());
     let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 

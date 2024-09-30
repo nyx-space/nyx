@@ -10,9 +10,10 @@ use nyx::dynamics::SpacecraftDynamics;
 use nyx::io::gravity::*;
 use nyx::linalg::{SMatrix, SVector};
 use nyx::od::prelude::*;
-use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
+use nyx::propagators::{PropOpts, Propagator};
 use nyx::utils::rss_orbit_errors;
 use nyx::Spacecraft;
+use nyx_space::propagators::IntegratorMethod;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 
@@ -90,7 +91,7 @@ fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>) {
     );
 
     let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
-    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
+    let setup = Propagator::new(orbital_dyn, IntegratorMethod::RungeKutta4, opts);
     let (_, traj) = setup
         .with(Spacecraft::from(initial_state), almanac.clone())
         .for_duration_with_traj(prop_time)
@@ -319,7 +320,7 @@ fn xhat_dev_test_ekf_multi_body(almanac: Arc<Almanac>) {
 
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
-    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
+    let setup = Propagator::new(orbital_dyn, IntegratorMethod::RungeKutta4, opts);
 
     let (_, traj) = setup
         .with(initial_state.into(), almanac.clone())
@@ -499,7 +500,7 @@ fn xhat_dev_test_ekf_harmonics(almanac: Arc<Almanac>) {
         PointMasses::new(bodies),
     ]));
 
-    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
+    let setup = Propagator::new(orbital_dyn, IntegratorMethod::RungeKutta4, opts);
 
     let (_, traj) = setup
         .with(initial_state.into(), almanac.clone())
@@ -649,7 +650,7 @@ fn xhat_dev_test_ekf_realistic(almanac: Arc<Almanac>) {
 
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER, SATURN_BARYCENTER];
     let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
-    let truth_setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
+    let truth_setup = Propagator::new(orbital_dyn, IntegratorMethod::RungeKutta4, opts);
 
     let (_, traj) = truth_setup
         .with(initial_state.into(), almanac.clone())
@@ -666,7 +667,7 @@ fn xhat_dev_test_ekf_realistic(almanac: Arc<Almanac>) {
     // We expect the estimated orbit to be _nearly_ perfect because we've removed SATURN_BARYCENTER from the estimated trajectory
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let estimator = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
-    let setup = Propagator::new::<RK4Fixed>(estimator, opts);
+    let setup = Propagator::new(estimator, IntegratorMethod::RungeKutta4, opts);
     let prop_est = setup.with(Spacecraft::from(initial_state).with_stm(), almanac.clone());
     let covar_radius_km = 1.0e2;
     let covar_velocity_km_s = 1.0e1;
@@ -804,7 +805,7 @@ fn xhat_dev_test_ckf_smoother_multi_body(almanac: Arc<Almanac>) {
 
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
-    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
+    let setup = Propagator::new(orbital_dyn, IntegratorMethod::RungeKutta4, opts);
     let (_, traj) = setup
         .with(initial_state.into(), almanac.clone())
         .for_duration_with_traj(prop_time)
@@ -1074,7 +1075,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body(almanac: Arc<Almanac>) {
 
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
-    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
+    let setup = Propagator::new(orbital_dyn, IntegratorMethod::RungeKutta4, opts);
     let (_, traj) = setup
         .with(initial_state.into(), almanac.clone())
         .for_duration_with_traj(prop_time)
@@ -1345,7 +1346,7 @@ fn xhat_dev_test_ckf_iteration_multi_body(almanac: Arc<Almanac>) {
 
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
-    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
+    let setup = Propagator::new(orbital_dyn, IntegratorMethod::RungeKutta4, opts);
     let (_, traj) = setup
         .with(initial_state.into(), almanac.clone())
         .for_duration_with_traj(prop_time)

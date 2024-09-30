@@ -84,7 +84,7 @@ impl IntegratorMethod {
         }
     }
 
-    /// Returns the stages of this integrator (as usize because it's used as indexing)
+    /// Returns the stages of this integrator, i.e. how many times the derivatives will be called
     pub const fn stages(self) -> usize {
         match self {
             Self::RungeKutta89 => RK89::STAGES,

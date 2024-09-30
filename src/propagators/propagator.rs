@@ -21,7 +21,7 @@ use std::sync::Arc;
 use anise::almanac::Almanac;
 
 use super::error_ctrl::{ErrorCtrl, RSSCartesianStep};
-use super::{Dormand78, IntegrationDetails, PropInstance, PropOpts, RK, RK89};
+use super::{IntegrationDetails, IntegratorMethod, PropInstance, PropOpts};
 use crate::dynamics::Dynamics;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, OVector};
@@ -32,7 +32,7 @@ use crate::State;
 /// It is an EventTracker, without any event tracking. It includes the options, the integrator
 /// details of the previous step, and the set of coefficients used for the monomorphic instance.
 #[derive(Clone, Debug)]
-pub struct Propagator<'a, D: Dynamics, E: ErrorCtrl>
+pub struct Propagator<D: Dynamics, E: ErrorCtrl>
 where
     DefaultAllocator: Allocator<<D::StateType as State>::Size>
         + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
@@ -41,14 +41,11 @@ where
 {
     pub dynamics: D, // Stores the dynamics used. *Must* use this to get the latest values
     pub opts: PropOpts<E>, // Stores the integration options (tolerance, min/max step, init step, etc.)
-    pub(crate) order: u8,  // Order of the integrator
-    pub(crate) stages: usize, // Number of stages, i.e. how many times the derivatives will be called
-    pub(crate) a_coeffs: &'a [f64],
-    pub(crate) b_coeffs: &'a [f64],
+    pub method: IntegratorMethod,
 }
 
 /// The `Propagator` trait defines the functions of a propagator and of an event tracker.
-impl<'a, D: Dynamics, E: ErrorCtrl> Propagator<'a, D, E>
+impl<D: Dynamics, E: ErrorCtrl> Propagator<D, E>
 where
     DefaultAllocator: Allocator<<D::StateType as State>::Size>
         + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
@@ -56,14 +53,11 @@ where
         + Allocator<<D::StateType as State>::VecLength>,
 {
     /// Each propagator must be initialized with `new` which stores propagator information.
-    pub fn new<T: RK>(dynamics: D, opts: PropOpts<E>) -> Self {
+    pub fn new(dynamics: D, method: IntegratorMethod, opts: PropOpts<E>) -> Self {
         Self {
             dynamics,
             opts,
-            stages: T::STAGES,
-            order: T::ORDER,
-            a_coeffs: T::A_COEFFS,
-            b_coeffs: T::B_COEFFS,
+            method,
         }
     }
 
@@ -83,19 +77,19 @@ where
 
     /// An RK89 propagator (the default) with custom propagator options.
     pub fn rk89(dynamics: D, opts: PropOpts<E>) -> Self {
-        Self::new::<RK89>(dynamics, opts)
+        Self::new(dynamics, IntegratorMethod::RungeKutta89, opts)
     }
 
     /// A Dormand Prince 7-8 propagator with custom propagator options: it's about 20% faster than an RK98, and more stable in two body dynamics.
     /// WARNINGS: Dormand Prince may have issues with generating proper trajectories, leading to glitches in event finding.
     pub fn dp78(dynamics: D, opts: PropOpts<E>) -> Self {
-        Self::new::<Dormand78>(dynamics, opts)
+        Self::new(dynamics, IntegratorMethod::DormandPrince78, opts)
     }
 
-    pub fn with(&'a self, state: D::StateType, almanac: Arc<Almanac>) -> PropInstance<'a, D, E> {
+    pub fn with(&self, state: D::StateType, almanac: Arc<Almanac>) -> PropInstance<D, E> {
         // Pre-allocate the k used in the propagator
-        let mut k = Vec::with_capacity(self.stages + 1);
-        for _ in 0..self.stages {
+        let mut k = Vec::with_capacity(self.method.stages() + 1);
+        for _ in 0..self.method.stages() {
             k.push(OVector::<f64, <D::StateType as State>::VecLength>::zeros());
         }
         PropInstance {
@@ -115,7 +109,7 @@ where
     }
 }
 
-impl<'a, D: Dynamics> Propagator<'a, D, RSSCartesianStep>
+impl<D: Dynamics> Propagator<D, RSSCartesianStep>
 where
     DefaultAllocator: Allocator<<D::StateType as State>::Size>
         + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
@@ -124,13 +118,13 @@ where
 {
     /// Default propagator is an RK89 with the default PropOpts.
     pub fn default(dynamics: D) -> Self {
-        Self::new::<RK89>(dynamics, PropOpts::default())
+        Self::rk89(dynamics, PropOpts::default())
     }
 
     /// A default Dormand Prince 78 propagator with the default PropOpts.
     /// Faster and more stable than an RK89 (`default`) but seems to cause issues for event finding.
     /// WARNINGS: Dormand Prince may have issues with generating proper trajectories, leading to glitches in event finding.
     pub fn default_dp78(dynamics: D) -> Self {
-        Self::new::<Dormand78>(dynamics, PropOpts::default())
+        Self::dp78(dynamics, PropOpts::default())
     }
 }

@@ -32,8 +32,9 @@ fn stm_fixed_step(almanac: Arc<Almanac>) {
         .with_mu_km3_s2(GMAT_EARTH_GM);
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let prop = Propagator::new::<RK4Fixed>(
+    let prop = Propagator::new(
         SpacecraftDynamics::new(OrbitalDynamics::two_body()),
+        IntegratorMethod::RungeKutta4,
         PropOpts::with_fixed_step(10 * Unit::Second),
     );
 
