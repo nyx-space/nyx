@@ -3,8 +3,8 @@ extern crate nyx_space as nyx;
 use anise::constants::celestial_objects::JUPITER_BARYCENTER;
 use anise::constants::celestial_objects::MOON;
 use anise::constants::celestial_objects::SUN;
-use nyx::md::targeter::*;
 use nyx::md::prelude::*;
+use nyx::md::targeter::*;
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use rstest::*;

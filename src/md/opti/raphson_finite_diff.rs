@@ -16,8 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::targeter::Targeter;
 use super::solution::TargeterSolution;
+use super::targeter::Targeter;
 use crate::cosmic::{AstroAlmanacSnafu, AstroPhysicsSnafu};
 use crate::dynamics::guidance::{GuidanceError, LocalFrame, Mnvr};
 use crate::errors::TargetingError;

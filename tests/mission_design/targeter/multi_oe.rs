@@ -2,8 +2,8 @@ extern crate nyx_space as nyx;
 
 // use nyx::dynamics::guidance::Mnvr;
 use nyx::dynamics::guidance::Thruster;
-use nyx::md::targeter::*;
 use nyx::md::prelude::*;
+use nyx::md::targeter::*;
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use rstest::*;
