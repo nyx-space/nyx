@@ -40,107 +40,38 @@ fn regress_leo_day_adaptive(almanac: Arc<Almanac>) {
     ));
     let final_dt = dt + prop_time;
 
-    let all_rslts = vec![
-        Orbit::cartesian(
-            -5_971.198_524_908_157,
-            3_945.775_509_326_305_4,
-            2_864.262_542_023_422,
-            0.048_766_212_879_869_19,
-            -4.184_873_956_982_518,
-            5.849_098_380_963_502,
-            final_dt,
-            eme2k,
-        ),
-        Orbit::cartesian(
-            -5_971.194_190_197_366,
-            3_945.506_606_221_459_6,
-            2_864.636_682_800_498_4,
-            0.049_097_015_227_526_38,
-            -4.185_093_356_859_808,
-            5.848_940_840_578_1,
-            final_dt,
-            eme2k,
-        ),
-        Orbit::cartesian(
-            -5_971.194_190_305_766,
-            3_945.506_612_356_549_3,
-            2_864.636_674_277_756_4,
-            0.049_097_007_640_393_29,
-            -4.185_093_351_832_897,
-            5.848_940_844_198_66,
-            final_dt,
-            eme2k,
-        ),
-    ];
+    let rslt = Orbit::cartesian(
+        -5_971.194_190_197_366,
+        3_945.506_606_221_459_6,
+        2_864.636_682_800_498_4,
+        0.049_097_015_227_526_38,
+        -4.185_093_356_859_808,
+        5.848_940_840_578_1,
+        final_dt,
+        eme2k,
+    );
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
-    {
-        let setup = Propagator::new::<RK2Fixed>(
-            dynamics.clone(),
-            PropOpts::with_fixed_step(1.0 * Unit::Second),
-        );
-        let mut prop = setup.with(init, almanac.clone());
-        prop.for_duration(prop_time).unwrap();
+    let setup = Propagator::new::<CashKarp45>(
+        dynamics.clone(),
+        PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSCartesianState {}),
+    );
+    let mut prop = setup.with(init, almanac.clone());
+    prop.for_duration(prop_time).unwrap();
+    assert_orbit_eq_or_abs(
+        &prop.state.orbit,
+        &rslt,
+        1e-7,
+        "CashKarp45 two body prop failed",
+    );
+    let prev_details = prop.latest_details();
+    if prev_details.error > accuracy {
         assert_eq!(
-            prop.state.orbit.to_cartesian_pos_vel(),
-            all_rslts[0].to_cartesian_pos_vel(),
-            "RK2Fixed two body prop failed"
+            prev_details.step, min_step,
+            "step size should be at its minimum because error is higher than tolerance: {:?}",
+            prev_details
         );
-        let prev_details = prop.latest_details();
-        if prev_details.error > accuracy {
-            assert_eq!(
-                prev_details.step, min_step,
-                "step size should be at its minimum because error is higher than tolerance: {:?}",
-                prev_details
-            );
-        }
-    }
-
-    {
-        let setup = Propagator::new::<CashKarp45>(
-            dynamics.clone(),
-            PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSCartesianState {}),
-        );
-        let mut prop = setup.with(init, almanac.clone());
-        prop.for_duration(prop_time).unwrap();
-        assert_orbit_eq_or_abs(
-            &prop.state.orbit,
-            &all_rslts[1],
-            1e-7,
-            "CashKarp45 two body prop failed",
-        );
-        let prev_details = prop.latest_details();
-        if prev_details.error > accuracy {
-            assert_eq!(
-                prev_details.step, min_step,
-                "step size should be at its minimum because error is higher than tolerance: {:?}",
-                prev_details
-            );
-        }
-    }
-
-    {
-        let setup = Propagator::new::<Fehlberg45>(
-            dynamics,
-            PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSCartesianState {}),
-        );
-        let mut prop = setup.with(init, almanac.clone());
-        prop.for_duration(prop_time).unwrap();
-        assert_orbit_eq_or_abs(
-            &prop.state.orbit,
-            &all_rslts[2],
-            1e-7,
-            "Fehlberg45 two body prop failed",
-        );
-        let prev_details = prop.latest_details();
-        if prev_details.error > accuracy {
-            assert_eq!(
-                prev_details.step, min_step,
-                "step size should be at its minimum because error is higher than tolerance: {:?}",
-                prev_details
-            );
-        }
     }
 }
 

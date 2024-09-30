@@ -80,25 +80,6 @@ impl RK for RK4Fixed {
     ];
 }
 
-/// `RK2Fixed` is a fixed step RK4 (or midpoint method).
-///
-/// If initialized with an `PropOpts.with_adaptive_step`, the variable step will **not** be taken into consideration.
-#[allow(clippy::upper_case_acronyms)]
-pub struct RK2Fixed {}
-
-impl RK for RK2Fixed {
-    const ORDER: u8 = 2;
-    const STAGES: usize = 2;
-    const A_COEFFS: &'static [f64] = &[2.0 / 3.0];
-    const B_COEFFS: &'static [f64] = &[
-        1.0 / 4.0,
-        3.0 / 4.0,
-        // NOTE: Duplicating the B coefficients for force the error to zero.
-        1.0 / 4.0,
-        3.0 / 4.0,
-    ];
-}
-
 const SQRT6: f64 = 2.449_489_742_783_178;
 
 /// `RK89` is a Runge Kutta 8-9 integrator.

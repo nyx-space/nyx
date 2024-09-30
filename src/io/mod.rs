@@ -159,13 +159,13 @@ impl ExportCfg {
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub(crate)))]
 pub enum ConfigError {
-    #[snafu(display("Failed to read configuration file: {source}"))]
+    #[snafu(display("failed to read configuration file: {source}"))]
     ReadError { source: io::Error },
 
-    #[snafu(display("Failed to parse YAML configuration file: {source}"))]
+    #[snafu(display("failed to parse YAML configuration file: {source}"))]
     ParseError { source: serde_yaml::Error },
 
-    #[snafu(display("Invalid configuration: {msg}"))]
+    #[snafu(display("of invalid configuration: {msg}"))]
     InvalidConfig { msg: String },
 }
 
