@@ -77,12 +77,13 @@ typed-builder = "0.20.0"
 pythonize = { version = "0.21", optional = true }
 snafu = { version = "0.8.3", features = ["backtrace"] }
 serde_dhall = "0.12"
-toml = "0.8.14"
+
 
 [dev-dependencies]
 polars = { version = "0.43.1", features = ["parquet"] }
 rstest = "0.22.0"
 pretty_env_logger = "0.5"
+toml = "0.8.14"
 
 [build-dependencies]
 shadow-rs = "0.35.0"

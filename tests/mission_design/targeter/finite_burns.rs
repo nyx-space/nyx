@@ -4,8 +4,8 @@ use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SUN};
 use hifitime::TimeUnits;
 use nyx::dynamics::guidance::{LocalFrame, Mnvr, Thruster};
 use nyx::linalg::Vector3;
-use nyx::md::optimizer::*;
 use nyx::md::prelude::*;
+use nyx::md::targeter::*;
 
 use crate::propagation::GMAT_EARTH_GM;
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
@@ -52,7 +52,7 @@ fn thrust_dir_tgt_sma_aop_raan(almanac: Arc<Almanac>) {
         Objective::within_tolerance(StateParameter::RAAN, 60.000182, 1e-3),
     ];
 
-    let tgt = Optimizer::thrust_dir(&setup, objectives);
+    let tgt = Targeter::thrust_dir(&setup, objectives);
 
     println!("{}", tgt);
 
@@ -99,7 +99,7 @@ fn thrust_dir_rate_tgt_sma_aop_raan(almanac: Arc<Almanac>) {
         Objective::within_tolerance(StateParameter::RAAN, 60.000182, 1e-3),
     ];
 
-    let tgt = Optimizer::thrust_dir_rate(&setup, objectives);
+    let tgt = Targeter::thrust_dir_rate(&setup, objectives);
 
     println!("{}", tgt);
 
@@ -148,7 +148,7 @@ fn thrust_profile_tgt_sma_aop_raan(almanac: Arc<Almanac>) {
         Objective::within_tolerance(StateParameter::RAAN, 60.000182, 1e-3),
     ];
 
-    let tgt = Optimizer::thrust_profile(&setup, objectives);
+    let tgt = Targeter::thrust_profile(&setup, objectives);
 
     println!("{}", tgt);
 
@@ -222,7 +222,7 @@ fn val_tgt_finite_burn(almanac: Arc<Almanac>) {
     let sc_no_thrust = SpacecraftDynamics::new(orbital_dyn);
     let mut prop_no_thrust = Propagator::default(sc_no_thrust);
     prop_no_thrust.set_max_step(mnvr0.duration());
-    let impulsive_tgt = Optimizer::delta_v(
+    let impulsive_tgt = Targeter::delta_v(
         &prop_no_thrust,
         [
             Objective::within_tolerance(StateParameter::X, sc_xf_desired.orbit.radius_km.x, 1e-5),

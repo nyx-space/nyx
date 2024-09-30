@@ -64,7 +64,6 @@ pub mod snc;
 pub type SpacecraftODProcess<'a> = self::process::ODProcess<
     'a,
     crate::md::prelude::SpacecraftDynamics,
-    crate::propagators::RSSCartesianStep,
     msr::RangeDoppler,
     nalgebra::Const<3>,
     crate::Spacecraft,

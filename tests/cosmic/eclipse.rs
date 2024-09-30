@@ -7,7 +7,7 @@ use nyx::cosmic::eclipse::EclipseLocator;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::SpacecraftDynamics;
-use nyx::propagators::{PropOpts, Propagator};
+use nyx::propagators::{IntegratorOptions, Propagator};
 use nyx::time::{Epoch, Unit};
 use std::sync::{mpsc, Arc};
 use std::thread;
@@ -38,7 +38,7 @@ fn leo_sun_earth_eclipses(almanac: Arc<Almanac>) {
     let almanac_c = almanac.clone();
     thread::spawn(move || {
         let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
-        let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step_s(60.0));
+        let setup = Propagator::rk89(dynamics, IntegratorOptions::with_fixed_step_s(60.0));
 
         setup
             .with(leo.into(), almanac_c)
@@ -90,7 +90,7 @@ fn geo_sun_earth_eclipses(almanac: Arc<Almanac>) {
 
     thread::spawn(move || {
         let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
-        let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step_s(60.0));
+        let setup = Propagator::rk89(dynamics, IntegratorOptions::with_fixed_step_s(60.0));
 
         setup
             .with(geo.into(), almanac_c)

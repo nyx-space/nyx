@@ -1,7 +1,7 @@
 extern crate nyx_space as nyx;
 
-use nyx::md::optimizer::*;
 use nyx::md::prelude::*;
+use nyx::md::targeter::*;
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use rstest::*;
@@ -38,7 +38,7 @@ fn tgt_vnc_c3_decl(almanac: Arc<Almanac>) {
         Objective::within_tolerance(StateParameter::C3, -5.0, 0.5),
     ];
 
-    let tgt = Optimizer::vnc(&setup, objectives);
+    let tgt = Targeter::vnc(&setup, objectives);
 
     println!("{}", tgt);
 
@@ -86,7 +86,7 @@ fn tgt_vnc_sma_ecc(almanac: Arc<Almanac>) {
         Objective::within_tolerance(StateParameter::SMA, 8100.0, 0.1),
     ];
 
-    let tgt = Optimizer::vnc_with_components(
+    let tgt = Targeter::vnc_with_components(
         &setup,
         [
             Variable {

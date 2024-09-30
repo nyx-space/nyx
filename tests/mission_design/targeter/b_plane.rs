@@ -4,8 +4,8 @@ use anise::constants::celestial_objects::JUPITER_BARYCENTER;
 use anise::constants::celestial_objects::MOON;
 use anise::constants::celestial_objects::SUN;
 use anise::constants::frames::MOON_J2000;
-use nyx::md::optimizer::*;
 use nyx::md::prelude::*;
+use nyx::md::targeter::*;
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use rstest::*;
@@ -48,7 +48,7 @@ fn tgt_b_plane_earth_gravity_assist_no_propagation(almanac: Arc<Almanac>) {
 
     let b_plane_tgt = BPlaneTarget::from_bt_br(13135.7982982557, 5022.26511510685);
 
-    let tgt = Optimizer::delta_v(&prop, b_plane_tgt.to_objectives());
+    let tgt = Targeter::delta_v(&prop, b_plane_tgt.to_objectives());
 
     let sol = tgt
         .try_achieve_from(spacecraft, epoch, epoch, almanac.clone())
@@ -117,7 +117,7 @@ fn tgt_b_plane_lunar_transfer(almanac: Arc<Almanac>) {
     // GMAT truth with central differencing: 1.15740867962, -0.576350387399, 0.632247251449
     // GMAT truth with forward differencing: 1.33490412071, -0.5447988683, 1.77697094604 (approach currently in Nyx)
 
-    let tgt = Optimizer::in_frame(
+    let tgt = Targeter::in_frame(
         &prop,
         [
             Variable {
@@ -209,7 +209,7 @@ fn tgt_b_plane_earth_gravity_assist_with_propagation(almanac: Arc<Almanac>) {
 
     let b_plane_tgt = BPlaneTarget::from_bt_br(13135.7982982557, 5022.26511510685);
 
-    let tgt = Optimizer::delta_v(&prop, b_plane_tgt.to_objectives());
+    let tgt = Targeter::delta_v(&prop, b_plane_tgt.to_objectives());
 
     let sol = tgt
         .try_achieve_from(prior_sc, prior_sc.epoch(), epoch, almanac.clone())

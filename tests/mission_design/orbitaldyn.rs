@@ -8,7 +8,6 @@ use na::{Const, OMatrix};
 use nyx::cosmic::{assert_orbit_eq_or_abs, Orbit};
 use nyx::dynamics::{Dynamics, OrbitalDynamics, PointMasses, SpacecraftDynamics};
 use nyx::linalg::Vector6;
-use nyx::propagators::error_ctrl::RSSCartesianStep;
 use nyx::time::{Epoch, Unit};
 use nyx::utils::{rss_orbit_errors, rss_orbit_vec_errors};
 use nyx::State;
@@ -53,9 +52,10 @@ fn energy_conservation(almanac: Arc<Almanac>) {
         eme2k,
     );
 
-    let rk89_final = Propagator::new::<RK89>(
+    let rk89_final = Propagator::new(
         SpacecraftDynamics::new(OrbitalDynamics::two_body()),
-        PropOpts::default(),
+        IntegratorMethod::RungeKutta89,
+        IntegratorOptions::default(),
     )
     .with(Spacecraft::from(start_state), almanac.clone())
     .for_duration(prop_time)
@@ -74,9 +74,10 @@ fn energy_conservation(almanac: Arc<Almanac>) {
     }
     println!();
 
-    let dp78_final = Propagator::new::<Dormand78>(
+    let dp78_final = Propagator::new(
         SpacecraftDynamics::new(OrbitalDynamics::two_body()),
-        PropOpts::default(),
+        IntegratorMethod::DormandPrince78,
+        IntegratorOptions::default(),
     )
     .with(start_state.into(), almanac)
     .for_duration(prop_time)
@@ -120,7 +121,7 @@ fn val_two_body_dynamics(almanac: Arc<Almanac>) {
     );
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
-    let setup = Propagator::rk89(dynamics, PropOpts::<RSSCartesianStep>::default());
+    let setup = Propagator::rk89(dynamics, IntegratorOptions::default());
     let mut prop = setup.with(state.into(), almanac);
     prop.for_duration(prop_time).unwrap();
 
@@ -209,7 +210,10 @@ fn val_halo_earth_moon_dynamics(almanac_gmat: Arc<Almanac>) {
     let bodies = vec![MOON];
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
 
-    let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step(10 * Unit::Second));
+    let setup = Propagator::rk89(
+        dynamics,
+        IntegratorOptions::with_fixed_step(10 * Unit::Second),
+    );
     let mut prop = setup.with(halo_rcvr.into(), almanac);
     prop.for_duration(prop_time).unwrap();
     let (err_r, err_v) = rss_orbit_errors(&prop.state.orbit, &rslt);
@@ -273,7 +277,7 @@ fn val_halo_earth_moon_dynamics_adaptive(almanac_gmat: Arc<Almanac>) {
     let bodies = vec![MOON];
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
 
-    let setup = Propagator::rk89(dynamics, PropOpts::default());
+    let setup = Propagator::rk89(dynamics, IntegratorOptions::default());
     let mut prop = setup.with(halo_rcvr.into(), almanac);
     prop.for_duration(prop_time).unwrap();
     let (err_r, err_v) = rss_orbit_vec_errors(&prop.state.orbit.to_cartesian_pos_vel(), &rslt);
@@ -339,7 +343,7 @@ fn val_llo_earth_moon_dynamics_adaptive(almanac_gmat: Arc<Almanac>) {
     let bodies = vec![MOON];
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
 
-    let setup = Propagator::rk89(dynamics, PropOpts::default());
+    let setup = Propagator::rk89(dynamics, IntegratorOptions::default());
     let mut prop = setup.with(llo_xmtr.into(), almanac);
     prop.for_duration(prop_time).unwrap();
     let (err_r, err_v) = rss_orbit_vec_errors(&prop.state.orbit.to_cartesian_pos_vel(), &rslt);
@@ -401,7 +405,10 @@ fn val_halo_multi_body_dynamics(almanac_gmat: Arc<Almanac>) {
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
 
-    let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step(10 * Unit::Second));
+    let setup = Propagator::rk89(
+        dynamics,
+        IntegratorOptions::with_fixed_step(10 * Unit::Second),
+    );
     let mut prop = setup.with(halo_rcvr.into(), almanac);
     prop.for_duration(prop_time).unwrap();
     let (err_r, err_v) = rss_orbit_vec_errors(&prop.state.orbit.to_cartesian_pos_vel(), &rslt);
@@ -752,7 +759,7 @@ fn two_body_dual(almanac: Arc<Almanac>) {
     let prop_time = 2 * Unit::Minute;
     let step_size = 10 * Unit::Second;
 
-    let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step(step_size));
+    let setup = Propagator::rk89(dynamics, IntegratorOptions::with_fixed_step(step_size));
     let mut prop = setup.with(init_sc, almanac.clone());
     let final_state = prop.for_duration(prop_time).unwrap();
 
@@ -805,7 +812,7 @@ fn multi_body_dynamics_dual(almanac: Arc<Almanac>) {
     // let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
-    let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step(step_size));
+    let setup = Propagator::rk89(dynamics, IntegratorOptions::with_fixed_step(step_size));
     let final_state = setup
         .with(halo_rcvr.into(), almanac.clone())
         .for_duration(prop_time)
@@ -915,7 +922,7 @@ fn val_earth_sph_harmonics_j2(almanac: Arc<Almanac>) {
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::from_model(harmonics));
 
-    let prop_state = Propagator::rk89(dynamics, PropOpts::<RSSCartesianStep>::default())
+    let prop_state = Propagator::rk89(dynamics, IntegratorOptions::default())
         .with(state.into(), almanac)
         .for_duration(1 * Unit::Day)
         .unwrap();
@@ -968,7 +975,7 @@ fn val_earth_sph_harmonics_12x12(almanac_gmat: Arc<Almanac>) {
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::from_model(harmonics));
 
-    let setup = Propagator::rk89(dynamics.clone(), PropOpts::with_tolerance(1e-9));
+    let setup = Propagator::rk89(dynamics.clone(), IntegratorOptions::with_tolerance(1e-9));
     let prop_time = 1 * Unit::Day;
     let final_state = setup
         .with(state.into(), almanac.clone())
@@ -992,7 +999,7 @@ fn val_earth_sph_harmonics_12x12(almanac_gmat: Arc<Almanac>) {
 
     // We set up a new propagator with a fixed step. Without the fixed step, the error control
     // on the STM leads to a difference of 1.04 meters in this one day propagation.
-    let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step_s(30.0));
+    let setup = Propagator::rk89(dynamics, IntegratorOptions::with_fixed_step_s(30.0));
     let prop_time = 6 * Unit::Hour;
     let final_state = setup
         .with(state.into(), almanac.clone())
@@ -1155,7 +1162,7 @@ fn hf_prop(almanac: Arc<Almanac>) {
         harmonics,
     ]));
 
-    let setup = Propagator::rk89(dynamics, PropOpts::with_tolerance(1e-9));
+    let setup = Propagator::rk89(dynamics, IntegratorOptions::with_tolerance(1e-9));
     let rslt = setup
         .with(state.into(), almanac)
         .for_duration(30.0 * Unit::Day)
@@ -1196,7 +1203,11 @@ fn val_cislunar_dynamics(almanac_gmat: Arc<Almanac>) {
     );
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(vec![EARTH, SUN, MOON]));
-    let setup = Propagator::new::<RK4Fixed>(dynamics, PropOpts::with_fixed_step_s(0.5));
+    let setup = Propagator::new(
+        dynamics,
+        IntegratorMethod::RungeKutta4,
+        IntegratorOptions::with_fixed_step_s(0.5),
+    );
     let mut prop = setup.with(state.into(), almanac);
     prop.for_duration(prop_time).unwrap();
 

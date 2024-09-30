@@ -110,6 +110,12 @@ where
     fn set_value(&mut self, param: StateParameter, _val: f64) -> Result<(), StateError> {
         Err(StateError::Unavailable { param })
     }
+
+    /// Returns a copy of the orbit
+    fn orbit(&self) -> Orbit;
+
+    /// Modifies this state's orbit
+    fn set_orbit(&mut self, _orbit: Orbit) {}
 }
 
 pub fn assert_orbit_eq_or_abs(left: &Orbit, right: &Orbit, epsilon: f64, msg: &str) {

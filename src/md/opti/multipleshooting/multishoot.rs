@@ -22,9 +22,8 @@ pub use super::CostFunction;
 use super::{MultipleShootingError, TargetingSnafu};
 use crate::linalg::{DMatrix, DVector, SVector};
 use crate::md::opti::solution::TargeterSolution;
-use crate::md::optimizer::Optimizer;
+use crate::md::targeter::Targeter;
 use crate::md::{prelude::*, TargetingError};
-use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::pseudo_inverse;
 use crate::{Orbit, Spacecraft};
 
@@ -39,15 +38,9 @@ pub trait MultishootNode<const O: usize>: Copy + Into<[Objective; O]> {
 /// Source of implementation: "Low Thrust Optimization in Cislunar and Translunar space", 2018 Nathan Re (Parrish)
 /// OT: size of the objectives for each node (e.g. 3 if the objectives are X, Y, Z).
 /// VT: size of the variables for targeter node (e.g. 4 if the objectives are thrust direction (x,y,z) and thrust level).
-pub struct MultipleShooting<
-    'a,
-    E: ErrorCtrl,
-    T: MultishootNode<OT>,
-    const VT: usize,
-    const OT: usize,
-> {
+pub struct MultipleShooting<'a, T: MultishootNode<OT>, const VT: usize, const OT: usize> {
     /// The propagator setup (kind, stages, etc.)
-    pub prop: &'a Propagator<'a, SpacecraftDynamics, E>,
+    pub prop: &'a Propagator<SpacecraftDynamics>,
     /// List of nodes of the optimal trajectory
     pub targets: Vec<T>,
     /// Starting point, must be a spacecraft equipped with a thruster
@@ -66,9 +59,7 @@ pub struct MultipleShooting<
     pub all_dvs: Vec<SVector<f64, VT>>,
 }
 
-impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
-    MultipleShooting<'a, E, T, VT, OT>
-{
+impl<'a, T: MultishootNode<OT>, const VT: usize, const OT: usize> MultipleShooting<'a, T, VT, OT> {
     /// Solve the multiple shooting problem by finding the arrangement of nodes to minimize the cost function.
     pub fn solve(
         &mut self,
@@ -90,7 +81,7 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
                 /* ***
                  ** 1. Solve the delta-v differential corrector between each node
                  ** *** */
-                let tgt = Optimizer {
+                let tgt = Targeter {
                     prop: self.prop,
                     objectives: self.targets[i].into(),
                     variables: self.variables,
@@ -134,7 +125,7 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
                      ** Note that because the first initial_state is x0, the i-th "initial state"
                      ** is the initial state to reach the i-th node.
                      ** *** */
-                    let inner_tgt_a = Optimizer::delta_v(self.prop, next_node);
+                    let inner_tgt_a = Targeter::delta_v(self.prop, next_node);
                     let inner_sol_a = inner_tgt_a
                         .try_achieve_dual(
                             initial_states[i],
@@ -160,7 +151,7 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
                     /* ***
                      ** 2.C. Rerun the targeter from the new state at the perturbed node to the next unpertubed node
                      ** *** */
-                    let inner_tgt_b = Optimizer::delta_v(self.prop, self.targets[i + 1].into());
+                    let inner_tgt_b = Targeter::delta_v(self.prop, self.targets[i + 1].into());
                     let inner_sol_b = inner_tgt_b
                         .try_achieve_dual(
                             inner_sol_a.achieved_state,
@@ -250,7 +241,7 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
 
                 for (i, node) in self.targets.iter().enumerate() {
                     // Run the unpertubed targeter
-                    let tgt = Optimizer::delta_v(self.prop, (*node).into());
+                    let tgt = Targeter::delta_v(self.prop, (*node).into());
                     let sol = tgt
                         .try_achieve_dual(
                             initial_states[i],
@@ -287,8 +278,8 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
     }
 }
 
-impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize> fmt::Display
-    for MultipleShooting<'a, E, T, VT, OT>
+impl<'a, T: MultishootNode<OT>, const VT: usize, const OT: usize> fmt::Display
+    for MultipleShooting<'a, T, VT, OT>
 {
     #[allow(clippy::or_fun_call, clippy::clone_on_copy)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -357,15 +348,15 @@ impl<T: MultishootNode<O>, const O: usize> fmt::Display for MultipleShootingSolu
 impl<T: MultishootNode<O>, const O: usize> MultipleShootingSolution<T, O> {
     /// Allows building the trajectories between different nodes
     /// This will rebuild the targeters and apply the solutions sequentially
-    pub fn build_trajectories<'a, E: ErrorCtrl>(
+    pub fn build_trajectories(
         &self,
-        prop: &'a Propagator<'a, SpacecraftDynamics, E>,
+        prop: &Propagator<SpacecraftDynamics>,
         almanac: Arc<Almanac>,
     ) -> Result<Vec<ScTraj>, MultipleShootingError> {
         let mut trajz = Vec::with_capacity(self.nodes.len());
 
-        for (i, node) in self.nodes.iter().enumerate() {
-            let (_, traj) = Optimizer::delta_v(prop, (*node).into())
+        for (i, node) in self.nodes.iter().copied().enumerate() {
+            let (_, traj) = Targeter::delta_v(prop, node.into())
                 .apply_with_traj(&self.solutions[i], almanac.clone())
                 .context(TargetingSnafu { segment: i })?;
             trajz.push(traj);

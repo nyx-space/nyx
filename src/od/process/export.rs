@@ -23,7 +23,6 @@ use crate::linalg::{DefaultAllocator, DimName};
 use crate::md::trajectory::Interpolatable;
 use crate::md::StateParameter;
 use crate::od::estimate::*;
-use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::State;
 use crate::{od::*, Spacecraft};
 use arrow::array::{Array, BooleanBuilder, Float64Builder, StringBuilder};
@@ -41,8 +40,8 @@ use std::path::{Path, PathBuf};
 
 use super::ODProcess;
 
-impl<'a, D: Dynamics, E: ErrorCtrl, Msr: Measurement, A: DimName>
-    ODProcess<'a, D, E, Msr, A, Spacecraft, KF<Spacecraft, A, Msr::MeasurementSize>>
+impl<'a, D: Dynamics, Msr: Measurement, A: DimName>
+    ODProcess<'a, D, Msr, A, Spacecraft, KF<Spacecraft, A, Msr::MeasurementSize>>
 where
     D::StateType:
         Interpolatable + Add<OVector<f64, <Spacecraft as State>::Size>, Output = D::StateType>,

@@ -25,7 +25,7 @@ use snafu::prelude::*;
 
 pub mod prelude {
     pub use super::{
-        optimizer::*,
+        targeter::*,
         trajectory::{ExportCfg, Interpolatable, Traj},
         Event, ScTraj, StateParameter,
     };
@@ -36,7 +36,7 @@ pub mod prelude {
     pub use crate::dynamics::{Dynamics, NyxError};
     pub use crate::io::gravity::HarmonicsMem;
     pub use crate::md::objective::Objective;
-    pub use crate::propagators::{PropOpts, Propagator};
+    pub use crate::propagators::{IntegratorOptions, Propagator};
     pub use crate::time::{Duration, Epoch, TimeUnits, Unit};
     pub use crate::Spacecraft;
     pub use crate::{State, TimeTagged};
@@ -52,7 +52,7 @@ pub use events::{Event, EventEvaluator};
 
 pub mod objective;
 pub mod opti;
-pub use opti::optimizer;
+pub use opti::targeter;
 pub type ScTraj = trajectory::Traj<Spacecraft>;
 // pub type Ephemeris = trajectory::Traj<Orbit>;
 

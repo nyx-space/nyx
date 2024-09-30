@@ -23,7 +23,6 @@ pub use crate::od::estimate::*;
 pub use crate::od::ground_station::*;
 pub use crate::od::snc::*;
 pub use crate::od::*;
-use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::propagators::PropInstance;
 pub use crate::time::{Duration, Unit};
 use anise::prelude::Almanac;
@@ -45,7 +44,6 @@ mod export;
 pub struct ODProcess<
     'a,
     D: Dynamics,
-    E: ErrorCtrl,
     Msr: Measurement,
     A: DimName,
     S: EstimateFrom<D::StateType, Msr> + Interpolatable,
@@ -73,7 +71,7 @@ pub struct ODProcess<
         + Allocator<A, <S as State>::Size>,
 {
     /// PropInstance used for the estimation
-    pub prop: PropInstance<'a, D, E>,
+    pub prop: PropInstance<'a, D>,
     /// Kalman filter itself
     pub kf: K,
     /// Vector of estimates available after a pass
@@ -91,12 +89,11 @@ pub struct ODProcess<
 impl<
         'a,
         D: Dynamics,
-        E: ErrorCtrl,
         Msr: Measurement,
         A: DimName,
         S: EstimateFrom<D::StateType, Msr> + Interpolatable,
         K: Filter<S, A, Msr::MeasurementSize>,
-    > ODProcess<'a, D, E, Msr, A, S, K>
+    > ODProcess<'a, D, Msr, A, S, K>
 where
     D::StateType: Interpolatable + Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
     <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
@@ -123,7 +120,7 @@ where
 {
     /// Initialize a new orbit determination process with an optional trigger to switch from a CKF to an EKF.
     pub fn new(
-        prop: PropInstance<'a, D, E>,
+        prop: PropInstance<'a, D>,
         kf: K,
         ekf_trigger: Option<EkfTrigger>,
         resid_crit: Option<ResidRejectCrit>,
@@ -145,7 +142,7 @@ where
 
     /// Initialize a new orbit determination process with an Extended Kalman filter. The switch from a classical KF to an EKF is based on the provided trigger.
     pub fn ekf(
-        prop: PropInstance<'a, D, E>,
+        prop: PropInstance<'a, D>,
         kf: K,
         trigger: EkfTrigger,
         resid_crit: Option<ResidRejectCrit>,
@@ -286,7 +283,7 @@ where
     where
         Dev: TrackingDeviceSim<S, Msr>,
     {
-        // TODO(now): Add ExportCfg to iterate and to process so the data can be exported as we process it. Consider a thread writing with channel for faster serialization.
+        // TODO: Add ExportCfg to iterate and to process so the data can be exported as we process it. Consider a thread writing with channel for faster serialization.
 
         let mut best_rms = self.rms_residual_ratios();
         let mut previous_rms = best_rms;
@@ -754,12 +751,11 @@ where
 impl<
         'a,
         D: Dynamics,
-        E: ErrorCtrl,
         Msr: Measurement,
         A: DimName,
         S: EstimateFrom<D::StateType, Msr> + Interpolatable,
         K: Filter<S, A, Msr::MeasurementSize>,
-    > ODProcess<'a, D, E, Msr, A, S, K>
+    > ODProcess<'a, D, Msr, A, S, K>
 where
     D::StateType: Interpolatable + Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
     <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
@@ -785,7 +781,7 @@ where
         + Allocator<A, <S as State>::Size>,
 {
     pub fn ckf(
-        prop: PropInstance<'a, D, E>,
+        prop: PropInstance<'a, D>,
         kf: K,
         resid_crit: Option<ResidRejectCrit>,
         almanac: Arc<Almanac>,

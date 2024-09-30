@@ -16,10 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub use super::RK;
+use super::RK;
 
 /// `CashKarp45` is a [Runge Kutta Cash Karp integrator](https://en.wikipedia.org/wiki/Cash%E2%80%93Karp_method).
-pub struct CashKarp45 {}
+pub(crate) struct CashKarp45 {}
 
 impl RK for CashKarp45 {
     const ORDER: u8 = 5;
@@ -61,7 +61,7 @@ impl RK for CashKarp45 {
 ///
 /// If initialized with an `PropOpts.with_adaptive_step`, the variable step will **not** be taken into consideration.
 #[allow(clippy::upper_case_acronyms)]
-pub struct RK4Fixed {}
+pub(crate) struct RK4Fixed {}
 
 impl RK for RK4Fixed {
     const ORDER: u8 = 4;
@@ -80,32 +80,13 @@ impl RK for RK4Fixed {
     ];
 }
 
-/// `RK2Fixed` is a fixed step RK4 (or midpoint method).
-///
-/// If initialized with an `PropOpts.with_adaptive_step`, the variable step will **not** be taken into consideration.
-#[allow(clippy::upper_case_acronyms)]
-pub struct RK2Fixed {}
-
-impl RK for RK2Fixed {
-    const ORDER: u8 = 2;
-    const STAGES: usize = 2;
-    const A_COEFFS: &'static [f64] = &[2.0 / 3.0];
-    const B_COEFFS: &'static [f64] = &[
-        1.0 / 4.0,
-        3.0 / 4.0,
-        // NOTE: Duplicating the B coefficients for force the error to zero.
-        1.0 / 4.0,
-        3.0 / 4.0,
-    ];
-}
-
 const SQRT6: f64 = 2.449_489_742_783_178;
 
 /// `RK89` is a Runge Kutta 8-9 integrator.
 ///
 /// Coefficients taken from GMAT `src/base/propagator/RungeKutta89.cpp`.
 #[allow(clippy::upper_case_acronyms)]
-pub struct RK89 {}
+pub(crate) struct RK89 {}
 
 impl RK for RK89 {
     const ORDER: u8 = 9;

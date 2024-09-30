@@ -7,12 +7,13 @@ use self::nyx::cosmic::{GuidanceMode, Orbit, Spacecraft};
 use self::nyx::dynamics::guidance::{Objective, Ruggiero, Thruster};
 use self::nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
 use self::nyx::md::{Event, StateParameter};
-use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
+use self::nyx::propagators::{IntegratorOptions, Propagator};
 use self::nyx::time::{Epoch, Unit};
 
 /// NOTE: Herein shows the difference between the QLaw and Ruggiero (and other control laws).
 /// The Ruggiero control law takes quite some longer to converge than the QLaw.
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use nyx_space::propagators::IntegratorMethod;
 use rstest::*;
 
 #[fixture]
@@ -66,8 +67,11 @@ fn qlaw_as_ruggiero_case_a(almanac: Arc<Almanac>) {
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_a] {:x}", orbit);
 
-    let setup =
-        Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second));
+    let setup = Propagator::new(
+        sc.clone(),
+        IntegratorMethod::RungeKutta4,
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
+    );
     let mut prop = setup.with(sc_state, almanac.clone());
     let (final_state, traj) = prop.for_duration_with_traj(prop_time).unwrap();
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
@@ -128,11 +132,14 @@ fn qlaw_as_ruggiero_case_b(almanac: Arc<Almanac>) {
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_b] {:x}", orbit);
 
-    let final_state =
-        Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state, almanac)
-            .for_duration(prop_time)
-            .unwrap();
+    let final_state = Propagator::new(
+        sc.clone(),
+        IntegratorMethod::RungeKutta4,
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
+    )
+    .with(sc_state, almanac)
+    .for_duration(prop_time)
+    .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[qlaw_as_ruggiero_case_b] {:x}", final_state.orbit);
@@ -183,11 +190,14 @@ fn qlaw_as_ruggiero_case_c(almanac: Arc<Almanac>) {
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_c] {:x}", orbit);
 
-    let final_state =
-        Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state, almanac)
-            .for_duration(prop_time)
-            .unwrap();
+    let final_state = Propagator::new(
+        sc.clone(),
+        IntegratorMethod::RungeKutta4,
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
+    )
+    .with(sc_state, almanac)
+    .for_duration(prop_time)
+    .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[qlaw_as_ruggiero_case_c] {:x}", final_state.orbit);
@@ -241,11 +251,14 @@ fn qlaw_as_ruggiero_case_d(almanac: Arc<Almanac>) {
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_d] {:x}", orbit);
 
-    let final_state =
-        Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state, almanac)
-            .for_duration(prop_time)
-            .unwrap();
+    let final_state = Propagator::new(
+        sc.clone(),
+        IntegratorMethod::RungeKutta4,
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
+    )
+    .with(sc_state, almanac)
+    .for_duration(prop_time)
+    .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[qlaw_as_ruggiero_case_d] {:x}", final_state.orbit);
@@ -301,11 +314,14 @@ fn qlaw_as_ruggiero_case_e(almanac: Arc<Almanac>) {
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_e] {:x}", orbit);
 
-    let final_state =
-        Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state, almanac)
-            .for_duration(prop_time)
-            .unwrap();
+    let final_state = Propagator::new(
+        sc.clone(),
+        IntegratorMethod::RungeKutta4,
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
+    )
+    .with(sc_state, almanac)
+    .for_duration(prop_time)
+    .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[qlaw_as_ruggiero_case_e] {:x}", final_state.orbit);
@@ -357,8 +373,11 @@ fn qlaw_as_ruggiero_case_f(almanac: Arc<Almanac>) {
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_f] {:x}", orbit);
 
-    let setup =
-        Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second));
+    let setup = Propagator::new(
+        sc.clone(),
+        IntegratorMethod::RungeKutta4,
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
+    );
     let (final_state, traj) = setup
         .with(sc_state, almanac.clone())
         .for_duration_with_traj(prop_time)
@@ -417,11 +436,14 @@ fn ruggiero_iepc_2011_102(almanac: Arc<Almanac>) {
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[ruggiero_iepc_2011_102] {:x}", orbit);
 
-    let final_state =
-        Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
-            .with(sc_state, almanac)
-            .for_duration(prop_time)
-            .unwrap();
+    let final_state = Propagator::new(
+        sc.clone(),
+        IntegratorMethod::RungeKutta4,
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
+    )
+    .with(sc_state, almanac)
+    .for_duration(prop_time)
+    .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[ruggiero_iepc_2011_102] {:x}", final_state.orbit);

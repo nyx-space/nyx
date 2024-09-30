@@ -761,6 +761,14 @@ impl State for Spacecraft {
     fn unset_stm(&mut self) {
         self.stm = None;
     }
+
+    fn orbit(&self) -> Orbit {
+        self.orbit
+    }
+
+    fn set_orbit(&mut self, orbit: Orbit) {
+        self.orbit = orbit;
+    }
 }
 
 impl Add<OVector<f64, Const<6>>> for Spacecraft {

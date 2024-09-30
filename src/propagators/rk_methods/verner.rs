@@ -21,7 +21,7 @@ use super::RK;
 /// `Verner56` is an RK Verner integrator of order 5-6.
 ///
 /// Coefficients taken from [here (PDF)](http://people.math.sfu.ca/~jverner/classify.1992.ps).
-pub struct Verner56 {}
+pub(crate) struct Verner56 {}
 
 impl RK for Verner56 {
     const ORDER: u8 = 6;

@@ -16,9 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::error_ctrl::ErrorCtrl;
 use super::{DynamicsSnafu, IntegrationDetails, PropagationError, Propagator};
-use crate::dynamics::Dynamics;
+use crate::dynamics::{Dynamics, DynamicsAlmanacSnafu};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, OVector};
 use crate::md::trajectory::{Interpolatable, Traj};
@@ -39,7 +38,7 @@ use std::time::Instant;
 /// A Propagator allows propagating a set of dynamics forward or backward in time.
 /// It is an EventTracker, without any event tracking. It includes the options, the integrator
 /// details of the previous step, and the set of coefficients used for the monomorphic instance.
-pub struct PropInstance<'a, D: Dynamics, E: ErrorCtrl>
+pub struct PropInstance<'a, D: Dynamics>
 where
     DefaultAllocator: Allocator<<D::StateType as State>::Size>
         + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
@@ -48,7 +47,7 @@ where
     /// The state of this propagator instance
     pub state: D::StateType,
     /// The propagator setup (kind, stages, etc.)
-    pub prop: &'a Propagator<'a, D, E>,
+    pub prop: &'a Propagator<D>,
     /// Stores the details of the previous integration step
     pub details: IntegrationDetails,
     /// Should progress reports be logged
@@ -60,7 +59,7 @@ where
     pub(crate) k: Vec<OVector<f64, <D::StateType as State>::VecLength>>,
 }
 
-impl<'a, D: Dynamics, E: ErrorCtrl> PropInstance<'a, D, E>
+impl<'a, D: Dynamics> PropInstance<'a, D>
 where
     DefaultAllocator: Allocator<<D::StateType as State>::Size>
         + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
@@ -95,11 +94,6 @@ where
         }
         let stop_time = self.state.epoch() + duration;
 
-        #[cfg(not(target_arch = "wasm32"))]
-        let tick = Instant::now();
-        #[cfg(not(target_arch = "wasm32"))]
-        let mut prev_tick = Instant::now();
-
         if self.log_progress {
             // Prevent the print spam for orbit determination cases
             info!("Propagating for {} until {}", duration, stop_time);
@@ -115,6 +109,39 @@ where
         if backprop {
             self.step_size = -self.step_size; // Invert the step size
         }
+
+        // Transform the state if needed
+        let mut original_frame = None;
+        if let Some(integration_frame) = self.prop.opts.integration_frame {
+            if integration_frame != self.state.orbit().frame {
+                original_frame = Some(self.state.orbit().frame);
+                let mut new_orbit = self
+                    .almanac
+                    .transform_to(self.state.orbit(), integration_frame, None)
+                    .context(DynamicsAlmanacSnafu {
+                        action: "transforming state into desired integration frame",
+                    })
+                    .context(DynamicsSnafu)?;
+                // If the integration frame has parameters, we set them here.
+                if let Some(mu_km3_s2) = integration_frame.mu_km3_s2 {
+                    new_orbit.frame.mu_km3_s2 = Some(mu_km3_s2);
+                }
+                // If the integration frame has parameters, we set them here.
+                if let Some(shape) = integration_frame.shape {
+                    new_orbit.frame.shape = Some(shape);
+                }
+                if self.log_progress {
+                    info!("State transformed to the integration frame {integration_frame}");
+                }
+                self.state.set_orbit(new_orbit);
+            }
+        }
+
+        #[cfg(not(target_arch = "wasm32"))]
+        let tick = Instant::now();
+        #[cfg(not(target_arch = "wasm32"))]
+        let mut prev_tick = Instant::now();
+
         loop {
             let epoch = self.state.epoch();
             if (!backprop && epoch + self.step_size > stop_time)
@@ -129,6 +156,19 @@ where
                             debug!("Done in {}", tock);
                         }
                     }
+
+                    // Rotate back if needed
+                    if let Some(original_frame) = original_frame {
+                        let new_orbit = self
+                            .almanac
+                            .transform_to(self.state.orbit(), original_frame, None)
+                            .context(DynamicsAlmanacSnafu {
+                                action: "transforming state from desired integration frame",
+                            })
+                            .context(DynamicsSnafu)?;
+                        self.state.set_orbit(new_orbit);
+                    }
+
                     return Ok(self.state);
                 }
                 // Take one final step of exactly the needed duration until the stop time
@@ -158,6 +198,18 @@ where
                         let tock: Duration = tick.elapsed().into();
                         info!("\t... done in {}", tock);
                     }
+                }
+
+                // Rotate back if needed
+                if let Some(original_frame) = original_frame {
+                    let new_orbit = self
+                        .almanac
+                        .transform_to(self.state.orbit(), original_frame, None)
+                        .context(DynamicsAlmanacSnafu {
+                            action: "transforming state from desired integration frame",
+                        })
+                        .context(DynamicsSnafu)?;
+                    self.state.set_orbit(new_orbit);
                 }
 
                 return Ok(self.state);
@@ -342,14 +394,14 @@ where
                 .context(DynamicsSnafu)?;
             self.k[0] = ki;
             let mut a_idx: usize = 0;
-            for i in 0..(self.prop.stages - 1) {
+            for i in 0..(self.prop.method.stages() - 1) {
                 // Let's compute the c_i by summing the relevant items from the list of coefficients.
                 // \sum_{j=1}^{i-1} a_ij  ∀ i ∈ [2, s]
                 let mut ci: f64 = 0.0;
                 // The wi stores the a_{s1} * k_1 + a_{s2} * k_2 + ... + a_{s, s-1} * k_{s-1} +
                 let mut wi = OVector::<f64, <D::StateType as State>::VecLength>::from_element(0.0);
                 for kj in &self.k[0..i + 1] {
-                    let a_ij = self.prop.a_coeffs[a_idx];
+                    let a_ij = self.prop.method.a_coeffs()[a_idx];
                     ci += a_ij;
                     wi += a_ij * kj;
                     a_idx += 1;
@@ -374,9 +426,9 @@ where
             let mut error_est =
                 OVector::<f64, <D::StateType as State>::VecLength>::from_element(0.0);
             for (i, ki) in self.k.iter().enumerate() {
-                let b_i = self.prop.b_coeffs[i];
+                let b_i = self.prop.method.b_coeffs()[i];
                 if !self.fixed_step {
-                    let b_i_star = self.prop.b_coeffs[i + self.prop.stages];
+                    let b_i_star = self.prop.method.b_coeffs()[i + self.prop.method.stages()];
                     error_est += step_size * (b_i - b_i_star) * ki;
                 }
                 next_state += step_size * b_i * ki;
@@ -388,7 +440,11 @@ where
                 return Ok(((self.details.step), next_state));
             } else {
                 // Compute the error estimate.
-                self.details.error = E::estimate(&error_est, &next_state, state_vec);
+                self.details.error =
+                    self.prop
+                        .opts
+                        .error_ctrl
+                        .estimate(&error_est, &next_state, state_vec);
                 if self.details.error <= self.prop.opts.tolerance
                     || step_size <= self.prop.opts.min_step.to_seconds()
                     || self.details.attempts >= self.prop.opts.attempts
@@ -407,7 +463,7 @@ where
                         let proposed_step = 0.9
                             * step_size
                             * (self.prop.opts.tolerance / self.details.error)
-                                .powf(1.0 / f64::from(self.prop.order));
+                                .powf(1.0 / f64::from(self.prop.method.order()));
                         step_size = if proposed_step > self.prop.opts.max_step.to_seconds() {
                             self.prop.opts.max_step.to_seconds()
                         } else {
@@ -424,7 +480,7 @@ where
                     let proposed_step = 0.9
                         * step_size
                         * (self.prop.opts.tolerance / self.details.error)
-                            .powf(1.0 / f64::from(self.prop.order - 1));
+                            .powf(1.0 / f64::from(self.prop.method.order() - 1));
                     step_size = if proposed_step < self.prop.opts.min_step.to_seconds() {
                         self.prop.opts.min_step.to_seconds()
                     } else {

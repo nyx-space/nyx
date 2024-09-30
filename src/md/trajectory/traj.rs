@@ -445,8 +445,8 @@ where
         // Build an array of all the RIC differences
         let mut ric_diff = Vec::with_capacity(other_states.len());
         for (ii, other_state) in other_states.iter().enumerate() {
-            let self_orbit = *self_states[ii].orbit();
-            let other_orbit = *other_state.orbit();
+            let self_orbit = self_states[ii].orbit();
+            let other_orbit = other_state.orbit();
 
             let this_ric_diff = self_orbit.ric_difference(&other_orbit).map_err(Box::new)?;
 

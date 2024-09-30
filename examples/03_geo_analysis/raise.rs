@@ -19,7 +19,7 @@ use nyx::{
     },
     io::{gravity::HarmonicsMem, ExportCfg},
     md::{prelude::Objective, StateParameter},
-    propagators::{PropOpts, Propagator, RSSCartesianStep},
+    propagators::{ErrorControl, IntegratorOptions, Propagator},
     Spacecraft,
 };
 use std::{error::Error, sync::Arc};
@@ -117,9 +117,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     // We specify a minimum step in the propagator because the Ruggiero control would otherwise drive this step very low.
     let (final_state, traj) = Propagator::rk89(
         sc_dynamics.clone(),
-        PropOpts::builder()
+        IntegratorOptions::builder()
             .min_step(10.0_f64.seconds())
-            .error_ctrl(RSSCartesianStep {})
+            .error_ctrl(ErrorControl::RSSCartesianStep)
             .build(),
     )
     .with(sc, almanac.clone())

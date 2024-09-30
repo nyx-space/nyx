@@ -21,10 +21,9 @@ use super::multishoot::MultipleShooting;
 pub use super::CostFunction;
 use crate::errors::TargetingError;
 use crate::md::prelude::*;
-use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::{Orbit, Spacecraft};
 
-impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
+impl<'a> MultipleShooting<'a, Node, 3, 3> {
     /// Builds a multiple shooting structure assuming that the optimal trajectory is a straight line
     /// between the start and end points. The position of the nodes will be update at each iteration
     /// of the outer loop.
@@ -33,7 +32,7 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
         x0: Spacecraft,
         xf: Orbit,
         node_count: usize,
-        prop: &'a Propagator<'a, SpacecraftDynamics, E>,
+        prop: &'a Propagator<SpacecraftDynamics>,
     ) -> Result<Self, TargetingError> {
         if node_count < 3 {
             error!("At least three nodes are needed for a multiple shooting optimization");

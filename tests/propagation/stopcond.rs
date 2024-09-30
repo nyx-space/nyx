@@ -14,11 +14,11 @@ use nyx::dynamics::guidance::{FiniteBurns, LocalFrame, Mnvr, Thruster};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::SpacecraftDynamics;
 use nyx::md::{Event, StateParameter};
-use nyx::propagators::error_ctrl::RSSCartesianStep;
-use nyx::propagators::{PropOpts, Propagator};
+use nyx::propagators::{IntegratorOptions, Propagator};
 use nyx::time::{Epoch, TimeUnits, Unit};
 use nyx::{Spacecraft, State};
 
+use nyx_space::propagators::ErrorControl;
 use rstest::*;
 
 #[fixture]
@@ -163,7 +163,7 @@ fn stop_cond_nrho_apo(almanac: Arc<Almanac>) {
 
     let setup = Propagator::rk89(
         dynamics,
-        PropOpts::with_adaptive_step_s(1.0, 60.0, 1e-6, RSSCartesianStep {}),
+        IntegratorOptions::with_adaptive_step_s(1.0, 60.0, 1e-6, ErrorControl::RSSCartesianStep),
     );
 
     // NOTE: Here, we will propagate for the maximum duration in the original frame

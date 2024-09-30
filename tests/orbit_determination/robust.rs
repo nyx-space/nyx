@@ -9,11 +9,12 @@ use nyx::dynamics::SpacecraftDynamics;
 use nyx::io::ExportCfg;
 use nyx::md::StateParameter;
 use nyx::od::prelude::*;
-use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
+use nyx::propagators::{IntegratorOptions, Propagator};
 use nyx::time::{Epoch, TimeUnits, Unit};
 use nyx::utils::rss_orbit_errors;
 use nyx::Spacecraft;
 use nyx_space::mc::StateDispersion;
+use nyx_space::propagators::IntegratorMethod;
 use polars::prelude::*;
 use std::collections::BTreeMap;
 use std::env;
@@ -79,7 +80,7 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
-    let opts = PropOpts::with_fixed_step(step_size);
+    let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
@@ -119,7 +120,11 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
 
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER, SATURN_BARYCENTER];
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
-    let truth_setup = Propagator::new::<RK4Fixed>(SpacecraftDynamics::new(orbital_dyn), opts);
+    let truth_setup = Propagator::new(
+        SpacecraftDynamics::new(orbital_dyn),
+        IntegratorMethod::RungeKutta4,
+        opts,
+    );
     let (_, traj) = truth_setup
         .with(initial_state, almanac.clone())
         .for_duration_with_traj(prop_time)
@@ -146,7 +151,7 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
     // We expect the estimated orbit to be _nearly_ perfect because we"ve removed SATURN_BARYCENTER from the estimated trajectory
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let estimator = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
-    let setup = Propagator::new::<RK4Fixed>(estimator, opts);
+    let setup = Propagator::new(estimator, IntegratorMethod::RungeKutta4, opts);
     let prop_est = setup.with(initial_state_dev.with_stm(), almanac.clone());
 
     // Define the process noise to assume an unmodeled acceleration on X, Y and Z in the ECI frame

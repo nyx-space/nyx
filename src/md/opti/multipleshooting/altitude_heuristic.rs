@@ -27,10 +27,9 @@ use super::{
 };
 use crate::errors::TargetingError;
 use crate::md::{prelude::*, PropSnafu};
-use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::{Orbit, Spacecraft};
 
-impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
+impl<'a> MultipleShooting<'a, Node, 3, 3> {
     /// Builds a multiple shooting structure assuming that the optimal trajectory is near a linear
     /// heuristic in geodetic altitude and direction.
     /// For example, if x0 has an altitude of 100 km and xf has an altitude
@@ -42,7 +41,7 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
         node_count: usize,
         angular_velocity_deg_s: f64,
         body_frame: Frame,
-        prop: &'a Propagator<'a, SpacecraftDynamics, E>,
+        prop: &'a Propagator<SpacecraftDynamics>,
         almanac: Arc<Almanac>,
     ) -> Result<Self, MultipleShootingError> {
         if node_count < 3 {
