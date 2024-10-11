@@ -26,6 +26,10 @@ To install Nyx, follow these steps:
 2. Navigate to the directory: `cd nyx`
 3. Run any of the [examples](./examples/), e.g. `RUST_LOG=info cargo run --example 01_orbit_prop --release`
 
+#### Compilation
+
+Nyx uses `lld`, the LLVM linker, for faster compilation times. You may need to manually install `lld` depending on your distribution. On Ubuntu, this command is `sudo apt install clang lld`.
+
 ### Python
 
 For Python projects, get started by installing the library via `pip`: `pip install nyx_space`.
