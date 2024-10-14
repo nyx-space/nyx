@@ -23,7 +23,7 @@ use snafu::ResultExt;
 use crate::cosmic::{AstroPhysicsSnafu, Frame, Orbit};
 use crate::dynamics::AccelModel;
 use crate::io::gravity::HarmonicsMem;
-use crate::linalg::{DMatrix, Matrix3, Vector3, U7};
+use crate::linalg::{DMatrix, Matrix3, Vector3, Vector4, U7};
 use hyperdual::linalg::norm;
 use hyperdual::{hyperspace_from_vector, Float, OHyperdual};
 use std::cmp::min;
@@ -208,16 +208,10 @@ impl AccelModel for Harmonics {
 
         let rho = eq_radius_km / r_;
         let mut rho_np1 = mu_km3_s2 / r_ * rho;
-        let mut a0 = 0.0;
-        let mut a1 = 0.0;
-        let mut a2 = 0.0;
-        let mut a3 = 0.0;
+        let mut accel4: Vector4<f64> = Vector4::zeros();
 
         for n in 1..max_degree {
-            let mut sum0 = 0.0;
-            let mut sum1 = 0.0;
-            let mut sum2 = 0.0;
-            let mut sum3 = 0.0;
+            let mut sum: Vector4<f64> = Vector4::zeros();
             rho_np1 *= rho;
 
             for m in 0..=min(n, max_order) {
@@ -234,18 +228,19 @@ impl AccelModel for Harmonics {
                     (s_val * r_m[m - 1] - c_val * i_m[m - 1]) * 2.0.sqrt()
                 };
 
-                sum0 += (m as f64) * a_nm[(n, m)] * e_;
-                sum1 += (m as f64) * a_nm[(n, m)] * f_;
-                sum2 += self.vr01[(n, m)] * a_nm[(n, m + 1)] * d_;
-                sum3 += self.vr11[(n, m)] * a_nm[(n + 1, m + 1)] * d_;
+                sum.x += (m as f64) * a_nm[(n, m)] * e_;
+                sum.y += (m as f64) * a_nm[(n, m)] * f_;
+                sum.z += self.vr01[(n, m)] * a_nm[(n, m + 1)] * d_;
+                sum.w -= self.vr11[(n, m)] * a_nm[(n + 1, m + 1)] * d_;
             }
             let rr = rho_np1 / eq_radius_km;
-            a0 += rr * sum0;
-            a1 += rr * sum1;
-            a2 += rr * sum2;
-            a3 -= rr * sum3;
+            accel4 += rr * sum;
         }
-        let accel = Vector3::new(a0 + a3 * s_, a1 + a3 * t_, a2 + a3 * u_);
+        let accel = Vector3::new(
+            accel4.x + accel4.w * s_,
+            accel4.y + accel4.w * t_,
+            accel4.z + accel4.w * u_,
+        );
         // Rotate this acceleration vector back into the integration frame (no center change needed, it's just a vector)
         // As discussed with Sai, if the Earth was spinning faster, would the acceleration due to the harmonics be any different?
         // No. Therefore, we do not need to account for the transport theorem here.
