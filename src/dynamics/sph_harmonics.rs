@@ -231,7 +231,7 @@ impl AccelModel for Harmonics {
                 sum.x += (m as f64) * a_nm[(n, m)] * e_;
                 sum.y += (m as f64) * a_nm[(n, m)] * f_;
                 sum.z += self.vr01[(n, m)] * a_nm[(n, m + 1)] * d_;
-                sum.w += self.vr11[(n, m)] * a_nm[(n + 1, m + 1)] * d_;
+                sum.w -= self.vr11[(n, m)] * a_nm[(n + 1, m + 1)] * d_;
             }
             let rr = rho_np1 / eq_radius_km;
             accel4 += rr * sum;
