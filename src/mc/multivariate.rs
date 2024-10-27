@@ -23,7 +23,7 @@ use crate::errors::StateError;
 use crate::md::prelude::{BPlane, OrbitDual};
 use crate::md::{AstroSnafu, StateParameter};
 use crate::{pseudo_inverse, NyxError, Spacecraft, State};
-use na::{DMatrix, DVector, SMatrix, SVector};
+use nalgebra::{DMatrix, DVector, SMatrix, SVector};
 use rand_distr::{Distribution, Normal};
 use snafu::ResultExt;
 

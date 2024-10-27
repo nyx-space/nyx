@@ -4,7 +4,7 @@ extern crate nyx_space as nyx;
 use anise::constants::celestial_objects::{EARTH, JUPITER_BARYCENTER, MOON, SUN};
 use anise::constants::frames::IAU_EARTH_FRAME;
 use hifitime::MJD_J2000;
-use na::{Const, OMatrix};
+use nalgebra::{Const, OMatrix};
 use nyx::cosmic::{assert_orbit_eq_or_abs, Orbit};
 use nyx::dynamics::{Dynamics, OrbitalDynamics, PointMasses, SpacecraftDynamics};
 use nyx::linalg::Vector6;

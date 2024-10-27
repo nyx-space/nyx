@@ -28,7 +28,6 @@ Refer to [nyxspace.com](https://nyxspace.com) for a user guide, a show case, the
 
 #[macro_use]
 extern crate log;
-extern crate nalgebra as na;
 
 /// Provides all the propagators / integrators available in `nyx`.
 pub mod propagators;
@@ -74,14 +73,14 @@ pub mod time {
 
 /// Re-export nalgebra
 pub mod linalg {
-    pub use na::base::*;
+    pub use nalgebra::base::*;
 }
 
 /// Re-export some useful things
 pub use self::cosmic::{Orbit, Spacecraft, State, TimeTagged};
 
-#[cfg(feature = "python")]
-mod python;
+// #[cfg(feature = "python")]
+// mod python;
 
 /// The GMAT Earth gravitation parameter, used only for testing.
 #[cfg(test)]

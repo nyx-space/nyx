@@ -20,7 +20,7 @@ use core::fmt;
 
 use anise::errors::MathError;
 use anise::{astro::PhysicsResult, errors::PhysicsError};
-use na::{SMatrix, SVector};
+use nalgebra::{SMatrix, SVector};
 use typed_builder::TypedBuilder;
 
 use crate::{dynamics::guidance::LocalFrame, Spacecraft};

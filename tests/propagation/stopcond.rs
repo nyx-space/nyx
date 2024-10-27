@@ -8,7 +8,7 @@ use anise::constants::celestial_objects::{EARTH, SUN};
 use anise::constants::frames::{EARTH_J2000, MOON_J2000};
 use anise::prelude::Almanac;
 use hifitime::JD_J2000;
-use na::Vector3;
+use nalgebra::Vector3;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::guidance::{FiniteBurns, LocalFrame, Mnvr, Thruster};
 use nyx::dynamics::orbital::OrbitalDynamics;
