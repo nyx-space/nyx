@@ -30,7 +30,7 @@ use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 use filter::kalman::KF;
 use hifitime::TimeScale;
-use na::Const;
+use nalgebra::Const;
 use parquet::arrow::ArrowWriter;
 use snafu::prelude::*;
 use std::collections::HashMap;

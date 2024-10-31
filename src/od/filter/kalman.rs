@@ -175,7 +175,7 @@ where
         + Allocator<A, A>
         + Allocator<<T as State>::Size, A>
         + Allocator<A, <T as State>::Size>
-        + Allocator<na::Const<1>, M>,
+        + Allocator<nalgebra::Const<1>, M>,
     <DefaultAllocator as Allocator<<T as State>::Size>>::Buffer<f64>: Copy,
     <DefaultAllocator as Allocator<<T as State>::Size, <T as State>::Size>>::Buffer<f64>: Copy,
 {
