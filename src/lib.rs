@@ -57,6 +57,9 @@ pub mod od;
 /// All of the mission design and mission analysis tools and functions
 pub mod md;
 
+/// Units and their conversions
+pub mod units;
+
 /// Simple tools (e.g. Lambert solver)
 pub mod tools;
 
