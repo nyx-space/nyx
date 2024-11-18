@@ -26,6 +26,7 @@ use crate::propagators::TrajectoryEventSnafu;
 use crate::time::{Duration, Epoch, Unit};
 use crate::State;
 use anise::almanac::Almanac;
+use anise::errors::MathError;
 use rayon::iter::ParallelBridge;
 use rayon::prelude::ParallelIterator;
 use snafu::ResultExt;
@@ -442,12 +443,21 @@ where
                 self.details.step = self.step_size;
                 return Ok(((self.details.step), next_state));
             } else {
+                if next_state.iter().any(|x| x.is_nan()) {
+                    return Err(PropagationError::PropMathError {
+                        source: MathError::DomainError {
+                            value: f64::NAN,
+                            msg: "try another integration method, or decrease step size; part of state vector is",
+                        },
+                    });
+                }
                 // Compute the error estimate.
                 self.details.error =
                     self.prop
                         .opts
                         .error_ctrl
                         .estimate(&error_est, &next_state, state_vec);
+
                 if self.details.error <= self.prop.opts.tolerance
                     || step_size_s <= self.prop.opts.min_step.to_seconds()
                     || self.details.attempts >= self.prop.opts.attempts
@@ -473,11 +483,6 @@ where
                     assert!(step_size_s > 0.0);
                     // In all cases, let's update the step size to whatever was the adapted step size
                     self.step_size = step_size_s * Unit::Second;
-                    trace!(
-                        "+ integration error: {:e}\tnew step size: {}",
-                        self.details.error,
-                        step_size_s * Unit::Second
-                    );
                     return Ok((self.details.step, next_state));
                 } else {
                     // Error is too high and we aren't using the smallest step, and we haven't hit the max number of attempts.
@@ -487,13 +492,8 @@ where
                         * step_size_s
                         * (self.prop.opts.tolerance / self.details.error)
                             .powf(1.0 / f64::from(self.prop.method.order() - 1));
-                    step_size_s = self.prop.opts.bound_proposed_step(proposed_step_s);
 
-                    trace!(
-                        "- integration error: {:e}\tnew step size: {}",
-                        self.details.error,
-                        step_size_s * Unit::Second
-                    );
+                    step_size_s = self.prop.opts.bound_proposed_step(proposed_step_s);
                     // Note that we don't set self.step_size, that will be updated right before we return
                 }
             }
