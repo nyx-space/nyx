@@ -329,7 +329,7 @@ fn od_val_sc_srp_estimation(
     let setup = Propagator::dp78(
         sc_dynamics,
         IntegratorOptions::builder()
-            .max_step(1.minutes())
+            .max_step(30.seconds())
             .error_ctrl(ErrorControl::RSSCartesianStep)
             .build(),
     );

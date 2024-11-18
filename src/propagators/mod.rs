@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anise::errors::MathError;
 use snafu::prelude::*;
 use std::fmt;
 
@@ -66,4 +67,6 @@ pub enum PropagationError {
     NthEventError { nth: usize, found: usize },
     #[snafu(display("propagation failed because {source}"))]
     PropConfigError { source: ConfigError },
+    #[snafu(display("propagation encountered a math error {source}"))]
+    PropMathError { source: MathError },
 }
