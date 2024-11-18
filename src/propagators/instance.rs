@@ -222,7 +222,10 @@ where
                             // Report status every minute
                             let cur_epoch = self.state.epoch();
                             let dur_to_go = (stop_time - cur_epoch).floor(Unit::Second * 1);
-                            info!("\t... current epoch {}, remaing {}", cur_epoch, dur_to_go);
+                            info!(
+                                "\t... current epoch {}, remaining {} (step size = {})",
+                                cur_epoch, dur_to_go, self.details.step
+                            );
                             prev_tick = Instant::now();
                         }
                     }
@@ -385,7 +388,7 @@ where
         // Reset the number of attempts used (we don't reset the error because it's set before it's read)
         self.details.attempts = 1;
         // Convert the step size to seconds -- it's mutable because we may change it below
-        let mut step_size = self.step_size.to_seconds();
+        let mut step_size_s = self.step_size.to_seconds();
         loop {
             let ki = self
                 .prop
@@ -411,8 +414,8 @@ where
                     .prop
                     .dynamics
                     .eom(
-                        ci * step_size,
-                        &(state_vec + step_size * wi),
+                        ci * step_size_s,
+                        &(state_vec + step_size_s * wi),
                         state_ctx,
                         self.almanac.clone(),
                     )
@@ -429,9 +432,9 @@ where
                 let b_i = self.prop.method.b_coeffs()[i];
                 if !self.fixed_step {
                     let b_i_star = self.prop.method.b_coeffs()[i + self.prop.method.stages()];
-                    error_est += step_size * (b_i - b_i_star) * ki;
+                    error_est += step_size_s * (b_i - b_i_star) * ki;
                 }
-                next_state += step_size * b_i * ki;
+                next_state += step_size_s * b_i * ki;
             }
 
             if self.fixed_step {
@@ -446,7 +449,7 @@ where
                         .error_ctrl
                         .estimate(&error_est, &next_state, state_vec);
                 if self.details.error <= self.prop.opts.tolerance
-                    || step_size <= self.prop.opts.min_step.to_seconds()
+                    || step_size_s <= self.prop.opts.min_step.to_seconds()
                     || self.details.attempts >= self.prop.opts.attempts
                 {
                     if self.details.attempts >= self.prop.opts.attempts {
@@ -456,36 +459,41 @@ where
                         );
                     }
 
-                    self.details.step = step_size * Unit::Second;
+                    self.details.step = step_size_s * Unit::Second;
                     if self.details.error < self.prop.opts.tolerance {
                         // Let's increase the step size for the next iteration.
                         // Error is less than tolerance, let's attempt to increase the step for the next iteration.
-                        let proposed_step = 0.9
-                            * step_size
+                        let proposed_step_s = 0.9
+                            * step_size_s
                             * (self.prop.opts.tolerance / self.details.error)
                                 .powf(1.0 / f64::from(self.prop.method.order()));
-                        step_size = if proposed_step > self.prop.opts.max_step.to_seconds() {
-                            self.prop.opts.max_step.to_seconds()
-                        } else {
-                            proposed_step
-                        };
+
+                        step_size_s = self.prop.opts.bound_proposed_step(proposed_step_s);
                     }
+                    assert!(step_size_s > 0.0);
                     // In all cases, let's update the step size to whatever was the adapted step size
-                    self.step_size = step_size * Unit::Second;
+                    self.step_size = step_size_s * Unit::Second;
+                    trace!(
+                        "+ integration error: {:e}\tnew step size: {}",
+                        self.details.error,
+                        step_size_s * Unit::Second
+                    );
                     return Ok((self.details.step, next_state));
                 } else {
                     // Error is too high and we aren't using the smallest step, and we haven't hit the max number of attempts.
                     // So let's adapt the step size.
                     self.details.attempts += 1;
-                    let proposed_step = 0.9
-                        * step_size
+                    let proposed_step_s = 0.9
+                        * step_size_s
                         * (self.prop.opts.tolerance / self.details.error)
                             .powf(1.0 / f64::from(self.prop.method.order() - 1));
-                    step_size = if proposed_step < self.prop.opts.min_step.to_seconds() {
-                        self.prop.opts.min_step.to_seconds()
-                    } else {
-                        proposed_step
-                    };
+                    step_size_s = self.prop.opts.bound_proposed_step(proposed_step_s);
+
+                    trace!(
+                        "- integration error: {:e}\tnew step size: {}",
+                        self.details.error,
+                        step_size_s * Unit::Second
+                    );
                     // Note that we don't set self.step_size, that will be updated right before we return
                 }
             }
