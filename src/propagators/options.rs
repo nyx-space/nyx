@@ -144,17 +144,6 @@ impl IntegratorOptions {
         }
         self.min_step = min_step;
     }
-
-    /// Returns a proposed step in seconds that is within the bounds of these integrator options.
-    pub(crate) fn bound_proposed_step(&self, proposed_step_s: f64) -> f64 {
-        if proposed_step_s > self.max_step.to_seconds() {
-            self.max_step.to_seconds()
-        } else if proposed_step_s < self.min_step.to_seconds() {
-            self.min_step.to_seconds()
-        } else {
-            proposed_step_s
-        }
-    }
 }
 
 impl fmt::Display for IntegratorOptions {

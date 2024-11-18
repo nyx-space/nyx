@@ -443,14 +443,6 @@ where
                 self.details.step = self.step_size;
                 return Ok(((self.details.step), next_state));
             } else {
-                if next_state.iter().any(|x| x.is_nan()) {
-                    return Err(PropagationError::PropMathError {
-                        source: MathError::DomainError {
-                            value: f64::NAN,
-                            msg: "try another integration method, or decrease step size; part of state vector is",
-                        },
-                    });
-                }
                 // Compute the error estimate.
                 self.details.error =
                     self.prop
@@ -462,6 +454,14 @@ where
                     || step_size_s <= self.prop.opts.min_step.to_seconds()
                     || self.details.attempts >= self.prop.opts.attempts
                 {
+                    if next_state.iter().any(|x| x.is_nan()) {
+                        return Err(PropagationError::PropMathError {
+                            source: MathError::DomainError {
+                                value: f64::NAN,
+                                msg: "try another integration method, or decrease step size; part of state vector is",
+                            },
+                        });
+                    }
                     if self.details.attempts >= self.prop.opts.attempts {
                         warn!(
                             "Could not further decrease step size: maximum number of attempts reached ({})",
@@ -473,16 +473,28 @@ where
                     if self.details.error < self.prop.opts.tolerance {
                         // Let's increase the step size for the next iteration.
                         // Error is less than tolerance, let's attempt to increase the step for the next iteration.
-                        let proposed_step_s = 0.9
+                        let proposed_step = 0.9
                             * step_size_s
                             * (self.prop.opts.tolerance / self.details.error)
                                 .powf(1.0 / f64::from(self.prop.method.order()));
 
-                        step_size_s = self.prop.opts.bound_proposed_step(proposed_step_s);
+                        step_size_s = if proposed_step > self.prop.opts.max_step.to_seconds() {
+                            self.prop.opts.max_step.to_seconds()
+                        } else {
+                            proposed_step
+                        };
                     }
-                    assert!(step_size_s > 0.0);
                     // In all cases, let's update the step size to whatever was the adapted step size
                     self.step_size = step_size_s * Unit::Second;
+                    if self.step_size.abs() < self.prop.opts.min_step {
+                        // Custom signum in case the step size becomes zero.
+                        let signum = if self.step_size.is_negative() {
+                            -1.0
+                        } else {
+                            1.0
+                        };
+                        self.step_size = self.prop.opts.min_step * signum;
+                    }
                     return Ok((self.details.step, next_state));
                 } else {
                     // Error is too high and we aren't using the smallest step, and we haven't hit the max number of attempts.
@@ -493,7 +505,11 @@ where
                         * (self.prop.opts.tolerance / self.details.error)
                             .powf(1.0 / f64::from(self.prop.method.order() - 1));
 
-                    step_size_s = self.prop.opts.bound_proposed_step(proposed_step_s);
+                    step_size_s = if proposed_step_s < self.prop.opts.min_step.to_seconds() {
+                        self.prop.opts.min_step.to_seconds()
+                    } else {
+                        proposed_step_s
+                    };
                     // Note that we don't set self.step_size, that will be updated right before we return
                 }
             }
