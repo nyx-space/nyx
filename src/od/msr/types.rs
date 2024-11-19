@@ -16,15 +16,18 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-mod arc;
-mod measurement;
-mod range;
-mod range_doppler;
-mod rangerate;
-mod types;
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+pub enum MeasurementType {
+    Range,
+    Doppler,
+}
 
-pub use arc::TrackingArc;
-pub use range::RangeMsr;
-pub use range_doppler::RangeDoppler;
-pub use rangerate::RangeRate;
-pub use types::MeasurementType;
+impl MeasurementType {
+    /// Returns the expected unit of this measurement type
+    pub fn unit(self) -> &'static str {
+        match self {
+            MeasurementType::Range => "km",
+            MeasurementType::Doppler => "km/s",
+        }
+    }
+}
