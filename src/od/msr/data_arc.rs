@@ -92,7 +92,7 @@ impl TrackingDataArc {
 
         let mut measurements = BTreeMap::new();
 
-        // Now convert each batch on the fly
+        // We can safely unwrap the columns since we've checked for their existance just before.
         for maybe_batch in reader {
             let batch = maybe_batch.context(ArrowSnafu {
                 action: "reading batch of tracking data",
@@ -174,13 +174,27 @@ impl TrackingDataArc {
         })
     }
 
-    /// Compute the list of unique aliases in this tracking arc
+    /// Returns the unique list of aliases in this tracking data arc
     pub fn unique_aliases(&self) -> HashSet<String> {
+        self.unique().0
+    }
+
+    /// Returns the unique measurement types in this tracking data arc
+    pub fn unique_types(&self) -> HashSet<MeasurementType> {
+        self.unique().1
+    }
+
+    /// Returns the unique trackers and unique measurement types in this data arc
+    pub fn unique(&self) -> (HashSet<String>, HashSet<MeasurementType>) {
         let mut aliases = HashSet::new();
+        let mut types = HashSet::new();
         for msr in self.measurements.values() {
             aliases.insert(msr.tracker.clone());
+            for k in msr.data.keys() {
+                types.insert(*k);
+            }
         }
-        aliases
+        (aliases, types)
     }
 
     /// Returns the start epoch of this tracking arc
@@ -234,8 +248,9 @@ impl fmt::Display for TrackingDataArc {
             };
             write!(
                 f,
-                "Tracking arc with {} measurements over {} (from {start} to {end}) with trackers {:?}{src}",
+                "Tracking arc with {} measurements of type {:?} over {} (from {start} to {end}) with trackers {:?}{src}",
                 self.len(),
+                self.unique_types(),
                 end - start,
                 self.unique_aliases()
             )
@@ -251,6 +266,7 @@ mod ut_tracker {
     fn test_lro_data() {
         let trk = TrackingDataArc::from_parquet("04_lro_simulated_tracking.parquet").unwrap();
         println!("{trk}");
+        println!("min step = {}", trk.min_duration_sep().unwrap());
         // TODO: Add test nulls in specific sets, and missing columns.
     }
 }

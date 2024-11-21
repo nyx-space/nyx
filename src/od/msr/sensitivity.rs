@@ -17,11 +17,12 @@
 */
 
 use crate::linalg::allocator::Allocator;
-use crate::linalg::{DefaultAllocator, OVector};
-use crate::od::{GroundStation, TrackingDeviceSim};
+use crate::linalg::DefaultAllocator;
+use crate::od::{GroundStation, ODAlmanacSnafu, ODError, TrackingDeviceSim};
 use crate::{Spacecraft, State};
 use anise::prelude::Almanac;
-use nalgebra::{DimName, OMatrix};
+use nalgebra::{DimName, OMatrix, U1};
+use snafu::ResultExt;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
@@ -41,9 +42,10 @@ where
         rx: &Rx,
         tx: &Tx,
         almanac: Arc<Almanac>,
-    ) -> Result<Self, String>;
+    ) -> Result<Self, ODError>;
 }
 
+/// Trait required to build a triplet of a solve-for state, a receiver, and a transmitter.
 pub trait Sensitivity<SolveState: State, Rx, Tx>
 where
     Self: Sized,
@@ -59,7 +61,7 @@ where
         rx: &Rx,
         tx: &Tx,
         almanac: Arc<Almanac>,
-    ) -> Result<OMatrix<f64, M, SolveState::Size>, String>
+    ) -> Result<OMatrix<f64, M, SolveState::Size>, ODError>
     where
         DefaultAllocator: Allocator<M> + Allocator<M, SolveState::Size>;
 }
@@ -68,10 +70,10 @@ struct ScalarSensitivity<SolveState: State, Rx, Tx>
 where
     DefaultAllocator: Allocator<SolveState::Size>
         + Allocator<SolveState::VecLength>
-        + Allocator<SolveState::Size, SolveState::Size>,
+        + Allocator<SolveState::Size, SolveState::Size>
+        + Allocator<U1, SolveState::Size>,
 {
-    sensitivity_row: OVector<f64, SolveState::Size>,
-    msr_type: MeasurementType,
+    sensitivity_row: OMatrix<f64, U1, SolveState::Size>,
     _rx: PhantomData<Rx>,
     _tx: PhantomData<Tx>,
 }
@@ -88,7 +90,7 @@ where
         rx: &Spacecraft,
         tx: &GroundStation,
         almanac: Arc<Almanac>,
-    ) -> Result<OMatrix<f64, M, <Spacecraft as State>::Size>, String>
+    ) -> Result<OMatrix<f64, M, <Spacecraft as State>::Size>, ODError>
     where
         DefaultAllocator: Allocator<M> + Allocator<M, <Spacecraft as State>::Size>,
     {
@@ -106,8 +108,7 @@ where
                     GroundStation,
                 >>::new(*msr_type, self, rx, tx, almanac.clone())?;
 
-            // TODO: Check that I should be taking the transpose here!
-            mat.set_row(ith_row, &scalar_h.sensitivity_row.transpose());
+            mat.set_row(ith_row, &scalar_h.sensitivity_row);
         }
         // ScalarSensitivity<SolveState: State, Rx, Tx>
         Ok(mat)
@@ -123,12 +124,14 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
         rx: &Spacecraft,
         tx: &GroundStation,
         almanac: Arc<Almanac>,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, ODError> {
         let receiver = rx.orbit;
         // Compute the device location
         let transmitter = tx
             .location(rx.orbit.epoch, rx.orbit.frame, almanac.clone())
-            .unwrap();
+            .context(ODAlmanacSnafu {
+                action: "computing transmitter location when computing sensitivity matrix",
+            })?;
 
         let delta_r = receiver.radius_km - transmitter.radius_km;
         let delta_v = receiver.velocity_km_s - transmitter.velocity_km_s;
@@ -140,7 +143,9 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
                     Some(range_km) => *range_km,
                     None => {
                         tx.azimuth_elevation_of(receiver, None, &almanac)
-                            .unwrap()
+                            .context(ODAlmanacSnafu {
+                                action: "computing range for Doppler measurement",
+                            })?
                             .range_km
                     }
                 };
@@ -154,13 +159,12 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
                 let m23 = delta_v.z / ρ_km - ρ_dot_km_s * delta_r.z / ρ_km.powi(2);
 
                 let sensitivity_row =
-                    OVector::<f64, <Spacecraft as State>::Size>::from_row_slice(&[
+                    OMatrix::<f64, U1, <Spacecraft as State>::Size>::from_row_slice(&[
                         m21, m22, m23, m11, m12, m13, 0.0, 0.0, 0.0,
                     ]);
 
                 Ok(Self {
                     sensitivity_row,
-                    msr_type,
                     _rx: PhantomData::<_>,
                     _tx: PhantomData::<_>,
                 })
@@ -172,13 +176,12 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
                 let m13 = delta_r.z / ρ_km;
 
                 let sensitivity_row =
-                    OVector::<f64, <Spacecraft as State>::Size>::from_row_slice(&[
+                    OMatrix::<f64, U1, <Spacecraft as State>::Size>::from_row_slice(&[
                         m11, m12, m13, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                     ]);
 
                 Ok(Self {
                     sensitivity_row,
-                    msr_type,
                     _rx: PhantomData::<_>,
                     _tx: PhantomData::<_>,
                 })
