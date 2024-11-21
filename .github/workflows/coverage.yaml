@@ -33,10 +33,14 @@ jobs:
       - name: Generate full code coverage
         run: |
           # cargo llvm-cov test --lib --no-report --tests
-          # cargo llvm-cov test --no-report mission_design -- --nocapture --ignored
-          cargo llvm-cov test --no-report orbit_determination -- --nocapture --ignored
-          cargo llvm-cov test --no-report propulsion -- --nocapture --ignored
-          cargo llvm-cov test --no-report propagation -- --nocapture --ignored
+          echo "STOP CONDITIONS"
+          cargo llvm-cov test --no-report stop_ -- --nocapture --ignored
+          echo "GMAT VALIDATION"
+          cargo llvm-cov test --no-report gmat_val -- --nocapture --ignored
+          echo "ORBIT DETERMINATION"
+          cargo llvm-cov test --no-report od_ -- --nocapture --ignored
+          echo "MD TARGETERS"
+          cargo llvm-cov test --no-report tgt_ -- --nocapture --ignored
           cargo llvm-cov report --lcov > lcov.txt
           # cargo llvm-cov --lcov --output-path lcov.info
       - name: Upload coverage to Codecov
