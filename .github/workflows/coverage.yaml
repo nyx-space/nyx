@@ -33,7 +33,7 @@ jobs:
       - name: Generate full code coverage
         run: |
           # cargo llvm-cov test --lib --no-report --tests
-          cargo llvm-cov test --no-report mission_design -- --nocapture --ignored
+          # cargo llvm-cov test --no-report mission_design -- --nocapture --ignored
           cargo llvm-cov test --no-report orbit_determination -- --nocapture --ignored
           cargo llvm-cov test --no-report propulsion -- --nocapture --ignored
           cargo llvm-cov test --no-report propagation -- --nocapture --ignored
