@@ -22,7 +22,6 @@ use crate::od::{GroundStation, TrackingDeviceSim};
 use crate::{Spacecraft, State};
 use anise::prelude::Almanac;
 use nalgebra::{DimName, OMatrix};
-use std::collections::HashSet;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
@@ -45,7 +44,7 @@ where
     ) -> Result<Self, String>;
 }
 
-trait Sensitivity<SolveState: State, Rx, Tx>
+pub trait Sensitivity<SolveState: State, Rx, Tx>
 where
     Self: Sized,
     DefaultAllocator: Allocator<SolveState::Size>
@@ -56,7 +55,7 @@ where
     /// and S is the size of the state being solved for.
     fn h_tilde<M: DimName>(
         &self,
-        msr_types: HashSet<MeasurementType>, // Consider switching to array
+        msr_types: &[MeasurementType], // Consider switching to array
         rx: &Rx,
         tx: &Tx,
         almanac: Arc<Almanac>,
@@ -85,7 +84,7 @@ where
 {
     fn h_tilde<M: DimName>(
         &self,
-        msr_types: HashSet<MeasurementType>,
+        msr_types: &[MeasurementType],
         rx: &Spacecraft,
         tx: &GroundStation,
         almanac: Arc<Almanac>,
@@ -167,7 +166,7 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
                 })
             }
             MeasurementType::Range => {
-                let ρ_km = msr.data.get(&MeasurementType::Doppler).unwrap();
+                let ρ_km = msr.data.get(&MeasurementType::Range).unwrap();
                 let m11 = delta_r.x / ρ_km;
                 let m12 = delta_r.y / ρ_km;
                 let m13 = delta_r.z / ρ_km;

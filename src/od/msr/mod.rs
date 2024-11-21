@@ -18,11 +18,11 @@
 
 mod arc;
 mod data_arc;
-mod measurement;
+pub mod measurement;
 mod range;
 mod range_doppler;
 mod rangerate;
-mod sensitivity;
+pub mod sensitivity;
 mod types;
 
 pub use arc::TrackingArc;
