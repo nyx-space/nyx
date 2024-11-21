@@ -17,6 +17,7 @@
 */
 
 mod arc;
+mod data_arc;
 mod measurement;
 mod range;
 mod range_doppler;
