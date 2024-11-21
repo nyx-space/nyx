@@ -22,6 +22,7 @@ mod measurement;
 mod range;
 mod range_doppler;
 mod rangerate;
+mod sensitivity;
 mod types;
 
 pub use arc::TrackingArc;

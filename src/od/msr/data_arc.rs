@@ -25,7 +25,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs::File;
 use std::path::Path;
 
-use hifitime::Epoch;
+use hifitime::{Duration, Epoch};
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use snafu::{ensure, ResultExt};
 
@@ -201,6 +201,23 @@ impl TrackingDataArc {
     /// Returns whether this arc has no measurements.
     pub fn is_empty(&self) -> bool {
         self.measurements.is_empty()
+    }
+
+    /// Returns the minimum duration between two subsequent measurements.
+    /// This is important to correctly set up the propagator and not miss any measurement.
+    pub fn min_duration_sep(&self) -> Option<Duration> {
+        if self.is_empty() {
+            None
+        } else {
+            let mut min_sep = Duration::MAX;
+            let mut prev_epoch = self.start_epoch().unwrap();
+            for (epoch, _) in self.measurements.iter().skip(1) {
+                let this_sep = *epoch - prev_epoch;
+                min_sep = min_sep.min(this_sep);
+                prev_epoch = *epoch;
+            }
+            Some(min_sep)
+        }
     }
 }
 
