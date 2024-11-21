@@ -21,13 +21,15 @@ use crate::linalg::{DefaultAllocator, OVector};
 use crate::od::{GroundStation, TrackingDeviceSim};
 use crate::{Spacecraft, State};
 use anise::prelude::Almanac;
+use nalgebra::{DimName, OMatrix};
+use std::collections::HashSet;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
 use super::measurement::Measurement;
 use super::MeasurementType;
 
-trait Sensitivity<SolveState: State, Rx, Tx>
+trait ScalarSensitivityT<SolveState: State, Rx, Tx>
 where
     Self: Sized,
     DefaultAllocator: Allocator<SolveState::Size>
@@ -43,6 +45,26 @@ where
     ) -> Result<Self, String>;
 }
 
+trait Sensitivity<SolveState: State, Rx, Tx>
+where
+    Self: Sized,
+    DefaultAllocator: Allocator<SolveState::Size>
+        + Allocator<SolveState::VecLength>
+        + Allocator<SolveState::Size, SolveState::Size>,
+{
+    /// Returns the sensitivity matrix of size MxS where M is the number of simultaneous measurements
+    /// and S is the size of the state being solved for.
+    fn h_tilde<M: DimName>(
+        &self,
+        msr_types: HashSet<MeasurementType>, // Consider switching to array
+        rx: &Rx,
+        tx: &Tx,
+        almanac: Arc<Almanac>,
+    ) -> Result<OMatrix<f64, M, SolveState::Size>, String>
+    where
+        DefaultAllocator: Allocator<M> + Allocator<M, SolveState::Size>;
+}
+
 struct ScalarSensitivity<SolveState: State, Rx, Tx>
 where
     DefaultAllocator: Allocator<SolveState::Size>
@@ -55,7 +77,45 @@ where
     _tx: PhantomData<Tx>,
 }
 
-impl Sensitivity<Spacecraft, Spacecraft, GroundStation>
+impl Sensitivity<Spacecraft, Spacecraft, GroundStation> for Measurement
+where
+    DefaultAllocator: Allocator<<Spacecraft as State>::Size>
+        + Allocator<<Spacecraft as State>::VecLength>
+        + Allocator<<Spacecraft as State>::Size, <Spacecraft as State>::Size>,
+{
+    fn h_tilde<M: DimName>(
+        &self,
+        msr_types: HashSet<MeasurementType>,
+        rx: &Spacecraft,
+        tx: &GroundStation,
+        almanac: Arc<Almanac>,
+    ) -> Result<OMatrix<f64, M, <Spacecraft as State>::Size>, String>
+    where
+        DefaultAllocator: Allocator<M> + Allocator<M, <Spacecraft as State>::Size>,
+    {
+        // Rebuild each row of the scalar sensitivities.
+        let mut mat = OMatrix::<f64, M, <Spacecraft as State>::Size>::zeros();
+        for (ith_row, msr_type) in msr_types.iter().enumerate() {
+            if !self.data.contains_key(msr_type) {
+                // Skip computation, this row is zero anyway.
+                continue;
+            }
+            let scalar_h =
+                <ScalarSensitivity<Spacecraft, Spacecraft, GroundStation> as ScalarSensitivityT<
+                    Spacecraft,
+                    Spacecraft,
+                    GroundStation,
+                >>::new(*msr_type, self, rx, tx, almanac.clone())?;
+
+            // TODO: Check that I should be taking the transpose here!
+            mat.set_row(ith_row, &scalar_h.sensitivity_row.transpose());
+        }
+        // ScalarSensitivity<SolveState: State, Rx, Tx>
+        Ok(mat)
+    }
+}
+
+impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
     for ScalarSensitivity<Spacecraft, Spacecraft, GroundStation>
 {
     fn new(
