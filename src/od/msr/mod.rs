@@ -26,6 +26,7 @@ pub mod sensitivity;
 mod types;
 
 pub use arc::TrackingArc;
+pub use data_arc::TrackingDataArc;
 pub use range::RangeMsr;
 pub use range_doppler::RangeDoppler;
 pub use rangerate::RangeRate;

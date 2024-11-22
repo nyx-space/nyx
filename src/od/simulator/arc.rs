@@ -25,7 +25,7 @@ use rand_pcg::Pcg64Mcg;
 use crate::dynamics::NyxError;
 use crate::io::ConfigError;
 use crate::md::trajectory::Interpolatable;
-use crate::od::msr::{RangeDoppler, TrackingArc};
+use crate::od::msr::{RangeDoppler, TrackingArc, TrackingDataArc};
 use crate::od::prelude::Strand;
 use crate::od::simulator::Cadence;
 use crate::od::{GroundStation, Measurement};
@@ -255,6 +255,95 @@ where
         };
 
         Ok(trk)
+    }
+
+    /// Generates measurements for the tracking arc using the defined strands
+    ///
+    /// # Warning
+    /// This function will return an error if any of the devices defines as a scheduler.
+    /// You must create the schedule first using `build_schedule` first.
+    ///
+    /// # Notes
+    /// Although mutable, this function may be called several times to generate different measurements.
+    ///
+    /// # Algorithm
+    /// For each tracking device, and for each strand within that device, sample the trajectory at the sample
+    /// rate of the tracking device, adding a measurement whenever the spacecraft is visible.
+    /// Build the measurements as a vector, ordered chronologically.
+    ///
+    pub fn simulate_measurements(
+        &mut self,
+        almanac: Arc<Almanac>,
+    ) -> Result<TrackingDataArc, NyxError> {
+        let mut measurements = BTreeMap::new();
+
+        for (name, device) in self.devices.iter_mut() {
+            let cfg = &self.configs[name];
+            if cfg.scheduler.is_some() {
+                if cfg.strands.is_none() {
+                    return Err(NyxError::CustomError {
+                        msg: format!(
+                            "schedule for {name} must be built before generating measurements"
+                        ),
+                    });
+                } else {
+                    warn!("scheduler for {name} is ignored, using the defined tracking strands instead")
+                }
+            }
+
+            let init_msr_count = measurements.len();
+            let tick = Epoch::now().unwrap();
+
+            match cfg.strands.as_ref() {
+                Some(strands) => {
+                    // Strands are defined at this point
+                    'strands: for (ii, strand) in strands.iter().enumerate() {
+                        // Build the time series for this strand, sampling at the correct rate
+                        for epoch in TimeSeries::inclusive(strand.start, strand.end, cfg.sampling) {
+                            match device.measure_new(
+                                epoch,
+                                &self.trajectory,
+                                Some(&mut self.rng),
+                                almanac.clone(),
+                            ) {
+                                Ok(msr_opt) => {
+                                    if let Some(msr) = msr_opt {
+                                        measurements.insert(epoch, msr);
+                                    }
+                                }
+                                Err(e) => {
+                                    if epoch != strand.end {
+                                        warn!(
+                                            "Skipping the remaining strand #{ii} ending on {}: {e}",
+                                            strand.end
+                                        );
+                                    }
+                                    continue 'strands;
+                                }
+                            }
+                        }
+                    }
+
+                    info!(
+                        "Simulated {} measurements for {name} for {} tracking strands in {}",
+                        measurements.len() - init_msr_count,
+                        strands.len(),
+                        (Epoch::now().unwrap() - tick).round(1.0_f64.milliseconds())
+                    );
+                }
+                None => {
+                    warn!("No tracking strands defined for {name}, skipping");
+                }
+            }
+        }
+
+        // Build the tracking arc.
+        let trk_data = TrackingDataArc {
+            measurements,
+            source: None,
+        };
+
+        Ok(trk_data)
     }
 }
 

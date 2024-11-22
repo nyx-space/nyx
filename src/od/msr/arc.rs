@@ -32,6 +32,7 @@ use crate::md::trajectory::Interpolatable;
 use crate::od::prelude::TrkConfig;
 use crate::od::{Measurement, TrackingDeviceSim};
 use crate::State;
+
 use arrow::array::{Array, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;

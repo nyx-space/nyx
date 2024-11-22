@@ -15,29 +15,36 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
+use super::{measurement::Measurement, MeasurementType};
+use crate::io::watermark::pq_writer;
+use crate::io::{ArrowSnafu, InputOutputError, MissingDataSnafu, ParquetSnafu, StdIOSnafu};
+use crate::io::{EmptyDatasetSnafu, ExportCfg};
+use arrow::array::{Array, Float64Builder, StringBuilder};
+use arrow::datatypes::{DataType, Field, Schema};
+use arrow::record_batch::RecordBatch;
 use arrow::{
     array::{Float64Array, PrimitiveArray, StringArray},
     datatypes,
     record_batch::RecordBatchReader,
 };
 use core::fmt;
-use std::collections::{BTreeMap, HashMap, HashSet};
-use std::fs::File;
-use std::path::Path;
-
-use hifitime::{Duration, Epoch};
+use hifitime::prelude::{Duration, Epoch};
+use hifitime::TimeScale;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+use parquet::arrow::ArrowWriter;
 use snafu::{ensure, ResultExt};
-
-use crate::io::{ArrowSnafu, InputOutputError, MissingDataSnafu, ParquetSnafu, StdIOSnafu};
-
-use super::{measurement::Measurement, MeasurementType};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::error::Error;
+use std::fs::File;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 /// Tracking data storing all of measurements as a B-Tree.
+#[derive(Clone)]
 pub struct TrackingDataArc {
     /// All measurements in this data arc
     pub measurements: BTreeMap<Epoch, Measurement>,
-    /// Source file if loaded from a file
+    /// Source file if loaded from a file or saved to a file.
     pub source: Option<String>,
 }
 
@@ -233,6 +240,128 @@ impl TrackingDataArc {
             Some(min_sep)
         }
     }
+
+    /// Store this tracking arc to a parquet file.
+    pub fn to_parquet_simple<P: AsRef<Path> + fmt::Display>(
+        &self,
+        path: P,
+    ) -> Result<PathBuf, Box<dyn Error>> {
+        self.to_parquet(path, ExportCfg::default())
+    }
+
+    /// Store this tracking arc to a parquet file, with optional metadata and a timestamp appended to the filename.
+    pub fn to_parquet<P: AsRef<Path> + fmt::Display>(
+        &self,
+        path: P,
+        cfg: ExportCfg,
+    ) -> Result<PathBuf, Box<dyn Error>> {
+        ensure!(
+            !self.is_empty(),
+            EmptyDatasetSnafu {
+                action: "exporting tracking data arc"
+            }
+        );
+
+        let path_buf = cfg.actual_path(path);
+
+        if cfg.step.is_some() {
+            warn!("The `step` parameter in the export is not supported for tracking arcs.");
+        }
+
+        if cfg.fields.is_some() {
+            warn!("The `fields` parameter in the export is not supported for tracking arcs.");
+        }
+
+        // Build the schema
+        let mut hdrs = vec![
+            Field::new("Epoch (UTC)", DataType::Utf8, false),
+            Field::new("Tracking device", DataType::Utf8, false),
+        ];
+
+        let msr_types = self.unique_types();
+        let mut msr_fields = msr_types
+            .iter()
+            .map(|msr_type| msr_type.to_field())
+            .collect::<Vec<Field>>();
+
+        hdrs.append(&mut msr_fields);
+
+        // Build the schema
+        let schema = Arc::new(Schema::new(hdrs));
+        let mut record: Vec<Arc<dyn Array>> = Vec::new();
+
+        // Build the measurement iterator
+
+        let measurements =
+            if cfg.start_epoch.is_some() || cfg.end_epoch.is_some() || cfg.step.is_some() {
+                let start = cfg
+                    .start_epoch
+                    .unwrap_or_else(|| self.start_epoch().unwrap());
+                let end = cfg.end_epoch.unwrap_or_else(|| self.end_epoch().unwrap());
+
+                info!("Exporting measurements from {start} to {end}.");
+
+                self.measurements
+                    .range(start..end)
+                    .map(|(k, v)| (*k, v.clone()))
+                    .collect()
+            } else {
+                self.measurements.clone()
+            };
+
+        // Build all of the records
+
+        // Epochs
+        let mut utc_epoch = StringBuilder::new();
+        for epoch in measurements.keys() {
+            utc_epoch.append_value(epoch.to_time_scale(TimeScale::UTC).to_isoformat());
+        }
+        record.push(Arc::new(utc_epoch.finish()));
+
+        // Device names
+        let mut device_names = StringBuilder::new();
+        for m in measurements.values() {
+            device_names.append_value(m.tracker.clone());
+        }
+        record.push(Arc::new(device_names.finish()));
+
+        // Measurement data, column by column
+        for msr_type in msr_types {
+            let mut data_builder = Float64Builder::new();
+
+            for m in measurements.values() {
+                match m.data.get(&msr_type) {
+                    Some(value) => data_builder.append_value(*value),
+                    None => data_builder.append_null(),
+                };
+            }
+            record.push(Arc::new(data_builder.finish()));
+        }
+
+        // Serialize all of the devices and add that to the parquet file too.
+        let mut metadata = HashMap::new();
+        metadata.insert("Purpose".to_string(), "Tracking Arc Data".to_string());
+        if let Some(add_meta) = cfg.metadata {
+            for (k, v) in add_meta {
+                metadata.insert(k, v);
+            }
+        }
+
+        let props = pq_writer(Some(metadata));
+
+        let file = File::create(&path_buf)?;
+
+        let mut writer = ArrowWriter::try_new(file, schema.clone(), props).unwrap();
+
+        let batch = RecordBatch::try_new(schema, record)?;
+        writer.write(&batch)?;
+        writer.close()?;
+
+        info!("Serialized {self} to {}", path_buf.display());
+
+        // Return the path this was written to
+        Ok(path_buf)
+    }
 }
 
 impl fmt::Display for TrackingDataArc {
@@ -255,6 +384,18 @@ impl fmt::Display for TrackingDataArc {
                 self.unique_aliases()
             )
         }
+    }
+}
+
+impl fmt::Debug for TrackingDataArc {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self} @ {self:p}")
+    }
+}
+
+impl PartialEq for TrackingDataArc {
+    fn eq(&self, other: &Self) -> bool {
+        self.measurements == other.measurements
     }
 }
 

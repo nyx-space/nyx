@@ -28,6 +28,8 @@ use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, OMatrix};
 use crate::md::prelude::{Frame, Traj};
 use crate::md::trajectory::Interpolatable;
+use crate::od::msr::measurement::Measurement as NewMeasurement;
+use crate::od::msr::MeasurementType;
 use crate::od::{Measurement, ODError};
 use crate::Orbit;
 
@@ -79,4 +81,19 @@ where
         &mut self,
         epoch: Epoch,
     ) -> Result<OMatrix<f64, Msr::MeasurementSize, Msr::MeasurementSize>, ODError>;
+
+    fn measure_new(
+        &mut self,
+        epoch: Epoch,
+        traj: &Traj<MsrIn>,
+        rng: Option<&mut Pcg64Mcg>,
+        almanac: Arc<Almanac>,
+    ) -> Result<Option<NewMeasurement>, ODError>;
+
+    // Return the noise statistics of this tracking device for the provided measurement type at the requested epoch.
+    fn measurement_covar_new(
+        &self,
+        msr_type: MeasurementType,
+        epoch: Epoch,
+    ) -> Result<f64, ODError>;
 }

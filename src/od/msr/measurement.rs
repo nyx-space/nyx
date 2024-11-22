@@ -22,7 +22,7 @@ use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, OVector};
 use std::collections::{HashMap, HashSet};
 
 /// A type-agnostic simultaneous measurement storage structure. Allows storing any number of simultaneous measurement of a given taker.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Measurement {
     /// Tracker alias which made this measurement
     pub tracker: String,
@@ -33,6 +33,23 @@ pub struct Measurement {
 }
 
 impl Measurement {
+    pub fn new(tracker: String, epoch: Epoch) -> Self {
+        Self {
+            tracker,
+            epoch,
+            data: HashMap::new(),
+        }
+    }
+
+    pub fn push(&mut self, msr_type: MeasurementType, msr_value: f64) {
+        self.data.insert(msr_type, msr_value);
+    }
+
+    pub fn with(mut self, msr_type: MeasurementType, msr_value: f64) -> Self {
+        self.push(msr_type, msr_value);
+        self
+    }
+
     /// Builds an observation vector for this measurement provided a set of measurement types.
     /// If the requested measurement type is not available, then that specific row is set to zero.
     /// The caller must set the appropriate sensitivity matrix rows to zero.

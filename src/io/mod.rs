@@ -204,6 +204,8 @@ pub enum InputOutputError {
     ParseDhall { data: String, err: String },
     #[snafu(display("error serializing {what} to Dhall: {err}"))]
     SerializeDhall { what: String, err: String },
+    #[snafu(display("empty dataset error when (de)serializing for {action}"))]
+    EmptyDataset { action: &'static str },
 }
 
 impl PartialEq for InputOutputError {

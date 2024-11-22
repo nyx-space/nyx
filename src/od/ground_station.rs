@@ -20,6 +20,7 @@ use anise::astro::{Aberration, AzElRange, PhysicsResult};
 use anise::errors::AlmanacResult;
 use anise::prelude::{Almanac, Frame, Orbit};
 
+use super::msr::measurement::Measurement;
 use super::msr::RangeDoppler;
 use super::noise::StochasticNoise;
 use super::{ODAlmanacSnafu, ODError, ODTrajSnafu, TrackingDeviceSim};
@@ -373,6 +374,37 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
         msr_noises[(1, 1)] = doppler_noise_km2_s2;
 
         Ok(msr_noises)
+    }
+
+    fn measurement_covar_new(
+        &self,
+        msr_type: super::prelude::MeasurementType,
+        epoch: Epoch,
+    ) -> Result<f64, ODError> {
+        Ok(match msr_type {
+            super::msr::MeasurementType::Range => self
+                .range_noise_km
+                .ok_or(ODError::NoiseNotConfigured { kind: "Range" })?
+                .covariance(epoch),
+            super::msr::MeasurementType::Doppler => self
+                .doppler_noise_km_s
+                .ok_or(ODError::NoiseNotConfigured { kind: "Doppler" })?
+                .covariance(epoch),
+        })
+    }
+
+    fn measure_new(
+        &mut self,
+        epoch: Epoch,
+        traj: &Traj<Spacecraft>,
+        rng: Option<&mut Pcg64Mcg>,
+        almanac: Arc<Almanac>,
+    ) -> Result<Option<super::prelude::measurement::Measurement>, ODError> {
+        Ok(self.measure(epoch, traj, rng, almanac)?.map(|msr| {
+            Measurement::new(self.name.clone(), epoch)
+                .with(super::msr::MeasurementType::Range, msr.obs[0])
+                .with(super::msr::MeasurementType::Doppler, msr.obs[1])
+        }))
     }
 }
 

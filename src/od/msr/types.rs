@@ -16,6 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use std::collections::HashMap;
+
+use arrow::datatypes::{DataType, Field};
+
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum MeasurementType {
     Range,
@@ -29,5 +33,19 @@ impl MeasurementType {
             MeasurementType::Range => "km",
             MeasurementType::Doppler => "km/s",
         }
+    }
+
+    /// Returns the fields for this kind of measurement. The metadata includes a `unit` field with the unit.
+    /// Column is nullable in case there is no such measurement at a given epoch.
+    pub fn to_field(&self) -> Field {
+        let mut meta = HashMap::new();
+        meta.insert("unit".to_string(), self.unit().to_string());
+
+        Field::new(
+            format!("{self:?} ({})", self.unit()),
+            DataType::Float64,
+            true,
+        )
+        .with_metadata(meta)
     }
 }

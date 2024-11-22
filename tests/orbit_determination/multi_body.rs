@@ -125,6 +125,13 @@ fn od_val_multi_body_ckf_perfect_stations(
 
     let mut arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
     arc.set_devices(proc_devices, configs).unwrap();
+    arc.to_parquet_simple("multi_body.parquet").unwrap();
+
+    let new_arc = arc_sim.simulate_measurements(almanac.clone()).unwrap();
+    new_arc.to_parquet_simple("multi_body_new.parquet").unwrap();
+    let new_arc_reloaded = TrackingDataArc::from_parquet("multi_body_new.parquet").unwrap();
+
+    assert_eq!(new_arc_reloaded, new_arc);
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
