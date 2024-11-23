@@ -60,7 +60,7 @@ impl FromStr for TrkConfig {
     type Err = ConfigError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        serde_yaml::from_str(s).map_err(|source| ConfigError::ParseError { source })
+        serde_yml::from_str(s).map_err(|source| ConfigError::ParseError { source })
     }
 }
 
@@ -206,13 +206,13 @@ mod trkconfig_ut {
 
     #[test]
     fn serde_trkconfig() {
-        use serde_yaml;
+        use serde_yml;
 
         // Test the default config
         let cfg = TrkConfig::default();
-        let serialized = serde_yaml::to_string(&cfg).unwrap();
+        let serialized = serde_yml::to_string(&cfg).unwrap();
         println!("{serialized}");
-        let deserd: TrkConfig = serde_yaml::from_str(&serialized).unwrap();
+        let deserd: TrkConfig = serde_yml::from_str(&serialized).unwrap();
         assert_eq!(deserd, cfg);
         assert_eq!(
             cfg.scheduler.unwrap(),
@@ -234,9 +234,9 @@ mod trkconfig_ut {
             sampling: 45.2.seconds(),
             ..Default::default()
         };
-        let serialized = serde_yaml::to_string(&cfg).unwrap();
+        let serialized = serde_yml::to_string(&cfg).unwrap();
         println!("{serialized}");
-        let deserd: TrkConfig = serde_yaml::from_str(&serialized).unwrap();
+        let deserd: TrkConfig = serde_yml::from_str(&serialized).unwrap();
         assert_eq!(deserd, cfg);
     }
 
@@ -263,16 +263,16 @@ mod trkconfig_ut {
 
     #[test]
     fn api_trk_config() {
-        use serde_yaml;
+        use serde_yml;
 
         let cfg = TrkConfig::builder()
             .sampling(15.seconds())
             .scheduler(Scheduler::builder().handoff(Handoff::Overlap).build())
             .build();
 
-        let serialized = serde_yaml::to_string(&cfg).unwrap();
+        let serialized = serde_yml::to_string(&cfg).unwrap();
         println!("{serialized}");
-        let deserd: TrkConfig = serde_yaml::from_str(&serialized).unwrap();
+        let deserd: TrkConfig = serde_yml::from_str(&serialized).unwrap();
         assert_eq!(deserd, cfg);
 
         let cfg = TrkConfig::builder()

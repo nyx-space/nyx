@@ -126,7 +126,7 @@ impl GroundStation {
             for item in as_list.iter() {
                 // Check that the item is a dictionary
                 let next: Self =
-                    serde_yaml::from_value(pyany_to_value(item)?).context(ParseSnafu)?;
+                    serde_yml::from_value(pyany_to_value(item)?).context(ParseSnafu)?;
                 as_map.insert(next.name.clone(), next);
             }
             Ok(as_map)
@@ -148,12 +148,12 @@ impl GroundStation {
                     // Try to convert the underlying data
                     match pyany_to_value(v_any) {
                         Ok(value) => {
-                            let next: Self = serde_yaml::from_value(value).context(ParseSnafu)?;
+                            let next: Self = serde_yml::from_value(value).context(ParseSnafu)?;
                             as_map.insert(as_str, next);
                         }
                         Err(_) => {
                             // Maybe this was to be parsed in full as a single item
-                            let me: Self = serde_yaml::from_value(pyany_to_value(as_dict)?)
+                            let me: Self = serde_yml::from_value(pyany_to_value(as_dict)?)
                                 .context(ParseSnafu)?;
                             as_map.clear();
                             as_map.insert(me.name.clone(), me);

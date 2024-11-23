@@ -122,13 +122,13 @@ mod scheduler_ut {
     #[test]
     fn serde_cadence() {
         use hifitime::TimeUnits;
-        use serde_yaml;
+        use serde_yml;
 
-        let cont: Cadence = serde_yaml::from_str("!Continuous").unwrap();
+        let cont: Cadence = serde_yml::from_str("!Continuous").unwrap();
         assert_eq!(cont, Cadence::Continuous);
 
         let int: Cadence =
-            serde_yaml::from_str("!Intermittent {on: 1 h 35 min, off: 15 h 02 min 3 s}").unwrap();
+            serde_yml::from_str("!Intermittent {on: 1 h 35 min, off: 15 h 02 min 3 s}").unwrap();
         assert_eq!(
             int,
             Cadence::Intermittent {
@@ -141,23 +141,23 @@ mod scheduler_ut {
             r#"Intermittent { on: "1 h 35 min", off: "15 h 2 min 3 s" }"#
         );
 
-        let serialized = serde_yaml::to_string(&int).unwrap();
-        let deserd: Cadence = serde_yaml::from_str(&serialized).unwrap();
+        let serialized = serde_yml::to_string(&int).unwrap();
+        let deserd: Cadence = serde_yml::from_str(&serialized).unwrap();
         assert_eq!(deserd, int);
     }
 
     #[test]
     fn api_and_serde_scheduler() {
         use hifitime::TimeUnits;
-        use serde_yaml;
+        use serde_yml;
 
         let scheduler = Scheduler::default();
-        let serialized = serde_yaml::to_string(&scheduler).unwrap();
+        let serialized = serde_yml::to_string(&scheduler).unwrap();
         assert_eq!(
             serialized,
             "handoff: Eager\ncadence: Continuous\nmin_samples: 0\nsample_alignment: null\n"
         );
-        let deserd: Scheduler = serde_yaml::from_str(&serialized).unwrap();
+        let deserd: Scheduler = serde_yml::from_str(&serialized).unwrap();
         assert_eq!(deserd, scheduler);
 
         let scheduler = Scheduler::builder()
@@ -168,12 +168,12 @@ mod scheduler_ut {
             })
             .build();
 
-        let serialized = serde_yaml::to_string(&scheduler).unwrap();
+        let serialized = serde_yml::to_string(&scheduler).unwrap();
         assert_eq!(
             serialized,
             "handoff: Eager\ncadence: !Intermittent\n  on: 12 min\n  off: 17 h 5 min\nmin_samples: 10\nsample_alignment: 1 s\n"
         );
-        let deserd: Scheduler = serde_yaml::from_str(&serialized).unwrap();
+        let deserd: Scheduler = serde_yml::from_str(&serialized).unwrap();
         assert_eq!(deserd, scheduler);
     }
 

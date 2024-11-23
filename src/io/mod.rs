@@ -29,7 +29,7 @@ use hifitime::Duration;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer};
 use serde::{Serialize, Serializer};
-use serde_yaml::Error as YamlError;
+use serde_yml::Error as YamlError;
 use std::collections::{BTreeMap, HashMap};
 use std::convert::From;
 use std::fmt::Debug;
@@ -163,7 +163,7 @@ pub enum ConfigError {
     ReadError { source: io::Error },
 
     #[snafu(display("failed to parse YAML configuration file: {source}"))]
-    ParseError { source: serde_yaml::Error },
+    ParseError { source: serde_yml::Error },
 
     #[snafu(display("of invalid configuration: {msg}"))]
     InvalidConfig { msg: String },
@@ -223,7 +223,7 @@ pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {
         let file = File::open(path).context(ReadSnafu)?;
         let reader = BufReader::new(file);
 
-        serde_yaml::from_reader(reader).context(ParseSnafu)
+        serde_yml::from_reader(reader).context(ParseSnafu)
     }
 
     /// Builds a sequence of "Selves" from the provided path to a yaml
@@ -234,7 +234,7 @@ pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {
         let file = File::open(path).context(ReadSnafu)?;
         let reader = BufReader::new(file);
 
-        serde_yaml::from_reader(reader).context(ParseSnafu)
+        serde_yml::from_reader(reader).context(ParseSnafu)
     }
 
     /// Builds a map of names to "selves" from the provided path to a yaml
@@ -245,19 +245,19 @@ pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {
         let file = File::open(path).context(ReadSnafu)?;
         let reader = BufReader::new(file);
 
-        serde_yaml::from_reader(reader).context(ParseSnafu)
+        serde_yml::from_reader(reader).context(ParseSnafu)
     }
 
     /// Builds a sequence of "Selves" from the provided string of a yaml
     fn loads_many(data: &str) -> Result<Vec<Self>, ConfigError> {
         debug!("Loading YAML:\n{data}");
-        serde_yaml::from_str(data).context(ParseSnafu)
+        serde_yml::from_str(data).context(ParseSnafu)
     }
 
     /// Builds a sequence of "Selves" from the provided string of a yaml
     fn loads_named(data: &str) -> Result<BTreeMap<String, Self>, ConfigError> {
         debug!("Loading YAML:\n{data}");
-        serde_yaml::from_str(data).context(ParseSnafu)
+        serde_yml::from_str(data).context(ParseSnafu)
     }
 }
 

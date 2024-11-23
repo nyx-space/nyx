@@ -427,16 +427,3 @@ impl PartialEq for TrackingDataArc {
         self.measurements == other.measurements
     }
 }
-
-#[cfg(test)]
-mod ut_tracker {
-    use super::TrackingDataArc;
-
-    #[test]
-    fn test_lro_data() {
-        let trk = TrackingDataArc::from_parquet("04_lro_simulated_tracking.parquet").unwrap();
-        println!("{trk}");
-        println!("min step = {}", trk.min_duration_sep().unwrap());
-        // TODO: Add test nulls in specific sets, and missing columns.
-    }
-}

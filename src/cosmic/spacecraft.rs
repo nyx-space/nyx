@@ -808,7 +808,7 @@ impl ConfigRepr for Spacecraft {}
 
 #[test]
 fn test_serde() {
-    use serde_yaml;
+    use serde_yml;
     use std::str::FromStr;
 
     use anise::constants::frames::EARTH_J2000;
@@ -826,10 +826,10 @@ fn test_serde() {
 
     let sc = Spacecraft::new(orbit, 500.0, 159.0, 2.0, 2.0, 1.8, 2.2);
 
-    let serialized_sc = serde_yaml::to_string(&sc).unwrap();
+    let serialized_sc = serde_yml::to_string(&sc).unwrap();
     println!("{}", serialized_sc);
 
-    let deser_sc: Spacecraft = serde_yaml::from_str(&serialized_sc).unwrap();
+    let deser_sc: Spacecraft = serde_yml::from_str(&serialized_sc).unwrap();
 
     assert_eq!(sc, deser_sc);
 
@@ -860,7 +860,7 @@ drag:
     cd: 2.2
     "#;
 
-    let deser_sc: Spacecraft = serde_yaml::from_str(s).unwrap();
+    let deser_sc: Spacecraft = serde_yml::from_str(s).unwrap();
     assert_eq!(sc, deser_sc);
 
     // Check that we can specify a thruster info entirely.
@@ -898,7 +898,7 @@ thruster:
         isp_s: 300.5,
         thrust_N: 1e-5,
     });
-    let deser_sc: Spacecraft = serde_yaml::from_str(s).unwrap();
+    let deser_sc: Spacecraft = serde_yml::from_str(s).unwrap();
     assert_eq!(sc_thruster, deser_sc);
 
     // Tests the minimum definition which will set all of the defaults too
@@ -922,7 +922,7 @@ dry_mass_kg: 500.0
 fuel_mass_kg: 159.0
 "#;
 
-    let deser_sc: Spacecraft = serde_yaml::from_str(s).unwrap();
+    let deser_sc: Spacecraft = serde_yml::from_str(s).unwrap();
 
     let sc = Spacecraft::new(orbit, 500.0, 159.0, 0.0, 0.0, 1.8, 2.2);
     assert_eq!(sc, deser_sc);

@@ -328,7 +328,7 @@ mod gs_ut {
         assert_eq!(expected, stations);
 
         // Serialize back
-        let reser = serde_yaml::to_string(&expected).unwrap();
+        let reser = serde_yml::to_string(&expected).unwrap();
         dbg!(reser);
     }
 }
