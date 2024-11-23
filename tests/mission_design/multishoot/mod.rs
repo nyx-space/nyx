@@ -408,7 +408,7 @@ fn vmag_orbit_raising(almanac: Arc<Almanac>) {
         .enumerate()
     {
         traj.to_parquet_with_step(
-            &format!("multishoot_to_node_{}.parquet", i),
+            format!("multishoot_to_node_{}.parquet", i),
             2 * Unit::Second,
             almanac.clone(),
         )

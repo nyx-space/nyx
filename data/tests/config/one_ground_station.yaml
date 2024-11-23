@@ -17,3 +17,6 @@ doppler_noise_km_s:
     tau: 24 h
     process_noise: 50.0e-6 # 5 cm/s
 light_time_correction: false
+measurement_types:
+    - Range
+    - Doppler

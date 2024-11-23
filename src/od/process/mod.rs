@@ -26,58 +26,56 @@ pub use crate::od::*;
 use crate::propagators::PropInstance;
 pub use crate::time::{Duration, Unit};
 use anise::prelude::Almanac;
+use msr::sensitivity::TrackerSensitivity;
 use snafu::prelude::*;
 mod conf;
 pub use conf::{IterationConf, SmoothingArc};
 mod trigger;
 pub use trigger::EkfTrigger;
 mod rejectcrit;
-use self::msr::TrackingArc;
+use self::msr::TrackingDataArc;
 pub use self::rejectcrit::ResidRejectCrit;
 use std::collections::BTreeMap;
 use std::marker::PhantomData;
 use std::ops::Add;
 mod export;
 
+// Rename to simultaneous measurement or something like that.
+
 /// An orbit determination process. Note that everything passed to this structure is moved.
 #[allow(clippy::upper_case_acronyms)]
 pub struct ODProcess<
     'a,
     D: Dynamics,
-    Msr: Measurement,
+    MeasurementSize: DimName,
     A: DimName,
-    S: EstimateFrom<D::StateType, Msr> + Interpolatable,
-    K: Filter<S, A, Msr::MeasurementSize>,
+    K: Filter<D::StateType, A, MeasurementSize>,
+    T: TrackerSensitivity<D::StateType, D::StateType>,
 > where
-    D::StateType: Interpolatable + Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
+    D::StateType:
+        Interpolatable + Add<OVector<f64, <D::StateType as State>::Size>, Output = D::StateType>,
     <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
     DefaultAllocator: Allocator<<D::StateType as State>::Size>
-        + Allocator<<S as State>::Size>
-        + Allocator<<S as State>::VecLength>
         + Allocator<<D::StateType as State>::VecLength>
-        + Allocator<Msr::MeasurementSize>
-        + Allocator<Msr::MeasurementSize, S::Size>
-        + Allocator<S::Size>
-        + Allocator<Msr::MeasurementSize, Msr::MeasurementSize>
-        + Allocator<Msr::MeasurementSize, <D::StateType as State>::Size>
-        + Allocator<<D::StateType as State>::Size, Msr::MeasurementSize>
+        + Allocator<MeasurementSize>
+        + Allocator<MeasurementSize, <D::StateType as State>::Size>
+        + Allocator<MeasurementSize, MeasurementSize>
         + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<<S as State>::Size, <S as State>::Size>
         + Allocator<A>
         + Allocator<A, A>
         + Allocator<<D::StateType as State>::Size, A>
-        + Allocator<A, <D::StateType as State>::Size>
-        + Allocator<<S as State>::Size, A>
-        + Allocator<A, <S as State>::Size>,
+        + Allocator<A, <D::StateType as State>::Size>,
 {
     /// PropInstance used for the estimation
     pub prop: PropInstance<'a, D>,
     /// Kalman filter itself
     pub kf: K,
+    /// Tracking devices
+    pub devices: BTreeMap<String, T>,
     /// Vector of estimates available after a pass
     pub estimates: Vec<K::Estimate>,
     /// Vector of residuals available after a pass
-    pub residuals: Vec<Option<Residual<Msr::MeasurementSize>>>,
+    pub residuals: Vec<Option<Residual<MeasurementSize>>>,
     pub ekf_trigger: Option<EkfTrigger>,
     /// Residual rejection criteria allows preventing bad measurements from affecting the estimation.
     pub resid_crit: Option<ResidRejectCrit>,
@@ -89,39 +87,31 @@ pub struct ODProcess<
 impl<
         'a,
         D: Dynamics,
-        Msr: Measurement,
+        MeasurementSize: DimName,
         A: DimName,
-        S: EstimateFrom<D::StateType, Msr> + Interpolatable,
-        K: Filter<S, A, Msr::MeasurementSize>,
-    > ODProcess<'a, D, Msr, A, S, K>
+        K: Filter<D::StateType, A, MeasurementSize>,
+        T: TrackerSensitivity<D::StateType, D::StateType>,
+    > ODProcess<'a, D, MeasurementSize, A, K, T>
 where
-    D::StateType: Interpolatable + Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
+    D::StateType:
+        Interpolatable + Add<OVector<f64, <D::StateType as State>::Size>, Output = D::StateType>,
     <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
     DefaultAllocator: Allocator<<D::StateType as State>::Size>
-        + Allocator<Msr::MeasurementSize>
-        + Allocator<Msr::MeasurementSize, S::Size>
-        + Allocator<S::Size>
-        + Allocator<Msr::MeasurementSize, Msr::MeasurementSize>
-        + Allocator<Msr::MeasurementSize, <D::StateType as State>::Size>
-        + Allocator<Msr::MeasurementSize, <S as State>::Size>
-        + Allocator<<D::StateType as State>::Size, Msr::MeasurementSize>
-        + Allocator<<S as State>::Size, Msr::MeasurementSize>
-        + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
         + Allocator<<D::StateType as State>::VecLength>
+        + Allocator<MeasurementSize>
+        + Allocator<MeasurementSize, <D::StateType as State>::Size>
+        + Allocator<MeasurementSize, MeasurementSize>
+        + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
         + Allocator<A>
         + Allocator<A, A>
         + Allocator<<D::StateType as State>::Size, A>
-        + Allocator<A, <D::StateType as State>::Size>
-        + Allocator<<S as State>::Size>
-        + Allocator<<S as State>::VecLength>
-        + Allocator<<S as State>::Size, <S as State>::Size>
-        + Allocator<<S as State>::Size, A>
-        + Allocator<A, <S as State>::Size>,
+        + Allocator<A, <D::StateType as State>::Size>,
 {
     /// Initialize a new orbit determination process with an optional trigger to switch from a CKF to an EKF.
     pub fn new(
         prop: PropInstance<'a, D>,
         kf: K,
+        devices: BTreeMap<String, T>,
         ekf_trigger: Option<EkfTrigger>,
         resid_crit: Option<ResidRejectCrit>,
         almanac: Arc<Almanac>,
@@ -130,6 +120,7 @@ where
         Self {
             prop: prop.quiet(),
             kf,
+            devices,
             estimates: Vec::with_capacity(10_000),
             residuals: Vec::with_capacity(10_000),
             ekf_trigger,
@@ -144,6 +135,7 @@ where
     pub fn ekf(
         prop: PropInstance<'a, D>,
         kf: K,
+        devices: BTreeMap<String, T>,
         trigger: EkfTrigger,
         resid_crit: Option<ResidRejectCrit>,
         almanac: Arc<Almanac>,
@@ -152,6 +144,7 @@ where
         Self {
             prop: prop.quiet(),
             kf,
+            devices,
             estimates: Vec::with_capacity(10_000),
             residuals: Vec::with_capacity(10_000),
             ekf_trigger: Some(trigger),
@@ -273,18 +266,11 @@ where
     }
 
     /// Allows iterating on the filter solution. Requires specifying a smoothing condition to know where to stop the smoothing.
-    pub fn iterate<Dev>(
+    pub fn iterate_arc(
         &mut self,
-        measurements: &[(String, Msr)],
-        devices: &mut BTreeMap<String, Dev>,
-        step_size: Duration,
+        arc: &TrackingDataArc,
         config: IterationConf,
-    ) -> Result<(), ODError>
-    where
-        Dev: TrackingDeviceSim<S, Msr>,
-    {
-        // TODO: Add ExportCfg to iterate and to process so the data can be exported as we process it. Consider a thread writing with channel for faster serialization.
-
+    ) -> Result<(), ODError> {
         let mut best_rms = self.rms_residual_ratios();
         let mut previous_rms = best_rms;
         let mut divergence_cnt = 0;
@@ -318,12 +304,12 @@ where
             // Reset the propagator
             self.prop.state = self.init_state;
             // Empty the estimates and add the first smoothed estimate as the initial estimate
-            self.estimates = Vec::with_capacity(measurements.len().max(self.estimates.len()));
-            self.residuals = Vec::with_capacity(measurements.len().max(self.estimates.len()));
+            self.estimates = Vec::with_capacity(arc.measurements.len().max(self.estimates.len()));
+            self.residuals = Vec::with_capacity(arc.measurements.len().max(self.estimates.len()));
 
             self.kf.set_previous_estimate(&smoothed[0]);
             // And re-run the filter
-            self.process::<Dev>(measurements, devices, step_size)?;
+            self.process_arc(arc)?;
 
             // Compute the new RMS
             let new_rms = self.rms_residual_ratios();
@@ -407,41 +393,24 @@ where
         Ok(())
     }
 
-    /// Allows iterating on the filter solution. Requires specifying a smoothing condition to know where to stop the smoothing.
-    pub fn iterate_arc<Dev>(
-        &mut self,
-        arc: &TrackingArc<Msr>,
-        config: IterationConf,
-    ) -> Result<(), ODError>
-    where
-        Dev: TrackingDeviceSim<S, Msr>,
-    {
-        let mut devices = arc.rebuild_devices::<S, Dev>().context(ODConfigSnafu)?;
-
-        let measurements = &arc.measurements;
-        let step_size = match arc.min_duration_sep() {
-            Some(step_size) => step_size,
-            None => {
-                return Err(ODError::TooFewMeasurements {
-                    action: "determine the minimum step step",
-                    need: 2,
-                })
-            }
-        };
-
-        self.iterate(measurements, &mut devices, step_size, config)
-    }
-
-    /// Process the provided tracking arc for this orbit determination process.
+    /// Process the provided measurements for this orbit determination process given the associated devices.
+    ///
+    /// # Argument details
+    /// + The measurements must be a list mapping the name of the measurement device to the measurement itself.
+    /// + The name of all measurement devices must be present in the provided devices, i.e. the key set of `devices` must be a superset of the measurement device names present in the list.
+    /// + The maximum step size to ensure we don't skip any measurements.
     #[allow(clippy::erasing_op)]
-    pub fn process_arc<Dev>(&mut self, arc: &TrackingArc<Msr>) -> Result<(), ODError>
-    where
-        Dev: TrackingDeviceSim<S, Msr>,
-    {
-        let mut devices = arc.rebuild_devices::<S, Dev>().context(ODConfigSnafu)?;
-
+    pub fn process_arc(&mut self, arc: &TrackingDataArc) -> Result<(), ODError> {
         let measurements = &arc.measurements;
-        let step_size = match arc.min_duration_sep() {
+        ensure!(
+            measurements.len() >= 2,
+            TooFewMeasurementsSnafu {
+                need: 2_usize,
+                action: "running a Kalman filter"
+            }
+        );
+
+        let max_step = match arc.min_duration_sep() {
             Some(step_size) => step_size,
             None => {
                 return Err(ODError::TooFewMeasurements {
@@ -451,39 +420,12 @@ where
             }
         };
 
-        self.process(measurements, &mut devices, step_size)
-    }
-
-    /// Process the provided measurements for this orbit determination process given the associated devices.
-    ///
-    /// # Argument details
-    /// + The measurements must be a list mapping the name of the measurement device to the measurement itself.
-    /// + The name of all measurement devices must be present in the provided devices, i.e. the key set of `devices` must be a superset of the measurement device names present in the list.
-    /// + The maximum step size to ensure we don't skip any measurements.
-    #[allow(clippy::erasing_op)]
-    pub fn process<Dev>(
-        &mut self,
-        measurements: &[(String, Msr)],
-        devices: &mut BTreeMap<String, Dev>,
-        max_step: Duration,
-    ) -> Result<(), ODError>
-    where
-        Dev: TrackingDeviceSim<S, Msr>,
-    {
-        ensure!(
-            measurements.len() >= 2,
-            TooFewMeasurementsSnafu {
-                need: 2_usize,
-                action: "running a Kalman filter"
-            }
-        );
-
         ensure!(
             !max_step.is_negative() && max_step != Duration::ZERO,
             StepSizeSnafu { step: max_step }
         );
 
-        // Start by propagating the estimator (on the same thread).
+        // Start by propagating the estimator.
         let num_msrs = measurements.len();
 
         // Update the step size of the navigation propagator if it isn't already fixed step
@@ -491,7 +433,8 @@ where
             self.prop.set_step(max_step, false);
         }
 
-        let prop_time = measurements[num_msrs - 1].1.epoch() - self.kf.previous_estimate().epoch();
+        // let prop_time = measurements[num_msrs - 1].1.epoch() - self.kf.previous_estimate().epoch();
+        let prop_time = arc.end_epoch().unwrap() - self.kf.previous_estimate().epoch();
         info!("Navigation propagating for a total of {prop_time} with step size {max_step}");
 
         let mut epoch = self.prop.state.epoch();
@@ -501,23 +444,13 @@ where
         info!("Processing {num_msrs} measurements with covariance mapping");
 
         // We'll build a trajectory of the estimated states. This will be used to compute the measurements.
-        let mut traj: Traj<S> = Traj::new();
+        let mut traj: Traj<D::StateType> = Traj::new();
 
         let mut msr_accepted_cnt: usize = 0;
         let tick = Epoch::now().unwrap();
 
-        for (msr_cnt, (device_name, msr)) in measurements.iter().enumerate() {
-            let next_msr_epoch = msr.epoch();
-
-            for val in msr.observation().iter() {
-                ensure!(
-                    val.is_finite(),
-                    InvalidMeasurementSnafu {
-                        epoch: next_msr_epoch,
-                        val: *val
-                    }
-                );
-            }
+        for (msr_cnt, (epoch_ref, msr)) in measurements.iter().enumerate() {
+            let next_msr_epoch = *epoch_ref;
 
             // Advance the propagator
             loop {
@@ -544,28 +477,28 @@ where
                     .context(ODPropSnafu)?;
 
                 for state in traj_covar.states {
-                    traj.states.push(S::extract(state));
+                    // traj.states.push(S::extract(state));
+                    // HERE: At the time being, only spacecraft estimation is possible, and the trajectory will always be the exact state
+                    // that was propagated. Even once ground station biases are estimated, these won't go through the propagator.
+                    traj.states.push(state);
                 }
 
                 // Now that we've advanced the propagator, let's see whether we're at the time of the next measurement.
 
                 // Extract the state and update the STM in the filter.
-                let nominal_state = S::extract(self.prop.state);
+                let nominal_state = self.prop.state;
                 // Get the datetime and info needed to compute the theoretical measurement according to the model
                 epoch = nominal_state.epoch();
 
                 // Perform a measurement update
                 if nominal_state.epoch() == next_msr_epoch {
                     // Get the computed observations
-                    match devices.get_mut(device_name) {
+                    match self.devices.get_mut(&msr.tracker) {
                         Some(device) => {
                             if let Some(computed_meas) =
                                 device.measure(epoch, &traj, None, self.almanac.clone())?
                             {
-                                // Grab the device location
-                                let device_loc = device
-                                    .location(epoch, nominal_state.frame(), self.almanac.clone())
-                                    .unwrap();
+                                let msr_types = device.measurement_types();
 
                                 // Switch back from extended if necessary
                                 if let Some(trigger) = &mut self.ekf_trigger {
@@ -575,15 +508,37 @@ where
                                     }
                                 }
 
-                                let h_tilde = S::sensitivity(msr, nominal_state, device_loc);
+                                // Check that the observation is valid.
+                                for val in msr.observation::<MeasurementSize>(msr_types).iter() {
+                                    ensure!(
+                                        val.is_finite(),
+                                        InvalidMeasurementSnafu {
+                                            epoch: next_msr_epoch,
+                                            val: *val
+                                        }
+                                    );
+                                }
+
+                                let h_tilde = device
+                                    .h_tilde::<MeasurementSize>(
+                                        msr,
+                                        msr_types,
+                                        &nominal_state,
+                                        self.almanac.clone(),
+                                    )
+                                    .unwrap();
 
                                 self.kf.update_h_tilde(h_tilde);
 
                                 match self.kf.measurement_update(
                                     nominal_state,
-                                    &msr.observation(),
-                                    &computed_meas.observation(),
-                                    device.measurement_covar(epoch)?,
+                                    &msr.observation(msr_types),
+                                    &computed_meas.observation(msr_types),
+                                    device.measurement_covar_matrix(
+                                        device.measurement_types(),
+                                        epoch,
+                                    )?,
+                                    // device.measurement_covar(epoch)?,
                                     self.resid_crit,
                                 ) {
                                     Ok((estimate, mut residual)) => {
@@ -625,11 +580,11 @@ where
                                     Err(e) => return Err(e),
                                 }
                             } else {
-                                warn!("Real observation exists @ {epoch} but simulated {device_name} does not see it -- ignoring measurement");
+                                warn!("Real observation exists @ {epoch} but simulated {} does not see it -- ignoring measurement", msr.tracker);
                             }
                         }
                         None => {
-                            error!("Tracking arc references {device_name} which is not in the list of configured devices")
+                            error!("Tracking arc references {} which is not in the list of configured devices", msr.tracker)
                         }
                     }
 
@@ -695,8 +650,7 @@ where
             // Perform time update
 
             // Extract the state and update the STM in the filter.
-            let prop_state = self.prop.state;
-            let nominal_state = S::extract(prop_state);
+            let nominal_state = self.prop.state;
             // Get the datetime and info needed to compute the theoretical measurement according to the model
             epoch = nominal_state.epoch();
             // No measurement can be used here, let's just do a time update
@@ -726,10 +680,9 @@ where
     }
 
     /// Builds the navigation trajectory for the estimated state only
-    pub fn to_traj(&self) -> Result<Traj<S>, NyxError>
+    pub fn to_traj(&self) -> Result<Traj<D::StateType>, NyxError>
     where
-        DefaultAllocator: Allocator<<S as State>::VecLength>,
-        S: Interpolatable,
+        DefaultAllocator: Allocator<<D::StateType as State>::VecLength>,
     {
         if self.estimates.is_empty() {
             Err(NyxError::NoStateData {
@@ -751,38 +704,30 @@ where
 impl<
         'a,
         D: Dynamics,
-        Msr: Measurement,
+        MeasurementSize: DimName,
         A: DimName,
-        S: EstimateFrom<D::StateType, Msr> + Interpolatable,
-        K: Filter<S, A, Msr::MeasurementSize>,
-    > ODProcess<'a, D, Msr, A, S, K>
+        K: Filter<D::StateType, A, MeasurementSize>,
+        T: TrackerSensitivity<D::StateType, D::StateType>,
+    > ODProcess<'a, D, MeasurementSize, A, K, T>
 where
-    D::StateType: Interpolatable + Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
+    D::StateType:
+        Interpolatable + Add<OVector<f64, <D::StateType as State>::Size>, Output = D::StateType>,
     <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
     DefaultAllocator: Allocator<<D::StateType as State>::Size>
         + Allocator<<D::StateType as State>::VecLength>
-        + Allocator<Msr::MeasurementSize>
-        + Allocator<Msr::MeasurementSize, S::Size>
-        + Allocator<S::Size>
-        + Allocator<Msr::MeasurementSize, Msr::MeasurementSize>
-        + Allocator<Msr::MeasurementSize, <D::StateType as State>::Size>
-        + Allocator<<D::StateType as State>::Size, Msr::MeasurementSize>
-        + Allocator<<S as State>::Size, Msr::MeasurementSize>
-        + Allocator<Msr::MeasurementSize, <S as State>::Size>
+        + Allocator<MeasurementSize>
+        + Allocator<MeasurementSize, <D::StateType as State>::Size>
+        + Allocator<MeasurementSize, MeasurementSize>
         + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<<S as State>::Size>
-        + Allocator<<S as State>::VecLength>
-        + Allocator<<S as State>::Size, <S as State>::Size>
         + Allocator<A>
         + Allocator<A, A>
         + Allocator<<D::StateType as State>::Size, A>
-        + Allocator<A, <D::StateType as State>::Size>
-        + Allocator<<S as State>::Size, A>
-        + Allocator<A, <S as State>::Size>,
+        + Allocator<A, <D::StateType as State>::Size>,
 {
     pub fn ckf(
         prop: PropInstance<'a, D>,
         kf: K,
+        devices: BTreeMap<String, T>,
         resid_crit: Option<ResidRejectCrit>,
         almanac: Arc<Almanac>,
     ) -> Self {
@@ -790,6 +735,7 @@ where
         Self {
             prop: prop.quiet(),
             kf,
+            devices,
             estimates: Vec::with_capacity(10_000),
             residuals: Vec::with_capacity(10_000),
             resid_crit,

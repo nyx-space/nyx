@@ -21,31 +21,32 @@ use std::sync::Arc;
 use anise::almanac::Almanac;
 use anise::errors::AlmanacResult;
 use hifitime::Epoch;
+use indexmap::IndexSet;
+use nalgebra::{DimName, OMatrix};
 use rand_pcg::Pcg64Mcg;
 
 use crate::io::ConfigRepr;
 use crate::linalg::allocator::Allocator;
-use crate::linalg::{DefaultAllocator, OMatrix};
+use crate::linalg::DefaultAllocator;
 use crate::md::prelude::{Frame, Traj};
 use crate::md::trajectory::Interpolatable;
 use crate::od::msr::measurement::Measurement as NewMeasurement;
 use crate::od::msr::MeasurementType;
-use crate::od::{Measurement, ODError};
+use crate::od::ODError;
 use crate::Orbit;
 
 /// Tracking device simulator.
-pub trait TrackingDeviceSim<MsrIn, Msr>: ConfigRepr
+pub trait TrackingDevice<MsrIn>: ConfigRepr
 where
     MsrIn: Interpolatable,
-    Msr: Measurement,
-    DefaultAllocator: Allocator<Msr::MeasurementSize>
-        + Allocator<MsrIn::Size>
-        + Allocator<MsrIn::Size, MsrIn::Size>
-        + Allocator<Msr::MeasurementSize, Msr::MeasurementSize>
-        + Allocator<MsrIn::VecLength>,
+    DefaultAllocator:
+        Allocator<MsrIn::Size> + Allocator<MsrIn::Size, MsrIn::Size> + Allocator<MsrIn::VecLength>,
 {
     /// Returns the name of this tracking data simulator
     fn name(&self) -> String;
+
+    /// Returns the _enabled_ measurement types for thie device.
+    fn measurement_types(&self) -> &IndexSet<MeasurementType>;
 
     /// Performs a measurement of the input trajectory at the provided epoch (with integration times if relevant), and returns a measurement from itself to the input state. Returns None of the object is not visible.
     /// This trait function takes in a trajectory and epoch so it can properly simulate integration times for the measurements.
@@ -63,7 +64,7 @@ where
         traj: &Traj<MsrIn>,
         rng: Option<&mut Pcg64Mcg>,
         almanac: Arc<Almanac>,
-    ) -> Result<Option<Msr>, ODError>;
+    ) -> Result<Option<NewMeasurement>, ODError>;
 
     /// Returns the device location at the given epoch and in the given frame.
     fn location(&self, epoch: Epoch, frame: Frame, almanac: Arc<Almanac>) -> AlmanacResult<Orbit>;
@@ -74,26 +75,28 @@ where
         rx: MsrIn,
         rng: Option<&mut Pcg64Mcg>,
         almanac: Arc<Almanac>,
-    ) -> Result<Option<Msr>, ODError>;
-
-    // Return the noise statistics of this tracking device at the requested epoch.
-    fn measurement_covar(
-        &mut self,
-        epoch: Epoch,
-    ) -> Result<OMatrix<f64, Msr::MeasurementSize, Msr::MeasurementSize>, ODError>;
-
-    fn measure_new(
-        &mut self,
-        epoch: Epoch,
-        traj: &Traj<MsrIn>,
-        rng: Option<&mut Pcg64Mcg>,
-        almanac: Arc<Almanac>,
     ) -> Result<Option<NewMeasurement>, ODError>;
 
     // Return the noise statistics of this tracking device for the provided measurement type at the requested epoch.
-    fn measurement_covar_new(
+    fn measurement_covar(&self, msr_type: MeasurementType, epoch: Epoch) -> Result<f64, ODError>;
+
+    fn measurement_covar_matrix<M: DimName>(
         &self,
-        msr_type: MeasurementType,
+        msr_types: &IndexSet<MeasurementType>,
         epoch: Epoch,
-    ) -> Result<f64, ODError>;
+    ) -> Result<OMatrix<f64, M, M>, ODError>
+    where
+        DefaultAllocator: Allocator<M, M>,
+    {
+        // Rebuild the R matrix of the measurement noise.
+        let mut r_mat = OMatrix::<f64, M, M>::zeros();
+
+        for (i, msr_type) in msr_types.iter().enumerate() {
+            if self.measurement_types().contains(msr_type) {
+                r_mat[(i, i)] = self.measurement_covar(*msr_type, epoch)?;
+            }
+        }
+
+        Ok(r_mat)
+    }
 }

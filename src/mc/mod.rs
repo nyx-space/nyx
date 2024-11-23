@@ -32,7 +32,7 @@ mod generator;
 pub use generator::{DispersedState, Dispersion};
 
 mod multivariate;
-pub use multivariate::MultivariateNormal;
+pub use multivariate::MvnSpacecraft;
 
 mod results;
 pub use results::{Results, Stats};

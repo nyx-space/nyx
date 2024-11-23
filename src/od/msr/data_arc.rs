@@ -30,17 +30,20 @@ use arrow::{
 use core::fmt;
 use hifitime::prelude::{Duration, Epoch};
 use hifitime::TimeScale;
+use indexmap::IndexSet;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::arrow::ArrowWriter;
 use snafu::{ensure, ResultExt};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 use std::error::Error;
 use std::fs::File;
+use std::ops::Bound::{Excluded, Included, Unbounded};
+use std::ops::RangeBounds;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 /// Tracking data storing all of measurements as a B-Tree.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct TrackingDataArc {
     /// All measurements in this data arc
     pub measurements: BTreeMap<Epoch, Measurement>,
@@ -50,7 +53,7 @@ pub struct TrackingDataArc {
 
 impl TrackingDataArc {
     /// Loads a tracking arc from its serialization in parquet.
-    pub fn from_parquet<P: AsRef<Path> + fmt::Display>(path: P) -> Result<Self, InputOutputError> {
+    pub fn from_parquet<P: AsRef<Path>>(path: P) -> Result<Self, InputOutputError> {
         // Read the file since we closed it earlier
         let file = File::open(&path).context(StdIOSnafu {
             action: "opening file for tracking arc",
@@ -177,24 +180,24 @@ impl TrackingDataArc {
 
         Ok(Self {
             measurements,
-            source: Some(path.to_string()),
+            source: Some(path.as_ref().to_path_buf().display().to_string()),
         })
     }
 
     /// Returns the unique list of aliases in this tracking data arc
-    pub fn unique_aliases(&self) -> HashSet<String> {
+    pub fn unique_aliases(&self) -> IndexSet<String> {
         self.unique().0
     }
 
     /// Returns the unique measurement types in this tracking data arc
-    pub fn unique_types(&self) -> HashSet<MeasurementType> {
+    pub fn unique_types(&self) -> IndexSet<MeasurementType> {
         self.unique().1
     }
 
     /// Returns the unique trackers and unique measurement types in this data arc
-    pub fn unique(&self) -> (HashSet<String>, HashSet<MeasurementType>) {
-        let mut aliases = HashSet::new();
-        let mut types = HashSet::new();
+    pub fn unique(&self) -> (IndexSet<String>, IndexSet<MeasurementType>) {
+        let mut aliases = IndexSet::new();
+        let mut types = IndexSet::new();
         for msr in self.measurements.values() {
             aliases.insert(msr.tracker.clone());
             for k in msr.data.keys() {
@@ -241,16 +244,42 @@ impl TrackingDataArc {
         }
     }
 
+    /// Returns a new tracking arc that only contains measurements that fall within the given epoch range.
+    pub fn filter_by_epoch<R: RangeBounds<Epoch>>(mut self, bound: R) -> Self {
+        self.measurements = self
+            .measurements
+            .range(bound)
+            .map(|(epoch, msr)| (*epoch, msr.clone()))
+            .collect::<BTreeMap<Epoch, Measurement>>();
+        self
+    }
+
+    /// Returns a new tracking arc that only contains measurements that fall within the given offset from the first epoch
+    pub fn filter_by_offset<R: RangeBounds<Duration>>(self, bound: R) -> Self {
+        if self.is_empty() {
+            return self;
+        }
+        // Rebuild an epoch bound.
+        let start = match bound.start_bound() {
+            Unbounded => self.start_epoch().unwrap(),
+            Included(offset) | Excluded(offset) => self.start_epoch().unwrap() + *offset,
+        };
+
+        let end = match bound.end_bound() {
+            Unbounded => self.end_epoch().unwrap(),
+            Included(offset) | Excluded(offset) => self.end_epoch().unwrap() - *offset,
+        };
+
+        self.filter_by_epoch(start..end)
+    }
+
     /// Store this tracking arc to a parquet file.
-    pub fn to_parquet_simple<P: AsRef<Path> + fmt::Display>(
-        &self,
-        path: P,
-    ) -> Result<PathBuf, Box<dyn Error>> {
+    pub fn to_parquet_simple<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf, Box<dyn Error>> {
         self.to_parquet(path, ExportCfg::default())
     }
 
     /// Store this tracking arc to a parquet file, with optional metadata and a timestamp appended to the filename.
-    pub fn to_parquet<P: AsRef<Path> + fmt::Display>(
+    pub fn to_parquet<P: AsRef<Path>>(
         &self,
         path: P,
         cfg: ExportCfg,

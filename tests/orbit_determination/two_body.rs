@@ -2,6 +2,7 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
 use anise::constants::frames::IAU_EARTH_FRAME;
+use nalgebra::U2;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::sph_harmonics::Harmonics;
@@ -28,7 +29,7 @@ fn almanac() -> Arc<Almanac> {
 }
 
 #[fixture]
-fn sim_devices(almanac: Arc<Almanac>) -> Vec<GroundStation> {
+fn sim_devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
@@ -50,12 +51,17 @@ fn sim_devices(almanac: Arc<Almanac>) -> Vec<GroundStation> {
         iau_earth,
     );
 
-    vec![dss65_madrid, dss34_canberra, dss13_goldstone]
+    let mut devices = BTreeMap::new();
+    devices.insert("Madrid".to_string(), dss65_madrid);
+    devices.insert("Canberra".to_string(), dss34_canberra);
+    devices.insert("Goldstone".to_string(), dss13_goldstone);
+
+    devices
 }
 
 /// Devices for processing the measurement, noise may not be zero.
 #[fixture]
-fn proc_devices(almanac: Arc<Almanac>) -> Vec<GroundStation> {
+fn proc_devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
@@ -77,15 +83,20 @@ fn proc_devices(almanac: Arc<Almanac>) -> Vec<GroundStation> {
         iau_earth,
     );
 
-    vec![dss65_madrid, dss34_canberra, dss13_goldstone]
+    let mut devices = BTreeMap::new();
+    devices.insert("Madrid".to_string(), dss65_madrid);
+    devices.insert("Canberra".to_string(), dss34_canberra);
+    devices.insert("Goldstone".to_string(), dss13_goldstone);
+
+    devices
 }
 
 #[allow(clippy::identity_op)]
 #[rstest]
 fn od_tb_val_ekf_fixed_step_perfect_stations(
     almanac: Arc<Almanac>,
-    sim_devices: Vec<GroundStation>,
-    proc_devices: Vec<GroundStation>,
+    sim_devices: BTreeMap<String, GroundStation>,
+    proc_devices: BTreeMap<String, GroundStation>,
 ) {
     let _ = pretty_env_logger::try_init();
 
@@ -108,8 +119,8 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(
 
     let cfg = TrkConfig::load(trkconfig_yaml).unwrap();
 
-    for device in &sim_devices {
-        configs.insert(device.name.clone(), cfg.clone());
+    for name in sim_devices.keys() {
+        configs.insert(name.clone(), cfg.clone());
     }
 
     let all_stations = sim_devices;
@@ -136,8 +147,7 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 0).unwrap();
     arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let mut arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
-    arc.set_devices(proc_devices, configs).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -163,15 +173,16 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(
 
     let kf = KF::no_snc(initial_estimate);
 
-    let mut odp = ODProcess::ekf(
+    let mut odp = ODProcess::<_, U2, _, _, _>::ekf(
         prop_est,
         kf,
+        proc_devices,
         EkfTrigger::new(ekf_num_meas, ekf_disable_time),
         None,
         almanac,
     );
 
-    odp.process_arc::<GroundStation>(&arc).unwrap();
+    odp.process_arc(&arc).unwrap();
 
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];
@@ -221,8 +232,8 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(
 #[rstest]
 fn od_tb_val_with_arc(
     almanac: Arc<Almanac>,
-    sim_devices: Vec<GroundStation>,
-    proc_devices: Vec<GroundStation>,
+    sim_devices: BTreeMap<String, GroundStation>,
+    proc_devices: BTreeMap<String, GroundStation>,
 ) {
     let _ = pretty_env_logger::try_init();
 
@@ -283,8 +294,7 @@ fn od_tb_val_with_arc(
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 1).unwrap();
     arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let mut arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
-    arc.set_devices(proc_devices, configs).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // And serialize to disk
     let path: PathBuf = [
@@ -321,15 +331,16 @@ fn od_tb_val_with_arc(
 
     let kf = KF::no_snc(initial_estimate);
 
-    let mut odp = ODProcess::ekf(
+    let mut odp = ODProcess::<_, U2, _, _, _>::ekf(
         prop_est,
         kf,
+        proc_devices,
         EkfTrigger::new(ekf_num_meas, ekf_disable_time),
         Some(ResidRejectCrit::default()),
         almanac,
     );
 
-    odp.process_arc::<GroundStation>(&arc).unwrap();
+    odp.process_arc(&arc).unwrap();
 
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];
@@ -379,8 +390,8 @@ fn od_tb_val_with_arc(
 #[rstest]
 fn od_tb_val_ckf_fixed_step_perfect_stations(
     almanac: Arc<Almanac>,
-    sim_devices: Vec<GroundStation>,
-    proc_devices: Vec<GroundStation>,
+    sim_devices: BTreeMap<String, GroundStation>,
+    proc_devices: BTreeMap<String, GroundStation>,
 ) {
     /*
      * This tests that the state transition matrix computation is correct with two body dynamics.
@@ -404,8 +415,8 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
         .build();
 
     let mut configs = BTreeMap::new();
-    for device in &sim_devices {
-        configs.insert(device.name.clone(), cfg.clone());
+    for name in sim_devices.keys() {
+        configs.insert(name.clone(), cfg.clone());
     }
 
     let all_stations = sim_devices;
@@ -432,8 +443,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 0).unwrap();
     arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let mut arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
-    arc.set_devices(proc_devices, configs).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // And serialize to disk
     let path: PathBuf = [
@@ -471,15 +481,15 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
 
     let ckf = KF::no_snc(initial_estimate);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, None, almanac);
+    let mut odp = ODProcess::<_, U2, _, _, _>::ckf(prop_est, ckf, proc_devices, None, almanac);
 
-    odp.process_arc::<GroundStation>(&arc).unwrap();
+    odp.process_arc(&arc).unwrap();
 
     let path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "output_data", "tb_ckf.parquet"]
         .iter()
         .collect();
 
-    odp.to_parquet(path, ExportCfg::default()).unwrap();
+    odp.to_parquet(&arc, path, ExportCfg::default()).unwrap();
 
     // Check that there are no duplicates of epochs.
     let mut prev_epoch = odp.estimates[0].epoch();
@@ -550,7 +560,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
     assert!(delta.vmag_km_s() < 2e-16, "Velocity error should be zero");
 
     // Iterate
-    odp.iterate_arc::<GroundStation>(
+    odp.iterate_arc(
         &arc,
         IterationConf {
             smoother: SmoothingArc::TimeGap(10.0 * Unit::Second),
@@ -602,8 +612,8 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
 #[rstest]
 fn od_tb_ckf_fixed_step_iteration_test(
     almanac: Arc<Almanac>,
-    sim_devices: Vec<GroundStation>,
-    proc_devices: Vec<GroundStation>,
+    sim_devices: BTreeMap<String, GroundStation>,
+    proc_devices: BTreeMap<String, GroundStation>,
 ) {
     let _ = pretty_env_logger::try_init();
 
@@ -615,8 +625,8 @@ fn od_tb_ckf_fixed_step_iteration_test(
     let cfg = TrkConfig::from_sample_rate(10.seconds());
 
     let mut configs = BTreeMap::new();
-    for device in &sim_devices {
-        configs.insert(device.name.clone(), cfg.clone());
+    for name in sim_devices.keys() {
+        configs.insert(name.clone(), cfg.clone());
     }
 
     let all_stations = sim_devices;
@@ -641,8 +651,7 @@ fn od_tb_ckf_fixed_step_iteration_test(
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 0).unwrap();
     arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let mut arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
-    arc.set_devices(proc_devices, configs).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -670,9 +679,9 @@ fn od_tb_ckf_fixed_step_iteration_test(
 
     let ckf = KF::no_snc(initial_estimate);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, None, almanac);
+    let mut odp = ODProcess::<_, U2, _, _, _>::ckf(prop_est, ckf, proc_devices, None, almanac);
 
-    odp.process_arc::<GroundStation>(&arc).unwrap();
+    odp.process_arc(&arc).unwrap();
 
     // Check the final estimate prior to iteration
     let delta = (odp.estimates.last().unwrap().state().orbit - final_truth.orbit).unwrap();
@@ -692,7 +701,7 @@ fn od_tb_ckf_fixed_step_iteration_test(
     );
 
     // Iterate, and check that the initial state difference is lower
-    odp.iterate_arc::<GroundStation>(
+    odp.iterate_arc(
         &arc,
         IterationConf {
             smoother: SmoothingArc::TimeGap(10.0 * Unit::Second),
@@ -743,8 +752,8 @@ fn od_tb_ckf_fixed_step_iteration_test(
 #[rstest]
 fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map(
     almanac: Arc<Almanac>,
-    sim_devices: Vec<GroundStation>,
-    proc_devices: Vec<GroundStation>,
+    sim_devices: BTreeMap<String, GroundStation>,
+    proc_devices: BTreeMap<String, GroundStation>,
 ) {
     // Tests state noise compensation with covariance mapping
     let _ = pretty_env_logger::try_init();
@@ -752,8 +761,8 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map(
     // Define the tracking configurations
     let mut configs = BTreeMap::new();
     let cfg = TrkConfig::from_sample_rate(10.seconds());
-    for device in &sim_devices {
-        configs.insert(device.name.clone(), cfg.clone());
+    for name in sim_devices.keys() {
+        configs.insert(name.clone(), cfg.clone());
     }
 
     let all_stations = sim_devices;
@@ -778,8 +787,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map(
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 0).unwrap();
     arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let mut arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
-    arc.set_devices(proc_devices, configs).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -810,9 +818,9 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map(
 
     let ckf = KF::new(initial_estimate, process_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, None, almanac);
+    let mut odp = ODProcess::<_, U2, _, _, _>::ckf(prop_est, ckf, proc_devices, None, almanac);
 
-    odp.process_arc::<GroundStation>(&arc).unwrap();
+    odp.process_arc(&arc).unwrap();
 
     // Let's check that the covariance never falls below our sigma squared values
     for (no, est) in odp.estimates.iter().enumerate() {
@@ -902,7 +910,8 @@ fn od_tb_ckf_map_covar(almanac: Arc<Almanac>) {
 
     let ckf = KF::no_snc(initial_estimate);
 
-    let mut odp: SpacecraftODProcess = ODProcess::ckf(prop_est, ckf, None, almanac);
+    let mut odp: SpacecraftODProcess =
+        ODProcess::<_, U2, _, _, _>::ckf(prop_est, ckf, BTreeMap::new(), None, almanac);
 
     odp.predict_for(30.seconds(), duration).unwrap();
 
@@ -936,8 +945,8 @@ fn od_tb_ckf_map_covar(almanac: Arc<Almanac>) {
 #[rstest]
 fn od_tb_val_harmonics_ckf_fixed_step_perfect(
     almanac: Arc<Almanac>,
-    sim_devices: Vec<GroundStation>,
-    proc_devices: Vec<GroundStation>,
+    sim_devices: BTreeMap<String, GroundStation>,
+    proc_devices: BTreeMap<String, GroundStation>,
 ) {
     // Tests state noise compensation with covariance mapping
     let _ = pretty_env_logger::try_init();
@@ -945,8 +954,8 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect(
     // Define the tracking configurations
     let mut configs = BTreeMap::new();
     let cfg = TrkConfig::from_sample_rate(10.seconds());
-    for device in &sim_devices {
-        configs.insert(device.name.clone(), cfg.clone());
+    for name in sim_devices.keys() {
+        configs.insert(name.clone(), cfg.clone());
     }
 
     let all_stations = sim_devices;
@@ -974,8 +983,7 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect(
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 0).unwrap();
     arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let mut arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
-    arc.set_devices(proc_devices, configs).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -1002,9 +1010,9 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect(
 
     let ckf = KF::no_snc(initial_estimate);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, None, almanac);
+    let mut odp = ODProcess::<_, U2, _, _, _>::ckf(prop_est, ckf, proc_devices, None, almanac);
 
-    odp.process_arc::<GroundStation>(&arc).unwrap();
+    odp.process_arc(&arc).unwrap();
 
     // Let's check that the covariance never falls below our sigma squared values
     for (no, est) in odp.estimates.iter().enumerate() {
@@ -1044,8 +1052,8 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect(
 #[rstest]
 fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map(
     almanac: Arc<Almanac>,
-    sim_devices: Vec<GroundStation>,
-    proc_devices: Vec<GroundStation>,
+    sim_devices: BTreeMap<String, GroundStation>,
+    proc_devices: BTreeMap<String, GroundStation>,
 ) {
     // Tests state noise compensation with covariance mapping
     let _ = pretty_env_logger::try_init();
@@ -1053,8 +1061,8 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map(
     // Define the tracking configurations
     let mut configs = BTreeMap::new();
     let cfg = TrkConfig::from_sample_rate(10.seconds());
-    for device in &sim_devices {
-        configs.insert(device.name.clone(), cfg.clone());
+    for name in sim_devices.keys() {
+        configs.insert(name.clone(), cfg.clone());
     }
 
     let all_stations = sim_devices;
@@ -1078,8 +1086,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map(
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 0).unwrap();
     arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let mut arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
-    arc.set_devices(proc_devices, configs).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -1119,9 +1126,9 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map(
 
     let ckf = KF::with_sncs(initial_estimate, vec![process_noise1, process_noise2]);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, None, almanac);
+    let mut odp = ODProcess::<_, U2, _, _, _>::ckf(prop_est, ckf, proc_devices, None, almanac);
 
-    odp.process_arc::<GroundStation>(&arc).unwrap();
+    odp.process_arc(&arc).unwrap();
 
     // Let's check that the covariance never falls below our sigma squared values
     for (no, est) in odp.estimates.iter().enumerate() {

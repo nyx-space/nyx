@@ -5,7 +5,6 @@ use hifitime::TimeUnits;
 use nyx::dynamics::guidance::{LocalFrame, Mnvr, Thruster};
 use nyx::linalg::Vector3;
 use nyx::md::prelude::*;
-use nyx::md::targeter::*;
 
 use crate::propagation::GMAT_EARTH_GM;
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};

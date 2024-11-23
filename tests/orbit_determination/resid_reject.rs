@@ -1,5 +1,6 @@
 use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SATURN_BARYCENTER, SUN};
 use anise::constants::frames::{EARTH_J2000, IAU_EARTH_FRAME};
+use nalgebra::U2;
 use nyx_space::dynamics::guidance::LocalFrame;
 use pretty_env_logger::try_init;
 
@@ -64,7 +65,7 @@ fn traj(epoch: Epoch, almanac: Arc<Almanac>) -> Traj<Spacecraft> {
 fn devices_n_configs(
     epoch: Epoch,
     almanac: Arc<Almanac>,
-) -> (Vec<GroundStation>, BTreeMap<String, TrkConfig>) {
+) -> (BTreeMap<String, GroundStation>, BTreeMap<String, TrkConfig>) {
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     let elevation_mask = 0.0;
@@ -107,15 +108,19 @@ fn devices_n_configs(
             .build(),
     );
 
-    (vec![dss65_madrid, dss34_canberra], configs)
+    let mut devices = BTreeMap::new();
+    devices.insert("Madrid".to_string(), dss65_madrid);
+    devices.insert("Canberra".to_string(), dss34_canberra);
+
+    (devices, configs)
 }
 
 #[fixture]
 fn tracking_arc(
     traj: Traj<Spacecraft>,
-    devices_n_configs: (Vec<GroundStation>, BTreeMap<String, TrkConfig>),
+    devices_n_configs: (BTreeMap<String, GroundStation>, BTreeMap<String, TrkConfig>),
     almanac: Arc<Almanac>,
-) -> TrackingArc<RangeDoppler> {
+) -> TrackingDataArc {
     let (devices, configs) = devices_n_configs;
 
     // Simulate tracking data
@@ -177,9 +182,9 @@ fn initial_estimate(traj: Traj<Spacecraft>) -> KfEstimate<Spacecraft> {
 #[rstest]
 fn od_resid_reject_inflated_snc_ckf_two_way(
     traj: Traj<Spacecraft>,
-    tracking_arc: TrackingArc<RangeDoppler>,
+    tracking_arc: TrackingDataArc,
     initial_estimate: KfEstimate<Spacecraft>,
-    devices_n_configs: (Vec<GroundStation>, BTreeMap<String, TrkConfig>),
+    devices_n_configs: (BTreeMap<String, GroundStation>, BTreeMap<String, TrkConfig>),
     almanac: Arc<Almanac>,
 ) {
     let (devices, _configs) = devices_n_configs;
@@ -207,29 +212,15 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
     // the measurements are accepted.
     // So we end up with an excellent estimate but an unusably high covariance.
 
-    let mut odp = ODProcess::ckf(
+    let mut odp = ODProcess::<_, U2, _, _, _>::ckf(
         prop_est,
         kf,
+        devices,
         Some(ResidRejectCrit { num_sigmas: 3.0 }),
         almanac,
     );
 
-    // TODO: Fix the deserialization of the measurements such that they also deserialize the integration time.
-    // Without it, we're stuck having to rebuild them from scratch.
-    // https://github.com/nyx-space/nyx/issues/140
-
-    // Build the hashmap of devices from the vector using their names
-    let mut devices_map = devices
-        .into_iter()
-        .map(|dev| (dev.name.clone(), dev))
-        .collect::<BTreeMap<_, _>>();
-
-    odp.process(
-        &tracking_arc.measurements,
-        &mut devices_map,
-        tracking_arc.min_duration_sep().unwrap(),
-    )
-    .unwrap();
+    odp.process_arc(&tracking_arc).unwrap();
 
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
@@ -238,7 +229,9 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
     ]
     .iter()
     .collect();
-    odp.to_parquet(path, ExportCfg::timestamped()).unwrap();
+
+    odp.to_parquet(&tracking_arc, path, ExportCfg::timestamped())
+        .unwrap();
 
     let num_rejections = odp
         .residuals
@@ -293,9 +286,9 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
 #[rstest]
 fn od_resid_reject_default_ckf_two_way(
     traj: Traj<Spacecraft>,
-    tracking_arc: TrackingArc<RangeDoppler>,
+    tracking_arc: TrackingDataArc,
     initial_estimate: KfEstimate<Spacecraft>,
-    devices_n_configs: (Vec<GroundStation>, BTreeMap<String, TrkConfig>),
+    devices_n_configs: (BTreeMap<String, GroundStation>, BTreeMap<String, TrkConfig>),
     almanac: Arc<Almanac>,
 ) {
     let (devices, _configs) = devices_n_configs;
@@ -319,24 +312,15 @@ fn od_resid_reject_default_ckf_two_way(
 
     let kf = KF::new(initial_estimate, process_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, kf, Some(ResidRejectCrit::default()), almanac);
+    let mut odp = ODProcess::<_, U2, _, _, _>::ckf(
+        prop_est,
+        kf,
+        devices,
+        Some(ResidRejectCrit::default()),
+        almanac,
+    );
 
-    // TODO: Fix the deserialization of the measurements such that they also deserialize the integration time.
-    // Without it, we're stuck having to rebuild them from scratch.
-    // https://github.com/nyx-space/nyx/issues/140
-
-    // Build the hashmap of devices from the vector using their names
-    let mut devices_map = devices
-        .into_iter()
-        .map(|dev| (dev.name.clone(), dev))
-        .collect::<BTreeMap<_, _>>();
-
-    odp.process(
-        &tracking_arc.measurements,
-        &mut devices_map,
-        tracking_arc.min_duration_sep().unwrap(),
-    )
-    .unwrap();
+    odp.process_arc(&tracking_arc).unwrap();
 
     // Save this result before the asserts for analysis
     let path: PathBuf = [
@@ -346,7 +330,8 @@ fn od_resid_reject_default_ckf_two_way(
     ]
     .iter()
     .collect();
-    odp.to_parquet(path, ExportCfg::timestamped()).unwrap();
+    odp.to_parquet(&tracking_arc, path, ExportCfg::timestamped())
+        .unwrap();
 
     let num_rejections = odp
         .residuals

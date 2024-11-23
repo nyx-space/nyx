@@ -46,7 +46,7 @@ pub mod estimate;
 /// Handles loading of gravity models using files of NASA PDS and GMAT COF. Several gunzipped files are provided with nyx.
 pub mod gravity;
 pub mod matrices;
-pub mod tracking_data;
+// pub mod tracking_data;
 pub mod trajectory_data;
 
 use std::io;

@@ -1,8 +1,6 @@
-use nyx_space::io::tracking_data::DynamicTrackingArc;
 use nyx_space::io::ConfigRepr;
 use nyx_space::md::prelude::*;
 use nyx_space::md::trajectory::ExportCfg;
-use nyx_space::od::msr::RangeDoppler;
 use nyx_space::od::prelude::*;
 use nyx_space::od::simulator::TrackingArcSim;
 use nyx_space::od::simulator::TrkConfig;
@@ -78,7 +76,7 @@ fn continuous_tracking(almanac: Arc<Almanac>) {
     .iter()
     .collect();
 
-    let devices = GroundStation::load_many(ground_station_file).unwrap();
+    let devices = GroundStation::load_named(ground_station_file).unwrap();
 
     // dbg!(&devices);
 
@@ -98,10 +96,9 @@ fn continuous_tracking(almanac: Arc<Almanac>) {
     dbg!(&configs);
 
     // Build the tracking arc simulation to generate a "standard measurement".
-    let mut trk = TrackingArcSim::<Spacecraft, RangeDoppler, _>::with_seed(
-        devices, trajectory, configs, 12345,
-    )
-    .unwrap();
+    let mut trk =
+        TrackingArcSim::<Spacecraft, GroundStation>::with_seed(devices, trajectory, configs, 12345)
+            .unwrap();
 
     trk.build_schedule(almanac.clone()).unwrap();
     let arc = trk.generate_measurements(almanac).unwrap();
@@ -119,17 +116,12 @@ fn continuous_tracking(almanac: Arc<Almanac>) {
     println!("[{}] {arc}", output_fn.to_string_lossy());
 
     // Now read this file back in.
-    let dyn_arc = DynamicTrackingArc::from_parquet(output_fn).unwrap();
-    // And convert to the same tracking arc as earlier
-    let arc_concrete = dyn_arc.to_tracking_arc::<RangeDoppler>().unwrap();
+    let arc_concrete = TrackingDataArc::from_parquet(output_fn).unwrap();
 
     println!("{arc_concrete}");
 
     assert_eq!(arc.measurements.len(), 116);
     // Check that we've loaded all of the measurements
     assert_eq!(arc_concrete.measurements.len(), arc.measurements.len());
-    // Check that we find the same device names too
-    assert_eq!(arc_concrete.device_names(), arc.device_names());
-    // Check that we've copied over the device configurations as well
-    assert_eq!(arc_concrete.device_cfg, arc.device_cfg);
+    assert_eq!(arc_concrete.unique(), arc.unique());
 }

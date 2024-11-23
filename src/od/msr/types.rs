@@ -16,11 +16,14 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anise::astro::AzElRange;
+use arrow::datatypes::{DataType, Field};
+use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use arrow::datatypes::{DataType, Field};
+use crate::od::ODError;
 
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Hash, Serialize, Deserialize, PartialEq, Eq)]
 pub enum MeasurementType {
     Range,
     Doppler,
@@ -47,5 +50,32 @@ impl MeasurementType {
             true,
         )
         .with_metadata(meta)
+    }
+
+    /// Computes the one way measurement from an AER object and the noise of this measurement type, returned in the units of this measurement type.
+    pub fn compute_one_way(self, aer: AzElRange, noise: f64) -> Result<f64, ODError> {
+        match self {
+            MeasurementType::Range => Ok(aer.range_km + noise),
+            MeasurementType::Doppler => Ok(aer.range_rate_km_s + noise),
+        }
+    }
+
+    /// Computes the two way measurement from two AER values and the noise of this measurement type, returned in the units of this measurement type.
+    pub fn compute_two_way(
+        self,
+        aer_t0: AzElRange,
+        aer_t1: AzElRange,
+        noise: f64,
+    ) -> Result<f64, ODError> {
+        match self {
+            MeasurementType::Range => {
+                let range_km = (aer_t1.range_km + aer_t0.range_km) * 0.5;
+                Ok(range_km + noise / 2.0_f64.sqrt())
+            }
+            MeasurementType::Doppler => {
+                let doppler_km_s = (aer_t1.range_rate_km_s + aer_t0.range_rate_km_s) * 0.5;
+                Ok(doppler_km_s + noise / 2.0_f64.sqrt())
+            }
+        }
     }
 }

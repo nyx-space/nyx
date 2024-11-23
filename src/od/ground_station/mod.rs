@@ -17,21 +17,23 @@
 */
 
 use anise::astro::{Aberration, AzElRange, PhysicsResult};
+use anise::constants::frames::EARTH_J2000;
 use anise::errors::AlmanacResult;
 use anise::prelude::{Almanac, Frame, Orbit};
+use indexmap::IndexSet;
 
 use super::msr::measurement::Measurement;
-use super::msr::RangeDoppler;
+use super::msr::MeasurementType;
 use super::noise::StochasticNoise;
-use super::{ODAlmanacSnafu, ODError, ODTrajSnafu, TrackingDeviceSim};
+use super::{ODAlmanacSnafu, ODError, ODTrajSnafu, TrackingDevice};
 use crate::errors::EventError;
 use crate::io::ConfigRepr;
 use crate::md::prelude::{Interpolatable, Traj};
 use crate::md::EventEvaluator;
 use crate::time::Epoch;
 use crate::Spacecraft;
-use hifitime::{Duration, Unit};
-use nalgebra::{allocator::Allocator, DefaultAllocator, OMatrix};
+use hifitime::{Duration, TimeUnits, Unit};
+use nalgebra::{allocator::Allocator, DefaultAllocator};
 use rand_pcg::Pcg64Mcg;
 use serde_derive::{Deserialize, Serialize};
 use snafu::ResultExt;
@@ -56,8 +58,11 @@ pub struct GroundStation {
     /// in km
     pub height_km: f64,
     pub frame: Frame,
+    pub measurement_types: IndexSet<MeasurementType>,
     /// Duration needed to generate a measurement (if unset, it is assumed to be instantaneous)
-    #[serde(skip)]
+    /// TODO: Fix the deserialization of the measurements such that they also deserialize the integration time.
+    /// Without it, we're stuck having to rebuild them from scratch.
+    /// https://github.com/nyx-space/nyx/issues/140
     pub integration_time: Option<Duration>,
     /// Whether to correct for light travel time
     pub light_time_correction: bool,
@@ -86,6 +91,7 @@ impl GroundStation {
             longitude_deg,
             height_km,
             frame,
+            measurement_types: IndexSet::new(),
             integration_time: None,
             light_time_correction: false,
             timestamp_noise_s: None,
@@ -100,6 +106,9 @@ impl GroundStation {
         doppler_noise_km_s: StochasticNoise,
         iau_earth: Frame,
     ) -> Self {
+        let mut measurement_types = IndexSet::new();
+        measurement_types.insert(MeasurementType::Range);
+        measurement_types.insert(MeasurementType::Doppler);
         Self {
             name: "Madrid".to_string(),
             elevation_mask_deg: elevation_mask,
@@ -107,6 +116,7 @@ impl GroundStation {
             longitude_deg: 4.250_556,
             height_km: 0.834_939,
             frame: iau_earth,
+            measurement_types,
             integration_time: None,
             light_time_correction: false,
             timestamp_noise_s: None,
@@ -121,6 +131,9 @@ impl GroundStation {
         doppler_noise_km_s: StochasticNoise,
         iau_earth: Frame,
     ) -> Self {
+        let mut measurement_types = IndexSet::new();
+        measurement_types.insert(MeasurementType::Range);
+        measurement_types.insert(MeasurementType::Doppler);
         Self {
             name: "Canberra".to_string(),
             elevation_mask_deg: elevation_mask,
@@ -128,6 +141,7 @@ impl GroundStation {
             longitude_deg: 148.981_944,
             height_km: 0.691_750,
             frame: iau_earth,
+            measurement_types,
             integration_time: None,
             light_time_correction: false,
             timestamp_noise_s: None,
@@ -142,6 +156,9 @@ impl GroundStation {
         doppler_noise_km_s: StochasticNoise,
         iau_earth: Frame,
     ) -> Self {
+        let mut measurement_types = IndexSet::new();
+        measurement_types.insert(MeasurementType::Range);
+        measurement_types.insert(MeasurementType::Doppler);
         Self {
             name: "Goldstone".to_string(),
             elevation_mask_deg: elevation_mask,
@@ -149,6 +166,7 @@ impl GroundStation {
             longitude_deg: 243.205,
             height_km: 1.071_149_04,
             frame: iau_earth,
+            measurement_types,
             integration_time: None,
             light_time_correction: false,
             timestamp_noise_s: None,
@@ -191,51 +209,64 @@ impl GroundStation {
         )
     }
 
-    /// Returns the timestamp noise, range noise, and doppler noise for this ground station at the provided epoch.
-    fn noises(
-        &mut self,
-        epoch: Epoch,
-        rng: Option<&mut Pcg64Mcg>,
-    ) -> Result<(f64, f64, f64), ODError> {
-        let timestamp_noise_s;
-        let range_noise_km;
-        let doppler_noise_km_s;
+    /// Returns the noises for all measurement types configured for this ground station at the provided epoch, timestamp noise is the first entry.
+    fn noises(&mut self, epoch: Epoch, rng: Option<&mut Pcg64Mcg>) -> Result<Vec<f64>, ODError> {
+        let mut noises = vec![0.0; self.measurement_types.len() + 1];
 
-        match rng {
-            Some(rng) => {
-                // Add the range noise, or return an error if it's not configured.
-                range_noise_km = self
-                    .range_noise_km
-                    .ok_or(ODError::NoiseNotConfigured { kind: "Range" })?
-                    .sample(epoch, rng);
+        if let Some(rng) = rng {
+            // Add the timestamp noise first
 
-                // Add the Doppler noise, or return an error if it's not configured.
-                doppler_noise_km_s = self
-                    .doppler_noise_km_s
-                    .ok_or(ODError::NoiseNotConfigured { kind: "Doppler" })?
-                    .sample(epoch, rng);
-
-                // Only add the epoch noise if it's configured, it's valid to not have any noise on the clock.
-                if let Some(mut timestamp_noise) = self.timestamp_noise_s {
-                    timestamp_noise_s = timestamp_noise.sample(epoch, rng);
-                } else {
-                    timestamp_noise_s = 0.0;
-                }
+            if let Some(mut timestamp_noise) = self.timestamp_noise_s {
+                noises[0] = timestamp_noise.sample(epoch, rng);
             }
-            None => {
-                timestamp_noise_s = 0.0;
-                range_noise_km = 0.0;
-                doppler_noise_km_s = 0.0;
-            }
-        };
 
-        Ok((timestamp_noise_s, range_noise_km, doppler_noise_km_s))
+            for (ii, msr_type) in self.measurement_types.iter().enumerate() {
+                noises[ii + 1] = match msr_type {
+                    MeasurementType::Range => self
+                        .range_noise_km
+                        .ok_or(ODError::NoiseNotConfigured { kind: "Range" })?
+                        .sample(epoch, rng),
+                    MeasurementType::Doppler => self
+                        .doppler_noise_km_s
+                        .ok_or(ODError::NoiseNotConfigured { kind: "Doppler" })?
+                        .sample(epoch, rng),
+                };
+            }
+        }
+
+        Ok(noises)
+    }
+}
+
+impl Default for GroundStation {
+    fn default() -> Self {
+        let mut measurement_types = IndexSet::new();
+        measurement_types.insert(MeasurementType::Range);
+        measurement_types.insert(MeasurementType::Doppler);
+        Self {
+            name: "UNDEFINED".to_string(),
+            measurement_types,
+            elevation_mask_deg: 0.0,
+            latitude_deg: 0.0,
+            longitude_deg: 0.0,
+            height_km: 0.0,
+            frame: EARTH_J2000,
+            integration_time: None,
+            light_time_correction: false,
+            timestamp_noise_s: None,
+            range_noise_km: None,
+            doppler_noise_km_s: None,
+        }
     }
 }
 
 impl ConfigRepr for GroundStation {}
 
-impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
+impl TrackingDevice<Spacecraft> for GroundStation {
+    fn measurement_types(&self) -> &IndexSet<MeasurementType> {
+        &self.measurement_types
+    }
+
     /// Perform a measurement from the ground station to the receiver (rx).
     fn measure(
         &mut self,
@@ -243,9 +274,10 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
         traj: &Traj<Spacecraft>,
         rng: Option<&mut Pcg64Mcg>,
         almanac: Arc<Almanac>,
-    ) -> Result<Option<RangeDoppler>, ODError> {
+    ) -> Result<Option<super::prelude::measurement::Measurement>, ODError> {
         match self.integration_time {
             Some(integration_time) => {
+                // If out of traj bounds, return None.
                 let rx_0 = traj.at(epoch - integration_time).context(ODTrajSnafu)?;
                 let rx_1 = traj.at(epoch).context(ODTrajSnafu)?;
 
@@ -277,16 +309,16 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
                 }
 
                 // Noises are computed at the midpoint of the integration time.
-                let (timestamp_noise_s, range_noise_km, doppler_noise_km_s) =
-                    self.noises(epoch - integration_time * 0.5, rng)?;
+                let noises = self.noises(epoch - integration_time * 0.5, rng)?;
 
-                Ok(Some(RangeDoppler::two_way(
-                    aer_t0,
-                    aer_t1,
-                    timestamp_noise_s,
-                    range_noise_km,
-                    doppler_noise_km_s,
-                )))
+                let mut msr = Measurement::new(self.name.clone(), epoch + noises[0].seconds());
+
+                for (ii, msr_type) in self.measurement_types.iter().enumerate() {
+                    let msr_value = msr_type.compute_two_way(aer_t0, aer_t1, noises[ii + 1])?;
+                    msr.push(*msr_type, msr_value);
+                }
+
+                Ok(Some(msr))
             }
             None => self.measure_instantaneous(traj.at(epoch).context(ODTrajSnafu)?, rng, almanac),
         }
@@ -305,7 +337,7 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
         rx: Spacecraft,
         rng: Option<&mut Pcg64Mcg>,
         almanac: Arc<Almanac>,
-    ) -> Result<Option<RangeDoppler>, ODError> {
+    ) -> Result<Option<super::prelude::measurement::Measurement>, ODError> {
         let obstructing_body = if !self.frame.ephem_origin_match(rx.frame()) {
             Some(rx.frame())
         } else {
@@ -320,15 +352,16 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
 
         if aer.elevation_deg >= self.elevation_mask_deg {
             // Only update the noises if the measurement is valid.
-            let (timestamp_noise_s, range_noise_km, doppler_noise_km_s) =
-                self.noises(rx.orbit.epoch, rng)?;
+            let noises = self.noises(rx.orbit.epoch, rng)?;
 
-            Ok(Some(RangeDoppler::one_way(
-                aer,
-                timestamp_noise_s,
-                range_noise_km,
-                doppler_noise_km_s,
-            )))
+            let mut msr = Measurement::new(self.name.clone(), rx.orbit.epoch + noises[0].seconds());
+
+            for (ii, msr_type) in self.measurement_types.iter().enumerate() {
+                let msr_value = msr_type.compute_one_way(aer, noises[ii + 1])?;
+                msr.push(*msr_type, msr_value);
+            }
+
+            Ok(Some(msr))
         } else {
             debug!(
                 "{} {} (el. mask {:.3} deg), object at {:.3} deg -- no measurement",
@@ -346,37 +379,6 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
     /// a diagonal matrix. The first item in the diagonal is the range noise (in km), set to the square of the steady state sigma. The
     /// second item is the Doppler noise (in km/s), set to the square of the steady state sigma of that Gauss Markov process.
     fn measurement_covar(
-        &mut self,
-        epoch: Epoch,
-    ) -> Result<
-        OMatrix<
-            f64,
-            <RangeDoppler as super::Measurement>::MeasurementSize,
-            <RangeDoppler as super::Measurement>::MeasurementSize,
-        >,
-        ODError,
-    > {
-        let range_noise_km2 = self
-            .range_noise_km
-            .ok_or(ODError::NoiseNotConfigured { kind: "Range" })?
-            .covariance(epoch);
-        let doppler_noise_km2_s2 = self
-            .doppler_noise_km_s
-            .ok_or(ODError::NoiseNotConfigured { kind: "Doppler" })?
-            .covariance(epoch);
-
-        let mut msr_noises = OMatrix::<
-            f64,
-            <RangeDoppler as super::Measurement>::MeasurementSize,
-            <RangeDoppler as super::Measurement>::MeasurementSize,
-        >::zeros();
-        msr_noises[(0, 0)] = range_noise_km2;
-        msr_noises[(1, 1)] = doppler_noise_km2_s2;
-
-        Ok(msr_noises)
-    }
-
-    fn measurement_covar_new(
         &self,
         msr_type: super::prelude::MeasurementType,
         epoch: Epoch,
@@ -391,20 +393,6 @@ impl TrackingDeviceSim<Spacecraft, RangeDoppler> for GroundStation {
                 .ok_or(ODError::NoiseNotConfigured { kind: "Doppler" })?
                 .covariance(epoch),
         })
-    }
-
-    fn measure_new(
-        &mut self,
-        epoch: Epoch,
-        traj: &Traj<Spacecraft>,
-        rng: Option<&mut Pcg64Mcg>,
-        almanac: Arc<Almanac>,
-    ) -> Result<Option<super::prelude::measurement::Measurement>, ODError> {
-        Ok(self.measure(epoch, traj, rng, almanac)?.map(|msr| {
-            Measurement::new(self.name.clone(), epoch)
-                .with(super::msr::MeasurementType::Range, msr.obs[0])
-                .with(super::msr::MeasurementType::Doppler, msr.obs[1])
-        }))
     }
 }
 
@@ -475,7 +463,9 @@ where
 
 #[cfg(test)]
 mod gs_ut {
+
     use anise::constants::frames::IAU_EARTH_FRAME;
+    use indexmap::IndexSet;
 
     use crate::io::ConfigRepr;
     use crate::od::prelude::*;
@@ -504,9 +494,14 @@ mod gs_ut {
 
         dbg!(&gs);
 
+        let mut measurement_types = IndexSet::new();
+        measurement_types.insert(MeasurementType::Range);
+        measurement_types.insert(MeasurementType::Doppler);
+
         let expected_gs = GroundStation {
             name: "Demo ground station".to_string(),
             frame: IAU_EARTH_FRAME,
+            measurement_types,
             elevation_mask_deg: 5.0,
             range_noise_km: Some(StochasticNoise {
                 bias: Some(GaussMarkov::new(1.days(), 5e-3).unwrap()),
@@ -549,10 +544,15 @@ mod gs_ut {
 
         dbg!(&stations);
 
+        let mut measurement_types = IndexSet::new();
+        measurement_types.insert(MeasurementType::Range);
+        measurement_types.insert(MeasurementType::Doppler);
+
         let expected = vec![
             GroundStation {
                 name: "Demo ground station".to_string(),
                 frame: IAU_EARTH_FRAME.with_mu_km3_s2(398600.435436096),
+                measurement_types: measurement_types.clone(),
                 elevation_mask_deg: 5.0,
                 range_noise_km: Some(StochasticNoise {
                     bias: Some(GaussMarkov::new(1.days(), 5e-3).unwrap()),
@@ -572,6 +572,7 @@ mod gs_ut {
             GroundStation {
                 name: "Canberra".to_string(),
                 frame: IAU_EARTH_FRAME.with_mu_km3_s2(398600.435436096),
+                measurement_types,
                 elevation_mask_deg: 5.0,
                 range_noise_km: Some(StochasticNoise {
                     bias: Some(GaussMarkov::new(1.days(), 5e-3).unwrap()),

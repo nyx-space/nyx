@@ -33,40 +33,45 @@ fn almanac() -> Arc<Almanac> {
  * The latter would require iteration and smoothing before playing with an EKF. This will be handled in a subsequent version.
 **/
 
-#[allow(clippy::identity_op)]
-#[rstest]
-fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>) {
-    let _ = pretty_env_logger::try_init();
-
+#[fixture]
+fn devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
-
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
-        StochasticNoise::MIN,
-        StochasticNoise::MIN,
+        StochasticNoise::default_range_km(),
+        StochasticNoise::default_doppler_km_s(),
         iau_earth,
     );
     let dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
-        StochasticNoise::MIN,
-        StochasticNoise::MIN,
+        StochasticNoise::default_range_km(),
+        StochasticNoise::default_doppler_km_s(),
         iau_earth,
     );
+
+    let mut devices = BTreeMap::new();
+    devices.insert("Madrid".to_string(), dss65_madrid);
+    devices.insert("Canberra".to_string(), dss34_canberra);
+    devices
+}
+
+#[allow(clippy::identity_op)]
+#[rstest]
+fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>, devices: BTreeMap<String, GroundStation>) {
+    let _ = pretty_env_logger::try_init();
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
     let mut configs = BTreeMap::new();
     configs.insert(
-        dss65_madrid.name.clone(),
+        "Madrid".to_string(),
         TrkConfig::from_sample_rate(10.seconds()),
     );
     configs.insert(
-        dss34_canberra.name.clone(),
+        "Canberra".to_string(),
         TrkConfig::from_sample_rate(10.seconds()),
     );
-
-    let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
     let prop_time = 0.01 * Unit::Day;
@@ -99,7 +104,7 @@ fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>) {
 
     // Simulate tracking data
     println!("{traj}");
-    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
+    let mut arc_sim = TrackingArcSim::with_seed(devices.clone(), traj.clone(), configs, 0).unwrap();
     arc_sim.build_schedule(almanac.clone()).unwrap();
 
     let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
@@ -133,12 +138,12 @@ fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>) {
     let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
     let kf = KF::new(initial_estimate, process_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, kf, None, almanac);
+    let mut odp = SpacecraftODProcess::ckf(prop_est, kf, devices, None, almanac);
 
-    odp.process_arc::<GroundStation>(&arc).unwrap();
+    odp.process_arc(&arc).unwrap();
     let pre_smooth_first_est = odp.estimates[0];
     let pre_smooth_num_est = odp.estimates.len();
-    odp.iterate_arc::<GroundStation>(
+    odp.iterate_arc(
         &arc,
         IterationConf {
             smoother: SmoothingArc::All,
@@ -256,45 +261,28 @@ fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn xhat_dev_test_ekf_multi_body(almanac: Arc<Almanac>) {
+fn xhat_dev_test_ekf_multi_body(almanac: Arc<Almanac>, devices: BTreeMap<String, GroundStation>) {
     // We seed both propagators with the same initial state, but we let a large state deviation in the filter.
     // This does _not_ impact the prefits, but it impacts the state deviation and therefore the state estimate.
     // As such, it checks that the filter can return to a nominal state.
     let _ = pretty_env_logger::try_init();
 
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
-
     // Define the ground stations.
     let ekf_num_meas = 500;
     // Set the disable time to be very low to test enable/disable sequence
     let ekf_disable_time = 10.0 * Unit::Second;
-    let elevation_mask = 0.0;
-    let dss65_madrid = GroundStation::dss65_madrid(
-        elevation_mask,
-        StochasticNoise::default_range_km(),
-        StochasticNoise::default_doppler_km_s(),
-        iau_earth,
-    );
-    let dss34_canberra = GroundStation::dss34_canberra(
-        elevation_mask,
-        StochasticNoise::default_range_km(),
-        StochasticNoise::default_doppler_km_s(),
-        iau_earth,
-    );
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
     let mut configs = BTreeMap::new();
     configs.insert(
-        dss65_madrid.name.clone(),
+        "Madrid".to_string(),
         TrkConfig::from_sample_rate(10.seconds()),
     );
     configs.insert(
-        dss34_canberra.name.clone(),
+        "Canberra".to_string(),
         TrkConfig::from_sample_rate(10.seconds()),
     );
-
-    let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -328,7 +316,7 @@ fn xhat_dev_test_ekf_multi_body(almanac: Arc<Almanac>) {
         .unwrap();
 
     // Simulate tracking data
-    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
+    let mut arc_sim = TrackingArcSim::with_seed(devices.clone(), traj.clone(), configs, 0).unwrap();
     arc_sim.build_schedule(almanac.clone()).unwrap();
 
     let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
@@ -362,10 +350,10 @@ fn xhat_dev_test_ekf_multi_body(almanac: Arc<Almanac>) {
     let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
 
-    let mut odp = ODProcess::ekf(prop_est, kf, trig, None, almanac);
+    let mut odp = SpacecraftODProcess::ekf(prop_est, kf, devices, trig, None, almanac);
 
-    odp.process_arc::<GroundStation>(&arc).unwrap();
-    odp.iterate_arc::<GroundStation>(&arc, IterationConf::try_from(SmoothingArc::All).unwrap())
+    odp.process_arc(&arc).unwrap();
+    odp.iterate_arc(&arc, IterationConf::try_from(SmoothingArc::All).unwrap())
         .unwrap();
 
     // Check that the covariance deflated
@@ -429,42 +417,25 @@ fn xhat_dev_test_ekf_multi_body(almanac: Arc<Almanac>) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn xhat_dev_test_ekf_harmonics(almanac: Arc<Almanac>) {
+fn xhat_dev_test_ekf_harmonics(almanac: Arc<Almanac>, devices: BTreeMap<String, GroundStation>) {
     let _ = pretty_env_logger::try_init();
-
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     // Define the ground stations.
     let ekf_num_meas = 5000;
     // Set the disable time to be very low to test enable/disable sequence
     let ekf_disable_time = 1 * Unit::Minute;
-    let elevation_mask = 0.0;
-    let dss65_madrid = GroundStation::dss65_madrid(
-        elevation_mask,
-        StochasticNoise::default_range_km(),
-        StochasticNoise::default_doppler_km_s(),
-        iau_earth,
-    );
-    let dss34_canberra = GroundStation::dss34_canberra(
-        elevation_mask,
-        StochasticNoise::default_range_km(),
-        StochasticNoise::default_doppler_km_s(),
-        iau_earth,
-    );
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
     let mut configs = BTreeMap::new();
     configs.insert(
-        dss65_madrid.name.clone(),
+        "Madrid".to_string(),
         TrkConfig::from_sample_rate(10.seconds()),
     );
     configs.insert(
-        dss34_canberra.name.clone(),
+        "Canberra".to_string(),
         TrkConfig::from_sample_rate(10.seconds()),
     );
-
-    let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -508,7 +479,7 @@ fn xhat_dev_test_ekf_harmonics(almanac: Arc<Almanac>) {
         .unwrap();
 
     // Simulate tracking data
-    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
+    let mut arc_sim = TrackingArcSim::with_seed(devices.clone(), traj.clone(), configs, 0).unwrap();
     arc_sim.build_schedule(almanac.clone()).unwrap();
 
     let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
@@ -542,9 +513,9 @@ fn xhat_dev_test_ekf_harmonics(almanac: Arc<Almanac>) {
     let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
 
-    let mut odp = ODProcess::ekf(prop_est, kf, trig, None, almanac);
+    let mut odp = SpacecraftODProcess::ekf(prop_est, kf, devices, trig, None, almanac);
 
-    odp.process_arc::<GroundStation>(&arc).unwrap();
+    odp.process_arc(&arc).unwrap();
 
     // Check that the covariance deflated
     let est = &odp.estimates.last().unwrap();
@@ -592,42 +563,25 @@ fn xhat_dev_test_ekf_harmonics(almanac: Arc<Almanac>) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn xhat_dev_test_ekf_realistic(almanac: Arc<Almanac>) {
+fn xhat_dev_test_ekf_realistic(almanac: Arc<Almanac>, devices: BTreeMap<String, GroundStation>) {
     let _ = pretty_env_logger::try_init();
-
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
     // Define the ground stations.
     let ekf_num_meas = 500;
     // Set the disable time to be very low to test enable/disable sequence
     let ekf_disable_time = 10.0 * Unit::Second;
-    let elevation_mask = 0.0;
-    let dss65_madrid = GroundStation::dss65_madrid(
-        elevation_mask,
-        StochasticNoise::default_range_km(),
-        StochasticNoise::default_doppler_km_s(),
-        iau_earth,
-    );
-    let dss34_canberra = GroundStation::dss34_canberra(
-        elevation_mask,
-        StochasticNoise::default_range_km(),
-        StochasticNoise::default_doppler_km_s(),
-        iau_earth,
-    );
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
     let mut configs = BTreeMap::new();
     configs.insert(
-        dss65_madrid.name.clone(),
+        "Madrid".to_string(),
         TrkConfig::from_sample_rate(10.seconds()),
     );
     configs.insert(
-        dss34_canberra.name.clone(),
+        "Canberra".to_string(),
         TrkConfig::from_sample_rate(10.seconds()),
     );
-
-    let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -658,7 +612,7 @@ fn xhat_dev_test_ekf_realistic(almanac: Arc<Almanac>) {
         .unwrap();
 
     // Simulate tracking data
-    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
+    let mut arc_sim = TrackingArcSim::with_seed(devices.clone(), traj.clone(), configs, 0).unwrap();
     arc_sim.build_schedule(almanac.clone()).unwrap();
 
     let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
@@ -692,9 +646,9 @@ fn xhat_dev_test_ekf_realistic(almanac: Arc<Almanac>) {
     let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
 
-    let mut odp = ODProcess::ekf(prop_est, kf, trig, None, almanac);
+    let mut odp = SpacecraftODProcess::ekf(prop_est, kf, devices, trig, None, almanac);
 
-    odp.process_arc::<GroundStation>(&arc).unwrap();
+    odp.process_arc(&arc).unwrap();
 
     // Check that the covariance deflated
     let est = &odp.estimates.last().unwrap();
@@ -749,37 +703,23 @@ fn xhat_dev_test_ekf_realistic(almanac: Arc<Almanac>) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn xhat_dev_test_ckf_smoother_multi_body(almanac: Arc<Almanac>) {
+fn xhat_dev_test_ckf_smoother_multi_body(
+    almanac: Arc<Almanac>,
+    devices: BTreeMap<String, GroundStation>,
+) {
     let _ = pretty_env_logger::try_init();
-
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
-
-    let elevation_mask = 0.0;
-    let dss65_madrid = GroundStation::dss65_madrid(
-        elevation_mask,
-        StochasticNoise::default_range_km(),
-        StochasticNoise::default_doppler_km_s(),
-        iau_earth,
-    );
-    let dss34_canberra = GroundStation::dss34_canberra(
-        elevation_mask,
-        StochasticNoise::default_range_km(),
-        StochasticNoise::default_doppler_km_s(),
-        iau_earth,
-    );
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
     let mut configs = BTreeMap::new();
     configs.insert(
-        dss65_madrid.name.clone(),
+        "Madrid".to_string(),
         TrkConfig::from_sample_rate(10.seconds()),
     );
     configs.insert(
-        dss34_canberra.name.clone(),
+        "Canberra".to_string(),
         TrkConfig::from_sample_rate(10.seconds()),
     );
-    let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -812,7 +752,7 @@ fn xhat_dev_test_ckf_smoother_multi_body(almanac: Arc<Almanac>) {
         .unwrap();
 
     // Simulate tracking data
-    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
+    let mut arc_sim = TrackingArcSim::with_seed(devices.clone(), traj.clone(), configs, 0).unwrap();
     arc_sim.build_schedule(almanac.clone()).unwrap();
 
     let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
@@ -841,9 +781,9 @@ fn xhat_dev_test_ckf_smoother_multi_body(almanac: Arc<Almanac>) {
 
     let kf = KF::no_snc(initial_estimate);
 
-    let mut odp = ODProcess::ckf(prop_est, kf, None, almanac);
+    let mut odp = SpacecraftODProcess::ckf(prop_est, kf, devices, None, almanac);
 
-    odp.process_arc::<GroundStation>(&arc).unwrap();
+    odp.process_arc(&arc).unwrap();
 
     // Smoother
     let smoothed_estimates = odp.smooth(SmoothingArc::All).unwrap();
@@ -1019,37 +959,23 @@ fn xhat_dev_test_ckf_smoother_multi_body(almanac: Arc<Almanac>) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn xhat_dev_test_ekf_snc_smoother_multi_body(almanac: Arc<Almanac>) {
+fn xhat_dev_test_ekf_snc_smoother_multi_body(
+    almanac: Arc<Almanac>,
+    devices: BTreeMap<String, GroundStation>,
+) {
     let _ = pretty_env_logger::try_init();
-
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
-
-    let elevation_mask = 10.0;
-    let dss65_madrid = GroundStation::dss65_madrid(
-        elevation_mask,
-        StochasticNoise::default_range_km(),
-        StochasticNoise::default_doppler_km_s(),
-        iau_earth,
-    );
-    let dss34_canberra = GroundStation::dss34_canberra(
-        elevation_mask,
-        StochasticNoise::default_range_km(),
-        StochasticNoise::default_doppler_km_s(),
-        iau_earth,
-    );
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
     let mut configs = BTreeMap::new();
     configs.insert(
-        dss65_madrid.name.clone(),
+        "Madrid".to_string(),
         TrkConfig::from_sample_rate(10.seconds()),
     );
     configs.insert(
-        dss34_canberra.name.clone(),
+        "Canberra".to_string(),
         TrkConfig::from_sample_rate(10.seconds()),
     );
-    let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -1082,7 +1008,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body(almanac: Arc<Almanac>) {
         .unwrap();
 
     // Simulate tracking data
-    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
+    let mut arc_sim = TrackingArcSim::with_seed(devices.clone(), traj.clone(), configs, 0).unwrap();
     arc_sim.build_schedule(almanac.clone()).unwrap();
 
     let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
@@ -1118,15 +1044,16 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body(almanac: Arc<Almanac>) {
     let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
     let kf = KF::new(initial_estimate, process_noise);
 
-    let mut odp = ODProcess::ekf(
+    let mut odp = SpacecraftODProcess::ekf(
         prop_est,
         kf,
+        devices,
         EkfTrigger::new(ekf_num_meas, ekf_disable_time),
         None,
         almanac,
     );
 
-    odp.process_arc::<GroundStation>(&arc).unwrap();
+    odp.process_arc(&arc).unwrap();
 
     // Smoother
     let smoothed_estimates = odp.smooth(SmoothingArc::All).unwrap();
@@ -1290,37 +1217,23 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body(almanac: Arc<Almanac>) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn xhat_dev_test_ckf_iteration_multi_body(almanac: Arc<Almanac>) {
+fn xhat_dev_test_ckf_iteration_multi_body(
+    almanac: Arc<Almanac>,
+    devices: BTreeMap<String, GroundStation>,
+) {
     let _ = pretty_env_logger::try_init();
-
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
-
-    let elevation_mask = 0.0;
-    let dss65_madrid = GroundStation::dss65_madrid(
-        elevation_mask,
-        StochasticNoise::default_range_km(),
-        StochasticNoise::default_doppler_km_s(),
-        iau_earth,
-    );
-    let dss34_canberra = GroundStation::dss34_canberra(
-        elevation_mask,
-        StochasticNoise::default_range_km(),
-        StochasticNoise::default_doppler_km_s(),
-        iau_earth,
-    );
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
     let mut configs = BTreeMap::new();
     configs.insert(
-        dss65_madrid.name.clone(),
+        "Madrid".to_string(),
         TrkConfig::from_sample_rate(10.seconds()),
     );
     configs.insert(
-        dss34_canberra.name.clone(),
+        "Canberra".to_string(),
         TrkConfig::from_sample_rate(10.seconds()),
     );
-    let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -1353,7 +1266,7 @@ fn xhat_dev_test_ckf_iteration_multi_body(almanac: Arc<Almanac>) {
         .unwrap();
 
     // Simulate tracking data
-    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
+    let mut arc_sim = TrackingArcSim::with_seed(devices.clone(), traj.clone(), configs, 0).unwrap();
     arc_sim.build_schedule(almanac.clone()).unwrap();
 
     let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
@@ -1382,15 +1295,15 @@ fn xhat_dev_test_ckf_iteration_multi_body(almanac: Arc<Almanac>) {
 
     let kf = KF::no_snc(initial_estimate);
 
-    let mut odp = ODProcess::ckf(prop_est, kf, None, almanac);
+    let mut odp = SpacecraftODProcess::ckf(prop_est, kf, devices, None, almanac);
 
-    odp.process_arc::<GroundStation>(&arc).unwrap();
+    odp.process_arc(&arc).unwrap();
 
     // Clone the initial estimates
     let pre_iteration_estimates = odp.estimates.clone();
 
     // Iterate
-    odp.iterate_arc::<GroundStation>(&arc, IterationConf::try_from(SmoothingArc::All).unwrap())
+    odp.iterate_arc(&arc, IterationConf::try_from(SmoothingArc::All).unwrap())
         .unwrap();
 
     let mut rss_pos_avr = 0.0;

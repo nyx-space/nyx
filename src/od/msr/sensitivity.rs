@@ -18,9 +18,11 @@
 
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
-use crate::od::{GroundStation, ODAlmanacSnafu, ODError, TrackingDeviceSim};
+use crate::md::prelude::Interpolatable;
+use crate::od::{GroundStation, ODAlmanacSnafu, ODError, TrackingDevice};
 use crate::{Spacecraft, State};
 use anise::prelude::Almanac;
+use indexmap::IndexSet;
 use nalgebra::{DimName, OMatrix, U1};
 use snafu::ResultExt;
 use std::marker::PhantomData;
@@ -46,7 +48,7 @@ where
 }
 
 /// Trait required to build a triplet of a solve-for state, a receiver, and a transmitter.
-pub trait Sensitivity<SolveState: State, Rx, Tx>
+pub trait TrackerSensitivity<SolveState: Interpolatable, Rx>: TrackingDevice<SolveState>
 where
     Self: Sized,
     DefaultAllocator: Allocator<SolveState::Size>
@@ -57,9 +59,9 @@ where
     /// and S is the size of the state being solved for.
     fn h_tilde<M: DimName>(
         &self,
-        msr_types: &[MeasurementType], // Consider switching to array
+        msr: &Measurement,
+        msr_types: &IndexSet<MeasurementType>, // Consider switching to array
         rx: &Rx,
-        tx: &Tx,
         almanac: Arc<Almanac>,
     ) -> Result<OMatrix<f64, M, SolveState::Size>, ODError>
     where
@@ -78,7 +80,7 @@ where
     _tx: PhantomData<Tx>,
 }
 
-impl Sensitivity<Spacecraft, Spacecraft, GroundStation> for Measurement
+impl TrackerSensitivity<Spacecraft, Spacecraft> for GroundStation
 where
     DefaultAllocator: Allocator<<Spacecraft as State>::Size>
         + Allocator<<Spacecraft as State>::VecLength>
@@ -86,9 +88,9 @@ where
 {
     fn h_tilde<M: DimName>(
         &self,
-        msr_types: &[MeasurementType],
+        msr: &Measurement,
+        msr_types: &IndexSet<MeasurementType>,
         rx: &Spacecraft,
-        tx: &GroundStation,
         almanac: Arc<Almanac>,
     ) -> Result<OMatrix<f64, M, <Spacecraft as State>::Size>, ODError>
     where
@@ -97,7 +99,7 @@ where
         // Rebuild each row of the scalar sensitivities.
         let mut mat = OMatrix::<f64, M, <Spacecraft as State>::Size>::zeros();
         for (ith_row, msr_type) in msr_types.iter().enumerate() {
-            if !self.data.contains_key(msr_type) {
+            if !msr.data.contains_key(msr_type) {
                 // Skip computation, this row is zero anyway.
                 continue;
             }
@@ -106,11 +108,10 @@ where
                     Spacecraft,
                     Spacecraft,
                     GroundStation,
-                >>::new(*msr_type, self, rx, tx, almanac.clone())?;
+                >>::new(*msr_type, msr, rx, self, almanac.clone())?;
 
             mat.set_row(ith_row, &scalar_h.sensitivity_row);
         }
-        // ScalarSensitivity<SolveState: State, Rx, Tx>
         Ok(mat)
     }
 }

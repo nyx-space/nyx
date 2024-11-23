@@ -19,12 +19,10 @@
 use crate::dynamics::DynamicsError;
 pub use crate::dynamics::{Dynamics, NyxError};
 use crate::io::{ConfigError, InputOutputError};
-use crate::linalg::allocator::Allocator;
-use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
+use crate::linalg::OVector;
 use crate::md::trajectory::TrajError;
 use crate::propagators::PropagationError;
 use crate::time::Epoch;
-use crate::Orbit;
 pub use crate::{State, TimeTagged};
 use anise::almanac::planetary::PlanetaryDataError;
 use anise::errors::AlmanacError;
@@ -54,8 +52,7 @@ pub mod simulator;
 /// Provides the interfaces to the orbit determination process
 pub mod process;
 
-use arrow::datatypes::Field;
-pub use simulator::TrackingDeviceSim;
+pub use simulator::TrackingDevice;
 
 /// Provides all state noise compensation functionality
 pub mod snc;
@@ -64,10 +61,10 @@ pub mod snc;
 pub type SpacecraftODProcess<'a> = self::process::ODProcess<
     'a,
     crate::md::prelude::SpacecraftDynamics,
-    msr::RangeDoppler,
+    nalgebra::Const<2>,
     nalgebra::Const<3>,
-    crate::Spacecraft,
     filter::kalman::KF<crate::Spacecraft, nalgebra::Const<3>, nalgebra::Const<2>>,
+    GroundStation,
 >;
 
 #[allow(unused_imports)]
@@ -86,88 +83,88 @@ pub mod prelude {
     pub use crate::time::{Duration, Epoch, TimeUnits, Unit};
 }
 
-/// A trait defining a measurement that can be used in the orbit determination process.
-pub trait Measurement: Copy + TimeTagged {
-    /// Defines how much data is measured. For example, if measuring range and range rate, this should be of size 2 (nalgebra::U2).
-    type MeasurementSize: DimName;
+// /// A trait defining a measurement that can be used in the orbit determination process.
+// pub trait Measurement: Copy + TimeTagged {
+//     /// Defines how much data is measured. For example, if measuring range and range rate, this should be of size 2 (nalgebra::U2).
+//     type MeasurementSize: DimName;
 
-    /// Returns the fields for this kind of measurement.
-    /// The metadata must include a `unit` field with the unit.
-    fn fields() -> Vec<Field>;
+//     /// Returns the fields for this kind of measurement.
+//     /// The metadata must include a `unit` field with the unit.
+//     fn fields() -> Vec<Field>;
 
-    /// Initializes a new measurement from the provided data.
-    fn from_observation(epoch: Epoch, obs: OVector<f64, Self::MeasurementSize>) -> Self
-    where
-        DefaultAllocator: Allocator<Self::MeasurementSize>;
+//     /// Initializes a new measurement from the provided data.
+//     fn from_observation(epoch: Epoch, obs: OVector<f64, Self::MeasurementSize>) -> Self
+//     where
+//         DefaultAllocator: Allocator<Self::MeasurementSize>;
 
-    /// Returns the measurement/observation as a vector.
-    fn observation(&self) -> OVector<f64, Self::MeasurementSize>
-    where
-        DefaultAllocator: Allocator<Self::MeasurementSize>;
-}
+//     /// Returns the measurement/observation as a vector.
+//     fn observation(&self) -> OVector<f64, Self::MeasurementSize>
+//     where
+//         DefaultAllocator: Allocator<Self::MeasurementSize>;
+// }
 
-/// The Estimate trait defines the interface that is the opposite of a `SolveFor`.
-/// For example, `impl EstimateFrom<Spacecraft> for Orbit` means that the `Orbit` can be estimated (i.e. "solved for") from a `Spacecraft`.
-///
-/// In the future, there will be a way to estimate ground station biases, for example. This will need a new State that includes both the Spacecraft and
-/// the ground station bias information. Then, the `impl EstimateFrom<SpacecraftAndBias> for OrbitAndBias` will be added, where `OrbitAndBias` is the
-/// new State that includes the orbit and the bias of one ground station.
-pub trait EstimateFrom<O: State, M: Measurement>
-where
-    Self: State,
-    DefaultAllocator: Allocator<<O as State>::Size>
-        + Allocator<<O as State>::VecLength>
-        + Allocator<<O as State>::Size, <O as State>::Size>
-        + Allocator<Self::Size>
-        + Allocator<Self::VecLength>
-        + Allocator<Self::Size, Self::Size>,
-{
-    /// From the state extract the state to be estimated
-    fn extract(from: O) -> Self;
+// /// The Estimate trait defines the interface that is the opposite of a `SolveFor`.
+// /// For example, `impl EstimateFrom<Spacecraft> for Orbit` means that the `Orbit` can be estimated (i.e. "solved for") from a `Spacecraft`.
+// ///
+// /// In the future, there will be a way to estimate ground station biases, for example. This will need a new State that includes both the Spacecraft and
+// /// the ground station bias information. Then, the `impl EstimateFrom<SpacecraftAndBias> for OrbitAndBias` will be added, where `OrbitAndBias` is the
+// /// new State that includes the orbit and the bias of one ground station.
+// pub trait EstimateFrom<O: State, M: Measurement>
+// where
+//     Self: State,
+//     DefaultAllocator: Allocator<<O as State>::Size>
+//         + Allocator<<O as State>::VecLength>
+//         + Allocator<<O as State>::Size, <O as State>::Size>
+//         + Allocator<Self::Size>
+//         + Allocator<Self::VecLength>
+//         + Allocator<Self::Size, Self::Size>,
+// {
+//     /// From the state extract the state to be estimated
+//     fn extract(from: O) -> Self;
 
-    /// Returns the measurement sensitivity (often referred to as H tilde).
-    ///
-    /// # Limitations
-    /// The transmitter is necessarily an Orbit. This implies that any non-orbit parameter in the estimation vector must be a zero-bias estimator, i.e. it must be assumed that the parameter should be zero.
-    /// This is a limitation of the current implementation. It could be fixed by specifying another State like trait in the EstimateFrom trait, significantly adding complexity with little practical use.
-    /// To solve for non zero bias parameters, one ought to be able to estimate the _delta_ of that parameter and want that delta to return to zero, thereby becoming a zero-bias estimator.
-    fn sensitivity(
-        msr: &M,
-        receiver: Self,
-        transmitter: Orbit,
-    ) -> OMatrix<f64, M::MeasurementSize, Self::Size>
-    where
-        DefaultAllocator: Allocator<M::MeasurementSize, Self::Size>;
-}
+//     /// Returns the measurement sensitivity (often referred to as H tilde).
+//     ///
+//     /// # Limitations
+//     /// The transmitter is necessarily an Orbit. This implies that any non-orbit parameter in the estimation vector must be a zero-bias estimator, i.e. it must be assumed that the parameter should be zero.
+//     /// This is a limitation of the current implementation. It could be fixed by specifying another State like trait in the EstimateFrom trait, significantly adding complexity with little practical use.
+//     /// To solve for non zero bias parameters, one ought to be able to estimate the _delta_ of that parameter and want that delta to return to zero, thereby becoming a zero-bias estimator.
+//     fn sensitivity(
+//         msr: &M,
+//         receiver: Self,
+//         transmitter: Orbit,
+//     ) -> OMatrix<f64, M::MeasurementSize, Self::Size>
+//     where
+//         DefaultAllocator: Allocator<M::MeasurementSize, Self::Size>;
+// }
 
-/// A generic implementation of EstimateFrom for any State that is also a Measurement, e.g. if there is a direct observation of the full state.
-/// WARNING: The frame of the full state measurement is _not_ checked to match that of `Self` or of the filtering frame.
-impl<O> EstimateFrom<O, O> for O
-where
-    O: State + Measurement,
-    Self: State,
-    DefaultAllocator: Allocator<<O as State>::Size>
-        + Allocator<<O as State>::VecLength>
-        + Allocator<<O as State>::Size, <O as State>::Size>
-        + Allocator<Self::Size>
-        + Allocator<Self::VecLength>
-        + Allocator<Self::Size, Self::Size>,
-{
-    fn extract(from: O) -> Self {
-        from
-    }
+// /// A generic implementation of EstimateFrom for any State that is also a Measurement, e.g. if there is a direct observation of the full state.
+// /// WARNING: The frame of the full state measurement is _not_ checked to match that of `Self` or of the filtering frame.
+// impl<O> EstimateFrom<O, O> for O
+// where
+//     O: State + Measurement,
+//     Self: State,
+//     DefaultAllocator: Allocator<<O as State>::Size>
+//         + Allocator<<O as State>::VecLength>
+//         + Allocator<<O as State>::Size, <O as State>::Size>
+//         + Allocator<Self::Size>
+//         + Allocator<Self::VecLength>
+//         + Allocator<Self::Size, Self::Size>,
+// {
+//     fn extract(from: O) -> Self {
+//         from
+//     }
 
-    fn sensitivity(
-        _full_state_msr: &O,
-        _receiver: Self,
-        _transmitter: Orbit,
-    ) -> OMatrix<f64, <O as Measurement>::MeasurementSize, Self::Size>
-    where
-        DefaultAllocator: Allocator<<O as Measurement>::MeasurementSize, Self::Size>,
-    {
-        OMatrix::<f64, O::MeasurementSize, Self::Size>::identity()
-    }
-}
+//     fn sensitivity(
+//         _full_state_msr: &O,
+//         _receiver: Self,
+//         _transmitter: Orbit,
+//     ) -> OMatrix<f64, <O as Measurement>::MeasurementSize, Self::Size>
+//     where
+//         DefaultAllocator: Allocator<<O as Measurement>::MeasurementSize, Self::Size>,
+//     {
+//         OMatrix::<f64, O::MeasurementSize, Self::Size>::identity()
+//     }
+// }
 
 #[derive(Debug, PartialEq, Snafu)]
 #[snafu(visibility(pub(crate)))]
@@ -194,6 +191,8 @@ pub enum ODError {
     SingularNoiseRk,
     #[snafu(display("{kind} noise not configured"))]
     NoiseNotConfigured { kind: &'static str },
+    #[snafu(display("measurement sim error: {details}"))]
+    MeasurementSimError { details: String },
     #[snafu(display("during an OD encountered {source}"))]
     ODTrajError { source: TrajError },
     #[snafu(display("OD failed because {source}"))]

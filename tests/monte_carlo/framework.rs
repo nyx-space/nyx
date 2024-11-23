@@ -33,7 +33,7 @@ fn test_monte_carlo_epoch(almanac: Arc<Almanac>) {
     // 5% error on SMA and 5% on Eccentricity
     let nominal_state = Spacecraft::from(state);
 
-    let random_state = MultivariateNormal::new(
+    let random_state = MvnSpacecraft::new(
         nominal_state,
         vec![
             StateDispersion::zero_mean(StateParameter::SMA, 0.05),

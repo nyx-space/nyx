@@ -16,18 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-mod arc;
 mod data_arc;
 pub mod measurement;
-mod range;
-mod range_doppler;
-mod rangerate;
 pub mod sensitivity;
 mod types;
 
-pub use arc::TrackingArc;
 pub use data_arc::TrackingDataArc;
-pub use range::RangeMsr;
-pub use range_doppler::RangeDoppler;
-pub use rangerate::RangeRate;
+pub use measurement::Measurement;
 pub use types::MeasurementType;

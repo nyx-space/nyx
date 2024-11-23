@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use crate::dynamics::SpacecraftDynamics;
 use crate::io::watermark::pq_writer;
 use crate::io::{ArrowSnafu, ExportCfg, ParquetSnafu, StdIOSnafu};
 use crate::linalg::allocator::Allocator;
@@ -30,48 +31,43 @@ use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 use filter::kalman::KF;
 use hifitime::TimeScale;
+use msr::sensitivity::TrackerSensitivity;
+use msr::TrackingDataArc;
 use nalgebra::Const;
 use parquet::arrow::ArrowWriter;
 use snafu::prelude::*;
 use std::collections::HashMap;
 use std::fs::File;
-use std::ops::Add;
 use std::path::{Path, PathBuf};
 
 use super::ODProcess;
 
-impl<'a, D: Dynamics, Msr: Measurement, A: DimName>
-    ODProcess<'a, D, Msr, A, Spacecraft, KF<Spacecraft, A, Msr::MeasurementSize>>
+impl<'a, MeasurementSize: DimName, A: DimName, T: TrackerSensitivity<Spacecraft, Spacecraft>>
+    ODProcess<'a, SpacecraftDynamics, MeasurementSize, A, KF<Spacecraft, A, MeasurementSize>, T>
 where
-    D::StateType:
-        Interpolatable + Add<OVector<f64, <Spacecraft as State>::Size>, Output = D::StateType>,
-    <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
-    DefaultAllocator: Allocator<<D::StateType as State>::Size>
-        + Allocator<Msr::MeasurementSize>
-        + Allocator<Msr::MeasurementSize, <Spacecraft as State>::Size>
-        + Allocator<Const<1>, Msr::MeasurementSize>
+    DefaultAllocator: Allocator<MeasurementSize>
+        + Allocator<MeasurementSize, <Spacecraft as State>::Size>
+        + Allocator<Const<1>, MeasurementSize>
         + Allocator<<Spacecraft as State>::Size>
         + Allocator<<Spacecraft as State>::Size, <Spacecraft as State>::Size>
-        + Allocator<Msr::MeasurementSize, Msr::MeasurementSize>
-        + Allocator<Msr::MeasurementSize, <D::StateType as State>::Size>
-        + Allocator<Msr::MeasurementSize, <Spacecraft as State>::Size>
-        + Allocator<<D::StateType as State>::Size, Msr::MeasurementSize>
-        + Allocator<<Spacecraft as State>::Size, Msr::MeasurementSize>
-        + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<<D::StateType as State>::VecLength>
+        + Allocator<MeasurementSize, MeasurementSize>
+        + Allocator<MeasurementSize, <Spacecraft as State>::Size>
+        + Allocator<<Spacecraft as State>::Size, MeasurementSize>
         + Allocator<A>
         + Allocator<A, A>
-        + Allocator<<D::StateType as State>::Size, A>
-        + Allocator<A, <D::StateType as State>::Size>
         + Allocator<<Spacecraft as State>::Size>
         + Allocator<<Spacecraft as State>::VecLength>
         + Allocator<<Spacecraft as State>::Size, <Spacecraft as State>::Size>
         + Allocator<<Spacecraft as State>::Size, A>
         + Allocator<A, <Spacecraft as State>::Size>,
-    Spacecraft: EstimateFrom<D::StateType, Msr>,
 {
     /// Store the estimates and residuals in a parquet file
-    pub fn to_parquet<P: AsRef<Path>>(&self, path: P, cfg: ExportCfg) -> Result<PathBuf, ODError> {
+    pub fn to_parquet<P: AsRef<Path>>(
+        &self,
+        arc: &TrackingDataArc,
+        path: P,
+        cfg: ExportCfg,
+    ) -> Result<PathBuf, ODError> {
         ensure!(
             !self.estimates.is_empty(),
             TooFewMeasurementsSnafu {
@@ -221,25 +217,25 @@ where
 
         // Add the fields of the residuals
         let mut msr_fields = Vec::new();
-        for f in Msr::fields() {
+        for f in arc.unique_types() {
             msr_fields.push(
-                f.clone()
+                f.to_field()
                     .with_nullable(true)
-                    .with_name(format!("Prefit residual: {}", f.name())),
+                    .with_name(format!("Prefit residual: {f:?} ({})", f.unit())),
             );
         }
-        for f in Msr::fields() {
+        for f in arc.unique_types() {
             msr_fields.push(
-                f.clone()
+                f.to_field()
                     .with_nullable(true)
-                    .with_name(format!("Postfit residual: {}", f.name())),
+                    .with_name(format!("Postfit residual: {f:?} ({})", f.unit())),
             );
         }
-        for f in Msr::fields() {
+        for f in arc.unique_types() {
             msr_fields.push(
-                f.clone()
+                f.to_field()
                     .with_nullable(true)
-                    .with_name(format!("Measurement noise: {}", f.name())),
+                    .with_name(format!("Measurement noise: {f:?} ({})", f.unit())),
             );
         }
 
@@ -264,7 +260,7 @@ where
                     .end_epoch
                     .unwrap_or_else(|| self.estimates.last().unwrap().state().epoch());
 
-                let mut residuals: Vec<Option<Residual<Msr::MeasurementSize>>> =
+                let mut residuals: Vec<Option<Residual<MeasurementSize>>> =
                     Vec::with_capacity(self.residuals.len());
                 let mut estimates = Vec::with_capacity(self.estimates.len());
 
@@ -358,7 +354,7 @@ where
 
         // Finally, add the residuals.
         // Prefits
-        for i in 0..Msr::MeasurementSize::dim() {
+        for i in 0..MeasurementSize::dim() {
             let mut data = Float64Builder::new();
             for resid_opt in &residuals {
                 if let Some(resid) = resid_opt {
@@ -370,7 +366,7 @@ where
             record.push(Arc::new(data.finish()));
         }
         // Postfit
-        for i in 0..Msr::MeasurementSize::dim() {
+        for i in 0..MeasurementSize::dim() {
             let mut data = Float64Builder::new();
             for resid_opt in &residuals {
                 if let Some(resid) = resid_opt {
@@ -382,7 +378,7 @@ where
             record.push(Arc::new(data.finish()));
         }
         // Measurement noise
-        for i in 0..Msr::MeasurementSize::dim() {
+        for i in 0..MeasurementSize::dim() {
             let mut data = Float64Builder::new();
             for resid_opt in &residuals {
                 if let Some(resid) = resid_opt {

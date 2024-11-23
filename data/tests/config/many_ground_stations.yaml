@@ -17,6 +17,9 @@
   latitude_deg: 2.3522
   longitude_deg: 48.8566
   height_km: 0.4
+  measurement_types:
+    - Range
+    - Doppler
 
 - name: Canberra
   frame:
@@ -37,3 +40,6 @@
       tau: 24 h
       process_noise: 50.0e-6 # 5 cm/s
   light_time_correction: false
+  measurement_types:
+    - Range
+    - Doppler

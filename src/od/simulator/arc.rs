@@ -25,13 +25,13 @@ use rand_pcg::Pcg64Mcg;
 use crate::dynamics::NyxError;
 use crate::io::ConfigError;
 use crate::md::trajectory::Interpolatable;
-use crate::od::msr::{RangeDoppler, TrackingArc, TrackingDataArc};
+use crate::od::msr::TrackingDataArc;
 use crate::od::prelude::Strand;
 use crate::od::simulator::Cadence;
-use crate::od::{GroundStation, Measurement};
+use crate::od::GroundStation;
 use crate::Spacecraft;
 use crate::State;
-use crate::{linalg::allocator::Allocator, od::TrackingDeviceSim};
+use crate::{linalg::allocator::Allocator, od::TrackingDevice};
 use crate::{linalg::DefaultAllocator, md::prelude::Traj};
 use std::collections::BTreeMap;
 use std::fmt::Display;
@@ -41,18 +41,14 @@ use std::sync::Arc;
 use super::{Handoff, TrkConfig};
 
 #[derive(Clone)]
-pub struct TrackingArcSim<MsrIn, Msr, D>
+pub struct TrackingArcSim<MsrIn, D>
 where
-    D: TrackingDeviceSim<MsrIn, Msr>,
+    D: TrackingDevice<MsrIn>,
     MsrIn: State,
-    Msr: Measurement,
     MsrIn: Interpolatable,
     DefaultAllocator: Allocator<<MsrIn as State>::Size>
         + Allocator<<MsrIn as State>::Size, <MsrIn as State>::Size>
-        + Allocator<<MsrIn as State>::VecLength>
-        + Allocator<Msr::MeasurementSize, <MsrIn as State>::Size>
-        + Allocator<Msr::MeasurementSize, Msr::MeasurementSize>
-        + Allocator<Msr::MeasurementSize>,
+        + Allocator<<MsrIn as State>::VecLength>,
 {
     /// Map of devices from their names.
     pub devices: BTreeMap<String, D>,
@@ -65,51 +61,41 @@ where
     /// Greatest common denominator time series that allows this arc to meet all of the conditions.
     time_series: TimeSeries,
     _msr_in: PhantomData<MsrIn>,
-    _msr: PhantomData<Msr>,
 }
 
-impl<MsrIn, Msr, D> TrackingArcSim<MsrIn, Msr, D>
+impl<MsrIn, D> TrackingArcSim<MsrIn, D>
 where
-    D: TrackingDeviceSim<MsrIn, Msr>,
+    D: TrackingDevice<MsrIn>,
     MsrIn: State,
-    Msr: Measurement,
     MsrIn: Interpolatable,
     DefaultAllocator: Allocator<<MsrIn as State>::Size>
         + Allocator<<MsrIn as State>::Size, <MsrIn as State>::Size>
-        + Allocator<<MsrIn as State>::VecLength>
-        + Allocator<Msr::MeasurementSize, <MsrIn as State>::Size>
-        + Allocator<Msr::MeasurementSize, Msr::MeasurementSize>
-        + Allocator<Msr::MeasurementSize>,
+        + Allocator<<MsrIn as State>::VecLength>,
 {
     /// Build a new tracking arc simulator using the provided seeded random number generator.
     pub fn with_rng(
-        devices: Vec<D>,
+        devices: BTreeMap<String, D>,
         trajectory: Traj<MsrIn>,
         configs: BTreeMap<String, TrkConfig>,
         rng: Pcg64Mcg,
     ) -> Result<Self, ConfigError> {
         // Check that each device has an associated configurations.
         // We don't care if there are more configurations than chosen devices.
-        let mut devices_map = BTreeMap::new();
         let mut sampling_rates_ns = Vec::with_capacity(devices.len());
-        for device in devices {
-            if let Some(cfg) = configs.get(&device.name()) {
+        for name in devices.keys() {
+            if let Some(cfg) = configs.get(name) {
                 if let Err(e) = cfg.sanity_check() {
-                    warn!("Ignoring device {}: {e}", device.name());
+                    warn!("Ignoring device {name}: {e}");
                     continue;
                 }
                 sampling_rates_ns.push(cfg.sampling.truncated_nanoseconds());
             } else {
-                warn!(
-                    "Ignoring device {}: no associated tracking configuration",
-                    device.name()
-                );
+                warn!("Ignoring device {name}: no associated tracking configuration",);
                 continue;
             }
-            devices_map.insert(device.name(), device);
         }
 
-        if devices_map.is_empty() {
+        if devices.is_empty() {
             return Err(ConfigError::InvalidConfig {
                 msg: "None of the devices are properly configured".to_string(),
             });
@@ -128,13 +114,12 @@ where
         );
 
         let me = Self {
-            devices: devices_map,
+            devices,
             trajectory,
             configs,
             rng,
             time_series,
             _msr_in: PhantomData,
-            _msr: PhantomData,
         };
 
         info!("{me}");
@@ -144,7 +129,7 @@ where
 
     /// Build a new tracking arc simulator using the provided seed to initialize the random number generator.
     pub fn with_seed(
-        devices: Vec<D>,
+        devices: BTreeMap<String, D>,
         trajectory: Traj<MsrIn>,
         configs: BTreeMap<String, TrkConfig>,
         seed: u64,
@@ -156,7 +141,7 @@ where
 
     /// Build a new tracking arc simulator using the system entropy to seed the random number generator.
     pub fn new(
-        devices: Vec<D>,
+        devices: BTreeMap<String, D>,
         trajectory: Traj<MsrIn>,
         configs: BTreeMap<String, TrkConfig>,
     ) -> Result<Self, ConfigError> {
@@ -180,98 +165,6 @@ where
     /// Build the measurements as a vector, ordered chronologically.
     ///
     pub fn generate_measurements(
-        &mut self,
-        almanac: Arc<Almanac>,
-    ) -> Result<TrackingArc<Msr>, NyxError> {
-        let mut measurements = Vec::new();
-
-        for (name, device) in self.devices.iter_mut() {
-            let cfg = &self.configs[name];
-            if cfg.scheduler.is_some() {
-                if cfg.strands.is_none() {
-                    return Err(NyxError::CustomError {
-                        msg: format!(
-                            "schedule for {name} must be built before generating measurements"
-                        ),
-                    });
-                } else {
-                    warn!("scheduler for {name} is ignored, using the defined tracking strands instead")
-                }
-            }
-
-            let init_msr_count = measurements.len();
-            let tick = Epoch::now().unwrap();
-
-            match cfg.strands.as_ref() {
-                Some(strands) => {
-                    // Strands are defined at this point
-                    'strands: for (ii, strand) in strands.iter().enumerate() {
-                        // Build the time series for this strand, sampling at the correct rate
-                        for epoch in TimeSeries::inclusive(strand.start, strand.end, cfg.sampling) {
-                            match device.measure(
-                                epoch,
-                                &self.trajectory,
-                                Some(&mut self.rng),
-                                almanac.clone(),
-                            ) {
-                                Ok(msr_opt) => {
-                                    if let Some(msr) = msr_opt {
-                                        measurements.push((name.clone(), msr));
-                                    }
-                                }
-                                Err(e) => {
-                                    if epoch != strand.end {
-                                        warn!(
-                                            "Skipping the remaining strand #{ii} ending on {}: {e}",
-                                            strand.end
-                                        );
-                                    }
-                                    continue 'strands;
-                                }
-                            }
-                        }
-                    }
-
-                    info!(
-                        "Simulated {} measurements for {name} for {} tracking strands in {}",
-                        measurements.len() - init_msr_count,
-                        strands.len(),
-                        (Epoch::now().unwrap() - tick).round(1.0_f64.milliseconds())
-                    );
-                }
-                None => {
-                    warn!("No tracking strands defined for {name}, skipping");
-                }
-            }
-        }
-
-        // Reorder the measurements
-        measurements.sort_by_key(|(_name, msr)| msr.epoch());
-
-        // Build the tracking arc.
-        let trk = TrackingArc {
-            device_cfg: serde_yaml::to_string(&self.devices).unwrap(),
-            measurements,
-        };
-
-        Ok(trk)
-    }
-
-    /// Generates measurements for the tracking arc using the defined strands
-    ///
-    /// # Warning
-    /// This function will return an error if any of the devices defines as a scheduler.
-    /// You must create the schedule first using `build_schedule` first.
-    ///
-    /// # Notes
-    /// Although mutable, this function may be called several times to generate different measurements.
-    ///
-    /// # Algorithm
-    /// For each tracking device, and for each strand within that device, sample the trajectory at the sample
-    /// rate of the tracking device, adding a measurement whenever the spacecraft is visible.
-    /// Build the measurements as a vector, ordered chronologically.
-    ///
-    pub fn simulate_measurements(
         &mut self,
         almanac: Arc<Almanac>,
     ) -> Result<TrackingDataArc, NyxError> {
@@ -300,7 +193,7 @@ where
                     'strands: for (ii, strand) in strands.iter().enumerate() {
                         // Build the time series for this strand, sampling at the correct rate
                         for epoch in TimeSeries::inclusive(strand.start, strand.end, cfg.sampling) {
-                            match device.measure_new(
+                            match device.measure(
                                 epoch,
                                 &self.trajectory,
                                 Some(&mut self.rng),
@@ -347,17 +240,13 @@ where
     }
 }
 
-impl<MsrIn, Msr, D> Display for TrackingArcSim<MsrIn, Msr, D>
+impl<MsrIn, D> Display for TrackingArcSim<MsrIn, D>
 where
-    D: TrackingDeviceSim<MsrIn, Msr>,
-    Msr: Measurement,
+    D: TrackingDevice<MsrIn>,
     MsrIn: Interpolatable,
     DefaultAllocator: Allocator<<MsrIn as State>::Size>
         + Allocator<<MsrIn as State>::Size, <MsrIn as State>::Size>
-        + Allocator<<MsrIn as State>::VecLength>
-        + Allocator<Msr::MeasurementSize, <MsrIn as State>::Size>
-        + Allocator<Msr::MeasurementSize, Msr::MeasurementSize>
-        + Allocator<Msr::MeasurementSize>,
+        + Allocator<<MsrIn as State>::VecLength>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -371,7 +260,7 @@ where
 }
 
 // Literally the same as above, but can't make it generic =(
-impl TrackingArcSim<Spacecraft, RangeDoppler, GroundStation> {
+impl TrackingArcSim<Spacecraft, GroundStation> {
     /// Builds the schedule provided the config. Requires the tracker to be a ground station.
     ///
     /// # Algorithm

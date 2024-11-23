@@ -3,10 +3,10 @@ extern crate nyx_space as nyx;
 use anise::constants::celestial_objects::{EARTH, MOON, SUN};
 use anise::constants::frames::IAU_EARTH_FRAME;
 use anise::constants::usual_planetary_constants::MEAN_EARTH_ANGULAR_VELOCITY_DEG_S;
+use indexmap::IndexSet;
 use nalgebra::U2;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::SpacecraftDynamics;
-use nyx::od::msr::measurement::Measurement as NewMeasurement;
 use nyx::od::prelude::*;
 use nyx::time::Epoch;
 use nyx::{dynamics::OrbitalDynamics, propagators::Propagator};
@@ -16,8 +16,6 @@ use rand_pcg::Pcg64Mcg;
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use rstest::*;
-use sensitivity::Sensitivity;
-use std::collections::HashMap;
 use std::sync::Arc;
 
 #[fixture]
@@ -50,6 +48,7 @@ fn nil_measurement(almanac: Arc<Almanac>) {
         doppler_noise_km_s: Some(StochasticNoise::MIN),
         integration_time: None,
         light_time_correction: false,
+        ..Default::default()
     };
 
     let at_station = Orbit::try_latlongalt(
@@ -84,6 +83,10 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
     use self::nyx::md::prelude::*;
     use self::nyx::od::prelude::*;
     use std::str::FromStr;
+
+    let mut msr_types = IndexSet::new();
+    msr_types.insert(MeasurementType::Range);
+    msr_types.insert(MeasurementType::Doppler);
 
     let cislunar1 = Orbit::cartesian(
         -6252.59501113,
@@ -198,7 +201,7 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
             .unwrap()
             .unwrap();
 
-        let obs = meas.observation();
+        let obs = meas.observation::<U2>(&msr_types);
         println!(
             "range difference {:e}\t range rate difference: {:e}",
             (obs[0] - truth.range).abs(),
@@ -247,38 +250,7 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
             .unwrap()
         {
             traj2_msr_cnt += 1;
-            let exp_h = Spacecraft::sensitivity(
-                &msr,
-                state,
-                dss65_madrid
-                    .location(state.epoch(), state.orbit.frame, almanac.clone())
-                    .unwrap(),
-            );
-
-            // Rebuild the measurement and recompute the sensitivity.
-            let mut data = HashMap::new();
-            data.insert(MeasurementType::Range, msr.observation()[0]);
-            data.insert(MeasurementType::Doppler, msr.observation()[1]);
-            let n_msr = NewMeasurement {
-                epoch: state.epoch(),
-                tracker: "DSS 65".to_string(),
-                data,
-            };
-            let got_h = n_msr
-                .h_tilde::<U2>(
-                    &[MeasurementType::Range, MeasurementType::Doppler],
-                    &state,
-                    &dss65_madrid,
-                    almanac.clone(),
-                )
-                .unwrap();
-            let err = exp_h - got_h;
-            if err.norm() > 0.0 {
-                println!("ERR = {:.3e}", exp_h - got_h);
-                println!("EXP = {exp_h:.6}");
-                println!("GOT = {got_h:.6}");
-                panic!();
-            }
+            println!("{msr}");
         }
     }
 
@@ -296,7 +268,7 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
             .measure(state.epoch(), &traj2, Some(&mut rng), almanac.clone())
             .unwrap()
             .unwrap();
-        let obs = meas.observation();
+        let obs = meas.observation::<U2>(&msr_types);
         println!(
             "range difference {:e}\t range rate difference: {:e}",
             (obs[0] - truth.range).abs(),
