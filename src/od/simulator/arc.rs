@@ -95,7 +95,7 @@ where
             }
         }
 
-        if devices.is_empty() {
+        if sampling_rates_ns.is_empty() {
             return Err(ConfigError::InvalidConfig {
                 msg: "None of the devices are properly configured".to_string(),
             });
@@ -171,61 +171,64 @@ where
         let mut measurements = BTreeMap::new();
 
         for (name, device) in self.devices.iter_mut() {
-            let cfg = &self.configs[name];
-            if cfg.scheduler.is_some() {
-                if cfg.strands.is_none() {
-                    return Err(NyxError::CustomError {
-                        msg: format!(
-                            "schedule for {name} must be built before generating measurements"
-                        ),
-                    });
-                } else {
-                    warn!("scheduler for {name} is ignored, using the defined tracking strands instead")
+            if let Some(cfg) = self.configs.get(name) {
+                if cfg.scheduler.is_some() {
+                    if cfg.strands.is_none() {
+                        return Err(NyxError::CustomError {
+                            msg: format!(
+                                "schedule for {name} must be built before generating measurements"
+                            ),
+                        });
+                    } else {
+                        warn!("scheduler for {name} is ignored, using the defined tracking strands instead")
+                    }
                 }
-            }
 
-            let init_msr_count = measurements.len();
-            let tick = Epoch::now().unwrap();
+                let init_msr_count = measurements.len();
+                let tick = Epoch::now().unwrap();
 
-            match cfg.strands.as_ref() {
-                Some(strands) => {
-                    // Strands are defined at this point
-                    'strands: for (ii, strand) in strands.iter().enumerate() {
-                        // Build the time series for this strand, sampling at the correct rate
-                        for epoch in TimeSeries::inclusive(strand.start, strand.end, cfg.sampling) {
-                            match device.measure(
-                                epoch,
-                                &self.trajectory,
-                                Some(&mut self.rng),
-                                almanac.clone(),
-                            ) {
-                                Ok(msr_opt) => {
-                                    if let Some(msr) = msr_opt {
-                                        measurements.insert(epoch, msr);
+                match cfg.strands.as_ref() {
+                    Some(strands) => {
+                        // Strands are defined at this point
+                        'strands: for (ii, strand) in strands.iter().enumerate() {
+                            // Build the time series for this strand, sampling at the correct rate
+                            for epoch in
+                                TimeSeries::inclusive(strand.start, strand.end, cfg.sampling)
+                            {
+                                match device.measure(
+                                    epoch,
+                                    &self.trajectory,
+                                    Some(&mut self.rng),
+                                    almanac.clone(),
+                                ) {
+                                    Ok(msr_opt) => {
+                                        if let Some(msr) = msr_opt {
+                                            measurements.insert(epoch, msr);
+                                        }
                                     }
-                                }
-                                Err(e) => {
-                                    if epoch != strand.end {
-                                        warn!(
+                                    Err(e) => {
+                                        if epoch != strand.end {
+                                            warn!(
                                             "Skipping the remaining strand #{ii} ending on {}: {e}",
                                             strand.end
                                         );
+                                        }
+                                        continue 'strands;
                                     }
-                                    continue 'strands;
                                 }
                             }
                         }
-                    }
 
-                    info!(
-                        "Simulated {} measurements for {name} for {} tracking strands in {}",
-                        measurements.len() - init_msr_count,
-                        strands.len(),
-                        (Epoch::now().unwrap() - tick).round(1.0_f64.milliseconds())
-                    );
-                }
-                None => {
-                    warn!("No tracking strands defined for {name}, skipping");
+                        info!(
+                            "Simulated {} measurements for {name} for {} tracking strands in {}",
+                            measurements.len() - init_msr_count,
+                            strands.len(),
+                            (Epoch::now().unwrap() - tick).round(1.0_f64.milliseconds())
+                        );
+                    }
+                    None => {
+                        warn!("No tracking strands defined for {name}, skipping");
+                    }
                 }
             }
         }
@@ -280,78 +283,81 @@ impl TrackingArcSim<Spacecraft, GroundStation> {
     ) -> Result<BTreeMap<String, TrkConfig>, NyxError> {
         // Consider using find_all via the heuristic
         let mut built_cfg = self.configs.clone();
+
         for (name, device) in self.devices.iter() {
-            let cfg = &self.configs[name];
-            if let Some(scheduler) = cfg.scheduler {
-                info!("Building schedule for {name}");
-                built_cfg.get_mut(name).unwrap().scheduler = None;
-                built_cfg.get_mut(name).unwrap().strands = Some(Vec::new());
-                // Convert the trajectory into the ground station frame.
-                let traj = self.trajectory.to_frame(device.frame, almanac.clone())?;
+            if let Some(cfg) = self.configs.get(name) {
+                if let Some(scheduler) = cfg.scheduler {
+                    info!("Building schedule for {name}");
+                    built_cfg.get_mut(name).unwrap().scheduler = None;
+                    built_cfg.get_mut(name).unwrap().strands = Some(Vec::new());
 
-                match traj.find_arcs(&device, almanac.clone()) {
-                    Err(_) => info!("No measurements from {name}"),
-                    Ok(elevation_arcs) => {
-                        for arc in elevation_arcs {
-                            let strand_start = arc.rise.state.epoch();
-                            let strand_end = arc.fall.state.epoch();
+                    // Convert the trajectory into the ground station frame.
+                    let traj = self.trajectory.to_frame(device.frame, almanac.clone())?;
 
-                            if strand_end - strand_start
-                                < cfg.sampling * i64::from(scheduler.min_samples)
-                            {
-                                info!(
+                    match traj.find_arcs(&device, almanac.clone()) {
+                        Err(_) => info!("No measurements from {name}"),
+                        Ok(elevation_arcs) => {
+                            for arc in elevation_arcs {
+                                let strand_start = arc.rise.state.epoch();
+                                let strand_end = arc.fall.state.epoch();
+
+                                if strand_end - strand_start
+                                    < cfg.sampling * i64::from(scheduler.min_samples)
+                                {
+                                    info!(
                                     "Too few samples from {name} opportunity from {strand_start} to {strand_end}, discarding strand",
                                 );
-                                continue;
-                            }
+                                    continue;
+                                }
 
-                            let mut strand_range = Strand {
-                                start: strand_start,
-                                end: strand_end,
-                            };
+                                let mut strand_range = Strand {
+                                    start: strand_start,
+                                    end: strand_end,
+                                };
 
-                            // If there is an alignment, apply it
-                            if let Some(alignment) = scheduler.sample_alignment {
-                                strand_range.start = strand_range.start.round(alignment);
-                                strand_range.end = strand_range.end.round(alignment);
-                            }
+                                // If there is an alignment, apply it
+                                if let Some(alignment) = scheduler.sample_alignment {
+                                    strand_range.start = strand_range.start.round(alignment);
+                                    strand_range.end = strand_range.end.round(alignment);
+                                }
 
-                            if let Cadence::Intermittent { on, off } = scheduler.cadence {
-                                // Check that the next start time is within the allocated time
-                                if let Some(prev_strand) =
-                                    built_cfg[name].strands.as_ref().unwrap().last()
-                                {
-                                    if prev_strand.end + off > strand_range.start {
-                                        // We're turning on the tracking sooner than the schedule allows, so let's fix that.
-                                        strand_range.start = prev_strand.end + off;
-                                        // Check that we didn't eat into the whole tracking opportunity
-                                        if strand_range.start > strand_end {
-                                            // Lost this whole opportunity.
-                                            info!("Discarding {name} opportunity from {strand_start} to {strand_end} due to cadence {:?}", scheduler.cadence);
-                                            continue;
+                                if let Cadence::Intermittent { on, off } = scheduler.cadence {
+                                    // Check that the next start time is within the allocated time
+                                    if let Some(prev_strand) =
+                                        built_cfg[name].strands.as_ref().unwrap().last()
+                                    {
+                                        if prev_strand.end + off > strand_range.start {
+                                            // We're turning on the tracking sooner than the schedule allows, so let's fix that.
+                                            strand_range.start = prev_strand.end + off;
+                                            // Check that we didn't eat into the whole tracking opportunity
+                                            if strand_range.start > strand_end {
+                                                // Lost this whole opportunity.
+                                                info!("Discarding {name} opportunity from {strand_start} to {strand_end} due to cadence {:?}", scheduler.cadence);
+                                                continue;
+                                            }
                                         }
                                     }
+                                    // Check that we aren't tracking for longer than configured
+                                    if strand_range.end - strand_range.start > on {
+                                        strand_range.end = strand_range.start + on;
+                                    }
                                 }
-                                // Check that we aren't tracking for longer than configured
-                                if strand_range.end - strand_range.start > on {
-                                    strand_range.end = strand_range.start + on;
-                                }
+
+                                // We've found when the spacecraft is below the horizon, so this is a new strand.
+                                built_cfg
+                                    .get_mut(name)
+                                    .unwrap()
+                                    .strands
+                                    .as_mut()
+                                    .unwrap()
+                                    .push(strand_range);
                             }
 
-                            // We've found when the spacecraft is below the horizon, so this is a new strand.
-                            built_cfg
-                                .get_mut(name)
-                                .unwrap()
-                                .strands
-                                .as_mut()
-                                .unwrap()
-                                .push(strand_range);
+                            info!(
+                                "Built {} tracking strands for {name}",
+                                built_cfg[name].strands.as_ref().unwrap().len()
+                            );
                         }
-
-                        info!(
-                            "Built {} tracking strands for {name}",
-                            built_cfg[name].strands.as_ref().unwrap().len()
-                        );
                     }
                 }
             }
@@ -359,8 +365,10 @@ impl TrackingArcSim<Spacecraft, GroundStation> {
         // Build all of the strands, remembering which tracker they come from.
         let mut cfg_as_vec = Vec::new();
         for (name, cfg) in &built_cfg {
-            for (ii, strand) in cfg.strands.as_ref().unwrap().iter().enumerate() {
-                cfg_as_vec.push((name.clone(), ii, *strand));
+            if let Some(strands) = &cfg.strands {
+                for (ii, strand) in strands.iter().enumerate() {
+                    cfg_as_vec.push((name.clone(), ii, *strand));
+                }
             }
         }
         // Iterate through the strands by chronological order. Cannot use maps because we change types.

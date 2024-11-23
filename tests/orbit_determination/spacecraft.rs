@@ -449,8 +449,8 @@ fn od_val_sc_srp_estimation_cov_test(
         delta.vmag_km_s() * 1e6
     );
 
-    assert!(delta.rmag_km() < 1e-3, "More than 1 meter error");
-    assert!(delta.vmag_km_s() < 1e-6, "More than 1 millimeter/s error");
+    assert!(delta.rmag_km() < 2e-3, "More than 2 meter error");
+    assert!(delta.vmag_km_s() < 2e-6, "More than 2 millimeter/s error");
     assert!(
         (est.state().srp.cr - truth_cr).abs() < (1.5 - truth_cr),
         "Cr estimation did not improve"

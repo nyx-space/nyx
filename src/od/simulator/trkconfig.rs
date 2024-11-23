@@ -93,7 +93,11 @@ impl TrkConfig {
             for (ii, strand) in strands.iter().enumerate() {
                 if strand.duration() < self.sampling {
                     return Err(ConfigError::InvalidConfig {
-                        msg: format!("Strand #{ii} is shorter than sampling time"),
+                        msg: format!(
+                            "Strand #{ii} lasts {} which is shorter than sampling time of {}",
+                            strand.duration(),
+                            self.sampling
+                        ),
                     });
                 }
                 if strand.duration().is_negative() {

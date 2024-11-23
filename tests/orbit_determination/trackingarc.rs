@@ -57,7 +57,12 @@ fn devices() -> BTreeMap<String, GroundStation> {
     .iter()
     .collect();
 
-    GroundStation::load_named(ground_station_file).unwrap()
+    let mut devices = BTreeMap::new();
+    for gs in GroundStation::load_many(ground_station_file).unwrap() {
+        devices.insert(gs.name.clone(), gs);
+    }
+
+    devices
 }
 
 #[rstest]
@@ -222,7 +227,7 @@ fn trkconfig_delayed_start_cov_test(
 
     // Build the configs map with a single ground station
     let mut configs = BTreeMap::new();
-    configs.insert("Demo Ground Station".to_string(), trkcfg);
+    configs.insert("Demo ground station".to_string(), trkcfg);
 
     let mut trk = TrackingArcSim::<Spacecraft, GroundStation>::new(devices, traj, configs).unwrap();
 
@@ -252,7 +257,7 @@ fn trkconfig_cadence_cov_test(
     let mut configs = BTreeMap::new();
 
     configs.insert(
-        "Demo Ground Station".to_string(),
+        "Demo ground station".to_string(),
         TrkConfig::builder()
             .scheduler(
                 Scheduler::builder()

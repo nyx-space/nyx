@@ -76,9 +76,10 @@ fn continuous_tracking(almanac: Arc<Almanac>) {
     .iter()
     .collect();
 
-    let devices = GroundStation::load_named(ground_station_file).unwrap();
-
-    // dbg!(&devices);
+    let mut devices = BTreeMap::new();
+    for gs in GroundStation::load_many(ground_station_file).unwrap() {
+        devices.insert(gs.name.clone(), gs);
+    }
 
     // Load the tracking configuration from the test data.
     let trkconfg_yaml: PathBuf = [

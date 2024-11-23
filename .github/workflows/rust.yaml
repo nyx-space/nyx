@@ -93,6 +93,41 @@ jobs:
           cargo build --example 03_geo_raise --release
           cargo build --example 03_geo_sk --release
 
+  coverage:
+    name: Unit test and integration test coverage analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Download data
+        run: |
+          wget -O data/de440s.bsp http://public-data.nyxspace.com/anise/de440s.bsp
+          wget -O data/de440s.bsp http://public-data.nyxspace.com/anise/de438.bsp # GMAT validation cases
+          wget -O data/pck08.pca http://public-data.nyxspace.com/anise/v0.4/pck08.pca
+          wget -O data/earth_latest_high_prec.bpc http://public-data.nyxspace.com/anise/ci/earth_latest_high_prec-2023-09-08.bpc
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Generate full code coverage
+        run: |
+          cargo llvm-cov test --release --lib --no-report
+          cargo llvm-cov test --release cov_test --no-report
+          cargo llvm-cov report --lcov --output-path lcov.info
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
+          files: lcov.info
+          fail_ci_if_error: false
+
   lints:
     name: Lints
     runs-on: ubuntu-latest
