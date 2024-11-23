@@ -1,4 +1,5 @@
-- name: DSS-65 Madrid
+DSS-65 Madrid:
+  name: DSS-65 Madrid
   frame:
     ephemeris_id: 399
     orientation_id: 399
@@ -22,7 +23,8 @@
     - range_km
     - doppler_km_s
 
-- name: DSS-34 Canberra
+DSS-34 Canberra:
+  name: DSS-34 Canberra
   frame:
     ephemeris_id: 399
     orientation_id: 399
@@ -46,7 +48,8 @@
     - range_km
     - doppler_km_s
 
-- name: DSS-13 Goldstone
+DSS-13 Goldstone:
+  name: DSS-13 Goldstone
   frame:
     ephemeris_id: 399
     orientation_id: 399

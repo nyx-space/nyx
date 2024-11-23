@@ -19,7 +19,7 @@ fn almanac() -> Arc<Almanac> {
 }
 
 #[rstest]
-fn test_monte_carlo_epoch(almanac: Arc<Almanac>) {
+fn test_monte_carlo_epoch_cov_test(almanac: Arc<Almanac>) {
     extern crate pretty_env_logger;
     let _ = pretty_env_logger::try_init();
 

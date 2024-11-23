@@ -943,7 +943,7 @@ fn od_tb_ckf_map_covar(almanac: Arc<Almanac>) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn od_tb_val_harmonics_ckf_fixed_step_perfect(
+fn od_tb_val_harmonics_ckf_fixed_step_perfect_cov_test(
     almanac: Arc<Almanac>,
     sim_devices: BTreeMap<String, GroundStation>,
     proc_devices: BTreeMap<String, GroundStation>,
