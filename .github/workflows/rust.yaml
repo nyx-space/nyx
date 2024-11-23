@@ -73,7 +73,11 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo-
 
       - name: Unit Test (debug)
-        run: cargo test --lib
+        run: |
+         cat /home/runner/work/nyx/nyx/data/tests/config/many_ground_stations.yaml
+         cat /home/runner/work/nyx/nyx/data/tests/config/one_ground_station.yaml
+         ls -lh /home/runner/work/nyx/nyx/data/tests/config/
+         cargo test --lib
 
       - name: All integration tests (release)
         run: cargo test --release --test "*"

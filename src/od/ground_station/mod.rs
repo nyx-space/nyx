@@ -224,8 +224,6 @@ mod gs_ut {
 
         assert!(test_data.exists(), "Could not find the test data");
 
-        println!("Loading {}", test_data.to_str().unwrap());
-
         let gs = GroundStation::load(test_data).unwrap();
 
         dbg!(&gs);
@@ -284,8 +282,6 @@ mod gs_ut {
         ]
         .iter()
         .collect();
-
-        println!("Loading {}", test_file.to_str().unwrap());
 
         let stations = GroundStation::load_many(test_file).unwrap();
 
