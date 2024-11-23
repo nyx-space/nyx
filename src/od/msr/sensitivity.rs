@@ -187,6 +187,7 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
                     _tx: PhantomData::<_>,
                 })
             }
+            _ => todo!("az/el"),
         }
     }
 }

@@ -148,6 +148,7 @@ impl GroundStation {
                         .doppler_noise_km_s
                         .ok_or(ODError::NoiseNotConfigured { kind: "Doppler" })?
                         .sample(epoch, rng),
+                    _ => todo!("az/el"),
                 };
             }
         }
@@ -211,7 +212,6 @@ mod gs_ut {
 
         use hifitime::TimeUnits;
 
-        // Get the path to the root directory of the current Cargo project
         let test_data: PathBuf = [
             env::var("CARGO_MANIFEST_DIR").unwrap(),
             "data".to_string(),
@@ -261,8 +261,6 @@ mod gs_ut {
         use hifitime::TimeUnits;
         use std::env;
         use std::path::PathBuf;
-
-        // Get the path to the root directory of the current Cargo project
 
         let test_file: PathBuf = [
             env::var("CARGO_MANIFEST_DIR").unwrap(),

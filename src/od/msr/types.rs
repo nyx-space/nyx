@@ -27,14 +27,17 @@ use crate::od::ODError;
 pub enum MeasurementType {
     Range,
     Doppler,
+    Azimuth,
+    Elevation,
 }
 
 impl MeasurementType {
     /// Returns the expected unit of this measurement type
     pub fn unit(self) -> &'static str {
         match self {
-            MeasurementType::Range => "km",
-            MeasurementType::Doppler => "km/s",
+            Self::Range => "km",
+            Self::Doppler => "km/s",
+            Self::Azimuth | Self::Elevation => "deg",
         }
     }
 
@@ -55,8 +58,10 @@ impl MeasurementType {
     /// Computes the one way measurement from an AER object and the noise of this measurement type, returned in the units of this measurement type.
     pub fn compute_one_way(self, aer: AzElRange, noise: f64) -> Result<f64, ODError> {
         match self {
-            MeasurementType::Range => Ok(aer.range_km + noise),
-            MeasurementType::Doppler => Ok(aer.range_rate_km_s + noise),
+            Self::Range => Ok(aer.range_km + noise),
+            Self::Doppler => Ok(aer.range_rate_km_s + noise),
+            Self::Azimuth => Ok(aer.azimuth_deg + noise),
+            Self::Elevation => Ok(aer.elevation_deg + noise),
         }
     }
 
@@ -68,14 +73,17 @@ impl MeasurementType {
         noise: f64,
     ) -> Result<f64, ODError> {
         match self {
-            MeasurementType::Range => {
+            Self::Range => {
                 let range_km = (aer_t1.range_km + aer_t0.range_km) * 0.5;
                 Ok(range_km + noise / 2.0_f64.sqrt())
             }
-            MeasurementType::Doppler => {
+            Self::Doppler => {
                 let doppler_km_s = (aer_t1.range_rate_km_s + aer_t0.range_rate_km_s) * 0.5;
                 Ok(doppler_km_s + noise / 2.0_f64.sqrt())
             }
+            Self::Azimuth | Self::Elevation => Err(ODError::MeasurementSimError {
+                details: format!("{self:?} does not support two way"),
+            }),
         }
     }
 }

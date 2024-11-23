@@ -159,6 +159,7 @@ impl TrackingDevice<Spacecraft> for GroundStation {
                 .doppler_noise_km_s
                 .ok_or(ODError::NoiseNotConfigured { kind: "Doppler" })?
                 .covariance(epoch),
+            _ => todo!("az/el"),
         })
     }
 }

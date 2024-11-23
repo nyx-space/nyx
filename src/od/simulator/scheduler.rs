@@ -171,7 +171,7 @@ mod scheduler_ut {
         let serialized = serde_yml::to_string(&scheduler).unwrap();
         assert_eq!(
             serialized,
-            "handoff: Eager\ncadence: !Intermittent\n  on: 12 min\n  off: 17 h 5 min\nmin_samples: 10\nsample_alignment: 1 s\n"
+            "handoff: Eager\ncadence: !Intermittent\n  'on': '12 min'\n  'off': '17 h 5 min'\nmin_samples: 10\nsample_alignment: '1 s'\n"
         );
         let deserd: Scheduler = serde_yml::from_str(&serialized).unwrap();
         assert_eq!(deserd, scheduler);
