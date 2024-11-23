@@ -428,7 +428,7 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn traj_ephem_backward(almanac: Arc<Almanac>) {
+fn traj_ephem_backward_cov_test(almanac: Arc<Almanac>) {
     // Test that we can correctly interpolate a spacecraft orbit
 
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();

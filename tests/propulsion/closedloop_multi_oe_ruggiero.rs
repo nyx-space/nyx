@@ -95,7 +95,7 @@ fn qlaw_as_ruggiero_case_a(almanac: Arc<Almanac>) {
 }
 
 #[rstest]
-fn qlaw_as_ruggiero_case_b(almanac: Arc<Almanac>) {
+fn qlaw_as_ruggiero_case_b_cov_test(almanac: Arc<Almanac>) {
     // Source: AAS-2004-5089
 
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
@@ -400,7 +400,7 @@ fn qlaw_as_ruggiero_case_f(almanac: Arc<Almanac>) {
 }
 
 #[rstest]
-fn ruggiero_iepc_2011_102(almanac: Arc<Almanac>) {
+fn ruggiero_iepc_2011_102_cov_test(almanac: Arc<Almanac>) {
     // Source: IEPC 2011 102
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 

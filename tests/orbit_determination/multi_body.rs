@@ -208,7 +208,7 @@ fn od_val_multi_body_ckf_perfect_stations(
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn multi_body_ckf_covar_map(
+fn multi_body_ckf_covar_map_cov_test(
     almanac: Arc<Almanac>,
     mut sim_devices: BTreeMap<String, GroundStation>,
     proc_devices: BTreeMap<String, GroundStation>,

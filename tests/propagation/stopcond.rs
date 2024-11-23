@@ -28,7 +28,7 @@ fn almanac() -> Arc<Almanac> {
 }
 
 #[rstest]
-fn stop_cond_3rd_apo(almanac: Arc<Almanac>) {
+fn stop_cond_3rd_apo_cov_test(almanac: Arc<Almanac>) {
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
     let start_dt = Epoch::from_mjd_tai(JD_J2000);

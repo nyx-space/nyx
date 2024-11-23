@@ -239,7 +239,7 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
+fn od_robust_test_ekf_realistic_two_way_cov_test(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();

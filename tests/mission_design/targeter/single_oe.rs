@@ -570,7 +570,7 @@ fn tgt_aop_from_apo(almanac: Arc<Almanac>) {
 }
 
 #[rstest]
-fn tgt_aop_from_peri(almanac: Arc<Almanac>) {
+fn tgt_aop_from_peri_cov_test(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();

@@ -114,7 +114,7 @@ fn thrust_dir_rate_tgt_sma_aop_raan(almanac: Arc<Almanac>) {
 
 #[ignore]
 #[rstest]
-fn thrust_profile_tgt_sma_aop_raan(almanac: Arc<Almanac>) {
+fn thrust_profile_tgt_sma_aop_raan_cov_test(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();

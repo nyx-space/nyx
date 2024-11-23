@@ -284,7 +284,7 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
 }
 
 #[rstest]
-fn od_resid_reject_default_ckf_two_way(
+fn od_resid_reject_default_ckf_two_way_cov_test(
     traj: Traj<Spacecraft>,
     tracking_arc: TrackingDataArc,
     initial_estimate: KfEstimate<Spacecraft>,
