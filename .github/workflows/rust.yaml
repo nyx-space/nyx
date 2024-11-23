@@ -120,7 +120,7 @@ jobs:
         run: |
           cargo llvm-cov test --release --lib --no-report
           cargo llvm-cov test --release cov_test --no-report
-          cargo llvm-cov report --lcov --output-path lcov.info
+          cargo llvm-cov report --release --lcov --output-path lcov.info
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
