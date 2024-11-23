@@ -20,3 +20,4 @@ light_time_correction: false
 measurement_types:
     - Range
     - Doppler
+integration_time: 1 min
