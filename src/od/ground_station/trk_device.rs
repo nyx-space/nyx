@@ -150,16 +150,13 @@ impl TrackingDevice<Spacecraft> for GroundStation {
     /// a diagonal matrix. The first item in the diagonal is the range noise (in km), set to the square of the steady state sigma. The
     /// second item is the Doppler noise (in km/s), set to the square of the steady state sigma of that Gauss Markov process.
     fn measurement_covar(&self, msr_type: MeasurementType, epoch: Epoch) -> Result<f64, ODError> {
-        Ok(match msr_type {
-            MeasurementType::Range => self
-                .range_noise_km
-                .ok_or(ODError::NoiseNotConfigured { kind: "Range" })?
-                .covariance(epoch),
-            MeasurementType::Doppler => self
-                .doppler_noise_km_s
-                .ok_or(ODError::NoiseNotConfigured { kind: "Doppler" })?
-                .covariance(epoch),
-            _ => todo!("az/el"),
-        })
+        let stochastics = self.stochastic_noises.as_ref().unwrap();
+
+        Ok(stochastics
+            .get(&msr_type)
+            .ok_or(ODError::NoiseNotConfigured {
+                kind: format!("{msr_type:?}"),
+            })?
+            .covariance(epoch))
     }
 }

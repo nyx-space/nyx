@@ -190,7 +190,7 @@ pub enum ODError {
     #[snafu(display("Noise matrix is singular"))]
     SingularNoiseRk,
     #[snafu(display("{kind} noise not configured"))]
-    NoiseNotConfigured { kind: &'static str },
+    NoiseNotConfigured { kind: String },
     #[snafu(display("measurement sim error: {details}"))]
     MeasurementSimError { details: String },
     #[snafu(display("during an OD encountered {source}"))]

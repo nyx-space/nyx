@@ -25,9 +25,13 @@ use crate::od::ODError;
 
 #[derive(Copy, Clone, Debug, Hash, Serialize, Deserialize, PartialEq, Eq)]
 pub enum MeasurementType {
+    #[serde(rename = "range_km")]
     Range,
+    #[serde(rename = "doppler_km_s")]
     Doppler,
+    #[serde(rename = "azimuth_deg")]
     Azimuth,
+    #[serde(rename = "elevation_deg")]
     Elevation,
 }
 

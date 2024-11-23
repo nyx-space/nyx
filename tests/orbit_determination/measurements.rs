@@ -3,7 +3,7 @@ extern crate nyx_space as nyx;
 use anise::constants::celestial_objects::{EARTH, MOON, SUN};
 use anise::constants::frames::IAU_EARTH_FRAME;
 use anise::constants::usual_planetary_constants::MEAN_EARTH_ANGULAR_VELOCITY_DEG_S;
-use indexmap::IndexSet;
+use indexmap::{IndexMap, IndexSet};
 use nalgebra::U2;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::SpacecraftDynamics;
@@ -36,6 +36,10 @@ fn nil_measurement(almanac: Arc<Almanac>) {
 
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 
+    let mut stochastics = IndexMap::new();
+    stochastics.insert(MeasurementType::Range, StochasticNoise::MIN);
+    stochastics.insert(MeasurementType::Doppler, StochasticNoise::MIN);
+
     let mut station = GroundStation {
         name: "nil".to_string(),
         latitude_deg: lat,
@@ -44,8 +48,7 @@ fn nil_measurement(almanac: Arc<Almanac>) {
         frame: eme2k,
         elevation_mask_deg: 0.0,
         timestamp_noise_s: None,
-        range_noise_km: Some(StochasticNoise::MIN),
-        doppler_noise_km_s: Some(StochasticNoise::MIN),
+        stochastic_noises: Some(stochastics),
         integration_time: None,
         light_time_correction: false,
         ..Default::default()

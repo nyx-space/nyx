@@ -20,12 +20,14 @@ use anise::astro::{Aberration, AzElRange, PhysicsResult};
 use anise::constants::frames::EARTH_J2000;
 use anise::errors::AlmanacResult;
 use anise::prelude::{Almanac, Frame, Orbit};
-use indexmap::IndexSet;
+use indexmap::{IndexMap, IndexSet};
+use snafu::ensure;
 
 use super::msr::MeasurementType;
 use super::noise::StochasticNoise;
 use super::{ODAlmanacSnafu, ODError, ODTrajSnafu, TrackingDevice};
 use crate::io::ConfigRepr;
+use crate::od::NoiseNotConfiguredSnafu;
 use crate::time::Epoch;
 use hifitime::Duration;
 use rand_pcg::Pcg64Mcg;
@@ -61,10 +63,7 @@ pub struct GroundStation {
     pub light_time_correction: bool,
     /// Noise on the timestamp of the measurement
     pub timestamp_noise_s: Option<StochasticNoise>,
-    /// Noise on the range data of the measurement
-    pub range_noise_km: Option<StochasticNoise>,
-    /// Noise on the Doppler data of the measurement
-    pub doppler_noise_km_s: Option<StochasticNoise>,
+    pub stochastic_noises: Option<IndexMap<MeasurementType, StochasticNoise>>,
 }
 
 impl GroundStation {
@@ -88,8 +87,7 @@ impl GroundStation {
             integration_time: None,
             light_time_correction: false,
             timestamp_noise_s: None,
-            range_noise_km: None,
-            doppler_noise_km_s: None,
+            stochastic_noises: None,
         }
     }
 
@@ -132,24 +130,27 @@ impl GroundStation {
         let mut noises = vec![0.0; self.measurement_types.len() + 1];
 
         if let Some(rng) = rng {
+            ensure!(
+                self.stochastic_noises.is_some(),
+                NoiseNotConfiguredSnafu {
+                    kind: "ground station stochastics".to_string(),
+                }
+            );
             // Add the timestamp noise first
 
             if let Some(mut timestamp_noise) = self.timestamp_noise_s {
                 noises[0] = timestamp_noise.sample(epoch, rng);
             }
 
+            let stochastics = self.stochastic_noises.as_mut().unwrap();
+
             for (ii, msr_type) in self.measurement_types.iter().enumerate() {
-                noises[ii + 1] = match msr_type {
-                    MeasurementType::Range => self
-                        .range_noise_km
-                        .ok_or(ODError::NoiseNotConfigured { kind: "Range" })?
-                        .sample(epoch, rng),
-                    MeasurementType::Doppler => self
-                        .doppler_noise_km_s
-                        .ok_or(ODError::NoiseNotConfigured { kind: "Doppler" })?
-                        .sample(epoch, rng),
-                    _ => todo!("az/el"),
-                };
+                noises[ii + 1] = stochastics
+                    .get_mut(msr_type)
+                    .ok_or(ODError::NoiseNotConfigured {
+                        kind: format!("{msr_type:?}"),
+                    })?
+                    .sample(epoch, rng);
             }
         }
 
@@ -173,8 +174,7 @@ impl Default for GroundStation {
             integration_time: None,
             light_time_correction: false,
             timestamp_noise_s: None,
-            range_noise_km: None,
-            doppler_noise_km_s: None,
+            stochastic_noises: None,
         }
     }
 }
@@ -200,7 +200,7 @@ impl fmt::Display for GroundStation {
 mod gs_ut {
 
     use anise::constants::frames::IAU_EARTH_FRAME;
-    use indexmap::IndexSet;
+    use indexmap::{IndexMap, IndexSet};
 
     use crate::io::ConfigRepr;
     use crate::od::prelude::*;
@@ -232,19 +232,28 @@ mod gs_ut {
         measurement_types.insert(MeasurementType::Range);
         measurement_types.insert(MeasurementType::Doppler);
 
+        let mut stochastics = IndexMap::new();
+        stochastics.insert(
+            MeasurementType::Range,
+            StochasticNoise {
+                bias: Some(GaussMarkov::new(1.days(), 5e-3).unwrap()),
+                ..Default::default()
+            },
+        );
+        stochastics.insert(
+            MeasurementType::Doppler,
+            StochasticNoise {
+                bias: Some(GaussMarkov::new(1.days(), 5e-5).unwrap()),
+                ..Default::default()
+            },
+        );
+
         let expected_gs = GroundStation {
             name: "Demo ground station".to_string(),
             frame: IAU_EARTH_FRAME,
             measurement_types,
             elevation_mask_deg: 5.0,
-            range_noise_km: Some(StochasticNoise {
-                bias: Some(GaussMarkov::new(1.days(), 5e-3).unwrap()),
-                ..Default::default()
-            }),
-            doppler_noise_km_s: Some(StochasticNoise {
-                bias: Some(GaussMarkov::new(1.days(), 5e-5).unwrap()),
-                ..Default::default()
-            }),
+            stochastic_noises: Some(stochastics),
             latitude_deg: 2.3522,
             longitude_deg: 48.8566,
             height_km: 0.4,
@@ -252,6 +261,8 @@ mod gs_ut {
             timestamp_noise_s: None,
             integration_time: Some(60 * Unit::Second),
         };
+
+        println!("{}", serde_yml::to_string(&expected_gs).unwrap());
 
         assert_eq!(expected_gs, gs);
     }
@@ -280,20 +291,29 @@ mod gs_ut {
         measurement_types.insert(MeasurementType::Range);
         measurement_types.insert(MeasurementType::Doppler);
 
+        let mut stochastics = IndexMap::new();
+        stochastics.insert(
+            MeasurementType::Range,
+            StochasticNoise {
+                bias: Some(GaussMarkov::new(1.days(), 5e-3).unwrap()),
+                ..Default::default()
+            },
+        );
+        stochastics.insert(
+            MeasurementType::Doppler,
+            StochasticNoise {
+                bias: Some(GaussMarkov::new(1.days(), 5e-5).unwrap()),
+                ..Default::default()
+            },
+        );
+
         let expected = vec![
             GroundStation {
                 name: "Demo ground station".to_string(),
                 frame: IAU_EARTH_FRAME.with_mu_km3_s2(398600.435436096),
                 measurement_types: measurement_types.clone(),
                 elevation_mask_deg: 5.0,
-                range_noise_km: Some(StochasticNoise {
-                    bias: Some(GaussMarkov::new(1.days(), 5e-3).unwrap()),
-                    ..Default::default()
-                }),
-                doppler_noise_km_s: Some(StochasticNoise {
-                    bias: Some(GaussMarkov::new(1.days(), 5e-5).unwrap()),
-                    ..Default::default()
-                }),
+                stochastic_noises: Some(stochastics.clone()),
                 latitude_deg: 2.3522,
                 longitude_deg: 48.8566,
                 height_km: 0.4,
@@ -306,14 +326,7 @@ mod gs_ut {
                 frame: IAU_EARTH_FRAME.with_mu_km3_s2(398600.435436096),
                 measurement_types,
                 elevation_mask_deg: 5.0,
-                range_noise_km: Some(StochasticNoise {
-                    bias: Some(GaussMarkov::new(1.days(), 5e-3).unwrap()),
-                    ..Default::default()
-                }),
-                doppler_noise_km_s: Some(StochasticNoise {
-                    bias: Some(GaussMarkov::new(1.days(), 5e-5).unwrap()),
-                    ..Default::default()
-                }),
+                stochastic_noises: Some(stochastics),
                 latitude_deg: -35.398333,
                 longitude_deg: 148.981944,
                 height_km: 0.691750,

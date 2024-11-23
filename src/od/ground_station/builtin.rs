@@ -28,6 +28,11 @@ impl GroundStation {
         let mut measurement_types = IndexSet::new();
         measurement_types.insert(MeasurementType::Range);
         measurement_types.insert(MeasurementType::Doppler);
+
+        let mut stochastics = IndexMap::new();
+        stochastics.insert(MeasurementType::Range, range_noise_km);
+        stochastics.insert(MeasurementType::Doppler, doppler_noise_km_s);
+
         Self {
             name: "Madrid".to_string(),
             elevation_mask_deg: elevation_mask,
@@ -39,8 +44,7 @@ impl GroundStation {
             integration_time: None,
             light_time_correction: false,
             timestamp_noise_s: None,
-            range_noise_km: Some(range_noise_km),
-            doppler_noise_km_s: Some(doppler_noise_km_s),
+            stochastic_noises: Some(stochastics),
         }
     }
 
@@ -53,6 +57,11 @@ impl GroundStation {
         let mut measurement_types = IndexSet::new();
         measurement_types.insert(MeasurementType::Range);
         measurement_types.insert(MeasurementType::Doppler);
+
+        let mut stochastics = IndexMap::new();
+        stochastics.insert(MeasurementType::Range, range_noise_km);
+        stochastics.insert(MeasurementType::Doppler, doppler_noise_km_s);
+
         Self {
             name: "Canberra".to_string(),
             elevation_mask_deg: elevation_mask,
@@ -64,8 +73,7 @@ impl GroundStation {
             integration_time: None,
             light_time_correction: false,
             timestamp_noise_s: None,
-            range_noise_km: Some(range_noise_km),
-            doppler_noise_km_s: Some(doppler_noise_km_s),
+            stochastic_noises: Some(stochastics),
         }
     }
 
@@ -78,6 +86,11 @@ impl GroundStation {
         let mut measurement_types = IndexSet::new();
         measurement_types.insert(MeasurementType::Range);
         measurement_types.insert(MeasurementType::Doppler);
+
+        let mut stochastics = IndexMap::new();
+        stochastics.insert(MeasurementType::Range, range_noise_km);
+        stochastics.insert(MeasurementType::Doppler, doppler_noise_km_s);
+
         Self {
             name: "Goldstone".to_string(),
             elevation_mask_deg: elevation_mask,
@@ -89,8 +102,7 @@ impl GroundStation {
             integration_time: None,
             light_time_correction: false,
             timestamp_noise_s: None,
-            range_noise_km: Some(range_noise_km),
-            doppler_noise_km_s: Some(doppler_noise_km_s),
+            stochastic_noises: Some(stochastics),
         }
     }
 }
