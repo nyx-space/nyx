@@ -127,7 +127,9 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
         almanac: Arc<Almanac>,
     ) -> Result<Self, ODError> {
         let receiver = rx.orbit;
-        // Compute the device location
+        // Compute the device location in the receiver frame because we compute the sensitivity in that frame.
+        // This frame is required because the scalar measurements are frame independent, but the sensitivity
+        // must be in the estimation frame.
         let transmitter = tx
             .location(rx.orbit.epoch, rx.orbit.frame, almanac.clone())
             .context(ODAlmanacSnafu {
@@ -187,7 +189,40 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
                     _tx: PhantomData::<_>,
                 })
             }
-            _ => todo!("az/el"),
+            MeasurementType::Azimuth => {
+                let m11 = -delta_r.y / (delta_r.x.powi(2) + delta_r.y.powi(2));
+                let m12 = delta_r.x / (delta_r.x.powi(2) + delta_r.y.powi(2));
+                let m13 = 0.0;
+
+                let sensitivity_row =
+                    OMatrix::<f64, U1, <Spacecraft as State>::Size>::from_row_slice(&[
+                        m11, m12, m13, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                    ]);
+
+                Ok(Self {
+                    sensitivity_row,
+                    _rx: PhantomData::<_>,
+                    _tx: PhantomData::<_>,
+                })
+            }
+            MeasurementType::Elevation => {
+                let r2 = delta_r.norm().powi(2);
+
+                let m11 = -(delta_r.x * delta_r.z) / (r2 * (r2 - delta_r.z.powi(2)).sqrt());
+                let m12 = -(delta_r.y * delta_r.z) / (r2 * (r2 - delta_r.z.powi(2)).sqrt());
+                let m13 = (delta_r.x.powi(2) + delta_r.y.powi(2)).sqrt() / r2;
+
+                let sensitivity_row =
+                    OMatrix::<f64, U1, <Spacecraft as State>::Size>::from_row_slice(&[
+                        m11, m12, m13, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                    ]);
+
+                Ok(Self {
+                    sensitivity_row,
+                    _rx: PhantomData::<_>,
+                    _tx: PhantomData::<_>,
+                })
+            }
         }
     }
 }
