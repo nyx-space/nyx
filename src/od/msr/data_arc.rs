@@ -68,13 +68,17 @@ impl TrackingDataArc {
         let mut has_epoch = false;
         let mut has_tracking_dev = false;
         let mut range_avail = false;
-        let mut rate_avail = false;
+        let mut doppler_avail = false;
+        let mut az_avail = false;
+        let mut el_avail = false;
         for field in &reader.schema().fields {
             match field.name().as_str() {
                 "Epoch (UTC)" => has_epoch = true,
                 "Tracking device" => has_tracking_dev = true,
                 "Range (km)" => range_avail = true,
-                "Doppler (km/s)" => rate_avail = true,
+                "Doppler (km/s)" => doppler_avail = true,
+                "Azimuth (deg)" => az_avail = true,
+                "Elevation (deg)" => el_avail = true,
                 _ => {}
             }
         }
@@ -94,9 +98,9 @@ impl TrackingDataArc {
         );
 
         ensure!(
-            range_avail || rate_avail,
+            range_avail || doppler_avail || az_avail || el_avail,
             MissingDataSnafu {
-                which: "`Range (km)` or `Doppler (km/s)`"
+                which: "`Range (km)` or `Doppler (km/s)` or `Azimuth (deg)` or `Elevation (deg)`"
             }
         );
 
@@ -135,10 +139,36 @@ impl TrackingDataArc {
                 None
             };
 
-            let doppler_data: Option<&PrimitiveArray<datatypes::Float64Type>> = if rate_avail {
+            let doppler_data: Option<&PrimitiveArray<datatypes::Float64Type>> = if doppler_avail {
                 Some(
                     batch
                         .column_by_name("Doppler (km/s)")
+                        .unwrap()
+                        .as_any()
+                        .downcast_ref::<Float64Array>()
+                        .unwrap(),
+                )
+            } else {
+                None
+            };
+
+            let azimuth_data: Option<&PrimitiveArray<datatypes::Float64Type>> = if az_avail {
+                Some(
+                    batch
+                        .column_by_name("Azimuth (deg)")
+                        .unwrap()
+                        .as_any()
+                        .downcast_ref::<Float64Array>()
+                        .unwrap(),
+                )
+            } else {
+                None
+            };
+
+            let elevation_data: Option<&PrimitiveArray<datatypes::Float64Type>> = if el_avail {
+                Some(
+                    batch
+                        .column_by_name("Elevation (deg)")
                         .unwrap()
                         .as_any()
                         .downcast_ref::<Float64Array>()
@@ -168,10 +198,22 @@ impl TrackingDataArc {
                         .insert(MeasurementType::Range, range_data.unwrap().value(i));
                 }
 
-                if rate_avail {
+                if doppler_avail {
                     measurement
                         .data
                         .insert(MeasurementType::Doppler, doppler_data.unwrap().value(i));
+                }
+
+                if az_avail {
+                    measurement
+                        .data
+                        .insert(MeasurementType::Azimuth, azimuth_data.unwrap().value(i));
+                }
+
+                if el_avail {
+                    measurement
+                        .data
+                        .insert(MeasurementType::Elevation, elevation_data.unwrap().value(i));
                 }
 
                 measurements.insert(epoch, measurement);

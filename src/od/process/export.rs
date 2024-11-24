@@ -42,24 +42,24 @@ use std::path::{Path, PathBuf};
 
 use super::ODProcess;
 
-impl<'a, MeasurementSize: DimName, A: DimName, T: TrackerSensitivity<Spacecraft, Spacecraft>>
-    ODProcess<'a, SpacecraftDynamics, MeasurementSize, A, KF<Spacecraft, A, MeasurementSize>, T>
+impl<'a, MsrSize: DimName, Accel: DimName, Trk: TrackerSensitivity<Spacecraft, Spacecraft>>
+    ODProcess<'a, SpacecraftDynamics, MsrSize, Accel, KF<Spacecraft, Accel, MsrSize>, Trk>
 where
-    DefaultAllocator: Allocator<MeasurementSize>
-        + Allocator<MeasurementSize, <Spacecraft as State>::Size>
-        + Allocator<Const<1>, MeasurementSize>
+    DefaultAllocator: Allocator<MsrSize>
+        + Allocator<MsrSize, <Spacecraft as State>::Size>
+        + Allocator<Const<1>, MsrSize>
         + Allocator<<Spacecraft as State>::Size>
         + Allocator<<Spacecraft as State>::Size, <Spacecraft as State>::Size>
-        + Allocator<MeasurementSize, MeasurementSize>
-        + Allocator<MeasurementSize, <Spacecraft as State>::Size>
-        + Allocator<<Spacecraft as State>::Size, MeasurementSize>
-        + Allocator<A>
-        + Allocator<A, A>
+        + Allocator<MsrSize, MsrSize>
+        + Allocator<MsrSize, <Spacecraft as State>::Size>
+        + Allocator<<Spacecraft as State>::Size, MsrSize>
+        + Allocator<Accel>
+        + Allocator<Accel, Accel>
         + Allocator<<Spacecraft as State>::Size>
         + Allocator<<Spacecraft as State>::VecLength>
         + Allocator<<Spacecraft as State>::Size, <Spacecraft as State>::Size>
-        + Allocator<<Spacecraft as State>::Size, A>
-        + Allocator<A, <Spacecraft as State>::Size>,
+        + Allocator<<Spacecraft as State>::Size, Accel>
+        + Allocator<Accel, <Spacecraft as State>::Size>,
 {
     /// Store the estimates and residuals in a parquet file
     pub fn to_parquet<P: AsRef<Path>>(
@@ -260,7 +260,7 @@ where
                     .end_epoch
                     .unwrap_or_else(|| self.estimates.last().unwrap().state().epoch());
 
-                let mut residuals: Vec<Option<Residual<MeasurementSize>>> =
+                let mut residuals: Vec<Option<Residual<MsrSize>>> =
                     Vec::with_capacity(self.residuals.len());
                 let mut estimates = Vec::with_capacity(self.estimates.len());
 
@@ -354,7 +354,7 @@ where
 
         // Finally, add the residuals.
         // Prefits
-        for i in 0..MeasurementSize::dim() {
+        for i in 0..MsrSize::dim() {
             let mut data = Float64Builder::new();
             for resid_opt in &residuals {
                 if let Some(resid) = resid_opt {
@@ -366,7 +366,7 @@ where
             record.push(Arc::new(data.finish()));
         }
         // Postfit
-        for i in 0..MeasurementSize::dim() {
+        for i in 0..MsrSize::dim() {
             let mut data = Float64Builder::new();
             for resid_opt in &residuals {
                 if let Some(resid) = resid_opt {
@@ -378,7 +378,7 @@ where
             record.push(Arc::new(data.finish()));
         }
         // Measurement noise
-        for i in 0..MeasurementSize::dim() {
+        for i in 0..MsrSize::dim() {
             let mut data = Float64Builder::new();
             for resid_opt in &residuals {
                 if let Some(resid) = resid_opt {

@@ -40,78 +40,76 @@ use std::marker::PhantomData;
 use std::ops::Add;
 mod export;
 
-// Rename to simultaneous measurement or something like that.
-
 /// An orbit determination process. Note that everything passed to this structure is moved.
 #[allow(clippy::upper_case_acronyms)]
 pub struct ODProcess<
     'a,
     D: Dynamics,
-    MeasurementSize: DimName,
-    A: DimName,
-    K: Filter<D::StateType, A, MeasurementSize>,
-    T: TrackerSensitivity<D::StateType, D::StateType>,
+    MsrSize: DimName,
+    Accel: DimName,
+    K: Filter<D::StateType, Accel, MsrSize>,
+    Trk: TrackerSensitivity<D::StateType, D::StateType>,
 > where
     D::StateType:
         Interpolatable + Add<OVector<f64, <D::StateType as State>::Size>, Output = D::StateType>,
     <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
     DefaultAllocator: Allocator<<D::StateType as State>::Size>
         + Allocator<<D::StateType as State>::VecLength>
-        + Allocator<MeasurementSize>
-        + Allocator<MeasurementSize, <D::StateType as State>::Size>
-        + Allocator<MeasurementSize, MeasurementSize>
+        + Allocator<MsrSize>
+        + Allocator<MsrSize, <D::StateType as State>::Size>
+        + Allocator<MsrSize, MsrSize>
         + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<A>
-        + Allocator<A, A>
-        + Allocator<<D::StateType as State>::Size, A>
-        + Allocator<A, <D::StateType as State>::Size>,
+        + Allocator<Accel>
+        + Allocator<Accel, Accel>
+        + Allocator<<D::StateType as State>::Size, Accel>
+        + Allocator<Accel, <D::StateType as State>::Size>,
 {
     /// PropInstance used for the estimation
     pub prop: PropInstance<'a, D>,
     /// Kalman filter itself
     pub kf: K,
     /// Tracking devices
-    pub devices: BTreeMap<String, T>,
+    pub devices: BTreeMap<String, Trk>,
     /// Vector of estimates available after a pass
     pub estimates: Vec<K::Estimate>,
     /// Vector of residuals available after a pass
-    pub residuals: Vec<Option<Residual<MeasurementSize>>>,
+    pub residuals: Vec<Option<Residual<MsrSize>>>,
     pub ekf_trigger: Option<EkfTrigger>,
     /// Residual rejection criteria allows preventing bad measurements from affecting the estimation.
     pub resid_crit: Option<ResidRejectCrit>,
     pub almanac: Arc<Almanac>,
     init_state: D::StateType,
-    _marker: PhantomData<A>,
+    _marker: PhantomData<Accel>,
 }
 
 impl<
         'a,
         D: Dynamics,
-        MeasurementSize: DimName,
-        A: DimName,
-        K: Filter<D::StateType, A, MeasurementSize>,
-        T: TrackerSensitivity<D::StateType, D::StateType>,
-    > ODProcess<'a, D, MeasurementSize, A, K, T>
+        MsrSize: DimName,
+        Accel: DimName,
+        K: Filter<D::StateType, Accel, MsrSize>,
+        Trk: TrackerSensitivity<D::StateType, D::StateType>,
+    > ODProcess<'a, D, MsrSize, Accel, K, Trk>
 where
     D::StateType:
         Interpolatable + Add<OVector<f64, <D::StateType as State>::Size>, Output = D::StateType>,
     <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
     DefaultAllocator: Allocator<<D::StateType as State>::Size>
         + Allocator<<D::StateType as State>::VecLength>
-        + Allocator<MeasurementSize>
-        + Allocator<MeasurementSize, <D::StateType as State>::Size>
-        + Allocator<MeasurementSize, MeasurementSize>
+        + Allocator<MsrSize>
+        + Allocator<MsrSize, <D::StateType as State>::Size>
+        + Allocator<MsrSize, MsrSize>
         + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<A>
-        + Allocator<A, A>
-        + Allocator<<D::StateType as State>::Size, A>
-        + Allocator<A, <D::StateType as State>::Size>,
+        + Allocator<Accel>
+        + Allocator<Accel, Accel>
+        + Allocator<<D::StateType as State>::Size, Accel>
+        + Allocator<Accel, <D::StateType as State>::Size>,
 {
     /// Initialize a new orbit determination process with an optional trigger to switch from a CKF to an EKF.
     pub fn new(
         prop: PropInstance<'a, D>,
         kf: K,
-        devices: BTreeMap<String, T>,
+        devices: BTreeMap<String, Trk>,
         ekf_trigger: Option<EkfTrigger>,
         resid_crit: Option<ResidRejectCrit>,
         almanac: Arc<Almanac>,
@@ -127,7 +125,7 @@ where
             resid_crit,
             almanac,
             init_state,
-            _marker: PhantomData::<A>,
+            _marker: PhantomData::<Accel>,
         }
     }
 
@@ -135,7 +133,7 @@ where
     pub fn ekf(
         prop: PropInstance<'a, D>,
         kf: K,
-        devices: BTreeMap<String, T>,
+        devices: BTreeMap<String, Trk>,
         trigger: EkfTrigger,
         resid_crit: Option<ResidRejectCrit>,
         almanac: Arc<Almanac>,
@@ -151,7 +149,7 @@ where
             resid_crit,
             almanac,
             init_state,
-            _marker: PhantomData::<A>,
+            _marker: PhantomData::<Accel>,
         }
     }
 
@@ -508,7 +506,7 @@ where
                                 }
 
                                 // Check that the observation is valid.
-                                for val in msr.observation::<MeasurementSize>(msr_types).iter() {
+                                for val in msr.observation::<MsrSize>(msr_types).iter() {
                                     ensure!(
                                         val.is_finite(),
                                         InvalidMeasurementSnafu {
@@ -519,7 +517,7 @@ where
                                 }
 
                                 let h_tilde = device
-                                    .h_tilde::<MeasurementSize>(
+                                    .h_tilde::<MsrSize>(
                                         msr,
                                         msr_types,
                                         &nominal_state,
@@ -702,30 +700,30 @@ where
 impl<
         'a,
         D: Dynamics,
-        MeasurementSize: DimName,
-        A: DimName,
-        K: Filter<D::StateType, A, MeasurementSize>,
-        T: TrackerSensitivity<D::StateType, D::StateType>,
-    > ODProcess<'a, D, MeasurementSize, A, K, T>
+        MsrSize: DimName,
+        Accel: DimName,
+        K: Filter<D::StateType, Accel, MsrSize>,
+        Trk: TrackerSensitivity<D::StateType, D::StateType>,
+    > ODProcess<'a, D, MsrSize, Accel, K, Trk>
 where
     D::StateType:
         Interpolatable + Add<OVector<f64, <D::StateType as State>::Size>, Output = D::StateType>,
     <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
     DefaultAllocator: Allocator<<D::StateType as State>::Size>
         + Allocator<<D::StateType as State>::VecLength>
-        + Allocator<MeasurementSize>
-        + Allocator<MeasurementSize, <D::StateType as State>::Size>
-        + Allocator<MeasurementSize, MeasurementSize>
+        + Allocator<MsrSize>
+        + Allocator<MsrSize, <D::StateType as State>::Size>
+        + Allocator<MsrSize, MsrSize>
         + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<A>
-        + Allocator<A, A>
-        + Allocator<<D::StateType as State>::Size, A>
-        + Allocator<A, <D::StateType as State>::Size>,
+        + Allocator<Accel>
+        + Allocator<Accel, Accel>
+        + Allocator<<D::StateType as State>::Size, Accel>
+        + Allocator<Accel, <D::StateType as State>::Size>,
 {
     pub fn ckf(
         prop: PropInstance<'a, D>,
         kf: K,
-        devices: BTreeMap<String, T>,
+        devices: BTreeMap<String, Trk>,
         resid_crit: Option<ResidRejectCrit>,
         almanac: Arc<Almanac>,
     ) -> Self {
@@ -740,7 +738,7 @@ where
             ekf_trigger: None,
             init_state,
             almanac,
-            _marker: PhantomData::<A>,
+            _marker: PhantomData::<Accel>,
         }
     }
 }

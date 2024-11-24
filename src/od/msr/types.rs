@@ -70,6 +70,7 @@ impl MeasurementType {
     }
 
     /// Computes the two way measurement from two AER values and the noise of this measurement type, returned in the units of this measurement type.
+    /// Two way is modeled by averaging the measurement in between both times, and adding the noise divided by sqrt(2).
     pub fn compute_two_way(
         self,
         aer_t0: AzElRange,
@@ -85,9 +86,14 @@ impl MeasurementType {
                 let doppler_km_s = (aer_t1.range_rate_km_s + aer_t0.range_rate_km_s) * 0.5;
                 Ok(doppler_km_s + noise / 2.0_f64.sqrt())
             }
-            Self::Azimuth | Self::Elevation => Err(ODError::MeasurementSimError {
-                details: format!("{self:?} does not support two way"),
-            }),
+            Self::Azimuth => {
+                let az_deg = (aer_t1.azimuth_deg + aer_t0.azimuth_deg) * 0.5;
+                Ok(az_deg + noise / 2.0_f64.sqrt())
+            }
+            Self::Elevation => {
+                let el_deg = (aer_t1.elevation_deg + aer_t0.elevation_deg) * 0.5;
+                Ok(el_deg + noise / 2.0_f64.sqrt())
+            }
         }
     }
 }

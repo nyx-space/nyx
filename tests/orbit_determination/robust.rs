@@ -154,8 +154,8 @@ fn od_robust_test_ekf_realistic_one_way_cov_test(almanac: Arc<Almanac>) {
     let reloaded = TrackingDataArc::from_parquet(&path).unwrap();
     assert_eq!(reloaded, arc);
 
-    // Now that we have the truth data, let"s start an OD with no noise at all and compute the estimates.
-    // We expect the estimated orbit to be _nearly_ perfect because we"ve removed SATURN_BARYCENTER from the estimated trajectory
+    // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
+    // We expect the estimated orbit to be _nearly_ perfect because we've removed SATURN_BARYCENTER from the estimated trajectory
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let estimator = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
     let setup = Propagator::new(estimator, IntegratorMethod::RungeKutta4, opts);
@@ -348,8 +348,8 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
 
     println!("{arc}");
 
-    // Now that we have the truth data, let"s start an OD with no noise at all and compute the estimates.
-    // We expect the estimated orbit to be _nearly_ perfect because we"ve removed SATURN_BARYCENTER from the estimated trajectory
+    // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
+    // We expect the estimated orbit to be _nearly_ perfect because we've removed SATURN_BARYCENTER from the estimated trajectory
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let estimator = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
     let setup = Propagator::default(estimator);

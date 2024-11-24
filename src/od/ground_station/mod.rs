@@ -91,6 +91,39 @@ impl GroundStation {
         }
     }
 
+    /// Returns a copy of this ground station with the new measurement type added (or replaced)
+    pub fn with_msr_type(mut self, msr_type: MeasurementType, noise: StochasticNoise) -> Self {
+        if self.stochastic_noises.is_none() {
+            self.stochastic_noises = Some(IndexMap::new());
+        }
+
+        self.stochastic_noises
+            .as_mut()
+            .unwrap()
+            .insert(msr_type, noise);
+
+        self.measurement_types.insert(msr_type);
+
+        self
+    }
+
+    /// Returns a copy of this ground station without the provided measurement type (if defined, else no error)
+    pub fn without_msr_type(mut self, msr_type: MeasurementType) -> Self {
+        if let Some(noises) = self.stochastic_noises.as_mut() {
+            noises.swap_remove(&msr_type);
+        }
+
+        self.measurement_types.swap_remove(&msr_type);
+
+        self
+    }
+
+    pub fn with_integration_time(mut self, integration_time: Option<Duration>) -> Self {
+        self.integration_time = integration_time;
+
+        self
+    }
+
     /// Computes the azimuth and elevation of the provided object seen from this ground station, both in degrees.
     /// This is a shortcut to almanac.azimuth_elevation_range_sez.
     pub fn azimuth_elevation_of(
