@@ -477,8 +477,7 @@ where
                     .context(ODPropSnafu)?;
 
                 for state in traj_covar.states {
-                    // traj.states.push(S::extract(state));
-                    // HERE: At the time being, only spacecraft estimation is possible, and the trajectory will always be the exact state
+                    // NOTE: At the time being, only spacecraft estimation is possible, and the trajectory will always be the exact state
                     // that was propagated. Even once ground station biases are estimated, these won't go through the propagator.
                     traj.states.push(state);
                 }
@@ -538,7 +537,6 @@ where
                                         device.measurement_types(),
                                         epoch,
                                     )?,
-                                    // device.measurement_covar(epoch)?,
                                     self.resid_crit,
                                 ) {
                                     Ok((estimate, mut residual)) => {

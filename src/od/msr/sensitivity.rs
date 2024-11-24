@@ -97,7 +97,7 @@ where
         DefaultAllocator: Allocator<M> + Allocator<M, <Spacecraft as State>::Size>,
     {
         // Rebuild each row of the scalar sensitivities.
-        let mut mat = OMatrix::<f64, M, <Spacecraft as State>::Size>::zeros();
+        let mut mat = OMatrix::<f64, M, <Spacecraft as State>::Size>::identity();
         for (ith_row, msr_type) in msr_types.iter().enumerate() {
             if !msr.data.contains_key(msr_type) {
                 // Skip computation, this row is zero anyway.

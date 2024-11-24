@@ -86,6 +86,8 @@ if __name__ == "__main__":
             connectgaps=True,
             line=dict(dash="dash", color="black"),
         )
+        unit = msr.split()[-1][1:-1]
+        fig.update_layout(yaxis_title=unit)
         fig.show()
 
     # Plot the RIC uncertainty

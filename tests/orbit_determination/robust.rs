@@ -39,7 +39,7 @@ fn almanac() -> Arc<Almanac> {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
+fn od_robust_test_ekf_realistic_one_way_cov_test(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
@@ -149,6 +149,11 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
 
     arc.to_parquet_simple(&path).unwrap();
 
+    println!("{arc}\n{arc:?}");
+    // Reload
+    let reloaded = TrackingDataArc::from_parquet(path.join("ekf_robust_msr.parquet")).unwrap();
+    assert_eq!(reloaded, arc);
+
     // Now that we have the truth data, let"s start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be _nearly_ perfect because we"ve removed SATURN_BARYCENTER from the estimated trajectory
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
@@ -239,7 +244,7 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn od_robust_test_ekf_realistic_two_way_cov_test(almanac: Arc<Almanac>) {
+fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
