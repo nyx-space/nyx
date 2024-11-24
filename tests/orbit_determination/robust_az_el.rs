@@ -56,20 +56,20 @@ fn devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
     .with_msr_type(MeasurementType::Elevation, StochasticNoise::MIN)
     .with_integration_time(integration_time);
 
-    // let dss13_goldstone = GroundStation::dss13_goldstone(
-    //     elevation_mask,
-    //     StochasticNoise::MIN,
-    //     StochasticNoise::MIN,
-    //     iau_earth,
-    // )
-    // .with_msr_type(MeasurementType::Azimuth, StochasticNoise::MIN)
-    // .with_msr_type(MeasurementType::Elevation, StochasticNoise::MIN)
-    // .with_integration_time(integration_time);
+    let dss13_goldstone = GroundStation::dss13_goldstone(
+        elevation_mask,
+        StochasticNoise::MIN,
+        StochasticNoise::MIN,
+        iau_earth,
+    )
+    .with_msr_type(MeasurementType::Azimuth, StochasticNoise::MIN)
+    .with_msr_type(MeasurementType::Elevation, StochasticNoise::MIN)
+    .with_integration_time(integration_time);
 
     let mut devices = BTreeMap::new();
     devices.insert(dss65_madrid.name(), dss65_madrid);
     devices.insert(dss34_canberra.name(), dss34_canberra);
-    // devices.insert(dss13_goldstone.name(), dss13_goldstone);
+    devices.insert(dss13_goldstone.name(), dss13_goldstone);
 
     devices
 }

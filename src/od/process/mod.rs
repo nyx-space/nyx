@@ -26,6 +26,7 @@ pub use crate::od::*;
 use crate::propagators::PropInstance;
 pub use crate::time::{Duration, Unit};
 use anise::prelude::Almanac;
+use indexmap::IndexSet;
 use msr::sensitivity::TrackerSensitivity;
 use snafu::prelude::*;
 mod conf;
@@ -505,75 +506,91 @@ where
                                     }
                                 }
 
-                                // Check that the observation is valid.
-                                for val in msr.observation::<MsrSize>(msr_types).iter() {
-                                    ensure!(
-                                        val.is_finite(),
-                                        InvalidMeasurementSnafu {
-                                            epoch: next_msr_epoch,
-                                            val: *val
-                                        }
-                                    );
-                                }
+                                // Perform several measurement updates to ensure the desired dimensionality.
+                                let windows = msr_types.len() / MsrSize::USIZE;
+                                for wno in 0..=windows {
+                                    let mut cur_msr_types = IndexSet::new();
+                                    for msr_type in msr_types
+                                        .iter()
+                                        .copied()
+                                        .skip(wno * MsrSize::USIZE)
+                                        .take(MsrSize::USIZE)
+                                    {
+                                        cur_msr_types.insert(msr_type);
+                                    }
 
-                                let h_tilde = device
-                                    .h_tilde::<MsrSize>(
-                                        msr,
-                                        msr_types,
-                                        &nominal_state,
-                                        self.almanac.clone(),
-                                    )
-                                    .unwrap();
+                                    if cur_msr_types.is_empty() {
+                                        // We've processed all measurements.
+                                        break;
+                                    }
 
-                                self.kf.update_h_tilde(h_tilde);
+                                    // Check that the observation is valid.
+                                    for val in msr.observation::<MsrSize>(&cur_msr_types).iter() {
+                                        ensure!(
+                                            val.is_finite(),
+                                            InvalidMeasurementSnafu {
+                                                epoch: next_msr_epoch,
+                                                val: *val
+                                            }
+                                        );
+                                    }
 
-                                match self.kf.measurement_update(
-                                    nominal_state,
-                                    &msr.observation(msr_types),
-                                    &computed_meas.observation(msr_types),
-                                    device.measurement_covar_matrix(
-                                        device.measurement_types(),
-                                        epoch,
-                                    )?,
-                                    self.resid_crit,
-                                ) {
-                                    Ok((estimate, mut residual)) => {
-                                        debug!("processed msr #{msr_cnt} @ {epoch}");
+                                    let h_tilde = device
+                                        .h_tilde::<MsrSize>(
+                                            msr,
+                                            &cur_msr_types,
+                                            &nominal_state,
+                                            self.almanac.clone(),
+                                        )
+                                        .unwrap();
 
-                                        residual.tracker = Some(device.name());
+                                    self.kf.update_h_tilde(h_tilde);
 
-                                        if !residual.rejected {
-                                            msr_accepted_cnt += 1;
-                                        }
+                                    match self.kf.measurement_update(
+                                        nominal_state,
+                                        &msr.observation(&cur_msr_types),
+                                        &computed_meas.observation(&cur_msr_types),
+                                        device.measurement_covar_matrix(&cur_msr_types, epoch)?,
+                                        self.resid_crit,
+                                    ) {
+                                        Ok((estimate, mut residual)) => {
+                                            debug!("processed msr #{msr_cnt} of type(s) {cur_msr_types:?} @ {epoch}");
 
-                                        // Switch to EKF if necessary, and update the dynamics and such
-                                        // Note: we call enable_ekf first to ensure that the trigger gets
-                                        // called in case it needs to save some information (e.g. the
-                                        // StdEkfTrigger needs to store the time of the previous measurement).
+                                            residual.tracker = Some(device.name());
 
-                                        if let Some(trigger) = &mut self.ekf_trigger {
-                                            if trigger.enable_ekf(&estimate)
-                                                && !self.kf.is_extended()
-                                            {
-                                                self.kf.set_extended(true);
-                                                if !estimate.within_3sigma() {
-                                                    warn!("EKF enabled @ {epoch} but filter DIVERGING");
-                                                } else {
-                                                    info!("EKF enabled @ {epoch}");
+                                            if !residual.rejected {
+                                                msr_accepted_cnt += 1;
+                                            }
+
+                                            // Switch to EKF if necessary, and update the dynamics and such
+                                            // Note: we call enable_ekf first to ensure that the trigger gets
+                                            // called in case it needs to save some information (e.g. the
+                                            // StdEkfTrigger needs to store the time of the previous measurement).
+
+                                            if let Some(trigger) = &mut self.ekf_trigger {
+                                                if trigger.enable_ekf(&estimate)
+                                                    && !self.kf.is_extended()
+                                                {
+                                                    self.kf.set_extended(true);
+                                                    if !estimate.within_3sigma() {
+                                                        warn!("EKF enabled @ {epoch} but filter DIVERGING");
+                                                    } else {
+                                                        info!("EKF enabled @ {epoch}");
+                                                    }
+                                                }
+                                                if self.kf.is_extended() {
+                                                    self.prop.state = self.prop.state
+                                                        + estimate.state_deviation();
                                                 }
                                             }
-                                            if self.kf.is_extended() {
-                                                self.prop.state =
-                                                    self.prop.state + estimate.state_deviation();
-                                            }
+
+                                            self.prop.state.reset_stm();
+
+                                            self.estimates.push(estimate);
+                                            self.residuals.push(Some(residual));
                                         }
-
-                                        self.prop.state.reset_stm();
-
-                                        self.estimates.push(estimate);
-                                        self.residuals.push(Some(residual));
+                                        Err(e) => return Err(e),
                                     }
-                                    Err(e) => return Err(e),
                                 }
                             } else {
                                 warn!("Real observation exists @ {epoch} but simulated {} does not see it -- ignoring measurement", msr.tracker);
