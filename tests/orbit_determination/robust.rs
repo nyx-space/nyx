@@ -151,7 +151,7 @@ fn od_robust_test_ekf_realistic_one_way_cov_test(almanac: Arc<Almanac>) {
 
     println!("{arc}\n{arc:?}");
     // Reload
-    let reloaded = TrackingDataArc::from_parquet(path.join("ekf_robust_msr.parquet")).unwrap();
+    let reloaded = TrackingDataArc::from_parquet(&path).unwrap();
     assert_eq!(reloaded, arc);
 
     // Now that we have the truth data, let"s start an OD with no noise at all and compute the estimates.
