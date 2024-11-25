@@ -130,7 +130,7 @@ fn estimator_setup() -> Propagator<SpacecraftDynamics> {
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let estimator = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
 
-    Propagator::new(estimator, IntegratorMethod::RungeKutta89, opts)
+    Propagator::new(estimator, IntegratorMethod::DormandPrince78, opts)
 }
 
 /*
@@ -153,7 +153,7 @@ fn od_robust_test_ekf_rng_dop_az_el(
 
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
     // Define the ground stations.
-    let ekf_num_meas = 300;
+    let ekf_num_meas = 3000;
     // Set the disable time to be very low to test enable/disable sequence
     let ekf_disable_time = 3 * Unit::Minute;
     let elevation_mask = 0.0;
@@ -214,7 +214,7 @@ fn od_robust_test_ekf_rng_dop_az_el(
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
         "output_data",
-        "ekf_rng_dpl_az_el.parquet",
+        "ekf_rng_dpl_az_el_arc.parquet",
     ]
     .iter()
     .collect();
@@ -245,21 +245,26 @@ fn od_robust_test_ekf_rng_dop_az_el(
     odp.process_arc(&subset).unwrap();
     odp.iterate_arc(&subset, IterationConf::once()).unwrap();
 
+    // Grab the comparison state, which differs from the initial state because of the integration time of the measurements.
+    let cmp_state = traj
+        .at(odp.estimates[0].state().orbit.epoch)
+        .expect("could not find comparison epoch in trajectory");
+
     let (sm_rss_pos_km, sm_rss_vel_km_s) =
-        rss_orbit_errors(&initial_state.orbit, &odp.estimates[0].state().orbit);
+        rss_orbit_errors(&cmp_state.orbit, &odp.estimates[0].state().orbit);
 
     println!(
         "Initial state error after smoothing:\t{:.3} m\t{:.3} m/s\n{}",
         sm_rss_pos_km * 1e3,
         sm_rss_vel_km_s * 1e3,
-        (initial_state.orbit - odp.estimates[0].state().orbit).unwrap()
+        (cmp_state.orbit - odp.estimates[0].state().orbit).unwrap()
     );
 
     odp.process_arc(&remaining).unwrap();
 
     odp.to_parquet(
         &remaining,
-        path.with_file_name("robustness_test_one_way.parquet"),
+        path.with_file_name("ekf_rng_dpl_az_el_odp.parquet"),
         ExportCfg::timestamped(),
     )
     .unwrap();

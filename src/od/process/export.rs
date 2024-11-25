@@ -354,11 +354,14 @@ where
 
         // Finally, add the residuals.
         // Prefits
-        for i in 0..MsrSize::dim() {
+        for msr_type in arc.unique_types() {
             let mut data = Float64Builder::new();
             for resid_opt in &residuals {
                 if let Some(resid) = resid_opt {
-                    data.append_value(resid.prefit[i]);
+                    match resid.prefit(msr_type) {
+                        Some(prefit) => data.append_value(prefit),
+                        None => data.append_null(),
+                    };
                 } else {
                     data.append_null();
                 }
@@ -366,11 +369,14 @@ where
             record.push(Arc::new(data.finish()));
         }
         // Postfit
-        for i in 0..MsrSize::dim() {
+        for msr_type in arc.unique_types() {
             let mut data = Float64Builder::new();
             for resid_opt in &residuals {
                 if let Some(resid) = resid_opt {
-                    data.append_value(resid.postfit[i]);
+                    match resid.postfit(msr_type) {
+                        Some(postfit) => data.append_value(postfit),
+                        None => data.append_null(),
+                    };
                 } else {
                     data.append_null();
                 }
@@ -378,11 +384,14 @@ where
             record.push(Arc::new(data.finish()));
         }
         // Measurement noise
-        for i in 0..MsrSize::dim() {
+        for msr_type in arc.unique_types() {
             let mut data = Float64Builder::new();
             for resid_opt in &residuals {
                 if let Some(resid) = resid_opt {
-                    data.append_value(resid.tracker_msr_noise[i]);
+                    match resid.trk_noise(msr_type) {
+                        Some(noise) => data.append_value(noise),
+                        None => data.append_null(),
+                    };
                 } else {
                     data.append_null();
                 }

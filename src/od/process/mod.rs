@@ -508,6 +508,7 @@ where
 
                                 // Perform several measurement updates to ensure the desired dimensionality.
                                 let windows = msr_types.len() / MsrSize::USIZE;
+                                let mut msr_rejected = false;
                                 for wno in 0..=windows {
                                     let mut cur_msr_types = IndexSet::new();
                                     for msr_type in msr_types
@@ -554,12 +555,13 @@ where
                                         self.resid_crit,
                                     ) {
                                         Ok((estimate, mut residual)) => {
-                                            debug!("processed msr #{msr_cnt} of type(s) {cur_msr_types:?} @ {epoch}");
+                                            debug!("processed measurement #{msr_cnt} for {cur_msr_types:?} @ {epoch} from {}", device.name());
 
                                             residual.tracker = Some(device.name());
+                                            residual.msr_types = cur_msr_types;
 
-                                            if !residual.rejected {
-                                                msr_accepted_cnt += 1;
+                                            if residual.rejected {
+                                                msr_rejected = true;
                                             }
 
                                             // Switch to EKF if necessary, and update the dynamics and such
@@ -591,6 +593,9 @@ where
                                         }
                                         Err(e) => return Err(e),
                                     }
+                                }
+                                if !msr_rejected {
+                                    msr_accepted_cnt += 1;
                                 }
                             } else {
                                 warn!("Real observation exists @ {epoch} but simulated {} does not see it -- ignoring measurement", msr.tracker);

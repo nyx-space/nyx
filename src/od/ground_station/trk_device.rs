@@ -48,9 +48,16 @@ impl TrackingDevice<Spacecraft> for GroundStation {
     ) -> Result<Option<Measurement>, ODError> {
         match self.integration_time {
             Some(integration_time) => {
-                // If out of traj bounds, return None.
-                let rx_0 = traj.at(epoch - integration_time).context(ODTrajSnafu)?;
-                let rx_1 = traj.at(epoch).context(ODTrajSnafu)?;
+                // If out of traj bounds, return None, else the whole strand is rejected.
+                let rx_0 = match traj.at(epoch - integration_time) {
+                    Ok(rx) => rx,
+                    Err(_) => return Ok(None),
+                };
+
+                let rx_1 = match traj.at(epoch).context(ODTrajSnafu) {
+                    Ok(rx) => rx,
+                    Err(_) => return Ok(None),
+                };
 
                 let obstructing_body = if !self.frame.ephem_origin_match(rx_0.frame()) {
                     Some(rx_0.frame())
