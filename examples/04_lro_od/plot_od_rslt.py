@@ -5,47 +5,48 @@ import plotly.graph_objects as go
 import plotly.express as px
 
 if __name__ == "__main__":
-    df = pl.read_parquet("./04_lro_od_results.parquet")
+    df = pl.read_parquet("output_data/ekf_rng_dpl_az_el_odp-2024-11-25T00-53-33.parquet")
 
     df = df.with_columns(pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f")).sort(
         "Epoch (UTC)", descending=False
     )
-    # Add the +/- 3 sigmas on measurement noise
-    df = df.with_columns(
-        [
-            (3.0 * pl.col("Measurement noise: Range (km)")).alias(
-                "Measurement noise 3-Sigma: Range (km)"
-            ),
-            (-3.0 * pl.col("Measurement noise: Range (km)")).alias(
-                "Measurement noise -3-Sigma: Range (km)"
-            ),
-        ]
-    )
-    df = df.with_columns(
-        [
-            (3.0 * pl.col("Measurement noise: Doppler (km/s)")).alias(
-                "Measurement noise 3-Sigma: Doppler (km/s)"
-            ),
-            (-3.0 * pl.col("Measurement noise: Doppler (km/s)")).alias(
-                "Measurement noise -3-Sigma: Doppler (km/s)"
-            ),
-        ]
-    )
+
+    all_msr_types = ["Range (km)", "Doppler (km/s)", "Azimuth (deg)", "Elevation (deg)"]
+    msr_type_count = 0
+    msr_types = []
+
+    for msr_type in all_msr_types:
+        if f"Measurement noise: {msr_type}" in df.columns:
+            msr_type_count += 1
+            msr_types += [msr_type]
+            # Add the +/- 3 sigmas on measurement noise
+            df = df.with_columns(
+                [
+                    (3.0 * pl.col(f"Measurement noise: {msr_type}")).alias(
+                        f"Measurement noise 3-Sigma: {msr_type}"
+                    ),
+                    (-3.0 * pl.col(f"Measurement noise: {msr_type}")).alias(
+                        f"Measurement noise -3-Sigma: {msr_type}"
+                    ),
+                ]
+            )
 
     # == Residual plots ==
     # Nyx uses the Mahalanobis distance for the residual ratios, so we test the goodness using the Chi Square distribution.
-    freedoms = 2 # Two degrees of freedoms for the range and the range rate.
+    freedoms = msr_type_count  # Two degrees of freedoms for the range and the range rate.
     x_chi = np.linspace(chi2.ppf(0.01, freedoms), chi2.ppf(0.99, freedoms), 100)
     y_chi = chi2.pdf(x_chi, freedoms)
 
     # Compute the scaling factor
     hist = np.histogram(df["Residual ratio"].fill_null(0.0), bins=50)[0]
-    max_hist = max(hist[1:]) # Ignore the bin of zeros
+    max_hist = max(hist[1:])  # Ignore the bin of zeros
     max_chi2_pdf = max(y_chi)
     scale_factor = max_hist / max_chi2_pdf
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=x_chi, y=y_chi * scale_factor, mode="lines", name="Scaled Chi-Squared"))
+    fig.add_trace(
+        go.Scatter(x=x_chi, y=y_chi * scale_factor, mode="lines", name="Scaled Chi-Squared")
+    )
     fig.add_trace(go.Histogram(x=df["Residual ratio"], nbinsx=100, name="Residual ratios"))
     fig.show()
 
@@ -63,7 +64,7 @@ if __name__ == "__main__":
     df_resid_ok = df.filter(df["Residual Rejected"] == False)
 
     # Plot the measurement residuals and their noises.
-    for msr in ["Range (km)", "Doppler (km/s)"]:
+    for msr in msr_types:
         y_cols = [
             f"{col}: {msr}"
             for col in [
@@ -101,6 +102,7 @@ if __name__ == "__main__":
         y=["Sigma Vx (RIC) (km/s)", "Sigma Vy (RIC) (km/s)", "Sigma Vz (RIC) (km/s)"],
     ).show()
 
+    raise AssertionError("stop")
     # Load the RIC diff.
     for fname, errname in [
         ("04_lro_od_truth_error", "OD vs Flown"),
