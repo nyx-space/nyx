@@ -44,6 +44,8 @@ fn devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
     )
     .with_msr_type(MeasurementType::Azimuth, StochasticNoise::MIN)
     .with_msr_type(MeasurementType::Elevation, StochasticNoise::MIN)
+    .without_msr_type(MeasurementType::Range)
+    .without_msr_type(MeasurementType::Doppler)
     .with_integration_time(integration_time);
 
     let dss34_canberra = GroundStation::dss34_canberra(
@@ -54,6 +56,8 @@ fn devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
     )
     .with_msr_type(MeasurementType::Azimuth, StochasticNoise::MIN)
     .with_msr_type(MeasurementType::Elevation, StochasticNoise::MIN)
+    .without_msr_type(MeasurementType::Range)
+    .without_msr_type(MeasurementType::Doppler)
     .with_integration_time(integration_time);
 
     let dss13_goldstone = GroundStation::dss13_goldstone(
@@ -64,6 +68,8 @@ fn devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
     )
     .with_msr_type(MeasurementType::Azimuth, StochasticNoise::MIN)
     .with_msr_type(MeasurementType::Elevation, StochasticNoise::MIN)
+    .without_msr_type(MeasurementType::Range)
+    .without_msr_type(MeasurementType::Doppler)
     .with_integration_time(integration_time);
 
     let mut devices = BTreeMap::new();
@@ -78,7 +84,7 @@ fn devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
 fn initial_state(almanac: Arc<Almanac>) -> Spacecraft {
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
-    let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+    let dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
     Spacecraft::from(Orbit::keplerian(
         22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k,
     ))
@@ -184,7 +190,7 @@ fn od_robust_test_ekf_rng_dop_az_el(
     ]);
 
     // Define the propagator information.
-    let prop_time = 2 * Unit::Day;
+    let prop_time = 0.2 * Unit::Day;
 
     let initial_state_dev = initial_estimate.nominal_state;
     let (init_rss_pos_km, init_rss_vel_km_s) =
@@ -236,7 +242,10 @@ fn od_robust_test_ekf_rng_dop_az_el(
 
     let trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
 
-    let mut odp = SpacecraftODProcess::ekf(prop_est, kf, devices, trig, None, almanac);
+    let mut odp = SpacecraftODProcess::ekf(
+        prop_est, kf, devices, trig, None, // Some(ResidRejectCrit::default()),
+        almanac,
+    );
 
     // Let's filter and iterate on the initial subset of the arc to refine the initial estimate
     let subset = arc.clone().filter_by_offset(..3.hours());
@@ -265,7 +274,7 @@ fn od_robust_test_ekf_rng_dop_az_el(
     odp.to_parquet(
         &remaining,
         path.with_file_name("ekf_rng_dpl_az_el_odp.parquet"),
-        ExportCfg::timestamped(),
+        ExportCfg::default(),
     )
     .unwrap();
 

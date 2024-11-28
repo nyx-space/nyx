@@ -526,12 +526,14 @@ where
                                     }
 
                                     // Check that the observation is valid.
-                                    for val in msr.observation::<MsrSize>(&cur_msr_types).iter() {
+                                    for val in
+                                        msr.observation::<MsrSize>(&cur_msr_types).iter().copied()
+                                    {
                                         ensure!(
                                             val.is_finite(),
                                             InvalidMeasurementSnafu {
                                                 epoch: next_msr_epoch,
-                                                val: *val
+                                                val
                                             }
                                         );
                                     }
@@ -598,11 +600,14 @@ where
                                     msr_accepted_cnt += 1;
                                 }
                             } else {
-                                warn!("Real observation exists @ {epoch} but simulated {} does not see it -- ignoring measurement", msr.tracker);
+                                warn!("Ignoring observation @ {epoch} because simulated {} does not expect it", msr.tracker);
                             }
                         }
                         None => {
-                            error!("Tracking arc references {} which is not in the list of configured devices", msr.tracker)
+                            error!(
+                                "Tracker {} is not in the list of configured devices",
+                                msr.tracker
+                            )
                         }
                     }
 

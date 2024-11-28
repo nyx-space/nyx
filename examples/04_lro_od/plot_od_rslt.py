@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 
 if __name__ == "__main__":
-    df = pl.read_parquet("output_data/ekf_rng_dpl_az_el_odp-2024-11-25T00-53-33.parquet")
+    df = pl.read_parquet("output_data/ekf_rng_dpl_az_el_odp.parquet")
 
     df = df.with_columns(pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f")).sort(
         "Epoch (UTC)", descending=False
