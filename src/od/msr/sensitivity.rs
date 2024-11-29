@@ -127,29 +127,18 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
         almanac: Arc<Almanac>,
     ) -> Result<Self, ODError> {
         let receiver = rx.orbit;
+
         // Compute the device location in the receiver frame because we compute the sensitivity in that frame.
         // This frame is required because the scalar measurements are frame independent, but the sensitivity
         // must be in the estimation frame.
-        // let transmitter = tx
-        //     .location(rx.orbit.epoch, rx.orbit.frame, almanac.clone())
-        //     .context(ODAlmanacSnafu {
-        //         action: "computing transmitter location when computing sensitivity matrix",
-        //     })?;
-
-        // let delta_r = receiver.radius_km - transmitter.radius_km;
-        // let delta_v = receiver.velocity_km_s - transmitter.velocity_km_s;
-
-        let receiver = rx.orbit;
-        // Compute the device location ensuring that the receiver and transmitter are in the same frame.
         let transmitter = tx
             .location(rx.orbit.epoch, rx.orbit.frame, almanac.clone())
             .context(ODAlmanacSnafu {
                 action: "computing transmitter location when computing sensitivity matrix",
             })?;
 
-        // Should this be in the SEZ frame?
-        // let delta_r = receiver.radius_km - transmitter.radius_km;
-        // let delta_v = receiver.velocity_km_s - transmitter.velocity_km_s;
+        let delta_r = receiver.radius_km - transmitter.radius_km;
+        let delta_v = receiver.velocity_km_s - transmitter.velocity_km_s;
 
         // SEZ DCM is topo to fixed
         let sez_dcm = transmitter
@@ -165,22 +154,6 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
         // .context(EphemerisSnafu {
         //     action: "transforming transmitter to SEZ",
         // })?;
-
-        // Convert the receiver into the transmitter frame.
-        let rx_in_tx_frame = almanac
-            .transform_to(rx.orbit, transmitter.frame, None)
-            .unwrap();
-        // Convert into SEZ frame
-        let rx_sez = (sez_dcm.transpose() * rx_in_tx_frame).unwrap();
-        // .context(EphemerisPhysicsSnafu { action: "" })
-        // .context(EphemerisSnafu {
-        //     action: "transforming received to SEZ",
-        // })?;
-
-        // let delta_r = rx_sez.radius_km - tx_sez.radius_km;
-        // let delta_v = rx_sez.velocity_km_s - tx_sez.velocity_km_s;
-        let delta_r = tx_sez.radius_km;
-        let delta_v = tx_sez.velocity_km_s;
 
         match msr_type {
             MeasurementType::Doppler => {
@@ -233,9 +206,12 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
                 })
             }
             MeasurementType::Azimuth => {
-                let m11 = -delta_r.y / (delta_r.x.powi(2) + delta_r.y.powi(2));
-                let m12 = delta_r.x / (delta_r.x.powi(2) + delta_r.y.powi(2));
+                let denom = tx_sez.radius_km.x.powi(2) + tx_sez.radius_km.y.powi(2);
+                let m11 = -tx_sez.radius_km.y / denom;
+                let m12 = tx_sez.radius_km.x / denom;
                 let m13 = 0.0;
+
+                // Build the sensitivity matrix in the transmitter frame and rotate back into the inertial frame.
 
                 let effective_sensitivity_row =
                     OMatrix::<f64, U1, Const<6>>::from_row_slice(&[m11, m12, m13, 0.0, 0.0, 0.0])
@@ -253,11 +229,14 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
                 })
             }
             MeasurementType::Elevation => {
-                let r2 = delta_r.norm().powi(2);
+                let r2 = tx_sez.radius_km.norm().powi(2);
+                let z2 = tx_sez.radius_km.z.powi(2);
 
-                let m11 = -(delta_r.x * delta_r.z) / (r2 * (r2 - delta_r.z.powi(2)).sqrt());
-                let m12 = -(delta_r.y * delta_r.z) / (r2 * (r2 - delta_r.z.powi(2)).sqrt());
-                let m13 = (delta_r.x.powi(2) + delta_r.y.powi(2)).sqrt() / r2;
+                // Build the sensitivity matrix in the transmitter frame and rotate back into the inertial frame.
+
+                let m11 = -(tx_sez.radius_km.x * tx_sez.radius_km.z) / (r2 * (r2 - z2).sqrt());
+                let m12 = -(tx_sez.radius_km.y * tx_sez.radius_km.z) / (r2 * (r2 - z2).sqrt());
+                let m13 = (tx_sez.radius_km.x.powi(2) + tx_sez.radius_km.y.powi(2)).sqrt() / r2;
 
                 let effective_sensitivity_row =
                     OMatrix::<f64, U1, Const<6>>::from_row_slice(&[m11, m12, m13, 0.0, 0.0, 0.0])
@@ -267,11 +246,6 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
                 for (i, val) in effective_sensitivity_row.iter().copied().enumerate() {
                     sensitivity_row[i] = val;
                 }
-
-                // let sensitivity_row =
-                //     OMatrix::<f64, U1, <Spacecraft as State>::Size>::from_row_slice(&[
-                //         m11, m12, m13, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                //     ]);
 
                 Ok(Self {
                     sensitivity_row,

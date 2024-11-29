@@ -3,6 +3,7 @@ extern crate pretty_env_logger;
 
 use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SATURN_BARYCENTER, SUN};
 use anise::constants::frames::IAU_EARTH_FRAME;
+use nalgebra::Const;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::SpacecraftDynamics;
@@ -34,42 +35,42 @@ fn almanac() -> Arc<Almanac> {
 fn devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
     let elevation_mask = 10.0;
-    let integration_time = Some(60 * Unit::Second);
+    let integration_time = None; //Some(60 * Unit::Second);
 
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
-        StochasticNoise::MIN,
-        StochasticNoise::MIN,
+        StochasticNoise::default_range_km(),
+        StochasticNoise::default_doppler_km_s(),
         iau_earth,
     )
-    .with_msr_type(MeasurementType::Azimuth, StochasticNoise::MIN)
-    .with_msr_type(MeasurementType::Elevation, StochasticNoise::MIN)
-    .without_msr_type(MeasurementType::Range)
-    .without_msr_type(MeasurementType::Doppler)
+    // .with_msr_type(MeasurementType::Azimuth, StochasticNoise::MIN)
+    // .with_msr_type(MeasurementType::Elevation, StochasticNoise::MIN)
+    // .without_msr_type(MeasurementType::Range)
+    // .without_msr_type(MeasurementType::Doppler)
     .with_integration_time(integration_time);
 
     let dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
-        StochasticNoise::MIN,
-        StochasticNoise::MIN,
+        StochasticNoise::default_range_km(),
+        StochasticNoise::default_doppler_km_s(),
         iau_earth,
     )
-    .with_msr_type(MeasurementType::Azimuth, StochasticNoise::MIN)
-    .with_msr_type(MeasurementType::Elevation, StochasticNoise::MIN)
-    .without_msr_type(MeasurementType::Range)
-    .without_msr_type(MeasurementType::Doppler)
+    // .with_msr_type(MeasurementType::Azimuth, StochasticNoise::MIN)
+    // .with_msr_type(MeasurementType::Elevation, StochasticNoise::MIN)
+    // .without_msr_type(MeasurementType::Range)
+    // .without_msr_type(MeasurementType::Doppler)
     .with_integration_time(integration_time);
 
     let dss13_goldstone = GroundStation::dss13_goldstone(
         elevation_mask,
-        StochasticNoise::MIN,
-        StochasticNoise::MIN,
+        StochasticNoise::default_range_km(),
+        StochasticNoise::default_doppler_km_s(),
         iau_earth,
     )
-    .with_msr_type(MeasurementType::Azimuth, StochasticNoise::MIN)
-    .with_msr_type(MeasurementType::Elevation, StochasticNoise::MIN)
-    .without_msr_type(MeasurementType::Range)
-    .without_msr_type(MeasurementType::Doppler)
+    // .with_msr_type(MeasurementType::Azimuth, StochasticNoise::MIN)
+    // .with_msr_type(MeasurementType::Elevation, StochasticNoise::MIN)
+    // .without_msr_type(MeasurementType::Range)
+    // .without_msr_type(MeasurementType::Doppler)
     .with_integration_time(integration_time);
 
     let mut devices = BTreeMap::new();
@@ -133,7 +134,7 @@ fn estimator_setup() -> Propagator<SpacecraftDynamics> {
     let step_size = 60.0 * Unit::Second;
     let opts = IntegratorOptions::with_max_step(step_size);
 
-    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER, SATURN_BARYCENTER];
     let estimator = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
 
     Propagator::new(estimator, IntegratorMethod::DormandPrince78, opts)
@@ -159,7 +160,7 @@ fn od_robust_test_ekf_rng_dop_az_el(
 
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
     // Define the ground stations.
-    let ekf_num_meas = 3000;
+    let ekf_num_meas = 10;
     // Set the disable time to be very low to test enable/disable sequence
     let ekf_disable_time = 3 * Unit::Minute;
     let elevation_mask = 0.0;
@@ -190,7 +191,7 @@ fn od_robust_test_ekf_rng_dop_az_el(
     ]);
 
     // Define the propagator information.
-    let prop_time = 0.2 * Unit::Day;
+    let prop_time = 1.1 * initial_state.orbit.period().unwrap();
 
     let initial_state_dev = initial_estimate.nominal_state;
     let (init_rss_pos_km, init_rss_vel_km_s) =
@@ -242,17 +243,32 @@ fn od_robust_test_ekf_rng_dop_az_el(
 
     let trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
 
-    let mut odp = SpacecraftODProcess::ekf(
-        prop_est, kf, devices, trig, None, // Some(ResidRejectCrit::default()),
+    let mut odp = ODProcess::<
+        SpacecraftDynamics,
+        Const<1>,
+        Const<3>,
+        KF<Spacecraft, Const<3>, Const<1>>,
+        GroundStation,
+    >::ekf(
+        prop_est,
+        kf,
+        devices,
+        trig,
+        Some(ResidRejectCrit::default()),
         almanac,
     );
 
-    // Let's filter and iterate on the initial subset of the arc to refine the initial estimate
-    let subset = arc.clone().filter_by_offset(..3.hours());
-    let remaining = arc.filter_by_offset(3.hours()..);
+    // let mut odp = SpacecraftODProcess::ekf(
+    //     prop_est, kf, devices, trig, None, // Some(ResidRejectCrit::default()),
+    //     almanac,
+    // );
 
-    odp.process_arc(&subset).unwrap();
-    odp.iterate_arc(&subset, IterationConf::once()).unwrap();
+    // Let's filter and iterate on the initial subset of the arc to refine the initial estimate
+    // let subset = arc.clone().filter_by_offset(..3.hours());
+    // let remaining = arc.filter_by_offset(3.hours()..);
+
+    odp.process_arc(&arc).unwrap();
+    odp.iterate_arc(&arc, IterationConf::once()).unwrap();
 
     // Grab the comparison state, which differs from the initial state because of the integration time of the measurements.
     let cmp_state = traj
@@ -269,10 +285,10 @@ fn od_robust_test_ekf_rng_dop_az_el(
         (cmp_state.orbit - odp.estimates[0].state().orbit).unwrap()
     );
 
-    odp.process_arc(&remaining).unwrap();
+    // odp.process_arc(&remaining).unwrap();
 
     odp.to_parquet(
-        &remaining,
+        &arc,
         path.with_file_name("ekf_rng_dpl_az_el_odp.parquet"),
         ExportCfg::default(),
     )

@@ -299,8 +299,11 @@ where
 
         // Compute the prefit ratio for the automatic rejection
         let r_k_inv = r_k.clone().try_inverse().ok_or(ODError::SingularNoiseRk)?;
-        let ratio_mat = prefit.transpose() * r_k_inv * &prefit;
-        let ratio = ratio_mat[0].sqrt();
+
+        let ratio_mat = prefit.transpose() * &r_k_inv * &prefit;
+        let ratio = dbg!(ratio_mat[0].powi(2));
+        let o_r_k = r_k[(0, 0)];
+        dbg!(prefit[0], o_r_k, prefit[0].abs() < o_r_k,);
 
         if let Some(resid_reject) = resid_rejection {
             if ratio > resid_reject.num_sigmas {
