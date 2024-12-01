@@ -78,7 +78,8 @@ impl StochasticNoise {
                 sigma: 2.0e-3, // 2 m
                 ..Default::default()
             }),
-            bias: Some(GaussMarkov::default_range_km()),
+            // bias: Some(GaussMarkov::default_range_km()),
+            bias: None,
         }
     }
 
@@ -89,7 +90,8 @@ impl StochasticNoise {
                 sigma: 3e-6, // 3 mm/s
                 ..Default::default()
             }),
-            bias: Some(GaussMarkov::default_doppler_km_s()),
+            // bias: Some(GaussMarkov::default_doppler_km_s()),
+            bias: None,
         }
     }
 
