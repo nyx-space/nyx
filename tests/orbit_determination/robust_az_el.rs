@@ -245,13 +245,17 @@ fn od_robust_test_ekf_rng_dop_az_el(
 
     let mut odp = ODProcess::<
         SpacecraftDynamics,
-        Const<1>,
+        Const<2>,
         Const<3>,
-        KF<Spacecraft, Const<3>, Const<1>>,
+        KF<Spacecraft, Const<3>, Const<2>>,
         GroundStation,
     >::ekf(
-        prop_est, kf, devices, trig, // Some(ResidRejectCrit::default()),
-        None, almanac,
+        prop_est,
+        kf,
+        devices,
+        trig,
+        Some(ResidRejectCrit::default()),
+        almanac,
     );
 
     // let mut odp = SpacecraftODProcess::ekf(

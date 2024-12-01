@@ -297,13 +297,22 @@ where
         // Compute observation deviation (usually marked as y_i)
         let prefit = real_obs - computed_obs;
 
-        // Compute the prefit ratio for the automatic rejection
-        let r_k_inv = r_k.clone().try_inverse().ok_or(ODError::SingularNoiseRk)?;
+        // Compute the prefit ratio for the automatic rejection.
+        // The measurement covariance is the square of the measurement itself.
+        // So we compute its Cholesky decomposition to return to the non squared values.
+        let r_k_chol_inv = r_k
+            .clone()
+            .cholesky()
+            .ok_or(ODError::SingularNoiseRk)?
+            .l()
+            .try_inverse()
+            .ok_or(ODError::SingularNoiseRk)?;
 
-        let ratio_mat = prefit.transpose() * &r_k_inv * &prefit;
-        let ratio = dbg!(ratio_mat[0].powi(2));
-        let o_r_k = r_k[(0, 0)];
-        dbg!(prefit[0], o_r_k, prefit[0].abs() < o_r_k,);
+        // Then we multiply the inverted r_k matrix with prefit, giving us the vector of
+        // ratios of the prefit over the r_k matrix diagonal.
+        let ratio_vec = r_k_chol_inv * &prefit;
+        // Compute the ratio as the dot product.
+        let ratio = ratio_vec.dot(&ratio_vec);
 
         if let Some(resid_reject) = resid_rejection {
             if ratio > resid_reject.num_sigmas {
