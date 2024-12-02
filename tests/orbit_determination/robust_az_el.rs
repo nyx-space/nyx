@@ -43,10 +43,14 @@ fn devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
         StochasticNoise::default_doppler_km_s(),
         iau_earth,
     )
-    // .with_msr_type(MeasurementType::Azimuth, StochasticNoise::MIN)
-    // .with_msr_type(MeasurementType::Elevation, StochasticNoise::MIN)
-    // .without_msr_type(MeasurementType::Range)
-    // .without_msr_type(MeasurementType::Doppler)
+    .with_msr_type(
+        MeasurementType::Azimuth,
+        StochasticNoise::default_angle_deg(),
+    )
+    .with_msr_type(
+        MeasurementType::Elevation,
+        StochasticNoise::default_angle_deg(),
+    )
     .with_integration_time(integration_time);
 
     let dss34_canberra = GroundStation::dss34_canberra(
@@ -55,10 +59,14 @@ fn devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
         StochasticNoise::default_doppler_km_s(),
         iau_earth,
     )
-    // .with_msr_type(MeasurementType::Azimuth, StochasticNoise::MIN)
-    // .with_msr_type(MeasurementType::Elevation, StochasticNoise::MIN)
-    // .without_msr_type(MeasurementType::Range)
-    // .without_msr_type(MeasurementType::Doppler)
+    .with_msr_type(
+        MeasurementType::Azimuth,
+        StochasticNoise::default_angle_deg(),
+    )
+    .with_msr_type(
+        MeasurementType::Elevation,
+        StochasticNoise::default_angle_deg(),
+    )
     .with_integration_time(integration_time);
 
     let dss13_goldstone = GroundStation::dss13_goldstone(
@@ -67,10 +75,14 @@ fn devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
         StochasticNoise::default_doppler_km_s(),
         iau_earth,
     )
-    // .with_msr_type(MeasurementType::Azimuth, StochasticNoise::MIN)
-    // .with_msr_type(MeasurementType::Elevation, StochasticNoise::MIN)
-    // .without_msr_type(MeasurementType::Range)
-    // .without_msr_type(MeasurementType::Doppler)
+    .with_msr_type(
+        MeasurementType::Azimuth,
+        StochasticNoise::default_angle_deg(),
+    )
+    .with_msr_type(
+        MeasurementType::Elevation,
+        StochasticNoise::default_angle_deg(),
+    )
     .with_integration_time(integration_time);
 
     let mut devices = BTreeMap::new();
@@ -245,16 +257,12 @@ fn od_robust_test_ekf_rng_dop_az_el(
 
     let mut odp = ODProcess::<
         SpacecraftDynamics,
-        Const<2>,
+        Const<4>,
         Const<3>,
-        KF<Spacecraft, Const<3>, Const<2>>,
+        KF<Spacecraft, Const<3>, Const<4>>,
         GroundStation,
     >::ekf(
-        prop_est,
-        kf,
-        devices,
-        trig,
-        Some(ResidRejectCrit::default()),
+        prop_est, kf, devices, trig, None, // Some(ResidRejectCrit::default()),
         almanac,
     );
 

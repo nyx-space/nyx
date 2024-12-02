@@ -17,6 +17,7 @@ if __name__ == "__main__":
 
     for msr_type in all_msr_types:
         if f"Measurement noise: {msr_type}" in df.columns:
+            print(f"Found data for {msr_type}")
             msr_type_count += 1
             msr_types += [msr_type]
             # Add the +/- 3 sigmas on measurement noise
@@ -43,20 +44,20 @@ if __name__ == "__main__":
     max_chi2_pdf = max(y_chi)
     scale_factor = max_hist / max_chi2_pdf
 
-    # fig = go.Figure()
-    # fig.add_trace(
-    #     go.Scatter(x=x_chi, y=y_chi * scale_factor, mode="lines", name="Scaled Chi-Squared")
-    # )
-    # fig.add_trace(go.Histogram(x=df["Residual ratio"], nbinsx=100, name="Residual ratios"))
-    # fig.show()
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(x=x_chi, y=y_chi * scale_factor, mode="lines", name="Scaled Chi-Squared")
+    )
+    fig.add_trace(go.Histogram(x=df["Residual ratio"], nbinsx=100, name="Residual ratios"))
+    fig.show()
 
-    # px.histogram(
-    #     df,
-    #     x="Residual ratio",
-    #     color="Tracker",
-    #     marginal="rug",  # can be `box`, `violin`
-    #     hover_data=df.columns,
-    # ).show()
+    px.histogram(
+        df,
+        x="Residual ratio",
+        color="Tracker",
+        marginal="rug",  # can be `box`, `violin`
+        hover_data=df.columns,
+    ).show()
 
     # Plot the residual ratios and whether they were accepted.
     px.scatter(df, x="Epoch (UTC)", y="Residual ratio", color="Residual Rejected").show()

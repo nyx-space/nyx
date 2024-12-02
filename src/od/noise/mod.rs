@@ -78,8 +78,7 @@ impl StochasticNoise {
                 sigma: 2.0e-3, // 2 m
                 ..Default::default()
             }),
-            // bias: Some(GaussMarkov::default_range_km()),
-            bias: None,
+            bias: Some(GaussMarkov::default_range_km()),
         }
     }
 
@@ -90,8 +89,19 @@ impl StochasticNoise {
                 sigma: 3e-6, // 3 mm/s
                 ..Default::default()
             }),
-            // bias: Some(GaussMarkov::default_doppler_km_s()),
-            bias: None,
+            bias: Some(GaussMarkov::default_doppler_km_s()),
+        }
+    }
+
+    /// Default stochastic process for an angle measurement (azimuth or elevation)
+    /// Using the instrument bias as the white noise value, zero constant bias.
+    pub fn default_angle_deg() -> Self {
+        Self {
+            white_noise: Some(WhiteNoise {
+                sigma: 1.0e-2, // 0.01 deg
+                ..Default::default()
+            }),
+            bias: Some(GaussMarkov::default_range_km()),
         }
     }
 

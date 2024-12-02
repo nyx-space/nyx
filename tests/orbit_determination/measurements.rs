@@ -358,5 +358,7 @@ fn verif_sensitivity_mat(almanac: Arc<Almanac>) {
             "{msr_type:?} error = {sensitivity_error:.3e} {}",
             msr_type.unit()
         );
+
+        assert!(sensitivity_error.abs() < 1e-3);
     }
 }

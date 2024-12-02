@@ -141,15 +141,26 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
         let delta_v = receiver.velocity_km_s - transmitter.velocity_km_s;
 
         // SEZ DCM is topo to fixed
-        let sez_dcm = transmitter
-            .dcm_from_topocentric_to_body_fixed(100000)
-            .unwrap();
+        // let sez_dcm = transmitter
+        //     .dcm_from_topocentric_to_body_fixed(100000)
+        //     .unwrap();
         // .context(EphemerisPhysicsSnafu { action: "" })
         // .context(EphemerisSnafu {
         //     action: "computing SEZ DCM for AER",
         // })?;
 
-        let tx_sez = (sez_dcm.transpose() * transmitter).unwrap();
+        // let tx_sez = (sez_dcm.transpose() * transmitter).unwrap();
+        // let rx_sez = (sez_dcm.transpose() * rx.orbit).unwrap();
+
+        /*
+                    Range error = 1.265e-5 km
+        Doppler error = 2.800e-8 km/s
+        Elevation error = 7.491e-4 deg
+        Azimuth error = -5.718e-4 deg */
+
+        // let delta_r = rx_sez.radius_km - tx_sez.radius_km;
+        // let delta_v = rx_sez.velocity_km_s - tx_sez.velocity_km_s;
+
         // .context(EphemerisPhysicsSnafu { action: "" })
         // .context(EphemerisSnafu {
         //     action: "transforming transmitter to SEZ",
@@ -206,16 +217,19 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
                 })
             }
             MeasurementType::Azimuth => {
-                let denom = tx_sez.radius_km.x.powi(2) + tx_sez.radius_km.y.powi(2);
-                let m11 = -tx_sez.radius_km.y / denom;
-                let m12 = tx_sez.radius_km.x / denom;
+                // let denom = tx_sez.radius_km.x.powi(2) + tx_sez.radius_km.y.powi(2);
+                // let m11 = -tx_sez.radius_km.y / denom;
+                // let m12 = tx_sez.radius_km.x / denom;
+                let denom = delta_r.x.powi(2) + delta_r.y.powi(2);
+                let m11 = -delta_r.y / denom;
+                let m12 = delta_r.x / denom;
                 let m13 = 0.0;
 
                 // Build the sensitivity matrix in the transmitter frame and rotate back into the inertial frame.
 
                 let effective_sensitivity_row =
-                    OMatrix::<f64, U1, Const<6>>::from_row_slice(&[m11, m12, m13, 0.0, 0.0, 0.0])
-                        * sez_dcm.state_dcm();
+                    OMatrix::<f64, U1, Const<6>>::from_row_slice(&[m11, m12, m13, 0.0, 0.0, 0.0]);
+                // * sez_dcm.state_dcm();
 
                 let mut sensitivity_row = OMatrix::<f64, U1, <Spacecraft as State>::Size>::zeros();
                 for (i, val) in effective_sensitivity_row.iter().copied().enumerate() {
@@ -229,18 +243,20 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
                 })
             }
             MeasurementType::Elevation => {
-                let r2 = tx_sez.radius_km.norm().powi(2);
-                let z2 = tx_sez.radius_km.z.powi(2);
+                // let r2 = tx_sez.radius_km.norm().powi(2);
+                // let z2 = tx_sez.radius_km.z.powi(2);
+                let r2 = delta_r.norm().powi(2);
+                let z2 = delta_r.z.powi(2);
 
                 // Build the sensitivity matrix in the transmitter frame and rotate back into the inertial frame.
 
-                let m11 = -(tx_sez.radius_km.x * tx_sez.radius_km.z) / (r2 * (r2 - z2).sqrt());
-                let m12 = -(tx_sez.radius_km.y * tx_sez.radius_km.z) / (r2 * (r2 - z2).sqrt());
-                let m13 = (tx_sez.radius_km.x.powi(2) + tx_sez.radius_km.y.powi(2)).sqrt() / r2;
+                let m11 = -(delta_r.x * delta_r.z) / (r2 * (r2 - z2).sqrt());
+                let m12 = -(delta_r.y * delta_r.z) / (r2 * (r2 - z2).sqrt());
+                let m13 = (delta_r.x.powi(2) + delta_r.y.powi(2)).sqrt() / r2;
 
                 let effective_sensitivity_row =
-                    OMatrix::<f64, U1, Const<6>>::from_row_slice(&[m11, m12, m13, 0.0, 0.0, 0.0])
-                        * sez_dcm.state_dcm();
+                    OMatrix::<f64, U1, Const<6>>::from_row_slice(&[m11, m12, m13, 0.0, 0.0, 0.0]);
+                // * sez_dcm.state_dcm();
 
                 let mut sensitivity_row = OMatrix::<f64, U1, <Spacecraft as State>::Size>::zeros();
                 for (i, val) in effective_sensitivity_row.iter().copied().enumerate() {

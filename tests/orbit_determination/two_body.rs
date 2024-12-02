@@ -386,12 +386,22 @@ fn od_tb_val_with_arc(
     assert!(delta.vmag_km_s() < 2e-16, "Velocity error should be zero");
 }
 
+#[fixture]
+fn cfg() -> TrkConfig {
+    // Define the tracking configurations
+    TrkConfig::builder()
+        .sampling(10.seconds())
+        .scheduler(Scheduler::builder().sample_alignment(10.seconds()).build())
+        .build()
+}
+
 #[allow(clippy::identity_op)]
 #[rstest]
 fn od_tb_val_ckf_fixed_step_perfect_stations(
     almanac: Arc<Almanac>,
     sim_devices: BTreeMap<String, GroundStation>,
     proc_devices: BTreeMap<String, GroundStation>,
+    cfg: TrkConfig,
 ) {
     /*
      * This tests that the state transition matrix computation is correct with two body dynamics.
@@ -407,12 +417,6 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
      * Thereby, this serves as a validation of the orbital dynamics implementation.
      **/
     let _ = pretty_env_logger::try_init();
-
-    // Define the tracking configurations
-    let cfg = TrkConfig::builder()
-        .sampling(10.seconds())
-        .scheduler(Scheduler::builder().sample_alignment(10.seconds()).build())
-        .build();
 
     let mut configs = BTreeMap::new();
     for name in sim_devices.keys() {
@@ -450,6 +454,261 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
         env!("CARGO_MANIFEST_DIR"),
         "output_data",
         "od_tb_val_ckf_fixed_step_perfect_stations.parquet",
+    ]
+    .iter()
+    .collect();
+
+    arc.to_parquet_simple(path).unwrap();
+
+    // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
+    // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
+    // the measurements, and the same time step.
+    let initial_state_est = Spacecraft::from(initial_state).with_stm();
+    // Use the same setup as earlier
+    let prop_est = setup.with(initial_state_est, almanac.clone());
+    let covar_radius_km = 1.0e-3;
+    let covar_velocity_km_s = 1.0e-6;
+    let init_covar = SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([
+        covar_radius_km,
+        covar_radius_km,
+        covar_radius_km,
+        covar_velocity_km_s,
+        covar_velocity_km_s,
+        covar_velocity_km_s,
+        0.0,
+        0.0,
+        0.0,
+    ]));
+
+    // Define the initial orbit estimate
+    let initial_estimate = KfEstimate::from_covar(initial_state_est, init_covar);
+
+    let ckf = KF::no_snc(initial_estimate);
+
+    let mut odp = ODProcess::<_, U2, _, _, _>::ckf(prop_est, ckf, proc_devices, None, almanac);
+
+    odp.process_arc(&arc).unwrap();
+
+    let path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "output_data", "tb_ckf.parquet"]
+        .iter()
+        .collect();
+
+    odp.to_parquet(&arc, path, ExportCfg::default()).unwrap();
+
+    // Check that there are no duplicates of epochs.
+    let mut prev_epoch = odp.estimates[0].epoch();
+
+    for est in odp.estimates.iter().skip(2) {
+        let this_epoch = est.epoch();
+        assert!(
+            this_epoch > prev_epoch,
+            "Estimates not continuously going forward: {this_epoch} <= {prev_epoch}"
+        );
+        prev_epoch = this_epoch;
+    }
+
+    for (no, est) in odp.estimates.iter().enumerate() {
+        if no == 0 {
+            // Skip the first estimate which is the initial estimate provided by user
+            continue;
+        }
+        for i in 0..6 {
+            assert!(
+                est.covar[(i, i)] >= 0.0,
+                "covar diagonal element negative @ [{}, {}] = {:e} @ {}",
+                i,
+                i,
+                est.covar[(i, i)],
+                est.epoch()
+            );
+        }
+        assert!(
+            est.state_deviation().norm() < 1e-12,
+            "estimate error should be zero (perfect dynamics) ({:e})",
+            est.state_deviation().norm()
+        );
+    }
+
+    for res in odp.residuals.iter().flatten() {
+        assert!(
+            res.prefit.norm() < 1e-12,
+            "prefit should be zero (perfect dynamics) ({:e})",
+            res
+        );
+    }
+
+    for res in odp.residuals.iter().flatten() {
+        assert!(
+            res.postfit.norm() < 1e-12,
+            "postfit should be zero (perfect dynamics) ({:e})",
+            res
+        );
+    }
+
+    let est = odp.estimates.last().unwrap();
+    println!("estimate error {:.2e}", est.state_deviation().norm());
+    println!("estimate covariance {:.2e}", est.covar.diagonal().norm());
+
+    assert!(
+        est.state_deviation().norm() < 1e-12,
+        "estimate error should be zero (perfect dynamics) ({:e})",
+        est.state_deviation().norm()
+    );
+
+    assert!(
+        est.covar.diagonal().norm() < 1e-6,
+        "estimate covariance norm should be zero (perfect dynamics) ({:e})",
+        est.covar.diagonal().norm()
+    );
+
+    let delta = (est.state().orbit - final_truth.orbit).unwrap();
+    println!(
+        "RMAG error = {:.2e} m\tVMAG error = {:.3e} mm/s",
+        delta.rmag_km() * 1e3,
+        delta.vmag_km_s() * 1e6
+    );
+
+    assert!(delta.rmag_km() < 2e-16, "Position error should be zero");
+    assert!(delta.vmag_km_s() < 2e-16, "Velocity error should be zero");
+
+    // Iterate
+    odp.iterate_arc(
+        &arc,
+        IterationConf {
+            smoother: SmoothingArc::TimeGap(10.0 * Unit::Second),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    println!(
+        "N-1 one iteration: \n{}",
+        odp.estimates[odp.estimates.len() - 1]
+    );
+
+    println!(
+        "Initial state after iteration: \n{:x}",
+        odp.estimates[0].state()
+    );
+
+    // Check the final estimate
+    let est = odp.estimates.last().unwrap();
+    println!("estimate error {:.2e}", est.state_deviation().norm());
+    println!("estimate covariance {:.2e}", est.covar.diagonal().norm());
+
+    assert!(
+        est.state_deviation().norm() < 1e-12,
+        "estimate error should be zero (perfect dynamics) ({:e})",
+        est.state_deviation().norm()
+    );
+
+    // Note we accept a larger covariance diagonal here because smoothing will increase the covariance
+    assert!(
+        est.covar.diagonal().norm() < 1e-4,
+        "estimate covariance norm should be zero (perfect dynamics) ({:e})",
+        est.covar.diagonal().norm()
+    );
+
+    let delta = (est.state().orbit - final_truth.orbit).unwrap();
+    println!(
+        "RMAG error = {:.2e} m\tVMAG error = {:.3e} mm/s",
+        delta.rmag_km() * 1e3,
+        delta.vmag_km_s() * 1e6
+    );
+
+    assert!(delta.rmag_km() < 1e-9, "More than 1 micrometer error");
+    assert!(delta.vmag_km_s() < 1e-9, "More than 1 micrometer/s error");
+}
+
+#[allow(clippy::identity_op)]
+#[rstest]
+fn od_tb_val_az_el_ckf_fixed_step_perfect_stations(
+    almanac: Arc<Almanac>,
+    mut sim_devices: BTreeMap<String, GroundStation>,
+    mut proc_devices: BTreeMap<String, GroundStation>,
+    cfg: TrkConfig,
+) {
+    /*
+     * This tests that the state transition matrix computation is correct with two body dynamics.
+     *
+     * Specifically, the same dynamics are used for both the measurement generation and for the estimation.
+     * However, only the estimation generation propagates the STM. When STM propagation is enabled, the code will compute
+     * the dynamics using a hyperdual representation in 7 dimensions: 1 for the reals, 3 for the position partials,
+     * 3 for the velocity partials.
+     *
+     * Hence, if the filter state estimation is any different from the truth data, then it means that the equations of
+     * motion computed in hyperdual space differ from the ones computes in the reals.
+     *
+     * Thereby, this serves as a validation of the orbital dynamics implementation.
+     **/
+    let _ = pretty_env_logger::try_init();
+
+    for (_, dev) in sim_devices.iter_mut() {
+        dev.measurement_types.swap_remove(&MeasurementType::Range);
+        dev.measurement_types.swap_remove(&MeasurementType::Doppler);
+        dev.measurement_types.insert(MeasurementType::Azimuth);
+        dev.measurement_types.insert(MeasurementType::Elevation);
+        dev.stochastic_noises
+            .as_mut()
+            .unwrap()
+            .insert(MeasurementType::Azimuth, StochasticNoise::ZERO);
+        dev.stochastic_noises
+            .as_mut()
+            .unwrap()
+            .insert(MeasurementType::Elevation, StochasticNoise::ZERO);
+    }
+
+    for (_, dev) in proc_devices.iter_mut() {
+        dev.measurement_types.swap_remove(&MeasurementType::Range);
+        dev.measurement_types.swap_remove(&MeasurementType::Doppler);
+        dev.measurement_types.insert(MeasurementType::Azimuth);
+        dev.measurement_types.insert(MeasurementType::Elevation);
+        dev.stochastic_noises
+            .as_mut()
+            .unwrap()
+            .insert(MeasurementType::Azimuth, StochasticNoise::MIN);
+        dev.stochastic_noises
+            .as_mut()
+            .unwrap()
+            .insert(MeasurementType::Elevation, StochasticNoise::MIN);
+    }
+
+    let mut configs = BTreeMap::new();
+    for name in sim_devices.keys() {
+        configs.insert(name.clone(), cfg.clone());
+    }
+
+    let all_stations = sim_devices;
+
+    // Define the propagator information.
+    let prop_time = 1 * Unit::Day;
+    let step_size = 10.0 * Unit::Second;
+    let opts = IntegratorOptions::with_fixed_step(step_size);
+
+    // Define state information.
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+
+    // Generate the truth data on one thread.
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
+
+    let setup = Propagator::new(orbital_dyn, IntegratorMethod::RungeKutta4, opts);
+    let mut prop = setup.with(initial_state.into(), almanac.clone());
+
+    let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
+
+    // Simulate tracking data
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 0).unwrap();
+    arc_sim.build_schedule(almanac.clone()).unwrap();
+
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+
+    // And serialize to disk
+    let path: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "output_data",
+        "od_tb_val_az_el_ckf_fixed_step_perfect_stations.parquet",
     ]
     .iter()
     .collect();
