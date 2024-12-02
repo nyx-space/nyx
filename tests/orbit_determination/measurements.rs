@@ -4,7 +4,7 @@ use anise::constants::celestial_objects::{EARTH, MOON, SUN};
 use anise::constants::frames::IAU_EARTH_FRAME;
 use anise::constants::usual_planetary_constants::MEAN_EARTH_ANGULAR_VELOCITY_DEG_S;
 use indexmap::{IndexMap, IndexSet};
-use nalgebra::U2;
+use nalgebra::{Const, U2};
 use nyx::cosmic::Orbit;
 use nyx::dynamics::SpacecraftDynamics;
 use nyx::od::prelude::*;
@@ -16,6 +16,7 @@ use rand_pcg::Pcg64Mcg;
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use rstest::*;
+use sensitivity::TrackerSensitivity;
 use std::sync::Arc;
 
 #[fixture]
@@ -276,6 +277,86 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
             "range difference {:e}\t range rate difference: {:e}",
             (obs[0] - truth.range).abs(),
             (obs[1] - truth.range_rate).abs()
+        );
+    }
+}
+
+/// Verifies that the sensitivity matrix is reasonably well.
+#[allow(clippy::identity_op)]
+#[rstest]
+fn verif_sensitivity_mat(almanac: Arc<Almanac>) {
+    use self::nyx::cosmic::Orbit;
+    use self::nyx::md::prelude::*;
+    use self::nyx::od::prelude::*;
+    use std::str::FromStr;
+
+    let cislunar1 = Orbit::cartesian(
+        58643.769540,
+        -61696.435624,
+        -36178.745722,
+        2.148654,
+        -1.202489,
+        -0.714016,
+        Epoch::from_str("2022-11-16T13:35:31.0 UTC").unwrap(),
+        almanac.frame_from_uid(EARTH_J2000).unwrap(),
+    );
+
+    let cislunar_sc: Spacecraft = cislunar1.into();
+
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
+
+    let mut dss65_madrid =
+        GroundStation::dss65_madrid(0.0, StochasticNoise::ZERO, StochasticNoise::ZERO, iau_earth)
+            .with_msr_type(MeasurementType::Azimuth, StochasticNoise::ZERO)
+            .with_msr_type(MeasurementType::Elevation, StochasticNoise::ZERO);
+
+    let mut cislunar_sc_pert = cislunar_sc;
+    cislunar_sc_pert.orbit.radius_km.x += 1.0;
+    cislunar_sc_pert.orbit.radius_km.y -= 1.0;
+    cislunar_sc_pert.orbit.radius_km.z += 1.0;
+    cislunar_sc_pert.orbit.velocity_km_s.x += 1.0e-3;
+    cislunar_sc_pert.orbit.velocity_km_s.y -= 1.0e-3;
+    cislunar_sc_pert.orbit.velocity_km_s.z += 1.0e-3;
+
+    let truth_meas = dss65_madrid
+        .measure_instantaneous(cislunar_sc, None, almanac.clone())
+        .expect("successful measurement")
+        .expect("a measurement");
+
+    let pert_meas = dss65_madrid
+        .measure_instantaneous(cislunar_sc_pert, None, almanac.clone())
+        .expect("successful measurement")
+        .expect("a measurement");
+
+    for msr_type in [
+        MeasurementType::Range,
+        MeasurementType::Doppler,
+        MeasurementType::Elevation,
+        MeasurementType::Azimuth,
+    ] {
+        let mut msr_types = IndexSet::new();
+        msr_types.insert(msr_type);
+
+        let truth_obs = truth_meas.observation::<Const<1>>(&msr_types);
+
+        let pert_obs = pert_meas.observation::<Const<1>>(&msr_types);
+
+        // Given this observation, feed it to the sensitivity matrix, and we should find the original state.
+
+        let h_tilde = dss65_madrid
+            .h_tilde::<Const<1>>(&truth_meas, &msr_types, &cislunar_sc, almanac.clone())
+            .expect("sensitivity should not fail");
+
+        let delta_state = cislunar_sc.to_vector().fixed_rows::<9>(0)
+            - cislunar_sc_pert.to_vector().fixed_rows::<9>(0);
+
+        let delta_obs = h_tilde * delta_state;
+        let computed_obs = truth_obs - delta_obs;
+
+        let sensitivity_error = (pert_obs - computed_obs)[0];
+        println!(
+            "{msr_type:?} error = {sensitivity_error:.3e} {}",
+            msr_type.unit()
         );
     }
 }

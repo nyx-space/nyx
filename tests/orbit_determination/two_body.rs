@@ -527,6 +527,14 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
 
     for res in odp.residuals.iter().flatten() {
         assert!(
+            res.prefit.norm() < 1e-12,
+            "prefit should be zero (perfect dynamics) ({:e})",
+            res
+        );
+    }
+
+    for res in odp.residuals.iter().flatten() {
+        assert!(
             res.postfit.norm() < 1e-12,
             "postfit should be zero (perfect dynamics) ({:e})",
             res
