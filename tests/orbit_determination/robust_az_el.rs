@@ -251,59 +251,36 @@ fn od_robust_test_ekf_rng_dop_az_el(
     let sigma_q = 5e-10_f64.powi(2);
     let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
 
-    let kf = KF::new(initial_estimate, process_noise);
-
     let trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
 
-    let mut odp = ODProcess::<
+    // Run with all data simultaneously
+    let mut odp_simul = ODProcess::<
         SpacecraftDynamics,
         Const<4>,
         Const<3>,
         KF<Spacecraft, Const<3>, Const<4>>,
         GroundStation,
     >::ekf(
-        prop_est, kf, devices, trig, None, // Some(ResidRejectCrit::default()),
-        almanac,
+        prop_est,
+        KF::new(initial_estimate, process_noise.clone()),
+        devices.clone(),
+        trig,
+        None,
+        almanac.clone(),
     );
 
-    // let mut odp = SpacecraftODProcess::ekf(
-    //     prop_est, kf, devices, trig, None, // Some(ResidRejectCrit::default()),
-    //     almanac,
-    // );
+    odp_simul.process_arc(&arc).unwrap();
 
-    // Let's filter and iterate on the initial subset of the arc to refine the initial estimate
-    // let subset = arc.clone().filter_by_offset(..3.hours());
-    // let remaining = arc.filter_by_offset(3.hours()..);
-
-    odp.process_arc(&arc).unwrap();
-    odp.iterate_arc(&arc, IterationConf::once()).unwrap();
-
-    // Grab the comparison state, which differs from the initial state because of the integration time of the measurements.
-    let cmp_state = traj
-        .at(odp.estimates[0].state().orbit.epoch)
-        .expect("could not find comparison epoch in trajectory");
-
-    let (sm_rss_pos_km, sm_rss_vel_km_s) =
-        rss_orbit_errors(&cmp_state.orbit, &odp.estimates[0].state().orbit);
-
-    println!(
-        "Initial state error after smoothing:\t{:.3} m\t{:.3} m/s\n{}",
-        sm_rss_pos_km * 1e3,
-        sm_rss_vel_km_s * 1e3,
-        (cmp_state.orbit - odp.estimates[0].state().orbit).unwrap()
-    );
-
-    // odp.process_arc(&remaining).unwrap();
-
-    odp.to_parquet(
-        &arc,
-        path.with_file_name("ekf_rng_dpl_az_el_odp.parquet"),
-        ExportCfg::default(),
-    )
-    .unwrap();
+    odp_simul
+        .to_parquet(
+            &arc,
+            path.with_file_name("ekf_rng_dpl_az_el_odp.parquet"),
+            ExportCfg::default(),
+        )
+        .unwrap();
 
     // Check that the covariance deflated
-    let est = &odp.estimates[odp.estimates.len() - 1];
+    let est = &odp_simul.estimates[odp_simul.estimates.len() - 1];
     let final_truth_state = traj.at(est.epoch()).unwrap();
 
     println!("Estimate:\n{}", est);
@@ -338,11 +315,41 @@ fn od_robust_test_ekf_rng_dop_az_el(
     );
 
     assert!(
-        delta.rmag_km() < 0.06,
-        "Position error should be less than 50 meters"
+        delta.rmag_km() < 0.01,
+        "Position error should be less than 10 meters"
     );
     assert!(
         delta.vmag_km_s() < 2e-4,
         "Velocity error should be on centimeter level"
+    );
+
+    // We get the best results with all data simultaneously, let's rerun with then two-by-two.
+    let prop_est = estimator_setup.with(initial_state_dev.with_stm(), almanac.clone());
+    let mut odp_2by2 = SpacecraftODProcess::ekf(
+        prop_est,
+        KF::new(initial_estimate, process_noise.clone()),
+        devices,
+        trig,
+        None,
+        almanac,
+    );
+
+    odp_2by2.process_arc(&arc).unwrap();
+    let est_2by2 = &odp_2by2.estimates[odp_2by2.estimates.len() - 1];
+
+    let delta_2by2 = (est.state().orbit - est_2by2.state().orbit).unwrap();
+    println!(
+        "RMAG diff = {:.6} m\tVMAG diff = {:.6} m/s",
+        delta_2by2.rmag_km() * 1e3,
+        delta_2by2.vmag_km_s() * 1e3
+    );
+
+    assert!(
+        delta_2by2.rmag_km() < 0.1,
+        "Position error should be less than 100 meters"
+    );
+    assert!(
+        delta_2by2.vmag_km_s() < 1e-1,
+        "Velocity error should be on decimeter level"
     );
 }

@@ -24,6 +24,7 @@ use crate::linalg::DefaultAllocator;
 use crate::time::Duration;
 use crate::State;
 
+#[derive(Copy, Clone, Debug)]
 /// An EkfTrigger on the number of measurements processed and a time between measurements.
 pub struct EkfTrigger {
     pub num_msrs: usize,
