@@ -26,6 +26,7 @@ use crate::linalg::DefaultAllocator;
 use crate::time::{Duration, Unit};
 use crate::State;
 use anise::prelude::{Almanac, Frame};
+use anise::structure::planetocentric::ellipsoid::Ellipsoid;
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 use std::default::Default;
@@ -152,6 +153,12 @@ impl Event {
     /// Match the apoapasis i.e. True Anomaly == 180
     pub fn apoapsis() -> Self {
         Self::new(StateParameter::Apoapsis, 180.0)
+    }
+
+    /// Match the central body's mean equatorial radius.
+    /// This is useful for detecting when an object might impact the central body.
+    pub fn mean_surface(body: &Ellipsoid) -> Self {
+        Self::new(StateParameter::Rmag, body.mean_equatorial_radius_km())
     }
 
     /// Match a specific event in another frame, using the default epoch precision and value.
