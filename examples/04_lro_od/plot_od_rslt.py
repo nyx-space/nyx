@@ -15,7 +15,6 @@ def main(path: str):
     df = (
         df.with_columns(pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f"))
         .sort("Epoch (UTC)", descending=False)
-        .with_columns(df["Residual ratio"].fill_null(0.0).alias("Residual ratio"))
     )
 
     all_msr_types = ["Range (km)", "Doppler (km/s)", "Azimuth (deg)", "Elevation (deg)"]
@@ -40,7 +39,7 @@ def main(path: str):
             )
 
     # Convert the Polars column to a NumPy array for compatibility with scipy and Plotly
-    residual_ratio = df["Residual ratio"].to_numpy()
+    residual_ratio = df["Residual ratio"].drop_nulls().to_numpy()
 
     # Create QQ plot
     qq = stats.probplot(residual_ratio)

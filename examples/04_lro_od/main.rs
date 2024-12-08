@@ -256,7 +256,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         SNC3::from_diagonal(10 * Unit::Minute, &[1e-12, 1e-12, 1e-12]),
     );
 
-    // We'll set up the OD process to reject measurements whose residuals are mover than 4 sigmas away from what we expect.
+    // We'll set up the OD process to reject measurements whose residuals are move than 3 sigmas away from what we expect.
     let mut odp = SpacecraftODProcess::ckf(
         setup.with(initial_estimate.state().with_stm(), almanac.clone()),
         kf,

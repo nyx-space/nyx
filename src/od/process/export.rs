@@ -42,8 +42,8 @@ use std::path::{Path, PathBuf};
 
 use super::ODProcess;
 
-impl<'a, MsrSize: DimName, Accel: DimName, Trk: TrackerSensitivity<Spacecraft, Spacecraft>>
-    ODProcess<'a, SpacecraftDynamics, MsrSize, Accel, KF<Spacecraft, Accel, MsrSize>, Trk>
+impl<MsrSize: DimName, Accel: DimName, Trk: TrackerSensitivity<Spacecraft, Spacecraft>>
+    ODProcess<'_, SpacecraftDynamics, MsrSize, Accel, KF<Spacecraft, Accel, MsrSize>, Trk>
 where
     DefaultAllocator: Allocator<MsrSize>
         + Allocator<MsrSize, <Spacecraft as State>::Size>
