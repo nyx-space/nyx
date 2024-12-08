@@ -216,7 +216,7 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
         prop_est,
         kf,
         devices,
-        Some(ResidRejectCrit { num_sigmas: 3.0 }),
+        Some(ResidRejectCrit { num_sigmas: 2.0 }), // 95% to force rejections
         almanac,
     );
 
@@ -240,7 +240,7 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
         .filter(|residual| residual.rejected)
         .count();
 
-    assert!(dbg!(num_rejections) < 20, "oddly high rejections");
+    assert!(dbg!(num_rejections) < 30, "oddly high rejections");
 
     // Check that the final post-fit residual isn't too bad, and definitely much better than the prefit.
     let est = &odp.estimates.last().unwrap();

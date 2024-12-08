@@ -1,4 +1,5 @@
 import polars as pl
+from scipy import stats
 from scipy.stats import chi2
 import numpy as np
 import plotly.graph_objects as go
@@ -7,8 +8,10 @@ import plotly.express as px
 if __name__ == "__main__":
     df = pl.read_parquet("output_data/ekf_rng_dpl_az_el_odp.parquet")
 
-    df = df.with_columns(pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f")).sort(
-        "Epoch (UTC)", descending=False
+    df = (
+        df.with_columns(pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f"))
+        .sort("Epoch (UTC)", descending=False)
+        .with_columns(df["Residual ratio"].fill_null(0.0).alias("Residual ratio"))
     )
 
     all_msr_types = ["Range (km)", "Doppler (km/s)", "Azimuth (deg)", "Elevation (deg)"]
@@ -32,24 +35,81 @@ if __name__ == "__main__":
                 ]
             )
 
-    # == Residual plots ==
-    # Nyx uses the Mahalanobis distance for the residual ratios, so we test the goodness using the Chi Square distribution.
-    freedoms = msr_type_count  # Two degrees of freedoms for the range and the range rate.
-    x_chi = np.linspace(chi2.ppf(0.01, freedoms), chi2.ppf(0.99, freedoms), 100)
-    y_chi = chi2.pdf(x_chi, freedoms)
+    # Convert the Polars column to a NumPy array for compatibility with scipy and Plotly
+    residual_ratio = df["Residual ratio"].to_numpy()
 
-    # Compute the scaling factor
-    hist = np.histogram(df["Residual ratio"].fill_null(0.0), bins=50)[0]
-    max_hist = max(hist[1:])  # Ignore the bin of zeros
-    max_chi2_pdf = max(y_chi)
-    scale_factor = max_hist / max_chi2_pdf
+    # Create QQ plot
+    qq = stats.probplot(residual_ratio)
+    x_qq = np.array([qq[0][0][0], qq[0][0][-1]])
+    y_qq = np.array([qq[0][1][0], qq[0][1][-1]])
 
-    fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(x=x_chi, y=y_chi * scale_factor, mode="lines", name="Scaled Chi-Squared")
+    # Create the QQ plot figure
+    fig_qq = go.Figure()
+
+    # Add scatter points
+    fig_qq.add_trace(
+        go.Scatter(
+            x=qq[0][0],
+            y=qq[0][1],
+            mode='markers',
+            name='Sample Data',
+            marker=dict(color='blue')
+        )
     )
-    fig.add_trace(go.Histogram(x=df["Residual ratio"], nbinsx=100, name="Residual ratios"))
-    fig.show()
+
+    # Add the theoretical line
+    fig_qq.add_trace(
+        go.Scatter(
+            x=x_qq,
+            y=y_qq,
+            mode='lines',
+            name='Theoretical Normal',
+            line=dict(color='red')
+        )
+    )
+
+    # Update layout
+    fig_qq.update_layout(
+        title='Normal Q-Q Plot',
+        xaxis_title='Theoretical Quantiles',
+        yaxis_title='Sample Quantiles',
+    )
+
+    # Show QQ plot
+    fig_qq.show()
+
+    # Create histogram with normal distribution overlay
+    hist_fig = px.histogram(
+        df,
+        x="Residual ratio",
+        color="Tracker",
+        marginal="rug",
+        hover_data=df.columns,
+    )
+
+    # Calculate normal distribution parameters
+    mean = residual_ratio.mean()
+    std = residual_ratio.std()
+    x_range = np.linspace(residual_ratio.min(), residual_ratio.max(), 100)
+    y_normal = stats.norm.pdf(x_range, mean, std)
+
+    # Scale the normal distribution to match histogram height
+    max_hist_height = 100
+    scaling_factor = max_hist_height / max(y_normal)
+    y_normal_scaled = y_normal * scaling_factor
+
+    # Add normal distribution curve
+    hist_fig.add_trace(
+        go.Scatter(
+            x=x_range,
+            y=y_normal_scaled,
+            name='Normal Distribution',
+            line=dict(color='red', width=2),
+        )
+    )
+
+    # Show histogram with normal overlay
+    hist_fig.show()
 
     px.histogram(
         df,
