@@ -4,9 +4,13 @@ from scipy.stats import chi2
 import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
+import click
 
-if __name__ == "__main__":
-    df = pl.read_parquet("output_data/ekf_rng_dpl_az_el_odp.parquet")
+
+@click.command
+@click.option("-p", "--path", type=str, default="./04_lro_od_results.parquet")
+def main(path: str):
+    df = pl.read_parquet(path)
 
     df = (
         df.with_columns(pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f"))
@@ -49,67 +53,24 @@ if __name__ == "__main__":
     # Add scatter points
     fig_qq.add_trace(
         go.Scatter(
-            x=qq[0][0],
-            y=qq[0][1],
-            mode='markers',
-            name='Sample Data',
-            marker=dict(color='blue')
+            x=qq[0][0], y=qq[0][1], mode="markers", name="Residuals ratios (QQ)", marker=dict(color="blue")
         )
     )
 
     # Add the theoretical line
     fig_qq.add_trace(
-        go.Scatter(
-            x=x_qq,
-            y=y_qq,
-            mode='lines',
-            name='Theoretical Normal',
-            line=dict(color='red')
-        )
+        go.Scatter(x=x_qq, y=y_qq, mode="lines", name="Theoretical Normal", line=dict(color="red"))
     )
 
     # Update layout
     fig_qq.update_layout(
-        title='Normal Q-Q Plot',
-        xaxis_title='Theoretical Quantiles',
-        yaxis_title='Sample Quantiles',
+        title="Normal Q-Q Plot",
+        xaxis_title="Theoretical Quantiles",
+        yaxis_title="Sample Quantiles",
     )
 
     # Show QQ plot
     fig_qq.show()
-
-    # Create histogram with normal distribution overlay
-    hist_fig = px.histogram(
-        df,
-        x="Residual ratio",
-        color="Tracker",
-        marginal="rug",
-        hover_data=df.columns,
-    )
-
-    # Calculate normal distribution parameters
-    mean = residual_ratio.mean()
-    std = residual_ratio.std()
-    x_range = np.linspace(residual_ratio.min(), residual_ratio.max(), 100)
-    y_normal = stats.norm.pdf(x_range, mean, std)
-
-    # Scale the normal distribution to match histogram height
-    max_hist_height = 100
-    scaling_factor = max_hist_height / max(y_normal)
-    y_normal_scaled = y_normal * scaling_factor
-
-    # Add normal distribution curve
-    hist_fig.add_trace(
-        go.Scatter(
-            x=x_range,
-            y=y_normal_scaled,
-            name='Normal Distribution',
-            line=dict(color='red', width=2),
-        )
-    )
-
-    # Show histogram with normal overlay
-    hist_fig.show()
 
     px.histogram(
         df,
@@ -163,7 +124,6 @@ if __name__ == "__main__":
         y=["Sigma Vx (RIC) (km/s)", "Sigma Vy (RIC) (km/s)", "Sigma Vz (RIC) (km/s)"],
     ).show()
 
-    raise AssertionError("stop")
     # Load the RIC diff.
     for fname, errname in [
         ("04_lro_od_truth_error", "OD vs Flown"),
@@ -219,3 +179,7 @@ if __name__ == "__main__":
             ],
             title=f"Velocity error with {errname} ({fname})",
         ).show()
+
+
+if __name__ == "__main__":
+    main()

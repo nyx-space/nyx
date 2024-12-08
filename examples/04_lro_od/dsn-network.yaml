@@ -15,7 +15,7 @@ DSS-65 Madrid:
       white_noise:
         mean: 0.0
         sigma: 50.0e-6 # 5 cm/s
-  light_time_correction: false
+  light_time_correction: true
   latitude_deg: 40.427222
   longitude_deg: 4.250556
   height_km: 0.834939
@@ -43,7 +43,7 @@ DSS-34 Canberra:
       white_noise:
         mean: 0.0
         sigma: 50.0e-6 # 5 cm/s
-  light_time_correction: false
+  light_time_correction: true
   measurement_types:
     - range_km
     - doppler_km_s
@@ -68,7 +68,7 @@ DSS-13 Goldstone:
       white_noise:
         mean: 0.0
         sigma: 50.0e-6 # 5 cm/s
-  light_time_correction: false
+  light_time_correction: true
   measurement_types:
     - range_km
     - doppler_km_s

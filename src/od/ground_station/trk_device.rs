@@ -84,6 +84,14 @@ impl TrackingDevice<Spacecraft> for GroundStation {
                         self.name, self.elevation_mask_deg, aer_t0.elevation_deg, aer_t1.elevation_deg
                     );
                     return Ok(None);
+                } else if aer_t0.is_obstructed() || aer_t1.is_obstructed() {
+                    debug!(
+                        "{} obstruction at t0={}, t1={} -- no measurement",
+                        self.name,
+                        aer_t0.is_obstructed(),
+                        aer_t1.is_obstructed()
+                    );
+                    return Ok(None);
                 }
 
                 // Noises are computed at the midpoint of the integration time.
@@ -128,7 +136,7 @@ impl TrackingDevice<Spacecraft> for GroundStation {
                 action: "computing AER",
             })?;
 
-        if aer.elevation_deg >= self.elevation_mask_deg {
+        if aer.elevation_deg >= self.elevation_mask_deg && !aer.is_obstructed() {
             // Only update the noises if the measurement is valid.
             let noises = self.noises(rx.orbit.epoch, rng)?;
 
