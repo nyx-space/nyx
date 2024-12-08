@@ -27,10 +27,8 @@ use nalgebra::{DMatrix, DVector, SMatrix, SVector};
 use rand_distr::{Distribution, Normal};
 use snafu::ResultExt;
 
-/// A multivariate state generator for Monte Carlo analyses. Ensures that the covariance is properly applied on all provided state variables.
-pub struct MultivariateNormal
-// TODO: Rename to MultivariateNormalSpacecraft ??
-{
+/// A multivariate spacecraft state generator for Monte Carlo analyses. Ensures that the covariance is properly applied on all provided state variables.
+pub struct MvnSpacecraft {
     /// The template state
     pub template: Spacecraft,
     pub dispersions: Vec<StateDispersion>,
@@ -42,7 +40,7 @@ pub struct MultivariateNormal
     pub std_norm_distr: Normal<f64>,
 }
 
-impl MultivariateNormal {
+impl MvnSpacecraft {
     /// Creates a new mulivariate state generator from a mean and covariance on the set of state parameters.
     /// The covariance must be positive semi definite.
     ///
@@ -266,7 +264,7 @@ impl MultivariateNormal {
     }
 }
 
-impl Distribution<DispersedState<Spacecraft>> for MultivariateNormal {
+impl Distribution<DispersedState<Spacecraft>> for MvnSpacecraft {
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> DispersedState<Spacecraft> {
         // Generate the vector representing the state
         let x_rng = SVector::<f64, 9>::from_fn(|_, _| self.std_norm_distr.sample(rng));
@@ -331,7 +329,7 @@ mod multivariate_ut {
 
         // Check that we can modify the radius magnitude
         let std_dev = 1.0;
-        let generator = MultivariateNormal::new(
+        let generator = MvnSpacecraft::new(
             state,
             vec![StateDispersion::builder()
                 .param(StateParameter::Rmag)
@@ -380,7 +378,7 @@ mod multivariate_ut {
 
         let std_dev = [10.0, 10.0, 10.0, 0.2, 0.2, 0.2, 0.0, 0.0, 0.0];
 
-        let generator = MultivariateNormal::new(
+        let generator = MvnSpacecraft::new(
             Spacecraft {
                 orbit: state,
                 ..Default::default()
@@ -462,7 +460,7 @@ mod multivariate_ut {
 
         let angle_sigma_deg = 0.2;
 
-        let generator = MultivariateNormal::new(
+        let generator = MvnSpacecraft::new(
             state,
             vec![StateDispersion::zero_mean(
                 StateParameter::RAAN,
@@ -530,7 +528,7 @@ mod multivariate_ut {
         let inc_sigma_deg = 0.15;
         let angle_sigma_deg = 0.02;
 
-        let generator = MultivariateNormal::new(
+        let generator = MvnSpacecraft::new(
             state,
             vec![
                 StateDispersion::zero_mean(StateParameter::SMA, sma_sigma_km),

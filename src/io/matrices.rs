@@ -84,16 +84,16 @@ pub struct Mat6([[f64; 6]; 6]);
 
 #[test]
 fn test_serde2() {
-    use serde_yaml;
+    use serde_yml;
 
     let m_diag = Matrix2Serde {
         inner: Either::Left(Diag2([1.0, 2.0])),
     };
 
-    println!("Diag -- \n{}", serde_yaml::to_string(&m_diag).unwrap());
+    println!("Diag -- \n{}", serde_yml::to_string(&m_diag).unwrap());
     // Load from one line list
     let diag_s = "[1.0, 2.0]";
-    let diag_loaded: Matrix2Serde = serde_yaml::from_str(diag_s).unwrap();
+    let diag_loaded: Matrix2Serde = serde_yml::from_str(diag_s).unwrap();
     assert_eq!(diag_loaded, m_diag);
 
     let m_full = Matrix2Serde {
@@ -101,30 +101,30 @@ fn test_serde2() {
     };
 
     // Serialization will print this as an exhaustive list of lists.
-    println!("Full -- \n{}", serde_yaml::to_string(&m_full).unwrap());
+    println!("Full -- \n{}", serde_yml::to_string(&m_full).unwrap());
     // Load from list
     let full_mat = r#"
 - [1.0, 2.0] # Row 1
 - [1.0, 2.0] # Row 2
     "#;
 
-    let full_loaded: Matrix2Serde = serde_yaml::from_str(full_mat).unwrap();
+    let full_loaded: Matrix2Serde = serde_yml::from_str(full_mat).unwrap();
 
     assert_eq!(full_loaded, m_full);
 }
 
 #[test]
 fn test_serde6() {
-    use serde_yaml;
+    use serde_yml;
 
     let m_diag = Matrix6Serde {
         inner: Either::Left(Diag6([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])),
     };
 
-    println!("Diag -- \n{}", serde_yaml::to_string(&m_diag).unwrap());
+    println!("Diag -- \n{}", serde_yml::to_string(&m_diag).unwrap());
     // Load from one line list
     let diag_s = "[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]";
-    let diag_loaded: Matrix6Serde = serde_yaml::from_str(diag_s).unwrap();
+    let diag_loaded: Matrix6Serde = serde_yml::from_str(diag_s).unwrap();
     assert_eq!(diag_loaded, m_diag);
 
     let m_full = Matrix6Serde {
@@ -132,7 +132,7 @@ fn test_serde6() {
     };
 
     // Serialization will print this as an exhaustive list of lists.
-    println!("Full -- \n{}", serde_yaml::to_string(&m_full).unwrap());
+    println!("Full -- \n{}", serde_yml::to_string(&m_full).unwrap());
     // Load from list
     let full_mat = r#"
 - [1.0, 2.0, 3.0, 4.0, 5.0, 6.0] # Row 1
@@ -143,7 +143,7 @@ fn test_serde6() {
 - [1.0, 2.0, 3.0, 4.0, 5.0, 6.0] # Row 6
     "#;
 
-    let full_loaded: Matrix6Serde = serde_yaml::from_str(full_mat).unwrap();
+    let full_loaded: Matrix6Serde = serde_yml::from_str(full_mat).unwrap();
 
     assert_eq!(full_loaded, m_full);
 }

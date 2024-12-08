@@ -1,7 +1,6 @@
 extern crate nyx_space as nyx;
 
 use nyx::md::prelude::*;
-use nyx::md::targeter::*;
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use rstest::*;
@@ -14,7 +13,7 @@ fn almanac() -> Arc<Almanac> {
 }
 
 #[rstest]
-fn tgt_vnc_c3_decl(almanac: Arc<Almanac>) {
+fn tgt_vnc_c3_decl_cov_test(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
@@ -62,7 +61,7 @@ fn tgt_vnc_c3_decl(almanac: Arc<Almanac>) {
 }
 
 #[rstest]
-fn tgt_vnc_sma_ecc(almanac: Arc<Almanac>) {
+fn tgt_vnc_sma_ecc_cov_test(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();

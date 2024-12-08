@@ -291,7 +291,7 @@ impl GaussMarkov {
             for item in as_list.iter() {
                 // Check that the item is a dictionary
                 let next: Self =
-                    serde_yaml::from_value(pyany_to_value(item)?).context(ParseSnafu)?;
+                    serde_yml::from_value(pyany_to_value(item)?).context(ParseSnafu)?;
                 selves.push(next);
             }
             Ok(selves)
@@ -307,7 +307,7 @@ impl GaussMarkov {
                 // Try to convert the underlying data
                 match pyany_to_value(v_any) {
                     Ok(value) => {
-                        match serde_yaml::from_value(value) {
+                        match serde_yml::from_value(value) {
                             Ok(next) => selves.push(next),
                             Err(_) => {
                                 // Maybe this was to be parsed in full as a single item
@@ -412,15 +412,15 @@ mod ut_gm {
 
     #[test]
     fn serde_test() {
-        use serde_yaml;
+        use serde_yml;
         use std::env;
         use std::path::PathBuf;
 
         // Note that we set the initial bias to zero because it is not serialized.
         let gm = GaussMarkov::new(Duration::MAX, 0.1).unwrap();
-        let serialized = serde_yaml::to_string(&gm).unwrap();
+        let serialized = serde_yml::to_string(&gm).unwrap();
         println!("{serialized}");
-        let gm_deser: GaussMarkov = serde_yaml::from_str(&serialized).unwrap();
+        let gm_deser: GaussMarkov = serde_yml::from_str(&serialized).unwrap();
         assert_eq!(gm_deser, gm);
 
         let test_data: PathBuf = [

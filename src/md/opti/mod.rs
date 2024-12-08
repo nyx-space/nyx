@@ -25,9 +25,6 @@ pub mod raphson_finite_diff;
 pub mod raphson_hyperdual;
 pub mod solution;
 pub mod target_variable;
-/// Uses a Levenberg Marquardt minimizer to solve the damped least squares problem.
-// #[cfg(feature = "broken-donotuse")]
-// pub mod minimize_lm;
 pub mod targeter;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

@@ -20,7 +20,7 @@ use super::{Estimate, State};
 use crate::cosmic::AstroError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, Matrix, OMatrix, OVector};
-use crate::mc::{MultivariateNormal, StateDispersion};
+use crate::mc::{MvnSpacecraft, StateDispersion};
 use crate::md::prelude::OrbitDual;
 use crate::md::StateParameter;
 use crate::Spacecraft;
@@ -108,7 +108,7 @@ impl KfEstimate<Spacecraft> {
         dispersions: Vec<StateDispersion>,
         seed: Option<u128>,
     ) -> Result<Self, Box<dyn Error>> {
-        let generator = MultivariateNormal::new(nominal_state, dispersions)?;
+        let generator = MvnSpacecraft::new(nominal_state, dispersions)?;
 
         let mut rng = match seed {
             Some(seed) => Pcg64Mcg::new(seed),
@@ -149,12 +149,8 @@ impl KfEstimate<Spacecraft> {
     }
 
     /// Builds a multivariate random variable from this estimate's nominal state and covariance, zero mean.
-    pub fn to_random_variable(&self) -> Result<MultivariateNormal, Box<dyn Error>> {
-        MultivariateNormal::from_spacecraft_cov(
-            self.nominal_state,
-            self.covar,
-            self.state_deviation,
-        )
+    pub fn to_random_variable(&self) -> Result<MvnSpacecraft, Box<dyn Error>> {
+        MvnSpacecraft::from_spacecraft_cov(self.nominal_state, self.covar, self.state_deviation)
     }
 
     /// Returns the 1-sigma uncertainty for a given parameter, in that parameter's unit

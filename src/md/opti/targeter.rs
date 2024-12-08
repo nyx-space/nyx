@@ -48,7 +48,7 @@ pub struct Targeter<'a, const V: usize, const O: usize> {
     pub iterations: usize,
 }
 
-impl<'a, const V: usize, const O: usize> fmt::Display for Targeter<'a, V, O> {
+impl<const V: usize, const O: usize> fmt::Display for Targeter<'_, V, O> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut objmsg = String::from("");
         for obj in &self.objectives {

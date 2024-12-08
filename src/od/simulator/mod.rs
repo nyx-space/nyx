@@ -23,6 +23,6 @@ pub use arc::TrackingArcSim;
 mod scheduler;
 pub use scheduler::{Cadence, Handoff, Scheduler};
 mod trackdata;
-pub use trackdata::TrackingDeviceSim;
+pub use trackdata::TrackingDevice;
 mod trkconfig;
 pub use trkconfig::{Strand, TrkConfig};

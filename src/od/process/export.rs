@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use crate::dynamics::SpacecraftDynamics;
 use crate::io::watermark::pq_writer;
 use crate::io::{ArrowSnafu, ExportCfg, ParquetSnafu, StdIOSnafu};
 use crate::linalg::allocator::Allocator;
@@ -30,48 +31,43 @@ use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 use filter::kalman::KF;
 use hifitime::TimeScale;
+use msr::sensitivity::TrackerSensitivity;
+use msr::TrackingDataArc;
 use nalgebra::Const;
 use parquet::arrow::ArrowWriter;
 use snafu::prelude::*;
 use std::collections::HashMap;
 use std::fs::File;
-use std::ops::Add;
 use std::path::{Path, PathBuf};
 
 use super::ODProcess;
 
-impl<'a, D: Dynamics, Msr: Measurement, A: DimName>
-    ODProcess<'a, D, Msr, A, Spacecraft, KF<Spacecraft, A, Msr::MeasurementSize>>
+impl<MsrSize: DimName, Accel: DimName, Trk: TrackerSensitivity<Spacecraft, Spacecraft>>
+    ODProcess<'_, SpacecraftDynamics, MsrSize, Accel, KF<Spacecraft, Accel, MsrSize>, Trk>
 where
-    D::StateType:
-        Interpolatable + Add<OVector<f64, <Spacecraft as State>::Size>, Output = D::StateType>,
-    <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
-    DefaultAllocator: Allocator<<D::StateType as State>::Size>
-        + Allocator<Msr::MeasurementSize>
-        + Allocator<Msr::MeasurementSize, <Spacecraft as State>::Size>
-        + Allocator<Const<1>, Msr::MeasurementSize>
+    DefaultAllocator: Allocator<MsrSize>
+        + Allocator<MsrSize, <Spacecraft as State>::Size>
+        + Allocator<Const<1>, MsrSize>
         + Allocator<<Spacecraft as State>::Size>
         + Allocator<<Spacecraft as State>::Size, <Spacecraft as State>::Size>
-        + Allocator<Msr::MeasurementSize, Msr::MeasurementSize>
-        + Allocator<Msr::MeasurementSize, <D::StateType as State>::Size>
-        + Allocator<Msr::MeasurementSize, <Spacecraft as State>::Size>
-        + Allocator<<D::StateType as State>::Size, Msr::MeasurementSize>
-        + Allocator<<Spacecraft as State>::Size, Msr::MeasurementSize>
-        + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<<D::StateType as State>::VecLength>
-        + Allocator<A>
-        + Allocator<A, A>
-        + Allocator<<D::StateType as State>::Size, A>
-        + Allocator<A, <D::StateType as State>::Size>
+        + Allocator<MsrSize, MsrSize>
+        + Allocator<MsrSize, <Spacecraft as State>::Size>
+        + Allocator<<Spacecraft as State>::Size, MsrSize>
+        + Allocator<Accel>
+        + Allocator<Accel, Accel>
         + Allocator<<Spacecraft as State>::Size>
         + Allocator<<Spacecraft as State>::VecLength>
         + Allocator<<Spacecraft as State>::Size, <Spacecraft as State>::Size>
-        + Allocator<<Spacecraft as State>::Size, A>
-        + Allocator<A, <Spacecraft as State>::Size>,
-    Spacecraft: EstimateFrom<D::StateType, Msr>,
+        + Allocator<<Spacecraft as State>::Size, Accel>
+        + Allocator<Accel, <Spacecraft as State>::Size>,
 {
     /// Store the estimates and residuals in a parquet file
-    pub fn to_parquet<P: AsRef<Path>>(&self, path: P, cfg: ExportCfg) -> Result<PathBuf, ODError> {
+    pub fn to_parquet<P: AsRef<Path>>(
+        &self,
+        arc: &TrackingDataArc,
+        path: P,
+        cfg: ExportCfg,
+    ) -> Result<PathBuf, ODError> {
         ensure!(
             !self.estimates.is_empty(),
             TooFewMeasurementsSnafu {
@@ -221,25 +217,25 @@ where
 
         // Add the fields of the residuals
         let mut msr_fields = Vec::new();
-        for f in Msr::fields() {
+        for f in arc.unique_types() {
             msr_fields.push(
-                f.clone()
+                f.to_field()
                     .with_nullable(true)
-                    .with_name(format!("Prefit residual: {}", f.name())),
+                    .with_name(format!("Prefit residual: {f:?} ({})", f.unit())),
             );
         }
-        for f in Msr::fields() {
+        for f in arc.unique_types() {
             msr_fields.push(
-                f.clone()
+                f.to_field()
                     .with_nullable(true)
-                    .with_name(format!("Postfit residual: {}", f.name())),
+                    .with_name(format!("Postfit residual: {f:?} ({})", f.unit())),
             );
         }
-        for f in Msr::fields() {
+        for f in arc.unique_types() {
             msr_fields.push(
-                f.clone()
+                f.to_field()
                     .with_nullable(true)
-                    .with_name(format!("Measurement noise: {}", f.name())),
+                    .with_name(format!("Measurement noise: {f:?} ({})", f.unit())),
             );
         }
 
@@ -264,7 +260,7 @@ where
                     .end_epoch
                     .unwrap_or_else(|| self.estimates.last().unwrap().state().epoch());
 
-                let mut residuals: Vec<Option<Residual<Msr::MeasurementSize>>> =
+                let mut residuals: Vec<Option<Residual<MsrSize>>> =
                     Vec::with_capacity(self.residuals.len());
                 let mut estimates = Vec::with_capacity(self.estimates.len());
 
@@ -358,11 +354,14 @@ where
 
         // Finally, add the residuals.
         // Prefits
-        for i in 0..Msr::MeasurementSize::dim() {
+        for msr_type in arc.unique_types() {
             let mut data = Float64Builder::new();
             for resid_opt in &residuals {
                 if let Some(resid) = resid_opt {
-                    data.append_value(resid.prefit[i]);
+                    match resid.prefit(msr_type) {
+                        Some(prefit) => data.append_value(prefit),
+                        None => data.append_null(),
+                    };
                 } else {
                     data.append_null();
                 }
@@ -370,11 +369,14 @@ where
             record.push(Arc::new(data.finish()));
         }
         // Postfit
-        for i in 0..Msr::MeasurementSize::dim() {
+        for msr_type in arc.unique_types() {
             let mut data = Float64Builder::new();
             for resid_opt in &residuals {
                 if let Some(resid) = resid_opt {
-                    data.append_value(resid.postfit[i]);
+                    match resid.postfit(msr_type) {
+                        Some(postfit) => data.append_value(postfit),
+                        None => data.append_null(),
+                    };
                 } else {
                     data.append_null();
                 }
@@ -382,11 +384,14 @@ where
             record.push(Arc::new(data.finish()));
         }
         // Measurement noise
-        for i in 0..Msr::MeasurementSize::dim() {
+        for msr_type in arc.unique_types() {
             let mut data = Float64Builder::new();
             for resid_opt in &residuals {
                 if let Some(resid) = resid_opt {
-                    data.append_value(resid.tracker_msr_noise[i]);
+                    match resid.trk_noise(msr_type) {
+                        Some(noise) => data.append_value(noise),
+                        None => data.append_null(),
+                    };
                 } else {
                     data.append_null();
                 }

@@ -59,7 +59,7 @@ pub struct MultipleShooting<'a, T: MultishootNode<OT>, const VT: usize, const OT
     pub all_dvs: Vec<SVector<f64, VT>>,
 }
 
-impl<'a, T: MultishootNode<OT>, const VT: usize, const OT: usize> MultipleShooting<'a, T, VT, OT> {
+impl<T: MultishootNode<OT>, const VT: usize, const OT: usize> MultipleShooting<'_, T, VT, OT> {
     /// Solve the multiple shooting problem by finding the arrangement of nodes to minimize the cost function.
     pub fn solve(
         &mut self,
@@ -278,8 +278,8 @@ impl<'a, T: MultishootNode<OT>, const VT: usize, const OT: usize> MultipleShooti
     }
 }
 
-impl<'a, T: MultishootNode<OT>, const VT: usize, const OT: usize> fmt::Display
-    for MultipleShooting<'a, T, VT, OT>
+impl<T: MultishootNode<OT>, const VT: usize, const OT: usize> fmt::Display
+    for MultipleShooting<'_, T, VT, OT>
 {
     #[allow(clippy::or_fun_call, clippy::clone_on_copy)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

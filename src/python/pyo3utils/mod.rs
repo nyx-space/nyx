@@ -18,7 +18,7 @@
 
 use crate::io::ConfigError;
 use pyo3::types::{PyAny, PyDict, PyList};
-use serde_yaml::{Mapping, Value};
+use serde_yml::{Mapping, Value};
 
 /// Try to convert the provided PyAny into a SerDe YAML Value
 pub fn pyany_to_value(any: &PyAny) -> Result<Value, ConfigError> {

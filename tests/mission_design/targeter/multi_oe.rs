@@ -1,9 +1,7 @@
 extern crate nyx_space as nyx;
 
-// use nyx::dynamics::guidance::Mnvr;
 use nyx::dynamics::guidance::Thruster;
 use nyx::md::prelude::*;
-use nyx::md::targeter::*;
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use rstest::*;
@@ -187,7 +185,7 @@ fn conv_tgt_sma_ecc(almanac: Arc<Almanac>) {
 }
 
 #[rstest]
-fn tgt_hd_sma_ecc(almanac: Arc<Almanac>) {
+fn tgt_hd_sma_ecc_cov_test(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();

@@ -19,7 +19,7 @@
 use crate::{
     io::{MissingDataSnafu, ParquetSnafu},
     linalg::{allocator::Allocator, DefaultAllocator, OVector},
-    od::{msr::TrackingArc, Measurement},
+    od::{msr::TrackingDataArc, Measurement},
 };
 
 #[cfg(feature = "python")]

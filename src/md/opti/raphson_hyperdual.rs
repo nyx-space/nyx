@@ -30,7 +30,7 @@ use crate::utils::are_eigenvalues_stable;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
-impl<'a, const V: usize, const O: usize> Targeter<'a, V, O> {
+impl<const V: usize, const O: usize> Targeter<'_, V, O> {
     /// Differential correction using hyperdual numbers for the objectives
     #[allow(clippy::comparison_chain)]
     pub fn try_achieve_dual(

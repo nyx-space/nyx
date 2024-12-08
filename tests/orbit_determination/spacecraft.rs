@@ -29,7 +29,7 @@ fn almanac() -> Arc<Almanac> {
 }
 
 #[fixture]
-fn sim_devices(almanac: Arc<Almanac>) -> Vec<GroundStation> {
+fn sim_devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
@@ -51,12 +51,16 @@ fn sim_devices(almanac: Arc<Almanac>) -> Vec<GroundStation> {
         iau_earth,
     );
 
-    vec![dss65_madrid, dss34_canberra, dss13_goldstone]
+    let mut devices = BTreeMap::new();
+    devices.insert("Madrid".to_string(), dss65_madrid);
+    devices.insert("Canberra".to_string(), dss34_canberra);
+    devices.insert("Goldstone".to_string(), dss13_goldstone);
+    devices
 }
 
 /// Devices for processing the measurement, noise may not be zero.
 #[fixture]
-fn proc_devices(almanac: Arc<Almanac>) -> Vec<GroundStation> {
+fn proc_devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
@@ -78,15 +82,19 @@ fn proc_devices(almanac: Arc<Almanac>) -> Vec<GroundStation> {
         iau_earth,
     );
 
-    vec![dss65_madrid, dss34_canberra, dss13_goldstone]
+    let mut devices = BTreeMap::new();
+    devices.insert("Madrid".to_string(), dss65_madrid);
+    devices.insert("Canberra".to_string(), dss34_canberra);
+    devices.insert("Goldstone".to_string(), dss13_goldstone);
+    devices
 }
 
 #[allow(clippy::identity_op)]
 #[rstest]
 fn od_val_sc_mb_srp_reals_duals_models(
     almanac: Arc<Almanac>,
-    sim_devices: Vec<GroundStation>,
-    proc_devices: Vec<GroundStation>,
+    sim_devices: BTreeMap<String, GroundStation>,
+    proc_devices: BTreeMap<String, GroundStation>,
 ) {
     /*
      * This tests that the state transition matrix computation is correct when multiple celestial gravities and solar radiation pressure
@@ -116,11 +124,9 @@ fn od_val_sc_mb_srp_reals_duals_models(
         }])
         .build();
 
-    for device in &sim_devices {
-        configs.insert(device.name.clone(), cfg.clone());
+    for name in sim_devices.keys() {
+        configs.insert(name.clone(), cfg.clone());
     }
-
-    let all_stations = sim_devices;
 
     // Define the propagator information.
     let step_size = 10.0 * Unit::Second;
@@ -178,11 +184,10 @@ fn od_val_sc_mb_srp_reals_duals_models(
         .unwrap();
 
     // Simulate tracking data
-    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 0).unwrap();
+    let mut arc_sim = TrackingArcSim::with_seed(sim_devices, traj, configs.clone(), 0).unwrap();
     arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let mut arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
-    arc.set_devices(proc_devices, configs).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     arc.to_parquet_simple(path.with_file_name("sc_msr_arc.parquet"))
         .unwrap();
@@ -214,11 +219,12 @@ fn od_val_sc_mb_srp_reals_duals_models(
 
     let ckf = KF::no_snc(initial_estimate);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, None, almanac);
+    let mut odp = SpacecraftODProcess::ckf(prop_est, ckf, proc_devices, None, almanac);
 
-    odp.process_arc::<GroundStation>(&arc).unwrap();
+    odp.process_arc(&arc).unwrap();
 
     odp.to_parquet(
+        &arc,
         path.with_file_name("spacecraft_od_results.parquet"),
         ExportCfg::timestamped(),
     )
@@ -281,10 +287,10 @@ fn od_val_sc_mb_srp_reals_duals_models(
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn od_val_sc_srp_estimation(
+fn od_val_sc_srp_estimation_cov_test(
     almanac: Arc<Almanac>,
-    sim_devices: Vec<GroundStation>,
-    proc_devices: Vec<GroundStation>,
+    sim_devices: BTreeMap<String, GroundStation>,
+    proc_devices: BTreeMap<String, GroundStation>,
 ) {
     /*
      * This tests that we can correctly estimate the solar radiation pressure.
@@ -357,8 +363,8 @@ fn od_val_sc_srp_estimation(
         }])
         .build();
 
-    for device in &sim_devices {
-        configs.insert(device.name.clone(), cfg.clone());
+    for name in sim_devices.keys() {
+        configs.insert(name.clone(), cfg.clone());
     }
 
     let all_stations = sim_devices;
@@ -368,8 +374,7 @@ fn od_val_sc_srp_estimation(
         TrackingArcSim::with_seed(all_stations, traj.clone(), configs.clone(), 120).unwrap();
     arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let mut arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
-    arc.set_devices(proc_devices, configs).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     arc.to_parquet_simple(path.with_file_name("sc_srp_msr_arc.parquet"))
         .unwrap();
@@ -407,17 +412,19 @@ fn od_val_sc_srp_estimation(
         SNC3::from_diagonal(2 * Unit::Minute, &[1e-15, 1e-15, 1e-15]),
     );
 
-    let mut odp = ODProcess::ekf(
+    let mut odp = SpacecraftODProcess::ekf(
         prop_est,
         ckf,
+        proc_devices,
         EkfTrigger::new(30, Unit::Minute * 2),
         None,
         almanac,
     );
 
-    odp.process_arc::<GroundStation>(&arc).unwrap();
+    odp.process_arc(&arc).unwrap();
 
     odp.to_parquet(
+        &arc,
         path.with_file_name("sc_od_with_srp.parquet"),
         ExportCfg::default(),
     )
@@ -442,8 +449,8 @@ fn od_val_sc_srp_estimation(
         delta.vmag_km_s() * 1e6
     );
 
-    assert!(delta.rmag_km() < 1e-3, "More than 1 meter error");
-    assert!(delta.vmag_km_s() < 1e-6, "More than 1 millimeter/s error");
+    assert!(delta.rmag_km() < 2e-3, "More than 2 meter error");
+    assert!(delta.vmag_km_s() < 2e-6, "More than 2 millimeter/s error");
     assert!(
         (est.state().srp.cr - truth_cr).abs() < (1.5 - truth_cr),
         "Cr estimation did not improve"

@@ -1,10 +1,7 @@
 extern crate nyx_space as nyx;
 
-use anise::constants::celestial_objects::JUPITER_BARYCENTER;
-use anise::constants::celestial_objects::MOON;
-use anise::constants::celestial_objects::SUN;
+use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SUN};
 use nyx::md::prelude::*;
-use nyx::md::targeter::*;
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use rstest::*;
@@ -573,7 +570,7 @@ fn tgt_aop_from_apo(almanac: Arc<Almanac>) {
 }
 
 #[rstest]
-fn tgt_aop_from_peri(almanac: Arc<Almanac>) {
+fn tgt_aop_from_peri_cov_test(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();

@@ -1,8 +1,6 @@
 use anise::constants::frames::{EARTH_J2000, IAU_EARTH_FRAME};
-use nyx_space::io::tracking_data::DynamicTrackingArc;
 use nyx_space::io::ConfigRepr;
 use nyx_space::md::prelude::*;
-use nyx_space::od::msr::RangeDoppler;
 use nyx_space::od::prelude::*;
 use nyx_space::od::simulator::TrackingArcSim;
 use nyx_space::od::simulator::{Cadence, Strand, TrkConfig};
@@ -47,7 +45,7 @@ fn traj(almanac: Arc<Almanac>) -> Traj<Spacecraft> {
 }
 
 #[fixture]
-fn devices() -> Vec<GroundStation> {
+fn devices() -> BTreeMap<String, GroundStation> {
     // Load the ground stations from the test data.
     let ground_station_file: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
@@ -59,11 +57,20 @@ fn devices() -> Vec<GroundStation> {
     .iter()
     .collect();
 
-    GroundStation::load_many(ground_station_file).unwrap()
+    let mut devices = BTreeMap::new();
+    for gs in GroundStation::load_many(ground_station_file).unwrap() {
+        devices.insert(gs.name.clone(), gs);
+    }
+
+    devices
 }
 
 #[rstest]
-fn trk_simple(traj: Traj<Spacecraft>, devices: Vec<GroundStation>, almanac: Arc<Almanac>) {
+fn trk_simple(
+    traj: Traj<Spacecraft>,
+    devices: BTreeMap<String, GroundStation>,
+    almanac: Arc<Almanac>,
+) {
     // Path to output data
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
@@ -104,7 +111,7 @@ fn trk_simple(traj: Traj<Spacecraft>, devices: Vec<GroundStation>, almanac: Arc<
 
     // Build the tracking arc simulation to generate a "standard measurement".
     let mut trk =
-        TrackingArcSim::<Spacecraft, RangeDoppler, _>::with_seed(devices, traj, configs, 12345)
+        TrackingArcSim::<Spacecraft, GroundStation>::with_seed(devices, traj, configs, 12345)
             .unwrap();
 
     // Test that building the schedule is deterministic
@@ -120,47 +127,6 @@ fn trk_simple(traj: Traj<Spacecraft>, devices: Vec<GroundStation>, almanac: Arc<
     trk.build_schedule(almanac.clone()).unwrap();
 
     let arc = trk.generate_measurements(almanac).unwrap();
-
-    // Test filtering by epoch
-    let start_epoch = arc.measurements[0].1.epoch() + 1.minutes();
-    for (_, msr) in arc.filter_by_epoch(start_epoch..).measurements {
-        assert!(msr.epoch() >= start_epoch);
-    }
-
-    for (_, msr) in arc.filter_by_epoch(..=start_epoch).measurements {
-        assert!(msr.epoch() <= start_epoch);
-    }
-
-    for (_, msr) in arc.filter_by_epoch(..start_epoch).measurements {
-        assert!(msr.epoch() < start_epoch);
-    }
-
-    assert_eq!(
-        arc.filter_by_epoch(start_epoch..start_epoch)
-            .measurements
-            .len(),
-        0
-    );
-
-    // Test filtering by duration offset
-    for (_, msr) in arc.filter_by_offset(1.minutes()..).measurements {
-        assert!(msr.epoch() >= start_epoch);
-    }
-
-    for (_, msr) in arc.filter_by_offset(..=1.minutes()).measurements {
-        assert!(msr.epoch() <= start_epoch);
-    }
-
-    for (_, msr) in arc.filter_by_offset(..1.minutes()).measurements {
-        assert!(msr.epoch() < start_epoch);
-    }
-
-    assert_eq!(
-        arc.filter_by_offset(1.minutes()..1.minutes())
-            .measurements
-            .len(),
-        0
-    );
 
     // Regression
     assert_eq!(arc.measurements.len(), 197);
@@ -178,25 +144,20 @@ fn trk_simple(traj: Traj<Spacecraft>, devices: Vec<GroundStation>, almanac: Arc<
     println!("[{}] {arc}", output_fn.to_string_lossy());
 
     // Now read this file back in.
-    let dyn_arc = DynamicTrackingArc::from_parquet(output_fn).unwrap();
-    // And convert to the same tracking arc as earlier
-    let arc_concrete = dyn_arc.to_tracking_arc::<RangeDoppler>().unwrap();
+    let arc_concrete = TrackingDataArc::from_parquet(output_fn).unwrap();
 
     println!("{arc_concrete}");
 
     // Check that we've loaded all of the measurements
     assert_eq!(arc_concrete.measurements.len(), arc.measurements.len());
-    // Check that we find the same device names too
-    assert_eq!(arc_concrete.device_names(), arc.device_names());
-    // Check that we've copied over the device configurations as well
-    assert_eq!(arc_concrete.device_cfg, arc.device_cfg);
+    assert_eq!(arc_concrete.unique(), arc.unique());
 }
 
 /// Tests that inclusion epochs work
 #[rstest]
 fn trkconfig_zero_inclusion(
     traj: Traj<Spacecraft>,
-    devices: Vec<GroundStation>,
+    devices: BTreeMap<String, GroundStation>,
     almanac: Arc<Almanac>,
 ) {
     // Build a tracking config that should always see this vehicle.
@@ -209,10 +170,9 @@ fn trkconfig_zero_inclusion(
 
     // Build the configs map, where we only have one of the two stations configured
     let mut configs = BTreeMap::new();
-    configs.insert(devices[1].name.clone(), trkcfg_always);
+    configs.insert("Canberra".to_string(), trkcfg_always);
 
-    let mut trk =
-        TrackingArcSim::<Spacecraft, RangeDoppler, _>::new(devices, traj, configs).unwrap();
+    let mut trk = TrackingArcSim::<Spacecraft, GroundStation>::new(devices, traj, configs).unwrap();
 
     trk.build_schedule(almanac.clone()).unwrap();
 
@@ -222,7 +182,7 @@ fn trkconfig_zero_inclusion(
     assert_eq!(arc.measurements.len(), 113);
 
     assert_eq!(
-        arc.device_names().len(),
+        arc.unique_aliases().len(),
         1,
         "only one device should have measurements"
     );
@@ -230,7 +190,7 @@ fn trkconfig_zero_inclusion(
 
 /// Test invalid tracking configurations
 #[rstest]
-fn trkconfig_invalid(traj: Traj<Spacecraft>, devices: Vec<GroundStation>) {
+fn trkconfig_invalid(traj: Traj<Spacecraft>, devices: BTreeMap<String, GroundStation>) {
     // Build a tracking config where the exclusion range is less than the sampling rate
     let trkcfg = TrkConfig::builder()
         .strands(vec![Strand {
@@ -241,18 +201,18 @@ fn trkconfig_invalid(traj: Traj<Spacecraft>, devices: Vec<GroundStation>) {
 
     // Build the configs map
     let mut configs = BTreeMap::new();
-    for device in &devices {
-        configs.insert(device.name.clone(), trkcfg.clone());
+    for name in devices.keys() {
+        configs.insert(name.clone(), trkcfg.clone());
     }
 
-    assert!(TrackingArcSim::<Spacecraft, RangeDoppler, _>::new(devices, traj, configs).is_err());
+    assert!(TrackingArcSim::<Spacecraft, GroundStation>::new(devices, traj, configs).is_err());
 }
 
 /// Test a delayed start of the configuration
 #[rstest]
-fn trkconfig_delayed_start(
+fn trkconfig_delayed_start_cov_test(
     traj: Traj<Spacecraft>,
-    devices: Vec<GroundStation>,
+    mut devices: BTreeMap<String, GroundStation>,
     almanac: Arc<Almanac>,
 ) {
     let trkcfg = TrkConfig::builder()
@@ -263,14 +223,13 @@ fn trkconfig_delayed_start(
         .sampling(1.26.minutes())
         .build();
 
+    devices.remove("Canberra").unwrap();
+
     // Build the configs map with a single ground station
     let mut configs = BTreeMap::new();
+    configs.insert("Demo ground station".to_string(), trkcfg);
 
-    configs.insert(devices[0].name.clone(), trkcfg);
-
-    let mut trk =
-        TrackingArcSim::<Spacecraft, RangeDoppler, _>::new(vec![devices[0].clone()], traj, configs)
-            .unwrap();
+    let mut trk = TrackingArcSim::<Spacecraft, GroundStation>::new(devices, traj, configs).unwrap();
 
     trk.build_schedule(almanac.clone()).unwrap();
 
@@ -289,12 +248,16 @@ fn trkconfig_delayed_start(
 
 /// Test different cadences and availabilities
 #[rstest]
-fn trkconfig_cadence(traj: Traj<Spacecraft>, devices: Vec<GroundStation>, almanac: Arc<Almanac>) {
+fn trkconfig_cadence_cov_test(
+    traj: Traj<Spacecraft>,
+    devices: BTreeMap<String, GroundStation>,
+    almanac: Arc<Almanac>,
+) {
     // Build the configs map with a single ground station
     let mut configs = BTreeMap::new();
 
     configs.insert(
-        devices[0].name.clone(),
+        "Demo ground station".to_string(),
         TrkConfig::builder()
             .scheduler(
                 Scheduler::builder()
@@ -308,15 +271,14 @@ fn trkconfig_cadence(traj: Traj<Spacecraft>, devices: Vec<GroundStation>, almana
     );
 
     configs.insert(
-        devices[1].name.clone(),
+        "Canberra".to_string(),
         TrkConfig::builder()
             .sampling(26.1.seconds())
             .scheduler(Scheduler::default())
             .build(),
     );
 
-    let mut trk =
-        TrackingArcSim::<Spacecraft, RangeDoppler, _>::new(devices, traj, configs).unwrap();
+    let mut trk = TrackingArcSim::<Spacecraft, GroundStation>::new(devices, traj, configs).unwrap();
 
     trk.build_schedule(almanac.clone()).unwrap();
 
