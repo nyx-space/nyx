@@ -11,6 +11,7 @@ mod measurements;
 mod multi_body;
 mod resid_reject;
 mod robust;
+mod robust_az_el;
 mod simulator;
 mod spacecraft;
 mod trackingarc;

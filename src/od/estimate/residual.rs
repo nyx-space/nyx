@@ -18,7 +18,9 @@
 
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OVector};
+use crate::od::msr::MeasurementType;
 use hifitime::Epoch;
+use indexmap::IndexSet;
 use std::fmt;
 
 /// Stores an Estimate, as the result of a `time_update` or `measurement_update`.
@@ -44,6 +46,8 @@ where
     pub rejected: bool,
     /// Name of the tracker that caused this residual
     pub tracker: Option<String>,
+    /// Measurement types used to compute this residual (in order)
+    pub msr_types: IndexSet<MeasurementType>,
 }
 
 impl<M> Residual<M>
@@ -61,6 +65,7 @@ where
             ratio: 0.0,
             rejected: true,
             tracker: None,
+            msr_types: IndexSet::new(),
         }
     }
 
@@ -79,6 +84,7 @@ where
             tracker_msr_noise: tracker_msr_covar.map(|x| x.sqrt()),
             rejected: true,
             tracker: None,
+            msr_types: IndexSet::new(),
         }
     }
 
@@ -97,7 +103,29 @@ where
             tracker_msr_noise: tracker_msr_covar.map(|x| x.sqrt()),
             rejected: false,
             tracker: None,
+            msr_types: IndexSet::new(),
         }
+    }
+
+    /// Returns the prefit for this measurement type, if available
+    pub fn prefit(&self, msr_type: MeasurementType) -> Option<f64> {
+        self.msr_types
+            .get_index_of(&msr_type)
+            .map(|idx| self.prefit[idx])
+    }
+
+    /// Returns the postfit for this measurement type, if available
+    pub fn postfit(&self, msr_type: MeasurementType) -> Option<f64> {
+        self.msr_types
+            .get_index_of(&msr_type)
+            .map(|idx| self.postfit[idx])
+    }
+
+    /// Returns the tracker noise for this measurement type, if available
+    pub fn trk_noise(&self, msr_type: MeasurementType) -> Option<f64> {
+        self.msr_types
+            .get_index_of(&msr_type)
+            .map(|idx| self.tracker_msr_noise[idx])
     }
 }
 
@@ -109,7 +137,8 @@ where
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "Residual from {} at {}: ratio = {:.3}\nPrefit {} Postfit {}",
+            "Residual of {:?} from {} at {}: ratio = {:.3}\nPrefit {} Postfit {}",
+            self.msr_types,
             self.tracker.as_ref().unwrap_or(&"Unknown".to_string()),
             self.epoch,
             self.ratio,

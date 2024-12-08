@@ -71,7 +71,7 @@ impl TrkConfig {
     }
 
     fn __repr__(&self) -> String {
-        serde_yaml::to_string(&self).unwrap()
+        serde_yml::to_string(&self).unwrap()
     }
 
     fn __str__(&self) -> String {

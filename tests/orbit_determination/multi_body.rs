@@ -4,6 +4,7 @@ use anise::constants::celestial_objects::JUPITER_BARYCENTER;
 use anise::constants::celestial_objects::MOON;
 use anise::constants::celestial_objects::SUN;
 use anise::constants::frames::IAU_EARTH_FRAME;
+use nalgebra::U2;
 use nyx::od::simulator::TrackingArcSim;
 use nyx::od::simulator::TrkConfig;
 use nyx_space::propagators::IntegratorMethod;
@@ -26,7 +27,7 @@ fn almanac() -> Arc<Almanac> {
 }
 
 #[fixture]
-fn sim_devices(almanac: Arc<Almanac>) -> Vec<GroundStation> {
+fn sim_devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
@@ -48,12 +49,17 @@ fn sim_devices(almanac: Arc<Almanac>) -> Vec<GroundStation> {
         iau_earth,
     );
 
-    vec![dss65_madrid, dss34_canberra, dss13_goldstone]
+    let mut devices = BTreeMap::new();
+    devices.insert(dss65_madrid.name(), dss65_madrid);
+    devices.insert(dss34_canberra.name(), dss34_canberra);
+    devices.insert(dss13_goldstone.name(), dss13_goldstone);
+
+    devices
 }
 
 /// Devices for processing the measurement, noise may not be zero.
 #[fixture]
-fn proc_devices(almanac: Arc<Almanac>) -> Vec<GroundStation> {
+fn proc_devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
@@ -75,28 +81,28 @@ fn proc_devices(almanac: Arc<Almanac>) -> Vec<GroundStation> {
         iau_earth,
     );
 
-    vec![dss65_madrid, dss34_canberra, dss13_goldstone]
+    let mut devices = BTreeMap::new();
+    devices.insert(dss65_madrid.name(), dss65_madrid);
+    devices.insert(dss34_canberra.name(), dss34_canberra);
+    devices.insert(dss13_goldstone.name(), dss13_goldstone);
+
+    devices
 }
 
 #[allow(clippy::identity_op)]
 #[rstest]
 fn od_val_multi_body_ckf_perfect_stations(
     almanac: Arc<Almanac>,
-    sim_devices: Vec<GroundStation>,
-    proc_devices: Vec<GroundStation>,
+    sim_devices: BTreeMap<String, GroundStation>,
+    proc_devices: BTreeMap<String, GroundStation>,
 ) {
     let _ = pretty_env_logger::try_init();
 
     // Define the tracking configurations
     let mut configs = BTreeMap::new();
-    for device in &sim_devices {
-        configs.insert(
-            device.name.clone(),
-            TrkConfig::from_sample_rate(10.seconds()),
-        );
+    for name in sim_devices.keys() {
+        configs.insert(name.clone(), TrkConfig::from_sample_rate(10.seconds()));
     }
-
-    let all_stations = sim_devices;
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -120,11 +126,11 @@ fn od_val_multi_body_ckf_perfect_stations(
     let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
     // Simulate tracking data
-    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 0).unwrap();
+    let mut arc_sim = TrackingArcSim::with_seed(sim_devices, traj, configs.clone(), 0).unwrap();
     arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let mut arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
-    arc.set_devices(proc_devices, configs).unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    arc.to_parquet_simple("multi_body.parquet").unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -149,9 +155,9 @@ fn od_val_multi_body_ckf_perfect_stations(
 
     let ckf = KF::no_snc(initial_estimate);
 
-    let mut odp = ODProcess::<_, RangeDoppler, _, _, _>::ckf(prop_est, ckf, None, almanac);
+    let mut odp = ODProcess::<_, U2, _, _, _>::ckf(prop_est, ckf, proc_devices, None, almanac);
 
-    odp.process_arc::<GroundStation>(&arc).unwrap();
+    odp.process_arc(&arc).unwrap();
 
     let mut last_est = None;
     for (no, est) in odp.estimates.iter().enumerate() {
@@ -202,15 +208,15 @@ fn od_val_multi_body_ckf_perfect_stations(
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn multi_body_ckf_covar_map(
+fn multi_body_ckf_covar_map_cov_test(
     almanac: Arc<Almanac>,
-    sim_devices: Vec<GroundStation>,
-    proc_devices: Vec<GroundStation>,
+    mut sim_devices: BTreeMap<String, GroundStation>,
+    proc_devices: BTreeMap<String, GroundStation>,
 ) {
     // For this test, we're only enabling one station so we can check that the covariance inflates between visibility passes.
     let _ = pretty_env_logger::try_init();
 
-    let dss13_goldstone = sim_devices[2].clone();
+    let dss13_goldstone = sim_devices.get("Goldstone").unwrap();
 
     // Define the tracking configurations
     let mut configs = BTreeMap::new();
@@ -222,7 +228,9 @@ fn multi_body_ckf_covar_map(
             .build(),
     );
 
-    let all_stations = vec![dss13_goldstone];
+    // Remove all but Goldstone
+    sim_devices.remove("Canberra").unwrap();
+    sim_devices.remove("Madrid").unwrap();
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -247,12 +255,10 @@ fn multi_body_ckf_covar_map(
     let (_, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
     // Simulate tracking data
-    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 0).unwrap();
+    let mut arc_sim = TrackingArcSim::with_seed(sim_devices, traj, configs.clone(), 0).unwrap();
     arc_sim.build_schedule(almanac.clone()).unwrap();
 
-    let mut arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
-    arc.set_devices(vec![proc_devices[2].clone()], configs)
-        .unwrap();
+    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -277,9 +283,10 @@ fn multi_body_ckf_covar_map(
 
     let ckf = KF::no_snc(initial_estimate);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, None, almanac.clone());
+    let mut odp =
+        ODProcess::<_, U2, _, _, _>::ckf(prop_est, ckf, proc_devices, None, almanac.clone());
 
-    odp.process_arc::<GroundStation>(&arc).unwrap();
+    odp.process_arc(&arc).unwrap();
 
     let mut num_pred = 0_u32;
     for est in odp.estimates.iter() {

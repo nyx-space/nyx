@@ -19,11 +19,10 @@ use nyx::{
     io::{ConfigRepr, ExportCfg},
     md::prelude::{HarmonicsMem, Traj},
     od::{
-        msr::RangeDoppler,
         prelude::{TrackingArcSim, TrkConfig, KF},
-        process::{Estimate, NavSolution, ODProcess, ResidRejectCrit, SpacecraftUncertainty},
+        process::{Estimate, NavSolution, ResidRejectCrit, SpacecraftUncertainty},
         snc::SNC3,
-        GroundStation,
+        GroundStation, SpacecraftODProcess,
     },
     propagators::Propagator,
     Orbit, Spacecraft, State,
@@ -198,7 +197,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     .iter()
     .collect();
 
-    let devices = GroundStation::load_many(ground_station_file)?;
+    let devices = GroundStation::load_named(ground_station_file)?;
 
     // Typical OD software requires that you specify your own tracking schedule or you'll have overlapping measurements.
     // Nyx can build a tracking schedule for you based on the first station with access.
@@ -214,8 +213,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let configs: BTreeMap<String, TrkConfig> = TrkConfig::load_named(trkconfg_yaml)?;
 
     // Build the tracking arc simulation to generate a "standard measurement".
-    let mut trk = TrackingArcSim::<Spacecraft, RangeDoppler, _>::new(
-        devices,
+    let mut trk = TrackingArcSim::<Spacecraft, GroundStation>::new(
+        devices.clone(),
         traj_as_flown.clone(),
         configs,
     )?;
@@ -254,18 +253,19 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Increase the initial covariance to account for larger deviation.
         initial_estimate,
         // Until https://github.com/nyx-space/nyx/issues/351, we need to specify the SNC in the acceleration of the Moon J2000 frame.
-        SNC3::from_diagonal(10 * Unit::Minute, &[1e-11, 1e-11, 1e-11]),
+        SNC3::from_diagonal(10 * Unit::Minute, &[1e-12, 1e-12, 1e-12]),
     );
 
-    // We'll set up the OD process to reject measurements whose residuals are mover than 4 sigmas away from what we expect.
-    let mut odp = ODProcess::ckf(
+    // We'll set up the OD process to reject measurements whose residuals are move than 3 sigmas away from what we expect.
+    let mut odp = SpacecraftODProcess::ckf(
         setup.with(initial_estimate.state().with_stm(), almanac.clone()),
         kf,
+        devices,
         Some(ResidRejectCrit::default()),
         almanac.clone(),
     );
 
-    odp.process_arc::<GroundStation>(&arc)?;
+    odp.process_arc(&arc)?;
 
     let ric_err = traj_as_flown
         .at(odp.estimates.last().unwrap().epoch())?
@@ -275,7 +275,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("RIC Position (m): {}", ric_err.radius_km * 1e3);
     println!("RIC Velocity (m/s): {}", ric_err.velocity_km_s * 1e3);
 
-    odp.to_parquet("./04_lro_od_results.parquet", ExportCfg::default())?;
+    odp.to_parquet(&arc, "./04_lro_od_results.parquet", ExportCfg::default())?;
 
     // In our case, we have the truth trajectory from NASA.
     // So we can compute the RIC state difference between the real LRO ephem and what we've just estimated.

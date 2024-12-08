@@ -5,7 +5,6 @@ use hifitime::TimeUnits;
 use nyx::dynamics::guidance::{LocalFrame, Mnvr, Thruster};
 use nyx::linalg::Vector3;
 use nyx::md::prelude::*;
-use nyx::md::targeter::*;
 
 use crate::propagation::GMAT_EARTH_GM;
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
@@ -115,7 +114,7 @@ fn thrust_dir_rate_tgt_sma_aop_raan(almanac: Arc<Almanac>) {
 
 #[ignore]
 #[rstest]
-fn thrust_profile_tgt_sma_aop_raan(almanac: Arc<Almanac>) {
+fn thrust_profile_tgt_sma_aop_raan_cov_test(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();

@@ -154,7 +154,7 @@ fn qlaw_as_ruggiero_case_b(almanac: Arc<Almanac>) {
 }
 
 #[rstest]
-fn qlaw_as_ruggiero_case_c(almanac: Arc<Almanac>) {
+fn qlaw_as_ruggiero_case_c_cov_test(almanac: Arc<Almanac>) {
     // Source: AAS-2004-5089
 
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();

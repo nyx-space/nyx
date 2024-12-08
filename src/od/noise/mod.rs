@@ -93,6 +93,18 @@ impl StochasticNoise {
         }
     }
 
+    /// Default stochastic process for an angle measurement (azimuth or elevation)
+    /// Using the instrument bias as the white noise value, zero constant bias.
+    pub fn default_angle_deg() -> Self {
+        Self {
+            white_noise: Some(WhiteNoise {
+                sigma: 1.0e-2, // 0.01 deg
+                ..Default::default()
+            }),
+            bias: Some(GaussMarkov::default_range_km()),
+        }
+    }
+
     /// Sample these stochastics
     pub fn sample<R: Rng>(&mut self, epoch: Epoch, rng: &mut R) -> f64 {
         let mut sample = 0.0;

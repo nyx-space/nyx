@@ -8,12 +8,17 @@ elevation_mask_deg: 5.0
 latitude_deg: 2.3522
 longitude_deg: 48.8566
 height_km: 0.4
-range_noise_km:
-  bias:
-    tau: 24 h
-    process_noise: 5.0e-3 # 5 m
-doppler_noise_km_s:
-  bias:
-    tau: 24 h
-    process_noise: 50.0e-6 # 5 cm/s
+stochastic_noises:
+  range_km:
+    bias:
+      tau: 24 h
+      process_noise: 5.0e-3 # 5 m
+  doppler_km_s:
+    bias:
+      tau: 24 h
+      process_noise: 50.0e-6 # 5 cm/s
 light_time_correction: false
+measurement_types:
+    - range_km
+    - doppler_km_s
+integration_time: 1 min

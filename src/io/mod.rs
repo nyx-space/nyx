@@ -29,7 +29,7 @@ use hifitime::Duration;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer};
 use serde::{Serialize, Serializer};
-use serde_yaml::Error as YamlError;
+use serde_yml::Error as YamlError;
 use std::collections::{BTreeMap, HashMap};
 use std::convert::From;
 use std::fmt::Debug;
@@ -46,7 +46,7 @@ pub mod estimate;
 /// Handles loading of gravity models using files of NASA PDS and GMAT COF. Several gunzipped files are provided with nyx.
 pub mod gravity;
 pub mod matrices;
-pub mod tracking_data;
+// pub mod tracking_data;
 pub mod trajectory_data;
 
 use std::io;
@@ -163,7 +163,7 @@ pub enum ConfigError {
     ReadError { source: io::Error },
 
     #[snafu(display("failed to parse YAML configuration file: {source}"))]
-    ParseError { source: serde_yaml::Error },
+    ParseError { source: serde_yml::Error },
 
     #[snafu(display("of invalid configuration: {msg}"))]
     InvalidConfig { msg: String },
@@ -204,6 +204,8 @@ pub enum InputOutputError {
     ParseDhall { data: String, err: String },
     #[snafu(display("error serializing {what} to Dhall: {err}"))]
     SerializeDhall { what: String, err: String },
+    #[snafu(display("empty dataset error when (de)serializing for {action}"))]
+    EmptyDataset { action: &'static str },
 }
 
 impl PartialEq for InputOutputError {
@@ -221,7 +223,7 @@ pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {
         let file = File::open(path).context(ReadSnafu)?;
         let reader = BufReader::new(file);
 
-        serde_yaml::from_reader(reader).context(ParseSnafu)
+        serde_yml::from_reader(reader).context(ParseSnafu)
     }
 
     /// Builds a sequence of "Selves" from the provided path to a yaml
@@ -232,7 +234,7 @@ pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {
         let file = File::open(path).context(ReadSnafu)?;
         let reader = BufReader::new(file);
 
-        serde_yaml::from_reader(reader).context(ParseSnafu)
+        serde_yml::from_reader(reader).context(ParseSnafu)
     }
 
     /// Builds a map of names to "selves" from the provided path to a yaml
@@ -243,19 +245,19 @@ pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {
         let file = File::open(path).context(ReadSnafu)?;
         let reader = BufReader::new(file);
 
-        serde_yaml::from_reader(reader).context(ParseSnafu)
+        serde_yml::from_reader(reader).context(ParseSnafu)
     }
 
     /// Builds a sequence of "Selves" from the provided string of a yaml
     fn loads_many(data: &str) -> Result<Vec<Self>, ConfigError> {
         debug!("Loading YAML:\n{data}");
-        serde_yaml::from_str(data).context(ParseSnafu)
+        serde_yml::from_str(data).context(ParseSnafu)
     }
 
     /// Builds a sequence of "Selves" from the provided string of a yaml
     fn loads_named(data: &str) -> Result<BTreeMap<String, Self>, ConfigError> {
         debug!("Loading YAML:\n{data}");
-        serde_yaml::from_str(data).context(ParseSnafu)
+        serde_yml::from_str(data).context(ParseSnafu)
     }
 }
 

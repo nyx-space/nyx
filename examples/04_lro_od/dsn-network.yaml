@@ -1,24 +1,30 @@
-- name: DSS-65 Madrid
+DSS-65 Madrid:
+  name: DSS-65 Madrid
   frame:
     ephemeris_id: 399
     orientation_id: 399
     mu_km3_s2: 398600.435436096
     shape: null
   elevation_mask_deg: 5.0
-  range_noise_km:
-    white_noise:
-      mean: 0.0
-      sigma: 5.0e-3 # 5 m
-  doppler_noise_km_s:
-    white_noise:
-      mean: 0.0
-      sigma: 50.0e-6 # 5 cm/s
-  light_time_correction: false
+  stochastic_noises:
+    range_km:
+      white_noise:
+        mean: 0.0
+        sigma: 5.0e-3 # 5 m
+    doppler_km_s:
+      white_noise:
+        mean: 0.0
+        sigma: 50.0e-6 # 5 cm/s
+  light_time_correction: true
   latitude_deg: 40.427222
   longitude_deg: 4.250556
   height_km: 0.834939
+  measurement_types:
+    - range_km
+    - doppler_km_s
 
-- name: DSS-34 Canberra
+DSS-34 Canberra:
+  name: DSS-34 Canberra
   frame:
     ephemeris_id: 399
     orientation_id: 399
@@ -28,17 +34,22 @@
   longitude_deg: 148.981944
   height_km: 0.691750
   elevation_mask_deg: 5.0
-  range_noise_km:
-    white_noise:
-      mean: 0.0
-      sigma: 5.0e-3 # 5 m
-  doppler_noise_km_s:
-    white_noise:
-      mean: 0.0
-      sigma: 50.0e-6 # 5 cm/s
-  light_time_correction: false
+  stochastic_noises:
+    range_km:
+      white_noise:
+        mean: 0.0
+        sigma: 5.0e-3 # 5 m
+    doppler_km_s:
+      white_noise:
+        mean: 0.0
+        sigma: 50.0e-6 # 5 cm/s
+  light_time_correction: true
+  measurement_types:
+    - range_km
+    - doppler_km_s
 
-- name: DSS-13 Goldstone
+DSS-13 Goldstone:
+  name: DSS-13 Goldstone
   frame:
     ephemeris_id: 399
     orientation_id: 399
@@ -48,12 +59,16 @@
   longitude_deg: 243.205
   height_km: 1.071149
   elevation_mask_deg: 5.0
-  range_noise_km:
-    white_noise:
-      mean: 0.0
-      sigma: 5.0e-3 # 5 m
-  doppler_noise_km_s:
-    white_noise:
-      mean: 0.0
-      sigma: 50.0e-6 # 5 cm/s
-  light_time_correction: false
+  stochastic_noises:
+    range_km:
+      white_noise:
+        mean: 0.0
+        sigma: 5.0e-3 # 5 m
+    doppler_km_s:
+      white_noise:
+        mean: 0.0
+        sigma: 50.0e-6 # 5 cm/s
+  light_time_correction: true
+  measurement_types:
+    - range_km
+    - doppler_km_s

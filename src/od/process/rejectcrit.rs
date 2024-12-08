@@ -113,10 +113,10 @@ impl ResidRejectCrit {
 }
 
 impl Default for ResidRejectCrit {
-    /// By default, a measurement is rejected if its prefit residual is greater the 4-sigma value of the measurement noise at that time step.
-    /// This corresponds to [1 chance in in 15,787](https://en.wikipedia.org/wiki/68%E2%80%9395%E2%80%9399.7_rule).
+    /// By default, a measurement is rejected if its prefit residual is greater the 3-sigma value of the measurement noise at that time step.
+    /// This corresponds to [1 chance in in 370](https://en.wikipedia.org/wiki/68%E2%80%9395%E2%80%9399.7_rule).
     fn default() -> Self {
-        Self { num_sigmas: 4.0 }
+        Self { num_sigmas: 3.0 }
     }
 }
 

@@ -39,7 +39,7 @@ fn almanac() -> Arc<Almanac> {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
+fn od_robust_test_ekf_realistic_one_way_cov_test(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
@@ -75,7 +75,9 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
     ]);
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
-    let all_stations = vec![dss65_madrid, dss34_canberra];
+    let mut devices = BTreeMap::new();
+    devices.insert("Madrid".to_string(), dss65_madrid);
+    devices.insert("Canberra".to_string(), dss34_canberra);
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -131,7 +133,7 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
         .unwrap();
 
     // Simulate tracking data
-    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
+    let mut arc_sim = TrackingArcSim::with_seed(devices.clone(), traj.clone(), configs, 0).unwrap();
     arc_sim.build_schedule(almanac.clone()).unwrap();
 
     let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
@@ -147,8 +149,13 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
 
     arc.to_parquet_simple(&path).unwrap();
 
-    // Now that we have the truth data, let"s start an OD with no noise at all and compute the estimates.
-    // We expect the estimated orbit to be _nearly_ perfect because we"ve removed SATURN_BARYCENTER from the estimated trajectory
+    println!("{arc}\n{arc:?}");
+    // Reload
+    let reloaded = TrackingDataArc::from_parquet(&path).unwrap();
+    assert_eq!(reloaded, arc);
+
+    // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
+    // We expect the estimated orbit to be _nearly_ perfect because we've removed SATURN_BARYCENTER from the estimated trajectory
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let estimator = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
     let setup = Propagator::new(estimator, IntegratorMethod::RungeKutta4, opts);
@@ -162,15 +169,14 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
 
     let trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
 
-    let mut odp = ODProcess::ekf(prop_est, kf, trig, None, almanac);
+    let mut odp = SpacecraftODProcess::ekf(prop_est, kf, devices, trig, None, almanac);
 
-    // Let"s filter and iterate on the initial subset of the arc to refine the initial estimate
-    let subset = arc.filter_by_offset(..3.hours());
+    // Let's filter and iterate on the initial subset of the arc to refine the initial estimate
+    let subset = arc.clone().filter_by_offset(..3.hours());
     let remaining = arc.filter_by_offset(3.hours()..);
 
-    odp.process_arc::<GroundStation>(&subset).unwrap();
-    odp.iterate_arc::<GroundStation>(&subset, IterationConf::once())
-        .unwrap();
+    odp.process_arc(&subset).unwrap();
+    odp.iterate_arc(&subset, IterationConf::once()).unwrap();
 
     let (sm_rss_pos_km, sm_rss_vel_km_s) =
         rss_orbit_errors(&initial_state.orbit, &odp.estimates[0].state().orbit);
@@ -182,9 +188,10 @@ fn od_robust_test_ekf_realistic_one_way(almanac: Arc<Almanac>) {
         (initial_state.orbit - odp.estimates[0].state().orbit).unwrap()
     );
 
-    odp.process_arc::<GroundStation>(&remaining).unwrap();
+    odp.process_arc(&remaining).unwrap();
 
     odp.to_parquet(
+        &remaining,
         path.with_file_name("robustness_test_one_way.parquet"),
         ExportCfg::timestamped(),
     )
@@ -280,7 +287,10 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
     ]);
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
-    let devices = vec![dss65_madrid, dss34_canberra];
+    // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
+    let mut devices = BTreeMap::new();
+    devices.insert("Madrid".to_string(), dss65_madrid);
+    devices.insert("Canberra".to_string(), dss34_canberra);
 
     // Disperse the initial state based on some orbital elements errors given from ULA Atlas 5 user guide, table 2.3.3-1 <https://www.ulalaunch.com/docs/default-source/rockets/atlasvusersguide2010a.pdf>
     // This assumes that the errors are ONE TENTH of the values given in the table. It assumes that the launch provider has provided an initial state vector, whose error is lower than the injection errors.
@@ -338,8 +348,8 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
 
     println!("{arc}");
 
-    // Now that we have the truth data, let"s start an OD with no noise at all and compute the estimates.
-    // We expect the estimated orbit to be _nearly_ perfect because we"ve removed SATURN_BARYCENTER from the estimated trajectory
+    // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
+    // We expect the estimated orbit to be _nearly_ perfect because we've removed SATURN_BARYCENTER from the estimated trajectory
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let estimator = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
     let setup = Propagator::default(estimator);
@@ -353,32 +363,18 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
 
     let trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
 
-    let mut odp = ODProcess::ekf(prop_est, kf, trig, None, almanac);
-
-    // TODO: Fix the deserialization of the measurements such that they also deserialize the integration time.
-    // Without it, we"re stuck having to rebuild them from scratch.
-    // https://github.com/nyx-space/nyx/issues/140
-
-    // Build the BTreeMap of devices from the vector using their names
-    let mut devices_map = devices
-        .into_iter()
-        .map(|dev| (dev.name.clone(), dev))
-        .collect::<BTreeMap<_, _>>();
+    let mut odp = SpacecraftODProcess::ekf(prop_est, kf, devices, trig, None, almanac);
 
     // Check that exporting an empty set returns an error.
     assert!(odp
         .to_parquet(
+            &arc,
             path.with_file_name("robustness_test_two_way.parquet"),
             ExportCfg::timestamped(),
         )
         .is_err());
 
-    odp.process(
-        &arc.measurements,
-        &mut devices_map,
-        arc.min_duration_sep().unwrap(),
-    )
-    .unwrap();
+    odp.process_arc(&arc).unwrap();
 
     let mut num_residual_none = 0;
     let mut num_residual_some = 0;
@@ -392,6 +388,7 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
     // Export as Parquet
     let timestamped_path = odp
         .to_parquet(
+            &arc,
             path.with_file_name("robustness_test_two_way.parquet"),
             ExportCfg::timestamped(),
         )

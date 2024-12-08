@@ -1,53 +1,75 @@
 import polars as pl
+from scipy import stats
 from scipy.stats import chi2
 import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
+import click
 
-if __name__ == "__main__":
-    df = pl.read_parquet("./04_lro_od_results.parquet")
 
-    df = df.with_columns(pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f")).sort(
-        "Epoch (UTC)", descending=False
-    )
-    # Add the +/- 3 sigmas on measurement noise
-    df = df.with_columns(
-        [
-            (3.0 * pl.col("Measurement noise: Range (km)")).alias(
-                "Measurement noise 3-Sigma: Range (km)"
-            ),
-            (-3.0 * pl.col("Measurement noise: Range (km)")).alias(
-                "Measurement noise -3-Sigma: Range (km)"
-            ),
-        ]
-    )
-    df = df.with_columns(
-        [
-            (3.0 * pl.col("Measurement noise: Doppler (km/s)")).alias(
-                "Measurement noise 3-Sigma: Doppler (km/s)"
-            ),
-            (-3.0 * pl.col("Measurement noise: Doppler (km/s)")).alias(
-                "Measurement noise -3-Sigma: Doppler (km/s)"
-            ),
-        ]
+@click.command
+@click.option("-p", "--path", type=str, default="./04_lro_od_results.parquet")
+def main(path: str):
+    df = pl.read_parquet(path)
+
+    df = (
+        df.with_columns(pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f"))
+        .sort("Epoch (UTC)", descending=False)
     )
 
-    # == Residual plots ==
-    # Nyx uses the Mahalanobis distance for the residual ratios, so we test the goodness using the Chi Square distribution.
-    freedoms = 2 # Two degrees of freedoms for the range and the range rate.
-    x_chi = np.linspace(chi2.ppf(0.01, freedoms), chi2.ppf(0.99, freedoms), 100)
-    y_chi = chi2.pdf(x_chi, freedoms)
+    all_msr_types = ["Range (km)", "Doppler (km/s)", "Azimuth (deg)", "Elevation (deg)"]
+    msr_type_count = 0
+    msr_types = []
 
-    # Compute the scaling factor
-    hist = np.histogram(df["Residual ratio"].fill_null(0.0), bins=50)[0]
-    max_hist = max(hist[1:]) # Ignore the bin of zeros
-    max_chi2_pdf = max(y_chi)
-    scale_factor = max_hist / max_chi2_pdf
+    for msr_type in all_msr_types:
+        if f"Measurement noise: {msr_type}" in df.columns:
+            print(f"Found data for {msr_type}")
+            msr_type_count += 1
+            msr_types += [msr_type]
+            # Add the +/- 3 sigmas on measurement noise
+            df = df.with_columns(
+                [
+                    (3.0 * pl.col(f"Measurement noise: {msr_type}")).alias(
+                        f"Measurement noise 3-Sigma: {msr_type}"
+                    ),
+                    (-3.0 * pl.col(f"Measurement noise: {msr_type}")).alias(
+                        f"Measurement noise -3-Sigma: {msr_type}"
+                    ),
+                ]
+            )
 
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=x_chi, y=y_chi * scale_factor, mode="lines", name="Scaled Chi-Squared"))
-    fig.add_trace(go.Histogram(x=df["Residual ratio"], nbinsx=100, name="Residual ratios"))
-    fig.show()
+    # Convert the Polars column to a NumPy array for compatibility with scipy and Plotly
+    residual_ratio = df["Residual ratio"].drop_nulls().to_numpy()
+
+    # Create QQ plot
+    qq = stats.probplot(residual_ratio)
+    x_qq = np.array([qq[0][0][0], qq[0][0][-1]])
+    y_qq = np.array([qq[0][1][0], qq[0][1][-1]])
+
+    # Create the QQ plot figure
+    fig_qq = go.Figure()
+
+    # Add scatter points
+    fig_qq.add_trace(
+        go.Scatter(
+            x=qq[0][0], y=qq[0][1], mode="markers", name="Residuals ratios (QQ)", marker=dict(color="blue")
+        )
+    )
+
+    # Add the theoretical line
+    fig_qq.add_trace(
+        go.Scatter(x=x_qq, y=y_qq, mode="lines", name="Theoretical Normal", line=dict(color="red"))
+    )
+
+    # Update layout
+    fig_qq.update_layout(
+        title="Normal Q-Q Plot",
+        xaxis_title="Theoretical Quantiles",
+        yaxis_title="Sample Quantiles",
+    )
+
+    # Show QQ plot
+    fig_qq.show()
 
     px.histogram(
         df,
@@ -63,7 +85,7 @@ if __name__ == "__main__":
     df_resid_ok = df.filter(df["Residual Rejected"] == False)
 
     # Plot the measurement residuals and their noises.
-    for msr in ["Range (km)", "Doppler (km/s)"]:
+    for msr in msr_types:
         y_cols = [
             f"{col}: {msr}"
             for col in [
@@ -86,6 +108,8 @@ if __name__ == "__main__":
             connectgaps=True,
             line=dict(dash="dash", color="black"),
         )
+        unit = msr.split()[-1][1:-1]
+        fig.update_layout(yaxis_title=unit)
         fig.show()
 
     # Plot the RIC uncertainty
@@ -154,3 +178,7 @@ if __name__ == "__main__":
             ],
             title=f"Velocity error with {errname} ({fname})",
         ).show()
+
+
+if __name__ == "__main__":
+    main()

@@ -18,7 +18,7 @@ use nyx::{
         Harmonics, OrbitalDynamics, SolarPressure, SpacecraftDynamics,
     },
     io::{gravity::HarmonicsMem, ExportCfg},
-    mc::{MonteCarlo, MultivariateNormal, StateDispersion},
+    mc::{MonteCarlo, MvnSpacecraft, StateDispersion},
     md::{prelude::Objective, StateParameter},
     propagators::{ErrorControl, IntegratorOptions, Propagator},
     Spacecraft, State,
@@ -88,7 +88,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Let's start by defining the dispersion.
     // The MultivariateNormal structure allows us to define the dispersions in any of the orbital parameters, but these are applied directly in the Cartesian state space.
     // Note that additional validation on the MVN is in progress -- https://github.com/nyx-space/nyx/issues/339.
-    let mc_rv = MultivariateNormal::new(
+    let mc_rv = MvnSpacecraft::new(
         sc,
         vec![StateDispersion::zero_mean(StateParameter::SMA, 3.0)],
     )?;

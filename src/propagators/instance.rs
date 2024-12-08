@@ -60,7 +60,7 @@ where
     pub(crate) k: Vec<OVector<f64, <D::StateType as State>::VecLength>>,
 }
 
-impl<'a, D: Dynamics> PropInstance<'a, D>
+impl<D: Dynamics> PropInstance<'_, D>
 where
     DefaultAllocator: Allocator<<D::StateType as State>::Size>
         + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
