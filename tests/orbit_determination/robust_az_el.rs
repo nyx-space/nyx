@@ -3,6 +3,7 @@ extern crate pretty_env_logger;
 
 use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SATURN_BARYCENTER, SUN};
 use anise::constants::frames::IAU_EARTH_FRAME;
+use indexmap::IndexSet;
 use nalgebra::Const;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::OrbitalDynamics;
@@ -35,7 +36,7 @@ fn almanac() -> Arc<Almanac> {
 fn devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
     let elevation_mask = 10.0;
-    let integration_time = None; //Some(60 * Unit::Second);
+    let integration_time = Some(60 * Unit::Second);
 
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
@@ -69,26 +70,9 @@ fn devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
     )
     .with_integration_time(integration_time);
 
-    let dss13_goldstone = GroundStation::dss13_goldstone(
-        elevation_mask,
-        StochasticNoise::default_range_km(),
-        StochasticNoise::default_doppler_km_s(),
-        iau_earth,
-    )
-    .with_msr_type(
-        MeasurementType::Azimuth,
-        StochasticNoise::default_angle_deg(),
-    )
-    .with_msr_type(
-        MeasurementType::Elevation,
-        StochasticNoise::default_angle_deg(),
-    )
-    .with_integration_time(integration_time);
-
     let mut devices = BTreeMap::new();
     devices.insert(dss65_madrid.name(), dss65_madrid);
     devices.insert(dss34_canberra.name(), dss34_canberra);
-    devices.insert(dss13_goldstone.name(), dss13_goldstone);
 
     devices
 }
@@ -152,14 +136,107 @@ fn estimator_setup() -> Propagator<SpacecraftDynamics> {
     Propagator::new(estimator, IntegratorMethod::DormandPrince78, opts)
 }
 
+#[rstest]
+fn od_robust_all_msr_types(
+    almanac: Arc<Almanac>,
+    devices: BTreeMap<String, GroundStation>,
+    initial_state: Spacecraft,
+    initial_estimate: KfEstimate<Spacecraft>,
+    truth_setup: Propagator<SpacecraftDynamics>,
+    estimator_setup: Propagator<SpacecraftDynamics>,
+) {
+    od_robust_test_ekf_rng_dop_az_el(
+        almanac,
+        devices,
+        initial_state,
+        initial_estimate,
+        truth_setup,
+        estimator_setup,
+    )
+}
+
+#[rstest]
+fn od_robust_rng_dpl_only(
+    almanac: Arc<Almanac>,
+    mut devices: BTreeMap<String, GroundStation>,
+    initial_state: Spacecraft,
+    initial_estimate: KfEstimate<Spacecraft>,
+    truth_setup: Propagator<SpacecraftDynamics>,
+    estimator_setup: Propagator<SpacecraftDynamics>,
+) {
+    // Drop azimuth and elevation.
+    for (name, gs) in devices.clone() {
+        devices.insert(
+            name,
+            gs.without_msr_type(MeasurementType::Azimuth)
+                .without_msr_type(MeasurementType::Elevation),
+        );
+    }
+
+    // Increase the noises to avoid rejections
+    for gs in devices.values_mut() {
+        let noises = gs.stochastic_noises.as_mut().unwrap();
+        for noise in noises.values_mut() {
+            noise.white_noise.as_mut().unwrap().mean *= 3.0;
+        }
+    }
+
+    od_robust_test_ekf_rng_dop_az_el(
+        almanac,
+        devices,
+        initial_state,
+        initial_estimate,
+        truth_setup,
+        estimator_setup,
+    )
+}
+
+#[rstest]
+fn od_robust_az_rng_then_el_dpl(
+    almanac: Arc<Almanac>,
+    mut devices: BTreeMap<String, GroundStation>,
+    initial_state: Spacecraft,
+    initial_estimate: KfEstimate<Spacecraft>,
+    truth_setup: Propagator<SpacecraftDynamics>,
+    estimator_setup: Propagator<SpacecraftDynamics>,
+) {
+    let mut processing_order = IndexSet::new();
+
+    processing_order.insert(MeasurementType::Azimuth);
+    processing_order.insert(MeasurementType::Range);
+    processing_order.insert(MeasurementType::Elevation);
+    processing_order.insert(MeasurementType::Doppler);
+
+    // Drop azimuth and elevation.
+    for (name, mut gs) in devices.clone() {
+        gs.measurement_types = processing_order.clone();
+        devices.insert(name, gs);
+    }
+
+    // Increase the noises to avoid rejections
+    for gs in devices.values_mut() {
+        let noises = gs.stochastic_noises.as_mut().unwrap();
+        for noise in noises.values_mut() {
+            noise.white_noise.as_mut().unwrap().mean *= 3.0;
+        }
+    }
+
+    od_robust_test_ekf_rng_dop_az_el(
+        almanac,
+        devices,
+        initial_state,
+        initial_estimate,
+        truth_setup,
+        estimator_setup,
+    )
+}
+
 /*
  * These tests check that if we start with a state deviation in the estimate, the filter will eventually converge back.
- * These tests do NOT check that the filter will converge if the initial state in the propagator has that state deviation.
- * The latter would require iteration and smoothing before playing with an EKF. This will be handled in a subsequent version.
 **/
 
+/// Generic test function used by all of the tests above.
 #[allow(clippy::identity_op)]
-#[rstest]
 fn od_robust_test_ekf_rng_dop_az_el(
     almanac: Arc<Almanac>,
     devices: BTreeMap<String, GroundStation>,
@@ -170,37 +247,16 @@ fn od_robust_test_ekf_rng_dop_az_el(
 ) {
     let _ = pretty_env_logger::try_init();
 
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
     // Define the ground stations.
     let ekf_num_meas = 10;
     // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 3 * Unit::Minute;
-    let elevation_mask = 0.0;
-
-    let dss65_madrid = GroundStation::dss65_madrid(
-        elevation_mask,
-        StochasticNoise::default_range_km(),
-        StochasticNoise::default_doppler_km_s(),
-        iau_earth,
-    );
-    let dss34_canberra = GroundStation::dss34_canberra(
-        elevation_mask,
-        StochasticNoise::default_range_km(),
-        StochasticNoise::default_doppler_km_s(),
-        iau_earth,
-    );
+    let ekf_disable_time = 30 * Unit::Minute;
 
     // Define the tracking configurations
-    let configs = BTreeMap::from([
-        (
-            dss65_madrid.name.clone(),
-            TrkConfig::from_sample_rate(60.seconds()),
-        ),
-        (
-            dss34_canberra.name.clone(),
-            TrkConfig::from_sample_rate(60.seconds()),
-        ),
-    ]);
+    let mut configs = BTreeMap::new();
+    for name in devices.keys() {
+        configs.insert(name.clone(), TrkConfig::from_sample_rate(60.seconds()));
+    }
 
     // Define the propagator information.
     let prop_time = 1.1 * initial_state.orbit.period().unwrap();
@@ -265,7 +321,7 @@ fn od_robust_test_ekf_rng_dop_az_el(
         KF::new(initial_estimate, process_noise.clone()),
         devices.clone(),
         trig,
-        None,
+        Some(ResidRejectCrit::default()),
         almanac.clone(),
     );
 
@@ -309,23 +365,78 @@ fn od_robust_test_ekf_rng_dop_az_el(
     );
     let delta = (est.state().orbit - final_truth_state.orbit).unwrap();
     println!(
-        "RMAG error = {:.6} m\tVMAG error = {:.6} m/s",
+        "[4x4] RMAG error = {:.6} m\tVMAG error = {:.6} m/s",
+        delta.rmag_km() * 1e3,
+        delta.vmag_km_s() * 1e3
+    );
+
+    // Compute the number of measurements.
+    if arc.unique_types().len() < 4 {
+        println!(
+            "Skipping 4x4 assertions because only {} msr types",
+            arc.unique_types().len()
+        );
+    } else {
+        assert!(
+            delta.rmag_km() < 0.01,
+            "Position error should be less than 10 meters"
+        );
+        assert!(
+            delta.vmag_km_s() < 2e-4,
+            "Velocity error should be on centimeter level"
+        );
+    }
+
+    // We get the best results with all data simultaneously, let's rerun with then two-by-two.
+    let prop_est = estimator_setup.with(initial_state_dev.with_stm(), almanac.clone());
+    let mut odp_2by2 = SpacecraftODProcess::ekf(
+        prop_est,
+        KF::new(initial_estimate, process_noise.clone()),
+        devices.clone(),
+        trig,
+        None,
+        almanac.clone(),
+    );
+
+    odp_2by2.process_arc(&arc).unwrap();
+    let est_2by2 = &odp_2by2.estimates[odp_2by2.estimates.len() - 1];
+
+    let delta = (est_2by2.state().orbit - final_truth_state.orbit).unwrap();
+    println!(
+        "[2x2] RMAG error = {:.6} m\tVMAG error = {:.6} m/s",
         delta.rmag_km() * 1e3,
         delta.vmag_km_s() * 1e3
     );
 
     assert!(
-        delta.rmag_km() < 0.01,
-        "Position error should be less than 10 meters"
+        delta.rmag_km() < 0.05,
+        "Position error should be less than 50 meters"
     );
     assert!(
-        delta.vmag_km_s() < 2e-4,
-        "Velocity error should be on centimeter level"
+        delta.vmag_km_s() < 5e-4,
+        "Velocity error should be on half decimeter level"
     );
 
-    // We get the best results with all data simultaneously, let's rerun with then two-by-two.
+    if arc.unique_types().len() == 4 {
+        let delta_2by2 = (est.state().orbit - est_2by2.state().orbit).unwrap();
+        println!(
+            "RMAG diff = {:.6} m\tVMAG diff = {:.6} m/s",
+            delta_2by2.rmag_km() * 1e3,
+            delta_2by2.vmag_km_s() * 1e3
+        );
+
+        assert!(
+            delta_2by2.rmag_km() < 0.1,
+            "Position error should be less than 100 meters"
+        );
+        assert!(
+            delta_2by2.vmag_km_s() < 1e-1,
+            "Velocity error should be on decimeter level"
+        );
+    }
+    // Rerun processing measurements one by one like in ODTK
     let prop_est = estimator_setup.with(initial_state_dev.with_stm(), almanac.clone());
-    let mut odp_2by2 = SpacecraftODProcess::ekf(
+    let mut odp_1by1 = SpacecraftODProcessSeq::ekf(
         prop_est,
         KF::new(initial_estimate, process_noise.clone()),
         devices,
@@ -334,22 +445,43 @@ fn od_robust_test_ekf_rng_dop_az_el(
         almanac,
     );
 
-    odp_2by2.process_arc(&arc).unwrap();
-    let est_2by2 = &odp_2by2.estimates[odp_2by2.estimates.len() - 1];
+    odp_1by1.process_arc(&arc).unwrap();
+    let est_1by1 = &odp_1by1.estimates[odp_1by1.estimates.len() - 1];
 
-    let delta_2by2 = (est.state().orbit - est_2by2.state().orbit).unwrap();
+    let delta = (est_1by1.state().orbit - final_truth_state.orbit).unwrap();
+    println!(
+        "[1x1] RMAG error = {:.6} m\tVMAG error = {:.6} m/s",
+        delta.rmag_km() * 1e3,
+        delta.vmag_km_s() * 1e3
+    );
+
+    assert!(
+        delta.rmag_km() < 0.15,
+        "Position error should be less than 150 meters"
+    );
+    assert!(
+        delta.vmag_km_s() < 1e-3,
+        "Velocity error should be on decimeter level"
+    );
+
+    let delta_1by1 = if arc.unique_types().len() == 4 {
+        (est.state().orbit - est_1by1.state().orbit).unwrap()
+    } else {
+        (est_2by2.state().orbit - est_1by1.state().orbit).unwrap()
+    };
+
     println!(
         "RMAG diff = {:.6} m\tVMAG diff = {:.6} m/s",
-        delta_2by2.rmag_km() * 1e3,
-        delta_2by2.vmag_km_s() * 1e3
+        delta_1by1.rmag_km() * 1e3,
+        delta_1by1.vmag_km_s() * 1e3
     );
 
     assert!(
-        delta_2by2.rmag_km() < 0.1,
-        "Position error should be less than 100 meters"
+        delta_1by1.rmag_km() < 0.2,
+        "Position error should be less than 200 meters"
     );
     assert!(
-        delta_2by2.vmag_km_s() < 1e-1,
+        delta_1by1.vmag_km_s() < 1e-1,
         "Velocity error should be on decimeter level"
     );
 }

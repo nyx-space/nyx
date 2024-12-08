@@ -424,6 +424,18 @@ where
             StepSizeSnafu { step: max_step }
         );
 
+        // Check proper configuration.
+        if MsrSize::USIZE > arc.unique_types().len() {
+            error!("Filter misconfigured: expect high rejection count!");
+            error!(
+                "Arc only contains {} measurement types, but filter configured for {}.",
+                arc.unique_types().len(),
+                MsrSize::USIZE
+            );
+            error!("Filter should be configured for these numbers to match.");
+            error!("Consider running subsequent arcs if ground stations provide different measurements.")
+        }
+
         // Start by propagating the estimator.
         let num_msrs = measurements.len();
 

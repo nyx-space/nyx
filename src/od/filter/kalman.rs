@@ -276,7 +276,7 @@ where
         nominal_state: T,
         real_obs: &OVector<f64, M>,
         computed_obs: &OVector<f64, M>,
-        measurement_covar: OMatrix<f64, M, M>,
+        r_k: OMatrix<f64, M, M>,
         resid_rejection: Option<ResidRejectCrit>,
     ) -> Result<(Self::Estimate, Residual<M>), ODError> {
         if !self.h_tilde_updated {
@@ -291,8 +291,8 @@ where
 
         let h_tilde_t = &self.h_tilde.transpose();
         let h_p_ht = &self.h_tilde * covar_bar * h_tilde_t;
-        // Account for state uncertainty in the measurement noise. Equation 4.10 of ODTK MathSpec.
-        let r_k = &h_p_ht + measurement_covar;
+
+        let s_k = &h_p_ht + &r_k;
 
         // Compute observation deviation (usually marked as y_i)
         let prefit = real_obs - computed_obs;
@@ -300,33 +300,36 @@ where
         // Compute the prefit ratio for the automatic rejection.
         // The measurement covariance is the square of the measurement itself.
         // So we compute its Cholesky decomposition to return to the non squared values.
-        let r_k_chol_inv = r_k
-            .clone()
-            .cholesky()
-            .ok_or(ODError::SingularNoiseRk)?
-            .l()
-            .try_inverse()
-            .ok_or(ODError::SingularNoiseRk)?;
+        let r_k_chol = s_k.clone().cholesky().ok_or(ODError::SingularNoiseRk)?.l();
 
-        // Then we multiply the inverted r_k matrix with prefit, giving us the vector of
-        // ratios of the prefit over the r_k matrix diagonal.
-        let ratio_vec = r_k_chol_inv * &prefit;
-        // Compute the ratio as the dot product.
-        let ratio = ratio_vec.dot(&ratio_vec);
+        // Compute the ratio as the average of each component of the prefit over the square root of the measurement
+        // matrix r_k. Refer to ODTK MathSpec equation 4.10.
+        let ratio = s_k
+            .diagonal()
+            .iter()
+            .copied()
+            .enumerate()
+            .map(|(idx, r)| prefit[idx] / r.sqrt())
+            .sum::<f64>()
+            / (M::USIZE as f64);
 
         if let Some(resid_reject) = resid_rejection {
-            if ratio > resid_reject.num_sigmas {
+            if ratio.abs() > resid_reject.num_sigmas {
                 // Reject this whole measurement and perform only a time update
                 let pred_est = self.time_update(nominal_state)?;
                 return Ok((
                     pred_est,
-                    Residual::rejected(epoch, prefit, ratio, r_k.diagonal()),
+                    Residual::rejected(epoch, prefit, ratio, r_k_chol.diagonal()),
                 ));
             }
         }
 
-        // Compute the Kalman gain but first adding the measurement noise to H⋅P⋅H^T
-        let mut innovation_covar = h_p_ht + &r_k;
+        // Compute the innovation matrix (S_k) but using the previously computed s_k.
+        // This differs from the typical Kalman definition, but it allows constant inflating of the covariance.
+        // In turn, this allows the filter to not be overly optimistic. In verification tests, using the nominal
+        // Kalman formulation shows an error roughly 7 times larger with a smaller than expected covariance, despite
+        // no difference in the truth and sim.
+        let mut innovation_covar = h_p_ht + &s_k;
         if !innovation_covar.try_inverse_mut() {
             return Err(ODError::SingularKalmanGain);
         }
@@ -339,7 +342,7 @@ where
             let postfit = &prefit - (&self.h_tilde * state_hat);
             (
                 state_hat,
-                Residual::accepted(epoch, prefit, postfit, ratio, r_k.diagonal()),
+                Residual::accepted(epoch, prefit, postfit, ratio, r_k_chol.diagonal()),
             )
         } else {
             // Must do a time update first
@@ -347,7 +350,7 @@ where
             let postfit = &prefit - (&self.h_tilde * state_bar);
             (
                 state_bar + &gain * &postfit,
-                Residual::accepted(epoch, prefit, postfit, ratio, r_k.diagonal()),
+                Residual::accepted(epoch, prefit, postfit, ratio, r_k_chol.diagonal()),
             )
         };
 
@@ -355,7 +358,7 @@ where
         let first_term = OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity()
             - &gain * &self.h_tilde;
         let covar =
-            first_term * covar_bar * first_term.transpose() + &gain * &r_k * &gain.transpose();
+            first_term * covar_bar * first_term.transpose() + &gain * &s_k * &gain.transpose();
 
         // And wrap up
         let estimate = KfEstimate {
