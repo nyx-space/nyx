@@ -1,8 +1,11 @@
+import click
 import polars as pl
 import plotly.express as px
 
-if __name__ == "__main__":
-    df = pl.read_parquet("./04_lro_simulated_tracking.parquet")
+@click.command
+@click.option("-p", "--path", type=str, default="./04_lro_simulated_tracking.parquet")
+def main(path: str):
+    df = pl.read_parquet(path)
 
     df = df.with_columns(pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f")).sort(
         "Epoch (UTC)", descending=False
@@ -21,3 +24,6 @@ if __name__ == "__main__":
     # Plot each measurement kind
     for msr_col_name in ["Range (km)", "Doppler (km/s)"]:
         px.scatter(df, x="Epoch (UTC)", y=msr_col_name, color="Tracking device").show()
+
+if __name__ == "__main__":
+    main()

@@ -132,7 +132,7 @@ fn continuous_tracking(almanac: Arc<Almanac>) {
 
     println!("{arc_rtn}");
 
-    assert_eq!(arc.measurements.len(), 116);
+    assert_eq!(arc.measurements.len(), 7723);
     // Check that we've loaded all of the measurements
     assert_eq!(arc_rtn.measurements.len(), arc.measurements.len());
     assert_eq!(arc_rtn.unique(), arc.unique());
@@ -149,7 +149,7 @@ fn continuous_tracking(almanac: Arc<Almanac>) {
         .clone()
         .to_tdm_file(
             "MySpacecraft".to_string(),
-            Some(aliases),
+            Some(aliases.clone()),
             path,
             ExportCfg::default(),
         )
@@ -166,18 +166,30 @@ fn continuous_tracking(almanac: Arc<Almanac>) {
     assert_eq!(arc_tdm.unique(), arc.unique());
 
     // Test the downsampling
-    let tdm_failed_downsample = arc_tdm.clone().downsample(10.seconds());
+    let tdm_failed_downsample = arc_tdm.clone().downsample(0.1.seconds());
     assert_eq!(
         tdm_failed_downsample.len(),
         arc_tdm.len(),
         "downsampling should have failed because it's upsampling"
     );
 
-    let tdm_downsample = arc_tdm.clone().downsample(10.minutes());
-    println!("{tdm_downsample}");
+    let arc_downsample = arc_tdm.clone().downsample(10.seconds());
+    println!("{arc_downsample}");
     assert_eq!(
-        tdm_downsample.len(),
+        arc_downsample.len(),
         arc_tdm.len() / 10 + 1,
         "downsampling has wrong sample count"
     );
+
+    let path: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "output_data",
+        "simple_arc_downsampled.parquet",
+    ]
+    .iter()
+    .collect();
+
+    arc_downsample
+        .to_parquet(path, ExportCfg::default())
+        .unwrap();
 }
