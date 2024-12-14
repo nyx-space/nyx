@@ -5,6 +5,7 @@ use nyx_space::od::prelude::*;
 use nyx_space::od::simulator::TrackingArcSim;
 use nyx_space::od::simulator::TrkConfig;
 use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::env;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -78,7 +79,17 @@ fn continuous_tracking(almanac: Arc<Almanac>) {
 
     let mut devices = BTreeMap::new();
     for gs in GroundStation::load_many(ground_station_file).unwrap() {
-        devices.insert(gs.name.clone(), gs);
+        devices.insert(
+            gs.name.clone(),
+            gs.with_msr_type(
+                MeasurementType::Azimuth,
+                StochasticNoise::default_angle_deg(),
+            )
+            .with_msr_type(
+                MeasurementType::Elevation,
+                StochasticNoise::default_angle_deg(),
+            ),
+        );
     }
 
     // Load the tracking configuration from the test data.
@@ -117,12 +128,68 @@ fn continuous_tracking(almanac: Arc<Almanac>) {
     println!("[{}] {arc}", output_fn.to_string_lossy());
 
     // Now read this file back in.
-    let arc_concrete = TrackingDataArc::from_parquet(output_fn).unwrap();
+    let arc_rtn = TrackingDataArc::from_parquet(output_fn).unwrap();
 
-    println!("{arc_concrete}");
+    println!("{arc_rtn}");
 
-    assert_eq!(arc.measurements.len(), 116);
+    assert_eq!(arc.measurements.len(), 7723);
     // Check that we've loaded all of the measurements
-    assert_eq!(arc_concrete.measurements.len(), arc.measurements.len());
-    assert_eq!(arc_concrete.unique(), arc.unique());
+    assert_eq!(arc_rtn.measurements.len(), arc.measurements.len());
+    assert_eq!(arc_rtn.unique(), arc.unique());
+
+    // Serialize as TDM
+    let path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "output_data", "simple_arc.tdm"]
+        .iter()
+        .collect();
+
+    let mut aliases = HashMap::new();
+    aliases.insert("Demo Ground Station".to_string(), "Fake GS".to_string());
+
+    let output_fn = arc
+        .clone()
+        .to_tdm_file(
+            "MySpacecraft".to_string(),
+            Some(aliases.clone()),
+            path,
+            ExportCfg::default(),
+        )
+        .unwrap();
+
+    // Read back from TDM
+    let arc_tdm = TrackingDataArc::from_tdm(output_fn, None).unwrap();
+    println!("{arc_tdm}");
+
+    // Check everything but the source, since it'll be set when read from TDM.
+    assert_eq!(arc_tdm.len(), arc.len());
+    assert_eq!(arc_tdm.start_epoch(), arc.start_epoch());
+    assert_eq!(arc_tdm.end_epoch(), arc.end_epoch());
+    assert_eq!(arc_tdm.unique(), arc.unique());
+
+    // Test the downsampling
+    let tdm_failed_downsample = arc_tdm.clone().downsample(0.1.seconds());
+    assert_eq!(
+        tdm_failed_downsample.len(),
+        arc_tdm.len(),
+        "downsampling should have failed because it's upsampling"
+    );
+
+    let arc_downsample = arc_tdm.clone().downsample(10.seconds());
+    println!("{arc_downsample}");
+    assert_eq!(
+        arc_downsample.len(),
+        arc_tdm.len() / 10 + 1,
+        "downsampling has wrong sample count"
+    );
+
+    let path: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "output_data",
+        "simple_arc_downsampled.parquet",
+    ]
+    .iter()
+    .collect();
+
+    arc_downsample
+        .to_parquet(path, ExportCfg::default())
+        .unwrap();
 }

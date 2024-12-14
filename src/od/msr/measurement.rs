@@ -18,9 +18,8 @@
 
 use super::MeasurementType;
 use hifitime::Epoch;
-use indexmap::IndexSet;
+use indexmap::{IndexMap, IndexSet};
 use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, OVector};
-use std::collections::HashMap;
 use std::fmt;
 
 /// A type-agnostic simultaneous measurement storage structure. Allows storing any number of simultaneous measurement of a given taker.
@@ -31,7 +30,7 @@ pub struct Measurement {
     /// Epoch of the measurement
     pub epoch: Epoch,
     /// All measurements made simultaneously
-    pub data: HashMap<MeasurementType, f64>,
+    pub data: IndexMap<MeasurementType, f64>,
 }
 
 impl Measurement {
@@ -39,7 +38,7 @@ impl Measurement {
         Self {
             tracker,
             epoch,
-            data: HashMap::new(),
+            data: IndexMap::new(),
         }
     }
 

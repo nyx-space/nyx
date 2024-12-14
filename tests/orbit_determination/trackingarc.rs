@@ -129,7 +129,7 @@ fn trk_simple(
     let arc = trk.generate_measurements(almanac).unwrap();
 
     // Regression
-    assert_eq!(arc.measurements.len(), 197);
+    assert_eq!(arc.measurements.len(), 12803);
 
     // And serialize to disk
     let path: PathBuf = [

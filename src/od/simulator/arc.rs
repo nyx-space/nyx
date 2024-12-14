@@ -288,6 +288,9 @@ impl TrackingArcSim<Spacecraft, GroundStation> {
             if let Some(cfg) = self.configs.get(name) {
                 if let Some(scheduler) = cfg.scheduler {
                     info!("Building schedule for {name}");
+                    if scheduler.handoff == Handoff::Overlap {
+                        warn!("Overlapping measurements on {name} is no longer supported on identical epochs.");
+                    }
                     built_cfg.get_mut(name).unwrap().scheduler = None;
                     built_cfg.get_mut(name).unwrap().strands = Some(Vec::new());
 

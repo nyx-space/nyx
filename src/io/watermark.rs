@@ -60,5 +60,5 @@ pub(crate) fn pq_writer(metadata: Option<HashMap<String, String>>) -> Option<Wri
 }
 
 pub(crate) fn prj_name_ver() -> String {
-    format!("Nyx v{}", build::PKG_VERSION)
+    format!("Nyx Space v{}", build::PKG_VERSION)
 }
