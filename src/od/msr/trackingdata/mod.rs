@@ -18,8 +18,8 @@
 use super::{measurement::Measurement, MeasurementType};
 use core::fmt;
 use hifitime::prelude::{Duration, Epoch};
-use indexmap::IndexSet;
-use std::collections::{BTreeMap, HashMap};
+use indexmap::{IndexMap, IndexSet};
+use std::collections::BTreeMap;
 use std::ops::Bound::{Excluded, Included, Unbounded};
 use std::ops::RangeBounds;
 
@@ -207,7 +207,7 @@ impl TrackingDataArc {
             let mut filtered_measurement = Measurement {
                 tracker: window[0].1.tracker.clone(),
                 epoch: **epoch,
-                data: HashMap::new(),
+                data: IndexMap::new(),
             };
 
             // Apply moving average filter for each measurement type

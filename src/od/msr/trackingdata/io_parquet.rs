@@ -29,6 +29,7 @@ use arrow::{
 };
 use hifitime::prelude::Epoch;
 use hifitime::TimeScale;
+use indexmap::IndexMap;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::arrow::ArrowWriter;
 use snafu::{ensure, ResultExt};
@@ -177,7 +178,7 @@ impl TrackingDataArc {
                 let mut measurement = Measurement {
                     epoch,
                     tracker: tracking_device.value(i).to_string(),
-                    data: HashMap::new(),
+                    data: IndexMap::new(),
                 };
 
                 if range_avail {

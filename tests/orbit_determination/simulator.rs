@@ -79,7 +79,17 @@ fn continuous_tracking(almanac: Arc<Almanac>) {
 
     let mut devices = BTreeMap::new();
     for gs in GroundStation::load_many(ground_station_file).unwrap() {
-        devices.insert(gs.name.clone(), gs);
+        devices.insert(
+            gs.name.clone(),
+            gs.with_msr_type(
+                MeasurementType::Azimuth,
+                StochasticNoise::default_angle_deg(),
+            )
+            .with_msr_type(
+                MeasurementType::Elevation,
+                StochasticNoise::default_angle_deg(),
+            ),
+        );
     }
 
     // Load the tracking configuration from the test data.

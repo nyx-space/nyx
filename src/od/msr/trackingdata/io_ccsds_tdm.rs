@@ -23,6 +23,7 @@ use crate::od::msr::{Measurement, MeasurementType};
 use hifitime::efmt::{Format, Formatter};
 use hifitime::prelude::Epoch;
 use hifitime::TimeScale;
+use indexmap::IndexMap;
 use snafu::ResultExt;
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
@@ -96,7 +97,7 @@ impl TrackingDataArc {
                     .or_insert_with(|| Measurement {
                         tracker: current_tracker.clone(),
                         epoch,
-                        data: HashMap::new(),
+                        data: IndexMap::new(),
                     })
                     .data
                     .insert(mtype, value);
