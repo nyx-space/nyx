@@ -16,11 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-mod data_arc;
 pub mod measurement;
 pub mod sensitivity;
+mod trackingdata;
 mod types;
 
-pub use data_arc::TrackingDataArc;
 pub use measurement::Measurement;
+pub use trackingdata::TrackingDataArc;
 pub use types::MeasurementType;

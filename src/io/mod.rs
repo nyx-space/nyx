@@ -186,7 +186,7 @@ pub enum InputOutputError {
     },
     #[snafu(display("missing required data {which}"))]
     MissingData { which: String },
-    #[snafu(display("unknown data column `{which}`"))]
+    #[snafu(display("unknown data `{which}`"))]
     UnsupportedData { which: String },
     #[snafu(display("{action} encountered a Parquet error: {source}"))]
     ParquetError {

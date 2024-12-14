@@ -15,10 +15,10 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use super::{measurement::Measurement, MeasurementType};
 use crate::io::watermark::pq_writer;
 use crate::io::{ArrowSnafu, InputOutputError, MissingDataSnafu, ParquetSnafu, StdIOSnafu};
 use crate::io::{EmptyDatasetSnafu, ExportCfg};
+use crate::od::msr::{Measurement, MeasurementType};
 use arrow::array::{Array, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
@@ -27,34 +27,22 @@ use arrow::{
     datatypes,
     record_batch::RecordBatchReader,
 };
-use core::fmt;
-use hifitime::prelude::{Duration, Epoch};
+use hifitime::prelude::Epoch;
 use hifitime::TimeScale;
-use indexmap::IndexSet;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::arrow::ArrowWriter;
 use snafu::{ensure, ResultExt};
 use std::collections::{BTreeMap, HashMap};
 use std::error::Error;
 use std::fs::File;
-use std::ops::Bound::{Excluded, Included, Unbounded};
-use std::ops::RangeBounds;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-/// Tracking data storing all of measurements as a B-Tree.
-#[derive(Clone, Default)]
-pub struct TrackingDataArc {
-    /// All measurements in this data arc
-    pub measurements: BTreeMap<Epoch, Measurement>,
-    /// Source file if loaded from a file or saved to a file.
-    pub source: Option<String>,
-}
+use super::TrackingDataArc;
 
 impl TrackingDataArc {
     /// Loads a tracking arc from its serialization in parquet.
     pub fn from_parquet<P: AsRef<Path>>(path: P) -> Result<Self, InputOutputError> {
-        // Read the file since we closed it earlier
         let file = File::open(&path).context(StdIOSnafu {
             action: "opening file for tracking arc",
         })?;
@@ -225,96 +213,6 @@ impl TrackingDataArc {
             source: Some(path.as_ref().to_path_buf().display().to_string()),
         })
     }
-
-    /// Returns the unique list of aliases in this tracking data arc
-    pub fn unique_aliases(&self) -> IndexSet<String> {
-        self.unique().0
-    }
-
-    /// Returns the unique measurement types in this tracking data arc
-    pub fn unique_types(&self) -> IndexSet<MeasurementType> {
-        self.unique().1
-    }
-
-    /// Returns the unique trackers and unique measurement types in this data arc
-    pub fn unique(&self) -> (IndexSet<String>, IndexSet<MeasurementType>) {
-        let mut aliases = IndexSet::new();
-        let mut types = IndexSet::new();
-        for msr in self.measurements.values() {
-            aliases.insert(msr.tracker.clone());
-            for k in msr.data.keys() {
-                types.insert(*k);
-            }
-        }
-        (aliases, types)
-    }
-
-    /// Returns the start epoch of this tracking arc
-    pub fn start_epoch(&self) -> Option<Epoch> {
-        self.measurements.first_key_value().map(|(k, _)| *k)
-    }
-
-    /// Returns the end epoch of this tracking arc
-    pub fn end_epoch(&self) -> Option<Epoch> {
-        self.measurements.last_key_value().map(|(k, _)| *k)
-    }
-
-    /// Returns the number of measurements in this data arc
-    pub fn len(&self) -> usize {
-        self.measurements.len()
-    }
-
-    /// Returns whether this arc has no measurements.
-    pub fn is_empty(&self) -> bool {
-        self.measurements.is_empty()
-    }
-
-    /// Returns the minimum duration between two subsequent measurements.
-    /// This is important to correctly set up the propagator and not miss any measurement.
-    pub fn min_duration_sep(&self) -> Option<Duration> {
-        if self.is_empty() {
-            None
-        } else {
-            let mut min_sep = Duration::MAX;
-            let mut prev_epoch = self.start_epoch().unwrap();
-            for (epoch, _) in self.measurements.iter().skip(1) {
-                let this_sep = *epoch - prev_epoch;
-                min_sep = min_sep.min(this_sep);
-                prev_epoch = *epoch;
-            }
-            Some(min_sep)
-        }
-    }
-
-    /// Returns a new tracking arc that only contains measurements that fall within the given epoch range.
-    pub fn filter_by_epoch<R: RangeBounds<Epoch>>(mut self, bound: R) -> Self {
-        self.measurements = self
-            .measurements
-            .range(bound)
-            .map(|(epoch, msr)| (*epoch, msr.clone()))
-            .collect::<BTreeMap<Epoch, Measurement>>();
-        self
-    }
-
-    /// Returns a new tracking arc that only contains measurements that fall within the given offset from the first epoch
-    pub fn filter_by_offset<R: RangeBounds<Duration>>(self, bound: R) -> Self {
-        if self.is_empty() {
-            return self;
-        }
-        // Rebuild an epoch bound.
-        let start = match bound.start_bound() {
-            Unbounded => self.start_epoch().unwrap(),
-            Included(offset) | Excluded(offset) => self.start_epoch().unwrap() + *offset,
-        };
-
-        let end = match bound.end_bound() {
-            Unbounded => self.end_epoch().unwrap(),
-            Included(offset) | Excluded(offset) => self.end_epoch().unwrap() - *offset,
-        };
-
-        self.filter_by_epoch(start..end)
-    }
-
     /// Store this tracking arc to a parquet file.
     pub fn to_parquet_simple<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf, Box<dyn Error>> {
         self.to_parquet(path, ExportCfg::default())
@@ -432,40 +330,5 @@ impl TrackingDataArc {
 
         // Return the path this was written to
         Ok(path_buf)
-    }
-}
-
-impl fmt::Display for TrackingDataArc {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.is_empty() {
-            write!(f, "Empty tracking arc")
-        } else {
-            let start = self.start_epoch().unwrap();
-            let end = self.end_epoch().unwrap();
-            let src = match &self.source {
-                Some(src) => format!(" (source: {src})"),
-                None => String::new(),
-            };
-            write!(
-                f,
-                "Tracking arc with {} measurements of type {:?} over {} (from {start} to {end}) with trackers {:?}{src}",
-                self.len(),
-                self.unique_types(),
-                end - start,
-                self.unique_aliases()
-            )
-        }
-    }
-}
-
-impl fmt::Debug for TrackingDataArc {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self} @ {self:p}")
-    }
-}
-
-impl PartialEq for TrackingDataArc {
-    fn eq(&self, other: &Self) -> bool {
-        self.measurements == other.measurements
     }
 }
