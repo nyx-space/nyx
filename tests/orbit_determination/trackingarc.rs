@@ -248,7 +248,7 @@ fn trkconfig_delayed_start_cov_test(
 
 /// Test different cadences and availabilities
 #[rstest]
-fn trkconfig_cadence_cov_test(
+fn trkconfig_cadence(
     traj: Traj<Spacecraft>,
     devices: BTreeMap<String, GroundStation>,
     almanac: Arc<Almanac>,
