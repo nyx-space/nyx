@@ -21,7 +21,7 @@ fn almanac() -> Arc<Almanac> {
 }
 
 #[rstest]
-fn continuous_tracking(almanac: Arc<Almanac>) {
+fn continuous_tracking_cov_test(almanac: Arc<Almanac>) {
     // Test that continuous tracking
     let _ = pretty_env_logger::try_init();
 

@@ -204,6 +204,7 @@ impl TrackingDataArc {
             )
             .map_err(err_hdlr)?;
 
+            writeln!(writer, "\tPATH = 1,2,1").map_err(err_hdlr)?;
             writeln!(
                 writer,
                 "\tPARTICIPANT_1 = {}",
@@ -220,6 +221,8 @@ impl TrackingDataArc {
             .map_err(err_hdlr)?;
 
             writeln!(writer, "\tPARTICIPANT_2 = {spacecraft_name}").map_err(err_hdlr)?;
+
+            writeln!(writer, "\tMODE = SEQUENTIAL").map_err(err_hdlr)?;
 
             // Add additional metadata, could include timetag ref for example.
             for (k, v) in &metadata {
