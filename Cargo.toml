@@ -56,7 +56,7 @@ approx = "0.5"
 rand_pcg = "0.3"
 indicatif = { version = "0.17", features = ["rayon"] }
 rstats = "2.0.1"
-parquet = { version = "53.0.0", default-features = false, features = [
+parquet = { version = "54.0.0", default-features = false, features = [
     "arrow",
     "zstd",
 ] }
