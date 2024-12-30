@@ -27,7 +27,7 @@ pub mod prelude {
     pub use super::{
         targeter::*,
         trajectory::{ExportCfg, Interpolatable, Traj},
-        Event, ScTraj, StateParameter,
+        Event, StateParameter, Trajectory,
     };
     pub use crate::cosmic::{try_achieve_b_plane, BPlane, BPlaneTarget, GuidanceMode, OrbitDual};
     pub use crate::dynamics::{
@@ -53,8 +53,7 @@ pub use events::{Event, EventEvaluator};
 pub mod objective;
 pub mod opti;
 pub use opti::targeter;
-pub type ScTraj = trajectory::Traj<Spacecraft>;
-// pub type Ephemeris = trajectory::Traj<Orbit>;
+pub type Trajectory = trajectory::Traj<Spacecraft>;
 
 mod param;
 pub use param::StateParameter;

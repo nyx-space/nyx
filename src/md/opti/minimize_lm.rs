@@ -60,7 +60,6 @@ where
     /// The control solution to this problem.
     pub control: SVector<f64, N>,
     pub residuals: SVector<f64, M>,
-    // pub jacobian: SMatrix<f64, O, V>,
     pub jacobian: SMatrix<f64, M, N>,
 }
 

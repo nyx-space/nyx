@@ -352,7 +352,7 @@ impl<T: MultishootNode<O>, const O: usize> MultipleShootingSolution<T, O> {
         &self,
         prop: &Propagator<SpacecraftDynamics>,
         almanac: Arc<Almanac>,
-    ) -> Result<Vec<ScTraj>, MultipleShootingError> {
+    ) -> Result<Vec<Trajectory>, MultipleShootingError> {
         let mut trajz = Vec::with_capacity(self.nodes.len());
 
         for (i, node) in self.nodes.iter().copied().enumerate() {

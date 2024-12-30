@@ -2,7 +2,7 @@
 
 [**Empowering flight dynamics engineers with open-source software**][website]
 
-Nyx is revolutionizing the field of flight dynamics engineering as a powerful, open-source tool for mission design and orbit determination. From trajectory optimization to orbit estimation, Nyx is built for speed, automation, and scalability. It dramatically reduces simulation time compared to commercial products, and integrates seamlessly into automated workflows across various platforms.
+Nyx is revolutionizing the field of flight dynamics engineering as a powerful, open-source tool for mission design and orbit determination. From trajectory optimization to orbit estimation, Nyx is built for speed, automation, and scalability.
 
 **Nyx has proven mission-critical reliability, already contributing to the success of three lunar missions.**
 
@@ -12,6 +12,28 @@ Nyx is revolutionizing the field of flight dynamics engineering as a powerful, o
 [![nyx-space on crates.io][cratesio-image]][cratesio]
 [![nyx-space on docs.rs][docsrs-image]][docsrs]
 [![codecov](https://codecov.io/gh/nyx-space/nyx/graph/badge.svg?token=gEiAvwzwh5)](https://codecov.io/gh/nyx-space/nyx)
+
+# Showcase
+
+[The website has the latest use cases][showcase]
+
+## GEO Low Thrust Orbit Raising & StationKeeping
+
+[Click for description](https://nyxspace.com/nyxspace/showcase/03_geo_analysis/?utm_source=readme-showcase)
+
+[![RAAN, AOP, INC over time](./examples/03_geo_analysis/plots/raise-traj-3d.png)](https://nyxspace.com/nyxspace/showcase/03_geo_analysis/?utm_source=readme-showcase)
+
+## James Webb Space Telescope Monte Carlo Simulation
+
+[Click for description](https://nyxspace.com/nyxspace/showcase/02_jwst_covar_monte_carlo/?utm_source=readme-showcase)
+
+[![RAAN, AOP, INC over time](./examples/02_jwst_covar_monte_carlo/plots/jwst_mc_inc_deg.png)](https://nyxspace.com/nyxspace/showcase/02_jwst_covar_monte_carlo/?utm_source=readme-showcase)
+
+## Orbit Determination of the Lunar Reconnaissance Orbiter
+
+[Click for description](https://nyxspace.com/nyxspace/showcase/04_lro_od/?utm_source=readme-showcase)
+
+[![RAAN, AOP, INC over time](./examples/04_lro_od/plots/doppler-resid.png)](https://nyxspace.com/nyxspace/showcase/04_lro_od/?utm_source=readme-showcase)
 
 # Documentation
 
@@ -49,8 +71,10 @@ Nyx is provided under the [AGPLv3 License](./LICENSE). By using this software, y
 [contact]: https://7ug5imdtt8v.typeform.com/to/neFvVW3p
 [nyxspace-image]: https://img.shields.io/badge/Nyx_Space-Website-orange
 [website]: https://nyxspace.com/?utm_source=readme
+[showcase]: https://nyxspace.com/nyxspace/showcase/?utm_source=readme
 
 # Author information
+
 > Chris Rabotin is a GNC and flight dynamics engineer with a heavy background in software.
 
 I currently work for Rocket Lab USA as the lead flight dynamics engineer on both Blue Ghost lunar lander missions. -- Find me on [LinkedIn](https://www.linkedin.com/in/chrisrabotin/).
