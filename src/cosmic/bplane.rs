@@ -27,15 +27,14 @@ use crate::time::{Duration, Epoch, Unit};
 use crate::utils::between_pm_180;
 use hyperdual::linalg::norm;
 use hyperdual::{Float, OHyperdual};
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
+
 use snafu::{ensure, ResultExt};
 use std::convert::From;
 use std::fmt;
 
 /// Stores a B-Plane
 #[derive(Copy, Clone, Debug)]
-#[cfg_attr(feature = "python", pyclass)]
+
 pub struct BPlane {
     /// The $B_T$ component, in kilometers
     pub b_t: OrbitPartial,
@@ -186,7 +185,6 @@ impl BPlane {
     }
 }
 
-#[cfg_attr(feature = "python", pymethods)]
 impl BPlane {
     pub fn b_dot_t(&self) -> f64 {
         self.b_t.real()
@@ -208,16 +206,6 @@ impl BPlane {
     /// Returns the B plane vector magnitude, in kilometers
     pub fn mag(&self) -> f64 {
         (self.b_dot_t().powi(2) + self.b_dot_r().powi(2)).sqrt()
-    }
-
-    #[cfg(feature = "python")]
-    pub fn __repr__(&self) -> String {
-        format!("{self:?}")
-    }
-
-    #[cfg(feature = "python")]
-    pub fn __str__(&self) -> String {
-        format!("{self}")
     }
 }
 

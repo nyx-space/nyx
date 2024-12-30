@@ -7,12 +7,12 @@ use nyx::cosmic::eclipse::EclipseLocator;
 use nyx::cosmic::{GuidanceMode, Orbit, Spacecraft};
 use nyx::dynamics::guidance::{GuidanceLaw, Ruggiero, Thruster};
 use nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
-use nyx::io::trajectory_data::TrajectoryLoader;
 use nyx::md::prelude::{ExportCfg, Objective};
 use nyx::md::StateParameter;
 use nyx::propagators::*;
 use nyx::time::{Epoch, TimeSeries, Unit};
 use nyx::State;
+use nyx_space::md::Trajectory;
 use std::path::PathBuf;
 use std::sync::mpsc::channel;
 use std::sync::Arc;
@@ -143,8 +143,7 @@ fn traj_ephem_forward(almanac: Arc<Almanac>) {
 
     // Reload this trajectory and make sure that it matches
 
-    let dyn_traj = TrajectoryLoader::from_parquet(exported_path).unwrap();
-    let concrete_traj = dyn_traj.to_traj::<Spacecraft>().unwrap();
+    let concrete_traj = Trajectory::from_parquet(exported_path).unwrap();
 
     if ephem != concrete_traj {
         // Uh oh, let's see where the differences are.

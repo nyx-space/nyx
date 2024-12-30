@@ -20,8 +20,7 @@ use crate::io::{ConfigError, ConfigRepr};
 #[cfg(feature = "python")]
 use crate::python::pyo3utils::pyany_to_value;
 use hifitime::{Duration, Epoch, TimeUnits};
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
+
 #[cfg(feature = "python")]
 use pyo3::types::{PyDict, PyList, PyType};
 #[cfg(feature = "python")]
@@ -48,7 +47,7 @@ use super::Stochastics;
 ///
 /// s(t - t_0) = ((q * τ) / 2) * (1 - exp((-2 / τ) * (t - t_0)))
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
-#[cfg_attr(feature = "python", pyclass)]
+
 #[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
 pub struct GaussMarkov {
     /// The time constant, tau gives the correlation time, or the time over which the intensity of the time correlation will fade to 1/e of its prior value. (This is sometimes incorrectly referred to as the "half-life" of the process.)
@@ -168,7 +167,7 @@ impl Mul<f64> for GaussMarkov {
     }
 }
 
-#[cfg_attr(feature = "python", pymethods)]
+
 impl GaussMarkov {
     #[cfg(feature = "python")]
     pub fn __repr__(&self) -> String {

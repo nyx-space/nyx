@@ -166,6 +166,25 @@ where
         self.to_parquet(path, None, cfg, almanac)
     }
 
+    /// A shortcut to `to_parquet_with_cfg`
+    pub fn to_parquet_with_step<P: AsRef<Path>>(
+        &self,
+        path: P,
+        step: Duration,
+        almanac: Arc<Almanac>,
+    ) -> Result<(), Box<dyn Error>> {
+        self.to_parquet_with_cfg(
+            path,
+            ExportCfg {
+                step: Some(step),
+                ..Default::default()
+            },
+            almanac,
+        )?;
+
+        Ok(())
+    }
+
     /// Store this trajectory arc to a parquet file with the provided configuration and event evaluators
     pub fn to_parquet<P: AsRef<Path>>(
         &self,

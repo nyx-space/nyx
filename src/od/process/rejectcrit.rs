@@ -23,8 +23,7 @@ use crate::python::PythonError;
 use crate::NyxError;
 #[cfg(feature = "python")]
 use pyo3::class::basic::CompareOp;
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
+
 #[cfg(feature = "python")]
 use pythonize::{depythonize, pythonize};
 use serde_derive::{Deserialize, Serialize};
@@ -36,7 +35,7 @@ use serde_derive::{Deserialize, Serialize};
 /// As such, if the prefit on range is bad, then the Doppler measurement with the same time stamp will also be rejected.
 /// This leads to better convergence of the filter, and more appropriate results.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
-#[cfg_attr(feature = "python", pyclass)]
+
 #[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
 pub struct ResidRejectCrit {
     /// Number of sigmas for a measurement to be considered an outlier.

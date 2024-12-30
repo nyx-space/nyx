@@ -21,8 +21,7 @@ use crate::io::ConfigRepr;
 use crate::io::{duration_from_str, duration_to_str, epoch_from_str, epoch_to_str, ConfigError};
 use hifitime::TimeUnits;
 use hifitime::{Duration, Epoch};
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
+
 use serde::Deserialize;
 use serde_derive::Serialize;
 use std::fmt::Debug;
@@ -33,9 +32,6 @@ use typed_builder::TypedBuilder;
 /// By default, the tracking configuration is continuous and the tracking arc is from the beginning of the simulation to the end.
 /// In Python, any value that is set to None at initialization will use the default values.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypedBuilder)]
-#[cfg_attr(feature = "python", pyclass)]
-#[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
-#[cfg_attr(feature = "python", pyo3(get_all, set_all))]
 #[builder(doc)]
 pub struct TrkConfig {
     /// Set to automatically build a tracking schedule based on some criteria
@@ -130,9 +126,6 @@ impl Default for TrkConfig {
 
 /// Stores a tracking strand with a start and end epoch
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
-#[cfg_attr(feature = "python", pyclass)]
-#[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
-#[cfg_attr(feature = "python", pyo3(get_all, set_all))]
 pub struct Strand {
     #[serde(serialize_with = "epoch_to_str", deserialize_with = "epoch_from_str")]
     pub start: Epoch,
@@ -140,7 +133,6 @@ pub struct Strand {
     pub end: Epoch,
 }
 
-#[cfg_attr(feature = "python", pymethods)]
 impl Strand {
     /// Returns whether the provided epoch is within the range
     pub fn contains(&self, epoch: Epoch) -> bool {
@@ -150,13 +142,6 @@ impl Strand {
     /// Returns the duration of this tracking strand
     pub fn duration(&self) -> Duration {
         self.end - self.start
-    }
-
-    /// Builds a new strand with the start and end epochs of this tracking strand.
-    #[cfg(feature = "python")]
-    #[new]
-    fn py_new(start: Epoch, end: Epoch) -> Self {
-        Self { start, end }
     }
 }
 

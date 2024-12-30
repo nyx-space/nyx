@@ -36,14 +36,12 @@ use crate::md::StateParameter;
 use crate::time::Epoch;
 use crate::utils::{cartesian_to_spherical, spherical_to_cartesian};
 
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
 use std::default::Default;
 use std::fmt;
 use std::ops::Add;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "python", pyclass)]
+
 pub enum GuidanceMode {
     /// Guidance is turned off and Guidance Law may switch mode to Thrust for next call
     Coast,
@@ -85,8 +83,6 @@ impl From<GuidanceMode> for f64 {
 ///
 /// Optionally, the spacecraft state can also store the state transition matrix from the start of the propagation until the current time (i.e. trajectory STM, not step-size STM).
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, TypedBuilder)]
-#[cfg_attr(feature = "python", pyclass)]
-#[cfg_attr(feature = "python", pyo3(module = "nyx_space.cosmic"))]
 pub struct Spacecraft {
     /// Initial orbit of the vehicle
     pub orbit: Orbit,

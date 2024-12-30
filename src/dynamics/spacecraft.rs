@@ -33,20 +33,6 @@ use std::fmt::{self, Write};
 use std::sync::Arc;
 
 use crate::cosmic::AstroError;
-#[cfg(feature = "python")]
-use crate::io::ConfigRepr;
-#[cfg(feature = "python")]
-use crate::python::PythonError;
-#[cfg(feature = "python")]
-use pyo3::class::basic::CompareOp;
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
-#[cfg(feature = "python")]
-use pyo3::types::PyType;
-#[cfg(feature = "python")]
-use pythonize::depythonize;
-#[cfg(feature = "python")]
-use std::collections::BTreeMap;
 
 const NORM_ERR: f64 = 1e-4;
 
@@ -54,8 +40,6 @@ const NORM_ERR: f64 = 1e-4;
 /// Note: when developing new guidance laws, it is recommended to _not_ enable prop decrement until the guidance law seems to work without proper physics.
 /// Note: if the spacecraft runs out of prop, the propagation segment will return an error.
 #[derive(Clone)]
-#[cfg_attr(feature = "python", pyclass)]
-#[cfg_attr(feature = "python", pyo3(module = "nyx_space.mission_design"))]
 pub struct SpacecraftDynamics {
     pub orbital_dyn: OrbitalDynamics,
     // TODO: https://github.com/nyx-space/nyx/issues/214
@@ -136,75 +120,6 @@ impl SpacecraftDynamics {
             force_models: self.force_models.clone(),
             decrement_mass: self.decrement_mass,
         }
-    }
-}
-
-#[cfg_attr(feature = "python", pymethods)]
-impl SpacecraftDynamics {
-    #[cfg(feature = "python")]
-    #[classmethod]
-    fn load(_cls: &PyType, path: &str) -> Result<Self, ConfigError> {
-        let serde = DynamicsSerde::load(path)?;
-
-        let cosm = Cosm::de438();
-
-        Self::from_config(serde, cosm)
-    }
-
-    #[cfg(feature = "python")]
-    #[classmethod]
-    fn load_many(_cls: &PyType, path: &str) -> Result<Vec<Self>, ConfigError> {
-        let orbits = DynamicsSerde::load_many(path)?;
-
-        let cosm = Cosm::de438();
-
-        let mut selves = Vec::with_capacity(orbits.len());
-
-        for serde in orbits {
-            selves.push(Self::from_config(serde, cosm.clone())?);
-        }
-
-        Ok(selves)
-    }
-
-    #[cfg(feature = "python")]
-    #[classmethod]
-    fn load_named(_cls: &PyType, path: &str) -> Result<BTreeMap<String, Self>, ConfigError> {
-        let orbits = DynamicsSerde::load_named(path)?;
-
-        let cosm = Cosm::de438();
-
-        let mut selves = BTreeMap::new();
-
-        for (k, v) in orbits {
-            selves.insert(k, Self::from_config(v, cosm.clone())?);
-        }
-
-        Ok(selves)
-    }
-
-    #[cfg(feature = "python")]
-    fn __repr__(&self) -> String {
-        format!("{self}")
-    }
-
-    #[cfg(feature = "python")]
-    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, PythonError> {
-        match op {
-            CompareOp::Eq => Ok(self.__repr__() == other.__repr__()),
-            CompareOp::Ne => Ok(self.__repr__() != other.__repr__()),
-            _ => Err(PythonError::OperationError { op }),
-        }
-    }
-
-    #[cfg(feature = "python")]
-    #[classmethod]
-    /// Loads the SpacecraftDynamics from its YAML representation
-    fn loads(_cls: &PyType, state: &PyAny) -> Result<Self, ConfigError> {
-        <Self as Configurable>::from_config(
-            depythonize(state).map_err(|e| ConfigError::InvalidConfig { msg: e.to_string() })?,
-            Cosm::de438(),
-        )
     }
 }
 

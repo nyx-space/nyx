@@ -20,15 +20,14 @@ use super::NyxError;
 use arrow::datatypes::{DataType, Field};
 use core::fmt;
 use enum_iterator::Sequence;
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
+
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, str::FromStr};
 
 /// Common state parameters
 #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
 #[derive(Copy, Clone, Debug, PartialEq, Sequence, Serialize, Deserialize)]
-#[cfg_attr(feature = "python", pyclass)]
+
 pub enum StateParameter {
     /// Argument of Latitude (deg)
     AoL,
@@ -134,7 +133,7 @@ pub enum StateParameter {
     VZ,
 }
 
-#[cfg_attr(feature = "python", pymethods)]
+
 impl StateParameter {
     /// Returns the default event finding precision in the unit of that parameter
     pub fn default_event_precision(&self) -> f64 {

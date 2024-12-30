@@ -38,12 +38,11 @@ pub mod builtin;
 pub mod event;
 pub mod trk_device;
 
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
+
 
 /// GroundStation defines a two-way ranging and doppler station.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[cfg_attr(feature = "python", pyclass)]
+
 #[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
 pub struct GroundStation {
     pub name: String,

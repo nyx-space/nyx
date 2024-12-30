@@ -46,16 +46,11 @@ pub mod estimate;
 /// Handles loading of gravity models using files of NASA PDS and GMAT COF. Several gunzipped files are provided with nyx.
 pub mod gravity;
 pub mod matrices;
-pub mod trajectory_data;
 
 use std::io;
 
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
-
 /// Configuration for exporting a trajectory to parquet.
 #[derive(Clone, Default, Serialize, Deserialize, TypedBuilder)]
-#[cfg_attr(feature = "python", pyclass)]
 #[builder(doc)]
 pub struct ExportCfg {
     /// Fields to export, if unset, defaults to all possible fields.
@@ -127,31 +122,6 @@ impl ExportCfg {
             }
         };
         path_buf
-    }
-}
-
-#[cfg(feature = "python")]
-#[pymethods]
-impl ExportCfg {
-    #[new]
-    #[pyo3(
-        text_signature = "(timestamp=None, fields=None, start_epoch=None, step=None, end_epoch=None, metadata=None)"
-    )]
-    fn py_new(
-        timestamp: Option<bool>,
-        fields: Option<Vec<StateParameter>>,
-        start_epoch: Option<Epoch>,
-        end_epoch: Option<Epoch>,
-        metadata: Option<HashMap<String, String>>,
-    ) -> Self {
-        Self {
-            timestamp: timestamp.unwrap_or(false),
-            fields,
-            start_epoch,
-            end_epoch,
-            metadata,
-            ..Default::default()
-        }
     }
 }
 

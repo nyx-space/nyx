@@ -23,8 +23,7 @@ use std::default::Default;
 use std::fmt;
 use typed_builder::TypedBuilder;
 
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
+
 
 /// Defines the stopping condition for the smoother
 #[derive(Clone, Copy, Debug)]
@@ -59,7 +58,7 @@ impl Default for SmoothingArc {
 /// Defines a filter iteration configuration. Allows iterating on an OD solution until convergence criteria is met.
 /// The root mean squared of the prefit residuals ratios is used to assess convergence between iterations.
 #[derive(Clone, Copy, Debug, TypedBuilder)]
-#[cfg_attr(feature = "python", pyclass)]
+
 pub struct IterationConf {
     /// The number of measurements to account for in the iteration
     #[builder(default)]

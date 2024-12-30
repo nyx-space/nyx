@@ -20,15 +20,19 @@ use anise::astro::Aberration;
 use anise::constants::orientations::J2000;
 use anise::errors::AlmanacError;
 use anise::prelude::{Almanac, Frame, Orbit};
+use arrow::array::RecordBatchReader;
+use arrow::array::{Float64Array, StringArray};
 use hifitime::TimeSeries;
-use snafu::ResultExt;
+use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+use snafu::{ensure, ResultExt};
 
 use super::TrajError;
 use super::{ExportCfg, Traj};
 use crate::cosmic::Spacecraft;
 use crate::errors::{FromAlmanacSnafu, NyxError};
 use crate::io::watermark::prj_name_ver;
-use crate::md::prelude::StateParameter;
+use crate::io::{InputOutputError, MissingDataSnafu, ParquetSnafu, StdIOSnafu};
+use crate::md::prelude::{Interpolatable, StateParameter};
 use crate::md::EventEvaluator;
 use crate::time::{Duration, Epoch, Format, Formatter, TimeUnits};
 use crate::State;
@@ -119,25 +123,6 @@ impl Traj<Spacecraft> {
         );
 
         Ok(traj)
-    }
-
-    /// A shortcut to `to_parquet_with_cfg`
-    pub fn to_parquet_with_step<P: AsRef<Path>>(
-        &self,
-        path: P,
-        step: Duration,
-        almanac: Arc<Almanac>,
-    ) -> Result<(), Box<dyn Error>> {
-        self.to_parquet_with_cfg(
-            path,
-            ExportCfg {
-                step: Some(step),
-                ..Default::default()
-            },
-            almanac,
-        )?;
-
-        Ok(())
     }
 
     /// Exports this trajectory to the provided filename in parquet format with only the epoch, the geodetic latitude, longitude, and height at one state per minute.
@@ -447,6 +432,194 @@ impl Traj<Spacecraft> {
             path_buf.display()
         );
         Ok(path_buf)
+    }
+
+    pub fn from_parquet<P: AsRef<Path>>(path: P) -> Result<Self, InputOutputError> {
+        let file = File::open(&path).context(StdIOSnafu {
+            action: "opening trajectory file",
+        })?;
+
+        let builder = ParquetRecordBatchReaderBuilder::try_new(file).unwrap();
+
+        let mut metadata = HashMap::new();
+        // Build the custom metadata
+        if let Some(file_metadata) = builder.metadata().file_metadata().key_value_metadata() {
+            for key_value in file_metadata {
+                if !key_value.key.starts_with("ARROW:") {
+                    metadata.insert(
+                        key_value.key.clone(),
+                        key_value.value.clone().unwrap_or("[unset]".to_string()),
+                    );
+                }
+            }
+        }
+
+        // Check the schema
+        let mut has_epoch = false; // Required
+        let mut frame = None;
+
+        let mut found_fields = vec![
+            (StateParameter::X, false),
+            (StateParameter::Y, false),
+            (StateParameter::Z, false),
+            (StateParameter::VX, false),
+            (StateParameter::VY, false),
+            (StateParameter::VZ, false),
+            (StateParameter::PropMass, false),
+        ];
+
+        let file = File::open(path).context(StdIOSnafu {
+            action: "opening output trajectory file",
+        })?;
+
+        let builder = ParquetRecordBatchReaderBuilder::try_new(file).unwrap();
+
+        let reader = builder.build().context(ParquetSnafu {
+            action: "building output trajectory file",
+        })?;
+
+        for field in &reader.schema().fields {
+            if field.name().as_str() == "Epoch (UTC)" {
+                has_epoch = true;
+            } else {
+                for potential_field in &mut found_fields {
+                    if field.name() == potential_field.0.to_field(None).name() {
+                        potential_field.1 = true;
+                        if potential_field.0 != StateParameter::PropMass {
+                            if let Some(frame_info) = field.metadata().get("Frame") {
+                                // Frame is expected to be serialized as Dhall.
+                                match serde_dhall::from_str(frame_info).parse::<Frame>() {
+                                    Err(e) => {
+                                        return Err(InputOutputError::ParseDhall {
+                                            data: frame_info.to_string(),
+                                            err: format!("{e}"),
+                                        })
+                                    }
+                                    Ok(deser_frame) => frame = Some(deser_frame),
+                                };
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        ensure!(
+            has_epoch,
+            MissingDataSnafu {
+                which: "Epoch (UTC)"
+            }
+        );
+
+        ensure!(
+            frame.is_some(),
+            MissingDataSnafu {
+                which: "Frame in metadata"
+            }
+        );
+
+        for (field, exists) in found_fields.iter().take(found_fields.len() - 1) {
+            ensure!(
+                exists,
+                MissingDataSnafu {
+                    which: format!("Missing `{}` field", field.to_field(None).name())
+                }
+            );
+        }
+
+        let sc_compat = found_fields.last().unwrap().1;
+
+        let expected_type = std::any::type_name::<Spacecraft>()
+            .split("::")
+            .last()
+            .unwrap();
+
+        if expected_type == "Spacecraft" {
+            ensure!(
+                sc_compat,
+                MissingDataSnafu {
+                    which: format!(
+                        "Missing `{}` field",
+                        found_fields.last().unwrap().0.to_field(None).name()
+                    )
+                }
+            );
+        } else if sc_compat {
+            // Not a spacecraft, remove the prop mass
+            if let Some(last_field) = found_fields.last_mut() {
+                if last_field.0 == StateParameter::PropMass && last_field.1 {
+                    last_field.1 = false;
+                }
+            }
+        }
+
+        // At this stage, we know that the measurement is valid and the conversion is supported.
+        let mut traj = Traj::default();
+
+        // Now convert each batch on the fly
+        for maybe_batch in reader {
+            let batch = maybe_batch.unwrap();
+
+            let epochs = batch
+                .column_by_name("Epoch (UTC)")
+                .unwrap()
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .unwrap();
+
+            let mut shared_data = vec![];
+
+            for (field, _) in found_fields.iter().take(found_fields.len() - 1) {
+                shared_data.push(
+                    batch
+                        .column_by_name(field.to_field(None).name())
+                        .unwrap()
+                        .as_any()
+                        .downcast_ref::<Float64Array>()
+                        .unwrap(),
+                );
+            }
+
+            if expected_type == "Spacecraft" {
+                // Read the prop only if this is a spacecraft we're building
+                shared_data.push(
+                    batch
+                        .column_by_name("prop_mass (kg)")
+                        .unwrap()
+                        .as_any()
+                        .downcast_ref::<Float64Array>()
+                        .unwrap(),
+                );
+            }
+
+            // Grab the frame -- it should have been serialized with all of the data so we don't need to reload it.
+
+            // Build the states
+            for i in 0..batch.num_rows() {
+                let mut state = Spacecraft::zeros();
+                state.set_epoch(Epoch::from_gregorian_str(epochs.value(i)).map_err(|e| {
+                    InputOutputError::Inconsistency {
+                        msg: format!("{e} when parsing epoch"),
+                    }
+                })?);
+                state.set_frame(frame.unwrap()); // We checked it was set above with an ensure! call
+                state.unset_stm(); // We don't have any STM data, so let's unset this.
+
+                for (j, (param, exists)) in found_fields.iter().enumerate() {
+                    if *exists {
+                        state.set_value(*param, shared_data[j].value(i)).unwrap();
+                    }
+                }
+
+                traj.states.push(state);
+            }
+        }
+
+        // Remove any duplicates that may exist in the imported trajectory.
+        traj.finalize();
+
+        Ok(traj)
     }
 }
 
