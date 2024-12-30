@@ -27,14 +27,15 @@ use crate::time::{Epoch, Unit};
 use crate::State;
 use anise::prelude::Almanac;
 use hifitime::{Duration, TimeUnits};
+use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::fmt;
 use std::sync::Arc;
 
 /// Mnvr defined a single maneuver. Direction MUST be in the VNC frame (Velocity / Normal / Cross).
 /// It may be used with a maneuver scheduler.
-#[derive(Copy, Clone, Debug)]
-pub struct Mnvr {
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Maneuver {
     /// Start epoch of the maneuver
     pub start: Epoch,
     /// End epoch of the maneuver
@@ -43,15 +44,15 @@ pub struct Mnvr {
     /// Thrust level, if 1.0 use all thruster available at full power
     /// TODO: Convert this to a common polynomial as well to optimize throttle, throttle rate (and accel?)
     pub thrust_prct: f64,
-    /// The interpolation polynomial for the in-plane angle
+    /// The interpolation polynomial for the azimuth (in-plane) angle
     pub alpha_inplane_radians: CommonPolynomial,
-    /// The interpolation polynomial for the out-of-plane angle
+    /// The interpolation polynomial for the elevation (out-of-plane) angle
     pub delta_outofplane_radians: CommonPolynomial,
     /// The frame in which the maneuvers are defined.
     pub frame: LocalFrame,
 }
 
-impl fmt::Display for Mnvr {
+impl fmt::Display for Maneuver {
     /// Prints the polynomial with the least significant coefficients first
     #[allow(clippy::identity_op)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -86,7 +87,7 @@ impl fmt::Display for Mnvr {
     }
 }
 
-impl Mnvr {
+impl Maneuver {
     /// Creates an impulsive maneuver whose vector is the deltaV.
     /// TODO: This should use William's algorithm
     pub fn from_impulsive(dt: Epoch, vector: Vector3<f64>, frame: LocalFrame) -> Self {
@@ -230,7 +231,7 @@ impl Mnvr {
     }
 }
 
-impl GuidanceLaw for Mnvr {
+impl GuidanceLaw for Maneuver {
     fn direction(&self, osc: &Spacecraft) -> Result<Vector3<f64>, GuidanceError> {
         match osc.mode() {
             GuidanceMode::Thrust => match self.frame {
@@ -263,5 +264,27 @@ impl GuidanceLaw for Mnvr {
             GuidanceMode::Coast
         };
         sc.mut_mode(next_mode);
+    }
+}
+
+#[cfg(test)]
+mod ut_mnvr {
+    use hifitime::Epoch;
+    use nalgebra::Vector3;
+
+    use crate::dynamics::guidance::LocalFrame;
+
+    use super::Maneuver;
+
+    #[test]
+    fn serde_mnvr() {
+        let epoch = Epoch::from_gregorian_utc_at_midnight(2012, 2, 29);
+        let mnvr = Maneuver::from_impulsive(epoch, Vector3::new(1.0, 1.0, 0.0), LocalFrame::RCN);
+
+        let mnvr_yml = serde_yml::to_string(&mnvr).unwrap();
+        println!("{mnvr_yml}");
+
+        let mnvr2 = serde_yml::from_str(&mnvr_yml).unwrap();
+        assert_eq!(mnvr, mnvr2);
     }
 }

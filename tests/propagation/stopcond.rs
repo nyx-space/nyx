@@ -10,7 +10,7 @@ use anise::prelude::Almanac;
 use hifitime::JD_J2000;
 use nalgebra::Vector3;
 use nyx::cosmic::Orbit;
-use nyx::dynamics::guidance::{FiniteBurns, LocalFrame, Mnvr, Thruster};
+use nyx::dynamics::guidance::{FiniteBurns, LocalFrame, Maneuver, Thruster};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::SpacecraftDynamics;
 use nyx::md::{Event, StateParameter};
@@ -313,7 +313,7 @@ fn event_and_combination(almanac: Arc<Almanac>) {
     );
 
     // Thrust in the +X direction continuously
-    let burn = FiniteBurns::from_mnvrs(vec![Mnvr::from_time_invariant(
+    let burn = FiniteBurns::from_mnvrs(vec![Maneuver::from_time_invariant(
         epoch + 1.minutes(),
         epoch + 15.minutes(),
         1.0,

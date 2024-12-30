@@ -19,7 +19,7 @@
 use hifitime::TimeUnits;
 use snafu::{ensure, ResultExt};
 
-use crate::dynamics::guidance::{LocalFrame, Mnvr};
+use crate::dynamics::guidance::{LocalFrame, Maneuver};
 use crate::linalg::SVector;
 use crate::md::objective::Objective;
 use crate::md::{prelude::*, GuidanceSnafu, NotFiniteSnafu, TargetingError};
@@ -61,12 +61,12 @@ impl<const V: usize, const O: usize> TargeterSolution<V, O> {
     }
 
     /// Returns a maneuver if targeter solution was a finite burn maneuver
-    pub fn to_mnvr(&self) -> Result<Mnvr, TargetingError> {
+    pub fn to_mnvr(&self) -> Result<Maneuver, TargetingError> {
         ensure!(self.is_finite_burn(), NotFiniteSnafu);
 
         let correction_epoch = self.corrected_state.epoch();
         let achievement_epoch = self.achieved_state.epoch();
-        let mut mnvr = Mnvr {
+        let mut mnvr = Maneuver {
             start: correction_epoch,
             end: achievement_epoch,
             thrust_prct: 1.0,

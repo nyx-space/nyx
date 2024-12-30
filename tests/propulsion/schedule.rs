@@ -1,6 +1,6 @@
 extern crate nyx_space as nyx;
 use self::nyx::cosmic::{GuidanceMode, Orbit, Spacecraft};
-use self::nyx::dynamics::guidance::{FiniteBurns, Mnvr, Thruster};
+use self::nyx::dynamics::guidance::{FiniteBurns, Maneuver, Thruster};
 use self::nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
 use self::nyx::linalg::Vector3;
 use self::nyx::propagators::{IntegratorOptions, Propagator};
@@ -57,7 +57,7 @@ fn val_transfer_schedule_no_depl(almanac: Arc<Almanac>) {
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
 
     // Define the maneuver and its schedule
-    let mnvr0 = Mnvr::from_time_invariant(
+    let mnvr0 = Maneuver::from_time_invariant(
         Epoch::from_gregorian_tai_at_midnight(2002, 1, 1),
         end_time,
         1.0, // Full thrust
@@ -149,7 +149,7 @@ fn val_transfer_schedule_depl_cov_test(almanac: Arc<Almanac>) {
     // With 100% thrust: RSS errors:     pos = 3.14651e1 km      vel = 3.75245e-2 km/s
 
     // Define the maneuver and its schedule
-    let mnvr0 = Mnvr::from_time_invariant(
+    let mnvr0 = Maneuver::from_time_invariant(
         Epoch::from_gregorian_tai_at_midnight(2002, 1, 1),
         end_time,
         1.0, // Full thrust
@@ -282,7 +282,7 @@ fn val_transfer_single_maneuver_depl_cov_test(almanac: Arc<Almanac>) {
     // With 100% thrust: RSS errors:     pos = 3.14651e1 km      vel = 3.75245e-2 km/s
 
     // Define the maneuver and its schedule
-    let mnvr0 = Mnvr::from_time_invariant(
+    let mnvr0 = Maneuver::from_time_invariant(
         Epoch::from_gregorian_tai_at_midnight(2002, 1, 1),
         end_time,
         1.0, // Full thrust

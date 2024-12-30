@@ -19,7 +19,7 @@
 use super::solution::TargeterSolution;
 use super::targeter::Targeter;
 use crate::cosmic::{AstroAlmanacSnafu, AstroPhysicsSnafu};
-use crate::dynamics::guidance::{GuidanceError, LocalFrame, Mnvr};
+use crate::dynamics::guidance::{GuidanceError, LocalFrame, Maneuver};
 use crate::errors::TargetingError;
 use crate::linalg::{SMatrix, SVector, Vector6};
 use crate::md::{prelude::*, AstroSnafu, GuidanceSnafu, UnderdeterminedProblemSnafu};
@@ -71,7 +71,7 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
         // Store the total correction in Vector3
         let mut total_correction = SVector::<f64, V>::zeros();
 
-        let mut mnvr = Mnvr {
+        let mut mnvr = Maneuver {
             start: correction_epoch,
             end: achievement_epoch,
             thrust_prct: 1.0,

@@ -2,7 +2,7 @@ extern crate nyx_space as nyx;
 
 use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SUN};
 use hifitime::TimeUnits;
-use nyx::dynamics::guidance::{LocalFrame, Mnvr, Thruster};
+use nyx::dynamics::guidance::{LocalFrame, Maneuver, Thruster};
 use nyx::linalg::Vector3;
 use nyx::md::prelude::*;
 use nyx_space::cosmic::Mass;
@@ -194,7 +194,7 @@ fn val_tgt_finite_burn(almanac: Arc<Almanac>) {
     // With 100% thrust: RSS errors:     pos = 3.14651e1 km      vel = 3.75245e-2 km/s
 
     // Define the maneuver and its schedule
-    let mnvr0 = Mnvr::from_time_invariant(
+    let mnvr0 = Maneuver::from_time_invariant(
         start_time + 1.seconds(),
         start_time + prop_time - 1.seconds(),
         1.0, // Full thrust

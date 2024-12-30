@@ -29,7 +29,7 @@ mod finiteburns;
 pub use finiteburns::FiniteBurns;
 
 mod mnvr;
-pub use mnvr::Mnvr;
+pub use mnvr::Maneuver;
 
 mod ruggiero;
 pub use ruggiero::{Objective, Ruggiero, StateParameter};
@@ -164,7 +164,7 @@ pub enum GuidanceError {
 }
 
 /// Local frame options, used notably for guidance laws.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LocalFrame {
     Inertial,
     RIC,

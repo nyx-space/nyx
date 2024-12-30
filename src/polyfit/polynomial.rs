@@ -17,7 +17,7 @@
 */
 
 /* NOTE: This code is effectively a clone of bacon-sci, MIT License, by Wyatt Campbell. */
-
+use serde_derive::{Deserialize, Serialize};
 use std::fmt;
 use std::ops;
 
@@ -243,7 +243,7 @@ impl<const S1: usize, const S2: usize> ops::Sub<Polynomial<S2>> for Polynomial<S
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub enum CommonPolynomial {
     Constant(f64),
     /// Linear(a, b) <=> f(x) = ax + b (order is FLIPPED from Polynomial<N> structure)
@@ -374,126 +374,140 @@ impl fmt::Display for CommonPolynomial {
     }
 }
 
-#[test]
-fn poly_constant() {
-    let c = CommonPolynomial::Constant(10.0);
-    for i in -100..=100 {
-        assert!(
-            (c.eval(i as f64) - 10.0).abs() < 2e-16,
-            "Constant polynomial returned wrong value"
+#[cfg(test)]
+mod ut_poly {
+    use crate::polyfit::{CommonPolynomial, Polynomial};
+
+    #[test]
+    fn poly_constant() {
+        let c = CommonPolynomial::Constant(10.0);
+        for i in -100..=100 {
+            assert!(
+                (c.eval(i as f64) - 10.0).abs() < 2e-16,
+                "Constant polynomial returned wrong value"
+            );
+        }
+    }
+
+    #[test]
+    fn poly_linear() {
+        let c = CommonPolynomial::Linear(2.0, 10.0);
+        for i in -100..=100 {
+            let x = i as f64;
+            let expect = 2.0 * x + 10.0;
+            assert!(
+                (c.eval(x) - expect).abs() < 2e-16,
+                "Constant polynomial returned wrong value"
+            );
+        }
+    }
+
+    #[test]
+    fn poly_quadratic() {
+        let p = Polynomial {
+            coefficients: [101.0, -2.0, 3.0],
+        };
+        let p2 = 2.0 * p;
+        let c = CommonPolynomial::Quadratic(3.0, -2.0, 101.0);
+        for i in -100..=100 {
+            let x = i as f64;
+            let expect = 3.0 * x.powi(2) - 2.0 * x + 101.0;
+            let expect_deriv = 6.0 * x - 2.0;
+            assert!(
+                (c.eval(x) - expect).abs() < 2e-16,
+                "Polynomial returned wrong value"
+            );
+            assert!(
+                (p.deriv(x) - expect_deriv).abs() < 2e-16,
+                "Polynomial derivative returned wrong value"
+            );
+
+            assert!(
+                (p.eval(x) - expect).abs() < 2e-16,
+                "Polynomial returned wrong value"
+            );
+            assert!(
+                (p2.eval(x) - 2.0 * expect).abs() < 2e-16,
+                "Polynomial returned wrong value"
+            );
+        }
+    }
+
+    #[test]
+    fn poly_print() {
+        let p = Polynomial {
+            coefficients: [101.0, -2.0, 3.0],
+        };
+        println!("{}", p);
+        assert_eq!(
+            format!("{}", p),
+            format!("{}", CommonPolynomial::Quadratic(3.0, -2.0, 101.0))
         );
     }
-}
 
-#[test]
-fn poly_linear() {
-    let c = CommonPolynomial::Linear(2.0, 10.0);
-    for i in -100..=100 {
-        let x = i as f64;
-        let expect = 2.0 * x + 10.0;
-        assert!(
-            (c.eval(x) - expect).abs() < 2e-16,
-            "Constant polynomial returned wrong value"
-        );
+    #[test]
+    fn poly_add() {
+        let p1 = Polynomial {
+            coefficients: [4.0, -2.0, 3.0],
+        };
+        let p2 = Polynomial {
+            coefficients: [0.0, -5.0, 0.0, 2.0],
+        };
+        //      P(x) = (3x^2 - 2x + 4) + (2x^3 - 5x)
+        // <=>  P(x) = 2x^3 + 3x^2 -7x + 4
+        let p_expected = Polynomial {
+            coefficients: [4.0, -7.0, 3.0, 2.0],
+        };
+
+        // let p3 = add::<4, 3>(p2, p1);
+        let p3 = p1 + p2;
+        println!("p3 = {:x}\npe = {:x}", p3, p_expected);
+        assert_eq!(p3, p_expected);
+        // Check this is correct
+        for i in -100..=100 {
+            let x = i as f64;
+            let expect = p1.eval(x) + p2.eval(x);
+            assert!(
+                (p3.eval(x) - expect).abs() < 2e-16,
+                "Constant polynomial returned wrong value"
+            );
+        }
     }
-}
 
-#[test]
-fn poly_quadratic() {
-    let p = Polynomial {
-        coefficients: [101.0, -2.0, 3.0],
-    };
-    let p2 = 2.0 * p;
-    let c = CommonPolynomial::Quadratic(3.0, -2.0, 101.0);
-    for i in -100..=100 {
-        let x = i as f64;
-        let expect = 3.0 * x.powi(2) - 2.0 * x + 101.0;
-        let expect_deriv = 6.0 * x - 2.0;
-        assert!(
-            (c.eval(x) - expect).abs() < 2e-16,
-            "Polynomial returned wrong value"
-        );
-        assert!(
-            (p.deriv(x) - expect_deriv).abs() < 2e-16,
-            "Polynomial derivative returned wrong value"
-        );
+    #[test]
+    fn poly_sub() {
+        let p2 = Polynomial {
+            coefficients: [4.0, -2.0, 3.0],
+        };
+        let p1 = Polynomial {
+            coefficients: [0.0, -5.0, 0.0, 2.0],
+        };
+        //      P(x) = (3x^2 - 2x + 4) + (2x^3 - 5x)
+        // <=>  P(x) = 2x^3 + 3x^2 -7x + 4
+        let p_expected = Polynomial {
+            coefficients: [-4.0, -3.0, -3.0, 2.0],
+        };
 
-        assert!(
-            (p.eval(x) - expect).abs() < 2e-16,
-            "Polynomial returned wrong value"
-        );
-        assert!(
-            (p2.eval(x) - 2.0 * expect).abs() < 2e-16,
-            "Polynomial returned wrong value"
-        );
+        let p3 = p1 - p2;
+        println!("p3 = {:x}\npe = {:x}", p3, p_expected);
+        assert_eq!(p3, p_expected);
+        // Check this is correct
+        for i in -100..=100 {
+            let x = i as f64;
+            let expect = p1.eval(x) - p2.eval(x);
+            assert!(
+                (p3.eval(x) - expect).abs() < 2e-16,
+                "Constant polynomial returned wrong value"
+            );
+        }
     }
-}
 
-#[test]
-fn poly_print() {
-    let p = Polynomial {
-        coefficients: [101.0, -2.0, 3.0],
-    };
-    println!("{}", p);
-    assert_eq!(
-        format!("{}", p),
-        format!("{}", CommonPolynomial::Quadratic(3.0, -2.0, 101.0))
-    );
-}
-
-#[test]
-fn poly_add() {
-    let p1 = Polynomial {
-        coefficients: [4.0, -2.0, 3.0],
-    };
-    let p2 = Polynomial {
-        coefficients: [0.0, -5.0, 0.0, 2.0],
-    };
-    //      P(x) = (3x^2 - 2x + 4) + (2x^3 - 5x)
-    // <=>  P(x) = 2x^3 + 3x^2 -7x + 4
-    let p_expected = Polynomial {
-        coefficients: [4.0, -7.0, 3.0, 2.0],
-    };
-
-    // let p3 = add::<4, 3>(p2, p1);
-    let p3 = p1 + p2;
-    println!("p3 = {:x}\npe = {:x}", p3, p_expected);
-    assert_eq!(p3, p_expected);
-    // Check this is correct
-    for i in -100..=100 {
-        let x = i as f64;
-        let expect = p1.eval(x) + p2.eval(x);
-        assert!(
-            (p3.eval(x) - expect).abs() < 2e-16,
-            "Constant polynomial returned wrong value"
-        );
-    }
-}
-
-#[test]
-fn poly_sub() {
-    let p2 = Polynomial {
-        coefficients: [4.0, -2.0, 3.0],
-    };
-    let p1 = Polynomial {
-        coefficients: [0.0, -5.0, 0.0, 2.0],
-    };
-    //      P(x) = (3x^2 - 2x + 4) + (2x^3 - 5x)
-    // <=>  P(x) = 2x^3 + 3x^2 -7x + 4
-    let p_expected = Polynomial {
-        coefficients: [-4.0, -3.0, -3.0, 2.0],
-    };
-
-    let p3 = p1 - p2;
-    println!("p3 = {:x}\npe = {:x}", p3, p_expected);
-    assert_eq!(p3, p_expected);
-    // Check this is correct
-    for i in -100..=100 {
-        let x = i as f64;
-        let expect = p1.eval(x) - p2.eval(x);
-        assert!(
-            (p3.eval(x) - expect).abs() < 2e-16,
-            "Constant polynomial returned wrong value"
-        );
+    #[test]
+    fn poly_serde() {
+        let c = CommonPolynomial::Quadratic(3.0, -2.0, 101.0);
+        let c_yml = serde_yml::to_string(&c).unwrap();
+        println!("{c_yml}");
+        let c2 = serde_yml::from_str(&c_yml).unwrap();
+        assert_eq!(c, c2);
     }
 }
