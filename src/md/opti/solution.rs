@@ -19,7 +19,7 @@
 use hifitime::TimeUnits;
 use snafu::{ensure, ResultExt};
 
-use crate::dynamics::guidance::{LocalFrame, Maneuver};
+use crate::dynamics::guidance::{LocalFrame, Maneuver, MnvrRepr};
 use crate::linalg::SVector;
 use crate::md::objective::Objective;
 use crate::md::{prelude::*, GuidanceSnafu, NotFiniteSnafu, TargetingError};
@@ -70,8 +70,10 @@ impl<const V: usize, const O: usize> TargeterSolution<V, O> {
             start: correction_epoch,
             end: achievement_epoch,
             thrust_prct: 1.0,
-            alpha_inplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
-            delta_outofplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
+            representation: MnvrRepr::Angles {
+                azimuth: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
+                elevation: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
+            },
             frame: LocalFrame::RCN,
         };
 
@@ -109,16 +111,26 @@ impl<const V: usize, const O: usize> TargeterSolution<V, O> {
                     }
                 }
                 Vary::MnvrAlpha | Vary::MnvrAlphaDot | Vary::MnvrAlphaDDot => {
-                    mnvr.alpha_inplane_radians = mnvr
-                        .alpha_inplane_radians
-                        .add_val_in_order(corr, var.component.vec_index())
-                        .unwrap();
+                    match mnvr.representation {
+                        MnvrRepr::Angles { azimuth, elevation } => {
+                            let azimuth = azimuth
+                                .add_val_in_order(corr, var.component.vec_index())
+                                .unwrap();
+                            mnvr.representation = MnvrRepr::Angles { azimuth, elevation };
+                        }
+                        _ => unreachable!(),
+                    };
                 }
                 Vary::MnvrDelta | Vary::MnvrDeltaDot | Vary::MnvrDeltaDDot => {
-                    mnvr.delta_outofplane_radians = mnvr
-                        .delta_outofplane_radians
-                        .add_val_in_order(corr, var.component.vec_index())
-                        .unwrap();
+                    match mnvr.representation {
+                        MnvrRepr::Angles { azimuth, elevation } => {
+                            let elevation = elevation
+                                .add_val_in_order(corr, var.component.vec_index())
+                                .unwrap();
+                            mnvr.representation = MnvrRepr::Angles { azimuth, elevation };
+                        }
+                        _ => unreachable!(),
+                    };
                 }
                 Vary::ThrustX | Vary::ThrustY | Vary::ThrustZ => {
                     let mut vector = mnvr.direction();

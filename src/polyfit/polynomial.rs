@@ -383,7 +383,7 @@ mod ut_poly {
         let c = CommonPolynomial::Constant(10.0);
         for i in -100..=100 {
             assert!(
-                (c.eval(i as f64) - 10.0).abs() < 2e-16,
+                (c.eval(i as f64) - 10.0).abs() < f64::EPSILON,
                 "Constant polynomial returned wrong value"
             );
         }
@@ -396,7 +396,7 @@ mod ut_poly {
             let x = i as f64;
             let expect = 2.0 * x + 10.0;
             assert!(
-                (c.eval(x) - expect).abs() < 2e-16,
+                (c.eval(x) - expect).abs() < f64::EPSILON,
                 "Constant polynomial returned wrong value"
             );
         }
@@ -414,20 +414,20 @@ mod ut_poly {
             let expect = 3.0 * x.powi(2) - 2.0 * x + 101.0;
             let expect_deriv = 6.0 * x - 2.0;
             assert!(
-                (c.eval(x) - expect).abs() < 2e-16,
+                (c.eval(x) - expect).abs() < f64::EPSILON,
                 "Polynomial returned wrong value"
             );
             assert!(
-                (p.deriv(x) - expect_deriv).abs() < 2e-16,
+                (p.deriv(x) - expect_deriv).abs() < f64::EPSILON,
                 "Polynomial derivative returned wrong value"
             );
 
             assert!(
-                (p.eval(x) - expect).abs() < 2e-16,
+                (p.eval(x) - expect).abs() < f64::EPSILON,
                 "Polynomial returned wrong value"
             );
             assert!(
-                (p2.eval(x) - 2.0 * expect).abs() < 2e-16,
+                (p2.eval(x) - 2.0 * expect).abs() < f64::EPSILON,
                 "Polynomial returned wrong value"
             );
         }
@@ -468,7 +468,7 @@ mod ut_poly {
             let x = i as f64;
             let expect = p1.eval(x) + p2.eval(x);
             assert!(
-                (p3.eval(x) - expect).abs() < 2e-16,
+                (p3.eval(x) - expect).abs() < f64::EPSILON,
                 "Constant polynomial returned wrong value"
             );
         }
@@ -496,7 +496,7 @@ mod ut_poly {
             let x = i as f64;
             let expect = p1.eval(x) - p2.eval(x);
             assert!(
-                (p3.eval(x) - expect).abs() < 2e-16,
+                (p3.eval(x) - expect).abs() < f64::EPSILON,
                 "Constant polynomial returned wrong value"
             );
         }

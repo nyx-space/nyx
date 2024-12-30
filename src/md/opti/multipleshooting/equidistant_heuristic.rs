@@ -41,7 +41,7 @@ impl<'a> MultipleShooting<'a, Node, 3, 3> {
 
         // Compute the direction of the objective
         let mut direction = xf.radius_km - x0.orbit.radius_km;
-        if direction.norm() < 2e-16 {
+        if direction.norm() < f64::EPSILON {
             return Err(TargetingError::TargetsTooClose);
         }
         let distance_increment = direction.norm() / (node_count as f64);

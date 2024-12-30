@@ -175,7 +175,7 @@ fn od_val_multi_body_ckf_perfect_stations(
             );
         }
         assert!(
-            est.state_deviation().norm() < 2e-16,
+            est.state_deviation().norm() < f64::EPSILON,
             "estimate error should be very good (perfect dynamics) ({:e})",
             est.state_deviation().norm()
         );
@@ -185,14 +185,14 @@ fn od_val_multi_body_ckf_perfect_stations(
 
     for res in odp.residuals.iter().flatten() {
         assert!(
-            res.postfit.norm() < 2e-16,
+            res.postfit.norm() < f64::EPSILON,
             "postfit should be zero (perfect dynamics) ({:e})",
             res
         );
     }
 
     let est = last_est.unwrap();
-    assert!(est.state_deviation().norm() < 2e-16);
+    assert!(est.state_deviation().norm() < f64::EPSILON);
     assert!(est.covar.norm() < 1e-5);
 
     let delta = (est.state().orbit - final_truth.orbit).unwrap();
@@ -202,8 +202,14 @@ fn od_val_multi_body_ckf_perfect_stations(
         delta.vmag_km_s() * 1e6
     );
 
-    assert!(delta.rmag_km() < 2e-16, "Position error should be zero");
-    assert!(delta.vmag_km_s() < 2e-16, "Velocity error should be zero");
+    assert!(
+        delta.rmag_km() < f64::EPSILON,
+        "Position error should be zero"
+    );
+    assert!(
+        delta.vmag_km_s() < f64::EPSILON,
+        "Velocity error should be zero"
+    );
 }
 
 #[allow(clippy::identity_op)]
@@ -295,7 +301,7 @@ fn multi_body_ckf_covar_map_cov_test(
         } else {
             // Only check that the covariance is low IF this isn't a predicted estimate
             assert!(
-                est.state_deviation().norm() < 2e-16,
+                est.state_deviation().norm() < f64::EPSILON,
                 "estimate error should be zero (perfect dynamics) ({:e})",
                 est.state_deviation().norm()
             );
@@ -313,7 +319,7 @@ fn multi_body_ckf_covar_map_cov_test(
     // Note that we check the residuals separately from the estimates because we have many predicted estimates which do not have any associated residuals.
     for res in odp.residuals.iter().flatten() {
         assert!(
-            res.postfit.norm() < 2e-16,
+            res.postfit.norm() < f64::EPSILON,
             "postfit should be zero (perfect dynamics) ({:e})",
             res
         );

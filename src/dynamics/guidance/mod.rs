@@ -29,7 +29,7 @@ mod finiteburns;
 pub use finiteburns::FiniteBurns;
 
 mod mnvr;
-pub use mnvr::Maneuver;
+pub use mnvr::{Maneuver, MnvrRepr};
 
 mod ruggiero;
 pub use ruggiero::{Objective, Ruggiero, StateParameter};
@@ -182,8 +182,8 @@ fn ra_dec_from_vec() {
         loop {
             let unit_v = unit_vector_from_ra_dec(alpha, delta);
             let (alpha2, delta2) = ra_dec_from_unit_vector(unit_v);
-            assert!((alpha - alpha2).abs() < 2e-16);
-            assert!((delta - delta2).abs() < 2e-16);
+            assert!((alpha - alpha2).abs() < f64::EPSILON);
+            assert!((delta - delta2).abs() < f64::EPSILON);
             alpha += TAU * 0.1; // Increment right ascension by one tenth of a circle
             if alpha > PI {
                 alpha = 0.0;
