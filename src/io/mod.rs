@@ -40,12 +40,8 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use typed_builder::TypedBuilder;
 
-/// Handles writing to an XYZV file
-pub mod cosmo;
-pub mod estimate;
 /// Handles loading of gravity models using files of NASA PDS and GMAT COF. Several gunzipped files are provided with nyx.
 pub mod gravity;
-pub mod matrices;
 
 use std::io;
 
