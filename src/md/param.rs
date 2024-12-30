@@ -133,7 +133,6 @@ pub enum StateParameter {
     VZ,
 }
 
-
 impl StateParameter {
     /// Returns the default event finding precision in the unit of that parameter
     pub fn default_event_precision(&self) -> f64 {
@@ -262,18 +261,6 @@ impl StateParameter {
             Self::Thrust => "N",
             _ => "",
         }
-    }
-
-    /// Prints this orbit in Keplerian form
-    #[cfg(feature = "python")]
-    fn __str__(&self) -> String {
-        format!("{self}")
-    }
-
-    #[cfg(feature = "python")]
-    #[new]
-    fn py_new(name: String) -> Result<Self, NyxError> {
-        Self::from_str(&name)
     }
 }
 

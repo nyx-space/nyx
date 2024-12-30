@@ -76,9 +76,6 @@ pub mod linalg {
 /// Re-export some useful things
 pub use self::cosmic::{Orbit, Spacecraft, State, TimeTagged};
 
-// #[cfg(feature = "python")]
-// mod python;
-
 /// The GMAT Earth gravitation parameter, used only for testing.
 #[cfg(test)]
 pub(crate) const GMAT_EARTH_GM: f64 = 398_600.441_5;
