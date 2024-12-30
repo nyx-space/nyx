@@ -124,7 +124,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     // The harmonics must be computed in the body fixed frame.
     // We're using the long term prediction of the Moon principal axes frame.
     let moon_pa_frame = MOON_PA_FRAME.with_orient(31008);
-    // let moon_pa_frame = IAU_MOON_FRAME;
     let sph_harmonics = Harmonics::from_stor(
         almanac.frame_from_uid(moon_pa_frame)?,
         HarmonicsMem::from_shadr(&jggrx_meta.uri, 80, 80, true)?,

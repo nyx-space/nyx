@@ -204,7 +204,6 @@ impl ForceModel for Drag {
 
                 // TODO: Drag modeling will be improved in https://github.com/nyx-space/nyx/issues/317
                 // The frame will be double checked in this PR as well.
-                // let velocity_integr_frame = self.cosm.frame_chg(&osc, integration_frame).velocity();
                 let velocity_integr_frame = almanac
                     .transform_to(osc_drag_frame, integration_frame, None)
                     .context(DynamicsAlmanacSnafu {
@@ -248,7 +247,6 @@ impl ForceModel for Drag {
                     10.0_f64.powf(logdensity)
                 };
 
-                // let velocity_integr_frame = self.cosm.frame_chg(&osc, integration_frame).velocity();
                 let velocity_integr_frame = almanac
                     .transform_to(osc_drag_frame, integration_frame, None)
                     .context(DynamicsAlmanacSnafu {

@@ -396,7 +396,6 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
 
     // Read in the Parquet file and assert proper data was written.
 
-    // let df = LazyFrame::scan_parquet(timestamped_path, Default::default()).unwrap();
     let df = ParquetReader::new(File::open(timestamped_path).unwrap())
         .finish()
         .unwrap();

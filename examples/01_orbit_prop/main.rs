@@ -20,7 +20,10 @@ use nyx::{
     propagators::Propagator,
     Spacecraft, State,
 };
-use polars::{df, series::ChunkCompare};
+use polars::{
+    frame::column::ScalarColumn,
+    prelude::{df, AnyValue, ChunkCompareIneq, Column, DataType, Scalar},
+};
 
 use std::{error::Error, sync::Arc};
 
@@ -274,7 +277,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
 
     // Finally, let's see when the spacecraft is visible, assuming 15 degrees minimum elevation.
-    let mask = aer_df.column("elevation (deg)")?.gt(15.0)?;
+    let mask = aer_df
+        .column("elevation (deg)")?
+        .gt(&Column::Scalar(ScalarColumn::new(
+            "elevation mask (deg)".into(),
+            Scalar::new(DataType::Float64, AnyValue::Float64(15.0)),
+            offset_s.len(),
+        )))?;
     let cubesat_visible = aer_df.filter(&mask)?;
 
     println!("{cubesat_visible}");
