@@ -50,9 +50,9 @@ pub struct SpacecraftUncertainty {
     #[builder(default = 50e-5)]
     pub vz_km_s: f64,
     #[builder(default)]
-    pub cr: f64,
+    pub coeff_reflectivity: f64,
     #[builder(default)]
-    pub cd: f64,
+    pub coeff_drag: f64,
     #[builder(default)]
     pub mass_kg: f64,
 }
@@ -68,8 +68,8 @@ impl SpacecraftUncertainty {
             || self.vx_km_s < 0.0
             || self.vy_km_s < 0.0
             || self.vz_km_s < 0.0
-            || self.cd < 0.0
-            || self.cr < 0.0
+            || self.coeff_drag < 0.0
+            || self.coeff_reflectivity < 0.0
             || self.mass_kg < 0.0
         {
             return Err(PhysicsError::AppliedMath {
@@ -104,8 +104,8 @@ impl SpacecraftUncertainty {
                 0.0,
                 0.0,
                 0.0,
-                self.cr.powi(2),
-                self.cd.powi(2),
+                self.coeff_reflectivity.powi(2),
+                self.coeff_drag.powi(2),
                 self.mass_kg.powi(2),
             ]));
 
@@ -154,7 +154,7 @@ impl fmt::Display for SpacecraftUncertainty {
         writeln!(
             f,
             "σ_cr = {}  σ_cd = {}  σ_mass = {} kg",
-            self.cr, self.cd, self.mass_kg
+            self.coeff_reflectivity, self.coeff_drag, self.mass_kg
         )
     }
 }

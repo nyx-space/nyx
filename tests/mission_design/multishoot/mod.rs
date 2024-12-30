@@ -13,6 +13,7 @@ use anise::{
     },
     prelude::Almanac,
 };
+use nyx_space::cosmic::Mass;
 use rstest::*;
 use std::sync::Arc;
 
@@ -36,8 +37,7 @@ fn alt_orbit_raising_cov_test(almanac: Arc<Almanac>) {
     /* Build the spacecraft -- really only the mass is needed here */
     let sc = Spacecraft {
         orbit: start,
-        dry_mass_kg: 100.0,
-        fuel_mass_kg: 500.0,
+        mass: Mass::from_dry_and_prop_masses(100.0, 500.0),
         thruster: Some(Thruster {
             thrust_N: 150.0,
             isp_s: 300.0,
@@ -224,8 +224,7 @@ fn vmag_orbit_raising(almanac: Arc<Almanac>) {
     /* Build the spacecraft -- really only the mass is needed here */
     let sc = Spacecraft {
         orbit: start,
-        dry_mass_kg: 100.0,
-        fuel_mass_kg: 500.0,
+        mass: Mass::from_dry_and_prop_masses(100.0, 500.0),
         thruster: Some(Thruster {
             thrust_N: 150.0,
             isp_s: 300.0,

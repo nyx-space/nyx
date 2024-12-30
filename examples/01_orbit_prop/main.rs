@@ -13,7 +13,7 @@ use anise::{
 use hifitime::{Epoch, Unit};
 use log::warn;
 use nyx::{
-    cosmic::{MetaAlmanac, Orbit, SrpConfig},
+    cosmic::{Mass, MetaAlmanac, Orbit, SRPData},
     dynamics::{Harmonics, OrbitalDynamics, SolarPressure, SpacecraftDynamics},
     io::{gravity::HarmonicsMem, ExportCfg},
     od::GroundStation,
@@ -91,10 +91,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Let's build a cubesat sized spacecraft, with an SRP area of 10 cm^2 and a mass of 9.6 kg.
     let sc = Spacecraft::builder()
         .orbit(orbit)
-        .dry_mass_kg(9.60)
-        .srp(SrpConfig {
+        .mass(Mass::from_dry_mass(9.60))
+        .srp(SRPData {
             area_m2: 10e-4,
-            cr: 1.1,
+            coeff_reflectivity: 1.1,
         })
         .build();
     println!("{sc:x}");

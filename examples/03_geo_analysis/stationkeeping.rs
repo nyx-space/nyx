@@ -12,7 +12,7 @@ use anise::{
 };
 use hifitime::{Epoch, TimeUnits, Unit};
 use nyx::{
-    cosmic::{eclipse::EclipseLocator, GuidanceMode, MetaAlmanac, Orbit, SrpConfig},
+    cosmic::{eclipse::EclipseLocator, GuidanceMode, Mass, MetaAlmanac, Orbit, SRPData},
     dynamics::{
         guidance::{Ruggiero, Thruster},
         Harmonics, OrbitalDynamics, SolarPressure, SpacecraftDynamics,
@@ -38,9 +38,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let sc = Spacecraft::builder()
         .orbit(orbit)
-        .dry_mass_kg(1000.0) // 1000 kg of dry mass
-        .fuel_mass_kg(1000.0) // 1000 kg of fuel, totalling 2.0 tons
-        .srp(SrpConfig::from_area(3.0 * 6.0)) // Assuming 1 kW/m^2 or 18 kW, giving a margin of 4.35 kW for on-propulsion consumption
+        .mass(Mass::from_dry_and_prop_masses(1000.0, 1000.0)) // 1000 kg of dry mass and prop, totalling 2.0 tons
+        .srp(SRPData::from_area(3.0 * 6.0)) // Assuming 1 kW/m^2 or 18 kW, giving a margin of 4.35 kW for on-propulsion consumption
         .thruster(Thruster {
             // "NEXT-STEP" row in Table 2
             isp_s: 4435.0,

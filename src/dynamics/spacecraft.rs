@@ -50,9 +50,9 @@ use std::collections::BTreeMap;
 
 const NORM_ERR: f64 = 1e-4;
 
-/// A generic spacecraft dynamics with associated force models, guidance law, and flag specifying whether to decrement the fuel mass or not.
-/// Note: when developing new guidance laws, it is recommended to _not_ enable fuel decrement until the guidance law seems to work without proper physics.
-/// Note: if the spacecraft runs out of fuel, the propagation segment will return an error.
+/// A generic spacecraft dynamics with associated force models, guidance law, and flag specifying whether to decrement the prop mass or not.
+/// Note: when developing new guidance laws, it is recommended to _not_ enable prop decrement until the guidance law seems to work without proper physics.
+/// Note: if the spacecraft runs out of prop, the propagation segment will return an error.
 #[derive(Clone)]
 #[cfg_attr(feature = "python", pyclass)]
 #[cfg_attr(feature = "python", pyo3(module = "nyx_space.mission_design"))]
@@ -77,7 +77,7 @@ impl SpacecraftDynamics {
     }
 
     /// Initialize a Spacecraft with a set of orbital dynamics and a propulsion subsystem.
-    /// Will _not_ decrement the fuel mass as propellant is consumed.
+    /// Will _not_ decrement the prop mass as propellant is consumed.
     pub fn from_guidance_law_no_decr(
         orbital_dyn: OrbitalDynamics,
         guid_law: Arc<dyn GuidanceLaw>,
@@ -239,8 +239,8 @@ impl Dynamics for SpacecraftDynamics {
         next_state: Self::StateType,
         almanac: Arc<Almanac>,
     ) -> Result<Self::StateType, DynamicsError> {
-        if next_state.fuel_mass_kg < 0.0 {
-            error!("negative fuel mass at {}", next_state.epoch());
+        if next_state.mass.prop_mass_kg < 0.0 {
+            error!("negative prop mass at {}", next_state.epoch());
             return Err(DynamicsError::FuelExhausted {
                 sc: Box::new(next_state),
             });
@@ -309,7 +309,7 @@ impl Dynamics for SpacecraftDynamics {
 
         // Now include the control as needed.
         if let Some(guid_law) = &self.guid_law {
-            let (thrust_force, fuel_rate) = {
+            let (thrust_force, prop_rate) = {
                 if osc_sc.thruster.is_none() {
                     return Err(DynamicsError::DynamicsGuidance {
                         source: GuidanceError::NoThrustersDefined,
@@ -345,9 +345,9 @@ impl Dynamics for SpacecraftDynamics {
                         (
                             thrust_inertial * total_thrust,
                             if self.decrement_mass {
-                                let fuel_usage = thrust_throttle_lvl * thruster.thrust_N
+                                let prop_usage = thrust_throttle_lvl * thruster.thrust_N
                                     / (thruster.isp_s * STD_GRAVITY);
-                                -fuel_usage
+                                -prop_usage
                             } else {
                                 0.0
                             },
@@ -367,7 +367,7 @@ impl Dynamics for SpacecraftDynamics {
             for i in 0..3 {
                 d_x[i + 3] += thrust_force[i] / osc_sc.mass_kg();
             }
-            d_x[8] += fuel_rate;
+            d_x[8] += prop_rate;
         }
         Ok(d_x)
     }

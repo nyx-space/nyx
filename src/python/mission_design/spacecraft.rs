@@ -17,7 +17,7 @@
 */
 use crate::python::PythonError;
 use crate::{
-    cosmic::{DragConfig, SrpConfig},
+    cosmic::{DragConfig, SRPData},
     dynamics::guidance::Thruster,
     io::{ConfigError, ConfigRepr},
     md::prelude::GuidanceMode,
@@ -43,7 +43,7 @@ impl Spacecraft {
         orbit: Option<Orbit>,
         dry_mass_kg: Option<f64>,
         fuel_mass_kg: Option<f64>,
-        srp: Option<SrpConfig>,
+        srp: Option<SRPData>,
         drag: Option<DragConfig>,
         thruster: Option<Thruster>,
         mode: Option<GuidanceMode>,
@@ -62,7 +62,7 @@ impl Spacecraft {
                 thruster,
                 mode: mode.unwrap_or(GuidanceMode::Coast),
                 stm: None,
-                srp: srp.unwrap_or_else(|| SrpConfig::default()),
+                srp: srp.unwrap_or_else(|| SRPData::default()),
                 drag: drag.unwrap_or_else(|| DragConfig::default()),
             })
         }
@@ -142,7 +142,7 @@ impl Spacecraft {
         self.value(param)
     }
 
-    fn srp(&self) -> SrpConfig {
+    fn srp(&self) -> SRPData {
         self.srp
     }
 
@@ -152,13 +152,13 @@ impl Spacecraft {
 }
 
 #[pymethods]
-impl SrpConfig {
+impl SRPData {
     #[new]
     #[pyo3(text_signature = "(area_m2, cr=1.8)")]
-    pub fn py_new(area_m2: Option<f64>, cr: Option<f64>) -> Self {
+    pub fn py_new(area_m2: Option<f64>, coeff_reflectivity: Option<f64>) -> Self {
         Self {
             area_m2: area_m2.unwrap_or(0.0),
-            cr: cr.unwrap_or(1.8),
+            coeff_reflectivity: cr.unwrap_or(1.8),
         }
     }
 
@@ -205,7 +205,7 @@ impl SrpConfig {
     }
 
     #[setter]
-    fn set_cr(&mut self, cr: f64) -> PyResult<()> {
+    fn set_cr(&mut self, coeff_reflectivity: f64) -> PyResult<()> {
         self.cr = cr;
         Ok(())
     }
@@ -215,10 +215,10 @@ impl SrpConfig {
 impl DragConfig {
     #[new]
     #[pyo3(text_signature = "(area_m2, cd=2.2)")]
-    pub fn py_new(area_m2: Option<f64>, cd: Option<f64>) -> Self {
+    pub fn py_new(area_m2: Option<f64>, coeff_drag: Option<f64>) -> Self {
         Self {
             area_m2: area_m2.unwrap_or(0.0),
-            cd: cd.unwrap_or(1.8),
+            coeff_drag: cd.unwrap_or(1.8),
         }
     }
 
@@ -265,7 +265,7 @@ impl DragConfig {
     }
 
     #[setter]
-    fn set_cr(&mut self, cd: f64) -> PyResult<()> {
+    fn set_cr(&mut self, coeff_drag: f64) -> PyResult<()> {
         self.cd = cd;
         Ok(())
     }

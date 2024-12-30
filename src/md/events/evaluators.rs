@@ -61,7 +61,7 @@ impl EventEvaluator<Spacecraft> for Event {
                 state.orbit.ta_deg().context(EventPhysicsSnafu)?,
                 180.0,
             )),
-            StateParameter::FuelMass => Ok(state.fuel_mass_kg - self.desired_value),
+            StateParameter::PropMass => Ok(state.mass.prop_mass_kg - self.desired_value),
             _ => Ok(state.value(self.parameter).context(EventStateSnafu {
                 param: self.parameter,
             })? - self.desired_value),

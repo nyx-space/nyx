@@ -38,7 +38,8 @@ gitlab = { repository = "nyx-space/nyx", branch = "master" }
 nalgebra = "0.33"
 log = "0.4"
 hifitime = "4.0.0"
-anise = "0.5.0"
+# anise = "0.5.0"
+anise = { path = "../anise/anise" }
 flate2 = { version = "1.0", features = [
     "rust_backend",
 ], default-features = false }
@@ -71,7 +72,7 @@ getrandom = { version = "0.2", features = ["js"] }
 typed-builder = "0.20.0"
 snafu = { version = "0.8.3", features = ["backtrace"] }
 serde_dhall = "0.12"
-indexmap = {version = "2.6.0", features = ["serde"]}
+indexmap = { version = "2.6.0", features = ["serde"] }
 
 
 [dev-dependencies]

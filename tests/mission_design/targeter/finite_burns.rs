@@ -5,6 +5,7 @@ use hifitime::TimeUnits;
 use nyx::dynamics::guidance::{LocalFrame, Mnvr, Thruster};
 use nyx::linalg::Vector3;
 use nyx::md::prelude::*;
+use nyx_space::cosmic::Mass;
 
 use crate::propagation::GMAT_EARTH_GM;
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
@@ -31,8 +32,7 @@ fn thrust_dir_tgt_sma_aop_raan(almanac: Arc<Almanac>) {
 
     let spacecraft = Spacecraft {
         orbit: xi_orig,
-        dry_mass_kg: 10.0,
-        fuel_mass_kg: 90.0,
+        mass: Mass::from_dry_and_prop_masses(10.0, 90.0),
         thruster: Some(Thruster {
             thrust_N: 500.0,
             isp_s: 300.0,
@@ -78,8 +78,7 @@ fn thrust_dir_rate_tgt_sma_aop_raan(almanac: Arc<Almanac>) {
 
     let spacecraft = Spacecraft {
         orbit: xi_orig,
-        dry_mass_kg: 10.0,
-        fuel_mass_kg: 90.0,
+        mass: Mass::from_dry_and_prop_masses(10.0, 90.0),
         thruster: Some(Thruster {
             thrust_N: 500.0,
             isp_s: 300.0,
@@ -127,8 +126,7 @@ fn thrust_profile_tgt_sma_aop_raan_cov_test(almanac: Arc<Almanac>) {
 
     let spacecraft = Spacecraft {
         orbit: xi_orig,
-        dry_mass_kg: 10.0,
-        fuel_mass_kg: 90.0,
+        mass: Mass::from_dry_and_prop_masses(10.0, 90.0),
         thruster: Some(Thruster {
             thrust_N: 500.0,
             isp_s: 300.0,

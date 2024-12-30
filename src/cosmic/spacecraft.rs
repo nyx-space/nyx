@@ -20,6 +20,7 @@ use anise::astro::PhysicsResult;
 use anise::constants::frames::EARTH_J2000;
 pub use anise::prelude::Orbit;
 
+pub use anise::structure::spacecraft::{DragData, Mass, SRPData};
 use nalgebra::Vector3;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
@@ -80,30 +81,25 @@ impl From<GuidanceMode> for f64 {
     }
 }
 
-/// A spacecraft state, composed of its orbit, its dry and fuel (wet) masses (in kg), its SRP configuration, its drag configuration, its thruster configuration, and its guidance mode.
+/// A spacecraft state, composed of its orbit, its masses (dry, prop, extra, all in kg), its SRP configuration, its drag configuration, its thruster configuration, and its guidance mode.
 ///
 /// Optionally, the spacecraft state can also store the state transition matrix from the start of the propagation until the current time (i.e. trajectory STM, not step-size STM).
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, TypedBuilder)]
 #[cfg_attr(feature = "python", pyclass)]
 #[cfg_attr(feature = "python", pyo3(module = "nyx_space.cosmic"))]
 pub struct Spacecraft {
-    /// Initial orbit the vehicle is in
+    /// Initial orbit of the vehicle
     pub orbit: Orbit,
-    /// Dry mass, i.e. mass without fuel, in kg
+    /// Dry, propellant, and extra masses
     #[builder(default)]
-    pub dry_mass_kg: f64,
-    /// Fuel mass (if fuel mass is negative, thrusting will fail, unless configured to break laws of physics)
-    #[builder(default)]
-    pub fuel_mass_kg: f64,
+    pub mass: Mass,
     /// Solar Radiation Pressure configuration for this spacecraft
     #[builder(default)]
     #[serde(default)]
-    pub srp: SrpConfig,
-
+    pub srp: SRPData,
     #[builder(default)]
     #[serde(default)]
-    pub drag: DragConfig,
-
+    pub drag: DragData,
     #[builder(default, setter(strip_option))]
     pub thruster: Option<Thruster>,
     /// Any extra information or extension that is needed for specific guidance laws
@@ -111,7 +107,7 @@ pub struct Spacecraft {
     #[serde(default)]
     pub mode: GuidanceMode,
     /// Optionally stores the state transition matrix from the start of the propagation until the current time (i.e. trajectory STM, not step-size STM)
-    /// STM is contains position and velocity, Cr, Cd, fuel mass
+    /// STM is contains position and velocity, Cr, Cd, prop mass
     #[builder(default, setter(strip_option))]
     #[serde(skip)]
     pub stm: Option<OMatrix<f64, Const<9>, Const<9>>>,
@@ -121,10 +117,9 @@ impl Default for Spacecraft {
     fn default() -> Self {
         Self {
             orbit: Orbit::zero(EARTH_J2000),
-            dry_mass_kg: 0.0,
-            fuel_mass_kg: 0.0,
-            srp: SrpConfig::default(),
-            drag: DragConfig::default(),
+            mass: Mass::default(),
+            srp: SRPData::default(),
+            drag: DragData::default(),
             thruster: None,
             mode: GuidanceMode::default(),
             stm: None,
@@ -138,88 +133,27 @@ impl From<Orbit> for Spacecraft {
     }
 }
 
-#[cfg_attr(feature = "python", pyclass)]
-#[cfg_attr(feature = "python", pyo3(module = "nyx_space.cosmic"))]
-#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
-/// The Solar Radiation Pressure configuration for a spacecraft
-pub struct SrpConfig {
-    /// solar radiation pressure area
-    pub area_m2: f64,
-    /// coefficient of reflectivity, must be between 0.0 (translucent) and 2.0 (all radiation absorbed and twice the force is transmitted back), defaults to 1.8
-    pub cr: f64,
-}
-
-impl SrpConfig {
-    /// Initialize the SRP from the c_r default and the provided drag area
-    pub fn from_area(area_m2: f64) -> Self {
-        Self {
-            area_m2,
-            ..Default::default()
-        }
-    }
-}
-
-impl Default for SrpConfig {
-    fn default() -> Self {
-        Self {
-            area_m2: 0.0,
-            cr: 1.8,
-        }
-    }
-}
-
-#[cfg_attr(feature = "python", pyclass)]
-#[cfg_attr(feature = "python", pyo3(module = "nyx_space.cosmic"))]
-#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
-/// The drag configuration for a spacecraft
-pub struct DragConfig {
-    /// drag area
-    pub area_m2: f64,
-    /// coefficient of drag; (spheres are between 2.0 and 2.1, use 2.2 in Earth's atmosphere (default)).
-    pub cd: f64,
-}
-
-impl DragConfig {
-    /// Initialize the drag from the c_d default and the provided drag area
-    pub fn from_area(area_m2: f64) -> Self {
-        Self {
-            area_m2,
-            ..Default::default()
-        }
-    }
-}
-
-impl Default for DragConfig {
-    fn default() -> Self {
-        Self {
-            area_m2: 0.0,
-            cd: 2.2,
-        }
-    }
-}
-
 impl Spacecraft {
     /// Initialize a spacecraft state from all of its parameters
     pub fn new(
         orbit: Orbit,
         dry_mass_kg: f64,
-        fuel_mass_kg: f64,
+        prop_mass_kg: f64,
         srp_area_m2: f64,
         drag_area_m2: f64,
-        cr: f64,
-        cd: f64,
+        coeff_reflectivity: f64,
+        coeff_drag: f64,
     ) -> Self {
         Self {
             orbit,
-            dry_mass_kg,
-            fuel_mass_kg,
-            srp: SrpConfig {
+            mass: Mass::from_dry_and_prop_masses(dry_mass_kg, prop_mass_kg),
+            srp: SRPData {
                 area_m2: srp_area_m2,
-                cr,
+                coeff_reflectivity,
             },
-            drag: DragConfig {
+            drag: DragData {
                 area_m2: drag_area_m2,
-                cd,
+                coeff_drag,
             },
             ..Default::default()
         }
@@ -229,36 +163,35 @@ impl Spacecraft {
     pub fn from_thruster(
         orbit: Orbit,
         dry_mass_kg: f64,
-        fuel_mass_kg: f64,
+        prop_mass_kg: f64,
         thruster: Thruster,
         mode: GuidanceMode,
     ) -> Self {
         Self {
             orbit,
-            dry_mass_kg,
-            fuel_mass_kg,
+            mass: Mass::from_dry_and_prop_masses(dry_mass_kg, prop_mass_kg),
             thruster: Some(thruster),
             mode,
             ..Default::default()
         }
     }
 
-    /// Initialize a spacecraft state from the SRP default 1.8 for coefficient of reflectivity (fuel mass and drag parameters nullified!)
+    /// Initialize a spacecraft state from the SRP default 1.8 for coefficient of reflectivity (prop mass and drag parameters nullified!)
     pub fn from_srp_defaults(orbit: Orbit, dry_mass_kg: f64, srp_area_m2: f64) -> Self {
         Self {
             orbit,
-            dry_mass_kg,
-            srp: SrpConfig::from_area(srp_area_m2),
+            mass: Mass::from_dry_mass(dry_mass_kg),
+            srp: SRPData::from_area(srp_area_m2),
             ..Default::default()
         }
     }
 
-    /// Initialize a spacecraft state from the SRP default 1.8 for coefficient of drag (fuel mass and SRP parameters nullified!)
+    /// Initialize a spacecraft state from the SRP default 1.8 for coefficient of drag (prop mass and SRP parameters nullified!)
     pub fn from_drag_defaults(orbit: Orbit, dry_mass_kg: f64, drag_area_m2: f64) -> Self {
         Self {
             orbit,
-            dry_mass_kg,
-            drag: DragConfig::from_area(drag_area_m2),
+            mass: Mass::from_dry_mass(dry_mass_kg),
+            drag: DragData::from_area(drag_area_m2),
             ..Default::default()
         }
     }
@@ -270,21 +203,21 @@ impl Spacecraft {
 
     /// Returns a copy of the state with a new dry mass
     pub fn with_dry_mass(mut self, dry_mass_kg: f64) -> Self {
-        self.dry_mass_kg = dry_mass_kg;
+        self.mass.dry_mass_kg = dry_mass_kg;
         self
     }
 
-    /// Returns a copy of the state with a new fuel mass
-    pub fn with_fuel_mass(mut self, fuel_mass_kg: f64) -> Self {
-        self.fuel_mass_kg = fuel_mass_kg;
+    /// Returns a copy of the state with a new prop mass
+    pub fn with_prop_mass(mut self, prop_mass_kg: f64) -> Self {
+        self.mass.prop_mass_kg = prop_mass_kg;
         self
     }
 
     /// Returns a copy of the state with a new SRP area and CR
-    pub fn with_srp(mut self, srp_area_m2: f64, cr: f64) -> Self {
-        self.srp = SrpConfig {
+    pub fn with_srp(mut self, srp_area_m2: f64, coeff_reflectivity: f64) -> Self {
+        self.srp = SRPData {
             area_m2: srp_area_m2,
-            cr,
+            coeff_reflectivity,
         };
 
         self
@@ -297,16 +230,16 @@ impl Spacecraft {
     }
 
     /// Returns a copy of the state with a new coefficient of reflectivity
-    pub fn with_cr(mut self, cr: f64) -> Self {
-        self.srp.cr = cr;
+    pub fn with_cr(mut self, coeff_reflectivity: f64) -> Self {
+        self.srp.coeff_reflectivity = coeff_reflectivity;
         self
     }
 
     /// Returns a copy of the state with a new drag area and CD
-    pub fn with_drag(mut self, drag_area_m2: f64, cd: f64) -> Self {
-        self.drag = DragConfig {
+    pub fn with_drag(mut self, drag_area_m2: f64, coeff_drag: f64) -> Self {
+        self.drag = DragData {
             area_m2: drag_area_m2,
-            cd,
+            coeff_drag,
         };
         self
     }
@@ -318,8 +251,8 @@ impl Spacecraft {
     }
 
     /// Returns a copy of the state with a new coefficient of drag
-    pub fn with_cd(mut self, cd: f64) -> Self {
-        self.drag.cd = cd;
+    pub fn with_cd(mut self, coeff_drag: f64) -> Self {
+        self.drag.coeff_drag = coeff_drag;
         self
     }
 
@@ -329,13 +262,15 @@ impl Spacecraft {
         self
     }
 
-    /// Returns the root sum square error between this spacecraft and the other, in kilometers for the position, kilometers per second in velocity, and kilograms in fuel
+    /// Returns the root sum square error between this spacecraft and the other, in kilometers for the position, kilometers per second in velocity, and kilograms in prop
     pub fn rss(&self, other: &Self) -> PhysicsResult<(f64, f64, f64)> {
         let rss_p_km = self.orbit.rss_radius_km(&other.orbit)?;
         let rss_v_km_s = self.orbit.rss_velocity_km_s(&other.orbit)?;
-        let rss_fuel_kg = (self.fuel_mass_kg - other.fuel_mass_kg).powi(2).sqrt();
+        let rss_prop_kg = (self.mass.prop_mass_kg - other.mass.prop_mass_kg)
+            .powi(2)
+            .sqrt();
 
-        Ok((rss_p_km, rss_v_km_s, rss_fuel_kg))
+        Ok((rss_p_km, rss_v_km_s, rss_prop_kg))
     }
 
     /// Sets the STM of this state of identity, which also enables computation of the STM for spacecraft navigation
@@ -351,7 +286,7 @@ impl Spacecraft {
 
     /// Returns the total mass in kilograms
     pub fn mass_kg(&self) -> f64 {
-        self.dry_mass_kg + self.fuel_mass_kg
+        self.mass.total_mass_kg()
     }
 
     /// Returns a copy of the state with the provided guidance mode
@@ -373,8 +308,7 @@ impl PartialEq for Spacecraft {
     fn eq(&self, other: &Self) -> bool {
         let mass_tol = 1e-6; // milligram
         self.orbit.eq_within(&other.orbit, 1e-9, 1e-12)
-            && (self.dry_mass_kg - other.dry_mass_kg).abs() < mass_tol
-            && (self.fuel_mass_kg - other.fuel_mass_kg).abs() < mass_tol
+            && (self.mass - other.mass).abs().total_mass_kg() < mass_tol
             && self.srp == other.srp
             && self.drag == other.drag
     }
@@ -388,7 +322,7 @@ impl fmt::Display for Spacecraft {
         write!(
             f,
             "total mass = {} kg @  {}  {:?}",
-            format!("{:.*}", mass_prec, self.dry_mass_kg + self.fuel_mass_kg),
+            format!("{:.*}", mass_prec, self.mass.total_mass_kg()),
             format!("{:.*}", orbit_prec, self.orbit),
             self.mode,
         )
@@ -403,7 +337,7 @@ impl fmt::LowerExp for Spacecraft {
         write!(
             f,
             "total mass = {} kg @  {}  {:?}",
-            format!("{:.*e}", mass_prec, self.dry_mass_kg + self.fuel_mass_kg),
+            format!("{:.*e}", mass_prec, self.mass.total_mass_kg()),
             format!("{:.*e}", orbit_prec, self.orbit),
             self.mode,
         )
@@ -418,7 +352,7 @@ impl fmt::LowerHex for Spacecraft {
         write!(
             f,
             "total mass = {} kg @  {}  {:?}",
-            format!("{:.*}", mass_prec, self.dry_mass_kg + self.fuel_mass_kg),
+            format!("{:.*}", mass_prec, self.mass.total_mass_kg()),
             format!("{:.*x}", orbit_prec, self.orbit),
             self.mode,
         )
@@ -433,7 +367,7 @@ impl fmt::UpperHex for Spacecraft {
         write!(
             f,
             "total mass = {} kg @  {}  {:?}",
-            format!("{:.*e}", mass_prec, self.dry_mass_kg + self.fuel_mass_kg),
+            format!("{:.*e}", mass_prec, self.mass.total_mass_kg()),
             format!("{:.*X}", orbit_prec, self.orbit),
             self.mode,
         )
@@ -466,9 +400,9 @@ impl State for Spacecraft {
             vector[i + 3] = *val;
         }
         // Set the spacecraft parameters
-        vector[6] = self.srp.cr;
-        vector[7] = self.drag.cd;
-        vector[8] = self.fuel_mass_kg;
+        vector[6] = self.srp.coeff_reflectivity;
+        vector[7] = self.drag.coeff_drag;
+        vector[8] = self.mass.prop_mass_kg;
         // Add the STM to the vector
         if let Some(stm) = self.stm {
             for (idx, stm_val) in stm.as_slice().iter().enumerate() {
@@ -497,13 +431,13 @@ impl State for Spacecraft {
         self.orbit.epoch = epoch;
         self.orbit.radius_km = radius_km;
         self.orbit.velocity_km_s = vel_km_s;
-        self.srp.cr = sc_state[6].clamp(0.0, 2.0);
-        self.drag.cd = sc_state[7];
-        self.fuel_mass_kg = sc_state[8];
+        self.srp.coeff_reflectivity = sc_state[6].clamp(0.0, 2.0);
+        self.drag.coeff_drag = sc_state[7];
+        self.mass.prop_mass_kg = sc_state[8];
     }
 
     /// diag(STM) = [X,Y,Z,Vx,Vy,Vz,Cr,Cd,Fuel]
-    /// WARNING: Currently the STM assumes that the fuel mass is constant at ALL TIMES!
+    /// WARNING: Currently the STM assumes that the prop mass is constant at ALL TIMES!
     fn stm(&self) -> Result<OMatrix<f64, Self::Size, Self::Size>, DynamicsError> {
         match self.stm {
             Some(stm) => Ok(stm),
@@ -525,10 +459,11 @@ impl State for Spacecraft {
 
     fn value(&self, param: StateParameter) -> Result<f64, StateError> {
         match param {
-            StateParameter::Cd => Ok(self.drag.cd),
-            StateParameter::Cr => Ok(self.srp.cr),
-            StateParameter::DryMass => Ok(self.dry_mass_kg),
-            StateParameter::FuelMass => Ok(self.fuel_mass_kg),
+            StateParameter::Cd => Ok(self.drag.coeff_drag),
+            StateParameter::Cr => Ok(self.srp.coeff_reflectivity),
+            StateParameter::DryMass => Ok(self.mass.dry_mass_kg),
+            StateParameter::PropMass => Ok(self.mass.prop_mass_kg),
+            StateParameter::TotalMass => Ok(self.mass.total_mass_kg()),
             StateParameter::Isp => match self.thruster {
                 Some(thruster) => Ok(thruster.isp_s),
                 None => Err(StateError::NoThrusterAvail),
@@ -694,9 +629,10 @@ impl State for Spacecraft {
 
     fn set_value(&mut self, param: StateParameter, val: f64) -> Result<(), StateError> {
         match param {
-            StateParameter::Cd => self.drag.cd = val,
-            StateParameter::Cr => self.srp.cr = val,
-            StateParameter::FuelMass => self.fuel_mass_kg = val,
+            StateParameter::Cd => self.drag.coeff_drag = val,
+            StateParameter::Cr => self.srp.coeff_reflectivity = val,
+            StateParameter::PropMass => self.mass.prop_mass_kg = val,
+            StateParameter::DryMass => self.mass.dry_mass_kg = val,
             StateParameter::Isp => match self.thruster {
                 Some(ref mut thruster) => thruster.isp_s = val,
                 None => return Err(StateError::NoThrusterAvail),
@@ -796,9 +732,9 @@ impl Add<OVector<f64, Const<9>>> for Spacecraft {
 
         self.orbit.radius_km += radius_km;
         self.orbit.velocity_km_s += vel_km_s;
-        self.srp.cr = (self.srp.cr + other[6]).clamp(0.0, 2.0);
-        self.drag.cd += other[7];
-        self.fuel_mass_kg += other[8];
+        self.srp.coeff_reflectivity = (self.srp.coeff_reflectivity + other[6]).clamp(0.0, 2.0);
+        self.drag.coeff_drag += other[7];
+        self.mass.prop_mass_kg += other[8];
 
         self
     }
@@ -850,14 +786,16 @@ orbit:
       orientation_id: 1
       mu_km3_s2: null
       shape: null
-dry_mass_kg: 500.0
-fuel_mass_kg: 159.0
+mass:
+    dry_mass_kg: 500.0
+    prop_mass_kg: 159.0
+    extra_mass_kg: 0.0
 srp:
     area_m2: 2.0
-    cr: 1.8
+    coeff_reflectivity: 1.8
 drag:
     area_m2: 2.0
-    cd: 2.2
+    coeff_drag: 2.2
     "#;
 
     let deser_sc: Spacecraft = serde_yml::from_str(s).unwrap();
@@ -880,14 +818,16 @@ orbit:
         orientation_id: 1
         mu_km3_s2: null
         shape: null
-dry_mass_kg: 500.0
-fuel_mass_kg: 159.0
+mass:
+    dry_mass_kg: 500.0
+    prop_mass_kg: 159.0
+    extra_mass_kg: 0.0
 srp:
     area_m2: 2.0
-    cr: 1.8
+    coeff_reflectivity: 1.8
 drag:
     area_m2: 2.0
-    cd: 2.2
+    coeff_drag: 2.2
 thruster:
     thrust_N: 1e-5
     isp_s: 300.5
@@ -918,8 +858,10 @@ orbit:
         orientation_id: 1
         mu_km3_s2: null
         shape: null
-dry_mass_kg: 500.0
-fuel_mass_kg: 159.0
+mass:
+    dry_mass_kg: 500.0
+    prop_mass_kg: 159.0
+    extra_mass_kg: 0.0
 "#;
 
     let deser_sc: Spacecraft = serde_yml::from_str(s).unwrap();

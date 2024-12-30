@@ -113,7 +113,7 @@ impl TrajectoryLoader {
             (StateParameter::VX, false),
             (StateParameter::VY, false),
             (StateParameter::VZ, false),
-            (StateParameter::FuelMass, false),
+            (StateParameter::PropMass, false),
         ];
 
         let file = File::open(&self.path).context(StdIOSnafu {
@@ -133,7 +133,7 @@ impl TrajectoryLoader {
                 for potential_field in &mut found_fields {
                     if field.name() == potential_field.0.to_field(None).name() {
                         potential_field.1 = true;
-                        if potential_field.0 != StateParameter::FuelMass {
+                        if potential_field.0 != StateParameter::PropMass {
                             if let Some(frame_info) = field.metadata().get("Frame") {
                                 // Frame is expected to be serialized as Dhall.
                                 match serde_dhall::from_str(frame_info).parse::<Frame>() {
@@ -191,9 +191,9 @@ impl TrajectoryLoader {
                 }
             );
         } else if sc_compat {
-            // Not a spacecraft, remove the fuel mass
+            // Not a spacecraft, remove the prop mass
             if let Some(last_field) = found_fields.last_mut() {
-                if last_field.0 == StateParameter::FuelMass && last_field.1 {
+                if last_field.0 == StateParameter::PropMass && last_field.1 {
                     last_field.1 = false;
                 }
             }
@@ -227,10 +227,10 @@ impl TrajectoryLoader {
             }
 
             if expected_type == "Spacecraft" {
-                // Read the fuel only if this is a spacecraft we're building
+                // Read the prop only if this is a spacecraft we're building
                 shared_data.push(
                     batch
-                        .column_by_name("fuel_mass (kg)")
+                        .column_by_name("prop_mass (kg)")
                         .unwrap()
                         .as_any()
                         .downcast_ref::<Float64Array>()
@@ -320,7 +320,7 @@ impl TrajectoryLoader {
                     let sc_tpl = match spacecraft_template {
                         Some(sc) => sc,
                         None => {
-                            warn!("No spacecraft template specified on OEM loading, assuming zero fuel mass");
+                            warn!("No spacecraft template specified on OEM loading, assuming zero prop mass");
                             Spacecraft::default()
                         }
                     };

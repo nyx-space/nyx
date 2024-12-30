@@ -128,9 +128,15 @@ impl KfEstimate<Spacecraft> {
             (3.0 * delta_orbit.velocity_km_s.x.abs()).powi(2),
             (3.0 * delta_orbit.velocity_km_s.y.abs()).powi(2),
             (3.0 * delta_orbit.velocity_km_s.z.abs()).powi(2),
-            (3.0 * (nominal_state.srp.cr - dispersed_state.state.srp.cr).abs()).powi(2),
-            (3.0 * (nominal_state.drag.cd - dispersed_state.state.drag.cd).abs()).powi(2),
-            (3.0 * (nominal_state.fuel_mass_kg - dispersed_state.state.fuel_mass_kg).abs()).powi(2),
+            (3.0 * (nominal_state.srp.coeff_reflectivity
+                - dispersed_state.state.srp.coeff_reflectivity)
+                .abs())
+            .powi(2),
+            (3.0 * (nominal_state.drag.coeff_drag - dispersed_state.state.drag.coeff_drag).abs())
+                .powi(2),
+            (3.0 * (nominal_state.mass.prop_mass_kg - dispersed_state.state.mass.prop_mass_kg)
+                .abs())
+            .powi(2),
         ];
 
         let diag = OVector::<f64, Const<9>>::from_iterator(diag_data);

@@ -6,7 +6,7 @@ from timeit import timeit
 
 import pandas as pd
 import yaml
-from nyx_space.cosmic import Orbit, Spacecraft, SrpConfig
+from nyx_space.cosmic import Orbit, Spacecraft, SRPData
 from nyx_space.mission_design import (
     Event,
     SpacecraftDynamics,
@@ -180,9 +180,9 @@ def test_build_spacecraft():
         400.0, 0.01, 15.6, 45.0, 90.0, 75.0, Epoch.system_now(), eme2k
     )
     # Define the SRP
-    srp = SrpConfig(2.0)  # 2.0 will be the area
+    srp = SRPData(2.0)  # 2.0 will be the area
     print(srp)
-    assert srp.cr == 1.8  # Default value
+    assert srp.coeff_reflectivity == 1.8  # Default value
     assert srp.area_m2 == 2.0
     sc = Spacecraft(orbit, 150.0, 15.0, srp)
     print(sc)

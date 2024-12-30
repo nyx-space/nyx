@@ -64,8 +64,6 @@ pub enum StateParameter {
     Energy,
     /// Flight path angle (deg)
     FlightPathAngle,
-    /// fuel mass in kilograms
-    FuelMass,
     /// Geodetic height (km)
     Height,
     /// Geodetic latitude (deg)
@@ -96,6 +94,8 @@ pub enum StateParameter {
     PeriapsisRadius,
     /// Orbital period (s)
     Period,
+    /// prop mass in kilograms
+    PropMass,
     /// Right ascension (deg)
     RightAscension,
     /// Right ascension of the ascending node (deg)
@@ -110,6 +110,8 @@ pub enum StateParameter {
     SemiMinorAxis,
     /// Thrust (Newtons)
     Thrust,
+    /// Total mass
+    TotalMass,
     /// True anomaly
     TrueAnomaly,
     /// True longitude
@@ -182,7 +184,7 @@ impl StateParameter {
 
             // Special
             Self::Energy => 1e-3,
-            Self::DryMass | Self::FuelMass => 1e-3,
+            Self::DryMass | Self::PropMass => 1e-3,
             Self::Period => 1e-1,
             _ => unimplemented!("{self} cannot be used for event finding"),
         }
@@ -203,7 +205,7 @@ impl StateParameter {
         matches!(
             &self,
             Self::DryMass
-                | Self::FuelMass
+                | Self::PropMass
                 | Self::Cr
                 | Self::Cd
                 | Self::Isp
@@ -256,7 +258,7 @@ impl StateParameter {
 
             Self::C3 | Self::Energy => "km^2/s^2",
 
-            Self::DryMass | Self::FuelMass => "kg",
+            Self::DryMass | Self::PropMass => "kg",
             Self::Isp => "isp",
             Self::Thrust => "N",
             _ => "",
@@ -339,7 +341,6 @@ impl FromStr for StateParameter {
             "ecc" => Ok(Self::Eccentricity),
             "energy" => Ok(Self::Energy),
             "fpa" => Ok(Self::FlightPathAngle),
-            "fuel_mass" => Ok(Self::FuelMass),
             "guidance_mode" | "mode" => Ok(Self::GuidanceMode),
             "geodetic_height" => Ok(Self::Height),
             "geodetic_latitude" => Ok(Self::Latitude),
@@ -354,6 +355,7 @@ impl FromStr for StateParameter {
             "ma" => Ok(Self::MeanAnomaly),
             "periapsis_radius" => Ok(Self::PeriapsisRadius),
             "period" => Ok(Self::Period),
+            "prop_mass" => Ok(Self::PropMass),
             "right_asc" => Ok(Self::RightAscension),
             "raan" => Ok(Self::RAAN),
             "rmag" => Ok(Self::Rmag),
@@ -363,6 +365,7 @@ impl FromStr for StateParameter {
             "ta" => Ok(Self::TrueAnomaly),
             "tlong" => Ok(Self::TrueLongitude),
             "thrust" => Ok(Self::Thrust),
+            "total_mass" => Ok(Self::TotalMass),
             "vdeclin" => Ok(Self::VelocityDeclination),
             "vmag" => Ok(Self::Vmag),
             "x" => Ok(Self::X),
@@ -399,7 +402,6 @@ impl fmt::Display for StateParameter {
             Self::Eccentricity => "ecc",
             Self::Energy => "energy",
             Self::FlightPathAngle => "fpa",
-            Self::FuelMass => "fuel_mass",
             Self::GuidanceMode => "guidance_mode",
             Self::Height => "geodetic_height",
             Self::Latitude => "geodetic_latitude",
@@ -414,6 +416,7 @@ impl fmt::Display for StateParameter {
             Self::MeanAnomaly => "ma",
             Self::PeriapsisRadius => "periapsis_radius",
             Self::Period => "period",
+            Self::PropMass => "prop_mass",
             Self::RightAscension => "right_asc",
             Self::RAAN => "raan",
             Self::Rmag => "rmag",
@@ -421,6 +424,7 @@ impl fmt::Display for StateParameter {
             Self::SemiMinorAxis => "semi_minor",
             Self::SMA => "sma",
             Self::Thrust => "thrust",
+            Self::TotalMass => "total_mass",
             Self::TrueAnomaly => "ta",
             Self::TrueLongitude => "tlong",
             Self::VelocityDeclination => "vdeclin",
@@ -465,7 +469,6 @@ mod ut_state_param {
             StateParameter::Eccentricity,
             StateParameter::Energy,
             StateParameter::FlightPathAngle,
-            StateParameter::FuelMass,
             StateParameter::GuidanceMode,
             StateParameter::Height,
             StateParameter::Latitude,
@@ -480,6 +483,7 @@ mod ut_state_param {
             StateParameter::MeanAnomaly,
             StateParameter::PeriapsisRadius,
             StateParameter::Period,
+            StateParameter::PropMass,
             StateParameter::RightAscension,
             StateParameter::RAAN,
             StateParameter::Rmag,
@@ -487,6 +491,7 @@ mod ut_state_param {
             StateParameter::SemiMinorAxis,
             StateParameter::SMA,
             StateParameter::Thrust,
+            StateParameter::TotalMass,
             StateParameter::TrueAnomaly,
             StateParameter::TrueLongitude,
             StateParameter::VelocityDeclination,

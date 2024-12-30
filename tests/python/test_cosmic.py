@@ -1,4 +1,4 @@
-from nyx_space.cosmic import Orbit, Spacecraft, SrpConfig, DragConfig
+from nyx_space.cosmic import Orbit, Spacecraft, SRPData, DragConfig
 from nyx_space.time import Epoch, Unit, Duration
 from nyx_space.monte_carlo import generate_orbits, generate_spacecraft, StateParameter
 import pickle
@@ -59,7 +59,7 @@ def test_define_spacecraft():
     print(repr(orbit))
 
     # Define the SRP
-    srp = SrpConfig(2.0)
+    srp = SRPData(2.0)
     # Define the Drag
     drag = DragConfig(2.0)
 
@@ -134,7 +134,7 @@ def test_generate_states():
     assert len(orbits) >= 98
 
     # Define the SRP
-    srp = SrpConfig(2.0)
+    srp = SRPData(2.0)
     # Define the Drag
     drag = DragConfig(2.0)
 

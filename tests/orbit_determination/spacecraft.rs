@@ -12,7 +12,7 @@ use nyx::md::{Event, StateParameter};
 use nyx::od::prelude::*;
 use nyx::propagators::{IntegratorOptions, Propagator};
 use nyx::time::{Epoch, TimeUnits, Unit};
-use nyx_space::cosmic::SrpConfig;
+use nyx_space::cosmic::{Mass, SRPData};
 use nyx_space::dynamics::guidance::LocalFrame;
 use nyx_space::propagators::{ErrorControl, IntegratorMethod};
 use std::collections::BTreeMap;
@@ -323,11 +323,11 @@ fn od_val_sc_srp_estimation_cov_test(
 
     let sc_truth = Spacecraft::builder()
         .orbit(initial_orbit)
-        .srp(SrpConfig {
-            cr: truth_cr,
+        .srp(SRPData {
+            coeff_reflectivity: truth_cr,
             area_m2: 100.0,
         })
-        .dry_mass_kg(dry_mass_kg)
+        .mass(Mass::from_dry_mass(dry_mass_kg))
         .build();
 
     println!("{sc_truth}");
@@ -381,11 +381,11 @@ fn od_val_sc_srp_estimation_cov_test(
 
     let sc_init_est = Spacecraft::builder()
         .orbit(initial_orbit)
-        .srp(SrpConfig {
-            cr: 1.5,
+        .srp(SRPData {
+            coeff_reflectivity: 1.5,
             area_m2: 100.0,
         })
-        .dry_mass_kg(dry_mass_kg)
+        .mass(Mass::from_dry_mass(dry_mass_kg))
         .build()
         .with_stm();
 
@@ -401,7 +401,7 @@ fn od_val_sc_srp_estimation_cov_test(
         .vx_km_s(0.5e-1)
         .vy_km_s(0.5e-1)
         .vz_km_s(0.5e-1)
-        .cr(0.2)
+        .coeff_reflectivity(0.2)
         .build();
 
     // Define the initial orbit estimate
@@ -437,7 +437,7 @@ fn od_val_sc_srp_estimation_cov_test(
     println!(
         "FINAL:\n\t{est}\n{:x}\nCr = {} +/-{}\nEXP:\t{:x}",
         est.state().orbit,
-        est.state().srp.cr,
+        est.state().srp.coeff_reflectivity,
         est.covar()[(6, 6)].sqrt(),
         truth.orbit
     );
@@ -452,7 +452,7 @@ fn od_val_sc_srp_estimation_cov_test(
     assert!(delta.rmag_km() < 2e-3, "More than 2 meter error");
     assert!(delta.vmag_km_s() < 2e-6, "More than 2 millimeter/s error");
     assert!(
-        (est.state().srp.cr - truth_cr).abs() < (1.5 - truth_cr),
+        (est.state().srp.coeff_reflectivity - truth_cr).abs() < (1.5 - truth_cr),
         "Cr estimation did not improve"
     );
 

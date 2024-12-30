@@ -331,15 +331,15 @@ fn event_and_combination(almanac: Arc<Almanac>) {
         .until_event(orbit.period().unwrap() * 4.0, &Event::apoapsis())
         .unwrap();
 
-    // Check that the fuel always decreases or stays constant
-    let mut cur_fuel = traj.states[0].fuel_mass_kg;
+    // Check that the prop always decreases or stays constant
+    let mut cur_prop = traj.states[0].mass.prop_mass_kg;
     for state in traj.states.iter().skip(1) {
         assert!(
-            state.fuel_mass_kg - cur_fuel <= 1e-6, // Check that fuel never increases, at least a mg level
-            "{cur_fuel} > {}",
-            state.fuel_mass_kg
+            state.mass.prop_mass_kg - cur_prop <= 1e-6, // Check that prop never increases, at least a mg level
+            "{cur_prop} > {}",
+            state.mass.prop_mass_kg
         );
-        cur_fuel = state.fuel_mass_kg;
+        cur_prop = state.mass.prop_mass_kg;
     }
 
     // Convert the trajectory to the Moon frame

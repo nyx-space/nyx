@@ -59,10 +59,10 @@ fn qlaw_as_ruggiero_case_a(almanac: Arc<Almanac>) {
     let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
     let dry_mass = 1.0;
-    let fuel_mass = 299.0;
+    let prop_mass = 299.0;
 
     let sc_state =
-        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_a] {:x}", orbit);
@@ -74,9 +74,9 @@ fn qlaw_as_ruggiero_case_a(almanac: Arc<Almanac>) {
     );
     let mut prop = setup.with(sc_state, almanac.clone());
     let (final_state, traj) = prop.for_duration_with_traj(prop_time).unwrap();
-    let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
+    let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[qlaw_as_ruggiero_case_a] {:x}", final_state.orbit);
-    println!("[qlaw_as_ruggiero_case_a] fuel usage: {:.3} kg", fuel_usage);
+    println!("[qlaw_as_ruggiero_case_a] prop usage: {:.3} kg", prop_usage);
     // Find all of the events
     for e in &events {
         println!(
@@ -91,7 +91,7 @@ fn qlaw_as_ruggiero_case_a(almanac: Arc<Almanac>) {
         "objective not achieved"
     );
 
-    assert!((fuel_usage - 93.449).abs() < 1.0);
+    assert!((prop_usage - 93.449).abs() < 1.0);
 }
 
 #[rstest]
@@ -123,11 +123,11 @@ fn qlaw_as_ruggiero_case_b(almanac: Arc<Almanac>) {
 
     let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
-    let fuel_mass = 1999.9;
+    let prop_mass = 1999.9;
     let dry_mass = 0.1;
 
     let sc_state =
-        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_b] {:x}", orbit);
@@ -141,16 +141,16 @@ fn qlaw_as_ruggiero_case_b(almanac: Arc<Almanac>) {
     .for_duration(prop_time)
     .unwrap();
 
-    let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
+    let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[qlaw_as_ruggiero_case_b] {:x}", final_state.orbit);
-    println!("[qlaw_as_ruggiero_case_b] fuel usage: {:.3} kg", fuel_usage);
+    println!("[qlaw_as_ruggiero_case_b] prop usage: {:.3} kg", prop_usage);
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
 
-    assert!((fuel_usage - 223.515).abs() < 1.0);
+    assert!((prop_usage - 223.515).abs() < 1.0);
 }
 
 #[rstest]
@@ -181,11 +181,11 @@ fn qlaw_as_ruggiero_case_c_cov_test(almanac: Arc<Almanac>) {
 
     let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
-    let fuel_mass = 299.9;
+    let prop_mass = 299.9;
     let dry_mass = 0.1;
 
     let sc_state =
-        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_c] {:x}", orbit);
@@ -199,15 +199,15 @@ fn qlaw_as_ruggiero_case_c_cov_test(almanac: Arc<Almanac>) {
     .for_duration(prop_time)
     .unwrap();
 
-    let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
+    let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[qlaw_as_ruggiero_case_c] {:x}", final_state.orbit);
-    println!("[qlaw_as_ruggiero_case_c] fuel usage: {:.3} kg", fuel_usage);
+    println!("[qlaw_as_ruggiero_case_c] prop usage: {:.3} kg", prop_usage);
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
-    assert!((fuel_usage - 41.742).abs() < 1.0);
+    assert!((prop_usage - 41.742).abs() < 1.0);
 }
 
 #[rstest]
@@ -242,11 +242,11 @@ fn qlaw_as_ruggiero_case_d(almanac: Arc<Almanac>) {
 
     let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
-    let fuel_mass = 67.0;
+    let prop_mass = 67.0;
     let dry_mass = 300.0;
 
     let sc_state =
-        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_d] {:x}", orbit);
@@ -260,16 +260,16 @@ fn qlaw_as_ruggiero_case_d(almanac: Arc<Almanac>) {
     .for_duration(prop_time)
     .unwrap();
 
-    let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
+    let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[qlaw_as_ruggiero_case_d] {:x}", final_state.orbit);
-    println!("[qlaw_as_ruggiero_case_d] fuel usage: {:.3} kg", fuel_usage);
+    println!("[qlaw_as_ruggiero_case_d] prop usage: {:.3} kg", prop_usage);
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
 
-    assert!((fuel_usage - 23.0).abs() < 1.0);
+    assert!((prop_usage - 23.0).abs() < 1.0);
 }
 
 #[rstest]
@@ -305,11 +305,11 @@ fn qlaw_as_ruggiero_case_e(almanac: Arc<Almanac>) {
 
     let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
-    let fuel_mass = 1999.9;
+    let prop_mass = 1999.9;
     let dry_mass = 0.1;
 
     let sc_state =
-        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_e] {:x}", orbit);
@@ -323,16 +323,16 @@ fn qlaw_as_ruggiero_case_e(almanac: Arc<Almanac>) {
     .for_duration(prop_time)
     .unwrap();
 
-    let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
+    let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[qlaw_as_ruggiero_case_e] {:x}", final_state.orbit);
-    println!("[qlaw_as_ruggiero_case_e] fuel usage: {:.3} kg", fuel_usage);
+    println!("[qlaw_as_ruggiero_case_e] prop usage: {:.3} kg", prop_usage);
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
 
-    assert!((fuel_usage - 23.0).abs() < 1.0);
+    assert!((prop_usage - 23.0).abs() < 1.0);
 }
 
 #[rstest]
@@ -364,11 +364,11 @@ fn qlaw_as_ruggiero_case_f(almanac: Arc<Almanac>) {
 
     let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
-    let fuel_mass = 67.0;
+    let prop_mass = 67.0;
     let dry_mass = 300.0;
 
     let sc_state =
-        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_f] {:x}", orbit);
@@ -387,16 +387,16 @@ fn qlaw_as_ruggiero_case_f(almanac: Arc<Almanac>) {
     traj.to_parquet_simple("output_data/rugg_case_f.parquet", almanac)
         .unwrap();
 
-    let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
+    let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[qlaw_as_ruggiero_case_f] {:x}", final_state.orbit);
-    println!("[qlaw_as_ruggiero_case_f] fuel usage: {:.3} kg", fuel_usage);
+    println!("[qlaw_as_ruggiero_case_f] prop usage: {:.3} kg", prop_usage);
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
 
-    assert!((fuel_usage - 10.378).abs() < 1.0);
+    assert!((prop_usage - 10.378).abs() < 1.0);
 }
 
 #[rstest]
@@ -427,11 +427,11 @@ fn ruggiero_iepc_2011_102(almanac: Arc<Almanac>) {
 
     let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
-    let fuel_mass = 67.0;
+    let prop_mass = 67.0;
     let dry_mass = 300.0;
 
     let sc_state =
-        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[ruggiero_iepc_2011_102] {:x}", orbit);
@@ -445,15 +445,15 @@ fn ruggiero_iepc_2011_102(almanac: Arc<Almanac>) {
     .for_duration(prop_time)
     .unwrap();
 
-    let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
+    let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[ruggiero_iepc_2011_102] {:x}", final_state.orbit);
-    println!("[ruggiero_iepc_2011_102] fuel usage: {:.3} kg", fuel_usage);
+    println!("[ruggiero_iepc_2011_102] prop usage: {:.3} kg", prop_usage);
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
 
-    // WARNING: Paper claims this can be done with only 49kg of fuel.
-    assert!((fuel_usage - 49.0).abs() < 1.0);
+    // WARNING: Paper claims this can be done with only 49kg of prop.
+    assert!((prop_usage - 49.0).abs() < 1.0);
 }

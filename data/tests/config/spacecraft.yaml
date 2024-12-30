@@ -8,13 +8,15 @@ orbit:
   frame: EME2000
   epoch: 2018-09-15T00:15:53.098 UTC
 srp:
-  cr: 1.0
+  coeff_reflectivity:1.0
   area_m2: 2.0
 drag:
-  cd: 2.2
+  coeff_drag: 2.2
   area_m2: 0.95
-dry_mass_kg: 50.0
-fuel_mass_kg: 50.0
+mass:
+  dry_mass_kg: 50.0
+  prop_mass_kg: 50.0
+  extra_mass_kg: 0.0
 thruster:
   thrust_N: 1e-5
   isp_s: 300.0
