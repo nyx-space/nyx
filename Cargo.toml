@@ -81,6 +81,9 @@ toml = "0.8.14"
 [build-dependencies]
 shadow-rs = "0.37.0"
 
+[profile.dev.package."*"]
+opt-level = 3
+
 [target.x86_64-unknown-linux-gnu]
 # For flamegraph -- https://github.com/flamegraph-rs/flamegraph
 linker = "/usr/bin/clang"
