@@ -33,6 +33,10 @@ pub enum MeasurementType {
     Azimuth,
     #[serde(rename = "elevation_deg")]
     Elevation,
+    #[serde(rename = "receive_freq")]
+    ReceiveFrequency,
+    #[serde(rename = "transmit_freq")]
+    TransmitFrequency,
 }
 
 impl MeasurementType {
@@ -42,6 +46,7 @@ impl MeasurementType {
             Self::Range => "km",
             Self::Doppler => "km/s",
             Self::Azimuth | Self::Elevation => "deg",
+            Self::ReceiveFrequency | Self::TransmitFrequency => "Hz",
         }
     }
 
@@ -66,6 +71,9 @@ impl MeasurementType {
             Self::Doppler => Ok(aer.range_rate_km_s + noise),
             Self::Azimuth => Ok(aer.azimuth_deg + noise),
             Self::Elevation => Ok(aer.elevation_deg + noise),
+            Self::ReceiveFrequency | Self::TransmitFrequency => Err(ODError::MeasurementSimError {
+                details: format!("{self:?} is only supported in CCSDS TDM parsing"),
+            }),
         }
     }
 
@@ -94,6 +102,9 @@ impl MeasurementType {
                 let el_deg = (aer_t1.elevation_deg + aer_t0.elevation_deg) * 0.5;
                 Ok(el_deg + noise / 2.0_f64.sqrt())
             }
+            Self::ReceiveFrequency | Self::TransmitFrequency => Err(ODError::MeasurementSimError {
+                details: format!("{self:?} is only supported in CCSDS TDM parsing"),
+            }),
         }
     }
 }

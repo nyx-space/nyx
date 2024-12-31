@@ -20,10 +20,11 @@ use crate::io::watermark::prj_name_ver;
 use crate::io::ExportCfg;
 use crate::io::{InputOutputError, StdIOSnafu};
 use crate::od::msr::{Measurement, MeasurementType};
+use anise::constants::SPEED_OF_LIGHT_KM_S;
 use hifitime::efmt::{Format, Formatter};
 use hifitime::prelude::Epoch;
 use hifitime::TimeScale;
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use snafu::ResultExt;
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
@@ -44,13 +45,18 @@ impl TrackingDataArc {
             action: "opening CCSDS TDM file for tracking arc",
         })?;
 
+        let source = path.as_ref().to_path_buf().display().to_string();
+        info!("parsing CCSDS TDM {source}");
+
         let mut measurements = BTreeMap::new();
+        let mut metadata = HashMap::new();
 
         let reader = BufReader::new(file);
 
         let mut in_data_section = false;
         let mut current_tracker = String::new();
         let mut time_system = TimeScale::UTC;
+        let mut has_freq_data = false;
 
         for line in reader.lines() {
             let line = line.context(StdIOSnafu {
@@ -88,10 +94,27 @@ impl TrackingDataArc {
                         }
                     }
                 }
+
+                let mut splt = line.split('=');
+                if let Some(keyword) = splt.nth(0) {
+                    // Get the zeroth item again since we've consumed the first zeroth one.
+                    if let Some(value) = splt.nth(0) {
+                        metadata.insert(keyword.trim().to_string(), value.trim().to_string());
+                    }
+                }
+
                 continue;
             }
 
             if let Some((mtype, epoch, value)) = parse_measurement_line(line, time_system)? {
+                if [
+                    MeasurementType::ReceiveFrequency,
+                    MeasurementType::TransmitFrequency,
+                ]
+                .contains(&mtype)
+                {
+                    has_freq_data = true;
+                }
                 measurements
                     .entry(epoch)
                     .or_insert_with(|| Measurement {
@@ -104,10 +127,127 @@ impl TrackingDataArc {
             }
         }
 
-        Ok(Self {
+        let mut turnaround_ratio = None;
+        let drop_freq_data;
+        if has_freq_data {
+            // If there is any frequency measurement, compute the turn-around ratio.
+            if let Some(ta_num_str) = metadata.get("TURNAROUND_NUMERATOR") {
+                if let Some(ta_denom_str) = metadata.get("TURNAROUND_DENOMINATOR") {
+                    if let Ok(ta_num) = ta_num_str.parse::<i32>() {
+                        if let Ok(ta_denom) = ta_denom_str.parse::<i32>() {
+                            // turn-around ratio is set.
+                            turnaround_ratio = Some(f64::from(ta_num) / f64::from(ta_denom));
+                            info!("turn-around ratio is {ta_num}/{ta_denom}");
+                            drop_freq_data = false;
+                        } else {
+                            error!("turn-around denominator `{ta_denom_str}` is not a valid double precision float");
+                            drop_freq_data = true;
+                        }
+                    } else {
+                        error!("turn-around numerator `{ta_num_str}` is not a valid double precision float");
+                        drop_freq_data = true;
+                    }
+                } else {
+                    error!("required turn-around denominator missing from metadata -- dropping ALL RECEIVE/TRANSMIT data");
+                    drop_freq_data = true;
+                }
+            } else {
+                error!("required turn-around numerator missing from metadata -- dropping ALL RECEIVE/TRANSMIT data");
+                drop_freq_data = true;
+            }
+        } else {
+            drop_freq_data = true;
+        }
+
+        // Now, let's convert the receive and transmit frequencies to Doppler measurements in velocity units.
+        // We expect the transmit and receive frequencies to have the exact same timestamp.
+        let mut freq_types = IndexSet::new();
+        freq_types.insert(MeasurementType::ReceiveFrequency);
+        freq_types.insert(MeasurementType::TransmitFrequency);
+        let mut latest_transmit_freq = None;
+        for (epoch, measurement) in measurements.iter_mut() {
+            if drop_freq_data {
+                for freq in &freq_types {
+                    measurement.data.swap_remove(freq);
+                }
+                continue;
+            }
+
+            let avail = measurement.availability(&freq_types);
+            let use_prev_transmit_freq;
+            let num_freq_msr = avail
+                .iter()
+                .copied()
+                .map(|v| if v { 1 } else { 0 })
+                .sum::<u8>();
+            if num_freq_msr == 0 {
+                // No frequency measurements
+                continue;
+            } else if num_freq_msr == 1 {
+                // avail[0] means that Receive Freq is available
+                // avail[1] means that Transmit Freq is available
+                // We can only compute Doppler data from one data point if that data point
+                // if the receive frequency and the transmit frequency was previously set.
+                if latest_transmit_freq.is_some() && avail[0] {
+                    use_prev_transmit_freq = true;
+                    warn!(
+                        "no transmit frequency at {epoch}, using previous value of {} Hz",
+                        latest_transmit_freq.unwrap()
+                    );
+                } else {
+                    warn!("only one of receive or transmit frequencies found at {epoch}, ignoring");
+                    for freq in &freq_types {
+                        measurement.data.swap_remove(freq);
+                    }
+                    continue;
+                }
+            } else {
+                use_prev_transmit_freq = false;
+            }
+
+            if !use_prev_transmit_freq {
+                // Update the latest transmit frequency since it's set.
+                latest_transmit_freq = Some(
+                    *measurement
+                        .data
+                        .get(&MeasurementType::TransmitFrequency)
+                        .unwrap(),
+                );
+            }
+
+            let transmit_freq_hz = latest_transmit_freq.unwrap();
+            let receive_freq_hz = *measurement
+                .data
+                .get(&MeasurementType::ReceiveFrequency)
+                .unwrap();
+
+            // Compute the Doppler shift, equation from section 3.5.2.8.2 of CCSDS TDM v2 specs
+            let doppler_shift_hz = transmit_freq_hz * turnaround_ratio.unwrap() - receive_freq_hz;
+            // Compute the expected Doppler measurement as range-rate.
+            let rho_dot_km_s = (doppler_shift_hz * SPEED_OF_LIGHT_KM_S)
+                / (2.0 * transmit_freq_hz * turnaround_ratio.unwrap());
+
+            // Finally, replace the frequency data with a Doppler measurement.
+            for freq in &freq_types {
+                measurement.data.swap_remove(freq);
+            }
+            measurement
+                .data
+                .insert(MeasurementType::Doppler, rho_dot_km_s);
+        }
+
+        let trk = Self {
             measurements,
-            source: Some(path.as_ref().to_path_buf().display().to_string()),
-        })
+            source: Some(source),
+        };
+
+        if trk.unique_types().is_empty() {
+            Err(InputOutputError::EmptyDataset {
+                action: "CCSDS TDM file",
+            })
+        } else {
+            Ok(trk)
+        }
     }
 
     /// Store this tracking arc to a CCSDS TDM file, with optional metadata and a timestamp appended to the filename.
@@ -254,6 +394,8 @@ impl TrackingDataArc {
                         MeasurementType::Doppler => "DOPPLER_INTEGRATED",
                         MeasurementType::Azimuth => "ANGLE_1",
                         MeasurementType::Elevation => "ANGLE_2",
+                        MeasurementType::ReceiveFrequency => "RECEIVE_FREQ",
+                        MeasurementType::TransmitFrequency => "TRANSMIT_FREQ",
                     };
 
                     writeln!(
@@ -295,6 +437,10 @@ fn parse_measurement_line(
         "DOPPLER_INSTANTANEOUS" | "DOPPLER_INTEGRATED" => MeasurementType::Doppler,
         "ANGLE_1" => MeasurementType::Azimuth,
         "ANGLE_2" => MeasurementType::Elevation,
+        "RECEIVE_FREQ" | "RECEIVE_FREQ_1" | "RECEIVE_FREQ_2" | "RECEIVE_FREQ_3"
+        | "RECEIVE_FREQ_4" | "RECEIVE_FREQ_5" => MeasurementType::ReceiveFrequency,
+        "TRANSMIT_FREQ" | "TRANSMIT_FREQ_1" | "TRANSMIT_FREQ_2" | "TRANSMIT_FREQ_3"
+        | "TRANSMIT_FREQ_4" | "TRANSMIT_FREQ_5" => MeasurementType::TransmitFrequency,
         _ => {
             return Err(InputOutputError::UnsupportedData {
                 which: mtype_str.to_string(),

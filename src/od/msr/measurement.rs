@@ -69,7 +69,7 @@ impl Measurement {
 
     /// Returns a vector specifying which measurement types are available.
     pub fn availability(&self, types: &IndexSet<MeasurementType>) -> Vec<bool> {
-        let mut rtn = Vec::with_capacity(types.len());
+        let mut rtn = vec![false; types.len()];
         for (i, t) in types.iter().enumerate() {
             if self.data.contains_key(t) {
                 rtn[i] = true;
