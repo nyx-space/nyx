@@ -187,8 +187,9 @@ impl ForceModel for SolarPressure {
                 * inv_r_sun_au_p2;
 
         // Note the 1e-3 is to convert the SRP from m/s^2 to km/s^2
-        let dual_force_scalar =
-            OHyperdual::<f64, Const<9>>::from_real(1e-3 * ctx.srp.coeff_reflectivity * ctx.srp.area_m2);
+        let dual_force_scalar = OHyperdual::<f64, Const<9>>::from_real(
+            1e-3 * ctx.srp.coeff_reflectivity * ctx.srp.area_m2,
+        );
         let mut dual_force: Vector3<OHyperdual<f64, Const<9>>> = Vector3::zeros();
         dual_force[0] = dual_force_scalar * flux_pressure * r_sun_unit[0];
         dual_force[1] = dual_force_scalar * flux_pressure * r_sun_unit[1];
