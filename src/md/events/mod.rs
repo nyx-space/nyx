@@ -27,8 +27,7 @@ use crate::time::{Duration, Unit};
 use crate::State;
 use anise::prelude::{Almanac, Frame};
 use anise::structure::planetocentric::ellipsoid::Ellipsoid;
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
+
 use std::default::Default;
 use std::fmt;
 use std::sync::Arc;
@@ -61,7 +60,7 @@ where
 
 /// Defines a state parameter event finder
 #[derive(Clone, Debug)]
-#[cfg_attr(feature = "python", pyclass)]
+
 pub struct Event {
     /// The state parameter
     pub parameter: StateParameter,

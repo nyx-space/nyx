@@ -29,7 +29,7 @@ mod finiteburns;
 pub use finiteburns::FiniteBurns;
 
 mod mnvr;
-pub use mnvr::Mnvr;
+pub use mnvr::{Maneuver, MnvrRepr};
 
 mod ruggiero;
 pub use ruggiero::{Objective, Ruggiero, StateParameter};
@@ -38,11 +38,7 @@ use snafu::Snafu;
 use std::fmt;
 use std::sync::Arc;
 
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
-
 /// Defines a thruster with a maximum isp and a maximum thrust.
-#[cfg_attr(feature = "python", pyclass)]
 #[allow(non_snake_case)]
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Thruster {
@@ -52,19 +48,10 @@ pub struct Thruster {
     pub isp_s: f64,
 }
 
-#[cfg_attr(feature = "python", pymethods)]
 impl Thruster {
     /// Returns the exhaust velocity v_e in meters per second
     pub fn exhaust_velocity_m_s(&self) -> f64 {
         self.isp_s * STD_GRAVITY
-    }
-
-    /// Creates a new Thruster given its thrust in Newton and its Isp in seconds
-    #[allow(non_snake_case)]
-    #[cfg(feature = "python")]
-    #[new]
-    fn py_new(thrust_N: f64, isp_s: f64) -> Self {
-        Self { thrust_N, isp_s }
     }
 }
 
@@ -164,7 +151,7 @@ pub enum GuidanceError {
 }
 
 /// Local frame options, used notably for guidance laws.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LocalFrame {
     Inertial,
     RIC,
@@ -195,8 +182,8 @@ fn ra_dec_from_vec() {
         loop {
             let unit_v = unit_vector_from_ra_dec(alpha, delta);
             let (alpha2, delta2) = ra_dec_from_unit_vector(unit_v);
-            assert!((alpha - alpha2).abs() < 2e-16);
-            assert!((delta - delta2).abs() < 2e-16);
+            assert!((alpha - alpha2).abs() < f64::EPSILON);
+            assert!((delta - delta2).abs() < f64::EPSILON);
             alpha += TAU * 0.1; // Increment right ascension by one tenth of a circle
             if alpha > PI {
                 alpha = 0.0;

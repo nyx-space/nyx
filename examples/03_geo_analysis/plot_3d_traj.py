@@ -37,8 +37,8 @@ def build_sphere(size, num_points=500, opacity=1.0):
 
 def plot_traj(
     df: pl.DataFrame,
-    colored_by="fuel_mass (kg)",
-    color_descr="fuel mass (kg)",
+    colored_by="prop_mass (kg)",
+    color_descr="prop mass (kg)",
     scale=1.0
 ):
     """

@@ -18,27 +18,28 @@ use anise::prelude::Almanac;
 */
 use hifitime::Epoch;
 
-use super::{GuidanceError, GuidanceLaw, Mnvr};
+use super::{GuidanceError, GuidanceLaw, Maneuver};
 use crate::cosmic::{GuidanceMode, Spacecraft};
 use crate::linalg::Vector3;
 use crate::State;
 use std::fmt;
 use std::sync::Arc;
-/// A controller for a set of pre-determined maneuvers.
+
+/// A guidance law for a set of pre-determined maneuvers.
 #[derive(Clone, Debug)]
 pub struct FiniteBurns {
     /// Maneuvers should be provided in chronological order, first maneuver first in the list
-    pub mnvrs: Vec<Mnvr>,
+    pub mnvrs: Vec<Maneuver>,
 }
 
 impl FiniteBurns {
     /// Builds a schedule from the vector of maneuvers, must be provided in chronological order.
-    pub fn from_mnvrs(mnvrs: Vec<Mnvr>) -> Arc<Self> {
+    pub fn from_mnvrs(mnvrs: Vec<Maneuver>) -> Arc<Self> {
         Arc::new(Self { mnvrs })
     }
 
     /// Find the maneuver with the closest start epoch that is less than or equal to the current epoch
-    fn maneuver_at(&self, epoch: Epoch) -> Option<&Mnvr> {
+    fn maneuver_at(&self, epoch: Epoch) -> Option<&Maneuver> {
         let index = self.mnvrs.binary_search_by_key(&epoch, |mnvr| mnvr.start);
         match index {
             Err(0) => None, // No maneuvers start before the current epoch
@@ -62,7 +63,7 @@ impl GuidanceLaw for FiniteBurns {
             GuidanceMode::Thrust => {
                 if let Some(next_mnvr) = self.maneuver_at(osc.epoch()) {
                     if next_mnvr.start <= osc.epoch() {
-                        <Mnvr as GuidanceLaw>::direction(next_mnvr, osc)
+                        <Maneuver as GuidanceLaw>::direction(next_mnvr, osc)
                     } else {
                         Ok(Vector3::zeros())
                     }

@@ -46,10 +46,10 @@ fn rugg_sma(almanac: Arc<Almanac>) {
 
     let guid_law = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
-    let fuel_mass = 67.0;
+    let prop_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
-        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
     println!("[rugg_sma] {:x}", orbit);
@@ -63,15 +63,15 @@ fn rugg_sma(almanac: Arc<Almanac>) {
     .for_duration(prop_time)
     .unwrap();
 
-    let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
+    let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[rugg_sma] {:x}", final_state.orbit);
-    println!("[rugg_sma] fuel usage: {:.3} kg", fuel_usage);
+    println!("[rugg_sma] prop usage: {:.3} kg", prop_usage);
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
-    assert!((fuel_usage - 21.0).abs() < 1.0);
+    assert!((prop_usage - 21.0).abs() < 1.0);
 }
 
 #[rstest]
@@ -97,12 +97,12 @@ fn rugg_sma_regress_threshold(almanac: Arc<Almanac>) {
         1.0,
     )];
 
-    let fuel_mass = 67.0;
+    let prop_mass = 67.0;
     let dry_mass = 300.0;
-    for (threshold, expected_fuel_usage) in &[(0.9, 16.9), (0.0, 21.3)] {
+    for (threshold, expected_prop_usage) in &[(0.9, 16.9), (0.0, 21.3)] {
         let guid_law = Ruggiero::from_ηthresholds(objectives, &[*threshold], orbit.into()).unwrap();
         let sc_state =
-            Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+            Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
         let sc = SpacecraftDynamics::from_guidance_law(OrbitalDynamics::two_body(), guid_law);
         println!("[rugg_sma_regress] {:x}", orbit);
@@ -116,15 +116,15 @@ fn rugg_sma_regress_threshold(almanac: Arc<Almanac>) {
         .for_duration(prop_time)
         .unwrap();
 
-        let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
+        let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
         println!("[rugg_sma_regress] {:x}", final_state.orbit);
-        println!("[rugg_sma_regress] fuel usage: {:.3} kg", fuel_usage);
+        println!("[rugg_sma_regress] prop usage: {:.3} kg", prop_usage);
 
         assert!(
             sc.guidance_achieved(&final_state).unwrap(),
             "objective not achieved"
         );
-        assert!((fuel_usage - *expected_fuel_usage).abs() < 0.5);
+        assert!((prop_usage - *expected_prop_usage).abs() < 0.5);
     }
 }
 
@@ -156,10 +156,10 @@ fn rugg_sma_decr(almanac: Arc<Almanac>) {
 
     let guid_law = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
-    let fuel_mass = 67.0;
+    let prop_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
-        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
     println!("[rugg_sma_decr] {:x}", orbit);
@@ -173,15 +173,15 @@ fn rugg_sma_decr(almanac: Arc<Almanac>) {
     .for_duration(prop_time)
     .unwrap();
 
-    let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
+    let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[rugg_sma_decr] {:x}", final_state.orbit);
-    println!("[rugg_sma_decr] fuel usage: {:.3} kg", fuel_usage);
+    println!("[rugg_sma_decr] prop usage: {:.3} kg", prop_usage);
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
-    assert!((fuel_usage - 21.0).abs() < 1.0);
+    assert!((prop_usage - 21.0).abs() < 1.0);
 }
 
 #[rstest]
@@ -214,10 +214,10 @@ fn rugg_inc(almanac: Arc<Almanac>) {
 
     let guid_law = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
-    let fuel_mass = 67.0;
+    let prop_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
-        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
     println!("[rugg_inc] {:x}", orbit);
@@ -231,15 +231,15 @@ fn rugg_inc(almanac: Arc<Almanac>) {
     .for_duration(prop_time)
     .unwrap();
 
-    let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
+    let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[rugg_inc] {:x}", final_state.orbit);
-    println!("[rugg_inc] fuel usage: {:.3} kg", fuel_usage);
+    println!("[rugg_inc] prop usage: {:.3} kg", prop_usage);
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
-    assert!((fuel_usage - 25.0).abs() < 1.0);
+    assert!((prop_usage - 25.0).abs() < 1.0);
 }
 
 #[rstest]
@@ -273,10 +273,10 @@ fn rugg_inc_threshold(almanac: Arc<Almanac>) {
 
     let guid_law = Ruggiero::from_ηthresholds(objectives, &[0.9], orbit.into()).unwrap();
 
-    let fuel_mass = 67.0;
+    let prop_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
-        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
     println!("[rugg_inc_threshold] {:x}", orbit);
@@ -290,15 +290,15 @@ fn rugg_inc_threshold(almanac: Arc<Almanac>) {
     .for_duration(prop_time)
     .unwrap();
 
-    let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
+    let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[rugg_inc_threshold] {:x}", final_state.orbit);
-    println!("[rugg_inc_threshold] fuel usage: {:.3} kg", fuel_usage);
+    println!("[rugg_inc_threshold] prop usage: {:.3} kg", prop_usage);
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
-    assert!((fuel_usage - 17.0).abs() < 1.0);
+    assert!((prop_usage - 17.0).abs() < 1.0);
 }
 
 #[rstest]
@@ -331,10 +331,10 @@ fn rugg_inc_decr(almanac: Arc<Almanac>) {
 
     let guid_law = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
-    let fuel_mass = 67.0;
+    let prop_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
-        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
     println!("[rugg_inc_decr] {:x}", orbit);
@@ -348,15 +348,15 @@ fn rugg_inc_decr(almanac: Arc<Almanac>) {
     .for_duration(prop_time)
     .unwrap();
 
-    let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
+    let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[rugg_inc_decr] {:x}", final_state.orbit);
-    println!("[rugg_inc_decr] fuel usage: {:.3} kg", fuel_usage);
+    println!("[rugg_inc_decr] prop usage: {:.3} kg", prop_usage);
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
-    assert!((fuel_usage - 25.0).abs() < 1.0);
+    assert!((prop_usage - 25.0).abs() < 1.0);
 }
 
 #[rstest]
@@ -389,10 +389,10 @@ fn rugg_ecc(almanac: Arc<Almanac>) {
 
     let guid_law = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
-    let fuel_mass = 67.0;
+    let prop_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
-        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
     println!("[rugg_ecc] {:x}", orbit);
@@ -406,15 +406,15 @@ fn rugg_ecc(almanac: Arc<Almanac>) {
     .for_duration(prop_time)
     .unwrap();
 
-    let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
+    let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[rugg_ecc] {:x}", final_state.orbit);
-    println!("[rugg_ecc] fuel usage: {:.3} kg", fuel_usage);
+    println!("[rugg_ecc] prop usage: {:.3} kg", prop_usage);
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
-    assert!((fuel_usage - 10.37).abs() < 1.0);
+    assert!((prop_usage - 10.37).abs() < 1.0);
 }
 
 #[rstest]
@@ -429,7 +429,7 @@ fn rugg_ecc_regress_threshold(almanac: Arc<Almanac>) {
 
     let prop_time = 150 * Unit::Day;
 
-    let fuel_mass = 67.0;
+    let prop_mass = 67.0;
     let dry_mass = 300.0;
 
     // Define the thruster
@@ -445,11 +445,11 @@ fn rugg_ecc_regress_threshold(almanac: Arc<Almanac>) {
         5e-5,
     )];
 
-    for (threshold, expected_fuel_usage) in &[(0.9, 8.2), (0.0, 10.37)] {
+    for (threshold, expected_prop_usage) in &[(0.9, 8.2), (0.0, 10.37)] {
         let guid_law = Ruggiero::from_ηthresholds(objectives, &[*threshold], orbit.into()).unwrap();
 
         let sc_state =
-            Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+            Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
         let sc = SpacecraftDynamics::from_guidance_law(OrbitalDynamics::two_body(), guid_law);
         println!("[rugg_ecc_regress] {:x}", orbit);
@@ -463,15 +463,15 @@ fn rugg_ecc_regress_threshold(almanac: Arc<Almanac>) {
         .for_duration(prop_time)
         .unwrap();
 
-        let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
+        let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
         println!("[rugg_ecc_regress] {:x}", final_state.orbit);
-        println!("[rugg_ecc_regress] fuel usage: {:.3} kg", fuel_usage);
+        println!("[rugg_ecc_regress] prop usage: {:.3} kg", prop_usage);
 
         assert!(
             sc.guidance_achieved(&final_state).unwrap(),
             "objective not achieved"
         );
-        assert!((fuel_usage - *expected_fuel_usage).abs() < 1.0);
+        assert!((prop_usage - *expected_prop_usage).abs() < 1.0);
     }
 }
 
@@ -505,10 +505,10 @@ fn rugg_ecc_decr(almanac: Arc<Almanac>) {
 
     let guid_law = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
-    let fuel_mass = 67.0;
+    let prop_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
-        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
     println!("[rugg_ecc_decr] {:x}", orbit);
@@ -522,15 +522,15 @@ fn rugg_ecc_decr(almanac: Arc<Almanac>) {
     .for_duration(prop_time)
     .unwrap();
 
-    let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
+    let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[rugg_ecc_decr] {:x}", final_state.orbit);
-    println!("[rugg_ecc_decr] fuel usage: {:.3} kg", fuel_usage);
+    println!("[rugg_ecc_decr] prop usage: {:.3} kg", prop_usage);
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
-    assert!((fuel_usage - 10.37).abs() < 1.0);
+    assert!((prop_usage - 10.37).abs() < 1.0);
 }
 
 #[rstest]
@@ -565,10 +565,10 @@ fn rugg_aop(almanac: Arc<Almanac>) {
 
     let guid_law = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
-    let fuel_mass = 67.0;
+    let prop_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
-        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
     println!("[rugg_aop] {:x}", orbit);
@@ -582,15 +582,15 @@ fn rugg_aop(almanac: Arc<Almanac>) {
     .for_duration(prop_time)
     .unwrap();
 
-    let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
+    let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[rugg_aop] {:x}", final_state.orbit);
-    println!("[rugg_aop] fuel usage: {:.3} kg", fuel_usage);
+    println!("[rugg_aop] prop usage: {:.3} kg", prop_usage);
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
-    assert!((fuel_usage - 0.014).abs() < 1e-2);
+    assert!((prop_usage - 0.014).abs() < 1e-2);
 }
 
 #[rstest]
@@ -624,10 +624,10 @@ fn rugg_aop_decr(almanac: Arc<Almanac>) {
 
     let guid_law = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
-    let fuel_mass = 67.0;
+    let prop_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
-        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
     println!("[rugg_aop_decr] {:x}", orbit);
@@ -641,15 +641,15 @@ fn rugg_aop_decr(almanac: Arc<Almanac>) {
     .for_duration(prop_time)
     .unwrap();
 
-    let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
+    let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[rugg_aop_decr] {:x}", final_state.orbit);
-    println!("[rugg_aop_decr] fuel usage: {:.3} kg", fuel_usage);
+    println!("[rugg_aop_decr] prop usage: {:.3} kg", prop_usage);
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
-    assert!((fuel_usage - 0.014).abs() < 1e-2);
+    assert!((prop_usage - 0.014).abs() < 1e-2);
 }
 
 #[rstest]
@@ -680,10 +680,10 @@ fn rugg_raan(almanac: Arc<Almanac>) {
 
     let guid_law = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
-    let fuel_mass = 67.0;
+    let prop_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
-        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
     println!("[rugg_raan] {:x}", orbit);
@@ -695,17 +695,17 @@ fn rugg_raan(almanac: Arc<Almanac>) {
     );
     let mut prop = setup.with(sc_state, almanac.clone());
     let (final_state, traj) = prop.for_duration_with_traj(prop_time).unwrap();
-    let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
+    let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[rugg_raan] {:x}", final_state.orbit);
     let event = Event::new(StateParameter::RAAN, 5.0);
     println!("[rugg_raan] {} => {:?}", event, traj.find(&event, almanac));
-    println!("[rugg_raan] fuel usage: {:.3} kg", fuel_usage);
+    println!("[rugg_raan] prop usage: {:.3} kg", prop_usage);
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
-    assert!((fuel_usage - 22.189).abs() < 1.0);
+    assert!((prop_usage - 22.189).abs() < 1.0);
 }
 
 #[rstest]
@@ -720,7 +720,7 @@ fn rugg_raan_regress_threshold(almanac: Arc<Almanac>) {
 
     let prop_time = 130 * Unit::Day;
 
-    let fuel_mass = 67.0;
+    let prop_mass = 67.0;
     let dry_mass = 300.0;
 
     // Define the thruster
@@ -732,11 +732,11 @@ fn rugg_raan_regress_threshold(almanac: Arc<Almanac>) {
     // Define the objectives
     let objectives = &[Objective::within_tolerance(StateParameter::RAAN, 5.0, 5e-5)];
 
-    for (threshold, expected_fuel_usage) in &[(0.9, 14.787), (0.0, 22.189)] {
+    for (threshold, expected_prop_usage) in &[(0.9, 14.787), (0.0, 22.189)] {
         let guid_law = Ruggiero::from_ηthresholds(objectives, &[*threshold], orbit.into()).unwrap();
 
         let sc_state =
-            Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+            Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
         let sc = SpacecraftDynamics::from_guidance_law(OrbitalDynamics::two_body(), guid_law);
         println!("[rugg_raan_regress] {:x}", orbit);
@@ -750,14 +750,14 @@ fn rugg_raan_regress_threshold(almanac: Arc<Almanac>) {
         .for_duration(prop_time)
         .unwrap();
 
-        let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
+        let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
         println!("[rugg_raan_regress] {:x}", final_state.orbit);
-        println!("[rugg_raan_regress] fuel usage: {:.3} kg", fuel_usage);
+        println!("[rugg_raan_regress] prop usage: {:.3} kg", prop_usage);
 
         assert!(
             sc.guidance_achieved(&final_state).unwrap(),
             "objective not achieved"
         );
-        assert!((fuel_usage - *expected_fuel_usage).abs() < 1e-1);
+        assert!((prop_usage - *expected_prop_usage).abs() < 1e-1);
     }
 }

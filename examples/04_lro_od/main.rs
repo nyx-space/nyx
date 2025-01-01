@@ -12,7 +12,7 @@ use anise::{
 };
 use hifitime::{Epoch, TimeUnits, Unit};
 use nyx::{
-    cosmic::{Aberration, Frame, MetaAlmanac, SrpConfig},
+    cosmic::{Aberration, Frame, Mass, MetaAlmanac, SRPData},
     dynamics::{
         guidance::LocalFrame, Harmonics, OrbitalDynamics, SolarPressure, SpacecraftDynamics,
     },
@@ -77,12 +77,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // To build the trajectory we need to provide a spacecraft template.
     let sc_template = Spacecraft::builder()
-        .dry_mass_kg(1018.0) // Launch masses
-        .fuel_mass_kg(900.0)
-        .srp(SrpConfig {
+        .mass(Mass::from_dry_and_prop_masses(1018.0, 900.0)) // Launch masses
+        .srp(SRPData {
             // SRP configuration is arbitrary, but we will be estimating it anyway.
             area_m2: 3.9 * 2.7,
-            cr: 0.96,
+            coeff_reflectivity: 0.96,
         })
         .orbit(Orbit::zero(MOON_J2000)) // Setting a zero orbit here because it's just a template
         .build();
@@ -125,7 +124,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     // The harmonics must be computed in the body fixed frame.
     // We're using the long term prediction of the Moon principal axes frame.
     let moon_pa_frame = MOON_PA_FRAME.with_orient(31008);
-    // let moon_pa_frame = IAU_MOON_FRAME;
     let sph_harmonics = Harmonics::from_stor(
         almanac.frame_from_uid(moon_pa_frame)?,
         HarmonicsMem::from_shadr(&jggrx_meta.uri, 80, 80, true)?,

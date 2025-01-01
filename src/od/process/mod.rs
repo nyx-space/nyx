@@ -444,7 +444,6 @@ where
             self.prop.set_step(max_step, false);
         }
 
-        // let prop_time = measurements[num_msrs - 1].1.epoch() - self.kf.previous_estimate().epoch();
         let prop_time = arc.end_epoch().unwrap() - self.kf.previous_estimate().epoch();
         info!("Navigation propagating for a total of {prop_time} with step size {max_step}");
 

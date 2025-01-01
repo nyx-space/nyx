@@ -40,23 +40,13 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use typed_builder::TypedBuilder;
 
-/// Handles writing to an XYZV file
-pub mod cosmo;
-pub mod estimate;
 /// Handles loading of gravity models using files of NASA PDS and GMAT COF. Several gunzipped files are provided with nyx.
 pub mod gravity;
-pub mod matrices;
-// pub mod tracking_data;
-pub mod trajectory_data;
 
 use std::io;
 
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
-
 /// Configuration for exporting a trajectory to parquet.
 #[derive(Clone, Default, Serialize, Deserialize, TypedBuilder)]
-#[cfg_attr(feature = "python", pyclass)]
 #[builder(doc)]
 pub struct ExportCfg {
     /// Fields to export, if unset, defaults to all possible fields.
@@ -131,31 +121,6 @@ impl ExportCfg {
     }
 }
 
-#[cfg(feature = "python")]
-#[pymethods]
-impl ExportCfg {
-    #[new]
-    #[pyo3(
-        text_signature = "(timestamp=None, fields=None, start_epoch=None, step=None, end_epoch=None, metadata=None)"
-    )]
-    fn py_new(
-        timestamp: Option<bool>,
-        fields: Option<Vec<StateParameter>>,
-        start_epoch: Option<Epoch>,
-        end_epoch: Option<Epoch>,
-        metadata: Option<HashMap<String, String>>,
-    ) -> Self {
-        Self {
-            timestamp: timestamp.unwrap_or(false),
-            fields,
-            start_epoch,
-            end_epoch,
-            metadata,
-            ..Default::default()
-        }
-    }
-}
-
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub(crate)))]
 pub enum ConfigError {
@@ -204,7 +169,7 @@ pub enum InputOutputError {
     ParseDhall { data: String, err: String },
     #[snafu(display("error serializing {what} to Dhall: {err}"))]
     SerializeDhall { what: String, err: String },
-    #[snafu(display("empty dataset error when (de)serializing for {action}"))]
+    #[snafu(display("empty dataset error when (de)serializing {action}"))]
     EmptyDataset { action: &'static str },
 }
 

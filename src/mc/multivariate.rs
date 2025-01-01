@@ -141,7 +141,7 @@ impl MvnSpacecraft {
                         StateParameter::Cd => {
                             cov[(8, 8)] = disp.mean.unwrap_or(0.0).powi(2);
                         }
-                        StateParameter::DryMass | StateParameter::FuelMass => {
+                        StateParameter::DryMass | StateParameter::PropMass => {
                             cov[(9, 9)] = disp.mean.unwrap_or(0.0).powi(2);
                         }
                         _ => return Err(Box::new(StateError::ReadOnly { param: disp.param })),
@@ -249,7 +249,7 @@ impl MvnSpacecraft {
                 .std_dev(cov[(7, 7)])
                 .build(),
             StateDispersion::builder()
-                .param(StateParameter::FuelMass)
+                .param(StateParameter::PropMass)
                 .std_dev(cov[(8, 8)])
                 .build(),
         ];
@@ -278,11 +278,11 @@ impl Distribution<DispersedState<Spacecraft>> for MvnSpacecraft {
             } else if coord < 6 {
                 state.orbit.velocity_km_s[coord % 3] += val;
             } else if coord == 6 {
-                state.srp.cr += val;
+                state.srp.coeff_reflectivity += val;
             } else if coord == 7 {
-                state.drag.cd += val;
+                state.drag.coeff_drag += val;
             } else if coord == 8 {
-                state.fuel_mass_kg += val;
+                state.mass.prop_mass_kg += val;
             }
         }
 

@@ -17,20 +17,11 @@
 */
 
 use crate::io::{ConfigError, ConfigRepr};
-#[cfg(feature = "python")]
-use crate::python::pyo3utils::pyany_to_value;
 use hifitime::{Duration, Epoch, TimeUnits};
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
-#[cfg(feature = "python")]
-use pyo3::types::{PyDict, PyList, PyType};
-#[cfg(feature = "python")]
-use pythonize::{depythonize, pythonize};
+
 use rand::Rng;
 use rand_distr::Normal;
 use serde_derive::{Deserialize, Serialize};
-#[cfg(feature = "python")]
-use std::collections::BTreeMap;
 use std::fmt;
 use std::ops::Mul;
 
@@ -48,8 +39,6 @@ use super::Stochastics;
 ///
 /// s(t - t_0) = ((q * τ) / 2) * (1 - exp((-2 / τ) * (t - t_0)))
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
-#[cfg_attr(feature = "python", pyclass)]
-#[cfg_attr(feature = "python", pyo3(module = "nyx_space.orbit_determination"))]
 pub struct GaussMarkov {
     /// The time constant, tau gives the correlation time, or the time over which the intensity of the time correlation will fade to 1/e of its prior value. (This is sometimes incorrectly referred to as the "half-life" of the process.)
     pub tau: Duration,
@@ -165,192 +154,6 @@ impl Mul<f64> for GaussMarkov {
             init_sample: None,
             prev_epoch: None,
         }
-    }
-}
-
-#[cfg_attr(feature = "python", pymethods)]
-impl GaussMarkov {
-    #[cfg(feature = "python")]
-    pub fn __repr__(&self) -> String {
-        format!("{self:?}")
-    }
-
-    #[cfg(feature = "python")]
-    pub fn __str__(&self) -> String {
-        format!("{self}")
-    }
-
-    #[cfg(feature = "python")]
-    #[new]
-    #[pyo3(text_signature = "(tau, sigma, state_state)")]
-    fn py_new(
-        tau: Option<Duration>,
-        sigma: Option<f64>,
-        steady_state: Option<f64>,
-        bias: Option<f64>,
-        epoch: Option<Epoch>,
-    ) -> Result<Self, ConfigError> {
-        if tau.is_none() && sigma.is_none() && steady_state.is_none() {
-            // We're called from pickle, return a non initialized state
-            return Ok(Self::ZERO);
-        } else if tau.is_none() || sigma.is_none() || steady_state.is_none() {
-            return Err(ConfigError::InvalidConfig {
-                msg: "tau, sigma, and steady_state must be specified".to_string(),
-            });
-        }
-
-        let tau = tau.unwrap();
-        let sigma = sigma.unwrap();
-        let steady_state = steady_state.unwrap();
-
-        if tau <= Duration::ZERO {
-            return Err(ConfigError::InvalidConfig {
-                msg: format!("tau must be positive but got {tau}"),
-            });
-        }
-
-        Ok(Self {
-            tau,
-            bias_sigma: sigma,
-            steady_state_sigma: steady_state,
-            bias,
-            epoch,
-        })
-    }
-
-    #[cfg(feature = "python")]
-    #[getter]
-    fn get_tau(&self) -> Duration {
-        self.tau
-    }
-
-    #[cfg(feature = "python")]
-    #[setter]
-    fn set_tau(&mut self, tau: Duration) -> PyResult<()> {
-        self.tau = tau;
-        Ok(())
-    }
-
-    #[cfg(feature = "python")]
-    #[getter]
-    fn get_bias(&self) -> Option<f64> {
-        self.bias
-    }
-
-    #[cfg(feature = "python")]
-    #[setter]
-    fn set_sampling(&mut self, bias: f64) -> PyResult<()> {
-        self.bias_sigma = bias;
-        Ok(())
-    }
-
-    /// Initializes a new Gauss Markov process for the provided kind of model.
-    ///
-    /// Available models are: `Range`, `Doppler`, `RangeHP`, `Doppler HP` (HP stands for high precision).
-    #[cfg(feature = "python")]
-    #[classmethod]
-    fn default(_cls: &PyType, kind: String) -> Result<Self, NyxError> {
-        Self::from_default(kind)
-    }
-
-    #[cfg(feature = "python")]
-    #[classmethod]
-    fn load(_cls: &PyType, path: &str) -> Result<Self, ConfigError> {
-        <Self as ConfigRepr>::load(path)
-    }
-
-    #[cfg(feature = "python")]
-    #[classmethod]
-    fn load_many(_cls: &PyType, path: &str) -> Result<Vec<Self>, ConfigError> {
-        <Self as ConfigRepr>::load_many(path)
-    }
-
-    #[cfg(feature = "python")]
-    #[classmethod]
-    fn load_named(_cls: &PyType, path: &str) -> Result<BTreeMap<String, Self>, ConfigError> {
-        <Self as ConfigRepr>::load_named(path)
-    }
-
-    /// Create a new `GaussMarkov` process as if it were purely a white noise, i.c. without any time correlation.
-    #[cfg(feature = "python")]
-    #[classmethod]
-    fn white(_cls: &PyType, sigma: f64) -> Result<Self, NyxError> {
-        Ok(Self::white_noise(sigma))
-    }
-
-    #[cfg(feature = "python")]
-    /// Loads the SpacecraftDynamics from its YAML representation
-    #[classmethod]
-    fn loads(_cls: &PyType, data: &PyAny) -> Result<Vec<Self>, ConfigError> {
-        use snafu::ResultExt;
-
-        use crate::io::ParseSnafu;
-
-        if let Ok(as_list) = data.downcast::<PyList>() {
-            let mut selves = Vec::new();
-            for item in as_list.iter() {
-                // Check that the item is a dictionary
-                let next: Self =
-                    serde_yml::from_value(pyany_to_value(item)?).context(ParseSnafu)?;
-                selves.push(next);
-            }
-            Ok(selves)
-        } else if let Ok(as_dict) = data.downcast::<PyDict>() {
-            let mut selves = Vec::new();
-            for item_as_list in as_dict.items() {
-                let v_any = item_as_list
-                    .get_item(1)
-                    .map_err(|_| ConfigError::InvalidConfig {
-                        msg: "could not get key from provided dictionary item".to_string(),
-                    })?;
-
-                // Try to convert the underlying data
-                match pyany_to_value(v_any) {
-                    Ok(value) => {
-                        match serde_yml::from_value(value) {
-                            Ok(next) => selves.push(next),
-                            Err(_) => {
-                                // Maybe this was to be parsed in full as a single item
-                                let me: Self = depythonize(data).map_err(|e| {
-                                    ConfigError::InvalidConfig { msg: e.to_string() }
-                                })?;
-                                selves.clear();
-                                selves.push(me);
-                                return Ok(selves);
-                            }
-                        }
-                    }
-                    Err(_) => {
-                        // Maybe this was to be parsed in full as a single item
-                        let me: Self = depythonize(data)
-                            .map_err(|e| ConfigError::InvalidConfig { msg: e.to_string() })?;
-                        selves.clear();
-                        selves.push(me);
-                        return Ok(selves);
-                    }
-                }
-            }
-            Ok(selves)
-        } else {
-            depythonize(data).map_err(|e| ConfigError::InvalidConfig { msg: e.to_string() })
-        }
-    }
-
-    #[cfg(feature = "python")]
-    fn dumps(&self, py: Python) -> Result<PyObject, NyxError> {
-        pythonize(py, &self).map_err(|e| NyxError::CustomError { msg: e.to_string() })
-    }
-
-    #[cfg(feature = "python")]
-    fn __getstate__(&self, py: Python) -> Result<PyObject, NyxError> {
-        self.dumps(py)
-    }
-
-    #[cfg(feature = "python")]
-    fn __setstate__(&mut self, state: &PyAny) -> Result<(), ConfigError> {
-        *self =
-            depythonize(state).map_err(|e| ConfigError::InvalidConfig { msg: e.to_string() })?;
-        Ok(())
     }
 }
 

@@ -838,11 +838,11 @@ fn multi_body_dynamics_dual(almanac: Arc<Almanac>) {
     );
     // This should be zero!
     assert!(
-        err_r < 2e-16,
+        err_r < f64::EPSILON,
         "position error too large for multibody gravity"
     );
     assert!(
-        err_v < 2e-16,
+        err_v < f64::EPSILON,
         "velocity error too large for multibody gravity"
     );
 
@@ -1020,8 +1020,14 @@ fn val_earth_sph_harmonics_12x12(almanac_gmat: Arc<Almanac>) {
         err_v * 1e3
     );
     // This should be zero!
-    assert!(err_r < 2e-16, "position error too large for 12x12 gravity");
-    assert!(err_v < 2e-16, "velocity error too large for 12x12 gravity");
+    assert!(
+        err_r < f64::EPSILON,
+        "position error too large for 12x12 gravity"
+    );
+    assert!(
+        err_v < f64::EPSILON,
+        "velocity error too large for 12x12 gravity"
+    );
 }
 
 #[allow(clippy::identity_op)]

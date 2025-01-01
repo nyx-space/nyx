@@ -145,7 +145,7 @@ impl ForceModel for SolarPressure {
         let flux_pressure = (k * self.phi / SPEED_OF_LIGHT_M_S) * (1.0 / r_sun_au).powi(2);
 
         // Note the 1e-3 is to convert the SRP from m/s^2 to km/s^2
-        Ok(1e-3 * ctx.srp.cr * ctx.srp.area_m2 * flux_pressure * r_sun_unit)
+        Ok(1e-3 * ctx.srp.coeff_reflectivity * ctx.srp.area_m2 * flux_pressure * r_sun_unit)
     }
 
     fn dual_eom(
@@ -187,8 +187,9 @@ impl ForceModel for SolarPressure {
                 * inv_r_sun_au_p2;
 
         // Note the 1e-3 is to convert the SRP from m/s^2 to km/s^2
-        let dual_force_scalar =
-            OHyperdual::<f64, Const<9>>::from_real(1e-3 * ctx.srp.cr * ctx.srp.area_m2);
+        let dual_force_scalar = OHyperdual::<f64, Const<9>>::from_real(
+            1e-3 * ctx.srp.coeff_reflectivity * ctx.srp.area_m2,
+        );
         let mut dual_force: Vector3<OHyperdual<f64, Const<9>>> = Vector3::zeros();
         dual_force[0] = dual_force_scalar * flux_pressure * r_sun_unit[0];
         dual_force[1] = dual_force_scalar * flux_pressure * r_sun_unit[1];
@@ -206,7 +207,7 @@ impl ForceModel for SolarPressure {
         }
 
         // Compute the partial wrt to Cr.
-        let wrt_cr = self.eom(ctx, almanac)? / ctx.srp.cr;
+        let wrt_cr = self.eom(ctx, almanac)? / ctx.srp.coeff_reflectivity;
         for j in 0..3 {
             grad[(3, j)] = wrt_cr[j];
         }

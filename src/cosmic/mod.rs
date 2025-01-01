@@ -19,7 +19,7 @@
 use anise::errors::{AlmanacError, PhysicsError};
 pub use anise::prelude::*;
 
-pub use crate::cosmic::{GuidanceMode, Spacecraft};
+pub use crate::cosmic::{DragData, GuidanceMode, Mass, SRPData, Spacecraft};
 use crate::dynamics::DynamicsError;
 pub use crate::errors::NyxError;
 use crate::errors::StateError;

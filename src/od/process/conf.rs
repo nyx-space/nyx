@@ -23,9 +23,6 @@ use std::default::Default;
 use std::fmt;
 use typed_builder::TypedBuilder;
 
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
-
 /// Defines the stopping condition for the smoother
 #[derive(Clone, Copy, Debug)]
 pub enum SmoothingArc {
@@ -59,7 +56,7 @@ impl Default for SmoothingArc {
 /// Defines a filter iteration configuration. Allows iterating on an OD solution until convergence criteria is met.
 /// The root mean squared of the prefit residuals ratios is used to assess convergence between iterations.
 #[derive(Clone, Copy, Debug, TypedBuilder)]
-#[cfg_attr(feature = "python", pyclass)]
+
 pub struct IterationConf {
     /// The number of measurements to account for in the iteration
     #[builder(default)]
@@ -88,75 +85,6 @@ impl IterationConf {
             max_iterations: 1,
             ..Default::default()
         }
-    }
-}
-
-#[cfg(feature = "python")]
-#[pymethods]
-impl IterationConf {
-    #[new]
-    fn py_new(
-        strategy: Option<String>,
-        duration: Option<Duration>,
-        epoch: Option<Epoch>,
-        absolute_tol: Option<f64>,
-        relative_tol: Option<f64>,
-        max_iterations: Option<usize>,
-        max_divergences: Option<usize>,
-        force_failure: Option<bool>,
-    ) -> Result<Self, NyxError> {
-        let mut me = Self {
-            smoother: if let Some(strategy) = strategy {
-                match strategy.to_lowercase().trim() {
-                    "all" => SmoothingArc::All,
-                    "prediction" => SmoothingArc::Prediction,
-                    _ => {
-                        return Err(NyxError::CustomError {
-                            msg: "strategy should be `all` or `prediction`".to_string(),
-                        })
-                    }
-                }
-            } else if let Some(duration) = duration {
-                SmoothingArc::TimeGap(duration)
-            } else if let Some(epoch) = epoch {
-                SmoothingArc::Epoch(epoch)
-            } else {
-                return Err(NyxError::CustomError {
-                    msg: "Smoothing arc strategy not specified".to_string(),
-                });
-            },
-            ..Default::default()
-        };
-
-        if let Some(abs_tol) = absolute_tol {
-            me.absolute_tol = abs_tol;
-        }
-
-        if let Some(rel_tol) = relative_tol {
-            me.relative_tol = rel_tol;
-        }
-
-        if let Some(max_it) = max_iterations {
-            me.max_iterations = max_it;
-        }
-
-        if let Some(max_div) = max_divergences {
-            me.max_divergences = max_div;
-        }
-
-        if let Some(force_failure) = force_failure {
-            me.force_failure = force_failure;
-        }
-
-        Ok(me)
-    }
-
-    fn __repr__(&self) -> String {
-        format!("{self}")
-    }
-
-    fn __str__(&self) -> String {
-        format!("Smoothing {self}")
     }
 }
 

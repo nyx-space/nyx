@@ -91,7 +91,7 @@ To build the following plots, use the `plot_3d_traj.py` script and the `plot_orb
 
 ![Orbital elements during orbit raise](./plots/raise-keplerian-oe.png)
 
-In the two follow plots, the colors correspond to the remaining fuel mass, thereby showing the fuel depletion over the orbit raise.
+In the two follow plots, the colors correspond to the remaining prop mass, thereby showing the prop depletion over the orbit raise.
 
 ![3D traj raise](./plots/raise-traj-3d.png)
 
@@ -112,7 +112,7 @@ To run the [station keeping Monte Carlo](./stationkeeping.rs) example, just exec
 RUST_LOG=info cargo run --example 03_geo_sk --release
 ```
 
-Over a two week period, this two-ton spacecraft would need roughly 0.8 kg of fuel (if using the _NEXT-STEP_ engine, cf. the comments in the drift analysis code) +/- 0.1 kg for station keeping.
+Over a two week period, this two-ton spacecraft would need roughly 0.8 kg of prop (if using the _NEXT-STEP_ engine, cf. the comments in the drift analysis code) +/- 0.1 kg for station keeping.
 
 ![Fuel mass](./plots/sk-fuel-mass.png)
 
@@ -123,4 +123,4 @@ The inclination plot shows when the guidance law turns on, and shows that we mai
 
 ### Further analysis
 
-Additional analysis would run this Monte Carlo for longer and with many more spacecraft (upward of 100), and crucially ensure that the Ruggiero guidance law bounds correspond to the GEO box. Subsequently, one should implement the Q-Law guidance law for more fuel economy. Finally, the analysis should also include a variation on the tightness of the box, especially if the vehicle is equipped with a variable thrust engine as one may wish to drift less out of the SK box and keep the engine at a lower thrust level, or vice versa.
+Additional analysis would run this Monte Carlo for longer and with many more spacecraft (upward of 100), and crucially ensure that the Ruggiero guidance law bounds correspond to the GEO box. Subsequently, one should implement the Q-Law guidance law for more prop economy. Finally, the analysis should also include a variation on the tightness of the box, especially if the vehicle is equipped with a variable thrust engine as one may wish to drift less out of the SK box and keep the engine at a lower thrust level, or vice versa.

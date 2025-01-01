@@ -19,7 +19,7 @@
 use super::solution::TargeterSolution;
 use super::targeter::Targeter;
 use crate::cosmic::{AstroAlmanacSnafu, AstroPhysicsSnafu};
-use crate::dynamics::guidance::{GuidanceError, LocalFrame, Mnvr};
+use crate::dynamics::guidance::{GuidanceError, LocalFrame, Maneuver, MnvrRepr};
 use crate::errors::TargetingError;
 use crate::linalg::{SMatrix, SVector, Vector6};
 use crate::md::{prelude::*, AstroSnafu, GuidanceSnafu, UnderdeterminedProblemSnafu};
@@ -71,12 +71,14 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
         // Store the total correction in Vector3
         let mut total_correction = SVector::<f64, V>::zeros();
 
-        let mut mnvr = Mnvr {
+        let mut mnvr = Maneuver {
             start: correction_epoch,
             end: achievement_epoch,
             thrust_prct: 1.0,
-            alpha_inplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
-            delta_outofplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
+            representation: MnvrRepr::Angles {
+                azimuth: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
+                elevation: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
+            },
             frame: LocalFrame::RCN,
         };
 
@@ -113,16 +115,26 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                     Vary::EndEpoch => mnvr.end += var.init_guess.seconds(),
                     Vary::StartEpoch => mnvr.start += var.init_guess.seconds(),
                     Vary::MnvrAlpha | Vary::MnvrAlphaDot | Vary::MnvrAlphaDDot => {
-                        mnvr.alpha_inplane_radians = mnvr
-                            .alpha_inplane_radians
-                            .add_val_in_order(var.init_guess, var.component.vec_index())
-                            .unwrap();
+                        match mnvr.representation {
+                            MnvrRepr::Angles { azimuth, elevation } => {
+                                let azimuth = azimuth
+                                    .add_val_in_order(var.init_guess, var.component.vec_index())
+                                    .unwrap();
+                                mnvr.representation = MnvrRepr::Angles { azimuth, elevation };
+                            }
+                            _ => unreachable!(),
+                        };
                     }
                     Vary::MnvrDelta | Vary::MnvrDeltaDot | Vary::MnvrDeltaDDot => {
-                        mnvr.delta_outofplane_radians = mnvr
-                            .delta_outofplane_radians
-                            .add_val_in_order(var.init_guess, var.component.vec_index())
-                            .unwrap();
+                        match mnvr.representation {
+                            MnvrRepr::Angles { azimuth, elevation } => {
+                                let elevation = elevation
+                                    .add_val_in_order(var.init_guess, var.component.vec_index())
+                                    .unwrap();
+                                mnvr.representation = MnvrRepr::Angles { azimuth, elevation };
+                            }
+                            _ => unreachable!(),
+                        };
                     }
                     Vary::ThrustX | Vary::ThrustY | Vary::ThrustZ => {
                         let mut vector = mnvr.direction();
@@ -328,16 +340,28 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                                 }
                             }
                             Vary::MnvrAlpha | Vary::MnvrAlphaDot | Vary::MnvrAlphaDDot => {
-                                this_mnvr.alpha_inplane_radians = mnvr
-                                    .alpha_inplane_radians
-                                    .add_val_in_order(pert, var.component.vec_index())
-                                    .unwrap();
+                                match mnvr.representation {
+                                    MnvrRepr::Angles { azimuth, elevation } => {
+                                        let azimuth = azimuth
+                                            .add_val_in_order(pert, var.component.vec_index())
+                                            .unwrap();
+                                        this_mnvr.representation =
+                                            MnvrRepr::Angles { azimuth, elevation };
+                                    }
+                                    _ => unreachable!(),
+                                };
                             }
                             Vary::MnvrDelta | Vary::MnvrDeltaDot | Vary::MnvrDeltaDDot => {
-                                this_mnvr.delta_outofplane_radians = mnvr
-                                    .delta_outofplane_radians
-                                    .add_val_in_order(pert, var.component.vec_index())
-                                    .unwrap();
+                                match mnvr.representation {
+                                    MnvrRepr::Angles { azimuth, elevation } => {
+                                        let elevation = elevation
+                                            .add_val_in_order(pert, var.component.vec_index())
+                                            .unwrap();
+                                        this_mnvr.representation =
+                                            MnvrRepr::Angles { azimuth, elevation };
+                                    }
+                                    _ => unreachable!(),
+                                };
                             }
                             Vary::ThrustX | Vary::ThrustY | Vary::ThrustZ => {
                                 let mut vector = this_mnvr.direction();
@@ -615,16 +639,26 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                             }
                         }
                         Vary::MnvrAlpha | Vary::MnvrAlphaDot | Vary::MnvrAlphaDDot => {
-                            mnvr.alpha_inplane_radians = mnvr
-                                .alpha_inplane_radians
-                                .add_val_in_order(corr, var.component.vec_index())
-                                .unwrap();
+                            match mnvr.representation {
+                                MnvrRepr::Angles { azimuth, elevation } => {
+                                    let azimuth = azimuth
+                                        .add_val_in_order(corr, var.component.vec_index())
+                                        .unwrap();
+                                    mnvr.representation = MnvrRepr::Angles { azimuth, elevation };
+                                }
+                                _ => unreachable!(),
+                            };
                         }
                         Vary::MnvrDelta | Vary::MnvrDeltaDot | Vary::MnvrDeltaDDot => {
-                            mnvr.delta_outofplane_radians = mnvr
-                                .delta_outofplane_radians
-                                .add_val_in_order(corr, var.component.vec_index())
-                                .unwrap();
+                            match mnvr.representation {
+                                MnvrRepr::Angles { azimuth, elevation } => {
+                                    let elevation = elevation
+                                        .add_val_in_order(corr, var.component.vec_index())
+                                        .unwrap();
+                                    mnvr.representation = MnvrRepr::Angles { azimuth, elevation };
+                                }
+                                _ => unreachable!(),
+                            };
                         }
                         Vary::ThrustX | Vary::ThrustY | Vary::ThrustZ => {
                             let mut vector = mnvr.direction();

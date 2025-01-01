@@ -33,29 +33,13 @@ use std::fmt::{self, Write};
 use std::sync::Arc;
 
 use crate::cosmic::AstroError;
-#[cfg(feature = "python")]
-use crate::io::ConfigRepr;
-#[cfg(feature = "python")]
-use crate::python::PythonError;
-#[cfg(feature = "python")]
-use pyo3::class::basic::CompareOp;
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
-#[cfg(feature = "python")]
-use pyo3::types::PyType;
-#[cfg(feature = "python")]
-use pythonize::depythonize;
-#[cfg(feature = "python")]
-use std::collections::BTreeMap;
 
 const NORM_ERR: f64 = 1e-4;
 
-/// A generic spacecraft dynamics with associated force models, guidance law, and flag specifying whether to decrement the fuel mass or not.
-/// Note: when developing new guidance laws, it is recommended to _not_ enable fuel decrement until the guidance law seems to work without proper physics.
-/// Note: if the spacecraft runs out of fuel, the propagation segment will return an error.
+/// A generic spacecraft dynamics with associated force models, guidance law, and flag specifying whether to decrement the prop mass or not.
+/// Note: when developing new guidance laws, it is recommended to _not_ enable prop decrement until the guidance law seems to work without proper physics.
+/// Note: if the spacecraft runs out of prop, the propagation segment will return an error.
 #[derive(Clone)]
-#[cfg_attr(feature = "python", pyclass)]
-#[cfg_attr(feature = "python", pyo3(module = "nyx_space.mission_design"))]
 pub struct SpacecraftDynamics {
     pub orbital_dyn: OrbitalDynamics,
     // TODO: https://github.com/nyx-space/nyx/issues/214
@@ -77,7 +61,7 @@ impl SpacecraftDynamics {
     }
 
     /// Initialize a Spacecraft with a set of orbital dynamics and a propulsion subsystem.
-    /// Will _not_ decrement the fuel mass as propellant is consumed.
+    /// Will _not_ decrement the prop mass as propellant is consumed.
     pub fn from_guidance_law_no_decr(
         orbital_dyn: OrbitalDynamics,
         guid_law: Arc<dyn GuidanceLaw>,
@@ -139,75 +123,6 @@ impl SpacecraftDynamics {
     }
 }
 
-#[cfg_attr(feature = "python", pymethods)]
-impl SpacecraftDynamics {
-    #[cfg(feature = "python")]
-    #[classmethod]
-    fn load(_cls: &PyType, path: &str) -> Result<Self, ConfigError> {
-        let serde = DynamicsSerde::load(path)?;
-
-        let cosm = Cosm::de438();
-
-        Self::from_config(serde, cosm)
-    }
-
-    #[cfg(feature = "python")]
-    #[classmethod]
-    fn load_many(_cls: &PyType, path: &str) -> Result<Vec<Self>, ConfigError> {
-        let orbits = DynamicsSerde::load_many(path)?;
-
-        let cosm = Cosm::de438();
-
-        let mut selves = Vec::with_capacity(orbits.len());
-
-        for serde in orbits {
-            selves.push(Self::from_config(serde, cosm.clone())?);
-        }
-
-        Ok(selves)
-    }
-
-    #[cfg(feature = "python")]
-    #[classmethod]
-    fn load_named(_cls: &PyType, path: &str) -> Result<BTreeMap<String, Self>, ConfigError> {
-        let orbits = DynamicsSerde::load_named(path)?;
-
-        let cosm = Cosm::de438();
-
-        let mut selves = BTreeMap::new();
-
-        for (k, v) in orbits {
-            selves.insert(k, Self::from_config(v, cosm.clone())?);
-        }
-
-        Ok(selves)
-    }
-
-    #[cfg(feature = "python")]
-    fn __repr__(&self) -> String {
-        format!("{self}")
-    }
-
-    #[cfg(feature = "python")]
-    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Result<bool, PythonError> {
-        match op {
-            CompareOp::Eq => Ok(self.__repr__() == other.__repr__()),
-            CompareOp::Ne => Ok(self.__repr__() != other.__repr__()),
-            _ => Err(PythonError::OperationError { op }),
-        }
-    }
-
-    #[cfg(feature = "python")]
-    #[classmethod]
-    /// Loads the SpacecraftDynamics from its YAML representation
-    fn loads(_cls: &PyType, state: &PyAny) -> Result<Self, ConfigError> {
-        <Self as Configurable>::from_config(
-            depythonize(state).map_err(|e| ConfigError::InvalidConfig { msg: e.to_string() })?,
-            Cosm::de438(),
-        )
-    }
-}
-
 impl fmt::Display for SpacecraftDynamics {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let force_models: String = if self.force_models.is_empty() {
@@ -239,8 +154,8 @@ impl Dynamics for SpacecraftDynamics {
         next_state: Self::StateType,
         almanac: Arc<Almanac>,
     ) -> Result<Self::StateType, DynamicsError> {
-        if next_state.fuel_mass_kg < 0.0 {
-            error!("negative fuel mass at {}", next_state.epoch());
+        if next_state.mass.prop_mass_kg < 0.0 {
+            error!("negative prop mass at {}", next_state.epoch());
             return Err(DynamicsError::FuelExhausted {
                 sc: Box::new(next_state),
             });
@@ -309,7 +224,7 @@ impl Dynamics for SpacecraftDynamics {
 
         // Now include the control as needed.
         if let Some(guid_law) = &self.guid_law {
-            let (thrust_force, fuel_rate) = {
+            let (thrust_force, prop_rate) = {
                 if osc_sc.thruster.is_none() {
                     return Err(DynamicsError::DynamicsGuidance {
                         source: GuidanceError::NoThrustersDefined,
@@ -345,9 +260,9 @@ impl Dynamics for SpacecraftDynamics {
                         (
                             thrust_inertial * total_thrust,
                             if self.decrement_mass {
-                                let fuel_usage = thrust_throttle_lvl * thruster.thrust_N
+                                let prop_usage = thrust_throttle_lvl * thruster.thrust_N
                                     / (thruster.isp_s * STD_GRAVITY);
-                                -fuel_usage
+                                -prop_usage
                             } else {
                                 0.0
                             },
@@ -367,7 +282,7 @@ impl Dynamics for SpacecraftDynamics {
             for i in 0..3 {
                 d_x[i + 3] += thrust_force[i] / osc_sc.mass_kg();
             }
-            d_x[8] += fuel_rate;
+            d_x[8] += prop_rate;
         }
         Ok(d_x)
     }

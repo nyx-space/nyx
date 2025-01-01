@@ -7,12 +7,12 @@ use nyx::cosmic::eclipse::EclipseLocator;
 use nyx::cosmic::{GuidanceMode, Orbit, Spacecraft};
 use nyx::dynamics::guidance::{GuidanceLaw, Ruggiero, Thruster};
 use nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
-use nyx::io::trajectory_data::TrajectoryLoader;
 use nyx::md::prelude::{ExportCfg, Objective};
 use nyx::md::StateParameter;
 use nyx::propagators::*;
 use nyx::time::{Epoch, TimeSeries, Unit};
 use nyx::State;
+use nyx_space::md::Trajectory;
 use std::path::PathBuf;
 use std::sync::mpsc::channel;
 use std::sync::Arc;
@@ -28,7 +28,7 @@ fn almanac() -> Arc<Almanac> {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn traj_ephem_forward(almanac: Arc<Almanac>) {
+fn traj_ephem_forward_cov_test(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
     // Test that we can correctly interpolate a spacecraft orbit
 
@@ -143,8 +143,7 @@ fn traj_ephem_forward(almanac: Arc<Almanac>) {
 
     // Reload this trajectory and make sure that it matches
 
-    let dyn_traj = TrajectoryLoader::from_parquet(exported_path).unwrap();
-    let concrete_traj = dyn_traj.to_traj::<Spacecraft>().unwrap();
+    let concrete_traj = Trajectory::from_parquet(exported_path).unwrap();
 
     if ephem != concrete_traj {
         // Uh oh, let's see where the differences are.
@@ -252,7 +251,7 @@ fn traj_ephem_forward(almanac: Arc<Almanac>) {
 #[rstest]
 fn traj_spacecraft(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
-    // Test the interpolation of a spaceraft trajectory and of its fuel. Includes a demo of checking what the guidance mode _should_ be provided the state.
+    // Test the interpolation of a spaceraft trajectory and of its prop. Includes a demo of checking what the guidance mode _should_ be provided the state.
     // Note that we _do not_ attempt to interpolate the Guidance Mode.
     // This is based on the Ruggiero AOP correction
 
@@ -273,7 +272,7 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
     let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
     // Build the spacecraft state
-    let fuel_mass = 67.0;
+    let prop_mass = 67.0;
     let dry_mass = 300.0;
     // Define the thruster
     let lowt = Thruster {
@@ -281,7 +280,7 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
         isp_s: 1650.0,
     };
     let start_state =
-        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc_dynamics =
         SpacecraftDynamics::from_guidance_law(OrbitalDynamics::two_body(), ruggiero_ctrl.clone());
@@ -354,7 +353,7 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
 
     let mut max_pos_err = (eval_state.orbit.radius_km - start_state.orbit.radius_km).norm();
     let mut max_vel_err = (eval_state.orbit.velocity_km_s - start_state.orbit.velocity_km_s).norm();
-    let mut max_fuel_err = eval_state.fuel_mass_kg - start_state.fuel_mass_kg;
+    let mut max_prop_err = eval_state.mass.prop_mass_kg - start_state.mass.prop_mass_kg;
     let mut max_err = (eval_state.to_vector() - start_state.to_vector()).norm();
 
     while let Ok(prop_state) = rx.recv() {
@@ -374,12 +373,12 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
                 prop_state.epoch()
             );
         }
-        let fuel_err = eval_state.fuel_mass_kg - prop_state.fuel_mass_kg;
-        if fuel_err > max_fuel_err {
-            max_fuel_err = fuel_err;
+        let prop_err = eval_state.mass.prop_mass_kg - prop_state.mass.prop_mass_kg;
+        if prop_err > max_prop_err {
+            max_prop_err = prop_err;
             println!(
-                "fuel_err = {:.3e} g @ {}",
-                fuel_err * 1e3,
+                "prop_err = {:.3e} g @ {}",
+                prop_err * 1e3,
                 prop_state.epoch()
             );
         }
@@ -390,10 +389,10 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
     }
 
     println!(
-        "[traj_spacecraft] Maximum interpolation error: pos: {:.2e} m\t\tvel: {:.2e} m/s\t\tfuel: {:.2e} g\t\tfull state: {:.2e} (no unit)",
+        "[traj_spacecraft] Maximum interpolation error: pos: {:.2e} m\t\tvel: {:.2e} m/s\t\tprop: {:.2e} g\t\tfull state: {:.2e} (no unit)",
         max_pos_err * 1e3,
         max_vel_err * 1e3,
-        max_fuel_err * 1e3,
+        max_prop_err * 1e3,
         max_err
     );
 
@@ -412,7 +411,7 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
     // Allow for up to 0.1 gram error
     assert!(
         max_vel_err < 1e-4,
-        "Maximum spacecraft fuel in interpolation is too high!"
+        "Maximum spacecraft prop in interpolation is too high!"
     );
 
     // And let's convert into another frame and back to check the error
@@ -428,7 +427,7 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn traj_ephem_backward_cov_test(almanac: Arc<Almanac>) {
+fn traj_ephem_backward(almanac: Arc<Almanac>) {
     // Test that we can correctly interpolate a spacecraft orbit
 
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();

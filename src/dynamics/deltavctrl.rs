@@ -19,7 +19,7 @@
 use crate::cosmic::Orbit;
 use crate::linalg::Vector3;
 
-pub use super::guidance::Mnvr;
+pub use super::guidance::Maneuver;
 
 /// The `DeltaVctrl` trait handles control laws, optimizations, and other such methods for
 /// controlling the change in velocity of a point mass during a mission arc (`MissionArc`).
@@ -37,13 +37,13 @@ where
 #[derive(Clone, Debug)]
 pub struct ImpulsiveBurns {
     /// Maneuvers should be provided in chronological order, first maneuver first in the list
-    pub mnvrs: Vec<Mnvr>,
+    pub mnvrs: Vec<Maneuver>,
     pub mnvr_no: usize,
 }
 
 impl ImpulsiveBurns {
     /// Builds a schedule from the vector of maneuvers, must be provided in chronological order.
-    pub fn from_mnvrs(mnvrs: Vec<Mnvr>) -> Self {
+    pub fn from_mnvrs(mnvrs: Vec<Maneuver>) -> Self {
         Self { mnvrs, mnvr_no: 0 }
     }
 }

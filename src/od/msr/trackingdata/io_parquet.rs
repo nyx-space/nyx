@@ -228,7 +228,7 @@ impl TrackingDataArc {
         ensure!(
             !self.is_empty(),
             EmptyDatasetSnafu {
-                action: "exporting tracking data arc"
+                action: "tracking data arc to parquet"
             }
         );
 

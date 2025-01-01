@@ -186,7 +186,6 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
 
         let width = f64::from(max_obj_val).log10() as usize + 2 + max_obj_tol;
 
-        // let start_instant = Instant::now();
         let max_iter = 10;
 
         for it in 0..=max_iter {

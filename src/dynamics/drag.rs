@@ -79,7 +79,13 @@ impl ForceModel for ConstantDrag {
 
         let velocity = osc.velocity_km_s;
         // Note the 1e3 factor to convert drag units from ((kg * km^2 * s^-2) / m^1) to (kg * km * s^-2)
-        Ok(-0.5 * 1e3 * self.rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
+        Ok(-0.5
+            * 1e3
+            * self.rho
+            * ctx.drag.coeff_drag
+            * ctx.drag.area_m2
+            * velocity.norm()
+            * velocity)
     }
 
     fn dual_eom(
@@ -170,7 +176,13 @@ impl ForceModel for Drag {
             AtmDensity::Constant(rho) => {
                 let velocity = osc_drag_frame.velocity_km_s;
                 // Note the 1e3 factor to convert drag units from ((kg * km^2 * s^-2) / m^1) to (kg * km * s^-2)
-                Ok(-0.5 * 1e3 * rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
+                Ok(-0.5
+                    * 1e3
+                    * rho
+                    * ctx.drag.coeff_drag
+                    * ctx.drag.area_m2
+                    * velocity.norm()
+                    * velocity)
             }
 
             AtmDensity::Exponential {
@@ -192,7 +204,6 @@ impl ForceModel for Drag {
 
                 // TODO: Drag modeling will be improved in https://github.com/nyx-space/nyx/issues/317
                 // The frame will be double checked in this PR as well.
-                // let velocity_integr_frame = self.cosm.frame_chg(&osc, integration_frame).velocity();
                 let velocity_integr_frame = almanac
                     .transform_to(osc_drag_frame, integration_frame, None)
                     .context(DynamicsAlmanacSnafu {
@@ -202,7 +213,13 @@ impl ForceModel for Drag {
 
                 let velocity = velocity_integr_frame - osc_drag_frame.velocity_km_s;
                 // Note the 1e3 factor to convert drag units from ((kg * km^2 * s^-2) / m^1) to (kg * km * s^-2)
-                Ok(-0.5 * 1e3 * rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
+                Ok(-0.5
+                    * 1e3
+                    * rho
+                    * ctx.drag.coeff_drag
+                    * ctx.drag.area_m2
+                    * velocity.norm()
+                    * velocity)
             }
 
             AtmDensity::StdAtm { max_alt_m } => {
@@ -230,7 +247,6 @@ impl ForceModel for Drag {
                     10.0_f64.powf(logdensity)
                 };
 
-                // let velocity_integr_frame = self.cosm.frame_chg(&osc, integration_frame).velocity();
                 let velocity_integr_frame = almanac
                     .transform_to(osc_drag_frame, integration_frame, None)
                     .context(DynamicsAlmanacSnafu {
@@ -240,7 +256,13 @@ impl ForceModel for Drag {
 
                 let velocity = velocity_integr_frame - osc_drag_frame.velocity_km_s;
                 // Note the 1e3 factor to convert drag units from ((kg * km^2 * s^-2) / m^1) to (kg * km * s^-2)
-                Ok(-0.5 * 1e3 * rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
+                Ok(-0.5
+                    * 1e3
+                    * rho
+                    * ctx.drag.coeff_drag
+                    * ctx.drag.area_m2
+                    * velocity.norm()
+                    * velocity)
             }
         }
     }

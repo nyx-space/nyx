@@ -12,7 +12,7 @@ use anise::{
 };
 use hifitime::{TimeUnits, Unit};
 use nyx::{
-    cosmic::{eclipse::EclipseLocator, Frame, MetaAlmanac, SrpConfig},
+    cosmic::{eclipse::EclipseLocator, Frame, Mass, MetaAlmanac, SRPData},
     dynamics::{guidance::LocalFrame, OrbitalDynamics, SolarPressure, SpacecraftDynamics},
     io::ExportCfg,
     mc::MonteCarlo,
@@ -62,11 +62,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     // SRP Coefficient of reflectivity assumed to be that of Kapton, i.e. 2 - 0.44 = 1.56, table 1 from https://amostech.com/TechnicalPapers/2018/Poster/Bengtson.pdf
     let jwst = Spacecraft::builder()
         .orbit(jwst_orbit)
-        .srp(SrpConfig {
+        .srp(SRPData {
             area_m2: 21.197 * 14.162,
-            cr: 1.56,
+            coeff_reflectivity: 1.56,
         })
-        .dry_mass_kg(6200.0)
+        .mass(Mass::from_dry_mass(6200.0))
         .build();
 
     // Build up the spacecraft uncertainty builder.

@@ -18,7 +18,7 @@ if __name__ == "__main__":
         "ta (deg)",
         "aol (deg)",
         "tlong (deg)",
-        "fuel_mass (kg)",
+        "prop_mass (kg)",
     ]
 
     for col in columns:

@@ -97,10 +97,10 @@ impl Interpolatable for Spacecraft {
         // Fuel is linearly interpolated -- should really be a Lagrange interpolation here
         let first = states.first().unwrap();
         let last = states.last().unwrap();
-        let fuel_kg_dt =
-            (last.fuel_mass_kg - first.fuel_mass_kg) / (last.epoch() - first.epoch()).to_seconds();
+        let prop_kg_dt = (last.mass.prop_mass_kg - first.mass.prop_mass_kg)
+            / (last.epoch() - first.epoch()).to_seconds();
 
-        self.fuel_mass_kg += fuel_kg_dt * (epoch - first.epoch()).to_seconds();
+        self.mass.prop_mass_kg += prop_kg_dt * (epoch - first.epoch()).to_seconds();
 
         Ok(self)
     }

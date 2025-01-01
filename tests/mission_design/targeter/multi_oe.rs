@@ -4,6 +4,7 @@ use nyx::dynamics::guidance::Thruster;
 use nyx::md::prelude::*;
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use nyx_space::cosmic::Mass;
 use rstest::*;
 use std::sync::Arc;
 
@@ -84,8 +85,11 @@ fn conv_tgt_sma_ecc(almanac: Arc<Almanac>) {
 
     let spacecraft = Spacecraft {
         orbit: xi_orig,
-        dry_mass_kg: 10.0,
-        fuel_mass_kg: 90.0,
+        mass: Mass {
+            dry_mass_kg: 10.0,
+            prop_mass_kg: 90.0,
+            extra_mass_kg: 0.0,
+        },
         thruster: Some(Thruster {
             thrust_N: 500.0,
             isp_s: 300.0,

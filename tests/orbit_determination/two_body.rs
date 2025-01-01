@@ -224,8 +224,14 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(
         delta.vmag_km_s() * 1e6
     );
 
-    assert!(delta.rmag_km() < 2e-16, "Position error should be zero");
-    assert!(delta.vmag_km_s() < 2e-16, "Velocity error should be zero");
+    assert!(
+        delta.rmag_km() < f64::EPSILON,
+        "Position error should be zero"
+    );
+    assert!(
+        delta.vmag_km_s() < f64::EPSILON,
+        "Velocity error should be zero"
+    );
 }
 
 #[allow(clippy::identity_op)]
@@ -382,8 +388,14 @@ fn od_tb_val_with_arc(
         delta.vmag_km_s() * 1e6
     );
 
-    assert!(delta.rmag_km() < 2e-16, "Position error should be zero");
-    assert!(delta.vmag_km_s() < 2e-16, "Velocity error should be zero");
+    assert!(
+        delta.rmag_km() < f64::EPSILON,
+        "Position error should be zero"
+    );
+    assert!(
+        delta.vmag_km_s() < f64::EPSILON,
+        "Velocity error should be zero"
+    );
 }
 
 #[fixture]
@@ -568,8 +580,14 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
         delta.vmag_km_s() * 1e6
     );
 
-    assert!(delta.rmag_km() < 2e-16, "Position error should be zero");
-    assert!(delta.vmag_km_s() < 2e-16, "Velocity error should be zero");
+    assert!(
+        delta.rmag_km() < f64::EPSILON,
+        "Position error should be zero"
+    );
+    assert!(
+        delta.vmag_km_s() < f64::EPSILON,
+        "Velocity error should be zero"
+    );
 
     // Iterate
     odp.iterate_arc(
@@ -823,8 +841,14 @@ fn od_tb_val_az_el_ckf_fixed_step_perfect_stations(
         delta.vmag_km_s() * 1e6
     );
 
-    assert!(delta.rmag_km() < 2e-16, "Position error should be zero");
-    assert!(delta.vmag_km_s() < 2e-16, "Velocity error should be zero");
+    assert!(
+        delta.rmag_km() < f64::EPSILON,
+        "Position error should be zero"
+    );
+    assert!(
+        delta.vmag_km_s() < f64::EPSILON,
+        "Velocity error should be zero"
+    );
 
     // Iterate
     odp.iterate_arc(
@@ -1311,8 +1335,14 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect_cov_test(
         delta.vmag_km_s() * 1e6
     );
 
-    assert!(delta.rmag_km() < 2e-16, "Position error should be zero");
-    assert!(delta.vmag_km_s() < 2e-16, "Velocity error should be zero");
+    assert!(
+        delta.rmag_km() < f64::EPSILON,
+        "Position error should be zero"
+    );
+    assert!(
+        delta.vmag_km_s() < f64::EPSILON,
+        "Velocity error should be zero"
+    );
 }
 
 #[allow(clippy::identity_op)]
@@ -1428,6 +1458,12 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map(
         delta.vmag_km_s() * 1e3
     );
 
-    assert!(delta.rmag_km() < 2e-16, "Position error should be zero");
-    assert!(delta.vmag_km_s() < 2e-16, "Velocity error should be zero");
+    assert!(
+        delta.rmag_km() < f64::EPSILON,
+        "Position error should be zero"
+    );
+    assert!(
+        delta.vmag_km_s() < f64::EPSILON,
+        "Velocity error should be zero"
+    );
 }
