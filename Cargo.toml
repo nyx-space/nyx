@@ -72,7 +72,7 @@ indexmap = { version = "2.6.0", features = ["serde"] }
 
 [dev-dependencies]
 polars = { version = "0.45.1", features = ["parquet"] }
-rstest = "0.23.0"
+rstest = "0.24.0"
 pretty_env_logger = "0.5"
 toml = "0.8.14"
 
