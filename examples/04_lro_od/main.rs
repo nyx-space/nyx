@@ -86,7 +86,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .orbit(Orbit::zero(MOON_J2000)) // Setting a zero orbit here because it's just a template
         .build();
     // Now we can build the trajectory from the BSP file.
-    // We'll arbitrarily set the tracking arc to 48 hours with a one minute time step.
+    // We'll arbitrarily set the tracking arc to 24 hours with a five second time step.
     let traj_as_flown = Traj::from_bsp(
         lro_frame,
         MOON_J2000,
