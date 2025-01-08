@@ -20,6 +20,7 @@ fn almanac() -> Arc<Almanac> {
     test_almanac_arcd()
 }
 
+// Consider changing this to a fixture to run the moduli tests.
 #[rstest]
 fn continuous_tracking_cov_test(almanac: Arc<Almanac>) {
     // Test that continuous tracking
@@ -27,8 +28,8 @@ fn continuous_tracking_cov_test(almanac: Arc<Almanac>) {
 
     // Dummy state
     let orbit = Orbit::try_keplerian_altitude(
-        500.0,
-        1e-3,
+        150_000.0,
+        1e-2,
         30.0,
         45.0,
         75.0,
@@ -41,7 +42,7 @@ fn continuous_tracking_cov_test(almanac: Arc<Almanac>) {
     // Generate a trajectory
     let (_, trajectory) = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()))
         .with(orbit.into(), almanac.clone())
-        .for_duration_with_traj(1.5.days())
+        .for_duration_with_traj(0.25 * orbit.period().unwrap())
         .unwrap();
 
     println!("{trajectory}");
@@ -113,7 +114,12 @@ fn continuous_tracking_cov_test(almanac: Arc<Almanac>) {
             .unwrap();
 
     trk.build_schedule(almanac.clone()).unwrap();
-    let arc = trk.generate_measurements(almanac).unwrap();
+    let mut arc = trk.generate_measurements(almanac).unwrap();
+
+    // Assume JPL DSN Code is used, cf. DSN docs 214, section 2.2.2.2.
+    let jpl_dsn_code_length_km = 75660.0;
+    arc.set_moduli(MeasurementType::Range, jpl_dsn_code_length_km);
+    arc.apply_moduli();
 
     // And serialize to disk
     let path: PathBuf = [
@@ -132,7 +138,7 @@ fn continuous_tracking_cov_test(almanac: Arc<Almanac>) {
 
     println!("{arc_rtn}");
 
-    assert_eq!(arc.measurements.len(), 7723);
+    assert_eq!(arc.measurements.len(), 96734);
     // Check that we've loaded all of the measurements
     assert_eq!(arc_rtn.measurements.len(), arc.measurements.len());
     assert_eq!(arc_rtn.unique(), arc.unique());
@@ -165,9 +171,6 @@ fn continuous_tracking_cov_test(almanac: Arc<Almanac>) {
     assert_eq!(arc_tdm.end_epoch(), arc.end_epoch());
     assert_eq!(arc_tdm.unique(), arc.unique());
     // Check that we have multiplied back and divided back correctly.
-    for (epoch, orig_msr) in &arc.measurements {
-        assert_eq!(orig_msr, (&arc_tdm).measurements.get(epoch).unwrap());
-    }
     assert_eq!(arc_tdm.measurements, arc.measurements);
 
     // Test the downsampling
@@ -182,7 +185,7 @@ fn continuous_tracking_cov_test(almanac: Arc<Almanac>) {
     println!("{arc_downsample}");
     assert_eq!(
         arc_downsample.len(),
-        arc_tdm.len() / 10 + 1,
+        arc_tdm.len() / 10,
         "downsampling has wrong sample count"
     );
 

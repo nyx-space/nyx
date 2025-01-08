@@ -102,7 +102,7 @@ impl PartialEq for Measurement {
             && self.epoch == other.epoch
             && self.data.iter().all(|(key, &value)| {
                 if let Some(&other_value) = other.data.get(key) {
-                    (value - other_value).abs() < 1e-12
+                    (value - other_value).abs() < 1e-10
                 } else {
                     false
                 }

@@ -257,7 +257,7 @@ impl TrackingDataArc {
                 // Only range modulus exists in TDM files.
                 Some(modulos)
             } else {
-                warn!("could not parse RANGE_MODULO of `{range_modulus}` as a double");
+                warn!("could not parse RANGE_MODULUS of `{range_modulus}` as a double");
                 None
             }
         } else {

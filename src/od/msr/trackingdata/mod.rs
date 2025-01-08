@@ -48,6 +48,19 @@ impl TrackingDataArc {
         self.moduli.as_mut().unwrap().insert(msr_type, modulus);
     }
 
+    /// Applies the moduli to each measurement, if defined.
+    pub fn apply_moduli(&mut self) {
+        if let Some(moduli) = &self.moduli {
+            for msr in self.measurements.values_mut() {
+                for (msr_type, modulus) in moduli {
+                    if let Some(msr_value) = msr.data.get_mut(msr_type) {
+                        *msr_value %= *modulus;
+                    }
+                }
+            }
+        }
+    }
+
     /// Returns the unique list of aliases in this tracking data arc
     pub fn unique_aliases(&self) -> IndexSet<String> {
         self.unique().0
