@@ -57,6 +57,7 @@ impl TrackingDataArc {
         let mut current_tracker = String::new();
         let mut time_system = TimeScale::UTC;
         let mut has_freq_data = false;
+        let mut msr_divider = 1.0;
 
         for line in reader.lines() {
             let line = line.context(StdIOSnafu {
@@ -80,8 +81,7 @@ impl TrackingDataArc {
                             current_tracker = alias.clone();
                         }
                     }
-                }
-                if line.starts_with("TIME_SYSTEM") {
+                } else if line.starts_with("TIME_SYSTEM") {
                     let ts = line.split('=').nth(1).unwrap_or("UTC").trim();
                     match ts {
                         "UTC" => time_system = TimeScale::UTC,
@@ -90,6 +90,18 @@ impl TrackingDataArc {
                         _ => {
                             return Err(InputOutputError::UnsupportedData {
                                 which: format!("time scale `{ts}` not supported"),
+                            })
+                        }
+                    }
+                } else if line.starts_with("PATH") {
+                    match line.split(",").count() {
+                        2 => msr_divider = 1.0,
+                        3 => msr_divider = 2.0,
+                        cnt => {
+                            return Err(InputOutputError::UnsupportedData {
+                                which: format!(
+                                    "found {cnt} paths in TDM, only 1 or 2 are supported"
+                                ),
                             })
                         }
                     }
@@ -114,6 +126,8 @@ impl TrackingDataArc {
                 .contains(&mtype)
                 {
                     has_freq_data = true;
+                    // Don't modify the values.
+                    msr_divider = 1.0;
                 }
                 measurements
                     .entry(epoch)
@@ -123,7 +137,7 @@ impl TrackingDataArc {
                         data: IndexMap::new(),
                     })
                     .data
-                    .insert(mtype, value);
+                    .insert(mtype, value / msr_divider);
             }
         }
 
@@ -236,9 +250,24 @@ impl TrackingDataArc {
                 .insert(MeasurementType::Doppler, rho_dot_km_s);
         }
 
+        let moduli = if let Some(range_modulus) = metadata.get("RANGE_MODULUS") {
+            if let Ok(value) = range_modulus.parse::<f64>() {
+                let mut modulos = IndexMap::new();
+                modulos.insert(MeasurementType::Range, value);
+                // Only range modulus exists in TDM files.
+                Some(modulos)
+            } else {
+                warn!("could not parse RANGE_MODULO of `{range_modulus}` as a double");
+                None
+            }
+        } else {
+            None
+        };
+
         let trk = Self {
             measurements,
             source: Some(source),
+            moduli,
         };
 
         if trk.unique_types().is_empty() {
@@ -322,94 +351,128 @@ impl TrackingDataArc {
         )
         .map_err(err_hdlr)?;
 
-        // Create a new meta section for each tracker
+        // Create a new meta section for each tracker and for each measurement type that is one or two way.
         // Get unique trackers and process each one separately
         let trackers = self.unique_aliases();
 
         for tracker in trackers {
             let tracker_data = self.clone().filter_by_tracker(tracker.clone());
 
-            writeln!(writer, "META_START").map_err(err_hdlr)?;
-            writeln!(writer, "\tTIME_SYSTEM = UTC").map_err(err_hdlr)?;
-            writeln!(
-                writer,
-                "\tSTART_TIME = {}",
-                Formatter::new(tracker_data.start_epoch().unwrap(), iso8601_no_ts)
-            )
-            .map_err(err_hdlr)?;
-            writeln!(
-                writer,
-                "\tSTOP_TIME = {}",
-                Formatter::new(tracker_data.end_epoch().unwrap(), iso8601_no_ts)
-            )
-            .map_err(err_hdlr)?;
+            let types = tracker_data.unique_types();
 
-            writeln!(writer, "\tPATH = 1,2,1").map_err(err_hdlr)?;
-            writeln!(
-                writer,
-                "\tPARTICIPANT_1 = {}",
-                if let Some(aliases) = &aliases {
-                    if let Some(alias) = aliases.get(&tracker) {
-                        alias
+            let two_way_types = types
+                .iter()
+                .filter(|msr_type| msr_type.may_be_two_way())
+                .copied()
+                .collect::<Vec<_>>();
+
+            let one_way_types = types
+                .iter()
+                .filter(|msr_type| !msr_type.may_be_two_way())
+                .copied()
+                .collect::<Vec<_>>();
+
+            // Add the two-way data first.
+            for (tno, types) in [two_way_types, one_way_types].iter().enumerate() {
+                writeln!(writer, "META_START").map_err(err_hdlr)?;
+                writeln!(writer, "\tTIME_SYSTEM = UTC").map_err(err_hdlr)?;
+                writeln!(
+                    writer,
+                    "\tSTART_TIME = {}",
+                    Formatter::new(tracker_data.start_epoch().unwrap(), iso8601_no_ts)
+                )
+                .map_err(err_hdlr)?;
+                writeln!(
+                    writer,
+                    "\tSTOP_TIME = {}",
+                    Formatter::new(tracker_data.end_epoch().unwrap(), iso8601_no_ts)
+                )
+                .map_err(err_hdlr)?;
+
+                let multiplier = if tno == 0 {
+                    writeln!(writer, "\tPATH = 1,2,1").map_err(err_hdlr)?;
+                    2.0
+                } else {
+                    writeln!(writer, "\tPATH = 1,2").map_err(err_hdlr)?;
+                    1.0
+                };
+
+                writeln!(
+                    writer,
+                    "\tPARTICIPANT_1 = {}",
+                    if let Some(aliases) = &aliases {
+                        if let Some(alias) = aliases.get(&tracker) {
+                            alias
+                        } else {
+                            &tracker
+                        }
                     } else {
                         &tracker
                     }
-                } else {
-                    &tracker
+                )
+                .map_err(err_hdlr)?;
+
+                writeln!(writer, "\tPARTICIPANT_2 = {spacecraft_name}").map_err(err_hdlr)?;
+
+                writeln!(writer, "\tMODE = SEQUENTIAL").map_err(err_hdlr)?;
+
+                // Add additional metadata, could include timetag ref for example.
+                for (k, v) in &metadata {
+                    if k != "originator" {
+                        writeln!(writer, "\t{k} = {v}").map_err(err_hdlr)?;
+                    }
                 }
-            )
-            .map_err(err_hdlr)?;
 
-            writeln!(writer, "\tPARTICIPANT_2 = {spacecraft_name}").map_err(err_hdlr)?;
+                if types.contains(&MeasurementType::Range) {
+                    writeln!(writer, "\tRANGE_UNITS = km").map_err(err_hdlr)?;
 
-            writeln!(writer, "\tMODE = SEQUENTIAL").map_err(err_hdlr)?;
-
-            // Add additional metadata, could include timetag ref for example.
-            for (k, v) in &metadata {
-                if k != "originator" {
-                    writeln!(writer, "\t{k} = {v}").map_err(err_hdlr)?;
+                    if let Some(moduli) = &self.moduli {
+                        if let Some(range_modulus) = moduli.get(&MeasurementType::Range) {
+                            writeln!(writer, "\tRANGE_MODULUS = {range_modulus:E}")
+                                .map_err(err_hdlr)?;
+                        }
+                    }
                 }
-            }
 
-            if self.unique_types().contains(&MeasurementType::Range) {
-                writeln!(writer, "\tRANGE_UNITS = km").map_err(err_hdlr)?;
-            }
-
-            if self.unique_types().contains(&MeasurementType::Azimuth)
-                || self.unique_types().contains(&MeasurementType::Elevation)
-            {
-                writeln!(writer, "\tANGLE_TYPE = AZEL").map_err(err_hdlr)?;
-            }
-
-            writeln!(writer, "META_STOP\n").map_err(err_hdlr)?;
-
-            // Write the data section
-            writeln!(writer, "DATA_START").map_err(err_hdlr)?;
-
-            // Process measurements for this tracker
-            for (epoch, measurement) in tracker_data.measurements {
-                for (mtype, value) in &measurement.data {
-                    let type_str = match mtype {
-                        MeasurementType::Range => "RANGE",
-                        MeasurementType::Doppler => "DOPPLER_INTEGRATED",
-                        MeasurementType::Azimuth => "ANGLE_1",
-                        MeasurementType::Elevation => "ANGLE_2",
-                        MeasurementType::ReceiveFrequency => "RECEIVE_FREQ",
-                        MeasurementType::TransmitFrequency => "TRANSMIT_FREQ",
-                    };
-
-                    writeln!(
-                        writer,
-                        "\t{:<20} = {:<23}\t{:.12}",
-                        type_str,
-                        Formatter::new(epoch, iso8601_no_ts),
-                        value
-                    )
-                    .map_err(err_hdlr)?;
+                if types.contains(&MeasurementType::Azimuth)
+                    || types.contains(&MeasurementType::Elevation)
+                {
+                    writeln!(writer, "\tANGLE_TYPE = AZEL").map_err(err_hdlr)?;
                 }
-            }
 
-            writeln!(writer, "DATA_STOP\n").map_err(err_hdlr)?;
+                writeln!(writer, "META_STOP\n").map_err(err_hdlr)?;
+
+                // Write the data section
+                writeln!(writer, "DATA_START").map_err(err_hdlr)?;
+
+                // Process measurements for this tracker
+                for (epoch, measurement) in &tracker_data.measurements {
+                    for (mtype, value) in &measurement.data {
+                        if !types.contains(mtype) {
+                            continue;
+                        }
+                        let type_str = match mtype {
+                            MeasurementType::Range => "RANGE",
+                            MeasurementType::Doppler => "DOPPLER_INTEGRATED",
+                            MeasurementType::Azimuth => "ANGLE_1",
+                            MeasurementType::Elevation => "ANGLE_2",
+                            MeasurementType::ReceiveFrequency => "RECEIVE_FREQ",
+                            MeasurementType::TransmitFrequency => "TRANSMIT_FREQ",
+                        };
+
+                        writeln!(
+                            writer,
+                            "\t{:<20} = {:<23}\t{:.12}",
+                            type_str,
+                            Formatter::new(*epoch, iso8601_no_ts),
+                            value * multiplier
+                        )
+                        .map_err(err_hdlr)?;
+                    }
+                }
+
+                writeln!(writer, "DATA_STOP\n").map_err(err_hdlr)?;
+            }
         }
 
         #[allow(clippy::writeln_empty_string)]

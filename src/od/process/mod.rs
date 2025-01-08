@@ -560,10 +560,19 @@ where
 
                                     self.kf.update_h_tilde(h_tilde);
 
+                                    let real_obs = msr.observation(&cur_msr_types);
+
+                                    let computed_obs = computed_meas
+                                        .observation::<MsrSize>(&cur_msr_types)
+                                        - device.measurement_bias_vector::<MsrSize>(
+                                            &cur_msr_types,
+                                            epoch,
+                                        )?;
+
                                     match self.kf.measurement_update(
                                         nominal_state,
-                                        &msr.observation(&cur_msr_types),
-                                        &computed_meas.observation(&cur_msr_types),
+                                        &real_obs,
+                                        &computed_obs,
                                         device.measurement_covar_matrix(&cur_msr_types, epoch)?,
                                         self.resid_crit,
                                     ) {

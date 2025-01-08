@@ -43,6 +43,8 @@ use super::TrackingDataArc;
 
 impl TrackingDataArc {
     /// Loads a tracking arc from its serialization in parquet.
+    ///
+    /// Warning: no metadata is read from the parquet file, even that written to it by Nyx.
     pub fn from_parquet<P: AsRef<Path>>(path: P) -> Result<Self, InputOutputError> {
         let file = File::open(&path).context(StdIOSnafu {
             action: "opening file for tracking arc",
@@ -211,6 +213,7 @@ impl TrackingDataArc {
 
         Ok(Self {
             measurements,
+            moduli: None,
             source: Some(path.as_ref().to_path_buf().display().to_string()),
         })
     }
@@ -314,6 +317,12 @@ impl TrackingDataArc {
         if let Some(add_meta) = cfg.metadata {
             for (k, v) in add_meta {
                 metadata.insert(k, v);
+            }
+        }
+
+        if let Some(modulos) = &self.moduli {
+            for (msr_type, v) in modulos {
+                metadata.insert(format!("MODULUS:{msr_type:?}"), v.to_string());
             }
         }
 

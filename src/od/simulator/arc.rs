@@ -237,6 +237,7 @@ where
         let trk_data = TrackingDataArc {
             measurements,
             source: None,
+            moduli: None,
         };
 
         Ok(trk_data)

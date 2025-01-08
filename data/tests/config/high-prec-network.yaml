@@ -1,7 +1,9 @@
 range_noise_model:
   tau: 12 h 159 ms
   process_noise: 5.0e-3 # 5 m
+  constant: 0
 
 doppler_noise_model:
   tau: 11 h 59 min
   process_noise: 50.0e-6 # 5 cm/s
+  constant: 0

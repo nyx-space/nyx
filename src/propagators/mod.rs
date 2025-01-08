@@ -32,12 +32,12 @@ pub use propagator::*;
 mod rk_methods;
 pub use rk_methods::*;
 mod options;
-pub use options::*;
-
 use crate::{dynamics::DynamicsError, errors::EventError, io::ConfigError, time::Duration};
+pub use options::*;
+use serde::{Deserialize, Serialize};
 
 /// Stores the details of the previous integration step of a given propagator. Access as `my_prop.clone().latest_details()`.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct IntegrationDetails {
     /// step size used
     pub step: Duration,

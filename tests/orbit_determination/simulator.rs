@@ -164,6 +164,11 @@ fn continuous_tracking_cov_test(almanac: Arc<Almanac>) {
     assert_eq!(arc_tdm.start_epoch(), arc.start_epoch());
     assert_eq!(arc_tdm.end_epoch(), arc.end_epoch());
     assert_eq!(arc_tdm.unique(), arc.unique());
+    // Check that we have multiplied back and divided back correctly.
+    for (epoch, orig_msr) in &arc.measurements {
+        assert_eq!(orig_msr, (&arc_tdm).measurements.get(epoch).unwrap());
+    }
+    assert_eq!(arc_tdm.measurements, arc.measurements);
 
     // Test the downsampling
     let tdm_failed_downsample = arc_tdm.clone().downsample(0.1.seconds());

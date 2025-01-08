@@ -13,10 +13,12 @@ stochastic_noises:
     bias:
       tau: 24 h
       process_noise: 5.0e-3 # 5 m
+      constant: 0
   doppler_km_s:
     bias:
       tau: 24 h
       process_noise: 50.0e-6 # 5 cm/s
+      constant: 0
 light_time_correction: false
 measurement_types:
     - range_km

@@ -34,6 +34,8 @@ pub struct TrackingDataArc {
     pub measurements: BTreeMap<Epoch, Measurement>, // BUG: Consider a map of tracking to epoch!
     /// Source file if loaded from a file or saved to a file.
     pub source: Option<String>,
+    /// Optionally provide a map of modulos (e.g. the RANGE_MODULO of CCSDS TDM).
+    pub moduli: Option<IndexMap<MeasurementType, f64>>,
 }
 
 impl TrackingDataArc {

@@ -22,7 +22,7 @@ use anise::almanac::Almanac;
 use anise::errors::AlmanacResult;
 use hifitime::Epoch;
 use indexmap::IndexSet;
-use nalgebra::{DimName, OMatrix};
+use nalgebra::{DimName, OMatrix, OVector};
 use rand_pcg::Pcg64Mcg;
 
 use crate::io::ConfigRepr;
@@ -80,6 +80,9 @@ where
     // Return the noise statistics of this tracking device for the provided measurement type at the requested epoch.
     fn measurement_covar(&self, msr_type: MeasurementType, epoch: Epoch) -> Result<f64, ODError>;
 
+    // Return the measurement bias for the provided measurement type at the requested epoch.
+    fn measurement_bias(&self, msr_type: MeasurementType, epoch: Epoch) -> Result<f64, ODError>;
+
     fn measurement_covar_matrix<M: DimName>(
         &self,
         msr_types: &IndexSet<MeasurementType>,
@@ -98,5 +101,25 @@ where
         }
 
         Ok(r_mat)
+    }
+
+    fn measurement_bias_vector<M: DimName>(
+        &self,
+        msr_types: &IndexSet<MeasurementType>,
+        epoch: Epoch,
+    ) -> Result<OVector<f64, M>, ODError>
+    where
+        DefaultAllocator: Allocator<M>,
+    {
+        // Rebuild the R matrix of the measurement noise.
+        let mut b_vec = OVector::<f64, M>::zeros();
+
+        for (i, msr_type) in msr_types.iter().enumerate() {
+            if self.measurement_types().contains(msr_type) {
+                b_vec[i] = self.measurement_bias(*msr_type, epoch)?;
+            }
+        }
+
+        Ok(b_vec)
     }
 }

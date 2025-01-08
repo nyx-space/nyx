@@ -27,6 +27,7 @@ use crate::time::{Duration, Unit};
 use crate::State;
 use anise::prelude::{Almanac, Frame};
 use anise::structure::planetocentric::ellipsoid::Ellipsoid;
+use serde::{Deserialize, Serialize};
 
 use std::default::Default;
 use std::fmt;
@@ -59,15 +60,14 @@ where
 }
 
 /// Defines a state parameter event finder
-#[derive(Clone, Debug)]
-
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct Event {
     /// The state parameter
     pub parameter: StateParameter,
     /// The desired self.desired_value, must be in the same units as the state parameter
     pub desired_value: f64,
-    /// The time precision after which the solver will report that it cannot find any more precise
-    pub epoch_precision: Unit,
+    /// The duration precision after which the solver will report that it cannot find any more precise
+    pub epoch_precision: Duration,
     /// The precision on the desired value
     pub value_precision: f64,
     /// An optional frame in which to search this -- it IS recommended to convert the whole trajectory instead of searching in a given frame!
@@ -133,12 +133,12 @@ impl Event {
         parameter: StateParameter,
         desired_value: f64,
         value_precision: f64,
-        epoch_precision: Unit,
+        unit_precision: Unit,
     ) -> Self {
         Self {
             parameter,
             desired_value,
-            epoch_precision,
+            epoch_precision: 1 * unit_precision,
             value_precision,
             obs_frame: None,
         }
@@ -166,7 +166,7 @@ impl Event {
         Self {
             parameter,
             desired_value,
-            epoch_precision: Unit::Millisecond,
+            epoch_precision: Unit::Millisecond * 1,
             value_precision: 1e-3,
             obs_frame: Some(target_frame),
         }
@@ -179,7 +179,7 @@ impl Default for Event {
             parameter: StateParameter::Periapsis,
             desired_value: 0.0,
             value_precision: 1e-3,
-            epoch_precision: Unit::Second,
+            epoch_precision: Unit::Second * 1,
             obs_frame: None,
         }
     }
