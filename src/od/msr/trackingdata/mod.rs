@@ -39,6 +39,15 @@ pub struct TrackingDataArc {
 }
 
 impl TrackingDataArc {
+    /// Set (or overwrites) the modulus of the provided measurement type.
+    pub fn set_moduli(&mut self, msr_type: MeasurementType, modulus: f64) {
+        if self.moduli.is_none() {
+            self.moduli = Some(IndexMap::new());
+        }
+
+        self.moduli.as_mut().unwrap().insert(msr_type, modulus);
+    }
+
     /// Returns the unique list of aliases in this tracking data arc
     pub fn unique_aliases(&self) -> IndexSet<String> {
         self.unique().0
