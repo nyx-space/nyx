@@ -37,6 +37,52 @@ use super::TrackingDataArc;
 
 impl TrackingDataArc {
     /// Loads a tracking arc from its serialization in CCSDS TDM.
+    ///
+    /// # Support level
+    ///
+    /// - Only the KVN format is supported.
+    /// - Support is limited to orbit determination in "xGEO", i.e. cislunar and deep space missions.
+    /// - Only one metadata and data section per file is tested.
+    ///
+    /// ## Data types
+    ///
+    /// Fully supported:
+    ///     - RANGE
+    ///     - DOPPLER_INSTANTANEOUS, DOPPLER_INTEGRATED
+    ///     - ANGLE_1 / ANGLE_2, as azimuth/elevation only
+    ///
+    /// Partially supported:
+    ///     - TRANSMIT_FREQ / RECEIVE_FREQ : these will be converted to Doppler measurements using the TURNAROUND_NUMERATOR and TURNAROUND_DENOMINATOR in the TDM. The freq rate is _not_ supported.
+    ///
+    /// ## Metadata support
+    ///
+    /// ### Mode
+    ///
+    /// Only the MODE = SEQUENTIAL is supported.
+    ///
+    /// ### Time systems / time scales
+    ///
+    /// All timescales supported by hifitime are supported here. This includes: UTC, TAI, GPS, TT, TDB, TAI, GST, QZSST.
+    ///
+    /// ### Path
+    ///
+    /// Only one way or two way data is supported, i.e. path must be either `PATH n,m,n` or `PATH n,m`.
+    ///
+    /// Note that the actual indexes of the path are ignored.
+    ///
+    /// ### Participants
+    ///
+    /// `PARTICIPANT_1` must be the ground station / tracker.
+    /// The second participant is ignored: the user must ensure that the Orbit Determination Process is properly configured and the proper arc is given.
+    ///
+    /// ### Turnaround ratio
+    ///
+    /// The turnaround ratio is only accounted for when the data contains RECEIVE_FREQ and TRANSMIT_FREQ data.
+    ///
+    /// ### Range and modulus
+    ///
+    /// Only kilometers are supported in range units. Range modulus is accounted for to compute range ambiguity.
+    ///
     pub fn from_tdm<P: AsRef<Path>>(
         path: P,
         aliases: Option<HashMap<String, String>>,
@@ -83,15 +129,13 @@ impl TrackingDataArc {
                     }
                 } else if line.starts_with("TIME_SYSTEM") {
                     let ts = line.split('=').nth(1).unwrap_or("UTC").trim();
-                    match ts {
-                        "UTC" => time_system = TimeScale::UTC,
-                        "TAI" => time_system = TimeScale::TAI,
-                        "GPS" => time_system = TimeScale::GPST,
-                        _ => {
-                            return Err(InputOutputError::UnsupportedData {
-                                which: format!("time scale `{ts}` not supported"),
-                            })
-                        }
+                    // Support for all time scales of hifitime
+                    if let Ok(ts) = TimeScale::from_str(ts) {
+                        time_system = ts;
+                    } else {
+                        return Err(InputOutputError::UnsupportedData {
+                            which: format!("time scale `{ts}` not supported"),
+                        });
                     }
                 } else if line.starts_with("PATH") {
                     match line.split(",").count() {

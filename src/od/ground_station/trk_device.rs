@@ -185,7 +185,7 @@ impl TrackingDevice<Spacecraft> for GroundStation {
             })?
             .bias
         {
-            Ok(gm.constant)
+            Ok(gm.constant.unwrap_or(0.0))
         } else {
             Ok(0.0)
         }

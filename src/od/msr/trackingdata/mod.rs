@@ -28,6 +28,44 @@ mod io_parquet;
 
 /// Tracking data storing all of measurements as a B-Tree.
 /// It inherently does NOT support multiple concurrent measurements from several trackers.
+///
+/// # Measurement Moduli, e.g. range modulus
+///
+/// In the case of ranging, and possibly other data types, a code is used to measure the range to the spacecraft. The length of this code
+/// determines the ambiguity resolution, as per equation 9 in section 2.2.2.2 of the JPL DESCANSO, document 214, _Pseudo-Noise and Regenerative Ranging_.
+/// For example, using the JPL Range Code and a frequency range clock of 1 MHz, the range ambiguity is 75,660 km. In other words,
+/// as soon as the spacecraft is at a range of 75,660 + 1 km the JPL Range Code will report the vehicle to be at a range of 1 km.
+/// This is simply because the range code overlaps with itself, effectively loosing track of its own reference:
+/// it's due to the phase shift of the signal "lapping" the original signal length.
+///
+/// ```text
+///             (Spacecraft)
+///             ^
+///             |    Actual Distance = 75,661 km
+///             |
+/// 0 km                                         75,660 km (Wrap-Around)
+/// |-----------------------------------------------|
+///   When the "code length" is exceeded,
+///   measurements wrap back to 0.
+///
+/// So effectively:
+///     Observed code range = Actual range (mod 75,660 km)
+///     75,661 km → 1 km
+///
+/// ```
+///
+/// Nyx can only resolve the range ambiguity if the tracking data specifies a modulus for this specific measurement type.
+/// For example, in the case of the JPL Range Code and a 1 MHz range clock, the ambiguity interval is 75,660 km.
+///
+/// The measurement used in the Orbit Determination Process then becomes the following, where `//` represents the [Euclidian division](https://doc.rust-lang.org/std/primitive.f64.html#method.div_euclid).
+///
+/// ```text
+/// k = computed_obs // ambiguity_interval
+/// real_obs = measured_obs + k * modulus
+/// ```
+///
+/// Reference: JPL DESCANSO, document 214, _Pseudo-Noise and Regenerative Ranging_.
+///
 #[derive(Clone, Default)]
 pub struct TrackingDataArc {
     /// All measurements in this data arc

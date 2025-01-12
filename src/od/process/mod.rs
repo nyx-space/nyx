@@ -26,9 +26,8 @@ pub use crate::od::*;
 use crate::propagators::PropInstance;
 pub use crate::time::{Duration, Unit};
 use anise::prelude::Almanac;
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexSet;
 use msr::sensitivity::TrackerSensitivity;
-use msr::MeasurementType;
 use snafu::prelude::*;
 mod conf;
 pub use conf::{IterationConf, SmoothingArc};
@@ -57,45 +56,6 @@ mod export;
 ///
 /// The measurement residual is a signed scalar, despite ODP being able to process multiple measurements simultaneously.
 /// By default, if a measurement is more than 3 measurement sigmas off, it will be rejected to avoid biasing the filter.
-///
-/// ## Ambiguity intervals
-///
-/// In the case of ranging, and possibly other data types, a code is used to measure the range to the spacecraft. The length of this code
-/// determines the ambiguity resolution, as per equation 9 in section 2.2.2.2 of the reference. For example, using the JPL Range Code and
-/// a frequency range clock of 1 MHz, the range ambiguity is 75,660 km. In other words, as soon as the spacecraft is at a range of 75,660 + 1 km
-/// the JPL Range Code will report the vehicle to be at a range of 1 km. This is simply because the range code overlaps with itself, effectively
-/// loosing track of its own reference: it's due to the phase shift of the signal "lapping" the original signal length.
-///
-/// ```text
-///             (Spacecraft)
-///             ^
-///             |    Actual Distance = 75,661 km
-///             |
-/// 0 km                                         75,660 km (Wrap-Around)
-/// |-----------------------------------------------|
-///   When the "code length" is exceeded,
-///   measurements wrap back to 0.
-///
-/// So effectively:
-///     Observed code range = Actual range (mod 75,660 km)
-///     75,661 km → 1 km
-///
-/// ```
-///
-/// Nyx solves this problem in two ways: the tracking data must specify a modulus for a specific measurement type. Then, the ambiguity interval
-/// of the ODP must be configured appropriately. In the case of the JPL Range Code and a 1 MHz range clock, the ambiguity interval is 75,660 km.
-/// The ranging equipment will provide a range modulus value, e.g. 123,000 km, which will need to be added to the reported range.
-///
-/// The equipment's modulus is provided in the TDM and must be specified in Nyx's TrackingDataArc `moduli` field.
-/// The ambiguity interval must be specified in the ODP.
-/// The measurement used in the ODP then becomes the following, where `//` represents the [Euclidian division](https://doc.rust-lang.org/std/primitive.f64.html#method.div_euclid).
-///
-/// ```text
-/// k = computed_obs // ambiguity_interval
-/// real_obs = measured_obs + k * modulus
-/// ```
-///
-/// Reference: JPL DESCANSO, document 214, _Pseudo-Noise and Regenerative Ranging_.
 ///
 #[allow(clippy::upper_case_acronyms)]
 pub struct ODProcess<
@@ -133,8 +93,6 @@ pub struct ODProcess<
     pub ekf_trigger: Option<EkfTrigger>,
     /// Residual rejection criteria allows preventing bad measurements from affecting the estimation.
     pub resid_crit: Option<ResidRejectCrit>,
-    /// Specifies the ambiguity interval of a specific measurement type.
-    pub ambiguity_intervals: Option<IndexMap<MeasurementType, f64>>,
     pub almanac: Arc<Almanac>,
     init_state: D::StateType,
     _marker: PhantomData<Accel>,
@@ -181,7 +139,6 @@ where
             residuals: Vec::with_capacity(10_000),
             ekf_trigger,
             resid_crit,
-            ambiguity_intervals: None,
             almanac,
             init_state,
             _marker: PhantomData::<Accel>,
@@ -206,7 +163,6 @@ where
             residuals: Vec::with_capacity(10_000),
             ekf_trigger: Some(trigger),
             resid_crit,
-            ambiguity_intervals: None,
             almanac,
             init_state,
             _marker: PhantomData::<Accel>,
@@ -628,28 +584,20 @@ where
 
                                     let mut real_obs = msr.observation(&cur_msr_types);
 
-                                    // If there is an ambiguity, apply it.
-                                    if let Some(ambiguity) = &self.ambiguity_intervals {
-                                        // Rebuild the R matrix of the measurement noise.
+                                    if let Some(moduli) = &arc.moduli {
                                         let mut obs_ambiguity = OVector::<f64, MsrSize>::zeros();
 
                                         for (i, msr_type) in cur_msr_types.iter().enumerate() {
-                                            if let Some(interval) = ambiguity.get(msr_type) {
-                                                if let Some(moduli) = &arc.moduli {
-                                                    if let Some(modulus) = moduli.get(msr_type) {
-                                                        let k =
-                                                            computed_obs[i].div_euclid(*interval);
-                                                        // real_obs = measured_obs + k * modulus
-                                                        obs_ambiguity[i] = k * *modulus;
-                                                    }
-                                                } else {
-                                                    // No need to account for ambiguity intervals if there is no moduli configured.
-                                                    break;
-                                                }
+                                            if let Some(modulus) = moduli.get(msr_type) {
+                                                let k = computed_obs[i].div_euclid(*modulus);
+                                                // real_obs = measured_obs + k * modulus
+                                                obs_ambiguity[i] = k * *modulus;
                                             }
                                         }
-
                                         real_obs += obs_ambiguity;
+                                    } else {
+                                        // No need to account for ambiguity intervals if there is no moduli configured.
+                                        break;
                                     }
 
                                     match self.kf.measurement_update(
@@ -867,7 +815,6 @@ where
             resid_crit,
             ekf_trigger: None,
             init_state,
-            ambiguity_intervals: None,
             almanac,
             _marker: PhantomData::<Accel>,
         }
