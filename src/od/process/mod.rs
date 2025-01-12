@@ -595,9 +595,6 @@ where
                                             }
                                         }
                                         real_obs += obs_ambiguity;
-                                    } else {
-                                        // No need to account for ambiguity intervals if there is no moduli configured.
-                                        break;
                                     }
 
                                     match self.kf.measurement_update(
