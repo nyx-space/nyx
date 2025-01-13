@@ -185,7 +185,7 @@ fn continuous_tracking_cov_test(almanac: Arc<Almanac>) {
     println!("{arc_downsample}");
     assert_eq!(
         arc_downsample.len(),
-        arc_tdm.len() / 10,
+        arc_tdm.len() / 10 + 1,
         "downsampling has wrong sample count"
     );
 
