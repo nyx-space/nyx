@@ -257,7 +257,9 @@ fn od_with_modulus_cov_test(
 
     println!("{estimate}");
 
-    let kf = KF::no_snc(estimate);
+    let sigma_q = 1e-12_f64.powi(2);
+    let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
+    let kf = KF::new(estimate, process_noise);
 
     let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
     let prop = setup.with(spacecraft.with_stm(), almanac.clone());
