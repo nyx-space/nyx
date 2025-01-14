@@ -245,8 +245,6 @@ fn od_with_modulus_cov_test(
     assert!((uncertainty.vy_km_s - 0.5e-3).abs() < f64::EPSILON);
     assert!((uncertainty.vz_km_s - 0.5e-3).abs() < f64::EPSILON);
 
-    println!("{uncertainty}");
-
     let estimate = uncertainty.to_estimate().unwrap();
 
     println!("{estimate}");
@@ -341,7 +339,9 @@ fn od_with_modulus_as_bias_cov_test(
 
     let estimate = uncertainty.to_estimate().unwrap();
 
-    let kf = KF::no_snc(estimate);
+    let sigma_q = 1e-8_f64.powi(2);
+    let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
+    let kf = KF::new(estimate, process_noise);
 
     let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
     let prop = setup.with(spacecraft.with_stm(), almanac.clone());
