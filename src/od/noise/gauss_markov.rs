@@ -23,7 +23,7 @@ use rand::Rng;
 use rand_distr::Normal;
 use serde_derive::{Deserialize, Serialize};
 use std::fmt;
-use std::ops::Mul;
+use std::ops::{Mul, MulAssign};
 
 use super::Stochastics;
 
@@ -153,14 +153,18 @@ impl Mul<f64> for GaussMarkov {
     type Output = Self;
 
     /// Scale the Gauss Markov process by a constant, maintaining the same time constant.
-    fn mul(self, rhs: f64) -> Self::Output {
-        Self {
-            tau: self.tau,
-            process_noise: self.process_noise * rhs,
-            constant: None,
-            init_sample: None,
-            prev_epoch: None,
-        }
+    fn mul(mut self, rhs: f64) -> Self::Output {
+        self.process_noise *= rhs;
+        self.constant = None;
+        self.init_sample = None;
+        self.prev_epoch = None;
+        self
+    }
+}
+
+impl MulAssign<f64> for GaussMarkov {
+    fn mul_assign(&mut self, rhs: f64) {
+        *self = *self * rhs;
     }
 }
 

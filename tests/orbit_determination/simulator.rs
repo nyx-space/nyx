@@ -216,7 +216,7 @@ fn continuous_tracking_cov_test(tracking_data: TrackingDataArc) {
 fn od_with_modulus_cov_test(
     spacecraft: Spacecraft,
     tracking_data: TrackingDataArc,
-    devices: BTreeMap<String, GroundStation>,
+    mut devices: BTreeMap<String, GroundStation>,
     trajectory: Trajectory,
     almanac: Arc<Almanac>,
 ) {
@@ -226,6 +226,14 @@ fn od_with_modulus_cov_test(
     let jpl_dsn_code_length_km = 75660.0;
     arc.set_moduli(MeasurementType::Range, jpl_dsn_code_length_km);
     arc.apply_moduli();
+
+    // Increase the noise on the OD process
+    // Set a bias instead of assuming a modulus.
+    for (_, device) in &mut devices {
+        for (_, stochastics) in device.stochastic_noises.as_mut().unwrap().iter_mut() {
+            *stochastics *= 2.0;
+        }
+    }
 
     let uncertainty = SpacecraftUncertainty::builder()
         .nominal(spacecraft)

@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use std::ops::{Mul, MulAssign};
+
 use anise::constants::SPEED_OF_LIGHT_KM_S;
 use hifitime::{Duration, Epoch};
 use rand::Rng;
@@ -74,6 +76,22 @@ impl Stochastics for WhiteNoise {
 
     fn sample<R: Rng>(&mut self, _epoch: Epoch, rng: &mut R) -> f64 {
         rng.sample(Normal::new(self.mean, self.sigma).unwrap())
+    }
+}
+
+impl Mul<f64> for WhiteNoise {
+    type Output = Self;
+
+    /// Scale the white noise sigmas by a constant.
+    fn mul(mut self, rhs: f64) -> Self::Output {
+        self.sigma *= rhs;
+        self
+    }
+}
+
+impl MulAssign<f64> for WhiteNoise {
+    fn mul_assign(&mut self, rhs: f64) {
+        *self = *self * rhs;
     }
 }
 
