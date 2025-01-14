@@ -1,3 +1,4 @@
+use nyx_space::dynamics::guidance::LocalFrame;
 use nyx_space::io::ConfigRepr;
 use nyx_space::md::prelude::*;
 use nyx_space::md::trajectory::ExportCfg;
@@ -20,53 +21,8 @@ fn almanac() -> Arc<Almanac> {
     test_almanac_arcd()
 }
 
-// Consider changing this to a fixture to run the moduli tests.
-#[rstest]
-fn continuous_tracking_cov_test(almanac: Arc<Almanac>) {
-    // Test that continuous tracking
-    let _ = pretty_env_logger::try_init();
-
-    // Dummy state
-    let orbit = Orbit::try_keplerian_altitude(
-        150_000.0,
-        1e-2,
-        30.0,
-        45.0,
-        75.0,
-        23.4,
-        Epoch::from_str("2023-02-22T19:18:17.16 UTC").unwrap(),
-        almanac.frame_from_uid(EARTH_J2000).unwrap(),
-    )
-    .unwrap();
-
-    // Generate a trajectory
-    let (_, trajectory) = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()))
-        .with(orbit.into(), almanac.clone())
-        .for_duration_with_traj(0.25 * orbit.period().unwrap())
-        .unwrap();
-
-    println!("{trajectory}");
-
-    // Save the trajectory to parquet
-    let path: PathBuf = [
-        env!("CARGO_MANIFEST_DIR"),
-        "output_data",
-        "tracking_truth_ephem.parquet",
-    ]
-    .iter()
-    .collect();
-
-    trajectory
-        .to_parquet_with_cfg(
-            path,
-            ExportCfg {
-                timestamp: true,
-                ..Default::default()
-            },
-            almanac.clone(),
-        )
-        .unwrap();
-
+#[fixture]
+fn devices() -> BTreeMap<String, GroundStation> {
     // Load the ground stations from the test data.
     let ground_station_file: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
@@ -93,6 +49,64 @@ fn continuous_tracking_cov_test(almanac: Arc<Almanac>) {
         );
     }
 
+    devices
+}
+
+#[fixture]
+fn spacecraft(almanac: Arc<Almanac>) -> Spacecraft {
+    // Dummy state
+    let orbit = Orbit::try_keplerian_altitude(
+        150_000.0,
+        1e-2,
+        30.0,
+        45.0,
+        75.0,
+        23.4,
+        Epoch::from_str("2023-02-22T19:18:17.16 UTC").unwrap(),
+        almanac.frame_from_uid(EARTH_J2000).unwrap(),
+    )
+    .unwrap();
+
+    orbit.into()
+}
+
+#[fixture]
+fn tracking_data(
+    spacecraft: Spacecraft,
+    devices: BTreeMap<String, GroundStation>,
+    almanac: Arc<Almanac>,
+) -> TrackingDataArc {
+    // Test that continuous tracking
+    let _ = pretty_env_logger::try_init();
+
+    // Generate a trajectory
+    let (_, trajectory) = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()))
+        .with(spacecraft, almanac.clone())
+        .for_duration_with_traj(0.25 * spacecraft.orbit.period().unwrap())
+        .unwrap();
+
+    println!("{trajectory}");
+
+    // Save the trajectory to parquet
+    let path: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "output_data",
+        "tracking_truth_ephem.parquet",
+    ]
+    .iter()
+    .collect();
+
+    trajectory
+        .to_parquet_with_cfg(
+            path,
+            ExportCfg {
+                timestamp: true,
+                ..Default::default()
+            },
+            almanac.clone(),
+        )
+        .unwrap();
+
     // Load the tracking configuration from the test data.
     let trkconfg_yaml: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
@@ -114,12 +128,13 @@ fn continuous_tracking_cov_test(almanac: Arc<Almanac>) {
             .unwrap();
 
     trk.build_schedule(almanac.clone()).unwrap();
-    let mut arc = trk.generate_measurements(almanac).unwrap();
+    trk.generate_measurements(almanac).unwrap()
+}
 
-    // Assume JPL DSN Code is used, cf. DSN docs 214, section 2.2.2.2.
-    let jpl_dsn_code_length_km = 75660.0;
-    arc.set_moduli(MeasurementType::Range, jpl_dsn_code_length_km);
-    arc.apply_moduli();
+// Consider changing this to a fixture to run the moduli tests.
+#[rstest]
+fn continuous_tracking_cov_test(tracking_data: TrackingDataArc) {
+    let arc = tracking_data;
 
     // And serialize to disk
     let path: PathBuf = [
@@ -201,3 +216,142 @@ fn continuous_tracking_cov_test(almanac: Arc<Almanac>) {
         .to_parquet(path, ExportCfg::default())
         .unwrap();
 }
+
+#[rstest]
+fn od_with_modulus_cov_test(
+    spacecraft: Spacecraft,
+    tracking_data: TrackingDataArc,
+    devices: BTreeMap<String, GroundStation>,
+    almanac: Arc<Almanac>,
+) {
+    let mut arc = tracking_data;
+
+    // Assume JPL DSN Code is used, cf. DSN docs 214, section 2.2.2.2.
+    let jpl_dsn_code_length_km = 75660.0;
+    arc.set_moduli(MeasurementType::Range, jpl_dsn_code_length_km);
+    arc.apply_moduli();
+
+    let uncertainty = SpacecraftUncertainty::builder()
+        .nominal(spacecraft)
+        .frame(LocalFrame::RIC)
+        .x_km(0.5)
+        .y_km(0.5)
+        .z_km(0.5)
+        .vx_km_s(0.5e-3)
+        .vy_km_s(0.5e-3)
+        .vz_km_s(0.5e-3)
+        .build();
+
+    assert!((uncertainty.x_km - 0.5).abs() < f64::EPSILON);
+    assert!((uncertainty.y_km - 0.5).abs() < f64::EPSILON);
+    assert!((uncertainty.z_km - 0.5).abs() < f64::EPSILON);
+    assert!((uncertainty.vx_km_s - 0.5e-3).abs() < f64::EPSILON);
+    assert!((uncertainty.vy_km_s - 0.5e-3).abs() < f64::EPSILON);
+    assert!((uncertainty.vz_km_s - 0.5e-3).abs() < f64::EPSILON);
+
+    println!("{uncertainty}");
+
+    let estimate = uncertainty.to_estimate().unwrap();
+
+    println!("{estimate}");
+
+    let kf = KF::no_snc(estimate);
+
+    let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
+    let prop = setup.with(spacecraft.with_stm(), almanac.clone());
+
+    let mut odp = SpacecraftODProcess::ekf(
+        prop,
+        kf,
+        devices,
+        EkfTrigger::new(10, Unit::Minute * 15),
+        None,
+        almanac,
+    );
+
+    odp.process_arc(&arc).unwrap();
+
+    odp.to_parquet(
+        &arc,
+        "./output_data/od_with_modulus.parquet",
+        ExportCfg::default(),
+    )
+    .unwrap();
+
+    // Test the rejection count?
+    let any_rejected = odp.residuals.iter().any(|resid| resid.unwrap().rejected);
+
+    assert!(
+        !any_rejected,
+        "expected zero rejections with properly configured modulus"
+    );
+}
+
+// #[rstest]
+// fn od_with_modulus_as_bias_cov_test(
+//     spacecraft: Spacecraft,
+//     tracking_data: TrackingDataArc,
+//     mut devices: BTreeMap<String, GroundStation>,
+//     almanac: Arc<Almanac>,
+// ) {
+//     let mut arc = tracking_data;
+
+//     // Assume JPL DSN Code is used, cf. DSN docs 214, section 2.2.2.2.
+//     let jpl_dsn_code_length_km = 75660.0;
+//     // Set a bias instead of assuming a modulus!
+
+//     arc.set_moduli(MeasurementType::Range, jpl_dsn_code_length_km);
+//     arc.apply_moduli();
+
+//     let uncertainty = SpacecraftUncertainty::builder()
+//         .nominal(spacecraft)
+//         .frame(LocalFrame::RIC)
+//         .x_km(0.5)
+//         .y_km(0.5)
+//         .z_km(0.5)
+//         .vx_km_s(0.5e-3)
+//         .vy_km_s(0.5e-3)
+//         .vz_km_s(0.5e-3)
+//         .build();
+
+//     assert!((uncertainty.x_km - 0.5).abs() < f64::EPSILON);
+//     assert!((uncertainty.y_km - 0.5).abs() < f64::EPSILON);
+//     assert!((uncertainty.z_km - 0.5).abs() < f64::EPSILON);
+//     assert!((uncertainty.vx_km_s - 0.5e-3).abs() < f64::EPSILON);
+//     assert!((uncertainty.vy_km_s - 0.5e-3).abs() < f64::EPSILON);
+//     assert!((uncertainty.vz_km_s - 0.5e-3).abs() < f64::EPSILON);
+
+//     println!("{uncertainty}");
+
+//     let estimate = uncertainty.to_estimate().unwrap();
+
+//     println!("{estimate}");
+
+//     let kf = KF::no_snc(estimate);
+
+//     let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
+//     let prop = setup.with(spacecraft.with_stm(), almanac.clone());
+
+//     let mut odp = SpacecraftODProcess::ekf(
+//         prop,
+//         kf,
+//         devices,
+//         EkfTrigger::new(10, Unit::Minute * 15),
+//         None,
+//         almanac,
+//     );
+
+//     odp.process_arc(&arc).unwrap();
+
+//     odp.to_parquet(
+//         &arc,
+//         "./output_data/od_with_modulus.parquet",
+//         ExportCfg::default(),
+//     )
+//     .unwrap();
+
+//     // Test the rejection count?
+//     let any_rejected = odp.residuals.iter().any(|resid| resid.unwrap().rejected);
+
+//     assert!(!any_rejected, "expected zero rejections");
+// }
