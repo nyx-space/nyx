@@ -9,7 +9,8 @@ import click
 
 @click.command
 @click.option("-p", "--path", type=str, default="./04_lro_od_results.parquet")
-def main(path: str):
+@click.option("-f", "--full", type=bool, default=True)
+def main(path: str, full: bool):
     df = pl.read_parquet(path)
 
     df = (
@@ -122,6 +123,9 @@ def main(path: str):
         x="Epoch (UTC)",
         y=["Sigma Vx (RIC) (km/s)", "Sigma Vy (RIC) (km/s)", "Sigma Vz (RIC) (km/s)"],
     ).show()
+
+    if not full:
+        return
 
     # Load the RIC diff.
     for fname, errname in [

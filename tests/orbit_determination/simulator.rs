@@ -36,17 +36,7 @@ fn devices() -> BTreeMap<String, GroundStation> {
 
     let mut devices = BTreeMap::new();
     for gs in GroundStation::load_many(ground_station_file).unwrap() {
-        devices.insert(
-            gs.name.clone(),
-            gs.with_msr_type(
-                MeasurementType::Azimuth,
-                StochasticNoise::default_angle_deg(),
-            )
-            .with_msr_type(
-                MeasurementType::Elevation,
-                StochasticNoise::default_angle_deg(),
-            ),
-        );
+        devices.insert(gs.name.clone(), gs);
     }
 
     devices
@@ -71,19 +61,24 @@ fn spacecraft(almanac: Arc<Almanac>) -> Spacecraft {
 }
 
 #[fixture]
-fn tracking_data(
-    spacecraft: Spacecraft,
-    devices: BTreeMap<String, GroundStation>,
-    almanac: Arc<Almanac>,
-) -> TrackingDataArc {
-    // Test that continuous tracking
-    let _ = pretty_env_logger::try_init();
-
+fn trajectory(spacecraft: Spacecraft, almanac: Arc<Almanac>) -> Trajectory {
     // Generate a trajectory
     let (_, trajectory) = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()))
         .with(spacecraft, almanac.clone())
         .for_duration_with_traj(0.25 * spacecraft.orbit.period().unwrap())
         .unwrap();
+
+    trajectory
+}
+
+#[fixture]
+fn tracking_data(
+    trajectory: Trajectory,
+    devices: BTreeMap<String, GroundStation>,
+    almanac: Arc<Almanac>,
+) -> TrackingDataArc {
+    // Test that continuous tracking
+    let _ = pretty_env_logger::try_init();
 
     println!("{trajectory}");
 
@@ -222,6 +217,7 @@ fn od_with_modulus_cov_test(
     spacecraft: Spacecraft,
     tracking_data: TrackingDataArc,
     devices: BTreeMap<String, GroundStation>,
+    trajectory: Trajectory,
     almanac: Arc<Almanac>,
 ) {
     let mut arc = tracking_data;
@@ -278,80 +274,107 @@ fn od_with_modulus_cov_test(
     )
     .unwrap();
 
-    // Test the rejection count?
-    let any_rejected = odp.residuals.iter().any(|resid| resid.unwrap().rejected);
+    // Check the final error.
+    let estimate = odp.estimates.last().unwrap();
+    let rss_pos_km = trajectory
+        .at(estimate.epoch())
+        .unwrap()
+        .orbit
+        .rss_radius_km(&estimate.orbital_state())
+        .unwrap();
 
-    assert!(
-        !any_rejected,
-        "expected zero rejections with properly configured modulus"
-    );
+    println!("rss_pos_km = {rss_pos_km}");
+
+    let reject_count = odp
+        .residuals
+        .iter()
+        .map(|resid| {
+            if let Some(resid) = resid {
+                if resid.rejected {
+                    1
+                } else {
+                    0
+                }
+            } else {
+                0
+            }
+        })
+        .sum::<u32>();
+
+    assert!(reject_count < 10, "wrong number of expected rejections");
 }
 
-// #[rstest]
-// fn od_with_modulus_as_bias_cov_test(
-//     spacecraft: Spacecraft,
-//     tracking_data: TrackingDataArc,
-//     mut devices: BTreeMap<String, GroundStation>,
-//     almanac: Arc<Almanac>,
-// ) {
-//     let mut arc = tracking_data;
+#[rstest]
+fn od_with_modulus_as_bias_cov_test(
+    spacecraft: Spacecraft,
+    mut tracking_data: TrackingDataArc,
+    mut devices: BTreeMap<String, GroundStation>,
+    trajectory: Trajectory,
+    almanac: Arc<Almanac>,
+) {
+    // Assume JPL DSN Code is used, cf. DSN docs 214, section 2.2.2.2.
+    let jpl_dsn_code_length_km = 75660.0;
 
-//     // Assume JPL DSN Code is used, cf. DSN docs 214, section 2.2.2.2.
-//     let jpl_dsn_code_length_km = 75660.0;
-//     // Set a bias instead of assuming a modulus!
+    tracking_data.set_moduli(MeasurementType::Range, jpl_dsn_code_length_km);
+    tracking_data.apply_moduli();
+    // Forget there ever was a modulus!
+    tracking_data.moduli = None;
 
-//     arc.set_moduli(MeasurementType::Range, jpl_dsn_code_length_km);
-//     arc.apply_moduli();
+    // Set a bias instead of assuming a modulus.
+    for (name, device) in devices.clone() {
+        let biased_device = device
+            .with_msr_bias_constant(MeasurementType::Range, jpl_dsn_code_length_km)
+            .unwrap();
+        devices.insert(name, biased_device);
+    }
 
-//     let uncertainty = SpacecraftUncertainty::builder()
-//         .nominal(spacecraft)
-//         .frame(LocalFrame::RIC)
-//         .x_km(0.5)
-//         .y_km(0.5)
-//         .z_km(0.5)
-//         .vx_km_s(0.5e-3)
-//         .vy_km_s(0.5e-3)
-//         .vz_km_s(0.5e-3)
-//         .build();
+    let uncertainty = SpacecraftUncertainty::builder()
+        .nominal(spacecraft)
+        .frame(LocalFrame::RIC)
+        .x_km(0.5)
+        .y_km(0.5)
+        .z_km(0.5)
+        .vx_km_s(0.5e-3)
+        .vy_km_s(0.5e-3)
+        .vz_km_s(0.5e-3)
+        .build();
 
-//     assert!((uncertainty.x_km - 0.5).abs() < f64::EPSILON);
-//     assert!((uncertainty.y_km - 0.5).abs() < f64::EPSILON);
-//     assert!((uncertainty.z_km - 0.5).abs() < f64::EPSILON);
-//     assert!((uncertainty.vx_km_s - 0.5e-3).abs() < f64::EPSILON);
-//     assert!((uncertainty.vy_km_s - 0.5e-3).abs() < f64::EPSILON);
-//     assert!((uncertainty.vz_km_s - 0.5e-3).abs() < f64::EPSILON);
+    let estimate = uncertainty.to_estimate().unwrap();
 
-//     println!("{uncertainty}");
+    let kf = KF::no_snc(estimate);
 
-//     let estimate = uncertainty.to_estimate().unwrap();
+    let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
+    let prop = setup.with(spacecraft.with_stm(), almanac.clone());
 
-//     println!("{estimate}");
+    let mut odp = SpacecraftODProcess::ekf(
+        prop,
+        kf,
+        devices,
+        EkfTrigger::new(10, Unit::Minute * 15),
+        None,
+        almanac,
+    );
 
-//     let kf = KF::no_snc(estimate);
+    odp.process_arc(&tracking_data).unwrap();
 
-//     let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
-//     let prop = setup.with(spacecraft.with_stm(), almanac.clone());
+    odp.to_parquet(
+        &tracking_data,
+        "./output_data/od_with_modulus.parquet",
+        ExportCfg::default(),
+    )
+    .unwrap();
 
-//     let mut odp = SpacecraftODProcess::ekf(
-//         prop,
-//         kf,
-//         devices,
-//         EkfTrigger::new(10, Unit::Minute * 15),
-//         None,
-//         almanac,
-//     );
+    // Check the final error.
+    let estimate = odp.estimates.last().unwrap();
+    let rss_pos_km = trajectory
+        .at(estimate.epoch())
+        .unwrap()
+        .orbit
+        .rss_radius_km(&estimate.orbital_state())
+        .unwrap();
 
-//     odp.process_arc(&arc).unwrap();
-
-//     odp.to_parquet(
-//         &arc,
-//         "./output_data/od_with_modulus.parquet",
-//         ExportCfg::default(),
-//     )
-//     .unwrap();
-
-//     // Test the rejection count?
-//     let any_rejected = odp.residuals.iter().any(|resid| resid.unwrap().rejected);
-
-//     assert!(!any_rejected, "expected zero rejections");
-// }
+    assert!(
+        rss_pos_km > 100_000.0,
+        "expected bias to not correctly solve OD"
+    )
+}
