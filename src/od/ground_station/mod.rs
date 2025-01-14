@@ -24,7 +24,7 @@ use indexmap::{IndexMap, IndexSet};
 use snafu::ensure;
 
 use super::msr::MeasurementType;
-use super::noise::StochasticNoise;
+use super::noise::{GaussMarkov, StochasticNoise};
 use super::{ODAlmanacSnafu, ODError, ODTrajSnafu, TrackingDevice};
 use crate::io::ConfigRepr;
 use crate::od::NoiseNotConfiguredSnafu;
@@ -117,6 +117,34 @@ impl GroundStation {
         self.integration_time = integration_time;
 
         self
+    }
+
+    /// Returns a copy of this ground station with the measurement type noises' constant bias set to the provided value.
+    pub fn with_msr_bias_constant(
+        mut self,
+        msr_type: MeasurementType,
+        bias_constant: f64,
+    ) -> Result<Self, ODError> {
+        if self.stochastic_noises.is_none() {
+            self.stochastic_noises = Some(IndexMap::new());
+        }
+
+        let stochastics = self.stochastic_noises.as_mut().unwrap();
+
+        let this_noise = stochastics
+            .get_mut(&msr_type)
+            .ok_or(ODError::NoiseNotConfigured {
+                kind: format!("{msr_type:?}"),
+            })
+            .unwrap();
+
+        if this_noise.bias.is_none() {
+            this_noise.bias = Some(GaussMarkov::ZERO);
+        }
+
+        this_noise.bias.unwrap().constant = Some(bias_constant);
+
+        Ok(self)
     }
 
     /// Computes the azimuth and elevation of the provided object seen from this ground station, both in degrees.
