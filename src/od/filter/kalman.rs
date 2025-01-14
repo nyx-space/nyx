@@ -300,6 +300,9 @@ where
         // Compute the prefit ratio for the automatic rejection.
         // The measurement covariance is the square of the measurement itself.
         // So we compute its Cholesky decomposition to return to the non squared values.
+        dbg!(epoch);
+        dbg!(&r_k);
+        dbg!(&s_k);
         let r_k_chol = s_k.clone().cholesky().ok_or(ODError::SingularNoiseRk)?.l();
 
         // Compute the ratio as the average of each component of the prefit over the square root of the measurement
