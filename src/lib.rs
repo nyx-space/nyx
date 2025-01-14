@@ -41,7 +41,7 @@ pub mod cosmic;
 /// Utility functions shared by different modules, and which may be useful to engineers.
 pub mod utils;
 
-mod errors;
+pub mod errors;
 /// Nyx will (almost) never panic and functions which may fail will return an error.
 pub use self::errors::NyxError;
 

@@ -23,7 +23,7 @@ use rand::Rng;
 use rand_distr::Normal;
 use serde_derive::{Deserialize, Serialize};
 use std::fmt;
-use std::ops::Mul;
+use std::ops::{Mul, MulAssign};
 
 use super::Stochastics;
 
@@ -43,6 +43,8 @@ pub struct GaussMarkov {
     /// The time constant, tau gives the correlation time, or the time over which the intensity of the time correlation will fade to 1/e of its prior value. (This is sometimes incorrectly referred to as the "half-life" of the process.)
     pub tau: Duration,
     pub process_noise: f64,
+    /// An optional constant offset on top of the noise, defaults to zero.
+    pub constant: Option<f64>,
     /// Epoch of the previous realization, used to compute the time delta for the process noise.
     #[serde(skip)]
     pub prev_epoch: Option<Epoch>,
@@ -76,6 +78,7 @@ impl GaussMarkov {
         Ok(Self {
             tau,
             process_noise,
+            constant: None,
             init_sample: None,
             prev_epoch: None,
         })
@@ -85,6 +88,7 @@ impl GaussMarkov {
     pub const ZERO: Self = Self {
         tau: Duration::MAX,
         process_noise: 0.0,
+        constant: None,
         init_sample: None,
         prev_epoch: None,
     };
@@ -95,6 +99,7 @@ impl GaussMarkov {
         Self {
             tau: 1.minutes(),
             process_noise: 60.0e-5,
+            constant: None,
             init_sample: None,
             prev_epoch: None,
         }
@@ -106,6 +111,7 @@ impl GaussMarkov {
         Self {
             tau: 1.minutes(),
             process_noise: 0.03e-6,
+            constant: None,
             init_sample: None,
             prev_epoch: None,
         }
@@ -139,7 +145,7 @@ impl Stochastics for GaussMarkov {
         let steady_noise = 0.5 * self.process_noise * self.tau.to_seconds() * anti_decay;
         let ss_sample = rng.sample(Normal::new(0.0, steady_noise).unwrap());
 
-        self.init_sample.unwrap() * decay + ss_sample
+        self.init_sample.unwrap() * decay + ss_sample + self.constant.unwrap_or(0.0)
     }
 }
 
@@ -147,13 +153,18 @@ impl Mul<f64> for GaussMarkov {
     type Output = Self;
 
     /// Scale the Gauss Markov process by a constant, maintaining the same time constant.
-    fn mul(self, rhs: f64) -> Self::Output {
-        Self {
-            tau: self.tau,
-            process_noise: self.process_noise * rhs,
-            init_sample: None,
-            prev_epoch: None,
-        }
+    fn mul(mut self, rhs: f64) -> Self::Output {
+        self.process_noise *= rhs;
+        self.constant = None;
+        self.init_sample = None;
+        self.prev_epoch = None;
+        self
+    }
+}
+
+impl MulAssign<f64> for GaussMarkov {
+    fn mul_assign(&mut self, rhs: f64) {
+        *self = *self * rhs;
     }
 }
 

@@ -41,7 +41,22 @@ use std::marker::PhantomData;
 use std::ops::Add;
 mod export;
 
-/// An orbit determination process. Note that everything passed to this structure is moved.
+/// Sets up an orbit determination process (ODP).
+///
+/// # Algorithm details
+///
+/// ## Classical vs. Extended Kalman filter
+///
+/// In Nyx, an ODP configured in Classical Kalman Filter will track the state deviation compared to the nominal state.
+/// An ODP configured in Extended Kalman Filter mode will update the propagation state on each (accepted) measurement.
+///
+/// The EKF mode requires a "trigger" which switches the filter from a CKF to an EKF. This prevents quick divergence of a filter.
+///
+/// ## Measurement residual ratio and rejection
+///
+/// The measurement residual is a signed scalar, despite ODP being able to process multiple measurements simultaneously.
+/// By default, if a measurement is more than 3 measurement sigmas off, it will be rejected to avoid biasing the filter.
+///
 #[allow(clippy::upper_case_acronyms)]
 pub struct ODProcess<
     'a,
@@ -560,10 +575,32 @@ where
 
                                     self.kf.update_h_tilde(h_tilde);
 
+                                    let computed_obs = computed_meas
+                                        .observation::<MsrSize>(&cur_msr_types)
+                                        - device.measurement_bias_vector::<MsrSize>(
+                                            &cur_msr_types,
+                                            epoch,
+                                        )?;
+
+                                    let mut real_obs = msr.observation(&cur_msr_types);
+
+                                    if let Some(moduli) = &arc.moduli {
+                                        let mut obs_ambiguity = OVector::<f64, MsrSize>::zeros();
+
+                                        for (i, msr_type) in cur_msr_types.iter().enumerate() {
+                                            if let Some(modulus) = moduli.get(msr_type) {
+                                                let k = computed_obs[i].div_euclid(*modulus);
+                                                // real_obs = measured_obs + k * modulus
+                                                obs_ambiguity[i] = k * *modulus;
+                                            }
+                                        }
+                                        real_obs += obs_ambiguity;
+                                    }
+
                                     match self.kf.measurement_update(
                                         nominal_state,
-                                        &msr.observation(&cur_msr_types),
-                                        &computed_meas.observation(&cur_msr_types),
+                                        &real_obs,
+                                        &computed_obs,
                                         device.measurement_covar_matrix(&cur_msr_types, epoch)?,
                                         self.resid_crit,
                                     ) {

@@ -17,6 +17,7 @@
 */
 
 use anise::prelude::Almanac;
+use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 
 use super::{
@@ -32,7 +33,7 @@ use std::fmt;
 use std::sync::Arc;
 
 /// Ruggiero defines the closed loop guidance law from IEPC 2011-102
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Default, Serialize, Deserialize)]
 pub struct Ruggiero {
     /// Stores the objectives
     pub objectives: [Option<Objective>; 5],

@@ -300,7 +300,14 @@ where
         // Compute the prefit ratio for the automatic rejection.
         // The measurement covariance is the square of the measurement itself.
         // So we compute its Cholesky decomposition to return to the non squared values.
-        let r_k_chol = s_k.clone().cholesky().ok_or(ODError::SingularNoiseRk)?.l();
+        let r_k_chol = match s_k.clone().cholesky() {
+            Some(r_k_clone) => r_k_clone.l(),
+            None => {
+                // In very rare case, when there isn't enough noise in the measurements,
+                // the inverting of S_k fails. If so, we revert back to the nominal Kalman derivation.
+                r_k.clone().cholesky().ok_or(ODError::SingularNoiseRk)?.l()
+            }
+        };
 
         // Compute the ratio as the average of each component of the prefit over the square root of the measurement
         // matrix r_k. Refer to ODTK MathSpec equation 4.10.

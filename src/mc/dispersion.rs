@@ -17,10 +17,11 @@
 */
 
 use crate::md::StateParameter;
+use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
 /// A dispersions configuration, allows specifying min/max bounds (by default, they are not set)
-#[derive(Copy, Clone, TypedBuilder)]
+#[derive(Copy, Clone, TypedBuilder, Serialize, Deserialize)]
 pub struct StateDispersion {
     pub param: StateParameter,
     #[builder(default, setter(strip_option))]

@@ -1,7 +1,7 @@
 [package]
 name = "nyx-space"
 build = "build.rs"
-version = "2.0.0"
+version = "2.0.1"
 edition = "2021"
 authors = ["Christopher Rabotin <christopher.rabotin@gmail.com>"]
 description = "A high-fidelity space mission toolkit, with orbit propagation, estimation and some systems engineering"

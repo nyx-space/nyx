@@ -62,6 +62,12 @@ For Python projects, get started by installing the library via `pip`: `pip insta
 
 Nyx is provided under the [AGPLv3 License](./LICENSE). By using this software, you assume responsibility for adhering to the license. Refer to [the pricing page](https://nyxspace.com/pricing/?utm_source=readme-price) for an FAQ on the AGPLv3 license. Notably, any software that incorporates, links to, or depends on Nyx must also be released under the AGPLv3 license, even if you distribute an unmodified version of Nyx.
 
+# Versioning
+
+Nyx mostly adheres to SemVer. New patch versions should be rare. Updated dependencies trigger a new minor version. _However_ new fields in structures and new behavior may also be added with minor releases, but the public facing initializers and functions should not significantly change (but may still change).
+
+Major releases are for dramatic changes.
+
 
 [cratesio-image]: https://img.shields.io/crates/v/nyx-space.svg
 [cratesio]: https://crates.io/crates/nyx-space

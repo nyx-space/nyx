@@ -28,15 +28,77 @@ mod io_parquet;
 
 /// Tracking data storing all of measurements as a B-Tree.
 /// It inherently does NOT support multiple concurrent measurements from several trackers.
+///
+/// # Measurement Moduli, e.g. range modulus
+///
+/// In the case of ranging, and possibly other data types, a code is used to measure the range to the spacecraft. The length of this code
+/// determines the ambiguity resolution, as per equation 9 in section 2.2.2.2 of the JPL DESCANSO, document 214, _Pseudo-Noise and Regenerative Ranging_.
+/// For example, using the JPL Range Code and a frequency range clock of 1 MHz, the range ambiguity is 75,660 km. In other words,
+/// as soon as the spacecraft is at a range of 75,660 + 1 km the JPL Range Code will report the vehicle to be at a range of 1 km.
+/// This is simply because the range code overlaps with itself, effectively loosing track of its own reference:
+/// it's due to the phase shift of the signal "lapping" the original signal length.
+///
+/// ```text
+///             (Spacecraft)
+///             ^
+///             |    Actual Distance = 75,661 km
+///             |
+/// 0 km                                         75,660 km (Wrap-Around)
+/// |-----------------------------------------------|
+///   When the "code length" is exceeded,
+///   measurements wrap back to 0.
+///
+/// So effectively:
+///     Observed code range = Actual range (mod 75,660 km)
+///     75,661 km → 1 km
+///
+/// ```
+///
+/// Nyx can only resolve the range ambiguity if the tracking data specifies a modulus for this specific measurement type.
+/// For example, in the case of the JPL Range Code and a 1 MHz range clock, the ambiguity interval is 75,660 km.
+///
+/// The measurement used in the Orbit Determination Process then becomes the following, where `//` represents the [Euclidian division](https://doc.rust-lang.org/std/primitive.f64.html#method.div_euclid).
+///
+/// ```text
+/// k = computed_obs // ambiguity_interval
+/// real_obs = measured_obs + k * modulus
+/// ```
+///
+/// Reference: JPL DESCANSO, document 214, _Pseudo-Noise and Regenerative Ranging_.
+///
 #[derive(Clone, Default)]
 pub struct TrackingDataArc {
     /// All measurements in this data arc
     pub measurements: BTreeMap<Epoch, Measurement>, // BUG: Consider a map of tracking to epoch!
     /// Source file if loaded from a file or saved to a file.
     pub source: Option<String>,
+    /// Optionally provide a map of modulos (e.g. the RANGE_MODULO of CCSDS TDM).
+    pub moduli: Option<IndexMap<MeasurementType, f64>>,
 }
 
 impl TrackingDataArc {
+    /// Set (or overwrites) the modulus of the provided measurement type.
+    pub fn set_moduli(&mut self, msr_type: MeasurementType, modulus: f64) {
+        if self.moduli.is_none() {
+            self.moduli = Some(IndexMap::new());
+        }
+
+        self.moduli.as_mut().unwrap().insert(msr_type, modulus);
+    }
+
+    /// Applies the moduli to each measurement, if defined.
+    pub fn apply_moduli(&mut self) {
+        if let Some(moduli) = &self.moduli {
+            for msr in self.measurements.values_mut() {
+                for (msr_type, modulus) in moduli {
+                    if let Some(msr_value) = msr.data.get_mut(msr_type) {
+                        *msr_value %= *modulus;
+                    }
+                }
+            }
+        }
+    }
+
     /// Returns the unique list of aliases in this tracking data arc
     pub fn unique_aliases(&self) -> IndexSet<String> {
         self.unique().0

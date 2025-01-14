@@ -27,6 +27,7 @@ use rand_pcg::Pcg64Mcg;
 use serde_derive::{Deserialize, Serialize};
 use std::error::Error;
 use std::fs::File;
+use std::ops::{Mul, MulAssign};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -209,6 +210,27 @@ impl StochasticNoise {
         writer.close()?;
 
         Ok(samples)
+    }
+}
+
+impl Mul<f64> for StochasticNoise {
+    type Output = Self;
+
+    fn mul(mut self, rhs: f64) -> Self::Output {
+        if let Some(mut wn) = &mut self.white_noise {
+            wn *= rhs;
+        }
+        if let Some(mut gm) = &mut self.bias {
+            gm *= rhs;
+        }
+
+        self
+    }
+}
+
+impl MulAssign<f64> for StochasticNoise {
+    fn mul_assign(&mut self, rhs: f64) {
+        *self = *self * rhs;
     }
 }
 

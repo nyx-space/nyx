@@ -476,7 +476,7 @@ impl OrbitDual {
                 param: StateParameter::MeanAnomaly,
             })
         } else if self.ecc()?.real() > 1.0 {
-            info!("computing the hyperbolic anomaly");
+            debug!("computing the hyperbolic anomaly");
             // From GMAT's TrueToHyperbolicAnomaly
             Ok(OrbitPartial {
                 dual: ((self.ta_deg()?.dual.to_radians().sin()

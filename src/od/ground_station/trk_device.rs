@@ -174,4 +174,20 @@ impl TrackingDevice<Spacecraft> for GroundStation {
             })?
             .covariance(epoch))
     }
+
+    fn measurement_bias(&self, msr_type: MeasurementType, _epoch: Epoch) -> Result<f64, ODError> {
+        let stochastics = self.stochastic_noises.as_ref().unwrap();
+
+        if let Some(gm) = stochastics
+            .get(&msr_type)
+            .ok_or(ODError::NoiseNotConfigured {
+                kind: format!("{msr_type:?}"),
+            })?
+            .bias
+        {
+            Ok(gm.constant.unwrap_or(0.0))
+        } else {
+            Ok(0.0)
+        }
+    }
 }

@@ -25,12 +25,13 @@ use crate::md::prelude::{Interpolatable, Traj};
 use crate::md::EventEvaluator;
 use crate::time::Duration;
 use core::fmt;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 /// Enumerates the possible edges of an event in a trajectory.
 ///
 /// `EventEdge` is used to describe the nature of a trajectory event, particularly in terms of its temporal dynamics relative to a specified condition or threshold. This enum helps in distinguishing whether the event is occurring at a rising edge, a falling edge, or if the edge is unclear due to insufficient data or ambiguous conditions.
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum EventEdge {
     /// Represents a rising edge of the event. This indicates that the event is transitioning from a lower to a higher evaluation of the event. For example, in the context of elevation, a rising edge would indicate an increase in elevation from a lower angle.
     Rising,
@@ -73,14 +74,14 @@ where
 {
     /// Generates detailed information about an event at a specific epoch in a trajectory.
     ///
-    /// This takes an `Epoch` as an input and returns a `Result<Self, NyxError>`.
+    /// This takes an `Epoch` as an input and returns a `Result<Self, EventError>`.
     /// It is designed to determine the state of a trajectory at a given epoch, evaluate the specific event at that state, and ascertain the nature of the event (rising, falling, or unclear).
     /// The initialization intelligently determines the edge type of the event by comparing the event's value at the current, previous, and next epochs.
     /// It ensures robust event characterization in trajectories.
     ///
     /// # Returns
     /// - `Ok(EventDetails<S>)` if the state at the given epoch can be determined and the event details are successfully evaluated.
-    /// - `Err(NyxError)` if there is an error in retrieving the state at the specified epoch.
+    /// - `Err(EventError)` if there is an error in retrieving the state at the specified epoch.
     ///
     pub fn new<E: EventEvaluator<S>>(
         state: S,

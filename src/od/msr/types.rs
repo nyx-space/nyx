@@ -50,6 +50,17 @@ impl MeasurementType {
         }
     }
 
+    /// Returns true if this measurement type could be a two-way measurement.
+    pub(crate) fn may_be_two_way(self) -> bool {
+        match self {
+            MeasurementType::Range | MeasurementType::Doppler => true,
+            MeasurementType::Azimuth
+            | MeasurementType::Elevation
+            | MeasurementType::ReceiveFrequency
+            | MeasurementType::TransmitFrequency => false,
+        }
+    }
+
     /// Returns the fields for this kind of measurement. The metadata includes a `unit` field with the unit.
     /// Column is nullable in case there is no such measurement at a given epoch.
     pub fn to_field(&self) -> Field {

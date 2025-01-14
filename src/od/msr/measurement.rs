@@ -23,7 +23,10 @@ use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, OVector};
 use std::fmt;
 
 /// A type-agnostic simultaneous measurement storage structure. Allows storing any number of simultaneous measurement of a given taker.
-#[derive(Clone, Debug, PartialEq)]
+///
+/// Note that two measurements are considered equal if the tracker and epoch match exactly, and if both have the same measurement types,
+/// and those measurements are equal to within 1e-10 (this allows for some leeway in TDM producers).
+#[derive(Clone, Debug)]
 pub struct Measurement {
     /// Tracker alias which made this measurement
     pub tracker: String,
@@ -58,6 +61,7 @@ impl Measurement {
     where
         DefaultAllocator: Allocator<S>,
     {
+        // Consider adding a modulo modifier here, any bias should be configured by each ground station.
         let mut obs = OVector::zeros();
         for (i, t) in types.iter().enumerate() {
             if let Some(msr_value) = self.data.get(t) {
@@ -89,5 +93,19 @@ impl fmt::Display for Measurement {
             .join(", ");
 
         write!(f, "{} measured {} on {}", self.tracker, msrs, self.epoch)
+    }
+}
+
+impl PartialEq for Measurement {
+    fn eq(&self, other: &Self) -> bool {
+        self.tracker == other.tracker
+            && self.epoch == other.epoch
+            && self.data.iter().all(|(key, &value)| {
+                if let Some(&other_value) = other.data.get(key) {
+                    (value - other_value).abs() < 1e-10
+                } else {
+                    false
+                }
+            })
     }
 }
