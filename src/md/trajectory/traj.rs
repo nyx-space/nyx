@@ -463,8 +463,8 @@ where
 
         // Build an array of all the RIC differences
         let mut ric_diff = Vec::with_capacity(other_states.len());
-        for (ii, other_state) in other_states.iter().enumerate() {
-            let self_orbit = self_states[ii].orbit();
+        for (other_state, self_state) in other_states.iter().zip(self_states.iter()) {
+            let self_orbit = self_state.orbit();
             let other_orbit = other_state.orbit();
 
             let this_ric_diff = self_orbit.ric_difference(&other_orbit).map_err(Box::new)?;
@@ -493,11 +493,13 @@ where
         // Add all of the fields
         for field in fields {
             let mut data = Float64Builder::new();
-            for (ii, self_state) in self_states.iter().enumerate() {
-                let self_val = self_state.value(field).unwrap();
-                let other_val = other_states[ii].value(field).unwrap();
+            for (other_state, self_state) in other_states.iter().zip(self_states.iter()) {
+                let self_val = self_state.value(field).map_err(Box::new)?;
+                let other_val = other_state.value(field).map_err(Box::new)?;
+
                 data.append_value(self_val - other_val);
             }
+
             record.push(Arc::new(data.finish()));
         }
 

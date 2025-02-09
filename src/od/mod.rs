@@ -18,6 +18,7 @@
 
 use crate::dynamics::DynamicsError;
 pub use crate::dynamics::{Dynamics, NyxError};
+use crate::errors::StateError;
 use crate::io::{ConfigError, InputOutputError};
 use crate::linalg::OVector;
 use crate::md::trajectory::TrajError;
@@ -140,4 +141,10 @@ pub enum ODError {
     },
     #[snafu(display("not enough residuals to {action}"))]
     ODNoResiduals { action: &'static str },
+    #[snafu(display("Could not {action} OD results: {source}"))]
+    ODStateError {
+        #[snafu(source(from(StateError, Box::new)))]
+        source: Box<StateError>,
+        action: &'static str,
+    },
 }

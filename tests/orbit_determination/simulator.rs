@@ -229,7 +229,7 @@ fn od_with_modulus_cov_test(
 
     // Increase the noise on the OD process
     // Set a bias instead of assuming a modulus.
-    for (_, device) in &mut devices {
+    for device in devices.values_mut() {
         for (_, stochastics) in device.stochastic_noises.as_mut().unwrap().iter_mut() {
             *stochastics *= 2.0;
         }

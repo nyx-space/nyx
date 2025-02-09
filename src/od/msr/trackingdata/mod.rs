@@ -18,10 +18,12 @@
 use super::{measurement::Measurement, MeasurementType};
 use core::fmt;
 use hifitime::prelude::{Duration, Epoch};
+use hifitime::Unit;
 use indexmap::{IndexMap, IndexSet};
+use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::ops::Bound::{Excluded, Included, Unbounded};
-use std::ops::RangeBounds;
+use std::ops::{Add, RangeBounds};
 
 mod io_ccsds_tdm;
 mod io_parquet;
@@ -74,11 +76,17 @@ pub struct TrackingDataArc {
     pub source: Option<String>,
     /// Optionally provide a map of modulos (e.g. the RANGE_MODULO of CCSDS TDM).
     pub moduli: Option<IndexMap<MeasurementType, f64>>,
+    /// Reject all of the measurements, useful for debugging passes.
+    pub force_reject: bool,
 }
 
 impl TrackingDataArc {
     /// Set (or overwrites) the modulus of the provided measurement type.
     pub fn set_moduli(&mut self, msr_type: MeasurementType, modulus: f64) {
+        if modulus.is_nan() || modulus.abs() < f64::EPSILON {
+            warn!("cannot set modulus for {msr_type:?} to {modulus}");
+            return;
+        }
         if self.moduli.is_none() {
             self.moduli = Some(IndexMap::new());
         }
@@ -132,6 +140,14 @@ impl TrackingDataArc {
         self.measurements.last_key_value().map(|(k, _)| *k)
     }
 
+    /// Returns the duration this tracking arc
+    pub fn duration(&self) -> Option<Duration> {
+        match self.start_epoch() {
+            Some(start) => self.end_epoch().map(|end| end - start),
+            None => None,
+        }
+    }
+
     /// Returns the number of measurements in this data arc
     pub fn len(&self) -> usize {
         self.measurements.len()
@@ -142,8 +158,7 @@ impl TrackingDataArc {
         self.measurements.is_empty()
     }
 
-    /// Returns the minimum duration between two subsequent measurements.
-    /// This is important to correctly set up the propagator and not miss any measurement.
+    /// Returns the minimum duration between two subsequent measurements, flooring at 10 seconds.
     pub fn min_duration_sep(&self) -> Option<Duration> {
         if self.is_empty() {
             None
@@ -155,7 +170,7 @@ impl TrackingDataArc {
                 min_sep = min_sep.min(this_sep);
                 prev_epoch = *epoch;
             }
-            Some(min_sep)
+            Some(min_sep.max(Unit::Second * 10))
         }
     }
 
@@ -323,5 +338,22 @@ impl fmt::Debug for TrackingDataArc {
 impl PartialEq for TrackingDataArc {
     fn eq(&self, other: &Self) -> bool {
         self.measurements == other.measurements
+    }
+}
+
+impl Add for TrackingDataArc {
+    type Output = Self;
+
+    fn add(mut self, rhs: Self) -> Self::Output {
+        self.force_reject = false;
+        for (epoch, msr) in rhs.measurements {
+            if let Entry::Vacant(e) = self.measurements.entry(epoch) {
+                e.insert(msr);
+            } else {
+                error!("merging tracking data with overlapping epoch is not supported");
+            }
+        }
+
+        self
     }
 }

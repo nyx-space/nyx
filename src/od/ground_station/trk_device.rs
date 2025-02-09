@@ -48,13 +48,14 @@ impl TrackingDevice<Spacecraft> for GroundStation {
     ) -> Result<Option<Measurement>, ODError> {
         match self.integration_time {
             Some(integration_time) => {
+                // TODO: This should support measurement alignment
                 // If out of traj bounds, return None, else the whole strand is rejected.
-                let rx_0 = match traj.at(epoch - integration_time) {
+                let rx_0 = match traj.at(epoch - integration_time * 0.5) {
                     Ok(rx) => rx,
                     Err(_) => return Ok(None),
                 };
 
-                let rx_1 = match traj.at(epoch).context(ODTrajSnafu) {
+                let rx_1 = match traj.at(epoch + integration_time * 0.5).context(ODTrajSnafu) {
                     Ok(rx) => rx,
                     Err(_) => return Ok(None),
                 };

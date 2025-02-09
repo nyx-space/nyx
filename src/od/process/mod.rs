@@ -462,11 +462,21 @@ where
         let prop_time = arc.end_epoch().unwrap() - self.kf.previous_estimate().epoch();
         info!("Navigation propagating for a total of {prop_time} with step size {max_step}");
 
+        let resid_crit = if arc.force_reject {
+            warn!("Rejecting all measurements from {arc} as requested");
+            Some(ResidRejectCrit { num_sigmas: 0.0 })
+        } else {
+            self.resid_crit
+        };
+
         let mut epoch = self.prop.state.epoch();
 
         let mut reported = [false; 11];
         reported[0] = true; // Prevent showing "0% done"
-        info!("Processing {num_msrs} measurements with covariance mapping");
+        info!(
+            "Processing {num_msrs} measurements from {:?}",
+            arc.unique_aliases()
+        );
 
         // We'll build a trajectory of the estimated states. This will be used to compute the measurements.
         let mut traj: Traj<D::StateType> = Traj::new();
@@ -514,8 +524,8 @@ where
                 // Get the datetime and info needed to compute the theoretical measurement according to the model
                 epoch = nominal_state.epoch();
 
-                // Perform a measurement update
-                if nominal_state.epoch() == next_msr_epoch {
+                // Perform a measurement update, accounting for possible errors in measurement timestamps
+                if (nominal_state.epoch() - next_msr_epoch).abs() < Unit::Microsecond * 1 {
                     // Get the computed observations
                     match self.devices.get_mut(&msr.tracker) {
                         Some(device) => {
@@ -602,7 +612,7 @@ where
                                         &real_obs,
                                         &computed_obs,
                                         device.measurement_covar_matrix(&cur_msr_types, epoch)?,
-                                        self.resid_crit,
+                                        resid_crit,
                                     ) {
                                         Ok((estimate, mut residual)) => {
                                             debug!("processed measurement #{msr_cnt} for {cur_msr_types:?} @ {epoch} from {}", device.name());
@@ -648,7 +658,7 @@ where
                                     msr_accepted_cnt += 1;
                                 }
                             } else {
-                                warn!("Ignoring observation @ {epoch} because simulated {} does not expect it", msr.tracker);
+                                debug!("ignoring observation @ {epoch} because simulated {} does not expect it", msr.tracker);
                             }
                         }
                         None => {
@@ -677,7 +687,7 @@ where
                     break;
                 } else {
                     // No measurement can be used here, let's just do a time update and continue advancing the propagator.
-                    debug!("time update {epoch}");
+                    debug!("time update {epoch:?}, next msr {next_msr_epoch:?}");
                     match self.kf.time_update(nominal_state) {
                         Ok(est) => {
                             // State deviation is always zero for an EKF time update
@@ -705,25 +715,16 @@ where
         Ok(())
     }
 
-    /// Continuously predicts the trajectory until the provided end epoch, with covariance mapping at each step. In other words, this performs a time update.
+    /// Perform a time update. Continuously predicts the trajectory until the provided end epoch, with covariance mapping at each step.
     pub fn predict_until(&mut self, step: Duration, end_epoch: Epoch) -> Result<(), ODError> {
         let prop_time = end_epoch - self.kf.previous_estimate().epoch();
-        info!("Mapping covariance for {prop_time} with {step} step");
+        info!("Mapping covariance for {prop_time} until {end_epoch} with {step} step");
 
         loop {
-            let mut epoch = self.prop.state.epoch();
-            if epoch + self.prop.details.step > end_epoch {
-                self.prop.until_epoch(end_epoch).context(ODPropSnafu)?;
-            } else {
-                self.prop.for_duration(step).context(ODPropSnafu)?;
-            }
-
-            // Perform time update
-
+            let nominal_state = self.prop.for_duration(step).context(ODPropSnafu)?;
             // Extract the state and update the STM in the filter.
-            let nominal_state = self.prop.state;
             // Get the datetime and info needed to compute the theoretical measurement according to the model
-            epoch = nominal_state.epoch();
+            let epoch = nominal_state.epoch();
             // No measurement can be used here, let's just do a time update
             debug!("time update {epoch}");
             match self.kf.time_update(nominal_state) {
@@ -736,7 +737,7 @@ where
                 Err(e) => return Err(e),
             }
             self.prop.state.reset_stm();
-            if epoch == end_epoch {
+            if epoch >= end_epoch {
                 break;
             }
         }
@@ -744,7 +745,7 @@ where
         Ok(())
     }
 
-    /// Continuously predicts the trajectory for the provided duration, with covariance mapping at each step. In other words, this performs a time update.
+    /// Perform a time update. Continuously predicts the trajectory for the provided duration, with covariance mapping at each step. In other words, this performs a time update.
     pub fn predict_for(&mut self, step: Duration, duration: Duration) -> Result<(), ODError> {
         let end_epoch = self.kf.previous_estimate().epoch() + duration;
         self.predict_until(step, end_epoch)
