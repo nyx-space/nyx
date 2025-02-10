@@ -23,7 +23,7 @@ use indexmap::{IndexMap, IndexSet};
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::ops::Bound::{Excluded, Included, Unbounded};
-use std::ops::{Add, RangeBounds};
+use std::ops::{Add, AddAssign, RangeBounds};
 
 mod io_ccsds_tdm;
 mod io_parquet;
@@ -219,6 +219,22 @@ impl TrackingDataArc {
         self
     }
 
+    /// Returns a new tracking arc that contains measurements from all trackers except the one provided
+    pub fn exclude_tracker(mut self, excluded_tracker: String) -> Self {
+        self.measurements = self
+            .measurements
+            .iter()
+            .filter_map(|(epoch, msr)| {
+                if msr.tracker != excluded_tracker {
+                    Some((*epoch, msr.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect::<BTreeMap<Epoch, Measurement>>();
+        self
+    }
+
     /// Downsamples the tracking data to a lower frequency using a simple moving average low-pass filter followed by decimation,
     /// returning new `TrackingDataArc` with downsampled measurements.
     ///
@@ -355,5 +371,11 @@ impl Add for TrackingDataArc {
         }
 
         self
+    }
+}
+
+impl AddAssign for TrackingDataArc {
+    fn add_assign(&mut self, rhs: Self) {
+        *self = self.clone() + rhs;
     }
 }

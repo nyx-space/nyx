@@ -326,7 +326,7 @@ where
                 let pred_est = self.time_update(nominal_state)?;
                 return Ok((
                     pred_est,
-                    Residual::rejected(epoch, prefit, ratio, r_k_chol.diagonal()),
+                    Residual::rejected(epoch, prefit, ratio, s_k.diagonal()),
                 ));
             }
         }

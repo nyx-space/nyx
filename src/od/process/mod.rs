@@ -630,7 +630,8 @@ where
                                             // StdEkfTrigger needs to store the time of the previous measurement).
 
                                             if let Some(trigger) = &mut self.ekf_trigger {
-                                                if trigger.enable_ekf(&estimate)
+                                                if !msr_rejected
+                                                    && trigger.enable_ekf(&estimate)
                                                     && !self.kf.is_extended()
                                                 {
                                                     self.kf.set_extended(true);
