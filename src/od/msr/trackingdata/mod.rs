@@ -22,7 +22,7 @@ use hifitime::Unit;
 use indexmap::{IndexMap, IndexSet};
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
-use std::ops::Bound::{Excluded, Included, Unbounded};
+use std::ops::Bound::{self, Excluded, Included, Unbounded};
 use std::ops::{Add, AddAssign, RangeBounds};
 
 mod io_ccsds_tdm;
@@ -221,6 +221,8 @@ impl TrackingDataArc {
 
     /// Returns a new tracking arc that contains measurements from all trackers except the one provided
     pub fn exclude_tracker(mut self, excluded_tracker: String) -> Self {
+        info!("Excluding tracker {excluded_tracker}");
+
         self.measurements = self
             .measurements
             .iter()
@@ -232,6 +234,34 @@ impl TrackingDataArc {
                 }
             })
             .collect::<BTreeMap<Epoch, Measurement>>();
+        self
+    }
+
+    /// Returns a new tracking arc that excludes measurements within the given epoch range.
+    pub fn exclude_by_epoch<R: RangeBounds<Epoch>>(mut self, bound: R) -> Self {
+        info!(
+            "Excluding measurements from {:?} to {:?}",
+            bound.start_bound(),
+            bound.end_bound()
+        );
+
+        let mut new_measurements = BTreeMap::new();
+
+        // Include entries before the excluded range
+        new_measurements.extend(
+            self.measurements
+                .range((Bound::Unbounded, bound.start_bound()))
+                .map(|(epoch, msr)| (*epoch, msr.clone())),
+        );
+
+        // Include entries after the excluded range
+        new_measurements.extend(
+            self.measurements
+                .range((bound.end_bound(), Bound::Unbounded))
+                .map(|(epoch, msr)| (*epoch, msr.clone())),
+        );
+
+        self.measurements = new_measurements;
         self
     }
 
