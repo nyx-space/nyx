@@ -610,6 +610,7 @@ where
 
                                     if real_obs.norm() == 0.0 {
                                         // Prevent bug in data type selection of ground station.
+                                        // https://github.com/nyx-space/nyx/issues/410
                                         continue;
                                     }
 
