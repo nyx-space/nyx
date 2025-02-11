@@ -131,6 +131,8 @@ fn tracking_data(
 fn continuous_tracking_cov_test(tracking_data: TrackingDataArc) {
     let arc = tracking_data;
 
+    let _ = pretty_env_logger::try_init();
+
     // And serialize to disk
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),

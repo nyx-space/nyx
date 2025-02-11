@@ -158,7 +158,7 @@ impl TrackingDataArc {
         self.measurements.is_empty()
     }
 
-    /// Returns the minimum duration between two subsequent measurements, flooring at 10 seconds.
+    /// Returns the minimum duration between two subsequent measurements, flooring at 0.1 seconds.
     pub fn min_duration_sep(&self) -> Option<Duration> {
         if self.is_empty() {
             None
@@ -170,7 +170,7 @@ impl TrackingDataArc {
                 min_sep = min_sep.min(this_sep);
                 prev_epoch = *epoch;
             }
-            Some(min_sep.max(Unit::Second * 10))
+            Some(min_sep.max(Unit::Second * 0.1))
         }
     }
 
