@@ -568,7 +568,7 @@ where
                                         ensure!(
                                             val.is_finite(),
                                             InvalidMeasurementSnafu {
-                                                epoch: next_msr_epoch,
+                                                epoch: *epoch_ref,
                                                 val
                                             }
                                         );
@@ -592,7 +592,8 @@ where
                                             epoch,
                                         )?;
 
-                                    let mut real_obs = msr.observation(&cur_msr_types);
+                                    let mut real_obs: OVector<f64, MsrSize> =
+                                        msr.observation(&cur_msr_types);
 
                                     if let Some(moduli) = &arc.moduli {
                                         let mut obs_ambiguity = OVector::<f64, MsrSize>::zeros();
@@ -605,6 +606,11 @@ where
                                             }
                                         }
                                         real_obs += obs_ambiguity;
+                                    }
+
+                                    if real_obs.norm() == 0.0 {
+                                        // Prevent bug in data type selection of ground station.
+                                        continue;
                                     }
 
                                     match self.kf.measurement_update(
@@ -762,14 +768,17 @@ where
                 msg: "No navigation trajectory to generate: run the OD process first".to_string(),
             })
         } else {
-            Ok(Traj {
+            // Make sure to remove duplicate entries.
+            let mut traj = Traj {
                 states: self
                     .estimates
                     .iter()
                     .map(|est| est.nominal_state())
                     .collect(),
                 name: None,
-            })
+            };
+            traj.finalize();
+            Ok(traj)
         }
     }
 }

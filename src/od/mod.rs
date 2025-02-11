@@ -121,8 +121,8 @@ pub enum ODError {
     NoiseNotConfigured { kind: String },
     #[snafu(display("measurement sim error: {details}"))]
     MeasurementSimError { details: String },
-    #[snafu(display("during an OD encountered {source}"))]
-    ODTrajError { source: TrajError },
+    #[snafu(display("during an OD encountered {source}: {details}"))]
+    ODTrajError { source: TrajError, details: String },
     #[snafu(display("OD failed because {source}"))]
     ODConfigError { source: ConfigError },
     #[snafu(display("OD failed because of an I/O error: {source}"))]

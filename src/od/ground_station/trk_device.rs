@@ -50,12 +50,20 @@ impl TrackingDevice<Spacecraft> for GroundStation {
             Some(integration_time) => {
                 // TODO: This should support measurement alignment
                 // If out of traj bounds, return None, else the whole strand is rejected.
-                let rx_0 = match traj.at(epoch - integration_time * 0.5) {
+                let rx_0 = match traj.at(epoch - integration_time).context(ODTrajSnafu {
+                    details: format!(
+                        "fetching state {epoch} at start of ground station integration time {integration_time}"
+                    ),
+                }) {
                     Ok(rx) => rx,
                     Err(_) => return Ok(None),
                 };
 
-                let rx_1 = match traj.at(epoch + integration_time * 0.5).context(ODTrajSnafu) {
+                let rx_1 = match traj.at(epoch).context(ODTrajSnafu {
+                    details: format!(
+                        "fetching state {epoch} at end of ground station integration time"
+                    ),
+                }) {
                     Ok(rx) => rx,
                     Err(_) => return Ok(None),
                 };
@@ -107,7 +115,13 @@ impl TrackingDevice<Spacecraft> for GroundStation {
 
                 Ok(Some(msr))
             }
-            None => self.measure_instantaneous(traj.at(epoch).context(ODTrajSnafu)?, rng, almanac),
+            None => self.measure_instantaneous(
+                traj.at(epoch).context(ODTrajSnafu {
+                    details: "fetching state for instantaneous measurement".to_string(),
+                })?,
+                rng,
+                almanac,
+            ),
         }
     }
 
