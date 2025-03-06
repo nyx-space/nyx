@@ -238,6 +238,7 @@ where
             measurements,
             source: None,
             moduli: None,
+            force_reject: false,
         };
 
         Ok(trk_data)

@@ -24,8 +24,5 @@ A clear and concise description of what you expected to happen.
 ## Code to reproduce the issue
 If possible, provide a short snippet of code that reproduces the bug.
 
-## Platform
-Describe the platform you encountered the bug on, e.g. desktop running Linux and calling Nyx from Python.
-
 ## Additional context
 Add any other context about the problem here.

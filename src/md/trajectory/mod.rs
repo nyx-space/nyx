@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use anise::math::interpolation::InterpolationError;
+use anise::math::{cartesian::CartesianState, interpolation::InterpolationError};
 use snafu::prelude::*;
 
 mod interpolatable;
@@ -53,4 +53,54 @@ pub enum TrajError {
     },
     #[snafu(display("Interpolation failed: {source}"))]
     Interpolation { source: InterpolationError },
+}
+
+/// Smooth the RIC differences using an in-line median filter.
+/// This avoids allocations and operates directly on the Cartesian components.
+fn smooth_state_diff_in_place(ric_diff: &mut [CartesianState], window_size: usize) {
+    assert!(
+        window_size % 2 == 1,
+        "Window size must be odd for proper median calculation"
+    );
+    let half_window = window_size / 2;
+
+    // Temporary buffer to store sorted values for median calculation
+    let mut temp_buffer = vec![0.0; window_size];
+
+    // Iterate over each state in the array
+    for i in 0..ric_diff.len() {
+        let start = i.saturating_sub(half_window);
+        let end = (i + half_window + 1).min(ric_diff.len());
+
+        // Smooth each component independently
+        for component in 0..6 {
+            // Fill the temporary buffer with values from the current window
+            for (j, idx) in (start..end).enumerate() {
+                temp_buffer[j] = match component {
+                    0 => ric_diff[idx].radius_km.x,
+                    1 => ric_diff[idx].radius_km.y,
+                    2 => ric_diff[idx].radius_km.z,
+                    3 => ric_diff[idx].velocity_km_s.x,
+                    4 => ric_diff[idx].velocity_km_s.y,
+                    5 => ric_diff[idx].velocity_km_s.z,
+                    _ => unreachable!(),
+                };
+            }
+
+            // Sort the buffer to find the median
+            temp_buffer[..end - start].sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
+
+            // Replace the current value with the median
+            let median = temp_buffer[(end - start) / 2];
+            match component {
+                0 => ric_diff[i].radius_km.x = median,
+                1 => ric_diff[i].radius_km.y = median,
+                2 => ric_diff[i].radius_km.z = median,
+                3 => ric_diff[i].velocity_km_s.x = median,
+                4 => ric_diff[i].velocity_km_s.y = median,
+                5 => ric_diff[i].velocity_km_s.z = median,
+                _ => unreachable!(),
+            }
+        }
+    }
 }

@@ -215,6 +215,7 @@ impl TrackingDataArc {
             measurements,
             moduli: None,
             source: Some(path.as_ref().to_path_buf().display().to_string()),
+            force_reject: false,
         })
     }
     /// Store this tracking arc to a parquet file.

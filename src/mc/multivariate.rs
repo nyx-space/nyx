@@ -28,6 +28,7 @@ use rand_distr::{Distribution, Normal};
 use snafu::ResultExt;
 
 /// A multivariate spacecraft state generator for Monte Carlo analyses. Ensures that the covariance is properly applied on all provided state variables.
+#[derive(Clone, Debug)]
 pub struct MvnSpacecraft {
     /// The template state
     pub template: Spacecraft,
@@ -120,7 +121,6 @@ impl MvnSpacecraft {
             let orbit_cov = &jac_inv * &covar * jac_inv.transpose();
             // Rotate the means into the Cartesian space
             let cartesian_mean = jac_inv * means;
-
             for ii in 0..6 {
                 for jj in 0..6 {
                     cov[(ii, jj)] = orbit_cov[(ii, jj)];
@@ -151,8 +151,7 @@ impl MvnSpacecraft {
         }
 
         // At this point, the cov matrix is a 9x9 with all dispersions transformed into the Cartesian state space.
-
-        let svd = cov.svd(false, true);
+        let svd = cov.svd_unordered(false, true);
         if svd.v_t.is_none() {
             return Err(Box::new(NyxError::CovarianceMatrixNotPsd));
         }
@@ -203,7 +202,7 @@ impl MvnSpacecraft {
             }
         };
 
-        let svd = cov.svd(false, true);
+        let svd = cov.svd_unordered(false, true);
         if svd.v_t.is_none() {
             return Err(Box::new(NyxError::CovarianceMatrixNotPsd));
         }

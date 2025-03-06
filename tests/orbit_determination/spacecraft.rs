@@ -307,7 +307,6 @@ fn od_val_sc_srp_estimation_cov_test(
     // Using a GTO because Cr estimation will be more obvious.
     let initial_orbit = Orbit::keplerian(24505.9, 0.725, 7.05, 0.0, 0.0, 0.0, epoch, eme2k);
 
-    // let initial_orbit = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, epoch, eme2k);
     let prop_time = initial_orbit.period().unwrap() * 5;
 
     let dry_mass_kg = 100.0; // in kg
@@ -395,22 +394,19 @@ fn od_val_sc_srp_estimation_cov_test(
     let sc = SpacecraftUncertainty::builder()
         .nominal(sc_init_est)
         .frame(LocalFrame::RIC)
-        .x_km(1.0)
-        .y_km(1.0)
-        .z_km(1.0)
-        .vx_km_s(0.5e-1)
-        .vy_km_s(0.5e-1)
-        .vz_km_s(0.5e-1)
+        .x_km(0.1)
+        .y_km(0.1)
+        .z_km(0.1)
+        .vx_km_s(0.1e-3)
+        .vy_km_s(0.1e-3)
+        .vz_km_s(0.1e-3)
         .coeff_reflectivity(0.2)
         .build();
 
     // Define the initial orbit estimate
     let initial_estimate = sc.to_estimate().unwrap();
 
-    let ckf = KF::new(
-        initial_estimate,
-        SNC3::from_diagonal(2 * Unit::Minute, &[1e-15, 1e-15, 1e-15]),
-    );
+    let ckf = KF::no_snc(initial_estimate);
 
     let mut odp = SpacecraftODProcess::ekf(
         prop_est,
@@ -435,7 +431,7 @@ fn od_val_sc_srp_estimation_cov_test(
     let truth = traj.at(est.epoch()).unwrap();
 
     println!(
-        "FINAL:\n\t{est}\n{:x}\nCr = {} +/-{}\nEXP:\t{:x}",
+        "FINAL:\n\t{est}\nGOT:{:x}\nGOT: Cr = {:.6} +/-{:.6}\nEXP: Cr = {truth_cr:.6}\nEXP:{:x}",
         est.state().orbit,
         est.state().srp.coeff_reflectivity,
         est.covar()[(6, 6)].sqrt(),

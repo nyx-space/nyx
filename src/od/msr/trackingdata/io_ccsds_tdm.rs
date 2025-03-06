@@ -223,6 +223,7 @@ impl TrackingDataArc {
         freq_types.insert(MeasurementType::ReceiveFrequency);
         freq_types.insert(MeasurementType::TransmitFrequency);
         let mut latest_transmit_freq = None;
+        let mut malformed_warning = 0;
         for (epoch, measurement) in measurements.iter_mut() {
             if drop_freq_data {
                 for freq in &freq_types {
@@ -248,10 +249,13 @@ impl TrackingDataArc {
                 // if the receive frequency and the transmit frequency was previously set.
                 if latest_transmit_freq.is_some() && avail[0] {
                     use_prev_transmit_freq = true;
-                    warn!(
-                        "no transmit frequency at {epoch}, using previous value of {} Hz",
-                        latest_transmit_freq.unwrap()
-                    );
+                    if malformed_warning == 0 {
+                        warn!(
+                            "no transmit frequency at {epoch}, using previous value of {} Hz",
+                            latest_transmit_freq.unwrap()
+                        );
+                    }
+                    malformed_warning += 1;
                 } else {
                     warn!("only one of receive or transmit frequencies found at {epoch}, ignoring");
                     for freq in &freq_types {
@@ -294,12 +298,21 @@ impl TrackingDataArc {
                 .insert(MeasurementType::Doppler, rho_dot_km_s);
         }
 
+        if malformed_warning > 1 {
+            warn!("missing transmit frequency warning occured {malformed_warning} times",);
+        }
+
         let moduli = if let Some(range_modulus) = metadata.get("RANGE_MODULUS") {
             if let Ok(value) = range_modulus.parse::<f64>() {
-                let mut modulos = IndexMap::new();
-                modulos.insert(MeasurementType::Range, value);
-                // Only range modulus exists in TDM files.
-                Some(modulos)
+                if value > 0.0 {
+                    let mut modulos = IndexMap::new();
+                    modulos.insert(MeasurementType::Range, value);
+                    // Only range modulus exists in TDM files.
+                    Some(modulos)
+                } else {
+                    // Do not apply a modulus of zero.
+                    None
+                }
             } else {
                 warn!("could not parse RANGE_MODULUS of `{range_modulus}` as a double");
                 None
@@ -312,6 +325,7 @@ impl TrackingDataArc {
             measurements,
             source: Some(source),
             moduli,
+            force_reject: false,
         };
 
         if trk.unique_types().is_empty() {

@@ -289,7 +289,11 @@ where
         for field in fields {
             let mut data = Float64Builder::new();
             for s in &estimates {
-                data.append_value(s.state().value(field).unwrap());
+                data.append_value(
+                    s.state()
+                        .value(field)
+                        .context(ODStateSnafu { action: "export" })?,
+                );
             }
             record.push(Arc::new(data.finish()));
         }
