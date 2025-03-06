@@ -201,7 +201,7 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
     let prop_est = setup.with(initial_state_dev.with_stm(), almanac.clone());
 
     // Define the process noise to assume an unmodeled acceleration on X, Y and Z in the ECI frame
-    let sigma_q = 5e-3_f64.powi(2);
+    let sigma_q = 5e-8_f64.powi(2);
     let process_noise = SNC3::from_diagonal(2.minutes(), &[sigma_q, sigma_q, sigma_q]);
 
     let kf = KF::new(initial_estimate, process_noise);
@@ -239,8 +239,6 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
         .flatten()
         .filter(|residual| residual.rejected)
         .count();
-
-    assert!(dbg!(num_rejections) < 30, "oddly high rejections");
 
     // Check that the final post-fit residual isn't too bad, and definitely much better than the prefit.
     let est = &odp.estimates.last().unwrap();
@@ -281,6 +279,7 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
     assert!(!final_resid.rejected, "final residual should be accepted");
     assert!(final_resid.prefit.norm() > final_resid.postfit.norm());
     assert!(final_resid.postfit.norm() < 1e-2);
+    assert!(dbg!(num_rejections) < 30, "oddly high rejections");
 }
 
 #[rstest]

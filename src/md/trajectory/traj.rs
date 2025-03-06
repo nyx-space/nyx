@@ -25,6 +25,7 @@ use crate::io::InputOutputError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 use crate::md::prelude::{GuidanceMode, StateParameter};
+use crate::md::trajectory::smooth_state_diff_in_place;
 use crate::md::EventEvaluator;
 use crate::time::{Duration, Epoch, TimeSeries, TimeUnits};
 use anise::almanac::Almanac;
@@ -471,6 +472,8 @@ where
 
             ric_diff.push(this_ric_diff);
         }
+
+        smooth_state_diff_in_place(&mut ric_diff, if other_states.len() > 5 { 5 } else { 1 });
 
         // Build all of the records
 
