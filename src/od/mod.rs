@@ -108,6 +108,8 @@ pub enum ODError {
     Diverged { loops: usize },
     #[snafu(display("STM is singular"))]
     SingularStateTransitionMatrix,
+    #[snafu(display("matrix inversion error"))]
+    MatrixInversion,
     #[snafu(display("invalid measurement @ {epoch} = {val}"))]
     InvalidMeasurement { epoch: Epoch, val: f64 },
     #[snafu(display("sensitivity matrix must be updated before this call"))]

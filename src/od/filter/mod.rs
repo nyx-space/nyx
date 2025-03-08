@@ -26,9 +26,14 @@ pub use crate::dynamics::Dynamics;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
 pub use crate::{State, TimeTagged};
-pub mod kalman;
 
-/// Defines a Filter trait where S is the size of the estimated state, A the number of acceleration components of the EOMs (used for process noise matrix size), M the size of the measurements.
+pub mod kalman;
+pub mod lsq;
+
+/// Defines a Filter trait where
+/// - S is the size of the estimated state,
+/// - A the number of acceleration components of the EOMs (used for process noise matrix size),
+/// - M the size of the measurements.
 pub trait Filter<T, A, M>
 where
     A: DimName,

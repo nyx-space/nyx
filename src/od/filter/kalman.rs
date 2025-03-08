@@ -190,15 +190,14 @@ where
         self.prev_estimate = *est;
     }
 
-    /// Update the sensitivity matrix (or "H tilde"). This function **must** be called prior to each
-    /// call to `measurement_update`.
+    /// Update the sensitivity matrix (or "H tilde").
+    /// This function **must** be called prior to each call to `measurement_update`.
     fn update_h_tilde(&mut self, h_tilde: OMatrix<f64, M, <T as State>::Size>) {
         self.h_tilde = h_tilde;
         self.h_tilde_updated = true;
     }
 
     /// Computes a time update/prediction (i.e. advances the filter estimate with the updated STM).
-    ///
     /// May return a FilterError if the STM was not updated.
     fn time_update(&mut self, nominal_state: T) -> Result<Self::Estimate, ODError> {
         let stm = nominal_state.stm().context(ODDynamicsSnafu)?;
