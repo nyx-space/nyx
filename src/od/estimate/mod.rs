@@ -29,6 +29,8 @@ pub mod residual;
 pub use residual::Residual;
 pub mod kfestimate;
 pub use kfestimate::KfEstimate;
+mod lsq_estimate;
+pub use lsq_estimate::LsqEstimate;
 mod sc_uncertainty;
 pub use sc_uncertainty::SpacecraftUncertainty;
 
