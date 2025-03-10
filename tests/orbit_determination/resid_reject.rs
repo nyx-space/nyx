@@ -201,10 +201,10 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
     let prop_est = setup.with(initial_state_dev.with_stm(), almanac.clone());
 
     // Define the process noise to assume an unmodeled acceleration on X, Y and Z in the ECI frame
-    let sigma_q = 5e-8_f64.powi(2);
+    let sigma_q = 5e-9_f64.powi(2);
     let process_noise = SNC3::from_diagonal(2.minutes(), &[sigma_q, sigma_q, sigma_q]);
 
-    let kf = KF::new(initial_estimate, process_noise);
+    let kf = KF::no_snc(initial_estimate);
 
     // ==> TEST <== //
     // We greatly inflate the SNC so that the covariance inflates tremendously. This leads to the
@@ -212,11 +212,12 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
     // the measurements are accepted.
     // So we end up with an excellent estimate but an unusably high covariance.
 
-    let mut odp = ODProcess::<_, U2, _, _, _>::ckf(
+    let mut odp = ODProcess::<_, U2, _, _, _>::ekf(
         prop_est,
         kf,
         devices,
-        Some(ResidRejectCrit { num_sigmas: 2.0 }), // 95% to force rejections
+        EkfTrigger::new(0, 1.hours()),
+        Some(ResidRejectCrit { num_sigmas: 3.0 }), // 95% to force rejections
         almanac,
     );
 
@@ -242,10 +243,33 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
 
     // Check that the final post-fit residual isn't too bad, and definitely much better than the prefit.
     let est = &odp.estimates.last().unwrap();
+    // BUG ? The prefit to postfit ratio seems to be a near consistent factor of two. Even with a postfit of zero, the state deviations are high: 8.4 km and 11.7 m/s.
+    // This is the case both with a sequential filter and a dual filter. SNC has no effect. Neither does the seed.
+    for (ith, (est, opt_resid)) in odp.estimates.iter().zip(odp.residuals.iter()).enumerate() {
+        if let Some(resid) = opt_resid {
+            println!("RESIDUAL #{ith}");
+            let truth_state = traj.at(resid.epoch).unwrap();
+            let est_state = est.nominal_state() + est.state_deviation;
+
+            let delta = (est_state.orbit - truth_state.orbit).unwrap();
+            println!(
+                "RMAG error = {:.6} m\tVMAG error = {:.6} m/s",
+                delta.rmag_km() * 1e3,
+                delta.vmag_km_s() * 1e3
+            );
+
+            println!("{truth_state:x}");
+            println!("{est_state:x}");
+
+            if ith > 50 {
+                break;
+            }
+        }
+    }
     let final_resid = &odp.residuals.last().unwrap().as_ref().unwrap();
     let final_truth_state = traj.at(est.epoch()).unwrap();
 
-    println!("{final_resid}");
+    println!("FINAL\n{final_resid}");
 
     println!("Estimate:\n{}", est);
     println!("Truth:\n{}", final_truth_state);

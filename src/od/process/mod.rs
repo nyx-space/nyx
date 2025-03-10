@@ -37,8 +37,10 @@ mod rejectcrit;
 use self::msr::TrackingDataArc;
 pub use self::rejectcrit::ResidRejectCrit;
 use std::collections::BTreeMap;
+use std::iter::Zip;
 use std::marker::PhantomData;
 use std::ops::Add;
+use std::slice::Iter;
 mod export;
 
 /// Sets up an orbit determination process (ODP).
@@ -649,8 +651,7 @@ where
                                                     }
                                                 }
                                                 if self.kf.is_extended() {
-                                                    self.prop.state = self.prop.state
-                                                        + estimate.state_deviation();
+                                                    self.prop.state = estimate.state();
                                                 }
                                             }
 
@@ -771,16 +772,17 @@ where
         } else {
             // Make sure to remove duplicate entries.
             let mut traj = Traj {
-                states: self
-                    .estimates
-                    .iter()
-                    .map(|est| est.nominal_state())
-                    .collect(),
+                states: self.estimates.iter().map(|est| est.state()).collect(),
                 name: None,
             };
             traj.finalize();
             Ok(traj)
         }
+    }
+
+    /// Returns a zipper iterator on the estimates and the associated residuals.
+    pub fn results(&self) -> Zip<Iter<'_, K::Estimate>, Iter<'_, Option<Residual<MsrSize>>>> {
+        self.estimates.iter().zip(self.residuals.iter())
     }
 }
 
