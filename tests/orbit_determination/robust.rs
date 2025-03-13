@@ -249,9 +249,9 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
 
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
     // Define the ground stations.
-    let ekf_num_meas = 0;
+    let ekf_num_meas = 100;
     // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 3 * Unit::Day;
+    let ekf_disable_time = 3 * Unit::Minute;
     let elevation_mask = 0.0;
 
     // Define the propagator information.
@@ -286,7 +286,6 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
         (dss34_canberra.name.clone(), TrkConfig::default()),
     ]);
 
-    // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     let mut devices = BTreeMap::new();
     devices.insert("Madrid".to_string(), dss65_madrid);
@@ -359,12 +358,11 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
     let sigma_q = 5e-16_f64.powi(2);
     let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
 
-    // let kf = KF::new(initial_estimate, process_noise);
-    let kf = KF::no_snc(initial_estimate);
+    let kf = KF::new(initial_estimate, process_noise);
 
     let trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
 
-    let mut odp = SpacecraftODProcessSeq::ekf(prop_est, kf, devices, trig, None, almanac);
+    let mut odp = SpacecraftODProcess::ekf(prop_est, kf, devices, trig, None, almanac);
 
     // Check that exporting an empty set returns an error.
     assert!(odp
@@ -412,7 +410,7 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
         .to_parquet(
             &arc,
             path.with_file_name("robustness_test_two_way.parquet"),
-            ExportCfg::timestamped(),
+            ExportCfg::default(),
         )
         .unwrap();
 
