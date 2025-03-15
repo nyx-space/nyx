@@ -616,8 +616,6 @@ where
                                         continue;
                                     }
 
-                                    dbg!(&cur_msr_types);
-
                                     match self.kf.measurement_update(
                                         nominal_state,
                                         &real_obs,
