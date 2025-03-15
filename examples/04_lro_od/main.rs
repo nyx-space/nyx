@@ -20,7 +20,7 @@ use nyx::{
     md::prelude::{HarmonicsMem, Traj},
     od::{
         prelude::{TrackingArcSim, TrkConfig, KF},
-        process::{Estimate, NavSolution, ResidRejectCrit, SpacecraftUncertainty},
+        process::{EkfTrigger, Estimate, NavSolution, ResidRejectCrit, SpacecraftUncertainty},
         snc::SNC3,
         GroundStation, SpacecraftODProcess,
     },
@@ -251,14 +251,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Increase the initial covariance to account for larger deviation.
         initial_estimate,
         // Until https://github.com/nyx-space/nyx/issues/351, we need to specify the SNC in the acceleration of the Moon J2000 frame.
-        SNC3::from_diagonal(10 * Unit::Minute, &[1e-12, 1e-12, 1e-12]),
+        SNC3::from_diagonal(10 * Unit::Minute, &[5e-13, 5e-13, 5e-13]),
     );
 
     // We'll set up the OD process to reject measurements whose residuals are move than 3 sigmas away from what we expect.
-    let mut odp = SpacecraftODProcess::ckf(
+    let mut odp = SpacecraftODProcess::ekf(
         setup.with(initial_estimate.state().with_stm(), almanac.clone()),
         kf,
         devices,
+        EkfTrigger::new(0, Unit::Hour * 1),
         Some(ResidRejectCrit::default()),
         almanac.clone(),
     );

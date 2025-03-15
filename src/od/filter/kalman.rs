@@ -283,18 +283,21 @@ where
             return Err(ODError::SensitivityNotUpdated);
         }
 
-        let stm = nominal_state.stm().context(ODDynamicsSnafu)?;
-
         let epoch = nominal_state.epoch();
 
+        // Grab the state transition matrix.
+        let stm = nominal_state.stm().context(ODDynamicsSnafu)?;
+
+        // Propagate the covariance.
         let covar_bar = stm * self.prev_estimate.covar * stm.transpose();
 
-        let h_tilde_t = &self.h_tilde.transpose();
-        let h_p_ht = &self.h_tilde * covar_bar * h_tilde_t;
+        // Project the propagated covariance into the measurement space.
+        let h_p_ht = &self.h_tilde * covar_bar * &self.h_tilde.transpose();
 
+        // Compute the innovation matrix (S_k).
         let s_k = &h_p_ht + &r_k;
 
-        // Compute observation deviation (usually marked as y_i)
+        // Compute observation deviation/error (usually marked as y_i)
         let prefit = real_obs - computed_obs;
 
         // Compute the prefit ratio for the automatic rejection.
@@ -331,20 +334,18 @@ where
             }
         }
 
-        // Compute the innovation matrix (S_k) but using the previously computed s_k.
-        // This differs from the typical Kalman definition, but it allows constant inflating of the covariance.
-        // In turn, this allows the filter to not be overly optimistic. In verification tests, using the nominal
-        // Kalman formulation shows an error roughly 7 times larger with a smaller than expected covariance, despite
-        // no difference in the truth and sim.
-        let mut innovation_covar = h_p_ht + &s_k;
-        if !innovation_covar.try_inverse_mut() {
-            return Err(ODError::SingularKalmanGain);
-        }
+        // Invert the innovation covariance.
+        let s_k_inv = match s_k.try_inverse() {
+            Some(s_k_inv) => s_k_inv,
+            None => return Err(ODError::SingularKalmanGain),
+        };
 
-        let gain = covar_bar * h_tilde_t * &innovation_covar;
+        let gain = covar_bar * &self.h_tilde.transpose() * &s_k_inv;
 
         // Compute the state estimate
         let (state_hat, res) = if self.ekf {
+            // In EKF, the state hat is actually the state deviation. We trust the gain to be correct,
+            // so we just apply it directly to the prefit residual.
             let state_hat = &gain * &prefit;
             let postfit = &prefit - (&self.h_tilde * state_hat);
             (
@@ -352,7 +353,7 @@ where
                 Residual::accepted(epoch, prefit, postfit, ratio, r_k_chol.diagonal()),
             )
         } else {
-            // Must do a time update first
+            // Time update
             let state_bar = stm * self.prev_estimate.state_deviation;
             let postfit = &prefit - (&self.h_tilde * state_bar);
             (
@@ -365,7 +366,7 @@ where
         let first_term = OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity()
             - &gain * &self.h_tilde;
         let covar =
-            first_term * covar_bar * first_term.transpose() + &gain * &s_k * &gain.transpose();
+            first_term * covar_bar * first_term.transpose() + &gain * &r_k * &gain.transpose();
 
         // And wrap up
         let estimate = KfEstimate {
