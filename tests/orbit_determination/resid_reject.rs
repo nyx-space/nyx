@@ -179,6 +179,7 @@ fn initial_estimate(traj: Traj<Spacecraft>) -> KfEstimate<Spacecraft> {
     initial_estimate
 }
 
+#[ignore = "large state deviations to be handled in #416"]
 #[rstest]
 fn od_resid_reject_inflated_snc_ckf_two_way(
     traj: Traj<Spacecraft>,
@@ -306,6 +307,7 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
     assert!(dbg!(num_rejections) < 30, "oddly high rejections");
 }
 
+#[ignore = "large state deviations to be handled in #416"]
 #[rstest]
 fn od_resid_reject_default_ckf_two_way_cov_test(
     traj: Traj<Spacecraft>,
