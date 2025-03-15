@@ -109,7 +109,7 @@ def main(path: str, wstats: bool):
         ).show()
 
         # Plot the residual ratios and whether they were accepted.
-        px.scatter(df, x="Epoch (UTC)", y="Residual ratio", color="Residual Rejected").show()
+        px.scatter(df, x="Epoch (UTC)", y="Residual ratio", color="Tracker").show()
 
 
 if __name__ == "__main__":

@@ -251,7 +251,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Increase the initial covariance to account for larger deviation.
         initial_estimate,
         // Until https://github.com/nyx-space/nyx/issues/351, we need to specify the SNC in the acceleration of the Moon J2000 frame.
-        SNC3::from_diagonal(10 * Unit::Minute, &[1e-12, 1e-12, 1e-12]),
+        SNC3::from_diagonal(10 * Unit::Minute, &[5e-13, 5e-13, 5e-13]),
     );
 
     // We'll set up the OD process to reject measurements whose residuals are move than 3 sigmas away from what we expect.

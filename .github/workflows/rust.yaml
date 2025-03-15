@@ -94,7 +94,7 @@ jobs:
           cargo build --example 03_geo_sk --release
 
   coverage:
-    name: Unit test and integration test coverage analysis
+    name: Test coverage analysis
     runs-on: ubuntu-latest
 
     steps:
