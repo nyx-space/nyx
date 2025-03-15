@@ -81,7 +81,7 @@ def main(path: str, full: bool):
     ).show()
 
     # Plot the residual ratios and whether they were accepted.
-    px.scatter(df, x="Epoch (UTC)", y="Residual ratio", color="Residual Rejected").show()
+    px.scatter(df, x="Epoch (UTC)", y="Residual ratio", color="Tracker").show()
 
     df_resid_ok = df.filter(df["Residual Rejected"] == False)
 

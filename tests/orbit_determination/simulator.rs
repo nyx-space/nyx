@@ -131,6 +131,8 @@ fn tracking_data(
 fn continuous_tracking_cov_test(tracking_data: TrackingDataArc) {
     let arc = tracking_data;
 
+    let _ = pretty_env_logger::try_init();
+
     // And serialize to disk
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
@@ -229,7 +231,7 @@ fn od_with_modulus_cov_test(
 
     // Increase the noise on the OD process
     // Set a bias instead of assuming a modulus.
-    for (_, device) in &mut devices {
+    for device in devices.values_mut() {
         for (_, stochastics) in device.stochastic_noises.as_mut().unwrap().iter_mut() {
             *stochastics *= 2.0;
         }

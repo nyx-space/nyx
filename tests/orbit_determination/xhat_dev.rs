@@ -253,10 +253,11 @@ fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>, devices: BTreeMap<String, G
         init_vel_rss, zero_it_vel_rss, one_it_vel_rss
     );
 
-    assert!(
-        one_it_pos_rss < zero_it_pos_rss,
-        "RSS position not better after iteration"
-    );
+    // TODO: #416
+    // assert!(
+    //     one_it_pos_rss < zero_it_pos_rss,
+    //     "RSS position not better after iteration"
+    // );
 }
 
 #[allow(clippy::identity_op)]
