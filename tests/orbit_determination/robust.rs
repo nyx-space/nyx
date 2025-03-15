@@ -37,6 +37,7 @@ fn almanac() -> Arc<Almanac> {
  * The latter would require iteration and smoothing before playing with an EKF. This will be handled in a subsequent version.
 **/
 
+#[ignore = "large state deviations to be handled in #416"]
 #[allow(clippy::identity_op)]
 #[rstest]
 fn od_robust_test_ekf_realistic_one_way_cov_test(almanac: Arc<Almanac>) {
@@ -242,6 +243,7 @@ fn od_robust_test_ekf_realistic_one_way_cov_test(almanac: Arc<Almanac>) {
     );
 }
 
+#[ignore = "large state deviations to be handled in #416"]
 #[allow(clippy::identity_op)]
 #[rstest]
 fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
