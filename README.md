@@ -84,3 +84,7 @@ Major releases are for dramatic changes.
 > Chris Rabotin is a GNC and flight dynamics engineer with a heavy background in software.
 
 I currently work for Rocket Lab USA as the lead flight dynamics engineer on both Blue Ghost lunar lander missions. -- Find me on [LinkedIn](https://www.linkedin.com/in/chrisrabotin/).
+
+# External contributions
+
+Contributions are licensed under AGPLv3 and may also be relicensed under a commercial license by Nyx Space. Contributors retain ownership of their copyrights but grant Nyx Space broad rights as outlined in the [Contributor License Agreement (CLA)](./CONTRIBUTOR_AGREEMENT.md).

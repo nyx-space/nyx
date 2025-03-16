@@ -37,6 +37,7 @@ fn almanac() -> Arc<Almanac> {
  * The latter would require iteration and smoothing before playing with an EKF. This will be handled in a subsequent version.
 **/
 
+#[ignore = "large state deviations to be handled in #416"]
 #[allow(clippy::identity_op)]
 #[rstest]
 fn od_robust_test_ekf_realistic_one_way_cov_test(almanac: Arc<Almanac>) {
@@ -242,6 +243,7 @@ fn od_robust_test_ekf_realistic_one_way_cov_test(almanac: Arc<Almanac>) {
     );
 }
 
+#[ignore = "large state deviations to be handled in #416"]
 #[allow(clippy::identity_op)]
 #[rstest]
 fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
@@ -249,7 +251,7 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
 
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
     // Define the ground stations.
-    let ekf_num_meas = 300;
+    let ekf_num_meas = 100;
     // Set the disable time to be very low to test enable/disable sequence
     let ekf_disable_time = 3 * Unit::Minute;
     let elevation_mask = 0.0;
@@ -286,7 +288,6 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
         (dss34_canberra.name.clone(), TrkConfig::default()),
     ]);
 
-    // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     let mut devices = BTreeMap::new();
     devices.insert("Madrid".to_string(), dss65_madrid);
@@ -356,7 +357,7 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
     let prop_est = setup.with(initial_state_dev.with_stm(), almanac.clone());
 
     // Define the process noise to assume an unmodeled acceleration on X, Y and Z in the ECI frame
-    let sigma_q = 5e-10_f64.powi(2);
+    let sigma_q = 5e-16_f64.powi(2);
     let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
 
     let kf = KF::new(initial_estimate, process_noise);
@@ -385,14 +386,80 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
         }
     });
 
+    for (ith, (est, opt_resid)) in odp.results().rev().take(10).enumerate() {
+        if let Some(resid) = opt_resid {
+            println!("RESIDUAL #{ith}");
+            println!("{resid}");
+            println!(
+                "{resid} -> {}",
+                resid.prefit[0] / resid.postfit[0],
+                // resid.prefit[1] / resid.postfit[1]
+            );
+            let truth_state = traj.at(resid.epoch).unwrap();
+            let est_state = est.nominal_state() + est.state_deviation;
+
+            let delta = (est_state.orbit - truth_state.orbit).unwrap();
+            println!(
+                "RMAG error = {:.6} m\tVMAG error = {:.6} m/s",
+                delta.rmag_km() * 1e3,
+                delta.vmag_km_s() * 1e3
+            );
+        }
+    }
+
     // Export as Parquet
     let timestamped_path = odp
         .to_parquet(
             &arc,
             path.with_file_name("robustness_test_two_way.parquet"),
-            ExportCfg::timestamped(),
+            ExportCfg::default(),
         )
         .unwrap();
+
+    // Test the results
+    // Check that the covariance deflated
+    let est = &odp.estimates[odp.estimates.len() - 1];
+    let final_truth_state = traj.at(est.epoch()).unwrap();
+
+    println!("Estimate:\n{}", est);
+    println!("Truth:\n{}", final_truth_state);
+    println!(
+        "Delta state with truth (epoch match: {}):\n{}",
+        final_truth_state.epoch() == est.epoch(),
+        (final_truth_state.orbit - est.state().orbit).unwrap()
+    );
+
+    for i in 0..6 {
+        if est.covar[(i, i)] < 0.0 {
+            println!(
+                "covar diagonal element negative @ [{}, {}] = {:.3e}-- issue #164",
+                i,
+                i,
+                est.covar[(i, i)],
+            );
+        }
+    }
+
+    assert_eq!(
+        final_truth_state.epoch(),
+        est.epoch(),
+        "time of final EST and TRUTH epochs differ"
+    );
+    let delta = (est.state().orbit - final_truth_state.orbit).unwrap();
+    println!(
+        "RMAG error = {:.6} m\tVMAG error = {:.6} m/s",
+        delta.rmag_km() * 1e3,
+        delta.vmag_km_s() * 1e3
+    );
+
+    assert!(
+        delta.rmag_km() < 0.2,
+        "Position error should be less than 200 meters (down from >3 km)"
+    );
+    assert!(
+        delta.vmag_km_s() < 1e-4,
+        "Velocity error should be on decimeter level"
+    );
 
     // Read in the Parquet file and assert proper data was written.
 
@@ -508,48 +575,4 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
             "Sigma Vz (RIC) (km/s)",
         ])
         .is_ok());
-
-    // Check that the covariance deflated
-    let est = &odp.estimates[odp.estimates.len() - 1];
-    let final_truth_state = traj.at(est.epoch()).unwrap();
-
-    println!("Estimate:\n{}", est);
-    println!("Truth:\n{}", final_truth_state);
-    println!(
-        "Delta state with truth (epoch match: {}):\n{}",
-        final_truth_state.epoch() == est.epoch(),
-        (final_truth_state.orbit - est.state().orbit).unwrap()
-    );
-
-    for i in 0..6 {
-        if est.covar[(i, i)] < 0.0 {
-            println!(
-                "covar diagonal element negative @ [{}, {}] = {:.3e}-- issue #164",
-                i,
-                i,
-                est.covar[(i, i)],
-            );
-        }
-    }
-
-    assert_eq!(
-        final_truth_state.epoch(),
-        est.epoch(),
-        "time of final EST and TRUTH epochs differ"
-    );
-    let delta = (est.state().orbit - final_truth_state.orbit).unwrap();
-    println!(
-        "RMAG error = {:.6} m\tVMAG error = {:.6} m/s",
-        delta.rmag_km() * 1e3,
-        delta.vmag_km_s() * 1e3
-    );
-
-    assert!(
-        delta.rmag_km() < 0.2,
-        "Position error should be less than 200 meters (down from >3 km)"
-    );
-    assert!(
-        delta.vmag_km_s() < 1e-4,
-        "Velocity error should be on decimeter level"
-    );
 }

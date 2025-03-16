@@ -197,8 +197,8 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
     );
     // Now, let's check specific arbitrarily selected observations
     for truth in &traj1_val_data {
-        let now = cislunar1.epoch + truth.offset;
-        let state = traj1.at(now).unwrap();
+        let epoch = cislunar1.epoch + truth.offset;
+        let state = traj1.at(epoch).unwrap();
         // Will panic if the measurement is not visible
         let meas = dss65_madrid
             .measure(state.epoch(), &traj1, Some(&mut rng), almanac.clone())
@@ -206,10 +206,23 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
             .unwrap();
 
         let obs = meas.observation::<U2>(&msr_types);
+        println!("@{epoch}");
         println!(
-            "range difference {:e}\t range rate difference: {:e}",
-            (obs[0] - truth.range).abs(),
-            (obs[1] - truth.range_rate).abs()
+            "COMPUTED range = {:.3} km\trange-rate = {:.3} km/s",
+            obs[0], obs[1]
+        );
+        println!(
+            "EXPECTED range = {:.3} km\trange-rate = {:.3} km/s",
+            truth.range, truth.range_rate
+        );
+        println!(
+            "ERROR    range = {:.3} km\trange-rate = {:.3} km/s",
+            obs[0] - truth.range,
+            obs[1] - truth.range_rate
+        );
+        assert!(
+            (obs[1] - truth.range_rate).abs() < 1e-3,
+            "range rate error greater than 1 m/s"
         );
     }
 
@@ -253,8 +266,10 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
             .measure(state.epoch(), &traj2, Some(&mut rng), almanac.clone())
             .unwrap()
         {
+            if traj2_msr_cnt == 0 {
+                println!("{msr}");
+            }
             traj2_msr_cnt += 1;
-            println!("{msr}");
         }
     }
 
@@ -265,18 +280,31 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
     );
     // Now, let's check specific arbitrarily selected observations
     for truth in &traj2_val_data {
-        let now = cislunar2.epoch + truth.offset;
-        let state = traj2.at(now).unwrap();
+        let epoch = cislunar2.epoch + truth.offset;
+        let state = traj2.at(epoch).unwrap();
         // Will panic if the measurement is not visible
         let meas = dss65_madrid
             .measure(state.epoch(), &traj2, Some(&mut rng), almanac.clone())
             .unwrap()
             .unwrap();
         let obs = meas.observation::<U2>(&msr_types);
+
         println!(
-            "range difference {:e}\t range rate difference: {:e}",
-            (obs[0] - truth.range).abs(),
-            (obs[1] - truth.range_rate).abs()
+            "COMPUTED range = {:.3} km\trange-rate = {:.3} km/s",
+            obs[0], obs[1]
+        );
+        println!(
+            "EXPECTED range = {:.3} km\trange-rate = {:.3} km/s",
+            truth.range, truth.range_rate
+        );
+        println!(
+            "ERROR    range = {:.3} km\trange-rate = {:.3} km/s",
+            obs[0] - truth.range,
+            obs[1] - truth.range_rate
+        );
+        assert!(
+            (obs[1] - truth.range_rate).abs() < 1e-3,
+            "range rate error greater than 1 m/s"
         );
     }
 }
