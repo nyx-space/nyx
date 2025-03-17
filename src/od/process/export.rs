@@ -238,6 +238,20 @@ where
                     .with_name(format!("Measurement noise: {f:?} ({})", f.unit())),
             );
         }
+        for f in arc.unique_types() {
+            msr_fields.push(
+                f.to_field()
+                    .with_nullable(true)
+                    .with_name(format!("Real observation: {f:?} ({})", f.unit())),
+            );
+        }
+        for f in arc.unique_types() {
+            msr_fields.push(
+                f.to_field()
+                    .with_nullable(true)
+                    .with_name(format!("Computed observation: {f:?} ({})", f.unit())),
+            );
+        }
 
         msr_fields.push(Field::new("Residual ratio", DataType::Float64, true));
         msr_fields.push(Field::new("Residual Rejected", DataType::Boolean, true));
@@ -394,6 +408,36 @@ where
                 if let Some(resid) = resid_opt {
                     match resid.trk_noise(msr_type) {
                         Some(noise) => data.append_value(noise),
+                        None => data.append_null(),
+                    };
+                } else {
+                    data.append_null();
+                }
+            }
+            record.push(Arc::new(data.finish()));
+        }
+        // Real observation
+        for msr_type in arc.unique_types() {
+            let mut data = Float64Builder::new();
+            for resid_opt in &residuals {
+                if let Some(resid) = resid_opt {
+                    match resid.real_obs(msr_type) {
+                        Some(postfit) => data.append_value(postfit),
+                        None => data.append_null(),
+                    };
+                } else {
+                    data.append_null();
+                }
+            }
+            record.push(Arc::new(data.finish()));
+        }
+        // Computed observation
+        for msr_type in arc.unique_types() {
+            let mut data = Float64Builder::new();
+            for resid_opt in &residuals {
+                if let Some(resid) = resid_opt {
+                    match resid.computed_obs(msr_type) {
+                        Some(postfit) => data.append_value(postfit),
                         None => data.append_null(),
                     };
                 } else {

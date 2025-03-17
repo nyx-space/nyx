@@ -80,8 +80,8 @@ where
     fn measurement_update(
         &mut self,
         nominal_state: T,
-        real_obs: &OVector<f64, M>,
-        computed_obs: &OVector<f64, M>,
+        real_obs: OVector<f64, M>,
+        computed_obs: OVector<f64, M>,
         measurement_covar: OMatrix<f64, M, M>,
         resid_rejection: Option<ResidRejectCrit>,
     ) -> Result<(Self::Estimate, Residual<M>), ODError>;

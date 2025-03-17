@@ -48,6 +48,10 @@ where
     pub tracker: Option<String>,
     /// Measurement types used to compute this residual (in order)
     pub msr_types: IndexSet<MeasurementType>,
+    /// The real observation from the tracking arc.
+    pub real_obs: OVector<f64, M>,
+    /// The computed observation as expected from the dynamics of the filter.
+    pub computed_obs: OVector<f64, M>,
 }
 
 impl<M> Residual<M>
@@ -66,6 +70,8 @@ where
             rejected: true,
             tracker: None,
             msr_types: IndexSet::new(),
+            real_obs: OVector::<f64, M>::zeros(),
+            computed_obs: OVector::<f64, M>::zeros(),
         }
     }
 
@@ -75,6 +81,8 @@ where
         prefit: OVector<f64, M>,
         ratio: f64,
         tracker_msr_covar: OVector<f64, M>,
+        real_obs: OVector<f64, M>,
+        computed_obs: OVector<f64, M>,
     ) -> Self {
         Self {
             epoch,
@@ -85,6 +93,8 @@ where
             rejected: true,
             tracker: None,
             msr_types: IndexSet::new(),
+            real_obs,
+            computed_obs,
         }
     }
 
@@ -94,6 +104,8 @@ where
         postfit: OVector<f64, M>,
         ratio: f64,
         tracker_msr_covar: OVector<f64, M>,
+        real_obs: OVector<f64, M>,
+        computed_obs: OVector<f64, M>,
     ) -> Self {
         Self {
             epoch,
@@ -104,6 +116,8 @@ where
             rejected: false,
             tracker: None,
             msr_types: IndexSet::new(),
+            real_obs,
+            computed_obs,
         }
     }
 
@@ -126,6 +140,20 @@ where
         self.msr_types
             .get_index_of(&msr_type)
             .map(|idx| self.tracker_msr_noise[idx])
+    }
+
+    /// Returns the real observation for this measurement type, if available
+    pub fn real_obs(&self, msr_type: MeasurementType) -> Option<f64> {
+        self.msr_types
+            .get_index_of(&msr_type)
+            .map(|idx| self.real_obs[idx])
+    }
+
+    /// Returns the computed/expected observation for this measurement type, if available
+    pub fn computed_obs(&self, msr_type: MeasurementType) -> Option<f64> {
+        self.msr_types
+            .get_index_of(&msr_type)
+            .map(|idx| self.computed_obs[idx])
     }
 }
 

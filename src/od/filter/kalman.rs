@@ -274,8 +274,8 @@ where
     fn measurement_update(
         &mut self,
         nominal_state: T,
-        real_obs: &OVector<f64, M>,
-        computed_obs: &OVector<f64, M>,
+        real_obs: OVector<f64, M>,
+        computed_obs: OVector<f64, M>,
         r_k: OMatrix<f64, M, M>,
         resid_rejection: Option<ResidRejectCrit>,
     ) -> Result<(Self::Estimate, Residual<M>), ODError> {
@@ -298,7 +298,7 @@ where
         let s_k = &h_p_ht + &r_k;
 
         // Compute observation deviation/error (usually marked as y_i)
-        let prefit = real_obs - computed_obs;
+        let prefit = real_obs.clone() - computed_obs.clone();
 
         // Compute the prefit ratio for the automatic rejection.
         // The measurement covariance is the square of the measurement itself.
@@ -329,7 +329,14 @@ where
                 let pred_est = self.time_update(nominal_state)?;
                 return Ok((
                     pred_est,
-                    Residual::rejected(epoch, prefit, ratio, r_k_chol.diagonal()),
+                    Residual::rejected(
+                        epoch,
+                        prefit,
+                        ratio,
+                        r_k_chol.diagonal(),
+                        real_obs,
+                        computed_obs,
+                    ),
                 ));
             }
         }
@@ -350,7 +357,15 @@ where
             let postfit = &prefit - (&self.h_tilde * state_hat);
             (
                 state_hat,
-                Residual::accepted(epoch, prefit, postfit, ratio, r_k_chol.diagonal()),
+                Residual::accepted(
+                    epoch,
+                    prefit,
+                    postfit,
+                    ratio,
+                    r_k_chol.diagonal(),
+                    real_obs,
+                    computed_obs,
+                ),
             )
         } else {
             // Time update
@@ -358,7 +373,15 @@ where
             let postfit = &prefit - (&self.h_tilde * state_bar);
             (
                 state_bar + &gain * &postfit,
-                Residual::accepted(epoch, prefit, postfit, ratio, r_k_chol.diagonal()),
+                Residual::accepted(
+                    epoch,
+                    prefit,
+                    postfit,
+                    ratio,
+                    r_k_chol.diagonal(),
+                    real_obs,
+                    computed_obs,
+                ),
             )
         };
 
