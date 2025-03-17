@@ -616,12 +616,6 @@ where
                                         real_obs += obs_ambiguity;
                                     }
 
-                                    if real_obs.norm() == 0.0 {
-                                        // Prevent bug in data type selection of ground station.
-                                        // https://github.com/nyx-space/nyx/issues/410
-                                        panic!("not fixed");
-                                    }
-
                                     match self.kf.measurement_update(
                                         nominal_state,
                                         real_obs,
