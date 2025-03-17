@@ -563,10 +563,18 @@ where
                                         break;
                                     }
 
-                                    // Check that the observation is valid.
-                                    for val in
-                                        msr.observation::<MsrSize>(&cur_msr_types).iter().copied()
+                                    // If this measurement type is unavailable, continue to the next one.
+                                    if !msr.availability(&cur_msr_types).iter().any(|avail| *avail)
                                     {
+                                        continue;
+                                    }
+
+                                    // Grab the un-modulo'd real observation
+                                    let mut real_obs: OVector<f64, MsrSize> =
+                                        msr.observation(&cur_msr_types);
+
+                                    // Check that the observation is valid.
+                                    for val in real_obs.iter().copied() {
                                         ensure!(
                                             val.is_finite(),
                                             InvalidMeasurementSnafu {
@@ -594,9 +602,7 @@ where
                                             epoch,
                                         )?;
 
-                                    let mut real_obs: OVector<f64, MsrSize> =
-                                        msr.observation(&cur_msr_types);
-
+                                    // Apply the modulo to the real obs
                                     if let Some(moduli) = &arc.moduli {
                                         let mut obs_ambiguity = OVector::<f64, MsrSize>::zeros();
 
@@ -613,13 +619,13 @@ where
                                     if real_obs.norm() == 0.0 {
                                         // Prevent bug in data type selection of ground station.
                                         // https://github.com/nyx-space/nyx/issues/410
-                                        continue;
+                                        panic!("not fixed");
                                     }
 
                                     match self.kf.measurement_update(
                                         nominal_state,
-                                        &real_obs,
-                                        &computed_obs,
+                                        real_obs,
+                                        computed_obs,
                                         device.measurement_covar_matrix(&cur_msr_types, epoch)?,
                                         resid_crit,
                                     ) {

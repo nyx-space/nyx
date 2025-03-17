@@ -45,8 +45,8 @@ fn empty_estimate() {
 fn filter_errors() {
     let initial_estimate = KfEstimate::zeros(Spacecraft::zeros());
     let measurement_noise = Matrix2::zeros();
-    let real_obs = &Vector2::zeros();
-    let computed_obs = &Vector2::zeros();
+    let real_obs = Vector2::zeros();
+    let computed_obs = Vector2::zeros();
     let sensitivity = SMatrix::<f64, 2, 9>::zeros();
 
     let mut ckf = KF::no_snc(initial_estimate);
