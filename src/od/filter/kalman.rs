@@ -350,7 +350,15 @@ where
             let postfit = &prefit - (&self.h_tilde * state_hat);
             (
                 state_hat,
-                Residual::accepted(epoch, prefit, postfit, ratio, r_k_chol.diagonal()),
+                Residual::accepted(
+                    epoch,
+                    prefit,
+                    postfit,
+                    ratio,
+                    r_k_chol.diagonal(),
+                    real_obs,
+                    computed_obs,
+                ),
             )
         } else {
             // Time update
@@ -358,7 +366,15 @@ where
             let postfit = &prefit - (&self.h_tilde * state_bar);
             (
                 state_bar + &gain * &postfit,
-                Residual::accepted(epoch, prefit, postfit, ratio, r_k_chol.diagonal()),
+                Residual::accepted(
+                    epoch,
+                    prefit,
+                    postfit,
+                    ratio,
+                    r_k_chol.diagonal(),
+                    real_obs,
+                    computed_obs,
+                ),
             )
         };
 
