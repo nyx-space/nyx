@@ -16,13 +16,16 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use crate::cosmic::AstroPhysicsSnafu;
 pub use crate::errors::NyxError;
+use crate::errors::StateAstroSnafu;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
+use crate::md::StateParameter;
 pub use crate::od::estimate::{Estimate, KfEstimate, Residual};
 use crate::od::process::ResidRejectCrit;
-pub use crate::od::snc::SNC;
-use crate::od::{Filter, ODDynamicsSnafu, ODError, State};
+pub use crate::od::snc::ProcessNoise;
+use crate::od::{Filter, ODDynamicsSnafu, ODError, ODStateSnafu, State};
 pub use crate::time::{Epoch, Unit};
 use snafu::prelude::*;
 
@@ -68,7 +71,47 @@ where
 
         // Try to apply an SNC, if applicable
         for (i, snc) in self.process_noise.iter().enumerate().rev() {
-            if let Some(snc_matrix) = snc.to_matrix(nominal_state.epoch()) {
+            if let Some(mut snc_matrix) = snc.to_matrix(nominal_state.epoch()) {
+                if let Some(local_frame) = snc.local_frame {
+                    // Rotate the SNC from the definition frame into the state frame.
+                    let dcm = local_frame
+                        .dcm_to_inertial(nominal_state.orbit())
+                        .context(AstroPhysicsSnafu)
+                        .context(StateAstroSnafu {
+                            param: StateParameter::Epoch,
+                        })
+                        .context(ODStateSnafu {
+                            action: "rotating SNC from definition frame into state frame",
+                        })?;
+
+                    match A::USIZE {
+                        3 => {
+                            let new_snc = dcm.rot_mat
+                                * snc_matrix.fixed_view::<3, 3>(0, 0)
+                                * dcm.rot_mat.transpose();
+                            for i in 0..A::USIZE {
+                                for j in 0..A::USIZE {
+                                    snc_matrix[(i, j)] = new_snc[(i, j)];
+                                }
+                            }
+                        }
+                        6 => {
+                            let new_snc = dcm.state_dcm()
+                                * snc_matrix.fixed_view::<6, 6>(0, 0)
+                                * dcm.transpose().state_dcm();
+                            for i in 0..A::USIZE {
+                                for j in 0..A::USIZE {
+                                    snc_matrix[(i, j)] = new_snc[(i, j)];
+                                }
+                            }
+                        }
+                        _ => {
+                            return Err(ODError::ODLimitation {
+                                action: "only process noises of size 3x3 or 6x6 are supported",
+                            })
+                        }
+                    }
+                }
                 // Check if we're using another SNC than the one before
                 if self.prev_used_snc != i {
                     info!("Switched to {}-th {}", i, snc);
@@ -277,7 +320,7 @@ where
     }
 
     /// Overwrites all of the process noises to the one provided
-    fn set_process_noise(&mut self, snc: SNC<A>) {
+    fn set_process_noise(&mut self, snc: ProcessNoise<A>) {
         self.process_noise = vec![snc];
     }
 }

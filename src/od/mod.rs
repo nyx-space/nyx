@@ -139,10 +139,12 @@ pub enum ODError {
     },
     #[snafu(display("not enough residuals to {action}"))]
     ODNoResiduals { action: &'static str },
-    #[snafu(display("Could not {action} OD results: {source}"))]
+    #[snafu(display("could not {action} OD results: {source}"))]
     ODStateError {
         #[snafu(source(from(StateError, Box::new)))]
         source: Box<StateError>,
         action: &'static str,
     },
+    #[snafu(display("Nyx orbit determination limitation: {action}"))]
+    ODLimitation { action: &'static str },
 }

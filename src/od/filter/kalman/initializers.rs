@@ -20,7 +20,7 @@ pub use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, U3};
 pub use crate::od::estimate::{Estimate, KfEstimate, Residual};
-pub use crate::od::snc::SNC;
+pub use crate::od::snc::ProcessNoise;
 use crate::od::State;
 pub use crate::time::{Epoch, Unit};
 
@@ -41,7 +41,7 @@ where
     <DefaultAllocator as Allocator<<T as State>::Size, <T as State>::Size>>::Buffer<f64>: Copy,
 {
     /// Initializes this KF with an initial estimate, measurement noise, and one process noise
-    pub fn new(initial_estimate: KfEstimate<T>, process_noise: SNC<A>) -> Self {
+    pub fn new(initial_estimate: KfEstimate<T>, process_noise: ProcessNoise<A>) -> Self {
         assert_eq!(
             A::dim() % 3,
             0,
@@ -63,7 +63,10 @@ where
     /// Initializes this KF with an initial estimate, measurement noise, and several process noise
     /// WARNING: SNCs MUST be ordered chronologically! They will be selected automatically by walking
     /// the list of SNCs backward until one can be applied!
-    pub fn with_sncs(initial_estimate: KfEstimate<T>, process_noises: Vec<SNC<A>>) -> Self {
+    pub fn with_sncs(
+        initial_estimate: KfEstimate<T>,
+        process_noises: Vec<ProcessNoise<A>>,
+    ) -> Self {
         assert_eq!(
             A::dim() % 3,
             0,

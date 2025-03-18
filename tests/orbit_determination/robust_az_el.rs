@@ -308,7 +308,8 @@ fn od_robust_test_ekf_rng_dop_az_el(
 
     // Define the process noise to assume an unmodeled acceleration on X, Y and Z in the EME2000 frame
     let sigma_q = 5e-10_f64.powi(2);
-    let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
+    let process_noise =
+        ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
 
     let trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
 

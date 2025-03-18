@@ -260,7 +260,8 @@ fn od_with_modulus_cov_test(
     println!("{estimate}");
 
     let sigma_q = 1e-12_f64.powi(2);
-    let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
+    let process_noise =
+        ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
     let kf = KF::new(estimate, process_noise);
 
     let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
@@ -352,7 +353,8 @@ fn od_with_modulus_as_bias_cov_test(
     let estimate = uncertainty.to_estimate().unwrap();
 
     let sigma_q = 1e-8_f64.powi(2);
-    let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
+    let process_noise =
+        ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
     let kf = KF::new(estimate, process_noise);
 
     let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));

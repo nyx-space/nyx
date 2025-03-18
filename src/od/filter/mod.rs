@@ -20,7 +20,7 @@ use self::kalman::Residual;
 
 use super::estimate::Estimate;
 use super::process::ResidRejectCrit;
-use super::snc::SNC;
+use super::snc::ProcessNoise;
 use super::ODError;
 pub use crate::dynamics::Dynamics;
 use crate::linalg::allocator::Allocator;
@@ -91,5 +91,5 @@ where
     fn set_extended(&mut self, status: bool);
 
     /// Sets the process noise matrix of the estimated state
-    fn set_process_noise(&mut self, snc: SNC<A>);
+    fn set_process_noise(&mut self, snc: ProcessNoise<A>);
 }

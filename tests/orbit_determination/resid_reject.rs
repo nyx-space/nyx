@@ -203,7 +203,7 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
 
     // Define the process noise to assume an unmodeled acceleration on X, Y and Z in the ECI frame
     let sigma_q = 5e-9_f64.powi(2);
-    let process_noise = SNC3::from_diagonal(2.minutes(), &[sigma_q, sigma_q, sigma_q]);
+    let process_noise = ProcessNoise3D::from_diagonal(2.minutes(), &[sigma_q, sigma_q, sigma_q]);
 
     let kf = KF::no_snc(initial_estimate);
 
@@ -333,7 +333,7 @@ fn od_resid_reject_default_ckf_two_way_cov_test(
 
     // Define the process noise to assume an unmodeled acceleration on X, Y and Z in the ECI frame
     let sigma_q = 5e-10_f64.powi(2);
-    let process_noise = SNC3::from_diagonal(2.minutes(), &[sigma_q, sigma_q, sigma_q]);
+    let process_noise = ProcessNoise3D::from_diagonal(2.minutes(), &[sigma_q, sigma_q, sigma_q]);
 
     let kf = KF::new(initial_estimate, process_noise);
 

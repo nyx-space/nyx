@@ -20,7 +20,7 @@ pub use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName};
 pub use crate::od::estimate::{Estimate, KfEstimate, Residual};
-pub use crate::od::snc::SNC;
+pub use crate::od::snc::ProcessNoise;
 use crate::od::State;
 pub use crate::time::{Epoch, Unit};
 
@@ -50,7 +50,7 @@ where
     /// The previous estimate used in the KF computations.
     pub prev_estimate: KfEstimate<T>,
     /// A sets of process noise (usually noted Q), must be ordered chronologically
-    pub process_noise: Vec<SNC<A>>,
+    pub process_noise: Vec<ProcessNoise<A>>,
     /// Determines whether this KF should operate as a Conventional/Classical Kalman filter or an Extended Kalman Filter.
     /// Recall that one should switch to an Extended KF only once the estimate is good (i.e. after a few good measurement updates on a CKF).
     pub ekf: bool,
