@@ -23,7 +23,7 @@ use crate::NyxError;
 /// Returns a unit vector from a normal distribution.
 /// Implements the Sphere Point Picking method: https://mathworld.wolfram.com/SpherePointPicking.html
 pub fn unit_vector_from_seed<R: Rng>(rng: &mut R) -> Vector3<f64> {
-    let distr = Uniform::new_inclusive(0.0, 1.0);
+    let distr = Uniform::new_inclusive(0.0, 1.0).expect("could not initialize uniform PRG");
     let u = distr.sample(rng);
     let v = distr.sample(rng);
     let theta = std::f64::consts::TAU * u;
@@ -82,7 +82,7 @@ pub fn dv_execution_error<R: Rng>(
 #[allow(clippy::float_equality_without_abs)]
 #[test]
 fn test_dv_mag_fixed() {
-    use super::thread_rng;
+    use super::ThreadRng;
     use crate::time::Epoch;
     use anise::constants::frames::EARTH_J2000;
     use anise::prelude::Orbit;
@@ -100,11 +100,13 @@ fn test_dv_mag_fixed() {
 
     let dv_mag_distr = Normal::new(5e-3, 5e-4).unwrap();
 
+    let mut thread_rng = ThreadRng::default();
+
     for _ in 0..=1000 {
-        let dv_mag = dv_mag_distr.sample(&mut thread_rng());
-        let dv_point = unit_vector_from_seed(&mut thread_rng());
+        let dv_mag = dv_mag_distr.sample(&mut thread_rng);
+        let dv_point = unit_vector_from_seed(&mut thread_rng);
         let dv = dv_point * dv_mag;
-        let dv_w_err = dv_pointing_error(&orbit.velocity_km_s, dv, 0.1, &mut thread_rng()).unwrap();
+        let dv_w_err = dv_pointing_error(&orbit.velocity_km_s, dv, 0.1, &mut thread_rng).unwrap();
         assert!(
             (dv_w_err.norm() - dv_mag) < f64::EPSILON,
             "{:.1e}",

@@ -178,7 +178,7 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
         },
     ];
 
-    let mut rng = Pcg64Mcg::from_entropy();
+    let mut rng = Pcg64Mcg::from_os_rng();
     let mut traj1_msr_cnt = 0;
     for state in traj1.every(1 * Unit::Minute) {
         if dss65_madrid

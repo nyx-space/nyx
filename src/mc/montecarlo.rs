@@ -288,7 +288,7 @@ where
         // Setup the RNG
         let rng = match seed {
             Some(seed) => Pcg64Mcg::new(seed),
-            None => Pcg64Mcg::from_entropy(),
+            None => Pcg64Mcg::from_os_rng(),
         };
 
         // Generate the states, forcing the borrow as specified in the `sample_iter` docs.

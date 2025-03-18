@@ -145,7 +145,7 @@ where
         trajectory: Traj<MsrIn>,
         configs: BTreeMap<String, TrkConfig>,
     ) -> Result<Self, ConfigError> {
-        let rng = Pcg64Mcg::from_entropy();
+        let rng = Pcg64Mcg::from_os_rng();
 
         Self::with_rng(devices, trajectory, configs, rng)
     }
