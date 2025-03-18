@@ -28,7 +28,7 @@ use snafu::prelude::*;
 
 use super::KF;
 
-impl<T, A, M> Filter<T, A, M> for KF<T, A, M>
+impl<T, A, M> Filter<T, A, M> for KF<T, A>
 where
     A: DimName,
     M: DimName,
@@ -57,13 +57,6 @@ where
 
     fn set_previous_estimate(&mut self, est: &Self::Estimate) {
         self.prev_estimate = *est;
-    }
-
-    /// Update the sensitivity matrix (or "H tilde"). This function **must** be called prior to each
-    /// call to `measurement_update`.
-    fn update_h_tilde(&mut self, h_tilde: OMatrix<f64, M, <T as State>::Size>) {
-        self.h_tilde = h_tilde;
-        self.h_tilde_updated = true;
     }
 
     /// Computes a time update/prediction (i.e. advances the filter estimate with the updated STM).
@@ -146,12 +139,9 @@ where
         real_obs: OVector<f64, M>,
         computed_obs: OVector<f64, M>,
         r_k: OMatrix<f64, M, M>,
+        h_tilde: OMatrix<f64, M, <T as State>::Size>,
         resid_rejection: Option<ResidRejectCrit>,
     ) -> Result<(Self::Estimate, Residual<M>), ODError> {
-        if !self.h_tilde_updated {
-            return Err(ODError::SensitivityNotUpdated);
-        }
-
         let epoch = nominal_state.epoch();
 
         // Grab the state transition matrix.
@@ -161,7 +151,7 @@ where
         let covar_bar = stm * self.prev_estimate.covar * stm.transpose();
 
         // Project the propagated covariance into the measurement space.
-        let h_p_ht = &self.h_tilde * covar_bar * &self.h_tilde.transpose();
+        let h_p_ht = &h_tilde * covar_bar * &h_tilde.transpose();
 
         // Compute the innovation matrix (S_k).
         let s_k = &h_p_ht + &r_k;
@@ -216,14 +206,14 @@ where
             None => return Err(ODError::SingularKalmanGain),
         };
 
-        let gain = covar_bar * &self.h_tilde.transpose() * &s_k_inv;
+        let gain = covar_bar * &h_tilde.transpose() * &s_k_inv;
 
         // Compute the state estimate
         let (state_hat, res) = if self.ekf {
             // In EKF, the state hat is actually the state deviation. We trust the gain to be correct,
             // so we just apply it directly to the prefit residual.
             let state_hat = &gain * &prefit;
-            let postfit = &prefit - (&self.h_tilde * state_hat);
+            let postfit = &prefit - (&h_tilde * state_hat);
             (
                 state_hat,
                 Residual::accepted(
@@ -239,7 +229,7 @@ where
         } else {
             // Time update
             let state_bar = stm * self.prev_estimate.state_deviation;
-            let postfit = &prefit - (&self.h_tilde * state_bar);
+            let postfit = &prefit - (&h_tilde * state_bar);
             (
                 state_bar + &gain * &postfit,
                 Residual::accepted(
@@ -255,8 +245,8 @@ where
         };
 
         // Compute covariance (Joseph update)
-        let first_term = OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity()
-            - &gain * &self.h_tilde;
+        let first_term =
+            OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity() - &gain * &h_tilde;
         let covar =
             first_term * covar_bar * first_term.transpose() + &gain * &r_k * &gain.transpose();
 
@@ -270,7 +260,6 @@ where
             predicted: false,
         };
 
-        self.h_tilde_updated = false;
         self.prev_estimate = estimate;
         // Update the prev epoch for all SNCs
         for snc in &mut self.process_noise {

@@ -18,7 +18,7 @@
 
 pub use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
-use crate::linalg::{DefaultAllocator, DimName, OMatrix};
+use crate::linalg::{DefaultAllocator, DimName};
 pub use crate::od::estimate::{Estimate, KfEstimate, Residual};
 pub use crate::od::snc::SNC;
 use crate::od::State;
@@ -33,17 +33,13 @@ pub mod initializers;
 /// M: Measurement size (used for the sensitivity matrix)
 #[derive(Debug, Clone)]
 #[allow(clippy::upper_case_acronyms)]
-pub struct KF<T, A, M>
+pub struct KF<T, A>
 where
     A: DimName,
-    M: DimName,
     T: State,
-    DefaultAllocator: Allocator<M>
-        + Allocator<<T as State>::Size>
+    DefaultAllocator: Allocator<<T as State>::Size>
         + Allocator<<T as State>::VecLength>
         + Allocator<A>
-        + Allocator<M, M>
-        + Allocator<M, <T as State>::Size>
         + Allocator<<T as State>::Size, <T as State>::Size>
         + Allocator<A, A>
         + Allocator<<T as State>::Size, A>
@@ -58,7 +54,5 @@ where
     /// Determines whether this KF should operate as a Conventional/Classical Kalman filter or an Extended Kalman Filter.
     /// Recall that one should switch to an Extended KF only once the estimate is good (i.e. after a few good measurement updates on a CKF).
     pub ekf: bool,
-    h_tilde: OMatrix<f64, M, <T as State>::Size>,
-    h_tilde_updated: bool,
     prev_used_snc: usize,
 }

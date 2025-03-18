@@ -18,7 +18,7 @@
 
 pub use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
-use crate::linalg::{DefaultAllocator, DimName, OMatrix, U3};
+use crate::linalg::{DefaultAllocator, DimName, U3};
 pub use crate::od::estimate::{Estimate, KfEstimate, Residual};
 pub use crate::od::snc::SNC;
 use crate::od::State;
@@ -26,18 +26,13 @@ pub use crate::time::{Epoch, Unit};
 
 use super::KF;
 
-impl<T, A, M> KF<T, A, M>
+impl<T, A> KF<T, A>
 where
     A: DimName,
-    M: DimName,
     T: State,
-    DefaultAllocator: Allocator<M>
-        + Allocator<<T as State>::Size>
+    DefaultAllocator: Allocator<<T as State>::Size>
         + Allocator<<T as State>::VecLength>
         + Allocator<A>
-        + Allocator<M, M>
-        + Allocator<M, <T as State>::Size>
-        + Allocator<<T as State>::Size, M>
         + Allocator<<T as State>::Size, <T as State>::Size>
         + Allocator<A, A>
         + Allocator<<T as State>::Size, A>
@@ -61,8 +56,6 @@ where
             prev_estimate: initial_estimate,
             process_noise: vec![process_noise],
             ekf: false,
-            h_tilde: OMatrix::<f64, M, <T as State>::Size>::zeros(),
-            h_tilde_updated: false,
             prev_used_snc: 0,
         }
     }
@@ -86,23 +79,16 @@ where
             prev_estimate: initial_estimate,
             process_noise: process_noises,
             ekf: false,
-            h_tilde: OMatrix::<f64, M, <T as State>::Size>::zeros(),
-            h_tilde_updated: false,
             prev_used_snc: 0,
         }
     }
 }
 
-impl<T, M> KF<T, U3, M>
+impl<T> KF<T, U3>
 where
-    M: DimName,
     T: State,
-    DefaultAllocator: Allocator<M>
-        + Allocator<<T as State>::Size>
+    DefaultAllocator: Allocator<<T as State>::Size>
         + Allocator<<T as State>::VecLength>
-        + Allocator<M, M>
-        + Allocator<M, <T as State>::Size>
-        + Allocator<<T as State>::Size, M>
         + Allocator<<T as State>::Size, <T as State>::Size>
         + Allocator<U3, U3>
         + Allocator<<T as State>::Size, U3>
@@ -116,8 +102,6 @@ where
             prev_estimate: initial_estimate,
             process_noise: Vec::new(),
             ekf: false,
-            h_tilde: OMatrix::<f64, M, <T as State>::Size>::zeros(),
-            h_tilde_updated: false,
             prev_used_snc: 0,
         }
     }

@@ -317,7 +317,7 @@ fn od_robust_test_ekf_rng_dop_az_el(
         SpacecraftDynamics,
         Const<4>,
         Const<3>,
-        KF<Spacecraft, Const<3>, Const<4>>,
+        KF<Spacecraft, Const<3>>,
         GroundStation,
     >::ekf(
         prop_est,

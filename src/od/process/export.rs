@@ -43,7 +43,7 @@ use std::path::{Path, PathBuf};
 use super::ODProcess;
 
 impl<MsrSize: DimName, Accel: DimName, Trk: TrackerSensitivity<Spacecraft, Spacecraft>>
-    ODProcess<'_, SpacecraftDynamics, MsrSize, Accel, KF<Spacecraft, Accel, MsrSize>, Trk>
+    ODProcess<'_, SpacecraftDynamics, MsrSize, Accel, KF<Spacecraft, Accel>, Trk>
 where
     DefaultAllocator: Allocator<MsrSize>
         + Allocator<MsrSize, <Spacecraft as State>::Size>
