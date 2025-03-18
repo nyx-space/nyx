@@ -18,7 +18,7 @@
 
 pub use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
-use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector, U3};
+use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
 pub use crate::od::estimate::{Estimate, KfEstimate, Residual};
 use crate::od::process::ResidRejectCrit;
 pub use crate::od::snc::SNC;
@@ -26,138 +26,7 @@ use crate::od::{Filter, ODDynamicsSnafu, ODError, State};
 pub use crate::time::{Epoch, Unit};
 use snafu::prelude::*;
 
-/// Defines both a Classical and an Extended Kalman filter (CKF and EKF)
-/// T: Type of state
-/// A: Acceleration size (for SNC)
-/// M: Measurement size (used for the sensitivity matrix)
-#[derive(Debug, Clone)]
-#[allow(clippy::upper_case_acronyms)]
-pub struct KF<T, A, M>
-where
-    A: DimName,
-    M: DimName,
-    T: State,
-    DefaultAllocator: Allocator<M>
-        + Allocator<<T as State>::Size>
-        + Allocator<<T as State>::VecLength>
-        + Allocator<A>
-        + Allocator<M, M>
-        + Allocator<M, <T as State>::Size>
-        + Allocator<<T as State>::Size, <T as State>::Size>
-        + Allocator<A, A>
-        + Allocator<<T as State>::Size, A>
-        + Allocator<A, <T as State>::Size>,
-    <DefaultAllocator as Allocator<<T as State>::Size>>::Buffer<f64>: Copy,
-    <DefaultAllocator as Allocator<<T as State>::Size, <T as State>::Size>>::Buffer<f64>: Copy,
-{
-    /// The previous estimate used in the KF computations.
-    pub prev_estimate: KfEstimate<T>,
-    /// A sets of process noise (usually noted Q), must be ordered chronologically
-    pub process_noise: Vec<SNC<A>>,
-    /// Determines whether this KF should operate as a Conventional/Classical Kalman filter or an Extended Kalman Filter.
-    /// Recall that one should switch to an Extended KF only once the estimate is good (i.e. after a few good measurement updates on a CKF).
-    pub ekf: bool,
-    h_tilde: OMatrix<f64, M, <T as State>::Size>,
-    h_tilde_updated: bool,
-    prev_used_snc: usize,
-}
-
-impl<T, A, M> KF<T, A, M>
-where
-    A: DimName,
-    M: DimName,
-    T: State,
-    DefaultAllocator: Allocator<M>
-        + Allocator<<T as State>::Size>
-        + Allocator<<T as State>::VecLength>
-        + Allocator<A>
-        + Allocator<M, M>
-        + Allocator<M, <T as State>::Size>
-        + Allocator<<T as State>::Size, M>
-        + Allocator<<T as State>::Size, <T as State>::Size>
-        + Allocator<A, A>
-        + Allocator<<T as State>::Size, A>
-        + Allocator<A, <T as State>::Size>,
-    <DefaultAllocator as Allocator<<T as State>::Size>>::Buffer<f64>: Copy,
-    <DefaultAllocator as Allocator<<T as State>::Size, <T as State>::Size>>::Buffer<f64>: Copy,
-{
-    /// Initializes this KF with an initial estimate, measurement noise, and one process noise
-    pub fn new(initial_estimate: KfEstimate<T>, process_noise: SNC<A>) -> Self {
-        assert_eq!(
-            A::dim() % 3,
-            0,
-            "SNC can only be applied to accelerations multiple of 3"
-        );
-
-        // Set the initial epoch of the SNC
-        let mut process_noise = process_noise;
-        process_noise.init_epoch = Some(initial_estimate.epoch());
-
-        Self {
-            prev_estimate: initial_estimate,
-            process_noise: vec![process_noise],
-            ekf: false,
-            h_tilde: OMatrix::<f64, M, <T as State>::Size>::zeros(),
-            h_tilde_updated: false,
-            prev_used_snc: 0,
-        }
-    }
-
-    /// Initializes this KF with an initial estimate, measurement noise, and several process noise
-    /// WARNING: SNCs MUST be ordered chronologically! They will be selected automatically by walking
-    /// the list of SNCs backward until one can be applied!
-    pub fn with_sncs(initial_estimate: KfEstimate<T>, process_noises: Vec<SNC<A>>) -> Self {
-        assert_eq!(
-            A::dim() % 3,
-            0,
-            "SNC can only be applied to accelerations multiple of 3"
-        );
-        let mut process_noises = process_noises;
-        // Set the initial epoch of the SNC
-        for snc in &mut process_noises {
-            snc.init_epoch = Some(initial_estimate.epoch());
-        }
-
-        Self {
-            prev_estimate: initial_estimate,
-            process_noise: process_noises,
-            ekf: false,
-            h_tilde: OMatrix::<f64, M, <T as State>::Size>::zeros(),
-            h_tilde_updated: false,
-            prev_used_snc: 0,
-        }
-    }
-}
-
-impl<T, M> KF<T, U3, M>
-where
-    M: DimName,
-    T: State,
-    DefaultAllocator: Allocator<M>
-        + Allocator<<T as State>::Size>
-        + Allocator<<T as State>::VecLength>
-        + Allocator<M, M>
-        + Allocator<M, <T as State>::Size>
-        + Allocator<<T as State>::Size, M>
-        + Allocator<<T as State>::Size, <T as State>::Size>
-        + Allocator<U3, U3>
-        + Allocator<<T as State>::Size, U3>
-        + Allocator<U3, <T as State>::Size>,
-    <DefaultAllocator as Allocator<<T as State>::Size>>::Buffer<f64>: Copy,
-    <DefaultAllocator as Allocator<<T as State>::Size, <T as State>::Size>>::Buffer<f64>: Copy,
-{
-    /// Initializes this KF without SNC
-    pub fn no_snc(initial_estimate: KfEstimate<T>) -> Self {
-        Self {
-            prev_estimate: initial_estimate,
-            process_noise: Vec::new(),
-            ekf: false,
-            h_tilde: OMatrix::<f64, M, <T as State>::Size>::zeros(),
-            h_tilde_updated: false,
-            prev_used_snc: 0,
-        }
-    }
-}
+use super::KF;
 
 impl<T, A, M> Filter<T, A, M> for KF<T, A, M>
 where
