@@ -135,7 +135,8 @@ fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>, devices: BTreeMap<String, G
     println!("Initial estimate:\n{}", initial_estimate);
 
     let sigma_q = 1e-7_f64.powi(2);
-    let process_noise = ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
+    let process_noise =
+        ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
     let kf = KF::new(initial_estimate, process_noise);
 
     let mut odp = SpacecraftODProcess::ckf(prop_est, kf, devices, None, almanac);
@@ -345,7 +346,8 @@ fn xhat_dev_test_ekf_multi_body(almanac: Arc<Almanac>, devices: BTreeMap<String,
     println!("Initial estimate:\n{}", initial_estimate);
 
     let sigma_q = 1e-8_f64.powi(2);
-    let process_noise = ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
+    let process_noise =
+        ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
     let kf = KF::new(initial_estimate, process_noise);
 
     let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
@@ -508,7 +510,8 @@ fn xhat_dev_test_ekf_harmonics(almanac: Arc<Almanac>, devices: BTreeMap<String, 
     println!("Initial estimate:\n{}", initial_estimate);
 
     let sigma_q = 1e-7_f64.powi(2);
-    let process_noise = ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
+    let process_noise =
+        ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
     let kf = KF::new(initial_estimate, process_noise);
 
     let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
@@ -1042,7 +1045,8 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body(
     println!("Initial estimate:\n{}", initial_estimate);
 
     let sigma_q = 1e-8_f64.powi(2);
-    let process_noise = ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
+    let process_noise =
+        ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
     let kf = KF::new(initial_estimate, process_noise);
 
     let mut odp = SpacecraftODProcess::ekf(
