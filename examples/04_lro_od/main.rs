@@ -247,11 +247,20 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("== FILTER STATE ==\n{sc_seed:x}\n{initial_estimate}");
 
+    // Build the SNC in the Moon J2000 frame, specified as a velocity noise over time.
+    let process_noise = ProcessNoise3D::from_velocity_km_s(
+        &[1.8e-9, 1.8e-9, 1.8e-9],
+        1 * Unit::Hour,
+        10 * Unit::Minute,
+        None,
+    );
+
+    println!("{process_noise}");
+
     let kf = KF::new(
         // Increase the initial covariance to account for larger deviation.
         initial_estimate,
-        // Until https://github.com/nyx-space/nyx/issues/351, we need to specify the SNC in the acceleration of the Moon J2000 frame.
-        ProcessNoise3D::from_diagonal(10 * Unit::Minute, &[5e-13, 5e-13, 5e-13]),
+        process_noise,
     );
 
     // We'll set up the OD process to reject measurements whose residuals are move than 3 sigmas away from what we expect.

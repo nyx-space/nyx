@@ -68,17 +68,26 @@ where
         let mut fmt_cov = Vec::with_capacity(A::dim());
         if let Some(decay) = &self.decay_diag {
             for (i, dv) in decay.iter().enumerate() {
-                fmt_cov.push(format!("{:.1e} × exp(- {:.1e} × t)", self.diag[i], dv));
+                fmt_cov.push(format!(
+                    "{:.1e} × exp(- {:.1e} × t)",
+                    self.diag[i] * 1e6,
+                    dv
+                ));
             }
         } else {
             for i in 0..A::dim() {
-                fmt_cov.push(format!("{:.1e}", self.diag[i]));
+                fmt_cov.push(format!("{:.1e}", self.diag[i] * 1e6));
             }
         }
         write!(
             f,
-            "SNC: diag({}) {}",
+            "SNC: diag({}) mm/s^2 {} {}",
             fmt_cov.join(", "),
+            if let Some(lf) = self.local_frame {
+                format!("in {lf:?}")
+            } else {
+                "".to_string()
+            },
             if let Some(start) = self.start_time {
                 format!("starting at {start}")
             } else {
@@ -200,7 +209,7 @@ where
 
 impl ProcessNoise3D {
     /// Initialize the process noise from velocity errors over time
-    pub fn from_velocity(
+    pub fn from_velocity_km_s(
         velocity_noise: &[f64; 3],
         noise_duration: Duration,
         disable_time: Duration,
@@ -240,7 +249,7 @@ fn test_snc_init() {
     );
     println!("{}", snc_std);
 
-    let snc_vel = ProcessNoise3D::from_velocity(
+    let snc_vel = ProcessNoise3D::from_velocity_km_s(
         &[1e-2, 1e-2, 1e-2],
         Unit::Hour * 2,
         Unit::Minute * 2,

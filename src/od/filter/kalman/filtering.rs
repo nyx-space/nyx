@@ -84,15 +84,14 @@ where
                             action: "rotating SNC from definition frame into state frame",
                         })?;
 
+                    // Note: the SNC must be a diagonal matrix, so we only update the diagonals!
                     match A::USIZE {
                         3 => {
                             let new_snc = dcm.rot_mat
                                 * snc_matrix.fixed_view::<3, 3>(0, 0)
                                 * dcm.rot_mat.transpose();
                             for i in 0..A::USIZE {
-                                for j in 0..A::USIZE {
-                                    snc_matrix[(i, j)] = new_snc[(i, j)];
-                                }
+                                snc_matrix[(i, i)] = new_snc[(i, i)];
                             }
                         }
                         6 => {
@@ -100,9 +99,7 @@ where
                                 * snc_matrix.fixed_view::<6, 6>(0, 0)
                                 * dcm.transpose().state_dcm();
                             for i in 0..A::USIZE {
-                                for j in 0..A::USIZE {
-                                    snc_matrix[(i, j)] = new_snc[(i, j)];
-                                }
+                                snc_matrix[(i, i)] = new_snc[(i, i)];
                             }
                         }
                         _ => {
