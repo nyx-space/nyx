@@ -152,7 +152,7 @@ impl StochasticNoise {
         let mut samples = Vec::with_capacity(capacity);
 
         for run in 0..num_runs {
-            let mut rng = Pcg64Mcg::from_entropy();
+            let mut rng = Pcg64Mcg::from_os_rng();
 
             let mut mdl = self;
             for epoch in TimeSeries::inclusive(start, end, step) {

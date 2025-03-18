@@ -112,7 +112,7 @@ impl KfEstimate<Spacecraft> {
 
         let mut rng = match seed {
             Some(seed) => Pcg64Mcg::new(seed),
-            None => Pcg64Mcg::from_entropy(),
+            None => Pcg64Mcg::from_os_rng(),
         };
         let dispersed_state = generator.sample(&mut rng);
 
