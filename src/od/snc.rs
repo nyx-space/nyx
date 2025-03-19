@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::cosmic::Frame;
+use crate::dynamics::guidance::LocalFrame;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector, U3, U6};
 use crate::time::{Duration, Epoch};
@@ -24,20 +24,31 @@ use crate::time::{Duration, Epoch};
 use std::fmt;
 
 #[allow(clippy::upper_case_acronyms)]
-pub type SNC3 = SNC<U3>;
+pub type ProcessNoise3D = ProcessNoise<U3>;
+
 #[allow(clippy::upper_case_acronyms)]
-pub type SNC6 = SNC<U6>;
+pub type ProcessNoise6D = ProcessNoise<U6>;
+
+#[deprecated = "SNC has been renamed to ProcessNoise"]
+#[allow(clippy::upper_case_acronyms)]
+pub type SNC<A> = ProcessNoise<A>;
+#[deprecated = "SNC has been renamed to ProcessNoise"]
+#[allow(clippy::upper_case_acronyms)]
+pub type SNC3 = ProcessNoise<U3>;
+#[deprecated = "SNC has been renamed to ProcessNoise"]
+#[allow(clippy::upper_case_acronyms)]
+pub type SNC6 = ProcessNoise<U6>;
 
 #[derive(Clone)]
 #[allow(clippy::upper_case_acronyms)]
-pub struct SNC<A: DimName>
+pub struct ProcessNoise<A: DimName>
 where
     DefaultAllocator: Allocator<A> + Allocator<A, A>,
 {
     /// Time at which this SNC starts to become applicable
     pub start_time: Option<Epoch>,
-    /// Specify the frame of this SNC -- CURRENTLY UNIMPLEMENTED
-    pub frame: Option<Frame>,
+    /// Specify the local frame of this SNC
+    pub local_frame: Option<LocalFrame>,
     /// Enables state noise compensation (process noise) only be applied if the time between measurements is less than the disable_time
     pub disable_time: Duration,
     // Stores the initial epoch when the SNC is requested, needed for decay. Kalman filter will edit this automatically.
@@ -48,7 +59,7 @@ where
     pub prev_epoch: Option<Epoch>,
 }
 
-impl<A> fmt::Debug for SNC<A>
+impl<A> fmt::Debug for ProcessNoise<A>
 where
     A: DimName,
     DefaultAllocator: Allocator<A> + Allocator<A, A>,
@@ -57,17 +68,26 @@ where
         let mut fmt_cov = Vec::with_capacity(A::dim());
         if let Some(decay) = &self.decay_diag {
             for (i, dv) in decay.iter().enumerate() {
-                fmt_cov.push(format!("{:.1e} × exp(- {:.1e} × t)", self.diag[i], dv));
+                fmt_cov.push(format!(
+                    "{:.1e} × exp(- {:.1e} × t)",
+                    self.diag[i] * 1e6,
+                    dv
+                ));
             }
         } else {
             for i in 0..A::dim() {
-                fmt_cov.push(format!("{:.1e}", self.diag[i]));
+                fmt_cov.push(format!("{:.1e}", self.diag[i] * 1e6));
             }
         }
         write!(
             f,
-            "SNC: diag({}) {}",
+            "SNC: diag({}) mm/s^2 {} {}",
             fmt_cov.join(", "),
+            if let Some(lf) = self.local_frame {
+                format!("in {lf:?}")
+            } else {
+                "".to_string()
+            },
             if let Some(start) = self.start_time {
                 format!("starting at {start}")
             } else {
@@ -77,7 +97,7 @@ where
     }
 }
 
-impl<A> fmt::Display for SNC<A>
+impl<A> fmt::Display for ProcessNoise<A>
 where
     A: DimName,
     DefaultAllocator: Allocator<A> + Allocator<A, A>,
@@ -87,7 +107,7 @@ where
     }
 }
 
-impl<A: DimName> SNC<A>
+impl<A: DimName> ProcessNoise<A>
 where
     DefaultAllocator: Allocator<A> + Allocator<A, A>,
 {
@@ -108,7 +128,7 @@ where
             diag,
             disable_time,
             start_time: None,
-            frame: None,
+            local_frame: None,
             decay_diag: None,
             init_epoch: None,
             prev_epoch: None,
@@ -187,20 +207,62 @@ where
     }
 }
 
+impl ProcessNoise3D {
+    /// Initialize the process noise from velocity errors over time
+    pub fn from_velocity_km_s(
+        velocity_noise: &[f64; 3],
+        noise_duration: Duration,
+        disable_time: Duration,
+        local_frame: Option<LocalFrame>,
+    ) -> Self {
+        let mut diag = OVector::<f64, U3>::zeros();
+        for (i, v) in velocity_noise.iter().enumerate() {
+            diag[i] = *v / noise_duration.to_seconds();
+        }
+
+        Self {
+            diag,
+            disable_time,
+            start_time: None,
+            local_frame,
+            decay_diag: None,
+            init_epoch: None,
+            prev_epoch: None,
+        }
+    }
+}
+
 #[test]
 fn test_snc_init() {
     use crate::time::Unit;
-    let snc_expo = SNC3::with_decay(
+    let snc_expo = ProcessNoise3D::with_decay(
         2 * Unit::Minute,
         &[1e-6, 1e-6, 1e-6],
         &[3600.0, 3600.0, 3600.0],
     );
     println!("{}", snc_expo);
 
-    let snc_std = SNC3::with_start_time(
+    let snc_std = ProcessNoise3D::with_start_time(
         2 * Unit::Minute,
         &[1e-6, 1e-6, 1e-6],
         Epoch::from_et_seconds(3600.0),
     );
     println!("{}", snc_std);
+
+    let snc_vel = ProcessNoise3D::from_velocity_km_s(
+        &[1e-2, 1e-2, 1e-2],
+        Unit::Hour * 2,
+        Unit::Minute * 2,
+        Some(LocalFrame::RIC),
+    );
+
+    let diag_val = 1e-2 / (Unit::Hour * 2).to_seconds();
+    assert_eq!(
+        snc_vel
+            .to_matrix(Epoch::from_et_seconds(3600.0))
+            .unwrap()
+            .diagonal(),
+        OVector::<f64, U3>::new(diag_val, diag_val, diag_val)
+    );
+    assert_eq!(snc_vel.local_frame, Some(LocalFrame::RIC));
 }

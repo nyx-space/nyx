@@ -584,6 +584,7 @@ where
                                         );
                                     }
 
+                                    // Compute device specific matrices
                                     let h_tilde = device
                                         .h_tilde::<MsrSize>(
                                             msr,
@@ -593,8 +594,10 @@ where
                                         )
                                         .unwrap();
 
-                                    self.kf.update_h_tilde(h_tilde);
+                                    let measurement_covar =
+                                        device.measurement_covar_matrix(&cur_msr_types, epoch)?;
 
+                                    // Apply any biases on the computed observation
                                     let computed_obs = computed_meas
                                         .observation::<MsrSize>(&cur_msr_types)
                                         - device.measurement_bias_vector::<MsrSize>(
@@ -620,7 +623,8 @@ where
                                         nominal_state,
                                         real_obs,
                                         computed_obs,
-                                        device.measurement_covar_matrix(&cur_msr_types, epoch)?,
+                                        measurement_covar,
+                                        h_tilde,
                                         resid_crit,
                                     ) {
                                         Ok((estimate, mut residual)) => {

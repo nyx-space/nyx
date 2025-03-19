@@ -64,7 +64,7 @@ pub type SpacecraftODProcess<'a> = self::process::ODProcess<
     crate::md::prelude::SpacecraftDynamics,
     nalgebra::Const<2>,
     nalgebra::Const<3>,
-    filter::kalman::KF<crate::Spacecraft, nalgebra::Const<3>, nalgebra::Const<2>>,
+    filter::kalman::KF<crate::Spacecraft, nalgebra::Const<3>>,
     GroundStation,
 >;
 
@@ -74,7 +74,7 @@ pub type SpacecraftODProcessSeq<'a> = self::process::ODProcess<
     crate::md::prelude::SpacecraftDynamics,
     nalgebra::Const<1>,
     nalgebra::Const<3>,
-    filter::kalman::KF<crate::Spacecraft, nalgebra::Const<3>, nalgebra::Const<1>>,
+    filter::kalman::KF<crate::Spacecraft, nalgebra::Const<3>>,
     GroundStation,
 >;
 
@@ -111,8 +111,6 @@ pub enum ODError {
     SingularStateTransitionMatrix,
     #[snafu(display("invalid measurement @ {epoch} = {val}"))]
     InvalidMeasurement { epoch: Epoch, val: f64 },
-    #[snafu(display("sensitivity matrix must be updated before this call"))]
-    SensitivityNotUpdated,
     #[snafu(display("Kalman gain is singular"))]
     SingularKalmanGain,
     #[snafu(display("noise matrix is singular"))]
@@ -141,10 +139,12 @@ pub enum ODError {
     },
     #[snafu(display("not enough residuals to {action}"))]
     ODNoResiduals { action: &'static str },
-    #[snafu(display("Could not {action} OD results: {source}"))]
+    #[snafu(display("could not {action} OD results: {source}"))]
     ODStateError {
         #[snafu(source(from(StateError, Box::new)))]
         source: Box<StateError>,
         action: &'static str,
     },
+    #[snafu(display("Nyx orbit determination limitation: {action}"))]
+    ODLimitation { action: &'static str },
 }

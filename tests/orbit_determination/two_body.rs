@@ -1105,7 +1105,8 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map(
 
     // Define the process noise to assume an unmodeled acceleration of 1e-3 km^2/s^2 on X, Y and Z in the ECI frame
     let sigma_q = 1e-8_f64.powi(2);
-    let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
+    let process_noise =
+        ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
 
     let ckf = KF::new(initial_estimate, process_noise);
 
@@ -1410,11 +1411,12 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map(
 
     // Define the process noise to assume an unmodeled acceleration of 1e-3 km^2/s^2 on X, Y and Z in the ECI frame
     let sigma_q1 = 1e-7_f64.powi(2);
-    let process_noise1 = SNC3::from_diagonal(2 * Unit::Day, &[sigma_q1, sigma_q1, sigma_q1]);
+    let process_noise1 =
+        ProcessNoise3D::from_diagonal(2 * Unit::Day, &[sigma_q1, sigma_q1, sigma_q1]);
 
     let sigma_q2 = 1e-8_f64.powi(2);
     let sigma_q2_d = 3600.0;
-    let mut process_noise2 = SNC3::with_decay(
+    let mut process_noise2 = ProcessNoise3D::with_decay(
         2 * Unit::Day,
         &[sigma_q2, sigma_q2, sigma_q2],
         &[sigma_q2_d, sigma_q2_d, sigma_q2_d],
