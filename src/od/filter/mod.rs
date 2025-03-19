@@ -20,7 +20,7 @@ use self::kalman::Residual;
 
 use super::estimate::Estimate;
 use super::process::ResidRejectCrit;
-use super::snc::SNC;
+use super::snc::ProcessNoise;
 use super::ODError;
 pub use crate::dynamics::Dynamics;
 use crate::linalg::allocator::Allocator;
@@ -53,10 +53,6 @@ where
     /// Set the previous estimate
     fn set_previous_estimate(&mut self, est: &Self::Estimate);
 
-    /// Update the sensitivity matrix (or "H tilde"). This function **must** be called prior to each
-    /// call to `measurement_update`.
-    fn update_h_tilde(&mut self, h_tilde: OMatrix<f64, M, <T as State>::Size>);
-
     /// Computes a time update/prediction at the provided nominal state (i.e. advances the filter estimate with the updated STM).
     ///
     /// Returns an error if the STM was not updated.
@@ -76,6 +72,7 @@ where
     /// * `real_obs`: the real observation that was measured.
     /// * `computed_obs`: the computed observation from the nominal state.
     /// * `measurement_covar`: the measurement covariance associated with this time update (i./e. the square of the standard deviation)
+    /// * `h_tilder`: the sensitivity matrix that maps the measurement(s) into the estimate state space
     /// * `resid_rejection`: the automatic residual rejection criteria, if enabled.
     fn measurement_update(
         &mut self,
@@ -83,6 +80,7 @@ where
         real_obs: OVector<f64, M>,
         computed_obs: OVector<f64, M>,
         measurement_covar: OMatrix<f64, M, M>,
+        h_tilde: OMatrix<f64, M, <T as State>::Size>,
         resid_rejection: Option<ResidRejectCrit>,
     ) -> Result<(Self::Estimate, Residual<M>), ODError>;
 
@@ -93,5 +91,5 @@ where
     fn set_extended(&mut self, status: bool);
 
     /// Sets the process noise matrix of the estimated state
-    fn set_process_noise(&mut self, snc: SNC<A>);
+    fn set_process_noise(&mut self, snc: ProcessNoise<A>);
 }

@@ -29,6 +29,12 @@ use anise::prelude::Almanac;
 use indexmap::IndexSet;
 use msr::sensitivity::TrackerSensitivity;
 use snafu::prelude::*;
+use std::collections::BTreeMap;
+use std::iter::Zip;
+use std::marker::PhantomData;
+use std::ops::Add;
+use std::slice::Iter;
+
 mod conf;
 pub use conf::{IterationConf, SmoothingArc};
 mod trigger;
@@ -36,12 +42,9 @@ pub use trigger::EkfTrigger;
 mod rejectcrit;
 use self::msr::TrackingDataArc;
 pub use self::rejectcrit::ResidRejectCrit;
-use std::collections::BTreeMap;
-use std::iter::Zip;
-use std::marker::PhantomData;
-use std::ops::Add;
-use std::slice::Iter;
 mod export;
+mod solution;
+pub use solution::ODSolution;
 
 /// Sets up an orbit determination process (ODP).
 ///
@@ -584,6 +587,7 @@ where
                                         );
                                     }
 
+                                    // Compute device specific matrices
                                     let h_tilde = device
                                         .h_tilde::<MsrSize>(
                                             msr,
@@ -593,8 +597,10 @@ where
                                         )
                                         .unwrap();
 
-                                    self.kf.update_h_tilde(h_tilde);
+                                    let measurement_covar =
+                                        device.measurement_covar_matrix(&cur_msr_types, epoch)?;
 
+                                    // Apply any biases on the computed observation
                                     let computed_obs = computed_meas
                                         .observation::<MsrSize>(&cur_msr_types)
                                         - device.measurement_bias_vector::<MsrSize>(
@@ -620,7 +626,8 @@ where
                                         nominal_state,
                                         real_obs,
                                         computed_obs,
-                                        device.measurement_covar_matrix(&cur_msr_types, epoch)?,
+                                        measurement_covar,
+                                        h_tilde,
                                         resid_crit,
                                     ) {
                                         Ok((estimate, mut residual)) => {

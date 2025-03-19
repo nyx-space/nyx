@@ -40,10 +40,10 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
-use super::ODProcess;
+use super::{ODProcess, ODSolution};
 
 impl<MsrSize: DimName, Accel: DimName, Trk: TrackerSensitivity<Spacecraft, Spacecraft>>
-    ODProcess<'_, SpacecraftDynamics, MsrSize, Accel, KF<Spacecraft, Accel, MsrSize>, Trk>
+    ODProcess<'_, SpacecraftDynamics, MsrSize, Accel, KF<Spacecraft, Accel>, Trk>
 where
     DefaultAllocator: Allocator<MsrSize>
         + Allocator<MsrSize, <Spacecraft as State>::Size>
@@ -68,6 +68,27 @@ where
         path: P,
         cfg: ExportCfg,
     ) -> Result<PathBuf, ODError> {
+        todo!()
+    }
+}
+
+impl<MsrSize: DimName, Trk: TrackerSensitivity<Spacecraft, Spacecraft>>
+    ODSolution<Spacecraft, KfEstimate<Spacecraft>, MsrSize, Trk>
+where
+    DefaultAllocator: Allocator<MsrSize>
+        + Allocator<MsrSize, <Spacecraft as State>::Size>
+        + Allocator<Const<1>, MsrSize>
+        + Allocator<<Spacecraft as State>::Size>
+        + Allocator<<Spacecraft as State>::Size, <Spacecraft as State>::Size>
+        + Allocator<MsrSize, MsrSize>
+        + Allocator<MsrSize, <Spacecraft as State>::Size>
+        + Allocator<<Spacecraft as State>::Size, MsrSize>
+        + Allocator<<Spacecraft as State>::Size>
+        + Allocator<<Spacecraft as State>::VecLength>
+        + Allocator<<Spacecraft as State>::Size, <Spacecraft as State>::Size>,
+{
+    /// Store the estimates and residuals in a parquet file
+    pub fn to_parquet<P: AsRef<Path>>(&self, path: P, cfg: ExportCfg) -> Result<PathBuf, ODError> {
         ensure!(
             !self.estimates.is_empty(),
             TooFewMeasurementsSnafu {
@@ -217,35 +238,35 @@ where
 
         // Add the fields of the residuals
         let mut msr_fields = Vec::new();
-        for f in arc.unique_types() {
+        for f in &self.measurement_types {
             msr_fields.push(
                 f.to_field()
                     .with_nullable(true)
                     .with_name(format!("Prefit residual: {f:?} ({})", f.unit())),
             );
         }
-        for f in arc.unique_types() {
+        for f in &self.measurement_types {
             msr_fields.push(
                 f.to_field()
                     .with_nullable(true)
                     .with_name(format!("Postfit residual: {f:?} ({})", f.unit())),
             );
         }
-        for f in arc.unique_types() {
+        for f in &self.measurement_types {
             msr_fields.push(
                 f.to_field()
                     .with_nullable(true)
                     .with_name(format!("Measurement noise: {f:?} ({})", f.unit())),
             );
         }
-        for f in arc.unique_types() {
+        for f in &self.measurement_types {
             msr_fields.push(
                 f.to_field()
                     .with_nullable(true)
                     .with_name(format!("Real observation: {f:?} ({})", f.unit())),
             );
         }
-        for f in arc.unique_types() {
+        for f in &self.measurement_types {
             msr_fields.push(
                 f.to_field()
                     .with_nullable(true)
@@ -372,11 +393,11 @@ where
 
         // Finally, add the residuals.
         // Prefits
-        for msr_type in arc.unique_types() {
+        for msr_type in &self.measurement_types {
             let mut data = Float64Builder::new();
             for resid_opt in &residuals {
                 if let Some(resid) = resid_opt {
-                    match resid.prefit(msr_type) {
+                    match resid.prefit(*msr_type) {
                         Some(prefit) => data.append_value(prefit),
                         None => data.append_null(),
                     };
@@ -387,11 +408,11 @@ where
             record.push(Arc::new(data.finish()));
         }
         // Postfit
-        for msr_type in arc.unique_types() {
+        for msr_type in &self.measurement_types {
             let mut data = Float64Builder::new();
             for resid_opt in &residuals {
                 if let Some(resid) = resid_opt {
-                    match resid.postfit(msr_type) {
+                    match resid.postfit(*msr_type) {
                         Some(postfit) => data.append_value(postfit),
                         None => data.append_null(),
                     };
@@ -402,11 +423,11 @@ where
             record.push(Arc::new(data.finish()));
         }
         // Measurement noise
-        for msr_type in arc.unique_types() {
+        for msr_type in &self.measurement_types {
             let mut data = Float64Builder::new();
             for resid_opt in &residuals {
                 if let Some(resid) = resid_opt {
-                    match resid.trk_noise(msr_type) {
+                    match resid.trk_noise(*msr_type) {
                         Some(noise) => data.append_value(noise),
                         None => data.append_null(),
                     };
@@ -417,11 +438,11 @@ where
             record.push(Arc::new(data.finish()));
         }
         // Real observation
-        for msr_type in arc.unique_types() {
+        for msr_type in &self.measurement_types {
             let mut data = Float64Builder::new();
             for resid_opt in &residuals {
                 if let Some(resid) = resid_opt {
-                    match resid.real_obs(msr_type) {
+                    match resid.real_obs(*msr_type) {
                         Some(postfit) => data.append_value(postfit),
                         None => data.append_null(),
                     };
@@ -432,11 +453,11 @@ where
             record.push(Arc::new(data.finish()));
         }
         // Computed observation
-        for msr_type in arc.unique_types() {
+        for msr_type in &self.measurement_types {
             let mut data = Float64Builder::new();
             for resid_opt in &residuals {
                 if let Some(resid) = resid_opt {
-                    match resid.computed_obs(msr_type) {
+                    match resid.computed_obs(*msr_type) {
                         Some(postfit) => data.append_value(postfit),
                         None => data.append_null(),
                     };
