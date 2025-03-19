@@ -259,9 +259,14 @@ fn od_with_modulus_cov_test(
 
     println!("{estimate}");
 
-    let sigma_q = 1e-12_f64.powi(2);
-    let process_noise =
-        ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
+    let sigma_q = 1e-19_f64;
+    let process_noise = ProcessNoise3D::from_velocity_km_s(
+        &[sigma_q, sigma_q, sigma_q],
+        20 * Unit::Minute,
+        2 * Unit::Minute,
+        Some(LocalFrame::RIC),
+    );
+    println!("{process_noise}");
     let kf = KF::new(estimate, process_noise);
 
     let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
