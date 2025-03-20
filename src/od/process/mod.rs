@@ -29,6 +29,12 @@ use anise::prelude::Almanac;
 use indexmap::IndexSet;
 use msr::sensitivity::TrackerSensitivity;
 use snafu::prelude::*;
+use std::collections::BTreeMap;
+use std::iter::Zip;
+use std::marker::PhantomData;
+use std::ops::Add;
+use std::slice::Iter;
+
 mod conf;
 pub use conf::{IterationConf, SmoothingArc};
 mod trigger;
@@ -36,12 +42,9 @@ pub use trigger::EkfTrigger;
 mod rejectcrit;
 use self::msr::TrackingDataArc;
 pub use self::rejectcrit::ResidRejectCrit;
-use std::collections::BTreeMap;
-use std::iter::Zip;
-use std::marker::PhantomData;
-use std::ops::Add;
-use std::slice::Iter;
 mod export;
+mod solution;
+pub use solution::ODSolution;
 
 /// Sets up an orbit determination process (ODP).
 ///
