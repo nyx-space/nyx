@@ -64,9 +64,9 @@ where
     /// Store the estimates and residuals in a parquet file
     pub fn to_parquet<P: AsRef<Path>>(
         &self,
-        arc: &TrackingDataArc,
-        path: P,
-        cfg: ExportCfg,
+        _arc: &TrackingDataArc,
+        _path: P,
+        _cfg: ExportCfg,
     ) -> Result<PathBuf, ODError> {
         todo!()
     }
@@ -279,6 +279,34 @@ where
         msr_fields.push(Field::new("Tracker", DataType::Utf8, true));
 
         hdrs.append(&mut msr_fields);
+
+        // Add the filter gain columns
+        for i in 0..state_items.len() {
+            for f in &self.measurement_types {
+                hdrs.push(Field::new(
+                    format!(
+                        "Gain {}*{f:?} ({}*{})",
+                        state_items[i],
+                        cov_units[i],
+                        f.unit()
+                    ),
+                    DataType::Float64,
+                    false,
+                ));
+            }
+        }
+
+        // Add the filter-smoother ratio columns
+        for i in 0..state_items.len() {
+            hdrs.push(Field::new(
+                format!(
+                    "Filter-smoother ratio {} ({})",
+                    state_items[i], cov_units[i],
+                ),
+                DataType::Float64,
+                false,
+            ));
+        }
 
         // Build the schema
         let schema = Arc::new(Schema::new(hdrs));
@@ -504,6 +532,34 @@ where
             }
         }
         record.push(Arc::new(data.finish()));
+
+        // Add the filter gains
+        for i in 0..est_size {
+            for j in 0..MsrSize::USIZE {
+                let mut data = Float64Builder::new();
+                for opt_k in &self.gains {
+                    if let Some(k) = opt_k {
+                        data.append_value(k[(i, j)]);
+                    } else {
+                        data.append_null();
+                    }
+                }
+                record.push(Arc::new(data.finish()));
+            }
+        }
+
+        // Add the filter-smoother consistency ratios
+        for i in 0..est_size {
+            let mut data = Float64Builder::new();
+            for opt_fsr in &self.filter_smoother_ratios {
+                if let Some(fsr) = opt_fsr {
+                    data.append_value(fsr[i]);
+                } else {
+                    data.append_null();
+                }
+            }
+            record.push(Arc::new(data.finish()));
+        }
 
         info!("Serialized {} estimates and residuals", estimates.len());
 

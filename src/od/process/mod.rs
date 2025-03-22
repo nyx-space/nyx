@@ -178,101 +178,9 @@ where
     ///
     /// Estimates must be ordered in chronological order. This function will smooth the
     /// estimates from the last in the list to the first one.
-    pub fn smooth(&self, condition: SmoothingArc) -> Result<Vec<K::Estimate>, ODError> {
-        let l = self.estimates.len() - 1;
-
-        info!("Smoothing {} estimates until {}", l + 1, condition);
-        let mut smoothed = Vec::with_capacity(self.estimates.len());
-        // Set the first item of the smoothed estimates to the last estimate (we cannot smooth the very last estimate)
-        smoothed.push(self.estimates.last().unwrap().clone());
-
-        loop {
-            let k = l - smoothed.len();
-            // Borrow the previously smoothed estimate of the k+1 estimate
-            let sm_est_kp1 = &self.estimates[k + 1];
-            let x_kp1_l = sm_est_kp1.state_deviation();
-            let p_kp1_l = sm_est_kp1.covar();
-            // Borrow the k-th estimate, which we're smoothing with the next estimate
-            let est_k = &self.estimates[k];
-            // Borrow the k+1-th estimate, which we're smoothing with the next estimate
-            let est_kp1 = &self.estimates[k + 1];
-
-            // Check the smoother stopping condition
-            match condition {
-                SmoothingArc::Epoch(e) => {
-                    // If the epoch of the next estimate is _before_ the stopping time, stop smoothing
-                    if est_kp1.epoch() < e {
-                        break;
-                    }
-                }
-                SmoothingArc::TimeGap(gap_s) => {
-                    if est_kp1.epoch() - est_k.epoch() > gap_s {
-                        break;
-                    }
-                }
-                SmoothingArc::Prediction => {
-                    if est_kp1.predicted() {
-                        break;
-                    }
-                }
-                SmoothingArc::All => {}
-            }
-
-            // Compute the STM between both steps taken by the filter
-            // The filter will reset the STM between each estimate it computes, time update or measurement update.
-            // Therefore, the STM is simply the inverse of the one we used previously.
-            // est_kp1 is the estimate that used the STM from time k to time k+1. So the STM stored there
-            // is \Phi_{k \to k+1}. Let's invert that.
-            let phi_kp1_k = &est_kp1
-                .stm()
-                .clone()
-                .try_inverse()
-                .ok_or(ODError::SingularStateTransitionMatrix)?;
-
-            // Compute smoothed state deviation
-            let x_k_l = phi_kp1_k * x_kp1_l;
-            // Compute smoothed covariance
-            let p_k_l = phi_kp1_k * p_kp1_l * phi_kp1_k.transpose();
-            // Store into vector
-            let mut smoothed_est_k = est_k.clone();
-            // Compute the smoothed state deviation
-            smoothed_est_k.set_state_deviation(x_k_l);
-            // Compute the smoothed covariance
-            smoothed_est_k.set_covar(p_k_l);
-
-            // Move on
-            smoothed.push(smoothed_est_k);
-            if smoothed.len() == self.estimates.len() {
-                break;
-            }
-        }
-
-        // Note that we have yet to reverse the list, so we print them backward
-        info!(
-            "Smoothed {} estimates (from {} to {})",
-            smoothed.len(),
-            smoothed.last().unwrap().epoch(),
-            smoothed[0].epoch(),
-        );
-
-        // Now, let's add all of the other estimates so that the same indexing can be done
-        // between all the estimates and the smoothed estimates
-        if smoothed.len() < self.estimates.len() {
-            // Add the estimates that might have been skipped.
-            let mut k = self.estimates.len() - smoothed.len();
-            loop {
-                smoothed.push(self.estimates[k].clone());
-                if k == 0 {
-                    break;
-                }
-                k -= 1;
-            }
-        }
-
-        // And reverse to maintain the order of estimates
-        smoothed.reverse();
-
-        Ok(smoothed)
+    #[deprecated = "use the ODSolution instead"]
+    pub fn smooth(&self, _condition: SmoothingArc) -> Result<Vec<K::Estimate>, ODError> {
+        panic!("use the ODSolution instead")
     }
 
     /// Returns the root mean square of the prefit residual ratios
@@ -588,14 +496,12 @@ where
                                     }
 
                                     // Compute device specific matrices
-                                    let h_tilde = device
-                                        .h_tilde::<MsrSize>(
-                                            msr,
-                                            &cur_msr_types,
-                                            &nominal_state,
-                                            self.almanac.clone(),
-                                        )
-                                        .unwrap();
+                                    let h_tilde = device.h_tilde::<MsrSize>(
+                                        msr,
+                                        &cur_msr_types,
+                                        &nominal_state,
+                                        self.almanac.clone(),
+                                    )?;
 
                                     let measurement_covar =
                                         device.measurement_covar_matrix(&cur_msr_types, epoch)?;

@@ -20,24 +20,17 @@ use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName};
 use crate::md::trajectory::{Interpolatable, Traj};
 pub use crate::od::estimate::*;
-pub use crate::od::ground_station::*;
-pub use crate::od::snc::*;
 pub use crate::od::*;
-use crate::propagators::PropInstance;
-pub use crate::time::{Duration, Unit};
 use anise::prelude::Almanac;
 use indexmap::IndexSet;
 use msr::sensitivity::TrackerSensitivity;
 use nalgebra::OMatrix;
-use snafu::prelude::*;
 use std::collections::BTreeMap;
 use std::iter::Zip;
 use std::ops::Add;
 use std::slice::Iter;
 
 use self::msr::MeasurementType;
-
-use super::SmoothingArc;
 
 #[derive(Clone, Debug)]
 #[allow(clippy::upper_case_acronyms)]
@@ -60,8 +53,10 @@ where
     pub estimates: Vec<EstType>,
     /// Vector of residuals available after a pass
     pub residuals: Vec<Option<Residual<MsrSize>>>,
-    /// Vector of filter gains used for each measurement update.
+    /// Vector of filter gains used for each measurement update, all None after running the smoother.
     pub gains: Vec<Option<OMatrix<f64, <StateType as State>::Size, MsrSize>>>,
+    /// Filter-smoother consistency ratios, all None before running the smoother.
+    pub filter_smoother_ratios: Vec<Option<OVector<f64, <StateType as State>::Size>>>,
     /// Tracking devices
     pub devices: BTreeMap<String, Trk>,
     pub measurement_types: IndexSet<MeasurementType>,
@@ -82,22 +77,41 @@ where
         + Allocator<<StateType as State>::Size, <StateType as State>::Size>
         + Allocator<<StateType as State>::Size, MsrSize>,
 {
-    /// Allows to smooth the provided estimates. Returns the smoothed estimates or an error.
+    /// Smoothes this OD solution, returning a new OD solution and the filter-smoother consistency ratios, with updated **postfit** residuals, and where the ratio now represents the filter-smoother consistency ratio.
     ///
-    /// Estimates must be ordered in chronological order. This function will smooth the
-    /// estimates from the last in the list to the first one.
-    pub fn smooth(&self, condition: SmoothingArc) -> Result<Vec<EstType>, ODError> {
-        // TODO: Consider whether I can rebuild the residuals after smoothing. That would be super useful! And a feature that is missing from ODTK.
-        // Then, it would return a self, but without gains.
+    /// Notes:
+    ///  1. Gains will be scrubbed because the smoother process does not recompute the gain.
+    ///  2. Prefit residuals, ratios, and measurement covariances are not updated, as these depend on the filtering process.
+    ///  3. Note: this function consumes the current OD solution to prevent reusing the wrong one.
+    ///
+    /// # Filter-Smoother consistency ratio
+    ///
+    /// This ratio is called "filter smoother consistency test" in the ODTK MathSpec.
+    /// It is calculated from the ratio of the states differences between the filter and smoother over the difference in the diagonal of the covariance between the filter and smoother.
+    ///
+    /// To assess whether the smoothing process improved the solution, compare the RMS of the postfit residuals from the filter and the smoother process.
+    ///
+    pub fn smooth(self, almanac: Arc<Almanac>) -> Result<Self, ODError> {
         let l = self.estimates.len() - 1;
 
-        info!("Smoothing {} estimates until {}", l + 1, condition);
-        let mut smoothed = Vec::with_capacity(self.estimates.len());
+        info!("Smoothing {} estimates.", l + 1);
+
+        let mut smoothed = Self {
+            estimates: Vec::with_capacity(self.estimates.len()),
+            residuals: Vec::with_capacity(self.residuals.len()),
+            gains: Vec::with_capacity(self.estimates.len()),
+            filter_smoother_ratios: Vec::with_capacity(self.estimates.len()),
+            devices: self.devices.clone(),
+            measurement_types: self.measurement_types.clone(),
+        };
+
         // Set the first item of the smoothed estimates to the last estimate (we cannot smooth the very last estimate)
-        smoothed.push(self.estimates.last().unwrap().clone());
+        smoothed
+            .estimates
+            .push(self.estimates.last().unwrap().clone());
 
         loop {
-            let k = l - smoothed.len();
+            let k = l - smoothed.estimates.len();
             // Borrow the previously smoothed estimate of the k+1 estimate
             let sm_est_kp1 = &self.estimates[k + 1];
             let x_kp1_l = sm_est_kp1.state_deviation();
@@ -106,27 +120,6 @@ where
             let est_k = &self.estimates[k];
             // Borrow the k+1-th estimate, which we're smoothing with the next estimate
             let est_kp1 = &self.estimates[k + 1];
-
-            // Check the smoother stopping condition
-            match condition {
-                SmoothingArc::Epoch(e) => {
-                    // If the epoch of the next estimate is _before_ the stopping time, stop smoothing
-                    if est_kp1.epoch() < e {
-                        break;
-                    }
-                }
-                SmoothingArc::TimeGap(gap_s) => {
-                    if est_kp1.epoch() - est_k.epoch() > gap_s {
-                        break;
-                    }
-                }
-                SmoothingArc::Prediction => {
-                    if est_kp1.predicted() {
-                        break;
-                    }
-                }
-                SmoothingArc::All => {}
-            }
 
             // Compute the STM between both steps taken by the filter
             // The filter will reset the STM between each estimate it computes, time update or measurement update.
@@ -149,10 +142,59 @@ where
             smoothed_est_k.set_state_deviation(x_k_l);
             // Compute the smoothed covariance
             smoothed_est_k.set_covar(p_k_l);
+            // Recompute the residual if available.
+            if let Some(mut residual) = self.residuals[k + 1].clone() {
+                let tracker = residual
+                    .tracker
+                    .as_ref()
+                    .expect("tracker unset in smoother process");
 
-            // Move on
-            smoothed.push(smoothed_est_k);
-            if smoothed.len() == self.estimates.len() {
+                let device = smoothed
+                    .devices
+                    .get_mut(tracker)
+                    .expect("unknown tracker in smoother process");
+
+                let new_state_est = smoothed_est_k.state();
+                let epoch = new_state_est.epoch();
+
+                if let Some(computed_meas) =
+                    device.measure_instantaneous(new_state_est, None, almanac.clone())?
+                {
+                    // Only recompute the computed observation from the update state estimate.
+                    residual.computed_obs = computed_meas
+                        .observation::<MsrSize>(&residual.msr_types)
+                        - device.measurement_bias_vector::<MsrSize>(&residual.msr_types, epoch)?;
+
+                    // Update the postfit residual.
+                    residual.postfit = &residual.real_obs - &residual.computed_obs;
+
+                    // Store the updated data.
+                    smoothed.residuals.push(Some(residual));
+                } else {
+                    smoothed.residuals.push(None);
+                }
+            } else {
+                smoothed.residuals.push(None);
+            }
+
+            // Compute the filter-smoother consistency ratio.
+            let delta_covar = est_k.covar() - smoothed_est_k.covar();
+            let delta_state =
+                est_k.state().to_state_vector() - smoothed_est_k.state().to_state_vector();
+
+            let fs_ratios = OVector::<f64, <StateType as State>::Size>::from_iterator(
+                delta_state
+                    .iter()
+                    .enumerate()
+                    .map(|(i, dx)| dx / delta_covar[(i, i)]),
+            );
+
+            smoothed.estimates.push(smoothed_est_k);
+            smoothed.filter_smoother_ratios.push(Some(fs_ratios));
+            // Set all gains to None.
+            smoothed.gains.push(None);
+
+            if smoothed.estimates.len() == self.estimates.len() {
                 break;
             }
         }
@@ -160,18 +202,18 @@ where
         // Note that we have yet to reverse the list, so we print them backward
         info!(
             "Smoothed {} estimates (from {} to {})",
-            smoothed.len(),
-            smoothed.last().unwrap().epoch(),
-            smoothed[0].epoch(),
+            smoothed.estimates.len(),
+            smoothed.estimates.last().unwrap().epoch(),
+            smoothed.estimates[0].epoch(),
         );
 
         // Now, let's add all of the other estimates so that the same indexing can be done
         // between all the estimates and the smoothed estimates
-        if smoothed.len() < self.estimates.len() {
+        if smoothed.estimates.len() < self.estimates.len() {
             // Add the estimates that might have been skipped.
-            let mut k = self.estimates.len() - smoothed.len();
+            let mut k = self.estimates.len() - smoothed.estimates.len();
             loop {
-                smoothed.push(self.estimates[k].clone());
+                smoothed.estimates.push(self.estimates[k].clone());
                 if k == 0 {
                     break;
                 }
@@ -180,7 +222,9 @@ where
         }
 
         // And reverse to maintain the order of estimates
-        smoothed.reverse();
+        smoothed.estimates.reverse();
+        smoothed.residuals.reverse();
+        smoothed.filter_smoother_ratios.reverse();
 
         Ok(smoothed)
     }
@@ -188,6 +232,24 @@ where
     /// Returns a zipper iterator on the estimates and the associated residuals.
     pub fn results(&self) -> Zip<Iter<'_, EstType>, Iter<'_, Option<Residual<MsrSize>>>> {
         self.estimates.iter().zip(self.residuals.iter())
+    }
+
+    /// Returns the root mean square of the prefit residuals
+    pub fn rms_prefit_residuals(&self) -> f64 {
+        let mut sum = 0.0;
+        for residual in self.residuals.iter().flatten() {
+            sum += residual.prefit.dot(&residual.prefit);
+        }
+        (sum / (self.residuals.len() as f64)).sqrt()
+    }
+
+    /// Returns the root mean square of the postfit residuals
+    pub fn rms_postfit_residuals(&self) -> f64 {
+        let mut sum = 0.0;
+        for residual in self.residuals.iter().flatten() {
+            sum += residual.postfit.dot(&residual.postfit);
+        }
+        (sum / (self.residuals.len() as f64)).sqrt()
     }
 
     /// Builds the navigation trajectory for the estimated state only
@@ -208,5 +270,14 @@ where
             traj.finalize();
             Ok(traj)
         }
+    }
+
+    /// Returns the root mean square of the prefit residual ratios
+    pub fn rms_residual_ratios(&self) -> f64 {
+        let mut sum = 0.0;
+        for residual in self.residuals.iter().flatten() {
+            sum += residual.ratio.powi(2);
+        }
+        (sum / (self.residuals.len() as f64)).sqrt()
     }
 }
