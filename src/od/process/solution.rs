@@ -88,6 +88,7 @@ where
     ///
     /// This ratio is called "filter smoother consistency test" in the ODTK MathSpec.
     /// It is calculated from the ratio of the states differences between the filter and smoother over the difference in the diagonal of the covariance between the filter and smoother.
+    /// Like residual ratios, a good filter-smoother ratio should be +/- 3.
     ///
     /// To assess whether the smoothing process improved the solution, compare the RMS of the postfit residuals from the filter and the smoother process.
     ///

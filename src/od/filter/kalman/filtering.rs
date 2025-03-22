@@ -181,7 +181,14 @@ where
         r_k: OMatrix<f64, M, M>,
         h_tilde: OMatrix<f64, M, <T as State>::Size>,
         resid_rejection: Option<ResidRejectCrit>,
-    ) -> Result<(Self::Estimate, Residual<M>), ODError> {
+    ) -> Result<
+        (
+            Self::Estimate,
+            Residual<M>,
+            Option<OMatrix<f64, <T as State>::Size, M>>,
+        ),
+        ODError,
+    > {
         let epoch = nominal_state.epoch();
 
         // Grab the state transition matrix.
@@ -236,6 +243,7 @@ where
                         real_obs,
                         computed_obs,
                     ),
+                    None,
                 ));
             }
         }
@@ -305,7 +313,7 @@ where
         for snc in &mut self.process_noise {
             snc.prev_epoch = Some(self.prev_estimate.epoch());
         }
-        Ok((estimate, res))
+        Ok((estimate, res, Some(gain)))
     }
 
     fn is_extended(&self) -> bool {

@@ -78,6 +78,7 @@ pub struct ODProcess<
         + Allocator<<D::StateType as State>::VecLength>
         + Allocator<MsrSize>
         + Allocator<MsrSize, <D::StateType as State>::Size>
+        + Allocator<<D::StateType as State>::Size, MsrSize>
         + Allocator<MsrSize, MsrSize>
         + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
         + Allocator<Accel>
@@ -119,6 +120,7 @@ where
         + Allocator<<D::StateType as State>::VecLength>
         + Allocator<MsrSize>
         + Allocator<MsrSize, <D::StateType as State>::Size>
+        + Allocator<<D::StateType as State>::Size, MsrSize>
         + Allocator<MsrSize, MsrSize>
         + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
         + Allocator<Accel>
@@ -536,7 +538,7 @@ where
                                         h_tilde,
                                         resid_crit,
                                     ) {
-                                        Ok((estimate, mut residual)) => {
+                                        Ok((estimate, mut residual, gain)) => {
                                             debug!("processed measurement #{msr_cnt} for {cur_msr_types:?} @ {epoch} from {}", device.name());
 
                                             residual.tracker = Some(device.name());
@@ -715,6 +717,7 @@ where
         + Allocator<<D::StateType as State>::VecLength>
         + Allocator<MsrSize>
         + Allocator<MsrSize, <D::StateType as State>::Size>
+        + Allocator<<D::StateType as State>::Size, MsrSize>
         + Allocator<MsrSize, MsrSize>
         + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
         + Allocator<Accel>
