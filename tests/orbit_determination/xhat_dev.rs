@@ -13,6 +13,7 @@ use nyx::od::prelude::*;
 use nyx::propagators::{IntegratorOptions, Propagator};
 use nyx::utils::rss_orbit_errors;
 use nyx::Spacecraft;
+use nyx_space::io::ExportCfg;
 use nyx_space::propagators::IntegratorMethod;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
@@ -139,28 +140,22 @@ fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>, devices: BTreeMap<String, G
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
     let kf = KF::new(initial_estimate, process_noise);
 
-    let mut odp = SpacecraftODProcess::ckf(prop_est, kf, devices, None, almanac);
+    let mut odp = SpacecraftODProcess::ckf(prop_est, kf, devices, None, almanac.clone());
 
-    odp.process_arc(&arc).unwrap();
-    let pre_smooth_first_est = odp.estimates[0];
-    let pre_smooth_num_est = odp.estimates.len();
-    odp.iterate_arc(
-        &arc,
-        IterationConf {
-            smoother: SmoothingArc::All,
-            ..Default::default()
-        },
-    )
-    .unwrap();
+    let od_sol = odp.process_arc(&arc).expect("OD process failed");
+    let pre_smooth_first_est = od_sol.estimates[0];
+    let pre_smooth_num_est = od_sol.estimates.len();
+
+    let smoothed_od_sol = od_sol.clone().smooth(almanac).expect("OD smoothing failed");
 
     assert_eq!(
         pre_smooth_num_est,
-        odp.estimates.len(),
+        smoothed_od_sol.estimates.len(),
         "different number of estimates smoothed and not"
     );
 
     // Check the new initial estimate is better than at the start
-    let smoothed_init_state = odp.estimates[0].state().orbit;
+    let smoothed_init_state = smoothed_od_sol.estimates[0].state().orbit;
     let (sm_err_p, sm_err_v) = rss_orbit_errors(&smoothed_init_state, &initial_state);
     println!(
         "New initial state dev: {:.3} m\t{:.3} m/s\n{}",
@@ -175,10 +170,8 @@ fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>, devices: BTreeMap<String, G
     );
     // We don't check the velocity because the initial error is zero, so the smoother will change the velocity for a better fit.
 
-    // TODO: Check that the smoothed trajectory gets better with several smoothing -- https://github.com/nyx-space/nyx/issues/134
-
     // Check that the covariance deflated
-    let est = &odp.estimates.last().unwrap();
+    let est = &smoothed_od_sol.estimates.last().unwrap();
     println!("Estimate:\n{}", est);
     let final_truth_state = traj.at(est.epoch()).unwrap();
     println!("Truth:\n{}", final_truth_state);
@@ -227,7 +220,7 @@ fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>, devices: BTreeMap<String, G
         sm_err_v * 1e3
     );
 
-    let post_smooth_first_est = odp.estimates[0];
+    let post_smooth_first_est = smoothed_od_sol.estimates[0];
 
     let init_pos_rss = initial_state.rss_radius_km(&initial_state_dev).unwrap();
     let init_vel_rss = initial_state.rss_velocity_km_s(&initial_state_dev).unwrap();
@@ -254,11 +247,30 @@ fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>, devices: BTreeMap<String, G
         init_vel_rss, zero_it_vel_rss, one_it_vel_rss
     );
 
-    // TODO: #416
-    // assert!(
-    //     one_it_pos_rss < zero_it_pos_rss,
-    //     "RSS position not better after iteration"
-    // );
+    println!(
+        "RMS before smoothing: {}\t{}\t{}",
+        od_sol.rms_prefit_residuals(),
+        od_sol.rms_postfit_residuals(),
+        od_sol.rms_residual_ratios()
+    );
+    println!(
+        "RMS after smoothing: {}\t{}\t{}",
+        smoothed_od_sol.rms_prefit_residuals(),
+        smoothed_od_sol.rms_postfit_residuals(),
+        smoothed_od_sol.rms_residual_ratios()
+    );
+
+    assert!(
+        smoothed_od_sol.rms_postfit_residuals() < od_sol.rms_postfit_residuals(),
+        "smoothing does not improve the residuals"
+    );
+
+    od_sol
+        .to_parquet("od_sol_xhat.parquet", ExportCfg::default())
+        .expect("could not export smoothed solutions");
+    smoothed_od_sol
+        .to_parquet("od_smooth_xhat.parquet", ExportCfg::default())
+        .expect("could not export smoothed solutions");
 }
 
 #[allow(clippy::identity_op)]

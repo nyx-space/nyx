@@ -70,6 +70,10 @@ def main(path: str, wstats: bool):
         # Convert the Polars column to a NumPy array for compatibility with scipy and Plotly
         residual_ratio = df["Residual ratio"].drop_nulls().to_numpy()
 
+        gain_columns = [c for c in df.columns if "Gain" in c]
+        fs_ratio_columns = [c for c in df.columns if "Filter-smoother ratio" in c]
+        is_filter_run = len(df[gain_columns].drop_nulls()) > 0
+
         # Create QQ plot
         qq = stats.probplot(residual_ratio)
         x_qq = np.array([qq[0][0][0], qq[0][0][-1]])
@@ -110,6 +114,12 @@ def main(path: str, wstats: bool):
 
         # Plot the residual ratios and whether they were accepted.
         px.scatter(df, x="Epoch (UTC)", y="Residual ratio", color="Tracker").show()
+
+        # Plot the filter gains or filter-smoother ratios
+        if is_filter_run:
+            px.scatter(df, x="Epoch (UTC)", y=gain_columns).show()
+        else:
+            px.line(df, x="Epoch (UTC)", y=fs_ratio_columns).show()
 
 
 if __name__ == "__main__":

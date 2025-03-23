@@ -77,6 +77,40 @@ where
         + Allocator<<StateType as State>::Size, <StateType as State>::Size>
         + Allocator<<StateType as State>::Size, MsrSize>,
 {
+    pub fn new(
+        devices: BTreeMap<String, Trk>,
+        measurement_types: IndexSet<MeasurementType>,
+    ) -> Self {
+        Self {
+            estimates: Vec::new(),
+            residuals: Vec::new(),
+            gains: Vec::new(),
+            filter_smoother_ratios: Vec::new(),
+            devices,
+            measurement_types,
+        }
+    }
+
+    /// Pushes a new measurement update result, ensuring proper sizes of the arrays.
+    pub(crate) fn push_measurement_update(
+        &mut self,
+        estimate: EstType,
+        residual: Residual<MsrSize>,
+        gain: Option<OMatrix<f64, <StateType as State>::Size, MsrSize>>,
+    ) {
+        self.estimates.push(estimate);
+        self.residuals.push(Some(residual));
+        self.gains.push(gain);
+        self.filter_smoother_ratios.push(None);
+    }
+
+    /// Pushes a new time update result, ensuring proper sizes of the arrays.
+    pub(crate) fn push_time_update(&mut self, estimate: EstType) {
+        self.estimates.push(estimate);
+        self.residuals.push(None);
+        self.gains.push(None);
+        self.filter_smoother_ratios.push(None);
+    }
     /// Smoothes this OD solution, returning a new OD solution and the filter-smoother consistency ratios, with updated **postfit** residuals, and where the ratio now represents the filter-smoother consistency ratio.
     ///
     /// Notes:
@@ -84,18 +118,56 @@ where
     ///  2. Prefit residuals, ratios, and measurement covariances are not updated, as these depend on the filtering process.
     ///  3. Note: this function consumes the current OD solution to prevent reusing the wrong one.
     ///
-    /// # Filter-Smoother consistency ratio
-    ///
-    /// This ratio is called "filter smoother consistency test" in the ODTK MathSpec.
-    /// It is calculated from the ratio of the states differences between the filter and smoother over the difference in the diagonal of the covariance between the filter and smoother.
-    /// Like residual ratios, a good filter-smoother ratio should be +/- 3.
     ///
     /// To assess whether the smoothing process improved the solution, compare the RMS of the postfit residuals from the filter and the smoother process.
     ///
+    /// # Filter-Smoother consistency ratio
+    ///
+    /// The **filter-smoother consistency ratio** is used to evaluate the consistency between the state estimates produced by a filter (e.g., Kalman filter) and a smoother.
+    /// This ratio is called "filter smoother consistency test" in the ODTK MathSpec.
+    ///
+    /// It is computed as follows:
+    ///
+    /// #### 1. Define the State Estimates
+    /// **Filter state estimate**:
+    /// $ \hat{X}_{f,k} $
+    /// This is the state estimate at time step $ k $ from the filter.
+    ///
+    /// **Smoother state estimate**:
+    /// $ \hat{X}_{s,k} $
+    /// This is the state estimate at time step $ k $ from the smoother.
+    ///
+    /// #### 2. Define the Covariances
+    ///
+    /// **Filter covariance**:
+    /// $ P_{f,k} $
+    /// This is the covariance of the state estimate at time step $ k $ from the filter.
+    ///
+    /// **Smoother covariance**:
+    /// $ P_{s,k} $
+    /// This is the covariance of the state estimate at time step $ k $ from the smoother.
+    ///
+    /// #### 3. Compute the Differences
+    ///
+    /// **State difference**:
+    /// $ \Delta X_k = \hat{X}_{s,k} - \hat{X}_{f,k} $
+    ///
+    /// **Covariance difference**:
+    /// $ \Delta P_k = P_{s,k} - P_{f,k} $
+    ///
+    /// #### 4. Calculate the Consistency Ratio
+    /// For each element $ i $ of the state vector, compute the ratio:
+    ///
+    /// $$
+    /// R_{i,k} = \frac{\Delta X_{i,k}}{\sqrt{\Delta P_{i,k}}}
+    /// $$
+    ///
+    /// #### 5. Evaluate Consistency
+    /// - If $ |R_{i,k}| \leq 3 $ for all $ i $ and $ k $, the filter-smoother consistency test is satisfied, indicating good consistency.
+    /// - If $ |R_{i,k}| > 3 $ for any $ i $ or $ k $, the test fails, suggesting potential modeling inconsistencies or issues with the estimation process.
+    ///
     pub fn smooth(self, almanac: Arc<Almanac>) -> Result<Self, ODError> {
         let l = self.estimates.len() - 1;
-
-        info!("Smoothing {} estimates.", l + 1);
 
         let mut smoothed = Self {
             estimates: Vec::with_capacity(self.estimates.len()),
@@ -110,6 +182,11 @@ where
         smoothed
             .estimates
             .push(self.estimates.last().unwrap().clone());
+        smoothed
+            .residuals
+            .push(self.residuals.last().unwrap().clone());
+        smoothed.gains.push(None);
+        smoothed.filter_smoother_ratios.push(None);
 
         loop {
             let k = l - smoothed.estimates.len();
@@ -187,7 +264,7 @@ where
                 delta_state
                     .iter()
                     .enumerate()
-                    .map(|(i, dx)| dx / delta_covar[(i, i)]),
+                    .map(|(i, dx)| dx / delta_covar[(i, i)].sqrt()),
             );
 
             smoothed.estimates.push(smoothed_est_k);
@@ -282,3 +359,5 @@ where
         (sum / (self.residuals.len() as f64)).sqrt()
     }
 }
+
+// TODO: Allow importing from parquet and initialization of a process, thereby allowing this to serve as a record!!

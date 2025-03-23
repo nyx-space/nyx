@@ -100,7 +100,35 @@ where
         if self.estimates.len() != self.residuals.len() {
             return Err(ODError::ODConfigError {
                 source: ConfigError::InvalidConfig {
-                    msg: "Estimates and residuals are not aligned.".to_string(),
+                    msg: format!(
+                        "Estimates ({}) and residuals ({}) are not aligned.",
+                        self.estimates.len(),
+                        self.residuals.len()
+                    ),
+                },
+            });
+        }
+
+        if self.estimates.len() != self.gains.len() {
+            return Err(ODError::ODConfigError {
+                source: ConfigError::InvalidConfig {
+                    msg: format!(
+                        "Estimates ({}) and filter gains ({}) are not aligned.",
+                        self.estimates.len(),
+                        self.gains.len()
+                    ),
+                },
+            });
+        }
+
+        if self.estimates.len() != self.filter_smoother_ratios.len() {
+            return Err(ODError::ODConfigError {
+                source: ConfigError::InvalidConfig {
+                    msg: format!(
+                        "Estimates ({}) and filter-smoother ratios ({}) are not aligned.",
+                        self.estimates.len(),
+                        self.filter_smoother_ratios.len()
+                    ),
                 },
             });
         }
@@ -291,7 +319,7 @@ where
                         f.unit()
                     ),
                     DataType::Float64,
-                    false,
+                    true,
                 ));
             }
         }
@@ -304,7 +332,7 @@ where
                     state_items[i], cov_units[i],
                 ),
                 DataType::Float64,
-                false,
+                true,
             ));
         }
 

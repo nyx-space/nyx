@@ -329,7 +329,13 @@ where
     /// + The name of all measurement devices must be present in the provided devices, i.e. the key set of `devices` must be a superset of the measurement device names present in the list.
     /// + The maximum step size to ensure we don't skip any measurements.
     #[allow(clippy::erasing_op)]
-    pub fn process_arc(&mut self, arc: &TrackingDataArc) -> Result<(), ODError> {
+    pub fn process_arc(
+        &mut self,
+        arc: &TrackingDataArc,
+    ) -> Result<ODSolution<D::StateType, K::Estimate, MsrSize, Trk>, ODError> {
+        // Initialize the solution.
+        let mut od_sol = ODSolution::new(self.devices.clone(), arc.unique_types());
+
         let measurements = &arc.measurements;
         ensure!(
             measurements.len() >= 2,
@@ -440,6 +446,7 @@ where
                 epoch = nominal_state.epoch();
 
                 // Perform a measurement update, accounting for possible errors in measurement timestamps
+                // TODO: Move epoch precision to process configuration.
                 if (nominal_state.epoch() - next_msr_epoch).abs() < Unit::Microsecond * 1 {
                     // Get the computed observations
                     match self.devices.get_mut(&msr.tracker) {
@@ -572,8 +579,8 @@ where
 
                                             self.prop.state.reset_stm();
 
-                                            self.estimates.push(estimate);
-                                            self.residuals.push(Some(residual));
+                                            od_sol
+                                                .push_measurement_update(estimate, residual, gain);
                                         }
                                         Err(e) => return Err(e),
                                     }
@@ -614,11 +621,8 @@ where
                     debug!("time update {epoch:?}, next msr {next_msr_epoch:?}");
                     match self.kf.time_update(nominal_state) {
                         Ok(est) => {
-                            // State deviation is always zero for an EKF time update
-                            // therefore we don't do anything different for an extended filter
-                            self.estimates.push(est);
-                            // We push None so that the residuals and estimates are aligned
-                            self.residuals.push(None);
+                            // State deviation is always zero for an EKF time update so we don't do anything different than for a CKF.
+                            od_sol.push_time_update(est);
                         }
                         Err(e) => return Err(e),
                     }
@@ -636,7 +640,7 @@ where
             );
         }
 
-        Ok(())
+        Ok(od_sol)
     }
 
     /// Perform a time update. Continuously predicts the trajectory until the provided end epoch, with covariance mapping at each step.
