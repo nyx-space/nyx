@@ -126,7 +126,6 @@ fn tracking_data(
     trk.generate_measurements(almanac).unwrap()
 }
 
-// Consider changing this to a fixture to run the moduli tests.
 #[rstest]
 fn continuous_tracking_cov_test(tracking_data: TrackingDataArc) {
     let arc = tracking_data;
@@ -278,7 +277,7 @@ fn od_with_modulus_cov_test(
         devices,
         EkfTrigger::new(10, Unit::Minute * 15),
         None,
-        almanac,
+        almanac.clone(),
     );
 
     let od_sol = odp.process_arc(&arc).unwrap();
@@ -301,21 +300,7 @@ fn od_with_modulus_cov_test(
 
     println!("rss_pos_km = {rss_pos_km}");
 
-    let reject_count = od_sol
-        .residuals
-        .iter()
-        .map(|resid| {
-            if let Some(resid) = resid {
-                if resid.rejected {
-                    1
-                } else {
-                    0
-                }
-            } else {
-                0
-            }
-        })
-        .sum::<u32>();
+    let reject_count = od_sol.rejected_residuals().len();
 
     assert!(reject_count < 10, "wrong number of expected rejections");
 }

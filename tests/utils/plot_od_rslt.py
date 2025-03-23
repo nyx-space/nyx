@@ -119,7 +119,7 @@ def main(path: str, wstats: bool):
         if is_filter_run:
             px.scatter(df, x="Epoch (UTC)", y=gain_columns).show()
         else:
-            px.line(df, x="Epoch (UTC)", y=fs_ratio_columns).show()
+            px.scatter(df, x="Epoch (UTC)", y=fs_ratio_columns).show()
 
 
 if __name__ == "__main__":

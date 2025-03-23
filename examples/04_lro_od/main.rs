@@ -283,6 +283,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("RIC Position (m): {}", ric_err.radius_km * 1e3);
     println!("RIC Velocity (m/s): {}", ric_err.velocity_km_s * 1e3);
 
+    println!(
+        "Num residuals rejected: #{}",
+        od_sol.rejected_residuals().len()
+    );
+    println!(
+        "Percentage within +/-3: {}",
+        od_sol.residual_ratio_within_threshold(3.0).unwrap()
+    );
+    println!("Ratios normal? {}", od_sol.is_normal(None).unwrap());
+
     od_sol.to_parquet("./04_lro_od_results.parquet", ExportCfg::default())?;
 
     // In our case, we have the truth trajectory from NASA.

@@ -68,6 +68,7 @@ typed-builder = "0.20.0"
 snafu = { version = "0.8.3", features = ["backtrace"] }
 serde_dhall = "0.12"
 indexmap = { version = "2.6.0", features = ["serde"] }
+statrs = "0.18.0"
 
 
 [dev-dependencies]

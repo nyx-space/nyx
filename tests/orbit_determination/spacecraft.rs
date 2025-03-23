@@ -414,7 +414,7 @@ fn od_val_sc_srp_estimation_cov_test(
         proc_devices,
         EkfTrigger::new(30, Unit::Minute * 2),
         None,
-        almanac,
+        almanac.clone(),
     );
 
     let od_sol = odp.process_arc(&arc).unwrap();
@@ -466,4 +466,57 @@ fn od_val_sc_srp_estimation_cov_test(
             );
         }
     }
+
+    // The following are merely checks that the code works as expected, not checks on the OD.
+
+    let pre_smooth_postfit_rms = od_sol.rms_postfit_residuals();
+
+    od_sol
+        .to_parquet("./od_srp_val.parquet", ExportCfg::default())
+        .unwrap();
+
+    println!(
+        "Num residuals accepted: #{}",
+        od_sol.accepted_residuals().len()
+    );
+    println!(
+        "Num residuals rejected: #{}",
+        od_sol.rejected_residuals().len()
+    );
+    println!(
+        "Percentage within +/-3: {}",
+        od_sol.residual_ratio_within_threshold(3.0).unwrap()
+    );
+    println!("Ratios normal? {}", od_sol.is_normal(None).unwrap());
+
+    // Regression tests, not solution test
+    assert_eq!(
+        od_sol.accepted_residuals().len(),
+        2992,
+        "all residuals should be accepted"
+    );
+    assert_eq!(
+        od_sol.rejected_residuals().len(),
+        0,
+        "all residuals should be accepted"
+    );
+    assert!(
+        (0.60..0.70).contains(&od_sol.residual_ratio_within_threshold(3.0).unwrap()),
+        "expecting 60-70% of valid residual ratios"
+    );
+    assert!(
+        !od_sol.is_normal(None).unwrap(),
+        "residuals should not be normally distributed"
+    );
+
+    let od_smoothed_sol = od_sol.smooth(almanac).unwrap();
+
+    od_smoothed_sol
+        .to_parquet("./od_srp_val_smoothed.parquet", ExportCfg::default())
+        .unwrap();
+
+    println!(
+        "one-pass vs smoothed postfit RMS: {pre_smooth_postfit_rms}\t{}",
+        od_smoothed_sol.rms_postfit_residuals()
+    );
 }
