@@ -329,18 +329,17 @@ fn od_robust_test_ekf_rng_dop_az_el(
         almanac.clone(),
     );
 
-    odp_simul.process_arc(&arc).unwrap();
+    let od_simul_sol = odp_simul.process_arc(&arc).unwrap();
 
-    odp_simul
+    od_simul_sol
         .to_parquet(
-            &arc,
             path.with_file_name("ekf_rng_dpl_az_el_odp.parquet"),
             ExportCfg::default(),
         )
         .unwrap();
 
     // Check that the covariance deflated
-    let est = &odp_simul.estimates[odp_simul.estimates.len() - 1];
+    let est = &od_simul_sol.estimates[od_simul_sol.estimates.len() - 1];
     let final_truth_state = traj.at(est.epoch()).unwrap();
 
     println!("Estimate:\n{}", est);
@@ -402,8 +401,8 @@ fn od_robust_test_ekf_rng_dop_az_el(
         almanac.clone(),
     );
 
-    odp_2by2.process_arc(&arc).unwrap();
-    let est_2by2 = &odp_2by2.estimates[odp_2by2.estimates.len() - 1];
+    let od_2by2_sol = odp_2by2.process_arc(&arc).unwrap();
+    let est_2by2 = &od_2by2_sol.estimates[od_2by2_sol.estimates.len() - 1];
 
     let delta = (est_2by2.state().orbit - final_truth_state.orbit).unwrap();
     println!(
@@ -449,8 +448,8 @@ fn od_robust_test_ekf_rng_dop_az_el(
         almanac,
     );
 
-    odp_1by1.process_arc(&arc).unwrap();
-    let est_1by1 = &odp_1by1.estimates[odp_1by1.estimates.len() - 1];
+    let od_1by1_sol = odp_1by1.process_arc(&arc).unwrap();
+    let est_1by1 = &od_1by1_sol.estimates[od_1by1_sol.estimates.len() - 1];
 
     let delta = (est_1by1.state().orbit - final_truth_state.orbit).unwrap();
     println!(

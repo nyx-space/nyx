@@ -221,16 +221,16 @@ fn od_val_sc_mb_srp_reals_duals_models(
 
     let mut odp = SpacecraftODProcess::ckf(prop_est, ckf, proc_devices, None, almanac);
 
-    odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
 
-    odp.to_parquet(
-        &arc,
-        path.with_file_name("spacecraft_od_results.parquet"),
-        ExportCfg::timestamped(),
-    )
-    .unwrap();
+    od_sol
+        .to_parquet(
+            path.with_file_name("spacecraft_od_results.parquet"),
+            ExportCfg::timestamped(),
+        )
+        .unwrap();
 
-    for (no, est) in odp.estimates.iter().enumerate() {
+    for (no, est) in od_sol.estimates.iter().enumerate() {
         if no == 0 {
             // Skip the first estimate which is the initial estimate provided by user
             continue;
@@ -250,7 +250,7 @@ fn od_val_sc_mb_srp_reals_duals_models(
         );
     }
 
-    for res in odp.residuals.iter().flatten() {
+    for res in od_sol.residuals.iter().flatten() {
         assert!(
             res.postfit.norm() < 1e-5,
             "postfit should be zero (perfect dynamics) ({:e})",
@@ -258,7 +258,7 @@ fn od_val_sc_mb_srp_reals_duals_models(
         );
     }
 
-    let est = odp.estimates.last().unwrap();
+    let est = od_sol.estimates.last().unwrap();
     println!("estimate error {:.2e}", est.state_deviation().norm());
     println!("estimate covariance {:.2e}", est.covar.diagonal().norm());
 
@@ -417,16 +417,16 @@ fn od_val_sc_srp_estimation_cov_test(
         almanac,
     );
 
-    odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
 
-    odp.to_parquet(
-        &arc,
-        path.with_file_name("sc_od_with_srp.parquet"),
-        ExportCfg::default(),
-    )
-    .unwrap();
+    od_sol
+        .to_parquet(
+            path.with_file_name("sc_od_with_srp.parquet"),
+            ExportCfg::default(),
+        )
+        .unwrap();
 
-    let est = odp.estimates.last().unwrap();
+    let est = od_sol.estimates.last().unwrap();
 
     let truth = traj.at(est.epoch()).unwrap();
 
@@ -452,7 +452,7 @@ fn od_val_sc_srp_estimation_cov_test(
         "Cr estimation did not improve"
     );
 
-    for (no, est) in odp.estimates.iter().enumerate() {
+    for (no, est) in od_sol.estimates.iter().enumerate() {
         if no == 0 {
             // Skip the first estimate which is the initial estimate provided by user
             continue;

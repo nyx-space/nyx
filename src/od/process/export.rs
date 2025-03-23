@@ -16,7 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::dynamics::SpacecraftDynamics;
 use crate::io::watermark::pq_writer;
 use crate::io::{ArrowSnafu, ExportCfg, ParquetSnafu, StdIOSnafu};
 use crate::linalg::allocator::Allocator;
@@ -29,10 +28,8 @@ use crate::{od::*, Spacecraft};
 use arrow::array::{Array, BooleanBuilder, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
-use filter::kalman::KF;
 use hifitime::TimeScale;
 use msr::sensitivity::TrackerSensitivity;
-use msr::TrackingDataArc;
 use nalgebra::Const;
 use parquet::arrow::ArrowWriter;
 use snafu::prelude::*;
@@ -40,37 +37,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
-use super::{ODProcess, ODSolution};
-
-impl<MsrSize: DimName, Accel: DimName, Trk: TrackerSensitivity<Spacecraft, Spacecraft>>
-    ODProcess<'_, SpacecraftDynamics, MsrSize, Accel, KF<Spacecraft, Accel>, Trk>
-where
-    DefaultAllocator: Allocator<MsrSize>
-        + Allocator<MsrSize, <Spacecraft as State>::Size>
-        + Allocator<Const<1>, MsrSize>
-        + Allocator<<Spacecraft as State>::Size>
-        + Allocator<<Spacecraft as State>::Size, <Spacecraft as State>::Size>
-        + Allocator<MsrSize, MsrSize>
-        + Allocator<MsrSize, <Spacecraft as State>::Size>
-        + Allocator<<Spacecraft as State>::Size, MsrSize>
-        + Allocator<Accel>
-        + Allocator<Accel, Accel>
-        + Allocator<<Spacecraft as State>::Size>
-        + Allocator<<Spacecraft as State>::VecLength>
-        + Allocator<<Spacecraft as State>::Size, <Spacecraft as State>::Size>
-        + Allocator<<Spacecraft as State>::Size, Accel>
-        + Allocator<Accel, <Spacecraft as State>::Size>,
-{
-    /// Store the estimates and residuals in a parquet file
-    pub fn to_parquet<P: AsRef<Path>>(
-        &self,
-        _arc: &TrackingDataArc,
-        _path: P,
-        _cfg: ExportCfg,
-    ) -> Result<PathBuf, ODError> {
-        todo!()
-    }
-}
+use super::ODSolution;
 
 impl<MsrSize: DimName, Trk: TrackerSensitivity<Spacecraft, Spacecraft>>
     ODSolution<Spacecraft, KfEstimate<Spacecraft>, MsrSize, Trk>

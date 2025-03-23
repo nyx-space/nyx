@@ -30,10 +30,8 @@ use indexmap::IndexSet;
 use msr::sensitivity::TrackerSensitivity;
 use snafu::prelude::*;
 use std::collections::BTreeMap;
-use std::iter::Zip;
 use std::marker::PhantomData;
 use std::ops::Add;
-use std::slice::Iter;
 
 mod conf;
 pub use conf::{IterationConf, SmoothingArc};
@@ -92,16 +90,12 @@ pub struct ODProcess<
     pub kf: K,
     /// Tracking devices
     pub devices: BTreeMap<String, Trk>,
-    /// Vector of estimates available after a pass
-    pub estimates: Vec<K::Estimate>,
-    /// Vector of residuals available after a pass
-    pub residuals: Vec<Option<Residual<MsrSize>>>,
     pub ekf_trigger: Option<EkfTrigger>,
     /// Residual rejection criteria allows preventing bad measurements from affecting the estimation.
     pub resid_crit: Option<ResidRejectCrit>,
     pub almanac: Arc<Almanac>,
-    init_state: D::StateType,
-    _marker: PhantomData<Accel>,
+    _msr_size: PhantomData<MsrSize>,
+    _acceleration_size: PhantomData<Accel>,
 }
 
 impl<
@@ -137,18 +131,15 @@ where
         resid_crit: Option<ResidRejectCrit>,
         almanac: Arc<Almanac>,
     ) -> Self {
-        let init_state = prop.state;
         Self {
             prop: prop.quiet(),
             kf,
             devices,
-            estimates: Vec::with_capacity(10_000),
-            residuals: Vec::with_capacity(10_000),
             ekf_trigger,
             resid_crit,
             almanac,
-            init_state,
-            _marker: PhantomData::<Accel>,
+            _msr_size: PhantomData::<MsrSize>,
+            _acceleration_size: PhantomData::<Accel>,
         }
     }
 
@@ -161,165 +152,16 @@ where
         resid_crit: Option<ResidRejectCrit>,
         almanac: Arc<Almanac>,
     ) -> Self {
-        let init_state = prop.state;
         Self {
             prop: prop.quiet(),
             kf,
             devices,
-            estimates: Vec::with_capacity(10_000),
-            residuals: Vec::with_capacity(10_000),
             ekf_trigger: Some(trigger),
             resid_crit,
             almanac,
-            init_state,
-            _marker: PhantomData::<Accel>,
+            _msr_size: PhantomData::<MsrSize>,
+            _acceleration_size: PhantomData::<Accel>,
         }
-    }
-
-    /// Allows to smooth the provided estimates. Returns the smoothed estimates or an error.
-    ///
-    /// Estimates must be ordered in chronological order. This function will smooth the
-    /// estimates from the last in the list to the first one.
-    #[deprecated = "use the ODSolution instead"]
-    pub fn smooth(&self, _condition: SmoothingArc) -> Result<Vec<K::Estimate>, ODError> {
-        panic!("use the ODSolution instead")
-    }
-
-    /// Returns the root mean square of the prefit residual ratios
-    pub fn rms_residual_ratios(&self) -> f64 {
-        let mut sum = 0.0;
-        for residual in self.residuals.iter().flatten() {
-            sum += residual.ratio.powi(2);
-        }
-        (sum / (self.residuals.len() as f64)).sqrt()
-    }
-
-    /// Allows iterating on the filter solution. Requires specifying a smoothing condition to know where to stop the smoothing.
-    pub fn iterate_arc(
-        &mut self,
-        arc: &TrackingDataArc,
-        config: IterationConf,
-    ) -> Result<(), ODError> {
-        let mut best_rms = self.rms_residual_ratios();
-        let mut previous_rms = best_rms;
-        let mut divergence_cnt = 0;
-        let mut iter_cnt = 0;
-        loop {
-            if best_rms <= config.absolute_tol {
-                info!("*****************");
-                info!("*** CONVERGED ***");
-                info!("*****************");
-
-                info!(
-                    "Filter converged to absolute tolerance ({:.2e} < {:.2e}) after {} iterations",
-                    best_rms, config.absolute_tol, iter_cnt
-                );
-                break;
-            }
-
-            iter_cnt += 1;
-
-            // Prevent infinite loop when iterating prior to turning on the EKF.
-            if let Some(trigger) = &mut self.ekf_trigger {
-                trigger.reset();
-            }
-
-            info!("***************************");
-            info!("*** Iteration number {iter_cnt:02} ***");
-            info!("***************************");
-
-            // First, smooth the estimates
-            let smoothed = self.smooth(config.smoother)?;
-            // Reset the propagator
-            self.prop.state = self.init_state;
-            // Empty the estimates and add the first smoothed estimate as the initial estimate
-            self.estimates = Vec::with_capacity(arc.measurements.len().max(self.estimates.len()));
-            self.residuals = Vec::with_capacity(arc.measurements.len().max(self.estimates.len()));
-
-            self.kf.set_previous_estimate(&smoothed[0]);
-            // And re-run the filter
-            self.process_arc(arc)?;
-
-            // Compute the new RMS
-            let new_rms = self.rms_residual_ratios();
-            let cur_rms_num = (new_rms - previous_rms).abs();
-            let cur_rel_rms = cur_rms_num / previous_rms;
-            if cur_rel_rms < config.relative_tol || cur_rms_num < config.absolute_tol * best_rms {
-                if previous_rms < best_rms {
-                    best_rms = previous_rms;
-                }
-                info!("*****************");
-                info!("*** CONVERGED ***");
-                info!("*****************");
-                info!(
-                    "New residual RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
-                    new_rms, previous_rms, best_rms
-                );
-                if cur_rel_rms < config.relative_tol {
-                    info!(
-                        "Filter converged on relative tolerance ({:.2e} < {:.2e}) after {} iterations",
-                        cur_rel_rms, config.relative_tol, iter_cnt
-                    );
-                } else {
-                    info!(
-                        "Filter converged on relative change ({:.2e} < {:.2e} * {:.2e}) after {} iterations",
-                        cur_rms_num, config.absolute_tol, best_rms, iter_cnt
-                    );
-                }
-                break;
-            } else if new_rms > previous_rms {
-                warn!(
-                    "New residual RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5} ({cur_rel_rms:.2e} > {:.2e})",
-                    new_rms, previous_rms, best_rms, config.relative_tol
-                );
-                divergence_cnt += 1;
-                previous_rms = new_rms;
-                if divergence_cnt >= config.max_divergences {
-                    let msg = format!(
-                        "Filter iterations have continuously diverged {} times: {}",
-                        config.max_divergences, config
-                    );
-                    if config.force_failure {
-                        return Err(ODError::Diverged {
-                            loops: config.max_divergences,
-                        });
-                    } else {
-                        error!("{}", msg);
-                        break;
-                    }
-                } else {
-                    warn!("Filter iteration caused divergence {} of {} acceptable subsequent divergences", divergence_cnt, config.max_divergences);
-                }
-            } else {
-                info!(
-                    "New residual RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5} ({cur_rel_rms:.2e} > {:.2e})",
-                    new_rms, previous_rms, best_rms, config.relative_tol
-                );
-                // Reset the counter
-                divergence_cnt = 0;
-                previous_rms = new_rms;
-                if previous_rms < best_rms {
-                    best_rms = previous_rms;
-                }
-            }
-
-            if iter_cnt >= config.max_iterations {
-                let msg = format!(
-                    "Filter has iterated {} times but failed to reach filter convergence criteria: {}",
-                    config.max_iterations, config
-                );
-                if config.force_failure {
-                    return Err(ODError::Diverged {
-                        loops: config.max_divergences,
-                    });
-                } else {
-                    error!("{}", msg);
-                    break;
-                }
-            }
-        }
-
-        Ok(())
     }
 
     /// Process the provided measurements for this orbit determination process given the associated devices.
@@ -644,7 +486,14 @@ where
     }
 
     /// Perform a time update. Continuously predicts the trajectory until the provided end epoch, with covariance mapping at each step.
-    pub fn predict_until(&mut self, step: Duration, end_epoch: Epoch) -> Result<(), ODError> {
+    pub fn predict_until(
+        &mut self,
+        step: Duration,
+        end_epoch: Epoch,
+    ) -> Result<ODSolution<D::StateType, K::Estimate, MsrSize, Trk>, ODError> {
+        // Initialize the solution with no measurement types.
+        let mut od_sol = ODSolution::new(self.devices.clone(), IndexSet::new());
+
         let prop_time = end_epoch - self.kf.previous_estimate().epoch();
         info!("Mapping covariance for {prop_time} until {end_epoch} with {step} step");
 
@@ -657,10 +506,7 @@ where
             debug!("time update {epoch}");
             match self.kf.time_update(nominal_state) {
                 Ok(est) => {
-                    // State deviation is always zero for an EKF time update
-                    // therefore we don't do anything different for an extended filter
-                    self.estimates.push(est);
-                    self.residuals.push(None);
+                    od_sol.push_time_update(est);
                 }
                 Err(e) => return Err(e),
             }
@@ -670,38 +516,17 @@ where
             }
         }
 
-        Ok(())
+        Ok(od_sol)
     }
 
     /// Perform a time update. Continuously predicts the trajectory for the provided duration, with covariance mapping at each step. In other words, this performs a time update.
-    pub fn predict_for(&mut self, step: Duration, duration: Duration) -> Result<(), ODError> {
+    pub fn predict_for(
+        &mut self,
+        step: Duration,
+        duration: Duration,
+    ) -> Result<ODSolution<D::StateType, K::Estimate, MsrSize, Trk>, ODError> {
         let end_epoch = self.kf.previous_estimate().epoch() + duration;
         self.predict_until(step, end_epoch)
-    }
-
-    /// Builds the navigation trajectory for the estimated state only
-    pub fn to_traj(&self) -> Result<Traj<D::StateType>, NyxError>
-    where
-        DefaultAllocator: Allocator<<D::StateType as State>::VecLength>,
-    {
-        if self.estimates.is_empty() {
-            Err(NyxError::NoStateData {
-                msg: "No navigation trajectory to generate: run the OD process first".to_string(),
-            })
-        } else {
-            // Make sure to remove duplicate entries.
-            let mut traj = Traj {
-                states: self.estimates.iter().map(|est| est.state()).collect(),
-                name: None,
-            };
-            traj.finalize();
-            Ok(traj)
-        }
-    }
-
-    /// Returns a zipper iterator on the estimates and the associated residuals.
-    pub fn results(&self) -> Zip<Iter<'_, K::Estimate>, Iter<'_, Option<Residual<MsrSize>>>> {
-        self.estimates.iter().zip(self.residuals.iter())
     }
 }
 
@@ -736,18 +561,15 @@ where
         resid_crit: Option<ResidRejectCrit>,
         almanac: Arc<Almanac>,
     ) -> Self {
-        let init_state = prop.state;
         Self {
             prop: prop.quiet(),
             kf,
             devices,
-            estimates: Vec::with_capacity(10_000),
-            residuals: Vec::with_capacity(10_000),
             resid_crit,
             ekf_trigger: None,
-            init_state,
             almanac,
-            _marker: PhantomData::<Accel>,
+            _msr_size: PhantomData::<MsrSize>,
+            _acceleration_size: PhantomData::<Accel>,
         }
     }
 }

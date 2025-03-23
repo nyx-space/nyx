@@ -16,7 +16,7 @@ use nyx::{
     dynamics::{guidance::LocalFrame, OrbitalDynamics, SolarPressure, SpacecraftDynamics},
     io::ExportCfg,
     mc::MonteCarlo,
-    od::{msr::TrackingDataArc, prelude::KF, process::SpacecraftUncertainty, SpacecraftODProcess},
+    od::{prelude::KF, process::SpacecraftUncertainty, SpacecraftODProcess},
     propagators::Propagator,
     Spacecraft, State,
 };
@@ -121,12 +121,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Define the prediction step, i.e. how often we want to know the covariance.
     let step = 1_i64.minutes();
     // Finally, predict, and export the trajectory with covariance to a parquet file.
-    odp.predict_for(step, prediction_duration)?;
-    odp.to_parquet(
-        &TrackingDataArc::default(),
-        "./02_jwst_covar_map.parquet",
-        ExportCfg::default(),
-    )?;
+    let od_sol = odp.predict_for(step, prediction_duration)?;
+    od_sol.to_parquet("./02_jwst_covar_map.parquet", ExportCfg::default())?;
 
     // === Monte Carlo framework ===
     // Nyx comes with a complete multi-threaded Monte Carlo frame. It's blazing fast.

@@ -16,7 +16,6 @@ use nyx::Spacecraft;
 use nyx_space::io::ExportCfg;
 use nyx_space::propagators::IntegratorMethod;
 use std::collections::BTreeMap;
-use std::convert::TryFrom;
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use rstest::*;
@@ -367,12 +366,12 @@ fn xhat_dev_test_ekf_multi_body(almanac: Arc<Almanac>, devices: BTreeMap<String,
 
     let mut odp = SpacecraftODProcess::ekf(prop_est, kf, devices, trig, None, almanac);
 
-    odp.process_arc(&arc).unwrap();
-    odp.iterate_arc(&arc, IterationConf::try_from(SmoothingArc::All).unwrap())
-        .unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
+    // odp.iterate_arc(&arc, IterationConf::try_from(SmoothingArc::All).unwrap())
+    //     .unwrap();
 
     // Check that the covariance deflated
-    let est = &odp.estimates.last().unwrap();
+    let est = &od_sol.estimates.last().unwrap();
     let final_truth_state = traj.at(est.epoch()).unwrap();
 
     println!("Estimate:\n{}", est);
@@ -531,10 +530,10 @@ fn xhat_dev_test_ekf_harmonics(almanac: Arc<Almanac>, devices: BTreeMap<String, 
 
     let mut odp = SpacecraftODProcess::ekf(prop_est, kf, devices, trig, None, almanac);
 
-    odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
 
     // Check that the covariance deflated
-    let est = &odp.estimates.last().unwrap();
+    let est = &od_sol.estimates.last().unwrap();
     let final_truth_state = traj.at(est.epoch()).unwrap();
 
     println!("Estimate:\n{}", est);
@@ -664,10 +663,10 @@ fn xhat_dev_test_ekf_realistic(almanac: Arc<Almanac>, devices: BTreeMap<String, 
 
     let mut odp = SpacecraftODProcess::ekf(prop_est, kf, devices, trig, None, almanac);
 
-    odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
 
     // Check that the covariance deflated
-    let est = &odp.estimates.last().unwrap();
+    let est = &od_sol.estimates.last().unwrap();
     let final_truth_state = traj.at(est.epoch()).unwrap();
 
     println!("Estimate:\n{}", est);
@@ -797,17 +796,17 @@ fn xhat_dev_test_ckf_smoother_multi_body(
 
     let kf = KF::no_snc(initial_estimate);
 
-    let mut odp = SpacecraftODProcess::ckf(prop_est, kf, devices, None, almanac);
+    let mut odp = SpacecraftODProcess::ckf(prop_est, kf, devices, None, almanac.clone());
 
-    odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
 
     // Smoother
-    let smoothed_estimates = odp.smooth(SmoothingArc::All).unwrap();
+    let smoothed = od_sol.clone().smooth(almanac).unwrap();
 
     // Check that the estimates and smoothed estimates have the same epochs
-    for (i, sm_est) in smoothed_estimates.iter().enumerate() {
+    for (i, sm_est) in smoothed.estimates.iter().enumerate() {
         let this_epoch = sm_est.epoch();
-        let est_epoch = odp.estimates[i].epoch();
+        let est_epoch = od_sol.estimates[i].epoch();
         assert_eq!(
             this_epoch, est_epoch,
             "Smoothed estimate epoch different from ODP estimate epoch: {} != {}",
@@ -815,16 +814,16 @@ fn xhat_dev_test_ckf_smoother_multi_body(
         );
     }
     assert_eq!(
-        odp.estimates.len(),
-        smoothed_estimates.len(),
+        od_sol.estimates.len(),
+        smoothed.estimates.len(),
         "Different number of estimates and smoothed estimates"
     );
 
     // Check the first estimate, which should be better thanks to smoothing
     // Only the print the final estimate
-    let est = &odp.estimates[0];
+    let est = &od_sol.estimates[0];
     let truth_state = traj.at(est.epoch()).unwrap().orbit;
-    let smoothed_est = &smoothed_estimates[0];
+    let smoothed_est = &smoothed.estimates[0];
     let (err_p, err_v) = rss_orbit_errors(&est.state().orbit, &truth_state);
     let (err_p_sm, err_v_sm) = rss_orbit_errors(&smoothed_est.state().orbit, &truth_state);
 
@@ -854,8 +853,8 @@ fn xhat_dev_test_ckf_smoother_multi_body(
     let mut num_vel_ok = 0;
 
     // Test smoothed estimates
-    for (i, est) in odp.estimates.iter().enumerate() {
-        let smoothed_est = &smoothed_estimates[i];
+    for (i, est) in od_sol.estimates.iter().enumerate() {
+        let smoothed_est = &smoothed.estimates[i];
 
         // Check that the covariance deflated
         let truth_state = traj.at(est.epoch()).unwrap().orbit;
@@ -949,13 +948,13 @@ fn xhat_dev_test_ckf_smoother_multi_body(
         }
     }
 
-    let cntf = odp.estimates.len() as f64;
+    let cntf = od_sol.estimates.len() as f64;
     println!(
         "\nPos. better: {}/{}\tVel. better: {}/{}\nPre-smoothing  avr. RSS:\t{:.3e}\t{:.3e}\nPost-smoothing avr. RSS:\t{:.3e}\t{:.3e}\n",
         num_pos_ok,
-        odp.estimates.len(),
+        od_sol.estimates.len(),
         num_vel_ok,
-        odp.estimates.len(),
+        od_sol.estimates.len(),
         rss_pos_avr / cntf,
         rss_vel_avr / cntf,
         rss_pos_avr_sm / cntf,
@@ -1067,13 +1066,13 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body(
         devices,
         EkfTrigger::new(ekf_num_meas, ekf_disable_time),
         None,
-        almanac,
+        almanac.clone(),
     );
 
-    odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
 
     // Smoother
-    let smoothed_estimates = odp.smooth(SmoothingArc::All).unwrap();
+    let smoothed = od_sol.clone().smooth(almanac.clone()).unwrap();
 
     let mut rss_pos_avr = 0.0;
     let mut rss_vel_avr = 0.0;
@@ -1084,11 +1083,11 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body(
 
     // Test smoothed estimates
     // Skip the first 10 estimates which are surprisingly good in this case
-    for offset in (1..odp.estimates.len() - 10).rev() {
-        let smoothed_est = &smoothed_estimates[odp.estimates.len() - offset];
+    for offset in (1..od_sol.estimates.len() - 10).rev() {
+        let smoothed_est = &smoothed.estimates[od_sol.estimates.len() - offset];
 
         // Check that the covariance deflated
-        let est = &odp.estimates[odp.estimates.len() - offset];
+        let est = &od_sol.estimates[od_sol.estimates.len() - offset];
         let truth_state = traj.at(est.epoch()).unwrap().orbit;
 
         // Some sanity checks to make sure that we have correctly indexed the estimates
@@ -1169,7 +1168,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body(
             println!(
                 "RSS position error after smoothing not better @{} (#{}):\n\testimate vs truth: {:.3e} m\t{:.3e} m/s\n{}\n\tsmoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
                 truth_state.epoch,
-                odp.estimates.len() - offset,
+                od_sol.estimates.len() - offset,
                 err_p * 1e3,
                 err_v * 1e3,
                 (truth_state - est.state().orbit).unwrap(),
@@ -1183,7 +1182,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body(
             println!(
                 "RSS velocity error after smoothing not better @{} (#{}):\n\testimate vs truth: {:.3e} m\t{:.3e} m/s\n{}\n\tsmoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
                 truth_state.epoch,
-                odp.estimates.len() - offset,
+                od_sol.estimates.len() - offset,
                 err_p * 1e3,
                 err_v * 1e3,
                 (truth_state - est.state().orbit).unwrap(),
@@ -1201,19 +1200,19 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body(
                     i,
                     est.covar[(i, i)],
                     truth_state.epoch,
-                    odp.estimates.len() - offset,
+                    od_sol.estimates.len() - offset,
                 );
             }
         }
     }
 
-    let cntf = odp.estimates.len() as f64;
+    let cntf = od_sol.estimates.len() as f64;
     println!(
         "\nPos. better: {}/{}\tVel. better: {}/{}\nPre-smoothing  avr. RSS:\t{:.3e}\t{:.3e}\nPost-smoothing avr. RSS:\t{:.3e}\t{:.3e}\n",
         num_pos_ok,
-        odp.estimates.len(),
+        od_sol.estimates.len(),
         num_vel_ok,
-        odp.estimates.len(),
+        od_sol.estimates.len(),
         rss_pos_avr / cntf,
         rss_vel_avr / cntf,
         rss_pos_avr_sm / cntf,
@@ -1312,16 +1311,15 @@ fn xhat_dev_test_ckf_iteration_multi_body(
 
     let kf = KF::no_snc(initial_estimate);
 
-    let mut odp = SpacecraftODProcess::ckf(prop_est, kf, devices, None, almanac);
+    let mut odp = SpacecraftODProcess::ckf(prop_est, kf, devices, None, almanac.clone());
 
-    odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
 
     // Clone the initial estimates
-    let pre_iteration_estimates = odp.estimates.clone();
+    let pre_iteration_estimates = od_sol.estimates.clone();
 
     // Iterate
-    odp.iterate_arc(&arc, IterationConf::try_from(SmoothingArc::All).unwrap())
-        .unwrap();
+    let smoothed = od_sol.clone().smooth(almanac.clone()).unwrap();
 
     let mut rss_pos_avr = 0.0;
     let mut rss_vel_avr = 0.0;
@@ -1332,11 +1330,11 @@ fn xhat_dev_test_ckf_iteration_multi_body(
 
     // Compare the initial estimates and the iterated estimates
     // Skip the first 10 estimates which are surprisingly good in this case
-    for offset in (1..odp.estimates.len() - 10).rev() {
-        let prior_est = &pre_iteration_estimates[odp.estimates.len() - offset];
+    for offset in (1..od_sol.estimates.len() - 10).rev() {
+        let prior_est = &pre_iteration_estimates[od_sol.estimates.len() - offset];
 
         // Check that the covariance deflated
-        let est = &odp.estimates[odp.estimates.len() - offset];
+        let est = &smoothed.estimates[od_sol.estimates.len() - offset];
         let truth_state = traj.at(est.epoch()).unwrap().orbit;
 
         // Some sanity checks to make sure that we have correctly indexed the estimates
@@ -1414,7 +1412,7 @@ fn xhat_dev_test_ckf_iteration_multi_body(
             println!(
                 "RSS position error after iteration not better @{} (#{}):\n\testimate vs truth: {:.3e} m\t{:.3e} m/s\n{}\n\tsmoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
                 truth_state.epoch,
-                odp.estimates.len() - offset,
+                od_sol.estimates.len() - offset,
                 err_p * 1e3,
                 err_v * 1e3,
                 (truth_state - prior_est.state().orbit).unwrap(),
@@ -1428,7 +1426,7 @@ fn xhat_dev_test_ckf_iteration_multi_body(
             println!(
                 "RSS velocity error after smoothing not better @{} (#{}):\n\testimate vs truth: {:.3e} m\t{:.3e} m/s\n{}\n\tsmoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
                 truth_state.epoch,
-                odp.estimates.len() - offset,
+                od_sol.estimates.len() - offset,
                 err_p * 1e3,
                 err_v * 1e3,
                 (truth_state - prior_est.state().orbit).unwrap(),
@@ -1446,19 +1444,19 @@ fn xhat_dev_test_ckf_iteration_multi_body(
                     i,
                     est.covar[(i, i)],
                     truth_state.epoch,
-                    odp.estimates.len() - offset,
+                    od_sol.estimates.len() - offset,
                 );
             }
         }
     }
 
-    let cntf = odp.estimates.len() as f64;
+    let cntf = od_sol.estimates.len() as f64;
     println!(
         "\nPos. better: {}/{}\tVel. better: {}/{}\nPre-iteration  avr. RSS:\t{:.3e}\t{:.3e}\nPost-iteration avr. RSS:\t{:.3e}\t{:.3e}\n",
         num_pos_ok,
-        odp.estimates.len(),
+        od_sol.estimates.len(),
         num_vel_ok,
-        odp.estimates.len(),
+        od_sol.estimates.len(),
         rss_pos_avr / cntf,
         rss_vel_avr / cntf,
         rss_pos_avr_it / cntf,

@@ -273,22 +273,22 @@ fn main() -> Result<(), Box<dyn Error>> {
         almanac.clone(),
     );
 
-    odp.process_arc(&arc)?;
+    let od_sol = odp.process_arc(&arc)?;
 
     let ric_err = traj_as_flown
-        .at(odp.estimates.last().unwrap().epoch())?
+        .at(od_sol.estimates.last().unwrap().epoch())?
         .orbit
-        .ric_difference(&odp.estimates.last().unwrap().orbital_state())?;
+        .ric_difference(&od_sol.estimates.last().unwrap().orbital_state())?;
     println!("== RIC at end ==");
     println!("RIC Position (m): {}", ric_err.radius_km * 1e3);
     println!("RIC Velocity (m/s): {}", ric_err.velocity_km_s * 1e3);
 
-    odp.to_parquet(&arc, "./04_lro_od_results.parquet", ExportCfg::default())?;
+    od_sol.to_parquet("./04_lro_od_results.parquet", ExportCfg::default())?;
 
     // In our case, we have the truth trajectory from NASA.
     // So we can compute the RIC state difference between the real LRO ephem and what we've just estimated.
     // Export the OD trajectory first.
-    let od_trajectory = odp.to_traj()?;
+    let od_trajectory = od_sol.to_traj()?;
     // Build the RIC difference.
     od_trajectory.ric_diff_to_parquet(
         &traj_as_flown,

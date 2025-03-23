@@ -222,7 +222,7 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
         almanac,
     );
 
-    odp.process_arc(&tracking_arc).unwrap();
+    let od_sol = odp.process_arc(&tracking_arc).unwrap();
 
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
@@ -232,10 +232,9 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
     .iter()
     .collect();
 
-    odp.to_parquet(&tracking_arc, path, ExportCfg::timestamped())
-        .unwrap();
+    od_sol.to_parquet(path, ExportCfg::timestamped()).unwrap();
 
-    let num_rejections = odp
+    let num_rejections = od_sol
         .residuals
         .iter()
         .flatten()
@@ -243,10 +242,10 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
         .count();
 
     // Check that the final post-fit residual isn't too bad, and definitely much better than the prefit.
-    let est = &odp.estimates.last().unwrap();
+    let est = &od_sol.estimates.last().unwrap();
     // BUG ? The prefit to postfit ratio seems to be a near consistent factor of two. Even with a postfit of zero, the state deviations are high: 8.4 km and 11.7 m/s.
     // This is the case both with a sequential filter and a dual filter. SNC has no effect. Neither does the seed.
-    for (ith, (est, opt_resid)) in odp.estimates.iter().zip(odp.residuals.iter()).enumerate() {
+    for (ith, (est, opt_resid)) in od_sol.results().enumerate() {
         if let Some(resid) = opt_resid {
             println!("RESIDUAL #{ith}");
             let truth_state = traj.at(resid.epoch).unwrap();
@@ -267,7 +266,7 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
             }
         }
     }
-    let final_resid = &odp.residuals.last().unwrap().as_ref().unwrap();
+    let final_resid = &od_sol.residuals.last().unwrap().as_ref().unwrap();
     let final_truth_state = traj.at(est.epoch()).unwrap();
 
     println!("FINAL\n{final_resid}");
@@ -345,7 +344,7 @@ fn od_resid_reject_default_ckf_two_way_cov_test(
         almanac,
     );
 
-    odp.process_arc(&tracking_arc).unwrap();
+    let od_sol = odp.process_arc(&tracking_arc).unwrap();
 
     // Save this result before the asserts for analysis
     let path: PathBuf = [
@@ -355,10 +354,9 @@ fn od_resid_reject_default_ckf_two_way_cov_test(
     ]
     .iter()
     .collect();
-    odp.to_parquet(&tracking_arc, path, ExportCfg::timestamped())
-        .unwrap();
+    od_sol.to_parquet(path, ExportCfg::timestamped()).unwrap();
 
-    let num_rejections = odp
+    let num_rejections = od_sol
         .residuals
         .iter()
         .flatten()
@@ -368,7 +366,7 @@ fn od_resid_reject_default_ckf_two_way_cov_test(
     assert!(num_rejections > 220);
 
     // Check that the error is within the covariance.
-    let est = &odp.estimates.last().unwrap();
+    let est = &od_sol.estimates.last().unwrap();
     let final_truth_state = traj.at(est.epoch()).unwrap();
 
     println!("Estimate:\n{}", est);

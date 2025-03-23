@@ -157,10 +157,10 @@ fn od_val_multi_body_ckf_perfect_stations(
 
     let mut odp = ODProcess::<_, U2, _, _, _>::ckf(prop_est, ckf, proc_devices, None, almanac);
 
-    odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
 
     let mut last_est = None;
-    for (no, est) in odp.estimates.iter().enumerate() {
+    for (no, est) in od_sol.estimates.iter().enumerate() {
         if no == 0 {
             // Skip the first estimate which is the initial estimate provided by user
             continue;
@@ -183,7 +183,7 @@ fn od_val_multi_body_ckf_perfect_stations(
         last_est = Some(est);
     }
 
-    for res in odp.residuals.iter().flatten() {
+    for res in od_sol.residuals.iter().flatten() {
         assert!(
             res.postfit.norm() < f64::EPSILON,
             "postfit should be zero (perfect dynamics) ({:e})",
@@ -292,10 +292,10 @@ fn multi_body_ckf_covar_map_cov_test(
     let mut odp =
         ODProcess::<_, U2, _, _, _>::ckf(prop_est, ckf, proc_devices, None, almanac.clone());
 
-    odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
 
     let mut num_pred = 0_u32;
-    for est in odp.estimates.iter() {
+    for est in od_sol.estimates.iter() {
         if est.predicted {
             num_pred += 1;
         } else {
@@ -317,7 +317,7 @@ fn multi_body_ckf_covar_map_cov_test(
     }
 
     // Note that we check the residuals separately from the estimates because we have many predicted estimates which do not have any associated residuals.
-    for res in odp.residuals.iter().flatten() {
+    for res in od_sol.residuals.iter().flatten() {
         assert!(
             res.postfit.norm() < f64::EPSILON,
             "postfit should be zero (perfect dynamics) ({:e})",
@@ -327,13 +327,13 @@ fn multi_body_ckf_covar_map_cov_test(
 
     assert!(num_pred > 0, "no predicted estimates");
 
-    let est = odp.estimates.last().unwrap();
+    let est = od_sol.estimates.last().unwrap();
 
     println!("{:.2e}", est.state_deviation().norm());
     println!("{:.2e}", est.covar.norm());
 
     // Test that we can generate a navigation trajectory and search it
-    let nav_traj = odp.to_traj().unwrap();
+    let nav_traj = od_sol.to_traj().unwrap();
     let aop_event = Event::apoapsis();
     for found_event in nav_traj.find(&aop_event, almanac).unwrap() {
         println!("{:x}", found_event.state);

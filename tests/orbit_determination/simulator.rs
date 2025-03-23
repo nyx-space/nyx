@@ -281,17 +281,17 @@ fn od_with_modulus_cov_test(
         almanac,
     );
 
-    odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
 
-    odp.to_parquet(
-        &arc,
-        "./output_data/od_with_modulus.parquet",
-        ExportCfg::default(),
-    )
-    .unwrap();
+    od_sol
+        .to_parquet(
+            "./output_data/od_with_modulus.parquet",
+            ExportCfg::default(),
+        )
+        .unwrap();
 
     // Check the final error.
-    let estimate = odp.estimates.last().unwrap();
+    let estimate = od_sol.estimates.last().unwrap();
     let rss_pos_km = trajectory
         .at(estimate.epoch())
         .unwrap()
@@ -301,7 +301,7 @@ fn od_with_modulus_cov_test(
 
     println!("rss_pos_km = {rss_pos_km}");
 
-    let reject_count = odp
+    let reject_count = od_sol
         .residuals
         .iter()
         .map(|resid| {
@@ -374,17 +374,17 @@ fn od_with_modulus_as_bias_cov_test(
         almanac,
     );
 
-    odp.process_arc(&tracking_data).unwrap();
+    let od_sol = odp.process_arc(&tracking_data).unwrap();
 
-    odp.to_parquet(
-        &tracking_data,
-        "./output_data/od_with_modulus.parquet",
-        ExportCfg::default(),
-    )
-    .unwrap();
+    od_sol
+        .to_parquet(
+            "./output_data/od_with_modulus.parquet",
+            ExportCfg::default(),
+        )
+        .unwrap();
 
     // Check the final error.
-    let estimate = odp.estimates.last().unwrap();
+    let estimate = od_sol.estimates.last().unwrap();
     let rss_pos_km = trajectory
         .at(estimate.epoch())
         .unwrap()
