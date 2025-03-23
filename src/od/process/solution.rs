@@ -27,13 +27,29 @@ use msr::sensitivity::TrackerSensitivity;
 use nalgebra::OMatrix;
 use statrs::distribution::{ContinuousCDF, Normal};
 use std::collections::BTreeMap;
+use std::fmt;
 use std::iter::Zip;
 use std::ops::Add;
 use std::slice::Iter;
 
 use self::msr::MeasurementType;
 
-#[derive(Clone, Debug)]
+/// The `ODSolution` structure is designed to manage and analyze the results of an OD process, including
+/// smoothing. It provides various functionalities such as splitting solutions by tracker or measurement type,
+/// joining solutions, and performing statistical analyses.
+///
+/// **Note:** Many methods in this structure assume that the solution has been split into subsets using the `split()` method.
+/// Calling these methods without first splitting will make analysis of operations results less obvious.
+///
+/// # Fields
+/// - `estimates`: A vector of state estimates generated during the OD process.
+/// - `residuals`: A vector of residuals corresponding to the state estimates.
+/// - `gains`: Filter gains used for measurement updates. These are set to `None` after running the smoother.
+/// - `filter_smoother_ratios`: Filter-smoother consistency ratios. These are set to `None` before running the smoother.
+/// - `devices`: A map of tracking devices used in the OD process.
+/// - `measurement_types`: A set of unique measurement types used in the OD process.
+///
+#[derive(Clone, Debug, PartialEq)]
 #[allow(clippy::upper_case_acronyms)]
 pub struct ODSolution<StateType, EstType, MsrSize, Trk>
 where
@@ -313,6 +329,208 @@ where
         self.estimates.iter().zip(self.residuals.iter())
     }
 
+    /// Returns a set of tuples of tracker and measurement types in this OD solution, e.g. `{(Canberra, Range), (Canberra, Doppler)}`.
+    pub fn unique(&self) -> IndexSet<(String, MeasurementType)> {
+        let mut mapping = IndexSet::new();
+        for resid in self.residuals.iter().flatten() {
+            for k in &resid.msr_types {
+                mapping.insert((
+                    resid.tracker.clone().expect("residual tracker not set!"),
+                    *k,
+                ));
+            }
+        }
+        mapping
+    }
+
+    /// Returns this OD solution without any time update
+    pub fn drop_time_updates(mut self) -> Self {
+        let mut estimates = Vec::new();
+        let mut residuals = Vec::new();
+        let mut gains = Vec::new();
+        let mut filter_smoother_ratios = Vec::new();
+
+        for (est, (resid_opt, (gain_opt, fsr_opt))) in self.estimates.iter().zip(
+            self.residuals
+                .iter()
+                .zip(self.gains.iter().zip(self.filter_smoother_ratios.iter())),
+        ) {
+            if resid_opt.is_none() {
+                continue;
+            }
+
+            estimates.push(est.clone());
+            residuals.push(resid_opt.clone());
+            gains.push(gain_opt.clone());
+            filter_smoother_ratios.push(fsr_opt.clone());
+        }
+
+        self.estimates = estimates;
+        self.residuals = residuals;
+        self.gains = gains;
+        self.filter_smoother_ratios = filter_smoother_ratios;
+
+        self
+    }
+
+    /// Returns this OD solution with only data from the desired measurement type, dropping all time updates.
+    pub fn filter_by_msr_type(mut self, msr_type: MeasurementType) -> Self {
+        let mut estimates = Vec::new();
+        let mut residuals = Vec::new();
+        let mut gains = Vec::new();
+        let mut filter_smoother_ratios = Vec::new();
+
+        for (est, (resid_opt, (gain_opt, fsr_opt))) in self.estimates.iter().zip(
+            self.residuals
+                .iter()
+                .zip(self.gains.iter().zip(self.filter_smoother_ratios.iter())),
+        ) {
+            match resid_opt {
+                None => continue, // Drop all time updates
+                Some(resid) => {
+                    if resid.msr_types.contains(&msr_type) {
+                        estimates.push(est.clone());
+                        residuals.push(Some(resid.clone()));
+                        gains.push(gain_opt.clone());
+                        filter_smoother_ratios.push(fsr_opt.clone());
+                    }
+                }
+            }
+        }
+
+        self.estimates = estimates;
+        self.residuals = residuals;
+        self.gains = gains;
+        self.filter_smoother_ratios = filter_smoother_ratios;
+
+        self
+    }
+
+    /// Returns this OD solution with only data from the desired tracker, dropping all time updates.
+    pub fn filter_by_tracker(mut self, tracker: String) -> Self {
+        let mut estimates = Vec::new();
+        let mut residuals = Vec::new();
+        let mut gains = Vec::new();
+        let mut filter_smoother_ratios = Vec::new();
+
+        for (est, (resid_opt, (gain_opt, fsr_opt))) in self.estimates.iter().zip(
+            self.residuals
+                .iter()
+                .zip(self.gains.iter().zip(self.filter_smoother_ratios.iter())),
+        ) {
+            match resid_opt {
+                None => continue, // Drop all time updates
+                Some(resid) => {
+                    if resid.tracker == Some(tracker.clone()) {
+                        estimates.push(est.clone());
+                        residuals.push(Some(resid.clone()));
+                        gains.push(gain_opt.clone());
+                        filter_smoother_ratios.push(fsr_opt.clone());
+                    }
+                }
+            }
+        }
+
+        self.estimates = estimates;
+        self.residuals = residuals;
+        self.gains = gains;
+        self.filter_smoother_ratios = filter_smoother_ratios;
+
+        self
+    }
+
+    /// Returns this OD solution with all data except from the desired tracker, including all time updates
+    pub fn exclude_tracker(mut self, excluded_tracker: String) -> Self {
+        let mut estimates = Vec::new();
+        let mut residuals = Vec::new();
+        let mut gains = Vec::new();
+        let mut filter_smoother_ratios = Vec::new();
+
+        for (est, (resid_opt, (gain_opt, fsr_opt))) in self.estimates.iter().zip(
+            self.residuals
+                .iter()
+                .zip(self.gains.iter().zip(self.filter_smoother_ratios.iter())),
+        ) {
+            if let Some(resid) = resid_opt {
+                if resid.tracker.is_none() || resid.tracker.as_ref().unwrap() == &excluded_tracker {
+                    continue;
+                }
+            }
+            // Otherwise, include in the result.
+            estimates.push(est.clone());
+            residuals.push(resid_opt.clone());
+            gains.push(gain_opt.clone());
+            filter_smoother_ratios.push(fsr_opt.clone());
+        }
+
+        self.estimates = estimates;
+        self.residuals = residuals;
+        self.gains = gains;
+        self.filter_smoother_ratios = filter_smoother_ratios;
+
+        self
+    }
+
+    /// Split this OD solution per tracker and per measurement type, dropping all time updates.
+    pub fn split(self) -> Vec<Self> {
+        let uniques = self.unique();
+        let mut splt = Vec::with_capacity(uniques.len());
+        for (tracker, msr_type) in uniques {
+            splt.push(
+                self.clone()
+                    .filter_by_tracker(tracker)
+                    .filter_by_msr_type(msr_type),
+            );
+        }
+        splt
+    }
+
+    /// Join this OD solution with another one.
+    pub fn join(mut self, mut other: Self) -> Self {
+        self.estimates.append(&mut other.estimates);
+        self.residuals.append(&mut other.residuals);
+        self.gains.append(&mut other.gains);
+        self.filter_smoother_ratios
+            .append(&mut other.filter_smoother_ratios);
+
+        // Sort to ensure chronological order using indices based permutations.
+        // Generate indices representing original positions
+        let mut indices: Vec<usize> = (0..self.estimates.len()).collect();
+
+        // Sort indices based on estimates' epochs
+        indices.sort_by(|&a, &b| {
+            self.estimates[a]
+                .epoch()
+                .partial_cmp(&self.estimates[b].epoch())
+                .expect("Epoch comparison failed")
+        });
+
+        // Apply permutation to both vectors in-place
+        for i in 0..indices.len() {
+            let current = i;
+            while indices[current] != current {
+                let target = indices[current];
+                indices.swap(current, target);
+                self.estimates.swap(current, target);
+                self.residuals.swap(current, target);
+                self.gains.swap(current, target);
+                self.filter_smoother_ratios.swap(current, target);
+            }
+        }
+
+        self
+    }
+
+    /// Returns True if this is the result of a filter run
+    pub fn is_filter_run(&self) -> bool {
+        self.gains.iter().flatten().count() > 0
+    }
+
+    /// Returns True if this is the result of a smoother run
+    pub fn is_smoother_run(&self) -> bool {
+        self.filter_smoother_ratios.iter().flatten().count() > 0
+    }
+
     /// Returns the root mean square of the prefit residuals
     pub fn rms_prefit_residuals(&self) -> f64 {
         let mut sum = 0.0;
@@ -438,7 +656,6 @@ where
                 d_stat = diff;
             }
         }
-        // TODO: Separate by tracker and measurement type.
         Ok(d_stat)
     }
 
@@ -471,6 +688,43 @@ where
         let d_critical = c_alpha / (n as f64).sqrt();
 
         Ok(ks_stat <= d_critical)
+    }
+}
+
+impl<StateType, EstType, MsrSize, Trk> fmt::Display for ODSolution<StateType, EstType, MsrSize, Trk>
+where
+    StateType: Interpolatable + Add<OVector<f64, <StateType as State>::Size>, Output = StateType>,
+    EstType: Estimate<StateType>,
+    MsrSize: DimName,
+    Trk: TrackerSensitivity<StateType, StateType>,
+    <DefaultAllocator as Allocator<<StateType as State>::VecLength>>::Buffer<f64>: Send,
+    DefaultAllocator: Allocator<<StateType as State>::Size>
+        + Allocator<<StateType as State>::VecLength>
+        + Allocator<MsrSize>
+        + Allocator<MsrSize, <StateType as State>::Size>
+        + Allocator<MsrSize, MsrSize>
+        + Allocator<<StateType as State>::Size, <StateType as State>::Size>
+        + Allocator<<StateType as State>::Size, MsrSize>,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.results().count() == 0 {
+            writeln!(f, "Empty OD solution")
+        } else {
+            let kind = if self.is_filter_run() {
+                "Filter"
+            } else {
+                "Smoother"
+            };
+            writeln!(
+                f,
+                "{kind} OD solution from {:?}, spanning {}-{}, with {} estimates, including {} accepted residuals",
+                self.unique(),
+                self.estimates.first().unwrap().epoch(),
+                self.estimates.last().unwrap().epoch(),
+                self.estimates.len(),
+                self.accepted_residuals().len()
+            )
+        }
     }
 }
 

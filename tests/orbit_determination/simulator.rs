@@ -303,6 +303,27 @@ fn od_with_modulus_cov_test(
     let reject_count = od_sol.rejected_residuals().len();
 
     assert!(reject_count < 10, "wrong number of expected rejections");
+
+    // Test filtering the OD solution.
+    let splt = od_sol.clone().split();
+    assert_eq!(splt.len(), 4);
+
+    let mut joined = splt[0].clone();
+    for sol in splt.iter().skip(1) {
+        joined = joined.join(sol.clone());
+    }
+    let msr_updates = od_sol.drop_time_updates();
+    assert_eq!(
+        msr_updates.estimates.len(),
+        msr_updates.residuals.len(),
+        "time updates were not dropped"
+    );
+    // This test processes range and Doppler simultaneously, so after joining the data, we end up with twice as many estimates.
+    assert_eq!(
+        joined.estimates.len(),
+        2 * msr_updates.estimates.len(),
+        "invalid estimate count: {joined} != {msr_updates}"
+    );
 }
 
 #[rstest]

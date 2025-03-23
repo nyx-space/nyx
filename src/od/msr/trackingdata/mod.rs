@@ -221,8 +221,6 @@ impl TrackingDataArc {
 
     /// Returns a new tracking arc that contains measurements from all trackers except the one provided
     pub fn exclude_tracker(mut self, excluded_tracker: String) -> Self {
-        info!("Excluding tracker {excluded_tracker}");
-
         self.measurements = self
             .measurements
             .iter()
