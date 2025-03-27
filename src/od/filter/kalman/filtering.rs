@@ -23,6 +23,7 @@ use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
 use crate::md::StateParameter;
 pub use crate::od::estimate::{Estimate, KfEstimate, Residual};
+use crate::od::prelude::KalmanVariant;
 use crate::od::process::ResidRejectCrit;
 pub use crate::od::snc::ProcessNoise;
 use crate::od::{Filter, ODDynamicsSnafu, ODError, ODStateSnafu, State};
@@ -149,10 +150,10 @@ where
             }
         }
 
-        let state_bar = if self.ekf {
-            OVector::<f64, <T as State>::Size>::zeros()
-        } else {
+        let state_bar = if matches!(self.variant, KalmanVariant::DeviationTracking) {
             stm * self.prev_estimate.state_deviation
+        } else {
+            OVector::<f64, <T as State>::Size>::zeros()
         };
         let estimate = KfEstimate {
             nominal_state,
@@ -256,40 +257,49 @@ where
 
         let gain = covar_bar * &h_tilde.transpose() * &s_k_inv;
 
-        // Compute the state estimate
-        let (state_hat, res) = if self.ekf {
-            // In EKF, the state hat is actually the state deviation. We trust the gain to be correct,
-            // so we just apply it directly to the prefit residual.
-            let state_hat = &gain * &prefit;
-            let postfit = &prefit - (&h_tilde * state_hat);
-            (
-                state_hat,
-                Residual::accepted(
-                    epoch,
-                    prefit,
-                    postfit,
-                    ratio,
-                    r_k_chol.diagonal(),
-                    real_obs,
-                    computed_obs,
-                ),
-            )
-        } else {
-            // Time update
-            let state_bar = stm * self.prev_estimate.state_deviation;
-            let postfit = &prefit - (&h_tilde * state_bar);
-            (
-                state_bar + &gain * &postfit,
-                Residual::accepted(
-                    epoch,
-                    prefit,
-                    postfit,
-                    ratio,
-                    r_k_chol.diagonal(),
-                    real_obs,
-                    computed_obs,
-                ),
-            )
+        // Compute the state estimate, depends on the variant.
+        let (state_hat, res) = match self.variant {
+            KalmanVariant::ReferenceUpdate => {
+                // In EKF, the state hat is actually the state deviation. We trust the gain to be correct,
+                // so we just apply it directly to the prefit residual.
+                let state_hat = &gain * &prefit;
+                let postfit = &prefit - (&h_tilde * state_hat);
+                (
+                    state_hat,
+                    Residual::accepted(
+                        epoch,
+                        prefit,
+                        postfit,
+                        ratio,
+                        r_k_chol.diagonal(),
+                        real_obs,
+                        computed_obs,
+                    ),
+                )
+            }
+            KalmanVariant::DeviationTracking => {
+                // Time update
+                let state_bar = stm * self.prev_estimate.state_deviation;
+                let postfit = &prefit - (&h_tilde * state_bar);
+                (
+                    state_bar + &gain * &postfit,
+                    Residual::accepted(
+                        epoch,
+                        prefit,
+                        postfit,
+                        ratio,
+                        r_k_chol.diagonal(),
+                        real_obs,
+                        computed_obs,
+                    ),
+                )
+            }
+            KalmanVariant::IterativeUpdate {
+                // pos_km,
+                // vel_km_s,
+                // max_iter,
+                ..
+            } => unimplemented!("iterative EKF"),
         };
 
         // Compute covariance (Joseph update)
@@ -316,12 +326,11 @@ where
         Ok((estimate, res, Some(gain)))
     }
 
-    fn is_extended(&self) -> bool {
-        self.ekf
-    }
-
-    fn set_extended(&mut self, status: bool) {
-        self.ekf = status;
+    fn replace_state(&self) -> bool {
+        matches!(
+            self.variant,
+            KalmanVariant::ReferenceUpdate | KalmanVariant::IterativeUpdate { .. }
+        )
     }
 
     /// Overwrites all of the process noises to the one provided

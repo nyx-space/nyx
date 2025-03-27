@@ -81,6 +81,7 @@ pub type SpacecraftODProcessSeq<'a> = self::process::ODProcess<
 #[allow(unused_imports)]
 pub mod prelude {
     pub use super::estimate::*;
+    pub use super::filter::kalman::KalmanVariant;
     pub use super::filter::kalman::*;
     pub use super::ground_station::*;
     pub use super::msr::*;

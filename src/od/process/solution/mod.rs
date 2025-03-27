@@ -52,6 +52,9 @@ mod stats;
 /// - `devices`: A map of tracking devices used in the OD process.
 /// - `measurement_types`: A set of unique measurement types used in the OD process.
 ///
+/// Implementation detail: these are not stored in vectors to allow for multiple estimates at the same time, e.g. when
+/// there are simultaneous measurements of angles and the filter processes each as a scalar.
+///
 #[derive(Clone, Debug, PartialEq)]
 #[allow(clippy::upper_case_acronyms)]
 pub struct ODSolution<StateType, EstType, MsrSize, Trk>

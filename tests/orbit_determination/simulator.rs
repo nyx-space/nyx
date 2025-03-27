@@ -266,7 +266,8 @@ fn od_with_modulus_cov_test(
         Some(LocalFrame::RIC),
     );
     println!("{process_noise}");
-    let kf = KF::new(estimate, process_noise);
+    // TODO: Switch to iterative tracking here
+    let kf = KF::new(estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
 
     let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
     let prop = setup.with(spacecraft.with_stm(), almanac.clone());
@@ -366,7 +367,8 @@ fn od_with_modulus_as_bias_cov_test(
     let sigma_q = 1e-8_f64.powi(2);
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
-    let kf = KF::new(estimate, process_noise);
+    // TODO: Switch to iterative tracking
+    let kf = KF::new(estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
 
     let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
     let prop = setup.with(spacecraft.with_stm(), almanac.clone());

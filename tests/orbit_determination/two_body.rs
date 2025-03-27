@@ -171,7 +171,7 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(
     let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
     println!("initial estimate:\n{}", initial_estimate);
 
-    let kf = KF::no_snc(initial_estimate);
+    let kf = KF::new(initial_estimate, KalmanVariant::ReferenceUpdate);
 
     let mut odp = ODProcess::<_, U2, _, _, _>::ekf(
         prop_est,
@@ -335,7 +335,7 @@ fn od_tb_val_with_arc(
     let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
     println!("initial estimate:\n{}", initial_estimate);
 
-    let kf = KF::no_snc(initial_estimate);
+    let kf = KF::new(initial_estimate, KalmanVariant::ReferenceUpdate);
 
     let mut odp = ODProcess::<_, U2, _, _, _>::ekf(
         prop_est,
@@ -495,7 +495,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
     // Define the initial orbit estimate
     let initial_estimate = KfEstimate::from_covar(initial_state_est, init_covar);
 
-    let ckf = KF::no_snc(initial_estimate);
+    let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
     let mut odp =
         ODProcess::<_, U2, _, _, _>::ckf(prop_est, ckf, proc_devices, None, almanac.clone());
@@ -750,7 +750,7 @@ fn od_tb_val_az_el_ckf_fixed_step_perfect_stations(
     // Define the initial orbit estimate
     let initial_estimate = KfEstimate::from_covar(initial_state_est, init_covar);
 
-    let ckf = KF::no_snc(initial_estimate);
+    let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
     let mut odp =
         ODProcess::<_, U2, _, _, _>::ckf(prop_est, ckf, proc_devices, None, almanac.clone());
@@ -956,7 +956,7 @@ fn od_tb_ckf_fixed_step_iteration_test(
     initial_state2.radius_km.z += 0.05;
     let initial_estimate = KfEstimate::from_covar(initial_state2.into(), init_covar);
 
-    let ckf = KF::no_snc(initial_estimate);
+    let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
     let mut odp =
         ODProcess::<_, U2, _, _, _>::ckf(prop_est, ckf, proc_devices, None, almanac.clone());
@@ -1090,7 +1090,8 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map(
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
 
-    let ckf = KF::new(initial_estimate, process_noise);
+    let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking)
+        .with_process_noise(process_noise);
 
     let mut odp = ODProcess::<_, U2, _, _, _>::ckf(prop_est, ckf, proc_devices, None, almanac);
 
@@ -1182,7 +1183,7 @@ fn od_tb_ckf_map_covar(almanac: Arc<Almanac>) {
 
     let initial_estimate = KfEstimate::from_covar(Spacecraft::from(initial_state), init_covar);
 
-    let ckf = KF::no_snc(initial_estimate);
+    let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
     let mut odp: SpacecraftODProcess =
         ODProcess::<_, U2, _, _, _>::ckf(prop_est, ckf, BTreeMap::new(), None, almanac);
@@ -1282,7 +1283,7 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect_cov_test(
     // Define the initial estimate
     let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
 
-    let ckf = KF::no_snc(initial_estimate);
+    let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
     let mut odp = ODProcess::<_, U2, _, _, _>::ckf(prop_est, ckf, proc_devices, None, almanac);
 
@@ -1405,7 +1406,9 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map(
     );
     process_noise2.start_time = Some(dt + 36_000.0); // Start the second process noise 10 hours into the tracking pass
 
-    let ckf = KF::with_sncs(initial_estimate, vec![process_noise1, process_noise2]);
+    let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking)
+        .with_process_noise(process_noise1)
+        .and_with_process_noise(process_noise2);
 
     let mut odp = ODProcess::<_, U2, _, _, _>::ckf(prop_est, ckf, proc_devices, None, almanac);
 

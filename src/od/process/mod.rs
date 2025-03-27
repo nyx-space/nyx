@@ -299,8 +299,8 @@ where
 
                                 // Switch back from extended if necessary
                                 if let Some(trigger) = &mut self.ekf_trigger {
-                                    if self.kf.is_extended() && trigger.disable_ekf(epoch) {
-                                        self.kf.set_extended(false);
+                                    if self.kf.replace_state() && trigger.disable_ekf(epoch) {
+                                        // self.kf.set_extended(false);
                                         info!("EKF disabled @ {epoch}");
                                     }
                                 }
@@ -404,16 +404,16 @@ where
                                             if let Some(trigger) = &mut self.ekf_trigger {
                                                 if !msr_rejected
                                                     && trigger.enable_ekf(&estimate)
-                                                    && !self.kf.is_extended()
+                                                    && !self.kf.replace_state()
                                                 {
-                                                    self.kf.set_extended(true);
+                                                    // self.kf.set_extended(true);
                                                     if !estimate.within_3sigma() {
                                                         warn!("EKF enabled @ {epoch} but filter DIVERGING");
                                                     } else {
                                                         info!("EKF enabled @ {epoch}");
                                                     }
                                                 }
-                                                if self.kf.is_extended() {
+                                                if self.kf.replace_state() {
                                                     self.prop.state = estimate.state();
                                                 }
                                             }

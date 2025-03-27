@@ -92,11 +92,10 @@ where
         ODError,
     >;
 
-    /// Returns whether the filter is an extended filter (e.g. EKF)
-    fn is_extended(&self) -> bool;
-
-    /// Sets the filter to be extended or not depending on the value of status
-    fn set_extended(&mut self, status: bool);
+    /// Returns whether to replace the propagator state.
+    /// Extended Kalman filters typically replace the state, also called "state replacement model".
+    /// "Classical" Kalman filter would not, and therefore would track a state error from the propagator state.
+    fn replace_state(&self) -> bool;
 
     /// Sets the process noise matrix of the estimated state
     fn set_process_noise(&mut self, snc: ProcessNoise<A>);

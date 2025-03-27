@@ -322,7 +322,8 @@ fn od_robust_test_ekf_rng_dop_az_el(
         GroundStation,
     >::ekf(
         prop_est,
-        KF::new(initial_estimate, process_noise.clone()),
+        KF::new(initial_estimate, KalmanVariant::ReferenceUpdate)
+            .with_process_noise(process_noise.clone()),
         devices.clone(),
         trig,
         Some(ResidRejectCrit::default()),
@@ -394,7 +395,8 @@ fn od_robust_test_ekf_rng_dop_az_el(
     let prop_est = estimator_setup.with(initial_state_dev.with_stm(), almanac.clone());
     let mut odp_2by2 = SpacecraftODProcess::ekf(
         prop_est,
-        KF::new(initial_estimate, process_noise.clone()),
+        KF::new(initial_estimate, KalmanVariant::ReferenceUpdate)
+            .with_process_noise(process_noise.clone()),
         devices.clone(),
         trig,
         None,
@@ -441,7 +443,8 @@ fn od_robust_test_ekf_rng_dop_az_el(
     let prop_est = estimator_setup.with(initial_state_dev.with_stm(), almanac.clone());
     let mut odp_1by1 = SpacecraftODProcessSeq::ekf(
         prop_est,
-        KF::new(initial_estimate, process_noise.clone()),
+        KF::new(initial_estimate, KalmanVariant::ReferenceUpdate)
+            .with_process_noise(process_noise.clone()),
         devices,
         trig,
         None,

@@ -19,7 +19,7 @@ use nyx::{
     io::{ConfigRepr, ExportCfg},
     md::prelude::{HarmonicsMem, Traj},
     od::{
-        prelude::{TrackingArcSim, TrkConfig, KF},
+        prelude::{KalmanVariant, TrackingArcSim, TrkConfig, KF},
         process::{EkfTrigger, Estimate, NavSolution, ResidRejectCrit, SpacecraftUncertainty},
         snc::ProcessNoise3D,
         GroundStation, SpacecraftODProcess,
@@ -260,8 +260,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let kf = KF::new(
         // Increase the initial covariance to account for larger deviation.
         initial_estimate,
-        process_noise,
-    );
+        KalmanVariant::ReferenceUpdate,
+    )
+    .with_process_noise(process_noise);
 
     // We'll set up the OD process to reject measurements whose residuals are move than 3 sigmas away from what we expect.
     let mut odp = SpacecraftODProcess::ekf(

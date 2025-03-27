@@ -4,7 +4,7 @@ extern crate nyx_space as nyx;
 use nyx::od::ODError;
 use nyx::Spacecraft;
 
-use self::nyx::od::prelude::{Estimate, Filter, KfEstimate, KF};
+use self::nyx::od::prelude::{Estimate, Filter, KalmanVariant, KfEstimate, KF};
 use self::nyx::State;
 
 mod measurements;
@@ -49,7 +49,7 @@ fn filter_errors() {
     let computed_obs = Vector2::zeros();
     let sensitivity = SMatrix::<f64, 2, 9>::zeros();
 
-    let mut ckf = KF::no_snc(initial_estimate);
+    let mut ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
     match ckf.measurement_update(
         Spacecraft::zeros().with_stm(),

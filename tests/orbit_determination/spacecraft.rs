@@ -217,7 +217,7 @@ fn od_val_sc_mb_srp_reals_duals_models(
     // Define the initial orbit estimate
     let initial_estimate = KfEstimate::from_covar(sc_init_est, init_covar);
 
-    let ckf = KF::no_snc(initial_estimate);
+    let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
     let mut odp = SpacecraftODProcess::ckf(prop_est, ckf, proc_devices, None, almanac);
 
@@ -406,7 +406,7 @@ fn od_val_sc_srp_estimation_cov_test(
     // Define the initial orbit estimate
     let initial_estimate = sc.to_estimate().unwrap();
 
-    let ckf = KF::no_snc(initial_estimate);
+    let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
     let mut odp = SpacecraftODProcess::ekf(
         prop_est,

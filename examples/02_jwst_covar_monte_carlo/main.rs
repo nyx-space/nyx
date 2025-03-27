@@ -16,7 +16,11 @@ use nyx::{
     dynamics::{guidance::LocalFrame, OrbitalDynamics, SolarPressure, SpacecraftDynamics},
     io::ExportCfg,
     mc::MonteCarlo,
-    od::{prelude::KF, process::SpacecraftUncertainty, SpacecraftODProcess},
+    od::{
+        prelude::{KalmanVariant, KF},
+        process::SpacecraftUncertainty,
+        SpacecraftODProcess,
+    },
     propagators::Propagator,
     Spacecraft, State,
 };
@@ -112,7 +116,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // For the covariance mapping / prediction, we'll use the common orbit determination approach.
     // This is done by setting up a spacecraft OD process, and predicting for the analysis duration.
 
-    let ckf = KF::no_snc(jwst_estimate);
+    let ckf = KF::new(jwst_estimate, KalmanVariant::DeviationTracking);
 
     // Build the propagation instance for the OD process.
     let prop = setup.with(jwst.with_stm(), almanac.clone());

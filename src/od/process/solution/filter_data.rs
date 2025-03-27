@@ -17,7 +17,7 @@
 */
 
 use crate::linalg::allocator::Allocator;
-use crate::linalg::{DefaultAllocator, DimName};
+use crate::linalg::{DefaultAllocator, DimName, OMatrix};
 use crate::md::trajectory::Interpolatable;
 pub use crate::od::estimate::*;
 pub use crate::od::*;
@@ -28,6 +28,32 @@ use std::ops::Add;
 use self::msr::MeasurementType;
 
 use super::ODSolution;
+
+#[derive(Clone, Debug, PartialEq)]
+#[allow(clippy::upper_case_acronyms)]
+pub struct ODRecord<StateType, EstType, MsrSize>
+where
+    StateType: Interpolatable + Add<OVector<f64, <StateType as State>::Size>, Output = StateType>,
+    EstType: Estimate<StateType>,
+    MsrSize: DimName,
+    <DefaultAllocator as Allocator<<StateType as State>::VecLength>>::Buffer<f64>: Send,
+    DefaultAllocator: Allocator<<StateType as State>::Size>
+        + Allocator<<StateType as State>::VecLength>
+        + Allocator<MsrSize>
+        + Allocator<MsrSize, <StateType as State>::Size>
+        + Allocator<MsrSize, MsrSize>
+        + Allocator<<StateType as State>::Size, <StateType as State>::Size>
+        + Allocator<<StateType as State>::Size, MsrSize>,
+{
+    /// Vector of estimates available after a pass
+    pub estimate: EstType,
+    /// Vector of residuals available after a pass
+    pub residual: Option<Residual<MsrSize>>,
+    /// Vector of filter gains used for each measurement update, all None after running the smoother.
+    pub gain: Option<OMatrix<f64, <StateType as State>::Size, MsrSize>>,
+    /// Filter-smoother consistency ratios, all None before running the smoother.
+    pub filter_smoother_ratio: Option<OVector<f64, <StateType as State>::Size>>,
+}
 
 impl<StateType, EstType, MsrSize, Trk> ODSolution<StateType, EstType, MsrSize, Trk>
 where
@@ -234,5 +260,24 @@ where
         }
 
         self
+    }
+
+    pub fn at(&self, epoch: Epoch) -> Option<ODRecord<StateType, EstType, MsrSize>> {
+        if let Ok(index) = self
+            .estimates
+            .iter()
+            .map(|est| est.epoch())
+            .collect::<Vec<Epoch>>()
+            .binary_search(&epoch)
+        {
+            Some(ODRecord {
+                estimate: self.estimates[index].clone(),
+                residual: self.residuals[index].clone(),
+                gain: self.gains[index].clone(),
+                filter_smoother_ratio: self.filter_smoother_ratios[index].clone(),
+            })
+        } else {
+            None
+        }
     }
 }

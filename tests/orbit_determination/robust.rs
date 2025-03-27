@@ -167,7 +167,8 @@ fn od_robust_test_ekf_realistic_one_way_cov_test(almanac: Arc<Almanac>) {
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
 
-    let kf = KF::new(initial_estimate, process_noise);
+    let kf =
+        KF::new(initial_estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
 
     let trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
 
@@ -365,7 +366,8 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
 
-    let kf = KF::new(initial_estimate, process_noise);
+    let kf =
+        KF::new(initial_estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
 
     let trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
 

@@ -137,7 +137,8 @@ fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>, devices: BTreeMap<String, G
     let sigma_q = 1e-7_f64.powi(2);
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
-    let kf = KF::new(initial_estimate, process_noise);
+    let kf =
+        KF::new(initial_estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
 
     let mut odp = SpacecraftODProcess::ckf(prop_est, kf, devices, None, almanac.clone());
 
@@ -359,7 +360,8 @@ fn xhat_dev_test_ekf_multi_body(almanac: Arc<Almanac>, devices: BTreeMap<String,
     let sigma_q = 1e-8_f64.powi(2);
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
-    let kf = KF::new(initial_estimate, process_noise);
+    let kf =
+        KF::new(initial_estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
 
     let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
@@ -523,7 +525,8 @@ fn xhat_dev_test_ekf_harmonics(almanac: Arc<Almanac>, devices: BTreeMap<String, 
     let sigma_q = 1e-7_f64.powi(2);
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
-    let kf = KF::new(initial_estimate, process_noise);
+    let kf =
+        KF::new(initial_estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
 
     let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
@@ -656,7 +659,7 @@ fn xhat_dev_test_ekf_realistic(almanac: Arc<Almanac>, devices: BTreeMap<String, 
     let initial_estimate = KfEstimate::from_covar(initial_state_dev.into(), init_covar);
     println!("Initial estimate:\n{}", initial_estimate);
 
-    let kf = KF::no_snc(initial_estimate);
+    let kf = KF::new(initial_estimate, KalmanVariant::ReferenceUpdate);
 
     let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
@@ -794,7 +797,7 @@ fn xhat_dev_test_ckf_smoother_multi_body(
     let initial_estimate = KfEstimate::from_covar(initial_state_dev.into(), init_covar);
     println!("Initial estimate:\n{}", initial_estimate);
 
-    let kf = KF::no_snc(initial_estimate);
+    let kf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
     let mut odp = SpacecraftODProcess::ckf(prop_est, kf, devices, None, almanac.clone());
 
@@ -1058,7 +1061,8 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body(
     let sigma_q = 1e-8_f64.powi(2);
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
-    let kf = KF::new(initial_estimate, process_noise);
+    let kf =
+        KF::new(initial_estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
 
     let mut odp = SpacecraftODProcess::ekf(
         prop_est,
@@ -1309,7 +1313,7 @@ fn xhat_dev_test_ckf_iteration_multi_body(
     let initial_estimate = KfEstimate::from_covar(initial_state_dev.into(), init_covar);
     println!("Initial estimate:\n{}", initial_estimate);
 
-    let kf = KF::no_snc(initial_estimate);
+    let kf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
     let mut odp = SpacecraftODProcess::ckf(prop_est, kf, devices, None, almanac.clone());
 
