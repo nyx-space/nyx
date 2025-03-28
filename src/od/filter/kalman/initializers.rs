@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use nalgebra::DimName;
+
 pub use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, U3};
@@ -26,7 +28,7 @@ pub use crate::time::{Epoch, Unit};
 
 use super::{KalmanVariant, KF};
 
-// Only process noises of size 3 are supported, so only these have initializers.
+// Only process noises of size 3 are supported, so only these have initializers. -- Rename this KF to "ODKalmanFilter" or something like that. GPS stuff needs process noise of size 6x6.
 
 impl<T> KF<T, U3>
 where
@@ -50,9 +52,39 @@ where
             prev_used_snc: 0,
         }
     }
+}
+
+impl<T, A> KF<T, A>
+where
+    T: State,
+    A: DimName,
+    DefaultAllocator: Allocator<<T as State>::Size>
+        + Allocator<<T as State>::VecLength>
+        + Allocator<A>
+        + Allocator<<T as State>::Size, <T as State>::Size>
+        + Allocator<A, A>
+        + Allocator<<T as State>::Size, A>
+        + Allocator<A, <T as State>::Size>,
+    <DefaultAllocator as Allocator<<T as State>::Size>>::Buffer<f64>: Copy,
+    <DefaultAllocator as Allocator<<T as State>::Size, <T as State>::Size>>::Buffer<f64>: Copy,
+{
+    /// Set (or replaces) the existing process noise configuration.
+    pub fn from_process_noise(
+        initial_estimate: KfEstimate<T>,
+        variant: KalmanVariant,
+        mut process_noise: ProcessNoise<A>,
+    ) -> Self {
+        process_noise.init_epoch = Some(initial_estimate.epoch());
+        Self {
+            prev_estimate: initial_estimate,
+            process_noise: vec![process_noise],
+            variant,
+            prev_used_snc: 0,
+        }
+    }
 
     /// Set (or replaces) the existing process noise configuration.
-    pub fn with_process_noise(mut self, mut process_noise: ProcessNoise<U3>) -> Self {
+    pub fn with_process_noise(mut self, mut process_noise: ProcessNoise<A>) -> Self {
         process_noise.init_epoch = Some(self.prev_estimate.epoch());
         self.process_noise.clear();
         self.process_noise.push(process_noise);
@@ -60,7 +92,8 @@ where
     }
 
     /// Pushes the provided process noise to the list the existing process noise configurations.
-    pub fn and_with_process_noise(mut self, process_noise: ProcessNoise<U3>) -> Self {
+    pub fn and_with_process_noise(mut self, mut process_noise: ProcessNoise<A>) -> Self {
+        process_noise.init_epoch = Some(self.prev_estimate.epoch());
         self.process_noise.push(process_noise);
         self
     }

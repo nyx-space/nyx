@@ -394,19 +394,19 @@ fn od_val_sc_srp_estimation_cov_test(
     let sc = SpacecraftUncertainty::builder()
         .nominal(sc_init_est)
         .frame(LocalFrame::RIC)
-        .x_km(0.1)
-        .y_km(0.1)
-        .z_km(0.1)
-        .vx_km_s(0.1e-3)
-        .vy_km_s(0.1e-3)
-        .vz_km_s(0.1e-3)
+        .x_km(0.001)
+        .y_km(0.001)
+        .z_km(0.001)
+        .vx_km_s(0.1e-6)
+        .vy_km_s(0.1e-6)
+        .vz_km_s(0.1e-6)
         .coeff_reflectivity(0.2)
         .build();
 
     // Define the initial orbit estimate
     let initial_estimate = sc.to_estimate().unwrap();
 
-    let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
+    let ckf = KF::new(initial_estimate, KalmanVariant::ReferenceUpdate);
 
     let mut odp = SpacecraftODProcess::ekf(
         prop_est,
@@ -418,13 +418,6 @@ fn od_val_sc_srp_estimation_cov_test(
     );
 
     let od_sol = odp.process_arc(&arc).unwrap();
-
-    od_sol
-        .to_parquet(
-            path.with_file_name("sc_od_with_srp.parquet"),
-            ExportCfg::default(),
-        )
-        .unwrap();
 
     let est = od_sol.estimates.last().unwrap();
 
@@ -501,8 +494,8 @@ fn od_val_sc_srp_estimation_cov_test(
         "all residuals should be accepted"
     );
     assert!(
-        (0.60..0.70).contains(&od_sol.residual_ratio_within_threshold(3.0).unwrap()),
-        "expecting 60-70% of valid residual ratios"
+        (0.80..0.90).contains(&od_sol.residual_ratio_within_threshold(3.0).unwrap()),
+        "expecting 80-90% of valid residual ratios"
     );
     assert!(
         !od_sol.is_normal(None).unwrap(),
