@@ -208,8 +208,7 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
     let kf = KF::new(
         initial_estimate,
         KalmanVariant::IterativeUpdate {
-            pos_km: Some(1e-3),
-            vel_km_s: None,
+            state_error: Some(1e-3),
             max_iter: Some(3),
         },
     )
@@ -345,8 +344,7 @@ fn od_resid_reject_default_ckf_two_way_cov_test(
     let kf = KF::new(
         initial_estimate,
         KalmanVariant::IterativeUpdate {
-            pos_km: Some(1e-3),
-            vel_km_s: None,
+            state_error: Some(1e-3),
             max_iter: Some(3),
         },
     )
