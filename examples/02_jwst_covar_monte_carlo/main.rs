@@ -116,11 +116,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     // For the covariance mapping / prediction, we'll use the common orbit determination approach.
     // This is done by setting up a spacecraft OD process, and predicting for the analysis duration.
 
-    let ckf = KF::new(jwst_estimate, KalmanVariant::DeviationTracking);
+    let kf = KF::new(jwst_estimate, KalmanVariant::DeviationTracking);
 
     // Build the propagation instance for the OD process.
     let prop = setup.with(jwst.with_stm(), almanac.clone());
-    let mut odp = SpacecraftODProcess::ckf(prop, ckf, BTreeMap::new(), None, almanac.clone());
+    let mut odp = SpacecraftODProcess::new(prop, kf, BTreeMap::new(), None, almanac.clone());
 
     // Define the prediction step, i.e. how often we want to know the covariance.
     let step = 1_i64.minutes();

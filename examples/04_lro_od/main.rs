@@ -20,7 +20,7 @@ use nyx::{
     md::prelude::{HarmonicsMem, Traj},
     od::{
         prelude::{KalmanVariant, TrackingArcSim, TrkConfig, KF},
-        process::{EkfTrigger, Estimate, NavSolution, ResidRejectCrit, SpacecraftUncertainty},
+        process::{Estimate, NavSolution, ResidRejectCrit, SpacecraftUncertainty},
         snc::ProcessNoise3D,
         GroundStation, SpacecraftODProcess,
     },
@@ -265,11 +265,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     .with_process_noise(process_noise);
 
     // We'll set up the OD process to reject measurements whose residuals are move than 3 sigmas away from what we expect.
-    let mut odp = SpacecraftODProcess::ekf(
+    let mut odp = SpacecraftODProcess::new(
         setup.with(initial_estimate.state().with_stm(), almanac.clone()),
         kf,
         devices,
-        EkfTrigger::new(0, Unit::Hour * 1),
         Some(ResidRejectCrit::default()),
         almanac.clone(),
     );

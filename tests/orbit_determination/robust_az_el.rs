@@ -250,11 +250,6 @@ fn od_robust_test_ekf_rng_dop_az_el(
 ) {
     let _ = pretty_env_logger::try_init();
 
-    // Define the ground stations.
-    let ekf_num_meas = 10;
-    // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 30 * Unit::Minute;
-
     // Define the tracking configurations
     let mut configs = BTreeMap::new();
     for name in devices.keys() {
@@ -311,8 +306,6 @@ fn od_robust_test_ekf_rng_dop_az_el(
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
 
-    let trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
-
     // Run with all data simultaneously
     let mut odp_simul = ODProcess::<
         SpacecraftDynamics,
@@ -320,12 +313,11 @@ fn od_robust_test_ekf_rng_dop_az_el(
         Const<3>,
         KF<Spacecraft, Const<3>>,
         GroundStation,
-    >::ekf(
+    >::new(
         prop_est,
         KF::new(initial_estimate, KalmanVariant::ReferenceUpdate)
             .with_process_noise(process_noise.clone()),
         devices.clone(),
-        trig,
         Some(ResidRejectCrit::default()),
         almanac.clone(),
     );
@@ -393,12 +385,11 @@ fn od_robust_test_ekf_rng_dop_az_el(
 
     // We get the best results with all data simultaneously, let's rerun with then two-by-two.
     let prop_est = estimator_setup.with(initial_state_dev.with_stm(), almanac.clone());
-    let mut odp_2by2 = SpacecraftODProcess::ekf(
+    let mut odp_2by2 = SpacecraftODProcess::new(
         prop_est,
         KF::new(initial_estimate, KalmanVariant::ReferenceUpdate)
             .with_process_noise(process_noise.clone()),
         devices.clone(),
-        trig,
         None,
         almanac.clone(),
     );
@@ -441,12 +432,11 @@ fn od_robust_test_ekf_rng_dop_az_el(
     }
     // Rerun processing measurements one by one like in ODTK
     let prop_est = estimator_setup.with(initial_state_dev.with_stm(), almanac.clone());
-    let mut odp_1by1 = SpacecraftODProcessSeq::ekf(
+    let mut odp_1by1 = SpacecraftODProcessSeq::new(
         prop_est,
         KF::new(initial_estimate, KalmanVariant::ReferenceUpdate)
             .with_process_noise(process_noise.clone()),
         devices,
-        trig,
         None,
         almanac,
     );

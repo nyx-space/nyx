@@ -35,30 +35,13 @@ use std::ops::Add;
 
 mod conf;
 pub use conf::{IterationConf, SmoothingArc};
-mod trigger;
-pub use trigger::EkfTrigger;
 mod rejectcrit;
 use self::msr::TrackingDataArc;
 pub use self::rejectcrit::ResidRejectCrit;
 mod solution;
 pub use solution::ODSolution;
 
-/// Sets up an orbit determination process (ODP).
-///
-/// # Algorithm details
-///
-/// ## Classical vs. Extended Kalman filter
-///
-/// In Nyx, an ODP configured in Classical Kalman Filter will track the state deviation compared to the nominal state.
-/// An ODP configured in Extended Kalman Filter mode will update the propagation state on each (accepted) measurement.
-///
-/// The EKF mode requires a "trigger" which switches the filter from a CKF to an EKF. This prevents quick divergence of a filter.
-///
-/// ## Measurement residual ratio and rejection
-///
-/// The measurement residual is a signed scalar, despite ODP being able to process multiple measurements simultaneously.
-/// By default, if a measurement is more than 3 measurement sigmas off, it will be rejected to avoid biasing the filter.
-///
+/// An orbit determination process (ODP) which filters OD measurements through the provided filter (typically a Kalman filter).
 #[allow(clippy::upper_case_acronyms)]
 pub struct ODProcess<
     'a,
@@ -89,7 +72,6 @@ pub struct ODProcess<
     pub kf: K,
     /// Tracking devices
     pub devices: BTreeMap<String, Trk>,
-    pub ekf_trigger: Option<EkfTrigger>,
     /// Residual rejection criteria allows preventing bad measurements from affecting the estimation.
     pub resid_crit: Option<ResidRejectCrit>,
     pub almanac: Arc<Almanac>,
@@ -126,7 +108,6 @@ where
         prop: PropInstance<'a, D>,
         kf: K,
         devices: BTreeMap<String, Trk>,
-        ekf_trigger: Option<EkfTrigger>,
         resid_crit: Option<ResidRejectCrit>,
         almanac: Arc<Almanac>,
     ) -> Self {
@@ -134,28 +115,6 @@ where
             prop: prop.quiet(),
             kf,
             devices,
-            ekf_trigger,
-            resid_crit,
-            almanac,
-            _msr_size: PhantomData::<MsrSize>,
-            _acceleration_size: PhantomData::<Accel>,
-        }
-    }
-
-    /// Initialize a new orbit determination process with an Extended Kalman filter. The switch from a classical KF to an EKF is based on the provided trigger.
-    pub fn ekf(
-        prop: PropInstance<'a, D>,
-        kf: K,
-        devices: BTreeMap<String, Trk>,
-        trigger: EkfTrigger,
-        resid_crit: Option<ResidRejectCrit>,
-        almanac: Arc<Almanac>,
-    ) -> Self {
-        Self {
-            prop: prop.quiet(),
-            kf,
-            devices,
-            ekf_trigger: Some(trigger),
             resid_crit,
             almanac,
             _msr_size: PhantomData::<MsrSize>,
@@ -297,12 +256,9 @@ where
                             {
                                 let msr_types = device.measurement_types();
 
-                                // Switch back from extended if necessary
-                                if let Some(trigger) = &mut self.ekf_trigger {
-                                    if self.kf.replace_state() && trigger.disable_ekf(epoch) {
-                                        // self.kf.set_extended(false);
-                                        info!("EKF disabled @ {epoch}");
-                                    }
+                                if self.kf.replace_state() {
+                                    // self.kf.set_extended(false);
+                                    info!("EKF disabled @ {epoch}");
                                 }
 
                                 // Perform several measurement updates to ensure the desired dimensionality.
@@ -396,26 +352,8 @@ where
                                                 msr_rejected = true;
                                             }
 
-                                            // Switch to EKF if necessary, and update the dynamics and such
-                                            // Note: we call enable_ekf first to ensure that the trigger gets
-                                            // called in case it needs to save some information (e.g. the
-                                            // StdEkfTrigger needs to store the time of the previous measurement).
-
-                                            if let Some(trigger) = &mut self.ekf_trigger {
-                                                if !msr_rejected
-                                                    && trigger.enable_ekf(&estimate)
-                                                    && !self.kf.replace_state()
-                                                {
-                                                    // self.kf.set_extended(true);
-                                                    if !estimate.within_3sigma() {
-                                                        warn!("EKF enabled @ {epoch} but filter DIVERGING");
-                                                    } else {
-                                                        info!("EKF enabled @ {epoch}");
-                                                    }
-                                                }
-                                                if self.kf.replace_state() {
-                                                    self.prop.state = estimate.state();
-                                                }
+                                            if self.kf.replace_state() {
+                                                self.prop.state = estimate.state();
                                             }
 
                                             self.prop.state.reset_stm();
@@ -526,49 +464,5 @@ where
     ) -> Result<ODSolution<D::StateType, K::Estimate, MsrSize, Trk>, ODError> {
         let end_epoch = self.kf.previous_estimate().epoch() + duration;
         self.predict_until(step, end_epoch)
-    }
-}
-
-impl<
-        'a,
-        D: Dynamics,
-        MsrSize: DimName,
-        Accel: DimName,
-        K: Filter<D::StateType, Accel, MsrSize>,
-        Trk: TrackerSensitivity<D::StateType, D::StateType>,
-    > ODProcess<'a, D, MsrSize, Accel, K, Trk>
-where
-    D::StateType:
-        Interpolatable + Add<OVector<f64, <D::StateType as State>::Size>, Output = D::StateType>,
-    <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
-    DefaultAllocator: Allocator<<D::StateType as State>::Size>
-        + Allocator<<D::StateType as State>::VecLength>
-        + Allocator<MsrSize>
-        + Allocator<MsrSize, <D::StateType as State>::Size>
-        + Allocator<<D::StateType as State>::Size, MsrSize>
-        + Allocator<MsrSize, MsrSize>
-        + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<Accel>
-        + Allocator<Accel, Accel>
-        + Allocator<<D::StateType as State>::Size, Accel>
-        + Allocator<Accel, <D::StateType as State>::Size>,
-{
-    pub fn ckf(
-        prop: PropInstance<'a, D>,
-        kf: K,
-        devices: BTreeMap<String, Trk>,
-        resid_crit: Option<ResidRejectCrit>,
-        almanac: Arc<Almanac>,
-    ) -> Self {
-        Self {
-            prop: prop.quiet(),
-            kf,
-            devices,
-            resid_crit,
-            ekf_trigger: None,
-            almanac,
-            _msr_size: PhantomData::<MsrSize>,
-            _acceleration_size: PhantomData::<Accel>,
-        }
     }
 }

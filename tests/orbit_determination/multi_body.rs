@@ -155,7 +155,7 @@ fn od_val_multi_body_ckf_perfect_stations(
 
     let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
-    let mut odp = ODProcess::<_, U2, _, _, _>::ckf(prop_est, ckf, proc_devices, None, almanac);
+    let mut odp = ODProcess::<_, U2, _, _, _>::new(prop_est, ckf, proc_devices, None, almanac);
 
     let od_sol = odp.process_arc(&arc).unwrap();
 
@@ -290,7 +290,7 @@ fn multi_body_ckf_covar_map_cov_test(
     let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
     let mut odp =
-        ODProcess::<_, U2, _, _, _>::ckf(prop_est, ckf, proc_devices, None, almanac.clone());
+        ODProcess::<_, U2, _, _, _>::new(prop_est, ckf, proc_devices, None, almanac.clone());
 
     let od_sol = odp.process_arc(&arc).unwrap();
 

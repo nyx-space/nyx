@@ -219,7 +219,7 @@ fn od_val_sc_mb_srp_reals_duals_models(
 
     let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
-    let mut odp = SpacecraftODProcess::ckf(prop_est, ckf, proc_devices, None, almanac);
+    let mut odp = SpacecraftODProcess::new(prop_est, ckf, proc_devices, None, almanac);
 
     let od_sol = odp.process_arc(&arc).unwrap();
 
@@ -408,14 +408,7 @@ fn od_val_sc_srp_estimation_cov_test(
 
     let ckf = KF::new(initial_estimate, KalmanVariant::ReferenceUpdate);
 
-    let mut odp = SpacecraftODProcess::ekf(
-        prop_est,
-        ckf,
-        proc_devices,
-        EkfTrigger::new(30, Unit::Minute * 2),
-        None,
-        almanac.clone(),
-    );
+    let mut odp = SpacecraftODProcess::new(prop_est, ckf, proc_devices, None, almanac.clone());
 
     let od_sol = odp.process_arc(&arc).unwrap();
 

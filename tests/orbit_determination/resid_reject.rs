@@ -220,12 +220,11 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
     // the measurements are accepted.
     // So we end up with an excellent estimate but an unusably high covariance.
 
-    let mut odp = ODProcess::<_, U2, _, _, _>::ekf(
+    let mut odp = ODProcess::<_, U2, _, _, _>::new(
         prop_est,
         kf,
         devices,
-        EkfTrigger::new(0, 1.hours()),
-        Some(ResidRejectCrit { num_sigmas: 3.0 }), // 95% to force rejections
+        Some(ResidRejectCrit { num_sigmas: 2.0 }), // 95% to force rejections
         almanac,
     );
 
@@ -350,7 +349,7 @@ fn od_resid_reject_default_ckf_two_way_cov_test(
     )
     .with_process_noise(process_noise);
 
-    let mut odp = ODProcess::<_, U2, _, _, _>::ckf(
+    let mut odp = ODProcess::<_, U2, _, _, _>::new(
         prop_est,
         kf,
         devices,

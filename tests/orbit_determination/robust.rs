@@ -45,9 +45,6 @@ fn od_robust_test_ekf_realistic_one_way_cov_test(almanac: Arc<Almanac>) {
 
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
     // Define the ground stations.
-    let ekf_num_meas = 300;
-    // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 3 * Unit::Minute;
     let elevation_mask = 0.0;
 
     let dss65_madrid = GroundStation::dss65_madrid(
@@ -170,9 +167,7 @@ fn od_robust_test_ekf_realistic_one_way_cov_test(almanac: Arc<Almanac>) {
     let kf =
         KF::new(initial_estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
 
-    let trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
-
-    let mut odp = SpacecraftODProcess::ekf(prop_est, kf, devices, trig, None, almanac.clone());
+    let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac.clone());
 
     // Let's filter and iterate on the initial subset of the arc to refine the initial estimate
     let subset = arc.clone().filter_by_offset(..3.hours());
@@ -256,9 +251,6 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
 
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
     // Define the ground stations.
-    let ekf_num_meas = 100;
-    // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 3 * Unit::Minute;
     let elevation_mask = 0.0;
 
     // Define the propagator information.
@@ -369,9 +361,7 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
     let kf =
         KF::new(initial_estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
 
-    let trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
-
-    let mut odp = SpacecraftODProcess::ekf(prop_est, kf, devices, trig, None, almanac);
+    let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac);
 
     let od_sol = odp.process_arc(&arc).unwrap();
 

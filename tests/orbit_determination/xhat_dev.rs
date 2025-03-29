@@ -140,7 +140,7 @@ fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>, devices: BTreeMap<String, G
     let kf =
         KF::new(initial_estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
 
-    let mut odp = SpacecraftODProcess::ckf(prop_est, kf, devices, None, almanac.clone());
+    let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac.clone());
 
     let od_sol = odp.process_arc(&arc).expect("OD process failed");
     let pre_smooth_first_est = od_sol.estimates[0];
@@ -281,11 +281,6 @@ fn xhat_dev_test_ekf_multi_body(almanac: Arc<Almanac>, devices: BTreeMap<String,
     // As such, it checks that the filter can return to a nominal state.
     let _ = pretty_env_logger::try_init();
 
-    // Define the ground stations.
-    let ekf_num_meas = 500;
-    // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 10.0 * Unit::Second;
-
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
     let mut configs = BTreeMap::new();
@@ -363,10 +358,7 @@ fn xhat_dev_test_ekf_multi_body(almanac: Arc<Almanac>, devices: BTreeMap<String,
     let kf =
         KF::new(initial_estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
 
-    let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
-    trig.within_sigma = 3.0;
-
-    let mut odp = SpacecraftODProcess::ekf(prop_est, kf, devices, trig, None, almanac);
+    let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac);
 
     let od_sol = odp.process_arc(&arc).unwrap();
     // odp.iterate_arc(&arc, IterationConf::try_from(SmoothingArc::All).unwrap())
@@ -435,11 +427,6 @@ fn xhat_dev_test_ekf_multi_body(almanac: Arc<Almanac>, devices: BTreeMap<String,
 #[rstest]
 fn xhat_dev_test_ekf_harmonics(almanac: Arc<Almanac>, devices: BTreeMap<String, GroundStation>) {
     let _ = pretty_env_logger::try_init();
-
-    // Define the ground stations.
-    let ekf_num_meas = 5000;
-    // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 1 * Unit::Minute;
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
@@ -528,10 +515,7 @@ fn xhat_dev_test_ekf_harmonics(almanac: Arc<Almanac>, devices: BTreeMap<String, 
     let kf =
         KF::new(initial_estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
 
-    let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
-    trig.within_sigma = 3.0;
-
-    let mut odp = SpacecraftODProcess::ekf(prop_est, kf, devices, trig, None, almanac);
+    let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac);
 
     let od_sol = odp.process_arc(&arc).unwrap();
 
@@ -583,11 +567,6 @@ fn xhat_dev_test_ekf_harmonics(almanac: Arc<Almanac>, devices: BTreeMap<String, 
 #[rstest]
 fn xhat_dev_test_ekf_realistic(almanac: Arc<Almanac>, devices: BTreeMap<String, GroundStation>) {
     let _ = pretty_env_logger::try_init();
-
-    // Define the ground stations.
-    let ekf_num_meas = 500;
-    // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 10.0 * Unit::Second;
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
@@ -661,10 +640,7 @@ fn xhat_dev_test_ekf_realistic(almanac: Arc<Almanac>, devices: BTreeMap<String, 
 
     let kf = KF::new(initial_estimate, KalmanVariant::ReferenceUpdate);
 
-    let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
-    trig.within_sigma = 3.0;
-
-    let mut odp = SpacecraftODProcess::ekf(prop_est, kf, devices, trig, None, almanac);
+    let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac);
 
     let od_sol = odp.process_arc(&arc).unwrap();
 
@@ -799,7 +775,7 @@ fn xhat_dev_test_ckf_smoother_multi_body(
 
     let kf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
-    let mut odp = SpacecraftODProcess::ckf(prop_est, kf, devices, None, almanac.clone());
+    let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac.clone());
 
     let od_sol = odp.process_arc(&arc).unwrap();
 
@@ -1049,11 +1025,6 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body(
         0.0,
     ]));
 
-    // Define the ground stations.
-    let ekf_num_meas = 100;
-    // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 1 * Unit::Hour;
-
     // Define the initial estimate
     let initial_estimate = KfEstimate::from_covar(initial_state_dev.into(), init_covar);
     println!("Initial estimate:\n{}", initial_estimate);
@@ -1064,14 +1035,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body(
     let kf =
         KF::new(initial_estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
 
-    let mut odp = SpacecraftODProcess::ekf(
-        prop_est,
-        kf,
-        devices,
-        EkfTrigger::new(ekf_num_meas, ekf_disable_time),
-        None,
-        almanac.clone(),
-    );
+    let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac.clone());
 
     let od_sol = odp.process_arc(&arc).unwrap();
 
@@ -1315,7 +1279,7 @@ fn xhat_dev_test_ckf_iteration_multi_body(
 
     let kf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
-    let mut odp = SpacecraftODProcess::ckf(prop_est, kf, devices, None, almanac.clone());
+    let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac.clone());
 
     let od_sol = odp.process_arc(&arc).unwrap();
 
