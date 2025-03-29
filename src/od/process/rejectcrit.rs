@@ -22,9 +22,9 @@ use serde_derive::{Deserialize, Serialize};
 /// Reject measurements if the prefit is greater than the provided sigmas deviation from the measurement noise.
 ///
 /// # Important
-/// Some software, like ODTK, processes each measurement as a scalar. Nyx processes the measurements together.
+/// Some software, like ODTK, processes each measurement as a scalar. Nyx can process the measurements together.
 /// As such, if the prefit on range is bad, then the Doppler measurement with the same time stamp will also be rejected.
-/// This leads to better convergence of the filter, and more appropriate results.
+/// This can lead to better convergence of the filter, and more appropriate results.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct ResidRejectCrit {
     /// Number of sigmas for a measurement to be considered an outlier.

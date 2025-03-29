@@ -40,6 +40,7 @@ where
         + Allocator<A>
         + Allocator<M, M>
         + Allocator<M, <T as State>::Size>
+        + Allocator<<T as State>::Size, M>
         + Allocator<<T as State>::Size, <T as State>::Size>
         + Allocator<A, A>
         + Allocator<<T as State>::Size, A>
@@ -64,7 +65,7 @@ where
     /// The real observation is the observation that was actually measured.
     /// The computed observation is the observation that was computed from the nominal state.
     ///
-    /// Returns the updated estimate and the residual. The residual may be zero if the residual ratio check prevented the ingestion of this measurement.
+    /// Returns the updated estimate, the residual, and the filter gain. The residual may be zero if the residual ratio check prevented the ingestion of this measurement.
     ///
     /// # Arguments
     ///
@@ -82,13 +83,19 @@ where
         measurement_covar: OMatrix<f64, M, M>,
         h_tilde: OMatrix<f64, M, <T as State>::Size>,
         resid_rejection: Option<ResidRejectCrit>,
-    ) -> Result<(Self::Estimate, Residual<M>), ODError>;
+    ) -> Result<
+        (
+            Self::Estimate,
+            Residual<M>,
+            Option<OMatrix<f64, <T as State>::Size, M>>,
+        ),
+        ODError,
+    >;
 
-    /// Returns whether the filter is an extended filter (e.g. EKF)
-    fn is_extended(&self) -> bool;
-
-    /// Sets the filter to be extended or not depending on the value of status
-    fn set_extended(&mut self, status: bool);
+    /// Returns whether to replace the propagator state.
+    /// Extended Kalman filters typically replace the state, also called "state replacement model".
+    /// "Classical" Kalman filter would not, and therefore would track a state error from the propagator state.
+    fn replace_state(&self) -> bool;
 
     /// Sets the process noise matrix of the estimated state
     fn set_process_noise(&mut self, snc: ProcessNoise<A>);

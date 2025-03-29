@@ -51,8 +51,28 @@ where
     pub prev_estimate: KfEstimate<T>,
     /// A sets of process noise (usually noted Q), must be ordered chronologically
     pub process_noise: Vec<ProcessNoise<A>>,
-    /// Determines whether this KF should operate as a Conventional/Classical Kalman filter or an Extended Kalman Filter.
-    /// Recall that one should switch to an Extended KF only once the estimate is good (i.e. after a few good measurement updates on a CKF).
-    pub ekf: bool,
-    prev_used_snc: usize,
+    /// The variant of this Kalman filter.
+    pub variant: KalmanVariant,
+    pub prev_used_snc: usize,
+}
+
+#[derive(Copy, Clone, Debug, Default, PartialEq)]
+pub enum KalmanVariant {
+    /// Configures the filter as a standard Extended Kalman Filter (EKF) update,
+    /// updating the full reference state in the process' propagator at each measurement update.
+    #[default]
+    ReferenceUpdate,
+    /// Tracks the state deviation (formerly called Classical Kalman Filter (CKF)) and does not update the reference in the process' propagator.
+    DeviationTracking,
+    /// Configures the Kalman Filter as an Iterative Extended Kalman Filter (IEKF). This should only be used to trust the observations even more than a single EKF update would.
+    ///
+    /// The two Option fields control the iteration:
+    /// - state_error: if Some(val), then iterations stop when the RSS of the previous state estimate and the new state estimate drops below `val` in km.
+    /// - max_iter: if Some(n), force exit after n iterations.
+    ///
+    /// If all are None, then the filter acts like the ReferenceUpdate mode.
+    IterativeUpdate {
+        state_error: Option<f64>,
+        max_iter: Option<u8>,
+    },
 }

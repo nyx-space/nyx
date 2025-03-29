@@ -16,7 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::dynamics::SpacecraftDynamics;
 use crate::io::watermark::pq_writer;
 use crate::io::{ArrowSnafu, ExportCfg, ParquetSnafu, StdIOSnafu};
 use crate::linalg::allocator::Allocator;
@@ -29,10 +28,8 @@ use crate::{od::*, Spacecraft};
 use arrow::array::{Array, BooleanBuilder, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
-use filter::kalman::KF;
 use hifitime::TimeScale;
 use msr::sensitivity::TrackerSensitivity;
-use msr::TrackingDataArc;
 use nalgebra::Const;
 use parquet::arrow::ArrowWriter;
 use snafu::prelude::*;
@@ -40,10 +37,10 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
-use super::ODProcess;
+use super::ODSolution;
 
-impl<MsrSize: DimName, Accel: DimName, Trk: TrackerSensitivity<Spacecraft, Spacecraft>>
-    ODProcess<'_, SpacecraftDynamics, MsrSize, Accel, KF<Spacecraft, Accel>, Trk>
+impl<MsrSize: DimName, Trk: TrackerSensitivity<Spacecraft, Spacecraft>>
+    ODSolution<Spacecraft, KfEstimate<Spacecraft>, MsrSize, Trk>
 where
     DefaultAllocator: Allocator<MsrSize>
         + Allocator<MsrSize, <Spacecraft as State>::Size>
@@ -53,21 +50,12 @@ where
         + Allocator<MsrSize, MsrSize>
         + Allocator<MsrSize, <Spacecraft as State>::Size>
         + Allocator<<Spacecraft as State>::Size, MsrSize>
-        + Allocator<Accel>
-        + Allocator<Accel, Accel>
         + Allocator<<Spacecraft as State>::Size>
         + Allocator<<Spacecraft as State>::VecLength>
-        + Allocator<<Spacecraft as State>::Size, <Spacecraft as State>::Size>
-        + Allocator<<Spacecraft as State>::Size, Accel>
-        + Allocator<Accel, <Spacecraft as State>::Size>,
+        + Allocator<<Spacecraft as State>::Size, <Spacecraft as State>::Size>,
 {
     /// Store the estimates and residuals in a parquet file
-    pub fn to_parquet<P: AsRef<Path>>(
-        &self,
-        arc: &TrackingDataArc,
-        path: P,
-        cfg: ExportCfg,
-    ) -> Result<PathBuf, ODError> {
+    pub fn to_parquet<P: AsRef<Path>>(&self, path: P, cfg: ExportCfg) -> Result<PathBuf, ODError> {
         ensure!(
             !self.estimates.is_empty(),
             TooFewMeasurementsSnafu {
@@ -79,7 +67,35 @@ where
         if self.estimates.len() != self.residuals.len() {
             return Err(ODError::ODConfigError {
                 source: ConfigError::InvalidConfig {
-                    msg: "Estimates and residuals are not aligned.".to_string(),
+                    msg: format!(
+                        "Estimates ({}) and residuals ({}) are not aligned.",
+                        self.estimates.len(),
+                        self.residuals.len()
+                    ),
+                },
+            });
+        }
+
+        if self.estimates.len() != self.gains.len() {
+            return Err(ODError::ODConfigError {
+                source: ConfigError::InvalidConfig {
+                    msg: format!(
+                        "Estimates ({}) and filter gains ({}) are not aligned.",
+                        self.estimates.len(),
+                        self.gains.len()
+                    ),
+                },
+            });
+        }
+
+        if self.estimates.len() != self.filter_smoother_ratios.len() {
+            return Err(ODError::ODConfigError {
+                source: ConfigError::InvalidConfig {
+                    msg: format!(
+                        "Estimates ({}) and filter-smoother ratios ({}) are not aligned.",
+                        self.estimates.len(),
+                        self.filter_smoother_ratios.len()
+                    ),
                 },
             });
         }
@@ -217,35 +233,35 @@ where
 
         // Add the fields of the residuals
         let mut msr_fields = Vec::new();
-        for f in arc.unique_types() {
+        for f in &self.measurement_types {
             msr_fields.push(
                 f.to_field()
                     .with_nullable(true)
                     .with_name(format!("Prefit residual: {f:?} ({})", f.unit())),
             );
         }
-        for f in arc.unique_types() {
+        for f in &self.measurement_types {
             msr_fields.push(
                 f.to_field()
                     .with_nullable(true)
                     .with_name(format!("Postfit residual: {f:?} ({})", f.unit())),
             );
         }
-        for f in arc.unique_types() {
+        for f in &self.measurement_types {
             msr_fields.push(
                 f.to_field()
                     .with_nullable(true)
                     .with_name(format!("Measurement noise: {f:?} ({})", f.unit())),
             );
         }
-        for f in arc.unique_types() {
+        for f in &self.measurement_types {
             msr_fields.push(
                 f.to_field()
                     .with_nullable(true)
                     .with_name(format!("Real observation: {f:?} ({})", f.unit())),
             );
         }
-        for f in arc.unique_types() {
+        for f in &self.measurement_types {
             msr_fields.push(
                 f.to_field()
                     .with_nullable(true)
@@ -258,6 +274,34 @@ where
         msr_fields.push(Field::new("Tracker", DataType::Utf8, true));
 
         hdrs.append(&mut msr_fields);
+
+        // Add the filter gain columns
+        for i in 0..state_items.len() {
+            for f in &self.measurement_types {
+                hdrs.push(Field::new(
+                    format!(
+                        "Gain {}*{f:?} ({}*{})",
+                        state_items[i],
+                        cov_units[i],
+                        f.unit()
+                    ),
+                    DataType::Float64,
+                    true,
+                ));
+            }
+        }
+
+        // Add the filter-smoother ratio columns
+        for i in 0..state_items.len() {
+            hdrs.push(Field::new(
+                format!(
+                    "Filter-smoother ratio {} ({})",
+                    state_items[i], cov_units[i],
+                ),
+                DataType::Float64,
+                true,
+            ));
+        }
 
         // Build the schema
         let schema = Arc::new(Schema::new(hdrs));
@@ -372,11 +416,11 @@ where
 
         // Finally, add the residuals.
         // Prefits
-        for msr_type in arc.unique_types() {
+        for msr_type in &self.measurement_types {
             let mut data = Float64Builder::new();
             for resid_opt in &residuals {
                 if let Some(resid) = resid_opt {
-                    match resid.prefit(msr_type) {
+                    match resid.prefit(*msr_type) {
                         Some(prefit) => data.append_value(prefit),
                         None => data.append_null(),
                     };
@@ -387,11 +431,11 @@ where
             record.push(Arc::new(data.finish()));
         }
         // Postfit
-        for msr_type in arc.unique_types() {
+        for msr_type in &self.measurement_types {
             let mut data = Float64Builder::new();
             for resid_opt in &residuals {
                 if let Some(resid) = resid_opt {
-                    match resid.postfit(msr_type) {
+                    match resid.postfit(*msr_type) {
                         Some(postfit) => data.append_value(postfit),
                         None => data.append_null(),
                     };
@@ -402,11 +446,11 @@ where
             record.push(Arc::new(data.finish()));
         }
         // Measurement noise
-        for msr_type in arc.unique_types() {
+        for msr_type in &self.measurement_types {
             let mut data = Float64Builder::new();
             for resid_opt in &residuals {
                 if let Some(resid) = resid_opt {
-                    match resid.trk_noise(msr_type) {
+                    match resid.trk_noise(*msr_type) {
                         Some(noise) => data.append_value(noise),
                         None => data.append_null(),
                     };
@@ -417,11 +461,11 @@ where
             record.push(Arc::new(data.finish()));
         }
         // Real observation
-        for msr_type in arc.unique_types() {
+        for msr_type in &self.measurement_types {
             let mut data = Float64Builder::new();
             for resid_opt in &residuals {
                 if let Some(resid) = resid_opt {
-                    match resid.real_obs(msr_type) {
+                    match resid.real_obs(*msr_type) {
                         Some(postfit) => data.append_value(postfit),
                         None => data.append_null(),
                     };
@@ -432,11 +476,11 @@ where
             record.push(Arc::new(data.finish()));
         }
         // Computed observation
-        for msr_type in arc.unique_types() {
+        for msr_type in &self.measurement_types {
             let mut data = Float64Builder::new();
             for resid_opt in &residuals {
                 if let Some(resid) = resid_opt {
-                    match resid.computed_obs(msr_type) {
+                    match resid.computed_obs(*msr_type) {
                         Some(postfit) => data.append_value(postfit),
                         None => data.append_null(),
                     };
@@ -483,6 +527,34 @@ where
             }
         }
         record.push(Arc::new(data.finish()));
+
+        // Add the filter gains
+        for i in 0..est_size {
+            for j in 0..MsrSize::USIZE {
+                let mut data = Float64Builder::new();
+                for opt_k in &self.gains {
+                    if let Some(k) = opt_k {
+                        data.append_value(k[(i, j)]);
+                    } else {
+                        data.append_null();
+                    }
+                }
+                record.push(Arc::new(data.finish()));
+            }
+        }
+
+        // Add the filter-smoother consistency ratios
+        for i in 0..est_size {
+            let mut data = Float64Builder::new();
+            for opt_fsr in &self.filter_smoother_ratios {
+                if let Some(fsr) = opt_fsr {
+                    data.append_value(fsr[i]);
+                } else {
+                    data.append_null();
+                }
+            }
+            record.push(Arc::new(data.finish()));
+        }
 
         info!("Serialized {} estimates and residuals", estimates.len());
 

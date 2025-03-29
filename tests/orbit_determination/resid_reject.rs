@@ -205,7 +205,14 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
     let sigma_q = 5e-9_f64.powi(2);
     let process_noise = ProcessNoise3D::from_diagonal(2.minutes(), &[sigma_q, sigma_q, sigma_q]);
 
-    let kf = KF::no_snc(initial_estimate);
+    let kf = KF::new(
+        initial_estimate,
+        KalmanVariant::IterativeUpdate {
+            state_error: Some(1e-3),
+            max_iter: Some(3),
+        },
+    )
+    .with_process_noise(process_noise);
 
     // ==> TEST <== //
     // We greatly inflate the SNC so that the covariance inflates tremendously. This leads to the
@@ -213,16 +220,15 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
     // the measurements are accepted.
     // So we end up with an excellent estimate but an unusably high covariance.
 
-    let mut odp = ODProcess::<_, U2, _, _, _>::ekf(
+    let mut odp = ODProcess::<_, U2, _, _, _>::new(
         prop_est,
         kf,
         devices,
-        EkfTrigger::new(0, 1.hours()),
-        Some(ResidRejectCrit { num_sigmas: 3.0 }), // 95% to force rejections
+        Some(ResidRejectCrit { num_sigmas: 2.0 }), // 95% to force rejections
         almanac,
     );
 
-    odp.process_arc(&tracking_arc).unwrap();
+    let od_sol = odp.process_arc(&tracking_arc).unwrap();
 
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
@@ -232,10 +238,9 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
     .iter()
     .collect();
 
-    odp.to_parquet(&tracking_arc, path, ExportCfg::timestamped())
-        .unwrap();
+    od_sol.to_parquet(path, ExportCfg::timestamped()).unwrap();
 
-    let num_rejections = odp
+    let num_rejections = od_sol
         .residuals
         .iter()
         .flatten()
@@ -243,10 +248,10 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
         .count();
 
     // Check that the final post-fit residual isn't too bad, and definitely much better than the prefit.
-    let est = &odp.estimates.last().unwrap();
+    let est = &od_sol.estimates.last().unwrap();
     // BUG ? The prefit to postfit ratio seems to be a near consistent factor of two. Even with a postfit of zero, the state deviations are high: 8.4 km and 11.7 m/s.
     // This is the case both with a sequential filter and a dual filter. SNC has no effect. Neither does the seed.
-    for (ith, (est, opt_resid)) in odp.estimates.iter().zip(odp.residuals.iter()).enumerate() {
+    for (ith, (est, opt_resid)) in od_sol.results().enumerate() {
         if let Some(resid) = opt_resid {
             println!("RESIDUAL #{ith}");
             let truth_state = traj.at(resid.epoch).unwrap();
@@ -267,7 +272,7 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
             }
         }
     }
-    let final_resid = &odp.residuals.last().unwrap().as_ref().unwrap();
+    let final_resid = &od_sol.residuals.last().unwrap().as_ref().unwrap();
     let final_truth_state = traj.at(est.epoch()).unwrap();
 
     println!("FINAL\n{final_resid}");
@@ -335,9 +340,16 @@ fn od_resid_reject_default_ckf_two_way_cov_test(
     let sigma_q = 5e-10_f64.powi(2);
     let process_noise = ProcessNoise3D::from_diagonal(2.minutes(), &[sigma_q, sigma_q, sigma_q]);
 
-    let kf = KF::new(initial_estimate, process_noise);
+    let kf = KF::new(
+        initial_estimate,
+        KalmanVariant::IterativeUpdate {
+            state_error: Some(1e-3),
+            max_iter: Some(3),
+        },
+    )
+    .with_process_noise(process_noise);
 
-    let mut odp = ODProcess::<_, U2, _, _, _>::ckf(
+    let mut odp = ODProcess::<_, U2, _, _, _>::new(
         prop_est,
         kf,
         devices,
@@ -345,7 +357,7 @@ fn od_resid_reject_default_ckf_two_way_cov_test(
         almanac,
     );
 
-    odp.process_arc(&tracking_arc).unwrap();
+    let od_sol = odp.process_arc(&tracking_arc).unwrap();
 
     // Save this result before the asserts for analysis
     let path: PathBuf = [
@@ -355,10 +367,9 @@ fn od_resid_reject_default_ckf_two_way_cov_test(
     ]
     .iter()
     .collect();
-    odp.to_parquet(&tracking_arc, path, ExportCfg::timestamped())
-        .unwrap();
+    od_sol.to_parquet(path, ExportCfg::timestamped()).unwrap();
 
-    let num_rejections = odp
+    let num_rejections = od_sol
         .residuals
         .iter()
         .flatten()
@@ -368,7 +379,7 @@ fn od_resid_reject_default_ckf_two_way_cov_test(
     assert!(num_rejections > 220);
 
     // Check that the error is within the covariance.
-    let est = &odp.estimates.last().unwrap();
+    let est = &od_sol.estimates.last().unwrap();
     let final_truth_state = traj.at(est.epoch()).unwrap();
 
     println!("Estimate:\n{}", est);

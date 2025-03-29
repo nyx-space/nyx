@@ -100,11 +100,6 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(
 ) {
     let _ = pretty_env_logger::try_init();
 
-    // Define the ground stations.
-    let ekf_num_meas = 100;
-    // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 5.0 * Unit::Second;
-
     // Load the tracking configurations
     let mut configs = BTreeMap::new();
     let trkconfig_yaml: PathBuf = [
@@ -171,21 +166,14 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(
     let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
     println!("initial estimate:\n{}", initial_estimate);
 
-    let kf = KF::no_snc(initial_estimate);
+    let kf = KF::new(initial_estimate, KalmanVariant::ReferenceUpdate);
 
-    let mut odp = ODProcess::<_, U2, _, _, _>::ekf(
-        prop_est,
-        kf,
-        proc_devices,
-        EkfTrigger::new(ekf_num_meas, ekf_disable_time),
-        None,
-        almanac,
-    );
+    let mut odp = ODProcess::<_, U2, _, _, _>::new(prop_est, kf, proc_devices, None, almanac);
 
-    odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
 
     // Check that the covariance deflated
-    let est = &odp.estimates[odp.estimates.len() - 1];
+    let est = &od_sol.estimates[od_sol.estimates.len() - 1];
     println!("Final estimate:\n{est}");
     assert!(
         est.state_deviation().norm() < 1e-12,
@@ -215,7 +203,7 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(
     }
 
     // Check the final estimate
-    let est = &odp.estimates[odp.estimates.len() - 1];
+    let est = &od_sol.estimates[od_sol.estimates.len() - 1];
     println!("{}\n\n{}\n{}", est.state_deviation(), est, final_truth);
     let delta = (est.state().orbit - final_truth.orbit).unwrap();
     println!(
@@ -244,12 +232,7 @@ fn od_tb_val_with_arc(
     let _ = pretty_env_logger::try_init();
 
     // Define the ground stations.
-    // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 5.0 * Unit::Second;
-
     let all_stations = sim_devices;
-
-    let ekf_num_meas = 100;
 
     // Define the propagator information.
     let duration = 1 * Unit::Day;
@@ -335,21 +318,20 @@ fn od_tb_val_with_arc(
     let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
     println!("initial estimate:\n{}", initial_estimate);
 
-    let kf = KF::no_snc(initial_estimate);
+    let kf = KF::new(initial_estimate, KalmanVariant::ReferenceUpdate);
 
-    let mut odp = ODProcess::<_, U2, _, _, _>::ekf(
+    let mut odp = ODProcess::<_, U2, _, _, _>::new(
         prop_est,
         kf,
         proc_devices,
-        EkfTrigger::new(ekf_num_meas, ekf_disable_time),
         Some(ResidRejectCrit::default()),
         almanac,
     );
 
-    odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
 
     // Check that the covariance deflated
-    let est = &odp.estimates[odp.estimates.len() - 1];
+    let est = &od_sol.estimates[od_sol.estimates.len() - 1];
     println!("Final estimate:\n{est}");
     assert!(
         est.state_deviation().norm() < f64::EPSILON,
@@ -379,7 +361,7 @@ fn od_tb_val_with_arc(
     }
 
     // Check the final estimate
-    let est = &odp.estimates[odp.estimates.len() - 1];
+    let est = &od_sol.estimates[od_sol.estimates.len() - 1];
     println!("{}\n\n{}\n{}", est.state_deviation(), est, final_truth);
     let delta = (est.state().orbit - final_truth.orbit).unwrap();
     println!(
@@ -495,22 +477,23 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
     // Define the initial orbit estimate
     let initial_estimate = KfEstimate::from_covar(initial_state_est, init_covar);
 
-    let ckf = KF::no_snc(initial_estimate);
+    let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
-    let mut odp = ODProcess::<_, U2, _, _, _>::ckf(prop_est, ckf, proc_devices, None, almanac);
+    let mut odp =
+        ODProcess::<_, U2, _, _, _>::new(prop_est, ckf, proc_devices, None, almanac.clone());
 
-    odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
 
     let path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "output_data", "tb_ckf.parquet"]
         .iter()
         .collect();
 
-    odp.to_parquet(&arc, path, ExportCfg::default()).unwrap();
+    od_sol.to_parquet(path, ExportCfg::default()).unwrap();
 
     // Check that there are no duplicates of epochs.
-    let mut prev_epoch = odp.estimates[0].epoch();
+    let mut prev_epoch = od_sol.estimates[0].epoch();
 
-    for est in odp.estimates.iter().skip(2) {
+    for est in od_sol.estimates.iter().skip(2) {
         let this_epoch = est.epoch();
         assert!(
             this_epoch > prev_epoch,
@@ -519,7 +502,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
         prev_epoch = this_epoch;
     }
 
-    for (no, est) in odp.estimates.iter().enumerate() {
+    for (no, est) in od_sol.estimates.iter().enumerate() {
         if no == 0 {
             // Skip the first estimate which is the initial estimate provided by user
             continue;
@@ -541,7 +524,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
         );
     }
 
-    for res in odp.residuals.iter().flatten() {
+    for res in od_sol.residuals.iter().flatten() {
         assert!(
             res.prefit.norm() < 1e-12,
             "prefit should be zero (perfect dynamics) ({:e})",
@@ -549,7 +532,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
         );
     }
 
-    for res in odp.residuals.iter().flatten() {
+    for res in od_sol.residuals.iter().flatten() {
         assert!(
             res.postfit.norm() < 1e-12,
             "postfit should be zero (perfect dynamics) ({:e})",
@@ -557,7 +540,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
         );
     }
 
-    let est = odp.estimates.last().unwrap();
+    let est = od_sol.estimates.last().unwrap();
     println!("estimate error {:.2e}", est.state_deviation().norm());
     println!("estimate covariance {:.2e}", est.covar.diagonal().norm());
 
@@ -589,28 +572,21 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
         "Velocity error should be zero"
     );
 
-    // Iterate
-    odp.iterate_arc(
-        &arc,
-        IterationConf {
-            smoother: SmoothingArc::TimeGap(10.0 * Unit::Second),
-            ..Default::default()
-        },
-    )
-    .unwrap();
+    // Smooth
+    let od_sol = od_sol.smooth(almanac).unwrap();
 
     println!(
         "N-1 one iteration: \n{}",
-        odp.estimates[odp.estimates.len() - 1]
+        od_sol.estimates[od_sol.estimates.len() - 1]
     );
 
     println!(
         "Initial state after iteration: \n{:x}",
-        odp.estimates[0].state()
+        od_sol.estimates[0].state()
     );
 
     // Check the final estimate
-    let est = odp.estimates.last().unwrap();
+    let est = od_sol.estimates.last().unwrap();
     println!("estimate error {:.2e}", est.state_deviation().norm());
     println!("estimate covariance {:.2e}", est.covar.diagonal().norm());
 
@@ -756,22 +732,23 @@ fn od_tb_val_az_el_ckf_fixed_step_perfect_stations(
     // Define the initial orbit estimate
     let initial_estimate = KfEstimate::from_covar(initial_state_est, init_covar);
 
-    let ckf = KF::no_snc(initial_estimate);
+    let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
-    let mut odp = ODProcess::<_, U2, _, _, _>::ckf(prop_est, ckf, proc_devices, None, almanac);
+    let mut odp =
+        ODProcess::<_, U2, _, _, _>::new(prop_est, ckf, proc_devices, None, almanac.clone());
 
-    odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
 
     let path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "output_data", "tb_ckf.parquet"]
         .iter()
         .collect();
 
-    odp.to_parquet(&arc, path, ExportCfg::default()).unwrap();
+    od_sol.to_parquet(path, ExportCfg::default()).unwrap();
 
     // Check that there are no duplicates of epochs.
-    let mut prev_epoch = odp.estimates[0].epoch();
+    let mut prev_epoch = od_sol.estimates[0].epoch();
 
-    for est in odp.estimates.iter().skip(2) {
+    for est in od_sol.estimates.iter().skip(2) {
         let this_epoch = est.epoch();
         assert!(
             this_epoch > prev_epoch,
@@ -780,7 +757,7 @@ fn od_tb_val_az_el_ckf_fixed_step_perfect_stations(
         prev_epoch = this_epoch;
     }
 
-    for (no, est) in odp.estimates.iter().enumerate() {
+    for (no, est) in od_sol.estimates.iter().enumerate() {
         if no == 0 {
             // Skip the first estimate which is the initial estimate provided by user
             continue;
@@ -802,7 +779,7 @@ fn od_tb_val_az_el_ckf_fixed_step_perfect_stations(
         );
     }
 
-    for res in odp.residuals.iter().flatten() {
+    for res in od_sol.residuals.iter().flatten() {
         assert!(
             res.prefit.norm() < 1e-12,
             "prefit should be zero (perfect dynamics) ({:e})",
@@ -810,7 +787,7 @@ fn od_tb_val_az_el_ckf_fixed_step_perfect_stations(
         );
     }
 
-    for res in odp.residuals.iter().flatten() {
+    for res in od_sol.residuals.iter().flatten() {
         assert!(
             res.postfit.norm() < 1e-12,
             "postfit should be zero (perfect dynamics) ({:e})",
@@ -818,7 +795,7 @@ fn od_tb_val_az_el_ckf_fixed_step_perfect_stations(
         );
     }
 
-    let est = odp.estimates.last().unwrap();
+    let est = od_sol.estimates.last().unwrap();
     println!("estimate error {:.2e}", est.state_deviation().norm());
     println!("estimate covariance {:.2e}", est.covar.diagonal().norm());
 
@@ -850,28 +827,21 @@ fn od_tb_val_az_el_ckf_fixed_step_perfect_stations(
         "Velocity error should be zero"
     );
 
-    // Iterate
-    odp.iterate_arc(
-        &arc,
-        IterationConf {
-            smoother: SmoothingArc::TimeGap(10.0 * Unit::Second),
-            ..Default::default()
-        },
-    )
-    .unwrap();
+    // Smooth
+    let od_sol = od_sol.smooth(almanac).unwrap();
 
     println!(
         "N-1 one iteration: \n{}",
-        odp.estimates[odp.estimates.len() - 1]
+        od_sol.estimates[od_sol.estimates.len() - 1]
     );
 
     println!(
         "Initial state after iteration: \n{:x}",
-        odp.estimates[0].state()
+        od_sol.estimates[0].state()
     );
 
     // Check the final estimate
-    let est = odp.estimates.last().unwrap();
+    let est = od_sol.estimates.last().unwrap();
     println!("estimate error {:.2e}", est.state_deviation().norm());
     println!("estimate covariance {:.2e}", est.covar.diagonal().norm());
 
@@ -968,14 +938,15 @@ fn od_tb_ckf_fixed_step_iteration_test(
     initial_state2.radius_km.z += 0.05;
     let initial_estimate = KfEstimate::from_covar(initial_state2.into(), init_covar);
 
-    let ckf = KF::no_snc(initial_estimate);
+    let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
-    let mut odp = ODProcess::<_, U2, _, _, _>::ckf(prop_est, ckf, proc_devices, None, almanac);
+    let mut odp =
+        ODProcess::<_, U2, _, _, _>::new(prop_est, ckf, proc_devices, None, almanac.clone());
 
-    odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
 
     // Check the final estimate prior to iteration
-    let delta = (odp.estimates.last().unwrap().state().orbit - final_truth.orbit).unwrap();
+    let delta = (od_sol.estimates.last().unwrap().state().orbit - final_truth.orbit).unwrap();
     println!(
         "RMAG error = {:.2e} m\tVMAG error = {:.3e} mm/s",
         delta.rmag_km() * 1e3,
@@ -991,20 +962,13 @@ fn od_tb_ckf_fixed_step_iteration_test(
         "More than station level velocity error"
     );
 
-    // Iterate, and check that the initial state difference is lower
-    odp.iterate_arc(
-        &arc,
-        IterationConf {
-            smoother: SmoothingArc::TimeGap(10.0 * Unit::Second),
-            ..Default::default()
-        },
-    )
-    .unwrap();
+    // Smooth
+    let od_sol = od_sol.smooth(almanac).unwrap();
 
     let dstate_no_iteration = (initial_state - initial_state2).unwrap();
-    let dstate_iteration = (initial_state - odp.estimates[0].state().orbit).unwrap();
+    let dstate_iteration = (initial_state - od_sol.estimates[0].state().orbit).unwrap();
 
-    println!("{}\n{}", initial_state2, odp.estimates[0].state());
+    println!("{}\n{}", initial_state2, od_sol.estimates[0].state());
 
     // Compute the order of magnitude of the errors, and check that iteration either decreases it or keeps it the same
     let err_it_oom = dstate_iteration.rmag_km().log10().floor() as i32;
@@ -1026,7 +990,7 @@ fn od_tb_ckf_fixed_step_iteration_test(
     );
 
     // Check the final estimate
-    let est = &odp.estimates[odp.estimates.len() - 1];
+    let est = &od_sol.estimates[od_sol.estimates.len() - 1];
     println!("{}\n\n{}\n{}", est.state_deviation(), est, final_truth);
     let delta = (est.state().orbit - final_truth.orbit).unwrap();
     println!(
@@ -1108,14 +1072,15 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map(
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
 
-    let ckf = KF::new(initial_estimate, process_noise);
+    let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking)
+        .with_process_noise(process_noise);
 
-    let mut odp = ODProcess::<_, U2, _, _, _>::ckf(prop_est, ckf, proc_devices, None, almanac);
+    let mut odp = ODProcess::<_, U2, _, _, _>::new(prop_est, ckf, proc_devices, None, almanac);
 
-    odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
 
     // Let's check that the covariance never falls below our sigma squared values
-    for (no, est) in odp.estimates.iter().enumerate() {
+    for (no, est) in od_sol.estimates.iter().enumerate() {
         if no == 1 {
             println!("{}", est);
         }
@@ -1147,7 +1112,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map(
     }
 
     // Check the final estimate
-    let est = &odp.estimates[odp.estimates.len() - 1];
+    let est = &od_sol.estimates[od_sol.estimates.len() - 1];
     println!("{}\n\n{}\n{}", est.state_deviation(), est, final_truth);
     let delta = (est.state().orbit - final_truth.orbit).unwrap();
     println!(
@@ -1200,15 +1165,15 @@ fn od_tb_ckf_map_covar(almanac: Arc<Almanac>) {
 
     let initial_estimate = KfEstimate::from_covar(Spacecraft::from(initial_state), init_covar);
 
-    let ckf = KF::no_snc(initial_estimate);
+    let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
     let mut odp: SpacecraftODProcess =
-        ODProcess::<_, U2, _, _, _>::ckf(prop_est, ckf, BTreeMap::new(), None, almanac);
+        ODProcess::<_, U2, _, _, _>::new(prop_est, ckf, BTreeMap::new(), None, almanac);
 
-    odp.predict_for(30.seconds(), duration).unwrap();
+    let od_sol = odp.predict_for(30.seconds(), duration).unwrap();
 
     // Check that the covariance inflated (we don't get the norm of the estimate because it's zero without any truth data)
-    let estimates = odp.estimates;
+    let estimates = od_sol.estimates;
     let est = &estimates[estimates.len() - 1];
     for i in 0..6 {
         assert!(
@@ -1300,14 +1265,14 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect_cov_test(
     // Define the initial estimate
     let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
 
-    let ckf = KF::no_snc(initial_estimate);
+    let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
-    let mut odp = ODProcess::<_, U2, _, _, _>::ckf(prop_est, ckf, proc_devices, None, almanac);
+    let mut odp = ODProcess::<_, U2, _, _, _>::new(prop_est, ckf, proc_devices, None, almanac);
 
-    odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
 
     // Let's check that the covariance never falls below our sigma squared values
-    for (no, est) in odp.estimates.iter().enumerate() {
+    for (no, est) in od_sol.estimates.iter().enumerate() {
         if no == 1 {
             println!("{}", est);
         }
@@ -1327,7 +1292,7 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect_cov_test(
     }
 
     // Check the final estimate
-    let est = &odp.estimates[odp.estimates.len() - 1];
+    let est = &od_sol.estimates[od_sol.estimates.len() - 1];
     println!("{}\n\n{}\n{}", est.state_deviation(), est, final_truth);
     let delta = (est.state().orbit - final_truth.orbit).unwrap();
     println!(
@@ -1423,14 +1388,16 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map(
     );
     process_noise2.start_time = Some(dt + 36_000.0); // Start the second process noise 10 hours into the tracking pass
 
-    let ckf = KF::with_sncs(initial_estimate, vec![process_noise1, process_noise2]);
+    let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking)
+        .with_process_noise(process_noise1)
+        .and_with_process_noise(process_noise2);
 
-    let mut odp = ODProcess::<_, U2, _, _, _>::ckf(prop_est, ckf, proc_devices, None, almanac);
+    let mut odp = ODProcess::<_, U2, _, _, _>::new(prop_est, ckf, proc_devices, None, almanac);
 
-    odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
 
     // Let's check that the covariance never falls below our sigma squared values
-    for (no, est) in odp.estimates.iter().enumerate() {
+    for (no, est) in od_sol.estimates.iter().enumerate() {
         if no == 1 {
             println!("{}", est);
         }
@@ -1451,7 +1418,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map(
     }
 
     // Check the final estimate
-    let est = &odp.estimates[odp.estimates.len() - 1];
+    let est = &od_sol.estimates[od_sol.estimates.len() - 1];
     println!("{}\n\n{}\n{}", est.state_deviation(), est, final_truth);
     let delta = (est.state().orbit - final_truth.orbit).unwrap();
     println!(

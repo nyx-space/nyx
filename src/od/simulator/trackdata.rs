@@ -36,7 +36,7 @@ use crate::od::ODError;
 use crate::Orbit;
 
 /// Tracking device simulator.
-pub trait TrackingDevice<MsrIn>: ConfigRepr
+pub trait TrackingDevice<MsrIn>: Clone + ConfigRepr
 where
     MsrIn: Interpolatable,
     DefaultAllocator:

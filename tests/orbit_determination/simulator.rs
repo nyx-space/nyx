@@ -126,7 +126,6 @@ fn tracking_data(
     trk.generate_measurements(almanac).unwrap()
 }
 
-// Consider changing this to a fixture to run the moduli tests.
 #[rstest]
 fn continuous_tracking_cov_test(tracking_data: TrackingDataArc) {
     let arc = tracking_data;
@@ -267,31 +266,25 @@ fn od_with_modulus_cov_test(
         Some(LocalFrame::RIC),
     );
     println!("{process_noise}");
-    let kf = KF::new(estimate, process_noise);
+    // TODO: Switch to iterative tracking here
+    let kf = KF::new(estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
 
     let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
     let prop = setup.with(spacecraft.with_stm(), almanac.clone());
 
-    let mut odp = SpacecraftODProcess::ekf(
-        prop,
-        kf,
-        devices,
-        EkfTrigger::new(10, Unit::Minute * 15),
-        None,
-        almanac,
-    );
+    let mut odp = SpacecraftODProcess::new(prop, kf, devices, None, almanac.clone());
 
-    odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
 
-    odp.to_parquet(
-        &arc,
-        "./output_data/od_with_modulus.parquet",
-        ExportCfg::default(),
-    )
-    .unwrap();
+    od_sol
+        .to_parquet(
+            "./output_data/od_with_modulus.parquet",
+            ExportCfg::default(),
+        )
+        .unwrap();
 
     // Check the final error.
-    let estimate = odp.estimates.last().unwrap();
+    let estimate = od_sol.estimates.last().unwrap();
     let rss_pos_km = trajectory
         .at(estimate.epoch())
         .unwrap()
@@ -301,23 +294,30 @@ fn od_with_modulus_cov_test(
 
     println!("rss_pos_km = {rss_pos_km}");
 
-    let reject_count = odp
-        .residuals
-        .iter()
-        .map(|resid| {
-            if let Some(resid) = resid {
-                if resid.rejected {
-                    1
-                } else {
-                    0
-                }
-            } else {
-                0
-            }
-        })
-        .sum::<u32>();
+    let reject_count = od_sol.rejected_residuals().len();
 
     assert!(reject_count < 10, "wrong number of expected rejections");
+
+    // Test filtering the OD solution.
+    let splt = od_sol.clone().split();
+    assert_eq!(splt.len(), 4);
+
+    let mut joined = splt[0].clone();
+    for sol in splt.iter().skip(1) {
+        joined = joined.join(sol.clone());
+    }
+    let msr_updates = od_sol.drop_time_updates();
+    assert_eq!(
+        msr_updates.estimates.len(),
+        msr_updates.residuals.len(),
+        "time updates were not dropped"
+    );
+    // This test processes range and Doppler simultaneously, so after joining the data, we end up with twice as many estimates.
+    assert_eq!(
+        joined.estimates.len(),
+        2 * msr_updates.estimates.len(),
+        "invalid estimate count: {joined} != {msr_updates}"
+    );
 }
 
 #[rstest]
@@ -360,31 +360,25 @@ fn od_with_modulus_as_bias_cov_test(
     let sigma_q = 1e-8_f64.powi(2);
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
-    let kf = KF::new(estimate, process_noise);
+    // TODO: Switch to iterative tracking
+    let kf = KF::new(estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
 
     let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
     let prop = setup.with(spacecraft.with_stm(), almanac.clone());
 
-    let mut odp = SpacecraftODProcess::ekf(
-        prop,
-        kf,
-        devices,
-        EkfTrigger::new(10, Unit::Minute * 15),
-        None,
-        almanac,
-    );
+    let mut odp = SpacecraftODProcess::new(prop, kf, devices, None, almanac);
 
-    odp.process_arc(&tracking_data).unwrap();
+    let od_sol = odp.process_arc(&tracking_data).unwrap();
 
-    odp.to_parquet(
-        &tracking_data,
-        "./output_data/od_with_modulus.parquet",
-        ExportCfg::default(),
-    )
-    .unwrap();
+    od_sol
+        .to_parquet(
+            "./output_data/od_with_modulus.parquet",
+            ExportCfg::default(),
+        )
+        .unwrap();
 
     // Check the final error.
-    let estimate = odp.estimates.last().unwrap();
+    let estimate = od_sol.estimates.last().unwrap();
     let rss_pos_km = trajectory
         .at(estimate.epoch())
         .unwrap()

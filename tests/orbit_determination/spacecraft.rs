@@ -217,20 +217,20 @@ fn od_val_sc_mb_srp_reals_duals_models(
     // Define the initial orbit estimate
     let initial_estimate = KfEstimate::from_covar(sc_init_est, init_covar);
 
-    let ckf = KF::no_snc(initial_estimate);
+    let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
-    let mut odp = SpacecraftODProcess::ckf(prop_est, ckf, proc_devices, None, almanac);
+    let mut odp = SpacecraftODProcess::new(prop_est, ckf, proc_devices, None, almanac);
 
-    odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
 
-    odp.to_parquet(
-        &arc,
-        path.with_file_name("spacecraft_od_results.parquet"),
-        ExportCfg::timestamped(),
-    )
-    .unwrap();
+    od_sol
+        .to_parquet(
+            path.with_file_name("spacecraft_od_results.parquet"),
+            ExportCfg::timestamped(),
+        )
+        .unwrap();
 
-    for (no, est) in odp.estimates.iter().enumerate() {
+    for (no, est) in od_sol.estimates.iter().enumerate() {
         if no == 0 {
             // Skip the first estimate which is the initial estimate provided by user
             continue;
@@ -250,7 +250,7 @@ fn od_val_sc_mb_srp_reals_duals_models(
         );
     }
 
-    for res in odp.residuals.iter().flatten() {
+    for res in od_sol.residuals.iter().flatten() {
         assert!(
             res.postfit.norm() < 1e-5,
             "postfit should be zero (perfect dynamics) ({:e})",
@@ -258,7 +258,7 @@ fn od_val_sc_mb_srp_reals_duals_models(
         );
     }
 
-    let est = odp.estimates.last().unwrap();
+    let est = od_sol.estimates.last().unwrap();
     println!("estimate error {:.2e}", est.state_deviation().norm());
     println!("estimate covariance {:.2e}", est.covar.diagonal().norm());
 
@@ -394,39 +394,25 @@ fn od_val_sc_srp_estimation_cov_test(
     let sc = SpacecraftUncertainty::builder()
         .nominal(sc_init_est)
         .frame(LocalFrame::RIC)
-        .x_km(0.1)
-        .y_km(0.1)
-        .z_km(0.1)
-        .vx_km_s(0.1e-3)
-        .vy_km_s(0.1e-3)
-        .vz_km_s(0.1e-3)
+        .x_km(0.001)
+        .y_km(0.001)
+        .z_km(0.001)
+        .vx_km_s(0.1e-6)
+        .vy_km_s(0.1e-6)
+        .vz_km_s(0.1e-6)
         .coeff_reflectivity(0.2)
         .build();
 
     // Define the initial orbit estimate
     let initial_estimate = sc.to_estimate().unwrap();
 
-    let ckf = KF::no_snc(initial_estimate);
+    let ckf = KF::new(initial_estimate, KalmanVariant::ReferenceUpdate);
 
-    let mut odp = SpacecraftODProcess::ekf(
-        prop_est,
-        ckf,
-        proc_devices,
-        EkfTrigger::new(30, Unit::Minute * 2),
-        None,
-        almanac,
-    );
+    let mut odp = SpacecraftODProcess::new(prop_est, ckf, proc_devices, None, almanac.clone());
 
-    odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
 
-    odp.to_parquet(
-        &arc,
-        path.with_file_name("sc_od_with_srp.parquet"),
-        ExportCfg::default(),
-    )
-    .unwrap();
-
-    let est = odp.estimates.last().unwrap();
+    let est = od_sol.estimates.last().unwrap();
 
     let truth = traj.at(est.epoch()).unwrap();
 
@@ -452,7 +438,7 @@ fn od_val_sc_srp_estimation_cov_test(
         "Cr estimation did not improve"
     );
 
-    for (no, est) in odp.estimates.iter().enumerate() {
+    for (no, est) in od_sol.estimates.iter().enumerate() {
         if no == 0 {
             // Skip the first estimate which is the initial estimate provided by user
             continue;
@@ -466,4 +452,57 @@ fn od_val_sc_srp_estimation_cov_test(
             );
         }
     }
+
+    // The following are merely checks that the code works as expected, not checks on the OD.
+
+    let pre_smooth_postfit_rms = od_sol.rms_postfit_residuals();
+
+    od_sol
+        .to_parquet("./od_srp_val.parquet", ExportCfg::default())
+        .unwrap();
+
+    println!(
+        "Num residuals accepted: #{}",
+        od_sol.accepted_residuals().len()
+    );
+    println!(
+        "Num residuals rejected: #{}",
+        od_sol.rejected_residuals().len()
+    );
+    println!(
+        "Percentage within +/-3: {}",
+        od_sol.residual_ratio_within_threshold(3.0).unwrap()
+    );
+    println!("Ratios normal? {}", od_sol.is_normal(None).unwrap());
+
+    // Regression tests, not solution test
+    assert_eq!(
+        od_sol.accepted_residuals().len(),
+        2992,
+        "all residuals should be accepted"
+    );
+    assert_eq!(
+        od_sol.rejected_residuals().len(),
+        0,
+        "all residuals should be accepted"
+    );
+    assert!(
+        (0.80..0.90).contains(&od_sol.residual_ratio_within_threshold(3.0).unwrap()),
+        "expecting 80-90% of valid residual ratios"
+    );
+    assert!(
+        !od_sol.is_normal(None).unwrap(),
+        "residuals should not be normally distributed"
+    );
+
+    let od_smoothed_sol = od_sol.smooth(almanac).unwrap();
+
+    od_smoothed_sol
+        .to_parquet("./od_srp_val_smoothed.parquet", ExportCfg::default())
+        .unwrap();
+
+    println!(
+        "one-pass vs smoothed postfit RMS: {pre_smooth_postfit_rms}\t{}",
+        od_smoothed_sol.rms_postfit_residuals()
+    );
 }

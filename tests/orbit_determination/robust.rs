@@ -45,9 +45,6 @@ fn od_robust_test_ekf_realistic_one_way_cov_test(almanac: Arc<Almanac>) {
 
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
     // Define the ground stations.
-    let ekf_num_meas = 300;
-    // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 3 * Unit::Minute;
     let elevation_mask = 0.0;
 
     let dss65_madrid = GroundStation::dss65_madrid(
@@ -167,40 +164,42 @@ fn od_robust_test_ekf_realistic_one_way_cov_test(almanac: Arc<Almanac>) {
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
 
-    let kf = KF::new(initial_estimate, process_noise);
+    let kf =
+        KF::new(initial_estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
 
-    let trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
-
-    let mut odp = SpacecraftODProcess::ekf(prop_est, kf, devices, trig, None, almanac);
+    let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac.clone());
 
     // Let's filter and iterate on the initial subset of the arc to refine the initial estimate
     let subset = arc.clone().filter_by_offset(..3.hours());
     let remaining = arc.filter_by_offset(3.hours()..);
 
-    odp.process_arc(&subset).unwrap();
-    odp.iterate_arc(&subset, IterationConf::once()).unwrap();
+    let od_sol = odp
+        .process_arc(&subset)
+        .expect("process failed")
+        .smooth(almanac)
+        .expect("smooth failed");
 
     let (sm_rss_pos_km, sm_rss_vel_km_s) =
-        rss_orbit_errors(&initial_state.orbit, &odp.estimates[0].state().orbit);
+        rss_orbit_errors(&initial_state.orbit, &od_sol.estimates[0].state().orbit);
 
     println!(
         "Initial state error after smoothing:\t{:.3} m\t{:.3} m/s\n{}",
         sm_rss_pos_km * 1e3,
         sm_rss_vel_km_s * 1e3,
-        (initial_state.orbit - odp.estimates[0].state().orbit).unwrap()
+        (initial_state.orbit - od_sol.estimates[0].state().orbit).unwrap()
     );
 
-    odp.process_arc(&remaining).unwrap();
+    let od_sol = odp.process_arc(&remaining).unwrap();
 
-    odp.to_parquet(
-        &remaining,
-        path.with_file_name("robustness_test_one_way.parquet"),
-        ExportCfg::timestamped(),
-    )
-    .unwrap();
+    od_sol
+        .to_parquet(
+            path.with_file_name("robustness_test_one_way.parquet"),
+            ExportCfg::timestamped(),
+        )
+        .unwrap();
 
     // Check that the covariance deflated
-    let est = &odp.estimates[odp.estimates.len() - 1];
+    let est = &od_sol.estimates[od_sol.estimates.len() - 1];
     let final_truth_state = traj.at(est.epoch()).unwrap();
 
     println!("Estimate:\n{}", est);
@@ -252,9 +251,6 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
 
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
     // Define the ground stations.
-    let ekf_num_meas = 100;
-    // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 3 * Unit::Minute;
     let elevation_mask = 0.0;
 
     // Define the propagator information.
@@ -362,33 +358,23 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
 
-    let kf = KF::new(initial_estimate, process_noise);
+    let kf =
+        KF::new(initial_estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
 
-    let trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
+    let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac);
 
-    let mut odp = SpacecraftODProcess::ekf(prop_est, kf, devices, trig, None, almanac);
-
-    // Check that exporting an empty set returns an error.
-    assert!(odp
-        .to_parquet(
-            &arc,
-            path.with_file_name("robustness_test_two_way.parquet"),
-            ExportCfg::timestamped(),
-        )
-        .is_err());
-
-    odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
 
     let mut num_residual_none = 0;
     let mut num_residual_some = 0;
-    odp.residuals.iter().for_each(|opt_v| match opt_v {
+    od_sol.residuals.iter().for_each(|opt_v| match opt_v {
         Some(_) => num_residual_some += 1,
         None => {
             num_residual_none += 1;
         }
     });
 
-    for (ith, (est, opt_resid)) in odp.results().rev().take(10).enumerate() {
+    for (ith, (est, opt_resid)) in od_sol.results().rev().take(10).enumerate() {
         if let Some(resid) = opt_resid {
             println!("RESIDUAL #{ith}");
             println!("{resid}");
@@ -410,9 +396,8 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
     }
 
     // Export as Parquet
-    let timestamped_path = odp
+    let timestamped_path = od_sol
         .to_parquet(
-            &arc,
             path.with_file_name("robustness_test_two_way.parquet"),
             ExportCfg::default(),
         )
@@ -420,7 +405,7 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
 
     // Test the results
     // Check that the covariance deflated
-    let est = &odp.estimates[odp.estimates.len() - 1];
+    let est = &od_sol.estimates[od_sol.estimates.len() - 1];
     let final_truth_state = traj.at(est.epoch()).unwrap();
 
     println!("Estimate:\n{}", est);
@@ -481,7 +466,7 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
         .unwrap();
 
     for series in df_residuals.iter() {
-        assert_eq!(series.len(), odp.estimates.len());
+        assert_eq!(series.len(), od_sol.estimates.len());
         let mut num_none = 0;
         let mut num_some = 0;
         series

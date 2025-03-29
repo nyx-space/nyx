@@ -13,9 +13,9 @@ use nyx::od::prelude::*;
 use nyx::propagators::{IntegratorOptions, Propagator};
 use nyx::utils::rss_orbit_errors;
 use nyx::Spacecraft;
+use nyx_space::io::ExportCfg;
 use nyx_space::propagators::IntegratorMethod;
 use std::collections::BTreeMap;
-use std::convert::TryFrom;
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use rstest::*;
@@ -137,30 +137,25 @@ fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>, devices: BTreeMap<String, G
     let sigma_q = 1e-7_f64.powi(2);
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
-    let kf = KF::new(initial_estimate, process_noise);
+    let kf =
+        KF::new(initial_estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
 
-    let mut odp = SpacecraftODProcess::ckf(prop_est, kf, devices, None, almanac);
+    let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac.clone());
 
-    odp.process_arc(&arc).unwrap();
-    let pre_smooth_first_est = odp.estimates[0];
-    let pre_smooth_num_est = odp.estimates.len();
-    odp.iterate_arc(
-        &arc,
-        IterationConf {
-            smoother: SmoothingArc::All,
-            ..Default::default()
-        },
-    )
-    .unwrap();
+    let od_sol = odp.process_arc(&arc).expect("OD process failed");
+    let pre_smooth_first_est = od_sol.estimates[0];
+    let pre_smooth_num_est = od_sol.estimates.len();
+
+    let smoothed_od_sol = od_sol.clone().smooth(almanac).expect("OD smoothing failed");
 
     assert_eq!(
         pre_smooth_num_est,
-        odp.estimates.len(),
+        smoothed_od_sol.estimates.len(),
         "different number of estimates smoothed and not"
     );
 
     // Check the new initial estimate is better than at the start
-    let smoothed_init_state = odp.estimates[0].state().orbit;
+    let smoothed_init_state = smoothed_od_sol.estimates[0].state().orbit;
     let (sm_err_p, sm_err_v) = rss_orbit_errors(&smoothed_init_state, &initial_state);
     println!(
         "New initial state dev: {:.3} m\t{:.3} m/s\n{}",
@@ -175,10 +170,8 @@ fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>, devices: BTreeMap<String, G
     );
     // We don't check the velocity because the initial error is zero, so the smoother will change the velocity for a better fit.
 
-    // TODO: Check that the smoothed trajectory gets better with several smoothing -- https://github.com/nyx-space/nyx/issues/134
-
     // Check that the covariance deflated
-    let est = &odp.estimates.last().unwrap();
+    let est = &smoothed_od_sol.estimates.last().unwrap();
     println!("Estimate:\n{}", est);
     let final_truth_state = traj.at(est.epoch()).unwrap();
     println!("Truth:\n{}", final_truth_state);
@@ -227,7 +220,7 @@ fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>, devices: BTreeMap<String, G
         sm_err_v * 1e3
     );
 
-    let post_smooth_first_est = odp.estimates[0];
+    let post_smooth_first_est = smoothed_od_sol.estimates[0];
 
     let init_pos_rss = initial_state.rss_radius_km(&initial_state_dev).unwrap();
     let init_vel_rss = initial_state.rss_velocity_km_s(&initial_state_dev).unwrap();
@@ -254,11 +247,30 @@ fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>, devices: BTreeMap<String, G
         init_vel_rss, zero_it_vel_rss, one_it_vel_rss
     );
 
-    // TODO: #416
-    // assert!(
-    //     one_it_pos_rss < zero_it_pos_rss,
-    //     "RSS position not better after iteration"
-    // );
+    println!(
+        "RMS before smoothing: {}\t{}\t{}",
+        od_sol.rms_prefit_residuals(),
+        od_sol.rms_postfit_residuals(),
+        od_sol.rms_residual_ratios()
+    );
+    println!(
+        "RMS after smoothing: {}\t{}\t{}",
+        smoothed_od_sol.rms_prefit_residuals(),
+        smoothed_od_sol.rms_postfit_residuals(),
+        smoothed_od_sol.rms_residual_ratios()
+    );
+
+    assert!(
+        smoothed_od_sol.rms_postfit_residuals() < od_sol.rms_postfit_residuals(),
+        "smoothing does not improve the residuals"
+    );
+
+    od_sol
+        .to_parquet("od_sol_xhat.parquet", ExportCfg::default())
+        .expect("could not export smoothed solutions");
+    smoothed_od_sol
+        .to_parquet("od_smooth_xhat.parquet", ExportCfg::default())
+        .expect("could not export smoothed solutions");
 }
 
 #[allow(clippy::identity_op)]
@@ -268,11 +280,6 @@ fn xhat_dev_test_ekf_multi_body(almanac: Arc<Almanac>, devices: BTreeMap<String,
     // This does _not_ impact the prefits, but it impacts the state deviation and therefore the state estimate.
     // As such, it checks that the filter can return to a nominal state.
     let _ = pretty_env_logger::try_init();
-
-    // Define the ground stations.
-    let ekf_num_meas = 500;
-    // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 10.0 * Unit::Second;
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
@@ -348,19 +355,17 @@ fn xhat_dev_test_ekf_multi_body(almanac: Arc<Almanac>, devices: BTreeMap<String,
     let sigma_q = 1e-8_f64.powi(2);
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
-    let kf = KF::new(initial_estimate, process_noise);
+    let kf =
+        KF::new(initial_estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
 
-    let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
-    trig.within_sigma = 3.0;
+    let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac);
 
-    let mut odp = SpacecraftODProcess::ekf(prop_est, kf, devices, trig, None, almanac);
-
-    odp.process_arc(&arc).unwrap();
-    odp.iterate_arc(&arc, IterationConf::try_from(SmoothingArc::All).unwrap())
-        .unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
+    // odp.iterate_arc(&arc, IterationConf::try_from(SmoothingArc::All).unwrap())
+    //     .unwrap();
 
     // Check that the covariance deflated
-    let est = &odp.estimates.last().unwrap();
+    let est = &od_sol.estimates.last().unwrap();
     let final_truth_state = traj.at(est.epoch()).unwrap();
 
     println!("Estimate:\n{}", est);
@@ -422,11 +427,6 @@ fn xhat_dev_test_ekf_multi_body(almanac: Arc<Almanac>, devices: BTreeMap<String,
 #[rstest]
 fn xhat_dev_test_ekf_harmonics(almanac: Arc<Almanac>, devices: BTreeMap<String, GroundStation>) {
     let _ = pretty_env_logger::try_init();
-
-    // Define the ground stations.
-    let ekf_num_meas = 5000;
-    // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 1 * Unit::Minute;
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
@@ -512,17 +512,15 @@ fn xhat_dev_test_ekf_harmonics(almanac: Arc<Almanac>, devices: BTreeMap<String, 
     let sigma_q = 1e-7_f64.powi(2);
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
-    let kf = KF::new(initial_estimate, process_noise);
+    let kf =
+        KF::new(initial_estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
 
-    let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
-    trig.within_sigma = 3.0;
+    let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac);
 
-    let mut odp = SpacecraftODProcess::ekf(prop_est, kf, devices, trig, None, almanac);
-
-    odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
 
     // Check that the covariance deflated
-    let est = &odp.estimates.last().unwrap();
+    let est = &od_sol.estimates.last().unwrap();
     let final_truth_state = traj.at(est.epoch()).unwrap();
 
     println!("Estimate:\n{}", est);
@@ -569,11 +567,6 @@ fn xhat_dev_test_ekf_harmonics(almanac: Arc<Almanac>, devices: BTreeMap<String, 
 #[rstest]
 fn xhat_dev_test_ekf_realistic(almanac: Arc<Almanac>, devices: BTreeMap<String, GroundStation>) {
     let _ = pretty_env_logger::try_init();
-
-    // Define the ground stations.
-    let ekf_num_meas = 500;
-    // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 10.0 * Unit::Second;
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     // Define the tracking configurations
@@ -645,17 +638,14 @@ fn xhat_dev_test_ekf_realistic(almanac: Arc<Almanac>, devices: BTreeMap<String, 
     let initial_estimate = KfEstimate::from_covar(initial_state_dev.into(), init_covar);
     println!("Initial estimate:\n{}", initial_estimate);
 
-    let kf = KF::no_snc(initial_estimate);
+    let kf = KF::new(initial_estimate, KalmanVariant::ReferenceUpdate);
 
-    let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
-    trig.within_sigma = 3.0;
+    let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac);
 
-    let mut odp = SpacecraftODProcess::ekf(prop_est, kf, devices, trig, None, almanac);
-
-    odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
 
     // Check that the covariance deflated
-    let est = &odp.estimates.last().unwrap();
+    let est = &od_sol.estimates.last().unwrap();
     let final_truth_state = traj.at(est.epoch()).unwrap();
 
     println!("Estimate:\n{}", est);
@@ -783,19 +773,19 @@ fn xhat_dev_test_ckf_smoother_multi_body(
     let initial_estimate = KfEstimate::from_covar(initial_state_dev.into(), init_covar);
     println!("Initial estimate:\n{}", initial_estimate);
 
-    let kf = KF::no_snc(initial_estimate);
+    let kf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
-    let mut odp = SpacecraftODProcess::ckf(prop_est, kf, devices, None, almanac);
+    let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac.clone());
 
-    odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
 
     // Smoother
-    let smoothed_estimates = odp.smooth(SmoothingArc::All).unwrap();
+    let smoothed = od_sol.clone().smooth(almanac).unwrap();
 
     // Check that the estimates and smoothed estimates have the same epochs
-    for (i, sm_est) in smoothed_estimates.iter().enumerate() {
+    for (i, sm_est) in smoothed.estimates.iter().enumerate() {
         let this_epoch = sm_est.epoch();
-        let est_epoch = odp.estimates[i].epoch();
+        let est_epoch = od_sol.estimates[i].epoch();
         assert_eq!(
             this_epoch, est_epoch,
             "Smoothed estimate epoch different from ODP estimate epoch: {} != {}",
@@ -803,16 +793,16 @@ fn xhat_dev_test_ckf_smoother_multi_body(
         );
     }
     assert_eq!(
-        odp.estimates.len(),
-        smoothed_estimates.len(),
+        od_sol.estimates.len(),
+        smoothed.estimates.len(),
         "Different number of estimates and smoothed estimates"
     );
 
     // Check the first estimate, which should be better thanks to smoothing
     // Only the print the final estimate
-    let est = &odp.estimates[0];
+    let est = &od_sol.estimates[0];
     let truth_state = traj.at(est.epoch()).unwrap().orbit;
-    let smoothed_est = &smoothed_estimates[0];
+    let smoothed_est = &smoothed.estimates[0];
     let (err_p, err_v) = rss_orbit_errors(&est.state().orbit, &truth_state);
     let (err_p_sm, err_v_sm) = rss_orbit_errors(&smoothed_est.state().orbit, &truth_state);
 
@@ -842,8 +832,8 @@ fn xhat_dev_test_ckf_smoother_multi_body(
     let mut num_vel_ok = 0;
 
     // Test smoothed estimates
-    for (i, est) in odp.estimates.iter().enumerate() {
-        let smoothed_est = &smoothed_estimates[i];
+    for (i, est) in od_sol.estimates.iter().enumerate() {
+        let smoothed_est = &smoothed.estimates[i];
 
         // Check that the covariance deflated
         let truth_state = traj.at(est.epoch()).unwrap().orbit;
@@ -937,13 +927,13 @@ fn xhat_dev_test_ckf_smoother_multi_body(
         }
     }
 
-    let cntf = odp.estimates.len() as f64;
+    let cntf = od_sol.estimates.len() as f64;
     println!(
         "\nPos. better: {}/{}\tVel. better: {}/{}\nPre-smoothing  avr. RSS:\t{:.3e}\t{:.3e}\nPost-smoothing avr. RSS:\t{:.3e}\t{:.3e}\n",
         num_pos_ok,
-        odp.estimates.len(),
+        od_sol.estimates.len(),
         num_vel_ok,
-        odp.estimates.len(),
+        od_sol.estimates.len(),
         rss_pos_avr / cntf,
         rss_vel_avr / cntf,
         rss_pos_avr_sm / cntf,
@@ -1035,11 +1025,6 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body(
         0.0,
     ]));
 
-    // Define the ground stations.
-    let ekf_num_meas = 100;
-    // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 1 * Unit::Hour;
-
     // Define the initial estimate
     let initial_estimate = KfEstimate::from_covar(initial_state_dev.into(), init_covar);
     println!("Initial estimate:\n{}", initial_estimate);
@@ -1047,21 +1032,15 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body(
     let sigma_q = 1e-8_f64.powi(2);
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
-    let kf = KF::new(initial_estimate, process_noise);
+    let kf =
+        KF::new(initial_estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
 
-    let mut odp = SpacecraftODProcess::ekf(
-        prop_est,
-        kf,
-        devices,
-        EkfTrigger::new(ekf_num_meas, ekf_disable_time),
-        None,
-        almanac,
-    );
+    let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac.clone());
 
-    odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
 
     // Smoother
-    let smoothed_estimates = odp.smooth(SmoothingArc::All).unwrap();
+    let smoothed = od_sol.clone().smooth(almanac.clone()).unwrap();
 
     let mut rss_pos_avr = 0.0;
     let mut rss_vel_avr = 0.0;
@@ -1072,11 +1051,11 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body(
 
     // Test smoothed estimates
     // Skip the first 10 estimates which are surprisingly good in this case
-    for offset in (1..odp.estimates.len() - 10).rev() {
-        let smoothed_est = &smoothed_estimates[odp.estimates.len() - offset];
+    for offset in (1..od_sol.estimates.len() - 10).rev() {
+        let smoothed_est = &smoothed.estimates[od_sol.estimates.len() - offset];
 
         // Check that the covariance deflated
-        let est = &odp.estimates[odp.estimates.len() - offset];
+        let est = &od_sol.estimates[od_sol.estimates.len() - offset];
         let truth_state = traj.at(est.epoch()).unwrap().orbit;
 
         // Some sanity checks to make sure that we have correctly indexed the estimates
@@ -1157,7 +1136,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body(
             println!(
                 "RSS position error after smoothing not better @{} (#{}):\n\testimate vs truth: {:.3e} m\t{:.3e} m/s\n{}\n\tsmoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
                 truth_state.epoch,
-                odp.estimates.len() - offset,
+                od_sol.estimates.len() - offset,
                 err_p * 1e3,
                 err_v * 1e3,
                 (truth_state - est.state().orbit).unwrap(),
@@ -1171,7 +1150,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body(
             println!(
                 "RSS velocity error after smoothing not better @{} (#{}):\n\testimate vs truth: {:.3e} m\t{:.3e} m/s\n{}\n\tsmoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
                 truth_state.epoch,
-                odp.estimates.len() - offset,
+                od_sol.estimates.len() - offset,
                 err_p * 1e3,
                 err_v * 1e3,
                 (truth_state - est.state().orbit).unwrap(),
@@ -1189,19 +1168,19 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body(
                     i,
                     est.covar[(i, i)],
                     truth_state.epoch,
-                    odp.estimates.len() - offset,
+                    od_sol.estimates.len() - offset,
                 );
             }
         }
     }
 
-    let cntf = odp.estimates.len() as f64;
+    let cntf = od_sol.estimates.len() as f64;
     println!(
         "\nPos. better: {}/{}\tVel. better: {}/{}\nPre-smoothing  avr. RSS:\t{:.3e}\t{:.3e}\nPost-smoothing avr. RSS:\t{:.3e}\t{:.3e}\n",
         num_pos_ok,
-        odp.estimates.len(),
+        od_sol.estimates.len(),
         num_vel_ok,
-        odp.estimates.len(),
+        od_sol.estimates.len(),
         rss_pos_avr / cntf,
         rss_vel_avr / cntf,
         rss_pos_avr_sm / cntf,
@@ -1298,18 +1277,17 @@ fn xhat_dev_test_ckf_iteration_multi_body(
     let initial_estimate = KfEstimate::from_covar(initial_state_dev.into(), init_covar);
     println!("Initial estimate:\n{}", initial_estimate);
 
-    let kf = KF::no_snc(initial_estimate);
+    let kf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
-    let mut odp = SpacecraftODProcess::ckf(prop_est, kf, devices, None, almanac);
+    let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac.clone());
 
-    odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(&arc).unwrap();
 
     // Clone the initial estimates
-    let pre_iteration_estimates = odp.estimates.clone();
+    let pre_iteration_estimates = od_sol.estimates.clone();
 
     // Iterate
-    odp.iterate_arc(&arc, IterationConf::try_from(SmoothingArc::All).unwrap())
-        .unwrap();
+    let smoothed = od_sol.clone().smooth(almanac.clone()).unwrap();
 
     let mut rss_pos_avr = 0.0;
     let mut rss_vel_avr = 0.0;
@@ -1320,11 +1298,11 @@ fn xhat_dev_test_ckf_iteration_multi_body(
 
     // Compare the initial estimates and the iterated estimates
     // Skip the first 10 estimates which are surprisingly good in this case
-    for offset in (1..odp.estimates.len() - 10).rev() {
-        let prior_est = &pre_iteration_estimates[odp.estimates.len() - offset];
+    for offset in (1..od_sol.estimates.len() - 10).rev() {
+        let prior_est = &pre_iteration_estimates[od_sol.estimates.len() - offset];
 
         // Check that the covariance deflated
-        let est = &odp.estimates[odp.estimates.len() - offset];
+        let est = &smoothed.estimates[od_sol.estimates.len() - offset];
         let truth_state = traj.at(est.epoch()).unwrap().orbit;
 
         // Some sanity checks to make sure that we have correctly indexed the estimates
@@ -1402,7 +1380,7 @@ fn xhat_dev_test_ckf_iteration_multi_body(
             println!(
                 "RSS position error after iteration not better @{} (#{}):\n\testimate vs truth: {:.3e} m\t{:.3e} m/s\n{}\n\tsmoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
                 truth_state.epoch,
-                odp.estimates.len() - offset,
+                od_sol.estimates.len() - offset,
                 err_p * 1e3,
                 err_v * 1e3,
                 (truth_state - prior_est.state().orbit).unwrap(),
@@ -1416,7 +1394,7 @@ fn xhat_dev_test_ckf_iteration_multi_body(
             println!(
                 "RSS velocity error after smoothing not better @{} (#{}):\n\testimate vs truth: {:.3e} m\t{:.3e} m/s\n{}\n\tsmoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
                 truth_state.epoch,
-                odp.estimates.len() - offset,
+                od_sol.estimates.len() - offset,
                 err_p * 1e3,
                 err_v * 1e3,
                 (truth_state - prior_est.state().orbit).unwrap(),
@@ -1434,19 +1412,19 @@ fn xhat_dev_test_ckf_iteration_multi_body(
                     i,
                     est.covar[(i, i)],
                     truth_state.epoch,
-                    odp.estimates.len() - offset,
+                    od_sol.estimates.len() - offset,
                 );
             }
         }
     }
 
-    let cntf = odp.estimates.len() as f64;
+    let cntf = od_sol.estimates.len() as f64;
     println!(
         "\nPos. better: {}/{}\tVel. better: {}/{}\nPre-iteration  avr. RSS:\t{:.3e}\t{:.3e}\nPost-iteration avr. RSS:\t{:.3e}\t{:.3e}\n",
         num_pos_ok,
-        odp.estimates.len(),
+        od_sol.estimates.len(),
         num_vel_ok,
-        odp.estimates.len(),
+        od_sol.estimates.len(),
         rss_pos_avr / cntf,
         rss_vel_avr / cntf,
         rss_pos_avr_it / cntf,
