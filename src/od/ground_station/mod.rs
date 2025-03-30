@@ -271,7 +271,7 @@ mod gs_ut {
         let test_data: PathBuf = [
             env::var("CARGO_MANIFEST_DIR").unwrap(),
             "data".to_string(),
-            "tests".to_string(),
+            "03_tests".to_string(),
             "config".to_string(),
             "one_ground_station.yaml".to_string(),
         ]
@@ -332,7 +332,7 @@ mod gs_ut {
         let test_file: PathBuf = [
             env::var("CARGO_MANIFEST_DIR").unwrap(),
             "data".to_string(),
-            "tests".to_string(),
+            "03_tests".to_string(),
             "config".to_string(),
             "many_ground_stations.yaml".to_string(),
         ]

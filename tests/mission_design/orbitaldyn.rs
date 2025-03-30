@@ -955,7 +955,8 @@ fn val_earth_sph_harmonics_12x12(almanac_gmat: Arc<Almanac>) {
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
-    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 12, 12, true).unwrap();
+    let earth_sph_harm =
+        HarmonicsMem::from_cof("data/01_planetary/JGM3.cof.gz", 12, 12, true).unwrap();
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm);
 
     let dt = Epoch::from_mjd_tai(MJD_J2000);
@@ -1042,7 +1043,8 @@ fn val_earth_sph_harmonics_70x70(almanac_gmat: Arc<Almanac>) {
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
-    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
+    let earth_sph_harm =
+        HarmonicsMem::from_cof("data/01_planetary/JGM3.cof.gz", 70, 70, true).unwrap();
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm);
 
     let dt = Epoch::from_mjd_tai(MJD_J2000);
@@ -1098,7 +1100,8 @@ fn val_earth_sph_harmonics_70x70_partials(almanac_gmat: Arc<Almanac>) {
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
-    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
+    let earth_sph_harm =
+        HarmonicsMem::from_cof("data/01_planetary/JGM3.cof.gz", 70, 70, true).unwrap();
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm);
 
     let dt = Epoch::from_mjd_tai(MJD_J2000);
@@ -1154,7 +1157,8 @@ fn hf_prop(almanac: Arc<Almanac>) {
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
-    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 21, 21, true).unwrap();
+    let earth_sph_harm =
+        HarmonicsMem::from_cof("data/01_planetary/JGM3.cof.gz", 21, 21, true).unwrap();
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm);
 
     let dt = Epoch::from_mjd_tai(MJD_J2000);

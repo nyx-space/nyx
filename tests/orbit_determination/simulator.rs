@@ -27,7 +27,7 @@ fn devices() -> BTreeMap<String, GroundStation> {
     let ground_station_file: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
         "data",
-        "tests",
+        "03_tests",
         "config",
         "many_ground_stations.yaml",
     ]
@@ -85,7 +85,8 @@ fn tracking_data(
     // Save the trajectory to parquet
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "output_data",
+        "data",
+        "04_output",
         "tracking_truth_ephem.parquet",
     ]
     .iter()
@@ -106,7 +107,7 @@ fn tracking_data(
     let trkconfg_yaml: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
         "data",
-        "tests",
+        "03_tests",
         "config",
         "tracking_cfg.yaml",
     ]
@@ -135,7 +136,8 @@ fn continuous_tracking_cov_test(tracking_data: TrackingDataArc) {
     // And serialize to disk
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "output_data",
+        "data",
+        "04_output",
         "simple_arc.parquet",
     ]
     .iter()
@@ -155,9 +157,14 @@ fn continuous_tracking_cov_test(tracking_data: TrackingDataArc) {
     assert_eq!(arc_rtn.unique(), arc.unique());
 
     // Serialize as TDM
-    let path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "output_data", "simple_arc.tdm"]
-        .iter()
-        .collect();
+    let path: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "data",
+        "04_output",
+        "simple_arc.tdm",
+    ]
+    .iter()
+    .collect();
 
     let mut aliases = HashMap::new();
     aliases.insert("Demo Ground Station".to_string(), "Fake GS".to_string());
@@ -202,7 +209,8 @@ fn continuous_tracking_cov_test(tracking_data: TrackingDataArc) {
 
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "output_data",
+        "data",
+        "04_output",
         "simple_arc_downsampled.parquet",
     ]
     .iter()
@@ -278,7 +286,7 @@ fn od_with_modulus_cov_test(
 
     od_sol
         .to_parquet(
-            "./output_data/od_with_modulus.parquet",
+            "./data/04_output/od_with_modulus.parquet",
             ExportCfg::default(),
         )
         .unwrap();
@@ -372,7 +380,7 @@ fn od_with_modulus_as_bias_cov_test(
 
     od_sol
         .to_parquet(
-            "./output_data/od_with_modulus.parquet",
+            "./data/04_output/od_with_modulus.parquet",
             ExportCfg::default(),
         )
         .unwrap();

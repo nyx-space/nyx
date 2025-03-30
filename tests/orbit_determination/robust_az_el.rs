@@ -286,7 +286,7 @@ fn od_robust_test_ekf_rng_dop_az_el(
     // And serialize to disk
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "output_data",
+        "data", "04_output",
         "ekf_rng_dpl_az_el_arc.parquet",
     ]
     .iter()

@@ -240,7 +240,7 @@ mod ut_gm {
         let test_data: PathBuf = [
             env::var("CARGO_MANIFEST_DIR").unwrap(),
             "data".to_string(),
-            "tests".to_string(),
+            "03_tests".to_string(),
             "config".to_string(),
             "high-prec-network.yaml".to_string(),
         ]

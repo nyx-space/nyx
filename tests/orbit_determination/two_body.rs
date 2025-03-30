@@ -105,7 +105,7 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(
     let trkconfig_yaml: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
         "data",
-        "tests",
+        "03_tests",
         "config",
         "trk_cfg_od_val.yaml",
     ]
@@ -259,7 +259,8 @@ fn od_tb_val_with_arc(
     // Save the trajectory to parquet
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "output_data",
+        "data",
+        "04_output",
         "od_val_with_arc_truth_ephem.parquet",
     ]
     .iter()
@@ -270,7 +271,7 @@ fn od_tb_val_with_arc(
     let trkconfig_yaml: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
         "data",
-        "tests",
+        "03_tests",
         "config",
         "trk_cfg_od_val_arc.yaml",
     ]
@@ -288,7 +289,8 @@ fn od_tb_val_with_arc(
     // And serialize to disk
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "output_data",
+        "data",
+        "04_output",
         "two_body_od_val_arc.parquet",
     ]
     .iter()
@@ -446,7 +448,8 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
     // And serialize to disk
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "output_data",
+        "data",
+        "04_output",
         "od_tb_val_ckf_fixed_step_perfect_stations.parquet",
     ]
     .iter()
@@ -484,9 +487,14 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
 
     let od_sol = odp.process_arc(&arc).unwrap();
 
-    let path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "output_data", "tb_ckf.parquet"]
-        .iter()
-        .collect();
+    let path: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "data",
+        "04_output",
+        "tb_ckf.parquet",
+    ]
+    .iter()
+    .collect();
 
     od_sol.to_parquet(path, ExportCfg::default()).unwrap();
 
@@ -701,7 +709,8 @@ fn od_tb_val_az_el_ckf_fixed_step_perfect_stations(
     // And serialize to disk
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "output_data",
+        "data",
+        "04_output",
         "od_tb_val_az_el_ckf_fixed_step_perfect_stations.parquet",
     ]
     .iter()
@@ -739,9 +748,14 @@ fn od_tb_val_az_el_ckf_fixed_step_perfect_stations(
 
     let od_sol = odp.process_arc(&arc).unwrap();
 
-    let path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "output_data", "tb_ckf.parquet"]
-        .iter()
-        .collect();
+    let path: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "data",
+        "04_output",
+        "tb_ckf.parquet",
+    ]
+    .iter()
+    .collect();
 
     od_sol.to_parquet(path, ExportCfg::default()).unwrap();
 
@@ -1228,7 +1242,8 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect_cov_test(
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
-    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
+    let earth_sph_harm =
+        HarmonicsMem::from_cof("data/01_planetary/JGM3.cof.gz", 70, 70, true).unwrap();
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm);
     let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::from_model(harmonics));
     let setup = Propagator::new(orbital_dyn, IntegratorMethod::RungeKutta4, opts);

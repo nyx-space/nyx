@@ -205,14 +205,8 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
     let sigma_q = 5e-9_f64.powi(2);
     let process_noise = ProcessNoise3D::from_diagonal(2.minutes(), &[sigma_q, sigma_q, sigma_q]);
 
-    let kf = KF::new(
-        initial_estimate,
-        KalmanVariant::IterativeUpdate {
-            state_error: Some(1e-3),
-            max_iter: Some(3),
-        },
-    )
-    .with_process_noise(process_noise);
+    let kf =
+        KF::new(initial_estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
 
     // ==> TEST <== //
     // We greatly inflate the SNC so that the covariance inflates tremendously. This leads to the
@@ -232,7 +226,8 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
 
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "output_data",
+        "data",
+        "04_output",
         "resid_reject_inflated_snc.parquet",
     ]
     .iter()
@@ -340,14 +335,8 @@ fn od_resid_reject_default_ckf_two_way_cov_test(
     let sigma_q = 5e-10_f64.powi(2);
     let process_noise = ProcessNoise3D::from_diagonal(2.minutes(), &[sigma_q, sigma_q, sigma_q]);
 
-    let kf = KF::new(
-        initial_estimate,
-        KalmanVariant::IterativeUpdate {
-            state_error: Some(1e-3),
-            max_iter: Some(3),
-        },
-    )
-    .with_process_noise(process_noise);
+    let kf =
+        KF::new(initial_estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
 
     let mut odp = ODProcess::<_, U2, _, _, _>::new(
         prop_est,
@@ -362,7 +351,8 @@ fn od_resid_reject_default_ckf_two_way_cov_test(
     // Save this result before the asserts for analysis
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "output_data",
+        "data",
+        "04_output",
         "resid_reject_test.parquet",
     ]
     .iter()

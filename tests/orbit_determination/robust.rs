@@ -139,7 +139,8 @@ fn od_robust_test_ekf_realistic_one_way_cov_test(almanac: Arc<Almanac>) {
     // And serialize to disk
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "output_data",
+        "data",
+        "04_output",
         "ekf_robust_msr.parquet",
     ]
     .iter()
@@ -334,7 +335,9 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
     let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // And serialize to disk
-    let path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "output_data"].iter().collect();
+    let path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "data", "04_output"]
+        .iter()
+        .collect();
 
     traj.to_parquet_simple(
         path.join("ekf_robust_two_way_traj.parquet"),

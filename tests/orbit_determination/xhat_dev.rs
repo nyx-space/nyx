@@ -467,7 +467,8 @@ fn xhat_dev_test_ekf_harmonics(almanac: Arc<Almanac>, devices: BTreeMap<String, 
     let hh_ord = 20;
 
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
-    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", hh_deg, hh_ord, true).unwrap();
+    let earth_sph_harm =
+        HarmonicsMem::from_cof("data/01_planetary/JGM3.cof.gz", hh_deg, hh_ord, true).unwrap();
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm);
     let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::new(vec![
         harmonics,

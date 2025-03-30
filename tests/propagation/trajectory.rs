@@ -124,7 +124,7 @@ fn traj_ephem_forward_cov_test(almanac: Arc<Almanac>) {
     // Save the trajectory to parquet
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "output_data",
+        "data", "04_output",
         "ephem_forward.parquet",
     ]
     .iter()
