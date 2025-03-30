@@ -135,8 +135,6 @@ fn stop_cond_3rd_peri(almanac: Arc<Almanac>) {
 fn stop_cond_nrho_apo(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
     use std::time::Instant;
-    // The following test technically works, but the transformation of thousands of states
-    // into another frame is quite slow...
 
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
 

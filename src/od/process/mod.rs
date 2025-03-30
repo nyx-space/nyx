@@ -122,12 +122,7 @@ where
         }
     }
 
-    /// Process the provided measurements for this orbit determination process given the associated devices.
-    ///
-    /// # Argument details
-    /// + The measurements must be a list mapping the name of the measurement device to the measurement itself.
-    /// + The name of all measurement devices must be present in the provided devices, i.e. the key set of `devices` must be a superset of the measurement device names present in the list.
-    /// + The maximum step size to ensure we don't skip any measurements.
+    /// Process the provided tracking arc for this orbit determination process.
     #[allow(clippy::erasing_op)]
     pub fn process_arc(
         &mut self,
