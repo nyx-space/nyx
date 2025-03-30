@@ -64,15 +64,4 @@ pub enum KalmanVariant {
     ReferenceUpdate,
     /// Tracks the state deviation (formerly called Classical Kalman Filter (CKF)) and does not update the reference in the process' propagator.
     DeviationTracking,
-    /// Configures the Kalman Filter as an Iterative Extended Kalman Filter (IEKF). This should only be used to trust the observations even more than a single EKF update would.
-    ///
-    /// The two Option fields control the iteration:
-    /// - state_error: if Some(val), then iterations stop when the RSS of the previous state estimate and the new state estimate drops below `val` in km.
-    /// - max_iter: if Some(n), force exit after n iterations.
-    ///
-    /// If all are None, then the filter acts like the ReferenceUpdate mode.
-    IterativeUpdate {
-        state_error: Option<f64>,
-        max_iter: Option<u8>,
-    },
 }

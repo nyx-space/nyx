@@ -304,7 +304,7 @@ fn od_with_modulus_cov_test(
 
     let mut joined = splt[0].clone();
     for sol in splt.iter().skip(1) {
-        joined = joined.join(sol.clone());
+        joined = joined.merge(sol.clone());
     }
     let msr_updates = od_sol.drop_time_updates();
     assert_eq!(

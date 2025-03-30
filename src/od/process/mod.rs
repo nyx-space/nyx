@@ -256,11 +256,6 @@ where
                             {
                                 let msr_types = device.measurement_types();
 
-                                if self.kf.replace_state() {
-                                    // self.kf.set_extended(false);
-                                    info!("EKF disabled @ {epoch}");
-                                }
-
                                 // Perform several measurement updates to ensure the desired dimensionality.
                                 let windows = msr_types.len() / MsrSize::USIZE;
                                 let mut msr_rejected = false;

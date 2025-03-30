@@ -120,6 +120,11 @@ def main(path: str, wstats: bool):
             px.scatter(df, x="Epoch (UTC)", y=gain_columns).show()
         else:
             px.scatter(df, x="Epoch (UTC)", y=fs_ratio_columns).show()
+        
+        # Plot the RIC uncertainty
+        px.line(
+            df, x="Epoch (UTC)", y=["Sigma X (RIC) (km)", "Sigma Y (RIC) (km)", "Sigma Z (RIC) (km)"]
+        ).show()
 
 
 if __name__ == "__main__":

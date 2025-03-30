@@ -294,12 +294,6 @@ where
                     ),
                 )
             }
-            KalmanVariant::IterativeUpdate {
-                // pos_km,
-                // vel_km_s,
-                // max_iter,
-                ..
-            } => unimplemented!("iterative EKF"),
         };
 
         // Compute covariance (Joseph update)
@@ -327,10 +321,7 @@ where
     }
 
     fn replace_state(&self) -> bool {
-        matches!(
-            self.variant,
-            KalmanVariant::ReferenceUpdate | KalmanVariant::IterativeUpdate { .. }
-        )
+        matches!(self.variant, KalmanVariant::ReferenceUpdate)
     }
 
     /// Overwrites all of the process noises to the one provided

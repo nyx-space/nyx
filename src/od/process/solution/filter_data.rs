@@ -226,8 +226,8 @@ where
         splt
     }
 
-    /// Join this OD solution with another one.
-    pub fn join(mut self, mut other: Self) -> Self {
+    /// Merge this OD solution with another one, returning a new OD solution.
+    pub fn merge(mut self, mut other: Self) -> Self {
         self.estimates.append(&mut other.estimates);
         self.residuals.append(&mut other.residuals);
         self.gains.append(&mut other.gains);
