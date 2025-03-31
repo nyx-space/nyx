@@ -67,12 +67,11 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-            data/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
 
       - name: Unit Test (debug)
-        run: cargo test --lib
+        run: ls -lR data/ && cargo test --lib
 
       - name: All integration tests (release)
         run: cargo test --release --test "*"
