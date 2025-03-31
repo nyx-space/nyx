@@ -191,4 +191,5 @@ where
     }
 }
 
-// TODO: Allow importing from parquet and initialization of a process, thereby allowing this to serve as a record!!
+// TODO: Allow importing from parquet and initialization of a process, thereby allowing this to serve as a record, but the devices will need to be manually passed in
+// because they depend on the almanac.
