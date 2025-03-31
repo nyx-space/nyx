@@ -36,7 +36,6 @@ jobs:
     strategy:
       matrix:
         rust:
-          #- { version: "1.70", name: MSRV } # Reenable this before stablizing version 2.0
           - { version: stable, name: stable }
 
     runs-on: ubuntu-latest

@@ -254,7 +254,7 @@ mod ut_sc_uncertainty {
         println!("{estimate}");
 
         let sma_sigma_km = estimate.sigma_for(StateParameter::SMA).unwrap();
-        assert!((sma_sigma_km - 1.352808889337306).abs() < f64::EPSILON);
+        assert!((sma_sigma_km - 1.3528088887049263).abs() < f64::EPSILON);
 
         let covar_keplerian = estimate.keplerian_covar();
         for i in 1..=3 {

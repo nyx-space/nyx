@@ -35,7 +35,6 @@ pub use super::sph_harmonics::Harmonics;
 
 /// `OrbitalDynamics` provides the equations of motion for any celestial dynamic, without state transition matrix computation.
 #[derive(Clone)]
-
 pub struct OrbitalDynamics {
     pub accel_models: Vec<Arc<dyn AccelModel + Sync>>,
 }

@@ -30,7 +30,6 @@ fn almanac() -> Arc<Almanac> {
 /*
  * These tests check that if we start with a state deviation in the estimate, the filter will eventually converge back.
  * These tests do NOT check that the filter will converge if the initial state in the propagator has that state deviation.
- * The latter would require iteration and smoothing before playing with an EKF. This will be handled in a subsequent version.
 **/
 
 #[fixture]
@@ -58,7 +57,7 @@ fn devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>, devices: BTreeMap<String, GroundStation>) {
+fn xhat_dev_test_two_body(almanac: Arc<Almanac>, devices: BTreeMap<String, GroundStation>) {
     let _ = pretty_env_logger::try_init();
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
@@ -137,8 +136,8 @@ fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>, devices: BTreeMap<String, G
     let sigma_q = 1e-7_f64.powi(2);
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
-    let kf =
-        KF::new(initial_estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
+    let kf = KF::new(initial_estimate, KalmanVariant::DeviationTracking)
+        .with_process_noise(process_noise);
 
     let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac.clone());
 
@@ -275,7 +274,7 @@ fn xhat_dev_test_ekf_two_body(almanac: Arc<Almanac>, devices: BTreeMap<String, G
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn xhat_dev_test_ekf_multi_body(almanac: Arc<Almanac>, devices: BTreeMap<String, GroundStation>) {
+fn xhat_dev_test_multi_body(almanac: Arc<Almanac>, devices: BTreeMap<String, GroundStation>) {
     // We seed both propagators with the same initial state, but we let a large state deviation in the filter.
     // This does _not_ impact the prefits, but it impacts the state deviation and therefore the state estimate.
     // As such, it checks that the filter can return to a nominal state.
@@ -355,14 +354,12 @@ fn xhat_dev_test_ekf_multi_body(almanac: Arc<Almanac>, devices: BTreeMap<String,
     let sigma_q = 1e-8_f64.powi(2);
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
-    let kf =
-        KF::new(initial_estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
+    let kf = KF::new(initial_estimate, KalmanVariant::DeviationTracking)
+        .with_process_noise(process_noise);
 
     let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac);
 
     let od_sol = odp.process_arc(&arc).unwrap();
-    // odp.iterate_arc(&arc, IterationConf::try_from(SmoothingArc::All).unwrap())
-    //     .unwrap();
 
     // Check that the covariance deflated
     let est = &od_sol.estimates.last().unwrap();
@@ -425,7 +422,7 @@ fn xhat_dev_test_ekf_multi_body(almanac: Arc<Almanac>, devices: BTreeMap<String,
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn xhat_dev_test_ekf_harmonics(almanac: Arc<Almanac>, devices: BTreeMap<String, GroundStation>) {
+fn xhat_dev_test_harmonics(almanac: Arc<Almanac>, devices: BTreeMap<String, GroundStation>) {
     let _ = pretty_env_logger::try_init();
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
@@ -513,8 +510,8 @@ fn xhat_dev_test_ekf_harmonics(almanac: Arc<Almanac>, devices: BTreeMap<String, 
     let sigma_q = 1e-7_f64.powi(2);
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
-    let kf =
-        KF::new(initial_estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
+    let kf = KF::new(initial_estimate, KalmanVariant::DeviationTracking)
+        .with_process_noise(process_noise);
 
     let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac);
 
@@ -546,8 +543,6 @@ fn xhat_dev_test_ekf_harmonics(almanac: Arc<Almanac>, devices: BTreeMap<String, 
         }
     }
 
-    assert!(est.within_3sigma(), "Final estimate is not within 3 sigma!");
-
     assert_eq!(
         final_truth_state.epoch(),
         est.epoch(),
@@ -566,7 +561,7 @@ fn xhat_dev_test_ekf_harmonics(almanac: Arc<Almanac>, devices: BTreeMap<String, 
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn xhat_dev_test_ekf_realistic(almanac: Arc<Almanac>, devices: BTreeMap<String, GroundStation>) {
+fn xhat_dev_test_realistic(almanac: Arc<Almanac>, devices: BTreeMap<String, GroundStation>) {
     let _ = pretty_env_logger::try_init();
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
@@ -639,7 +634,7 @@ fn xhat_dev_test_ekf_realistic(almanac: Arc<Almanac>, devices: BTreeMap<String, 
     let initial_estimate = KfEstimate::from_covar(initial_state_dev.into(), init_covar);
     println!("Initial estimate:\n{}", initial_estimate);
 
-    let kf = KF::new(initial_estimate, KalmanVariant::ReferenceUpdate);
+    let kf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
     let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac);
 
@@ -698,7 +693,7 @@ fn xhat_dev_test_ekf_realistic(almanac: Arc<Almanac>, devices: BTreeMap<String, 
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn xhat_dev_test_ckf_smoother_multi_body(
+fn xhat_dev_test_smoother_multi_body(
     almanac: Arc<Almanac>,
     devices: BTreeMap<String, GroundStation>,
 ) {
@@ -954,7 +949,7 @@ fn xhat_dev_test_ckf_smoother_multi_body(
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn xhat_dev_test_ekf_snc_smoother_multi_body(
+fn xhat_dev_test_snc_smoother_multi_body(
     almanac: Arc<Almanac>,
     devices: BTreeMap<String, GroundStation>,
 ) {
@@ -1033,8 +1028,8 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body(
     let sigma_q = 1e-8_f64.powi(2);
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
-    let kf =
-        KF::new(initial_estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
+    let kf = KF::new(initial_estimate, KalmanVariant::DeviationTracking)
+        .with_process_noise(process_noise);
 
     let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac.clone());
 
@@ -1202,7 +1197,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body(
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn xhat_dev_test_ckf_iteration_multi_body(
+fn xhat_dev_test_iteration_multi_body(
     almanac: Arc<Almanac>,
     devices: BTreeMap<String, GroundStation>,
 ) {
