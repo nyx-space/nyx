@@ -168,7 +168,7 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(
 
     let kf = KF::new(initial_estimate, KalmanVariant::ReferenceUpdate);
 
-    let mut odp = ODProcess::<_, U2, _, _, _>::new(prop_est, kf, proc_devices, None, almanac);
+    let mut odp = KalmanODProcess::<_, U2, _, _>::new(prop_est, kf, proc_devices, None, almanac);
 
     let od_sol = odp.process_arc(&arc).unwrap();
 
@@ -322,7 +322,7 @@ fn od_tb_val_with_arc(
 
     let kf = KF::new(initial_estimate, KalmanVariant::ReferenceUpdate);
 
-    let mut odp = ODProcess::<_, U2, _, _, _>::new(
+    let mut odp = KalmanODProcess::<_, U2, _, _>::new(
         prop_est,
         kf,
         proc_devices,
@@ -483,7 +483,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
     let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
     let mut odp =
-        ODProcess::<_, U2, _, _, _>::new(prop_est, ckf, proc_devices, None, almanac.clone());
+        KalmanODProcess::<_, U2, _, _>::new(prop_est, ckf, proc_devices, None, almanac.clone());
 
     let od_sol = odp.process_arc(&arc).unwrap();
 
@@ -744,7 +744,7 @@ fn od_tb_val_az_el_ckf_fixed_step_perfect_stations(
     let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
     let mut odp =
-        ODProcess::<_, U2, _, _, _>::new(prop_est, ckf, proc_devices, None, almanac.clone());
+        KalmanODProcess::<_, U2, _, _>::new(prop_est, ckf, proc_devices, None, almanac.clone());
 
     let od_sol = odp.process_arc(&arc).unwrap();
 
@@ -955,7 +955,7 @@ fn od_tb_ckf_fixed_step_iteration_test(
     let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
     let mut odp =
-        ODProcess::<_, U2, _, _, _>::new(prop_est, ckf, proc_devices, None, almanac.clone());
+        KalmanODProcess::<_, U2, _, _>::new(prop_est, ckf, proc_devices, None, almanac.clone());
 
     let od_sol = odp.process_arc(&arc).unwrap();
 
@@ -1089,7 +1089,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map(
     let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking)
         .with_process_noise(process_noise);
 
-    let mut odp = ODProcess::<_, U2, _, _, _>::new(prop_est, ckf, proc_devices, None, almanac);
+    let mut odp = KalmanODProcess::<_, U2, _, _>::new(prop_est, ckf, proc_devices, None, almanac);
 
     let od_sol = odp.process_arc(&arc).unwrap();
 
@@ -1181,8 +1181,8 @@ fn od_tb_ckf_map_covar(almanac: Arc<Almanac>) {
 
     let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
-    let mut odp: SpacecraftODProcess =
-        ODProcess::<_, U2, _, _, _>::new(prop_est, ckf, BTreeMap::new(), None, almanac);
+    let mut odp: SpacecraftKalmanOD =
+        KalmanODProcess::<_, U2, _, _>::new(prop_est, ckf, BTreeMap::new(), None, almanac);
 
     let od_sol = odp.predict_for(30.seconds(), duration).unwrap();
 
@@ -1282,7 +1282,7 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect_cov_test(
 
     let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
-    let mut odp = ODProcess::<_, U2, _, _, _>::new(prop_est, ckf, proc_devices, None, almanac);
+    let mut odp = KalmanODProcess::<_, U2, _, _>::new(prop_est, ckf, proc_devices, None, almanac);
 
     let od_sol = odp.process_arc(&arc).unwrap();
 
@@ -1407,7 +1407,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map(
         .with_process_noise(process_noise1)
         .and_with_process_noise(process_noise2);
 
-    let mut odp = ODProcess::<_, U2, _, _, _>::new(prop_est, ckf, proc_devices, None, almanac);
+    let mut odp = KalmanODProcess::<_, U2, _, _>::new(prop_est, ckf, proc_devices, None, almanac);
 
     let od_sol = odp.process_arc(&arc).unwrap();
 

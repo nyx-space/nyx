@@ -139,7 +139,7 @@ fn xhat_dev_test_two_body(almanac: Arc<Almanac>, devices: BTreeMap<String, Groun
     let kf = KF::new(initial_estimate, KalmanVariant::DeviationTracking)
         .with_process_noise(process_noise);
 
-    let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac.clone());
+    let mut odp = SpacecraftKalmanOD::new(prop_est, kf, devices, None, almanac.clone());
 
     let od_sol = odp.process_arc(&arc).expect("OD process failed");
     let pre_smooth_first_est = od_sol.estimates[0];
@@ -357,7 +357,7 @@ fn xhat_dev_test_multi_body(almanac: Arc<Almanac>, devices: BTreeMap<String, Gro
     let kf = KF::new(initial_estimate, KalmanVariant::DeviationTracking)
         .with_process_noise(process_noise);
 
-    let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac);
+    let mut odp = SpacecraftKalmanOD::new(prop_est, kf, devices, None, almanac);
 
     let od_sol = odp.process_arc(&arc).unwrap();
 
@@ -513,7 +513,7 @@ fn xhat_dev_test_harmonics(almanac: Arc<Almanac>, devices: BTreeMap<String, Grou
     let kf = KF::new(initial_estimate, KalmanVariant::DeviationTracking)
         .with_process_noise(process_noise);
 
-    let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac);
+    let mut odp = SpacecraftKalmanOD::new(prop_est, kf, devices, None, almanac);
 
     let od_sol = odp.process_arc(&arc).unwrap();
 
@@ -636,7 +636,7 @@ fn xhat_dev_test_realistic(almanac: Arc<Almanac>, devices: BTreeMap<String, Grou
 
     let kf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
-    let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac);
+    let mut odp = SpacecraftKalmanOD::new(prop_est, kf, devices, None, almanac);
 
     let od_sol = odp.process_arc(&arc).unwrap();
 
@@ -771,7 +771,7 @@ fn xhat_dev_test_smoother_multi_body(
 
     let kf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
-    let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac.clone());
+    let mut odp = SpacecraftKalmanOD::new(prop_est, kf, devices, None, almanac.clone());
 
     let od_sol = odp.process_arc(&arc).unwrap();
 
@@ -1031,7 +1031,7 @@ fn xhat_dev_test_snc_smoother_multi_body(
     let kf = KF::new(initial_estimate, KalmanVariant::DeviationTracking)
         .with_process_noise(process_noise);
 
-    let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac.clone());
+    let mut odp = SpacecraftKalmanOD::new(prop_est, kf, devices, None, almanac.clone());
 
     let od_sol = odp.process_arc(&arc).unwrap();
 
@@ -1275,7 +1275,7 @@ fn xhat_dev_test_iteration_multi_body(
 
     let kf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
-    let mut odp = SpacecraftODProcess::new(prop_est, kf, devices, None, almanac.clone());
+    let mut odp = SpacecraftKalmanOD::new(prop_est, kf, devices, None, almanac.clone());
 
     let od_sol = odp.process_arc(&arc).unwrap();
 

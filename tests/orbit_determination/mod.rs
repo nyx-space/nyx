@@ -4,7 +4,7 @@ extern crate nyx_space as nyx;
 use nyx::od::ODError;
 use nyx::Spacecraft;
 
-use self::nyx::od::prelude::{Estimate, Filter, KalmanVariant, KfEstimate, KF};
+use self::nyx::od::prelude::{Estimate, KalmanVariant, KfEstimate, KF};
 use self::nyx::State;
 
 mod measurements;

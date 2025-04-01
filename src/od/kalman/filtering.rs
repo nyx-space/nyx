@@ -26,47 +26,39 @@ pub use crate::od::estimate::{Estimate, KfEstimate, Residual};
 use crate::od::prelude::KalmanVariant;
 use crate::od::process::ResidRejectCrit;
 pub use crate::od::snc::ProcessNoise;
-use crate::od::{Filter, ODDynamicsSnafu, ODError, ODStateSnafu, State};
+use crate::od::{ODDynamicsSnafu, ODError, ODStateSnafu, State};
 pub use crate::time::{Epoch, Unit};
 use snafu::prelude::*;
 
 use super::KF;
 
-impl<T, A, M> Filter<T, A, M> for KF<T, A>
+impl<T, A> KF<T, A>
 where
     A: DimName,
-    M: DimName,
     T: State,
-    DefaultAllocator: Allocator<M>
-        + Allocator<<T as State>::Size>
+    DefaultAllocator: Allocator<<T as State>::Size>
         + Allocator<<T as State>::VecLength>
         + Allocator<A>
-        + Allocator<M, M>
-        + Allocator<M, <T as State>::Size>
-        + Allocator<<T as State>::Size, M>
         + Allocator<<T as State>::Size, <T as State>::Size>
         + Allocator<A, A>
         + Allocator<<T as State>::Size, A>
-        + Allocator<A, <T as State>::Size>
-        + Allocator<nalgebra::Const<1>, M>,
+        + Allocator<A, <T as State>::Size>,
     <DefaultAllocator as Allocator<<T as State>::Size>>::Buffer<f64>: Copy,
     <DefaultAllocator as Allocator<<T as State>::Size, <T as State>::Size>>::Buffer<f64>: Copy,
 {
-    type Estimate = KfEstimate<T>;
-
     /// Returns the previous estimate
-    fn previous_estimate(&self) -> &Self::Estimate {
+    pub fn previous_estimate(&self) -> &KfEstimate<T> {
         &self.prev_estimate
     }
 
-    fn set_previous_estimate(&mut self, est: &Self::Estimate) {
+    pub fn set_previous_estimate(&mut self, est: &KfEstimate<T>) {
         self.prev_estimate = *est;
     }
 
     /// Computes a time update/prediction (i.e. advances the filter estimate with the updated STM).
     ///
     /// May return a FilterError if the STM was not updated.
-    fn time_update(&mut self, nominal_state: T) -> Result<Self::Estimate, ODError> {
+    pub fn time_update(&mut self, nominal_state: T) -> Result<KfEstimate<T>, ODError> {
         let stm = nominal_state.stm().context(ODDynamicsSnafu)?;
         let mut covar_bar = stm * self.prev_estimate.covar * stm.transpose();
 
@@ -174,7 +166,7 @@ where
     /// Computes the measurement update with a provided real observation and computed observation.
     ///
     /// May return a FilterError if the STM or sensitivity matrices were not updated.
-    fn measurement_update(
+    pub fn measurement_update<M: DimName>(
         &mut self,
         nominal_state: T,
         real_obs: OVector<f64, M>,
@@ -184,12 +176,19 @@ where
         resid_rejection: Option<ResidRejectCrit>,
     ) -> Result<
         (
-            Self::Estimate,
+            KfEstimate<T>,
             Residual<M>,
             Option<OMatrix<f64, <T as State>::Size, M>>,
         ),
         ODError,
-    > {
+    >
+    where
+        DefaultAllocator: Allocator<M>
+            + Allocator<M, M>
+            + Allocator<M, <T as State>::Size>
+            + Allocator<<T as State>::Size, M>
+            + Allocator<nalgebra::Const<1>, M>,
+    {
         let epoch = nominal_state.epoch();
 
         // Grab the state transition matrix.
@@ -320,12 +319,12 @@ where
         Ok((estimate, res, Some(gain)))
     }
 
-    fn replace_state(&self) -> bool {
+    pub fn replace_state(&self) -> bool {
         matches!(self.variant, KalmanVariant::ReferenceUpdate)
     }
 
     /// Overwrites all of the process noises to the one provided
-    fn set_process_noise(&mut self, snc: ProcessNoise<A>) {
+    pub fn set_process_noise(&mut self, snc: ProcessNoise<A>) {
         self.process_noise = vec![snc];
     }
 }

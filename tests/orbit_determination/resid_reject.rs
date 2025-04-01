@@ -214,7 +214,7 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
     // the measurements are accepted.
     // So we end up with an excellent estimate but an unusably high covariance.
 
-    let mut odp = ODProcess::<_, U2, _, _, _>::new(
+    let mut odp = KalmanODProcess::<_, U2, _, _>::new(
         prop_est,
         kf,
         devices,
@@ -338,7 +338,7 @@ fn od_resid_reject_default_ckf_two_way_cov_test(
     let kf =
         KF::new(initial_estimate, KalmanVariant::ReferenceUpdate).with_process_noise(process_noise);
 
-    let mut odp = ODProcess::<_, U2, _, _, _>::new(
+    let mut odp = KalmanODProcess::<_, U2, _, _>::new(
         prop_est,
         kf,
         devices,

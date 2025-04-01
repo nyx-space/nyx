@@ -19,7 +19,7 @@ use nyx::{
     od::{
         prelude::{KalmanVariant, KF},
         process::SpacecraftUncertainty,
-        SpacecraftODProcess,
+        SpacecraftKalmanOD,
     },
     propagators::Propagator,
     Spacecraft, State,
@@ -120,7 +120,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Build the propagation instance for the OD process.
     let prop = setup.with(jwst.with_stm(), almanac.clone());
-    let mut odp = SpacecraftODProcess::new(prop, kf, BTreeMap::new(), None, almanac.clone());
+    let mut odp = SpacecraftKalmanOD::new(prop, kf, BTreeMap::new(), None, almanac.clone());
 
     // Define the prediction step, i.e. how often we want to know the covariance.
     let step = 1_i64.minutes();

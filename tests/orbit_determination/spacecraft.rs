@@ -155,7 +155,8 @@ fn od_val_sc_mb_srp_reals_duals_models(
     // Test the exporting of a spacecraft trajectory
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "data", "04_output",
+        "data",
+        "04_output",
         "sc_truth_val.parquet",
     ]
     .iter()
@@ -219,7 +220,7 @@ fn od_val_sc_mb_srp_reals_duals_models(
 
     let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
 
-    let mut odp = SpacecraftODProcess::new(prop_est, ckf, proc_devices, None, almanac);
+    let mut odp = SpacecraftKalmanOD::new(prop_est, ckf, proc_devices, None, almanac);
 
     let od_sol = odp.process_arc(&arc).unwrap();
 
@@ -344,7 +345,8 @@ fn od_val_sc_srp_estimation_cov_test(
     // Test the exporting of a spacecraft trajectory
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "data", "04_output",
+        "data",
+        "04_output",
         "sc_srp_truth.parquet",
     ]
     .iter()
@@ -408,7 +410,7 @@ fn od_val_sc_srp_estimation_cov_test(
 
     let ckf = KF::new(initial_estimate, KalmanVariant::ReferenceUpdate);
 
-    let mut odp = SpacecraftODProcess::new(prop_est, ckf, proc_devices, None, almanac.clone());
+    let mut odp = SpacecraftKalmanOD::new(prop_est, ckf, proc_devices, None, almanac.clone());
 
     let od_sol = odp.process_arc(&arc).unwrap();
 

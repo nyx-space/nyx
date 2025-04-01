@@ -28,8 +28,6 @@ pub use crate::time::{Epoch, Unit};
 
 use super::{KalmanVariant, KF};
 
-// Only process noises of size 3 are supported, so only these have initializers. -- Rename this KF to "ODKalmanFilter" or something like that. GPS stuff needs process noise of size 6x6.
-
 impl<T> KF<T, U3>
 where
     T: State,

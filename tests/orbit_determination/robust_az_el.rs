@@ -286,7 +286,8 @@ fn od_robust_test_ekf_rng_dop_az_el(
     // And serialize to disk
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "data", "04_output",
+        "data",
+        "04_output",
         "ekf_rng_dpl_az_el_arc.parquet",
     ]
     .iter()
@@ -307,20 +308,15 @@ fn od_robust_test_ekf_rng_dop_az_el(
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
 
     // Run with all data simultaneously
-    let mut odp_simul = ODProcess::<
-        SpacecraftDynamics,
-        Const<4>,
-        Const<3>,
-        KF<Spacecraft, Const<3>>,
-        GroundStation,
-    >::new(
-        prop_est,
-        KF::new(initial_estimate, KalmanVariant::ReferenceUpdate)
-            .with_process_noise(process_noise.clone()),
-        devices.clone(),
-        Some(ResidRejectCrit::default()),
-        almanac.clone(),
-    );
+    let mut odp_simul =
+        KalmanODProcess::<SpacecraftDynamics, Const<4>, Const<3>, GroundStation>::new(
+            prop_est,
+            KF::new(initial_estimate, KalmanVariant::ReferenceUpdate)
+                .with_process_noise(process_noise.clone()),
+            devices.clone(),
+            Some(ResidRejectCrit::default()),
+            almanac.clone(),
+        );
 
     let od_simul_sol = odp_simul.process_arc(&arc).unwrap();
 
@@ -385,7 +381,7 @@ fn od_robust_test_ekf_rng_dop_az_el(
 
     // We get the best results with all data simultaneously, let's rerun with then two-by-two.
     let prop_est = estimator_setup.with(initial_state_dev.with_stm(), almanac.clone());
-    let mut odp_2by2 = SpacecraftODProcess::new(
+    let mut odp_2by2 = SpacecraftKalmanOD::new(
         prop_est,
         KF::new(initial_estimate, KalmanVariant::ReferenceUpdate)
             .with_process_noise(process_noise.clone()),
@@ -432,7 +428,7 @@ fn od_robust_test_ekf_rng_dop_az_el(
     }
     // Rerun processing measurements one by one like in ODTK
     let prop_est = estimator_setup.with(initial_state_dev.with_stm(), almanac.clone());
-    let mut odp_1by1 = SpacecraftODProcessSeq::new(
+    let mut odp_1by1 = SpacecraftKalmanScalarOD::new(
         prop_est,
         KF::new(initial_estimate, KalmanVariant::ReferenceUpdate)
             .with_process_noise(process_noise.clone()),

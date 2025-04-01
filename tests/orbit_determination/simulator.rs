@@ -280,7 +280,7 @@ fn od_with_modulus_cov_test(
     let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
     let prop = setup.with(spacecraft.with_stm(), almanac.clone());
 
-    let mut odp = SpacecraftODProcess::new(prop, kf, devices, None, almanac.clone());
+    let mut odp = SpacecraftKalmanOD::new(prop, kf, devices, None, almanac.clone());
 
     let od_sol = odp.process_arc(&arc).unwrap();
 
@@ -374,7 +374,7 @@ fn od_with_modulus_as_bias_cov_test(
     let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
     let prop = setup.with(spacecraft.with_stm(), almanac.clone());
 
-    let mut odp = SpacecraftODProcess::new(prop, kf, devices, None, almanac);
+    let mut odp = SpacecraftKalmanOD::new(prop, kf, devices, None, almanac);
 
     let od_sol = odp.process_arc(&tracking_data).unwrap();
 

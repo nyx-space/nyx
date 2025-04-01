@@ -36,24 +36,26 @@ use std::ops::Add;
 mod conf;
 pub use conf::{IterationConf, SmoothingArc};
 mod rejectcrit;
+use self::kalman::KF;
 use self::msr::TrackingDataArc;
 pub use self::rejectcrit::ResidRejectCrit;
 mod solution;
 pub use solution::ODSolution;
 
-/// An orbit determination process (ODP) which filters OD measurements through the provided filter (typically a Kalman filter).
+/// An orbit determination process (ODP) which filters OD measurements through a Kalman filter.
 #[allow(clippy::upper_case_acronyms)]
-pub struct ODProcess<
+pub struct KalmanODProcess<
     'a,
     D: Dynamics,
     MsrSize: DimName,
     Accel: DimName,
-    K: Filter<D::StateType, Accel, MsrSize>,
     Trk: TrackerSensitivity<D::StateType, D::StateType>,
 > where
     D::StateType:
         Interpolatable + Add<OVector<f64, <D::StateType as State>::Size>, Output = D::StateType>,
     <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
+    <DefaultAllocator as Allocator<<D::StateType as State>::Size>>::Buffer<f64>: Copy,
+    <DefaultAllocator as Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>>::Buffer<f64>: Copy,
     DefaultAllocator: Allocator<<D::StateType as State>::Size>
         + Allocator<<D::StateType as State>::VecLength>
         + Allocator<MsrSize>
@@ -69,7 +71,7 @@ pub struct ODProcess<
     /// PropInstance used for the estimation
     pub prop: PropInstance<'a, D>,
     /// Kalman filter itself
-    pub kf: K,
+    pub kf: KF<D::StateType, Accel>,
     /// Tracking devices
     pub devices: BTreeMap<String, Trk>,
     /// Residual rejection criteria allows preventing bad measurements from affecting the estimation.
@@ -84,13 +86,14 @@ impl<
         D: Dynamics,
         MsrSize: DimName,
         Accel: DimName,
-        K: Filter<D::StateType, Accel, MsrSize>,
         Trk: TrackerSensitivity<D::StateType, D::StateType>,
-    > ODProcess<'a, D, MsrSize, Accel, K, Trk>
+    > KalmanODProcess<'a, D, MsrSize, Accel, Trk>
 where
     D::StateType:
         Interpolatable + Add<OVector<f64, <D::StateType as State>::Size>, Output = D::StateType>,
     <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
+    <DefaultAllocator as Allocator<<D::StateType as State>::Size>>::Buffer<f64>: Copy,
+    <DefaultAllocator as Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>>::Buffer<f64>: Copy,
     DefaultAllocator: Allocator<<D::StateType as State>::Size>
         + Allocator<<D::StateType as State>::VecLength>
         + Allocator<MsrSize>
@@ -101,12 +104,13 @@ where
         + Allocator<Accel>
         + Allocator<Accel, Accel>
         + Allocator<<D::StateType as State>::Size, Accel>
-        + Allocator<Accel, <D::StateType as State>::Size>,
+        + Allocator<Accel, <D::StateType as State>::Size>
+        + Allocator<nalgebra::Const<1>, MsrSize>,
 {
     /// Initialize a new orbit determination process with an optional trigger to switch from a CKF to an EKF.
     pub fn new(
         prop: PropInstance<'a, D>,
-        kf: K,
+        kf: KF<D::StateType, Accel>,
         devices: BTreeMap<String, Trk>,
         resid_crit: Option<ResidRejectCrit>,
         almanac: Arc<Almanac>,
@@ -127,7 +131,7 @@ where
     pub fn process_arc(
         &mut self,
         arc: &TrackingDataArc,
-    ) -> Result<ODSolution<D::StateType, K::Estimate, MsrSize, Trk>, ODError> {
+    ) -> Result<ODSolution<D::StateType, KfEstimate<D::StateType>, MsrSize, Trk>, ODError> {
         // Initialize the solution.
         let mut od_sol = ODSolution::new(self.devices.clone(), arc.unique_types());
 
@@ -417,7 +421,7 @@ where
         &mut self,
         step: Duration,
         end_epoch: Epoch,
-    ) -> Result<ODSolution<D::StateType, K::Estimate, MsrSize, Trk>, ODError> {
+    ) -> Result<ODSolution<D::StateType, KfEstimate<D::StateType>, MsrSize, Trk>, ODError> {
         // Initialize the solution with no measurement types.
         let mut od_sol = ODSolution::new(self.devices.clone(), IndexSet::new());
 
@@ -451,7 +455,7 @@ where
         &mut self,
         step: Duration,
         duration: Duration,
-    ) -> Result<ODSolution<D::StateType, K::Estimate, MsrSize, Trk>, ODError> {
+    ) -> Result<ODSolution<D::StateType, KfEstimate<D::StateType>, MsrSize, Trk>, ODError> {
         let end_epoch = self.kf.previous_estimate().epoch() + duration;
         self.predict_until(step, end_epoch)
     }
