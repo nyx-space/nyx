@@ -33,7 +33,7 @@ pub mod initializers;
 /// M: Measurement size (used for the sensitivity matrix)
 #[derive(Debug, Clone)]
 #[allow(clippy::upper_case_acronyms)]
-pub struct KF<T, A>
+pub struct KalmanFilter<T, A>
 where
     A: DimName,
     T: State,

@@ -30,9 +30,9 @@ use crate::od::{ODDynamicsSnafu, ODError, ODStateSnafu, State};
 pub use crate::time::{Epoch, Unit};
 use snafu::prelude::*;
 
-use super::KF;
+use super::KalmanFilter;
 
-impl<T, A> KF<T, A>
+impl<T, A> KalmanFilter<T, A>
 where
     A: DimName,
     T: State,

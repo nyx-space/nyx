@@ -136,7 +136,7 @@ fn xhat_dev_test_two_body(almanac: Arc<Almanac>, devices: BTreeMap<String, Groun
     let sigma_q = 1e-7_f64.powi(2);
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
-    let kf = KF::new(initial_estimate, KalmanVariant::DeviationTracking)
+    let kf = KalmanFilter::new(initial_estimate, KalmanVariant::DeviationTracking)
         .with_process_noise(process_noise);
 
     let mut odp = SpacecraftKalmanOD::new(prop_est, kf, devices, None, almanac.clone());
@@ -354,7 +354,7 @@ fn xhat_dev_test_multi_body(almanac: Arc<Almanac>, devices: BTreeMap<String, Gro
     let sigma_q = 1e-8_f64.powi(2);
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
-    let kf = KF::new(initial_estimate, KalmanVariant::DeviationTracking)
+    let kf = KalmanFilter::new(initial_estimate, KalmanVariant::DeviationTracking)
         .with_process_noise(process_noise);
 
     let mut odp = SpacecraftKalmanOD::new(prop_est, kf, devices, None, almanac);
@@ -510,7 +510,7 @@ fn xhat_dev_test_harmonics(almanac: Arc<Almanac>, devices: BTreeMap<String, Grou
     let sigma_q = 1e-7_f64.powi(2);
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
-    let kf = KF::new(initial_estimate, KalmanVariant::DeviationTracking)
+    let kf = KalmanFilter::new(initial_estimate, KalmanVariant::DeviationTracking)
         .with_process_noise(process_noise);
 
     let mut odp = SpacecraftKalmanOD::new(prop_est, kf, devices, None, almanac);
@@ -634,7 +634,7 @@ fn xhat_dev_test_realistic(almanac: Arc<Almanac>, devices: BTreeMap<String, Grou
     let initial_estimate = KfEstimate::from_covar(initial_state_dev.into(), init_covar);
     println!("Initial estimate:\n{}", initial_estimate);
 
-    let kf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
+    let kf = KalmanFilter::new(initial_estimate, KalmanVariant::DeviationTracking);
 
     let mut odp = SpacecraftKalmanOD::new(prop_est, kf, devices, None, almanac);
 
@@ -769,7 +769,7 @@ fn xhat_dev_test_smoother_multi_body(
     let initial_estimate = KfEstimate::from_covar(initial_state_dev.into(), init_covar);
     println!("Initial estimate:\n{}", initial_estimate);
 
-    let kf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
+    let kf = KalmanFilter::new(initial_estimate, KalmanVariant::DeviationTracking);
 
     let mut odp = SpacecraftKalmanOD::new(prop_est, kf, devices, None, almanac.clone());
 
@@ -1028,7 +1028,7 @@ fn xhat_dev_test_snc_smoother_multi_body(
     let sigma_q = 1e-8_f64.powi(2);
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
-    let kf = KF::new(initial_estimate, KalmanVariant::DeviationTracking)
+    let kf = KalmanFilter::new(initial_estimate, KalmanVariant::DeviationTracking)
         .with_process_noise(process_noise);
 
     let mut odp = SpacecraftKalmanOD::new(prop_est, kf, devices, None, almanac.clone());
@@ -1273,7 +1273,7 @@ fn xhat_dev_test_iteration_multi_body(
     let initial_estimate = KfEstimate::from_covar(initial_state_dev.into(), init_covar);
     println!("Initial estimate:\n{}", initial_estimate);
 
-    let kf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
+    let kf = KalmanFilter::new(initial_estimate, KalmanVariant::DeviationTracking);
 
     let mut odp = SpacecraftKalmanOD::new(prop_est, kf, devices, None, almanac.clone());
 

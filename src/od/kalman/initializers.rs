@@ -26,9 +26,9 @@ pub use crate::od::snc::ProcessNoise;
 use crate::od::State;
 pub use crate::time::{Epoch, Unit};
 
-use super::{KalmanVariant, KF};
+use super::{KalmanFilter, KalmanVariant};
 
-impl<T> KF<T, U3>
+impl<T> KalmanFilter<T, U3>
 where
     T: State,
     DefaultAllocator: Allocator<<T as State>::Size>
@@ -52,7 +52,7 @@ where
     }
 }
 
-impl<T, A> KF<T, A>
+impl<T, A> KalmanFilter<T, A>
 where
     T: State,
     A: DimName,

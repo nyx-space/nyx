@@ -153,7 +153,7 @@ fn od_val_multi_body_ckf_perfect_stations(
     // Define the initial estimate
     let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
 
-    let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
+    let ckf = KalmanFilter::new(initial_estimate, KalmanVariant::DeviationTracking);
 
     let mut odp = KalmanODProcess::<_, U2, _, _>::new(prop_est, ckf, proc_devices, None, almanac);
 
@@ -287,7 +287,7 @@ fn multi_body_ckf_covar_map_cov_test(
     // Define the initial estimate
     let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
 
-    let ckf = KF::new(initial_estimate, KalmanVariant::DeviationTracking);
+    let ckf = KalmanFilter::new(initial_estimate, KalmanVariant::DeviationTracking);
 
     let mut odp =
         KalmanODProcess::<_, U2, _, _>::new(prop_est, ckf, proc_devices, None, almanac.clone());

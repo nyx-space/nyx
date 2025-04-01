@@ -19,7 +19,7 @@ use nyx::{
     io::{ConfigRepr, ExportCfg},
     md::prelude::{HarmonicsMem, Traj},
     od::{
-        prelude::{KalmanVariant, TrackingArcSim, TrkConfig, KF},
+        prelude::{KalmanFilter, KalmanVariant, TrackingArcSim, TrkConfig},
         process::{Estimate, NavSolution, ResidRejectCrit, SpacecraftUncertainty},
         snc::ProcessNoise3D,
         GroundStation, SpacecraftKalmanOD,
@@ -257,7 +257,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("{process_noise}");
 
-    let kf = KF::new(
+    let kf = KalmanFilter::new(
         // Increase the initial covariance to account for larger deviation.
         initial_estimate,
         KalmanVariant::ReferenceUpdate,

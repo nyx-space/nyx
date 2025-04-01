@@ -36,7 +36,7 @@ use std::ops::Add;
 mod conf;
 pub use conf::{IterationConf, SmoothingArc};
 mod rejectcrit;
-use self::kalman::KF;
+use self::kalman::KalmanFilter;
 use self::msr::TrackingDataArc;
 pub use self::rejectcrit::ResidRejectCrit;
 mod solution;
@@ -71,7 +71,7 @@ pub struct KalmanODProcess<
     /// PropInstance used for the estimation
     pub prop: PropInstance<'a, D>,
     /// Kalman filter itself
-    pub kf: KF<D::StateType, Accel>,
+    pub kf: KalmanFilter<D::StateType, Accel>,
     /// Tracking devices
     pub devices: BTreeMap<String, Trk>,
     /// Residual rejection criteria allows preventing bad measurements from affecting the estimation.
@@ -110,7 +110,7 @@ where
     /// Initialize a new orbit determination process with an optional trigger to switch from a CKF to an EKF.
     pub fn new(
         prop: PropInstance<'a, D>,
-        kf: KF<D::StateType, Accel>,
+        kf: KalmanFilter<D::StateType, Accel>,
         devices: BTreeMap<String, Trk>,
         resid_crit: Option<ResidRejectCrit>,
         almanac: Arc<Almanac>,
