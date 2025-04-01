@@ -16,11 +16,7 @@ use nyx::{
     dynamics::{guidance::LocalFrame, OrbitalDynamics, SolarPressure, SpacecraftDynamics},
     io::ExportCfg,
     mc::MonteCarlo,
-    od::{
-        prelude::{KalmanFilter, KalmanVariant},
-        process::SpacecraftUncertainty,
-        SpacecraftKalmanOD,
-    },
+    od::{prelude::KalmanVariant, process::SpacecraftUncertainty, SpacecraftKalmanOD},
     propagators::Propagator,
     Spacecraft, State,
 };
@@ -114,18 +110,21 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // === Covariance mapping ===
     // For the covariance mapping / prediction, we'll use the common orbit determination approach.
-    // This is done by setting up a spacecraft OD process, and predicting for the analysis duration.
-
-    let kf = KalmanFilter::new(jwst_estimate, KalmanVariant::DeviationTracking);
+    // This is done by setting up a spacecraft Kalman filter OD process, and predicting for the analysis duration.
 
     // Build the propagation instance for the OD process.
-    let prop = setup.with(jwst.with_stm(), almanac.clone());
-    let mut odp = SpacecraftKalmanOD::new(prop, kf, BTreeMap::new(), None, almanac.clone());
+    let odp = SpacecraftKalmanOD::new(
+        setup.clone(),
+        KalmanVariant::DeviationTracking,
+        None,
+        BTreeMap::new(),
+        almanac.clone(),
+    );
 
     // Define the prediction step, i.e. how often we want to know the covariance.
     let step = 1_i64.minutes();
     // Finally, predict, and export the trajectory with covariance to a parquet file.
-    let od_sol = odp.predict_for(step, prediction_duration)?;
+    let od_sol = odp.predict_for(jwst_estimate, step, prediction_duration)?;
     od_sol.to_parquet("./02_jwst_covar_map.parquet", ExportCfg::default())?;
 
     // === Monte Carlo framework ===

@@ -199,8 +199,6 @@ fn od_val_sc_mb_srp_reals_duals_models(
     let initial_state_est = initial_state;
     let sc_init_est =
         Spacecraft::from_srp_defaults(initial_state_est, dry_mass_kg, sc_area).with_stm();
-    // Use the same setup as earlier
-    let prop_est = setup.with(sc_init_est, almanac.clone());
     let covar_radius_km = 1.0e-3_f64.powi(2);
     let covar_velocity_km_s = 1.0e-6_f64.powi(2);
     let init_covar = SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([
@@ -218,11 +216,15 @@ fn od_val_sc_mb_srp_reals_duals_models(
     // Define the initial orbit estimate
     let initial_estimate = KfEstimate::from_covar(sc_init_est, init_covar);
 
-    let ckf = KalmanFilter::new(initial_estimate, KalmanVariant::DeviationTracking);
+    let odp = SpacecraftKalmanOD::new(
+        setup,
+        KalmanVariant::DeviationTracking,
+        None,
+        proc_devices,
+        almanac,
+    );
 
-    let mut odp = SpacecraftKalmanOD::new(prop_est, ckf, proc_devices, None, almanac);
-
-    let od_sol = odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(initial_estimate, &arc).unwrap();
 
     od_sol
         .to_parquet(
@@ -390,9 +392,6 @@ fn od_val_sc_srp_estimation_cov_test(
         .build()
         .with_stm();
 
-    // Use the same setup as earlier
-    let prop_est = setup.with(sc_init_est, almanac.clone());
-
     let sc = SpacecraftUncertainty::builder()
         .nominal(sc_init_est)
         .frame(LocalFrame::RIC)
@@ -408,11 +407,15 @@ fn od_val_sc_srp_estimation_cov_test(
     // Define the initial orbit estimate
     let initial_estimate = sc.to_estimate().unwrap();
 
-    let ckf = KalmanFilter::new(initial_estimate, KalmanVariant::ReferenceUpdate);
+    let odp = SpacecraftKalmanOD::new(
+        setup,
+        KalmanVariant::ReferenceUpdate,
+        None,
+        proc_devices,
+        almanac.clone(),
+    );
 
-    let mut odp = SpacecraftKalmanOD::new(prop_est, ckf, proc_devices, None, almanac.clone());
-
-    let od_sol = odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(initial_estimate, &arc).unwrap();
 
     let est = od_sol.estimates.last().unwrap();
 

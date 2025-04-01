@@ -9,7 +9,7 @@ use nyx::time::{Epoch, Unit};
 use nyx::utils::rss_orbit_vec_errors;
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
-use nyx_space::md::prelude::Interpolatable;
+use nyx_space::md::prelude::{Interpolatable, State};
 use rstest::*;
 use std::sync::Arc;
 

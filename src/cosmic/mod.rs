@@ -71,6 +71,9 @@ where
         Err(DynamicsError::StateTransitionMatrixUnset)
     }
 
+    /// Copies the current state but sets the STM to identity
+    fn with_stm(self) -> Self;
+
     /// Return this state as a vector for the propagation/estimation
     /// By default, this is not implemented. This function must be implemented when filtering on this state.
     fn reset_stm(&mut self) {

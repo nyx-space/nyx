@@ -23,12 +23,13 @@ pub use crate::od::estimate::*;
 pub use crate::od::ground_station::*;
 pub use crate::od::snc::*;
 pub use crate::od::*;
-use crate::propagators::PropInstance;
+use crate::propagators::Propagator;
 pub use crate::time::{Duration, Unit};
 use anise::prelude::Almanac;
 use indexmap::IndexSet;
 use msr::sensitivity::TrackerSensitivity;
 use snafu::prelude::*;
+use solution::kalman::KalmanVariant;
 use std::collections::BTreeMap;
 use std::marker::PhantomData;
 use std::ops::Add;
@@ -43,9 +44,9 @@ mod solution;
 pub use solution::ODSolution;
 
 /// An orbit determination process (ODP) which filters OD measurements through a Kalman filter.
+#[derive(Clone)]
 #[allow(clippy::upper_case_acronyms)]
 pub struct KalmanODProcess<
-    'a,
     D: Dynamics,
     MsrSize: DimName,
     Accel: DimName,
@@ -68,26 +69,26 @@ pub struct KalmanODProcess<
         + Allocator<<D::StateType as State>::Size, Accel>
         + Allocator<Accel, <D::StateType as State>::Size>,
 {
-    /// PropInstance used for the estimation
-    pub prop: PropInstance<'a, D>,
-    /// Kalman filter itself
-    pub kf: KalmanFilter<D::StateType, Accel>,
-    /// Tracking devices
-    pub devices: BTreeMap<String, Trk>,
+    /// Propagator used for the estimation
+    pub prop: Propagator<D>,
+    /// Kalman filter variant
+    pub kf_variant: KalmanVariant,
     /// Residual rejection criteria allows preventing bad measurements from affecting the estimation.
     pub resid_crit: Option<ResidRejectCrit>,
+    /// Tracking devices
+    pub devices: BTreeMap<String, Trk>,
+    /// A sets of process noise (usually noted Q), must be ordered chronologically
+    pub process_noise: Vec<ProcessNoise<Accel>>,
     pub almanac: Arc<Almanac>,
     _msr_size: PhantomData<MsrSize>,
-    _acceleration_size: PhantomData<Accel>,
 }
 
 impl<
-        'a,
         D: Dynamics,
         MsrSize: DimName,
         Accel: DimName,
         Trk: TrackerSensitivity<D::StateType, D::StateType>,
-    > KalmanODProcess<'a, D, MsrSize, Accel, Trk>
+    > KalmanODProcess<D, MsrSize, Accel, Trk>
 where
     D::StateType:
         Interpolatable + Add<OVector<f64, <D::StateType as State>::Size>, Output = D::StateType>,
@@ -109,27 +110,62 @@ where
 {
     /// Initialize a new orbit determination process with an optional trigger to switch from a CKF to an EKF.
     pub fn new(
-        prop: PropInstance<'a, D>,
-        kf: KalmanFilter<D::StateType, Accel>,
-        devices: BTreeMap<String, Trk>,
+        prop: Propagator<D>,
+        kf_variant: KalmanVariant,
         resid_crit: Option<ResidRejectCrit>,
+        devices: BTreeMap<String, Trk>,
         almanac: Arc<Almanac>,
     ) -> Self {
         Self {
-            prop: prop.quiet(),
-            kf,
+            prop,
+            kf_variant,
             devices,
             resid_crit,
+            process_noise: vec![],
             almanac,
             _msr_size: PhantomData::<MsrSize>,
-            _acceleration_size: PhantomData::<Accel>,
         }
+    }
+
+    /// Set (or replaces) the existing process noise configuration.
+    pub fn from_process_noise(
+        prop: Propagator<D>,
+        kf_variant: KalmanVariant,
+        devices: BTreeMap<String, Trk>,
+        resid_crit: Option<ResidRejectCrit>,
+        process_noise: ProcessNoise<Accel>,
+        almanac: Arc<Almanac>,
+    ) -> Self {
+        let mut me = Self::new(
+            prop,
+            kf_variant,
+            resid_crit,
+            devices,
+            almanac
+        );
+        me.process_noise.push(process_noise);
+        
+        me
+    }
+
+    /// Set (or replaces) the existing process noise configuration.
+    pub fn with_process_noise(mut self, process_noise: ProcessNoise<Accel>) -> Self {
+        self.process_noise.clear();
+        self.process_noise.push(process_noise);
+        self
+    }
+
+    /// Pushes the provided process noise to the list the existing process noise configurations.
+    pub fn and_with_process_noise(mut self, process_noise: ProcessNoise<Accel>) -> Self {
+        self.process_noise.push(process_noise);
+        self
     }
 
     /// Process the provided tracking arc for this orbit determination process.
     #[allow(clippy::erasing_op)]
     pub fn process_arc(
-        &mut self,
+        &self,
+        initial_estimate: KfEstimate<D::StateType>,
         arc: &TrackingDataArc,
     ) -> Result<ODSolution<D::StateType, KfEstimate<D::StateType>, MsrSize, Trk>, ODError> {
         // Initialize the solution.
@@ -174,12 +210,17 @@ where
         // Start by propagating the estimator.
         let num_msrs = measurements.len();
 
+        // Set up the propagator instance.
+        let prop = self.prop.clone();
+        let mut prop_instance = prop.with(initial_estimate.nominal_state().with_stm(), self.almanac.clone()).quiet();
+
         // Update the step size of the navigation propagator if it isn't already fixed step
-        if !self.prop.fixed_step {
-            self.prop.set_step(max_step, false);
+        if !prop_instance.fixed_step {
+            prop_instance.set_step(max_step, false);
         }
 
-        let prop_time = arc.end_epoch().unwrap() - self.kf.previous_estimate().epoch();
+        
+        let prop_time = arc.end_epoch().unwrap() - initial_estimate.epoch();
         info!("Navigation propagating for a total of {prop_time} with step size {max_step}");
 
         let resid_crit = if arc.force_reject {
@@ -189,7 +230,7 @@ where
             self.resid_crit
         };
 
-        let mut epoch = self.prop.state.epoch();
+        let mut epoch = prop_instance.state.epoch();
 
         let mut reported = [false; 11];
         reported[0] = true; // Prevent showing "0% done"
@@ -197,6 +238,16 @@ where
             "Processing {num_msrs} measurements from {:?}",
             arc.unique_aliases()
         );
+
+        // Set up the Kalman filter.
+        let mut kf = KalmanFilter::<D::StateType, Accel> {
+            prev_estimate: initial_estimate,
+            process_noise: self.process_noise.clone(),
+            variant: self.kf_variant,
+            prev_used_snc: 0,
+        };
+
+        let mut devices = self.devices.clone();
 
         // We'll build a trajectory of the estimated states. This will be used to compute the measurements.
         let mut traj: Traj<D::StateType> = Traj::new();
@@ -212,7 +263,7 @@ where
                 let delta_t = next_msr_epoch - epoch;
 
                 // Propagator for the minimum time between the maximum step size, the next step size, and the duration to the next measurement.
-                let next_step_size = delta_t.min(self.prop.step_size).min(max_step);
+                let next_step_size = delta_t.min(prop_instance.step_size).min(max_step);
 
                 // Remove old states from the trajectory
                 // This is a manual implementation of `retaint` because we know it's a sorted vec, so no need to resort every time
@@ -226,8 +277,7 @@ where
                 traj.states.truncate(index);
 
                 debug!("propagate for {next_step_size} (Δt to next msr: {delta_t})");
-                let (_, traj_covar) = self
-                    .prop
+                let (_, traj_covar) = prop_instance
                     .for_duration_with_traj(next_step_size)
                     .context(ODPropSnafu)?;
 
@@ -240,7 +290,7 @@ where
                 // Now that we've advanced the propagator, let's see whether we're at the time of the next measurement.
 
                 // Extract the state and update the STM in the filter.
-                let nominal_state = self.prop.state;
+                let nominal_state = prop_instance.state;
                 // Get the datetime and info needed to compute the theoretical measurement according to the model
                 epoch = nominal_state.epoch();
 
@@ -248,7 +298,7 @@ where
                 // TODO: Move epoch precision to process configuration.
                 if (nominal_state.epoch() - next_msr_epoch).abs() < Unit::Microsecond * 1 {
                     // Get the computed observations
-                    match self.devices.get_mut(&msr.tracker) {
+                    match devices.get_mut(&msr.tracker) {
                         Some(device) => {
                             if let Some(computed_meas) =
                                 device.measure(epoch, &traj, None, self.almanac.clone())?
@@ -328,7 +378,7 @@ where
                                         real_obs += obs_ambiguity;
                                     }
 
-                                    match self.kf.measurement_update(
+                                    match kf.measurement_update(
                                         nominal_state,
                                         real_obs,
                                         computed_obs,
@@ -346,11 +396,11 @@ where
                                                 msr_rejected = true;
                                             }
 
-                                            if self.kf.replace_state() {
-                                                self.prop.state = estimate.state();
+                                            if kf.replace_state() {
+                                                prop_instance.state = estimate.state();
                                             }
 
-                                            self.prop.state.reset_stm();
+                                            prop_instance.state.reset_stm();
 
                                             od_sol
                                                 .push_measurement_update(estimate, residual, gain);
@@ -392,14 +442,14 @@ where
                 } else {
                     // No measurement can be used here, let's just do a time update and continue advancing the propagator.
                     debug!("time update {epoch:?}, next msr {next_msr_epoch:?}");
-                    match self.kf.time_update(nominal_state) {
+                    match kf.time_update(nominal_state) {
                         Ok(est) => {
                             // State deviation is always zero for an EKF time update so we don't do anything different than for a CKF.
                             od_sol.push_time_update(est);
                         }
                         Err(e) => return Err(e),
                     }
-                    self.prop.state.reset_stm();
+                    prop_instance.state.reset_stm();
                 }
             }
         }
@@ -418,30 +468,43 @@ where
 
     /// Perform a time update. Continuously predicts the trajectory until the provided end epoch, with covariance mapping at each step.
     pub fn predict_until(
-        &mut self,
+        &self,
+        initial_estimate: KfEstimate<D::StateType>,
         step: Duration,
         end_epoch: Epoch,
     ) -> Result<ODSolution<D::StateType, KfEstimate<D::StateType>, MsrSize, Trk>, ODError> {
         // Initialize the solution with no measurement types.
         let mut od_sol = ODSolution::new(self.devices.clone(), IndexSet::new());
 
-        let prop_time = end_epoch - self.kf.previous_estimate().epoch();
+        // Set up the propagator instance.
+        let prop = self.prop.clone();
+        let mut prop_instance = prop.with(initial_estimate.nominal_state().with_stm(), self.almanac.clone()).quiet();
+
+        // Set up the Kalman filter.
+        let mut kf = KalmanFilter::<D::StateType, Accel> {
+            prev_estimate: initial_estimate,
+            process_noise: self.process_noise.clone(),
+            variant: self.kf_variant,
+            prev_used_snc: 0,
+        };
+
+        let prop_time = end_epoch - kf.previous_estimate().epoch();
         info!("Mapping covariance for {prop_time} until {end_epoch} with {step} step");
 
         loop {
-            let nominal_state = self.prop.for_duration(step).context(ODPropSnafu)?;
+            let nominal_state = prop_instance.for_duration(step).context(ODPropSnafu)?;
             // Extract the state and update the STM in the filter.
             // Get the datetime and info needed to compute the theoretical measurement according to the model
             let epoch = nominal_state.epoch();
             // No measurement can be used here, let's just do a time update
             debug!("time update {epoch}");
-            match self.kf.time_update(nominal_state) {
+            match kf.time_update(nominal_state) {
                 Ok(est) => {
                     od_sol.push_time_update(est);
                 }
                 Err(e) => return Err(e),
             }
-            self.prop.state.reset_stm();
+            prop_instance.state.reset_stm();
             if epoch >= end_epoch {
                 break;
             }
@@ -452,11 +515,12 @@ where
 
     /// Perform a time update. Continuously predicts the trajectory for the provided duration, with covariance mapping at each step. In other words, this performs a time update.
     pub fn predict_for(
-        &mut self,
+        &self,
+        initial_estimate: KfEstimate<D::StateType>,
         step: Duration,
         duration: Duration,
     ) -> Result<ODSolution<D::StateType, KfEstimate<D::StateType>, MsrSize, Trk>, ODError> {
-        let end_epoch = self.kf.previous_estimate().epoch() + duration;
-        self.predict_until(step, end_epoch)
+        let end_epoch = initial_estimate.nominal_state().epoch() + duration;
+        self.predict_until(initial_estimate, step, end_epoch)
     }
 }

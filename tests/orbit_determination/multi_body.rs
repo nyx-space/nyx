@@ -1,10 +1,7 @@
 extern crate nyx_space as nyx;
 
-use anise::constants::celestial_objects::JUPITER_BARYCENTER;
-use anise::constants::celestial_objects::MOON;
-use anise::constants::celestial_objects::SUN;
+use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SUN};
 use anise::constants::frames::IAU_EARTH_FRAME;
-use nalgebra::U2;
 use nyx::od::simulator::TrackingArcSim;
 use nyx::od::simulator::TrkConfig;
 use nyx_space::propagators::IntegratorMethod;
@@ -135,7 +132,6 @@ fn od_val_multi_body_ckf_perfect_stations(
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let prop_est = setup.with(Spacecraft::from(initial_state).with_stm(), almanac.clone());
     let covar_radius_km = 1.0e-3_f64.powi(2);
     let covar_velocity_km_s = 1.0e-6_f64.powi(2);
     let init_covar = SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([
@@ -153,11 +149,15 @@ fn od_val_multi_body_ckf_perfect_stations(
     // Define the initial estimate
     let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
 
-    let ckf = KalmanFilter::new(initial_estimate, KalmanVariant::DeviationTracking);
+    let odp = SpacecraftKalmanOD::new(
+        setup,
+        KalmanVariant::DeviationTracking,
+        None,
+        proc_devices,
+        almanac,
+    );
 
-    let mut odp = KalmanODProcess::<_, U2, _, _>::new(prop_est, ckf, proc_devices, None, almanac);
-
-    let od_sol = odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(initial_estimate, &arc).unwrap();
 
     let mut last_est = None;
     for (no, est) in od_sol.estimates.iter().enumerate() {
@@ -269,7 +269,6 @@ fn multi_body_ckf_covar_map_cov_test(
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let prop_est = setup.with(Spacecraft::from(initial_state).with_stm(), almanac.clone());
     let covar_radius_km = 1.0e-3_f64.powi(2);
     let covar_velocity_km_s = 1.0e-6_f64.powi(2);
     let init_covar = SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([
@@ -287,12 +286,15 @@ fn multi_body_ckf_covar_map_cov_test(
     // Define the initial estimate
     let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
 
-    let ckf = KalmanFilter::new(initial_estimate, KalmanVariant::DeviationTracking);
+    let odp = SpacecraftKalmanOD::new(
+        setup,
+        KalmanVariant::DeviationTracking,
+        None,
+        proc_devices,
+        almanac.clone(),
+    );
 
-    let mut odp =
-        KalmanODProcess::<_, U2, _, _>::new(prop_est, ckf, proc_devices, None, almanac.clone());
-
-    let od_sol = odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(initial_estimate, &arc).unwrap();
 
     let mut num_pred = 0_u32;
     for est in od_sol.estimates.iter() {

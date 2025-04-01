@@ -274,12 +274,6 @@ impl Spacecraft {
         self.stm = Some(OMatrix::<f64, Const<9>, Const<9>>::identity());
     }
 
-    /// Copies the current state but sets the STM to identity
-    pub fn with_stm(mut self) -> Self {
-        self.enable_stm();
-        self
-    }
-
     /// Returns the total mass in kilograms
     pub fn mass_kg(&self) -> f64 {
         self.mass.total_mass_kg()
@@ -373,6 +367,12 @@ impl fmt::UpperHex for Spacecraft {
 impl State for Spacecraft {
     type Size = Const<9>;
     type VecLength = Const<90>;
+
+    /// Copies the current state but sets the STM to identity
+    fn with_stm(mut self) -> Self {
+        self.enable_stm();
+        self
+    }
 
     fn reset_stm(&mut self) {
         self.stm = Some(OMatrix::<f64, Const<9>, Const<9>>::identity());

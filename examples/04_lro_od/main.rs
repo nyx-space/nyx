@@ -19,7 +19,7 @@ use nyx::{
     io::{ConfigRepr, ExportCfg},
     md::prelude::{HarmonicsMem, Traj},
     od::{
-        prelude::{KalmanFilter, KalmanVariant, TrackingArcSim, TrkConfig},
+        prelude::{KalmanVariant, TrackingArcSim, TrkConfig},
         process::{Estimate, NavSolution, ResidRejectCrit, SpacecraftUncertainty},
         snc::ProcessNoise3D,
         GroundStation, SpacecraftKalmanOD,
@@ -257,23 +257,17 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("{process_noise}");
 
-    let kf = KalmanFilter::new(
-        // Increase the initial covariance to account for larger deviation.
-        initial_estimate,
+    // We'll set up the OD process to reject measurements whose residuals are move than 3 sigmas away from what we expect.
+    let odp = SpacecraftKalmanOD::new(
+        setup,
         KalmanVariant::ReferenceUpdate,
+        Some(ResidRejectCrit::default()),
+        devices,
+        almanac.clone(),
     )
     .with_process_noise(process_noise);
 
-    // We'll set up the OD process to reject measurements whose residuals are move than 3 sigmas away from what we expect.
-    let mut odp = SpacecraftKalmanOD::new(
-        setup.with(initial_estimate.state().with_stm(), almanac.clone()),
-        kf,
-        devices,
-        Some(ResidRejectCrit::default()),
-        almanac.clone(),
-    );
-
-    let od_sol = odp.process_arc(&arc)?;
+    let od_sol = odp.process_arc(initial_estimate, &arc)?;
 
     let ric_err = traj_as_flown
         .at(od_sol.estimates.last().unwrap().epoch())?

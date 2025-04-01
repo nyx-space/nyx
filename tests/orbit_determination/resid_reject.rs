@@ -1,6 +1,5 @@
 use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SATURN_BARYCENTER, SUN};
 use anise::constants::frames::{EARTH_J2000, IAU_EARTH_FRAME};
-use nalgebra::U2;
 use nyx_space::dynamics::guidance::LocalFrame;
 use pretty_env_logger::try_init;
 
@@ -190,8 +189,6 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
 ) {
     let (devices, _configs) = devices_n_configs;
 
-    let initial_state_dev = initial_estimate.nominal_state;
-
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let estimator = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
     let setup = Propagator::new(
@@ -199,14 +196,10 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
         IntegratorMethod::RungeKutta4,
         IntegratorOptions::with_fixed_step(10.seconds()),
     );
-    let prop_est = setup.with(initial_state_dev.with_stm(), almanac.clone());
 
     // Define the process noise to assume an unmodeled acceleration on X, Y and Z in the ECI frame
     let sigma_q = 5e-9_f64.powi(2);
     let process_noise = ProcessNoise3D::from_diagonal(2.minutes(), &[sigma_q, sigma_q, sigma_q]);
-
-    let kf = KalmanFilter::new(initial_estimate, KalmanVariant::ReferenceUpdate)
-        .with_process_noise(process_noise);
 
     // ==> TEST <== //
     // We greatly inflate the SNC so that the covariance inflates tremendously. This leads to the
@@ -214,15 +207,16 @@ fn od_resid_reject_inflated_snc_ckf_two_way(
     // the measurements are accepted.
     // So we end up with an excellent estimate but an unusably high covariance.
 
-    let mut odp = KalmanODProcess::<_, U2, _, _>::new(
-        prop_est,
-        kf,
-        devices,
+    let odp = SpacecraftKalmanOD::new(
+        setup,
+        KalmanVariant::ReferenceUpdate,
         Some(ResidRejectCrit { num_sigmas: 2.0 }), // 95% to force rejections
+        devices,
         almanac,
-    );
+    )
+    .with_process_noise(process_noise);
 
-    let od_sol = odp.process_arc(&tracking_arc).unwrap();
+    let od_sol = odp.process_arc(initial_estimate, &tracking_arc).unwrap();
 
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
@@ -318,8 +312,6 @@ fn od_resid_reject_default_ckf_two_way_cov_test(
 ) {
     let (devices, _configs) = devices_n_configs;
 
-    let initial_state_dev = initial_estimate.nominal_state;
-
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be _nearly_ perfect because we've removed SATURN_BARYCENTER from the estimated trajectory
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
@@ -329,24 +321,21 @@ fn od_resid_reject_default_ckf_two_way_cov_test(
         IntegratorMethod::RungeKutta4,
         IntegratorOptions::with_fixed_step(10.seconds()),
     );
-    let prop_est = setup.with(initial_state_dev.with_stm(), almanac.clone());
 
     // Define the process noise to assume an unmodeled acceleration on X, Y and Z in the ECI frame
     let sigma_q = 5e-10_f64.powi(2);
     let process_noise = ProcessNoise3D::from_diagonal(2.minutes(), &[sigma_q, sigma_q, sigma_q]);
 
-    let kf = KalmanFilter::new(initial_estimate, KalmanVariant::ReferenceUpdate)
-        .with_process_noise(process_noise);
-
-    let mut odp = KalmanODProcess::<_, U2, _, _>::new(
-        prop_est,
-        kf,
-        devices,
+    let odp = SpacecraftKalmanOD::new(
+        setup,
+        KalmanVariant::ReferenceUpdate,
         Some(ResidRejectCrit::default()),
+        devices,
         almanac,
-    );
+    )
+    .with_process_noise(process_noise);
 
-    let od_sol = odp.process_arc(&tracking_arc).unwrap();
+    let od_sol = odp.process_arc(initial_estimate, &tracking_arc).unwrap();
 
     // Save this result before the asserts for analysis
     let path: PathBuf = [

@@ -274,16 +274,19 @@ fn od_with_modulus_cov_test(
         Some(LocalFrame::RIC),
     );
     println!("{process_noise}");
-    // TODO: Switch to iterative tracking here
-    let kf = KalmanFilter::new(estimate, KalmanVariant::ReferenceUpdate)
-        .with_process_noise(process_noise);
 
     let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
-    let prop = setup.with(spacecraft.with_stm(), almanac.clone());
 
-    let mut odp = SpacecraftKalmanOD::new(prop, kf, devices, None, almanac.clone());
+    let odp = SpacecraftKalmanOD::new(
+        setup,
+        KalmanVariant::ReferenceUpdate,
+        None,
+        devices,
+        almanac.clone(),
+    )
+    .with_process_noise(process_noise);
 
-    let od_sol = odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(estimate, &arc).unwrap();
 
     od_sol
         .to_parquet(
@@ -369,16 +372,19 @@ fn od_with_modulus_as_bias_cov_test(
     let sigma_q = 1e-8_f64.powi(2);
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
-    // TODO: Switch to iterative tracking
-    let kf = KalmanFilter::new(estimate, KalmanVariant::ReferenceUpdate)
-        .with_process_noise(process_noise);
 
     let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
-    let prop = setup.with(spacecraft.with_stm(), almanac.clone());
 
-    let mut odp = SpacecraftKalmanOD::new(prop, kf, devices, None, almanac);
+    let odp = SpacecraftKalmanOD::new(
+        setup,
+        KalmanVariant::ReferenceUpdate,
+        None,
+        devices,
+        almanac,
+    )
+    .with_process_noise(process_noise);
 
-    let od_sol = odp.process_arc(&tracking_data).unwrap();
+    let od_sol = odp.process_arc(estimate, &tracking_data).unwrap();
 
     od_sol
         .to_parquet(

@@ -59,8 +59,7 @@ pub use simulator::TrackingDevice;
 pub mod snc;
 
 /// A helper type for spacecraft orbit determination.
-pub type SpacecraftKalmanOD<'a> = self::process::KalmanODProcess<
-    'a,
+pub type SpacecraftKalmanOD = self::process::KalmanODProcess<
     SpacecraftDynamics,
     nalgebra::Const<2>,
     nalgebra::Const<3>,
@@ -68,8 +67,7 @@ pub type SpacecraftKalmanOD<'a> = self::process::KalmanODProcess<
 >;
 
 /// A helper type for spacecraft orbit determination sequentially processing measurements
-pub type SpacecraftKalmanScalarOD<'a> = self::process::KalmanODProcess<
-    'a,
+pub type SpacecraftKalmanScalarOD = self::process::KalmanODProcess<
     SpacecraftDynamics,
     nalgebra::Const<1>,
     nalgebra::Const<3>,

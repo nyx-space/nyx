@@ -84,7 +84,7 @@ fn od_robust_test_ekf_realistic_one_way_cov_test(almanac: Arc<Almanac>) {
 
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
-    let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+    let dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
     let initial_state = Spacecraft::from(Orbit::keplerian(
         22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k,
     ));
@@ -158,24 +158,27 @@ fn od_robust_test_ekf_realistic_one_way_cov_test(almanac: Arc<Almanac>) {
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let estimator = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
     let setup = Propagator::new(estimator, IntegratorMethod::RungeKutta4, opts);
-    let prop_est = setup.with(initial_state_dev.with_stm(), almanac.clone());
 
     // Define the process noise to assume an unmodeled acceleration on X, Y and Z in the ECI frame
     let sigma_q = 5e-10_f64.powi(2);
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
 
-    let kf = KalmanFilter::new(initial_estimate, KalmanVariant::ReferenceUpdate)
-        .with_process_noise(process_noise);
-
-    let mut odp = SpacecraftKalmanOD::new(prop_est, kf, devices, None, almanac.clone());
+    let mut odp = SpacecraftKalmanOD::new(
+        setup,
+        KalmanVariant::DeviationTracking,
+        None,
+        devices,
+        almanac.clone(),
+    )
+    .with_process_noise(process_noise);
 
     // Let's filter and iterate on the initial subset of the arc to refine the initial estimate
     let subset = arc.clone().filter_by_offset(..3.hours());
     let remaining = arc.filter_by_offset(3.hours()..);
 
-    let od_sol = odp
-        .process_arc(&subset)
+    let mut od_sol = odp
+        .process_arc(initial_estimate, &subset)
         .expect("process failed")
         .smooth(almanac)
         .expect("smooth failed");
@@ -190,12 +193,17 @@ fn od_robust_test_ekf_realistic_one_way_cov_test(almanac: Arc<Almanac>) {
         (initial_state.orbit - od_sol.estimates[0].state().orbit).unwrap()
     );
 
-    let od_sol = odp.process_arc(&remaining).unwrap();
+    odp.kf_variant = KalmanVariant::ReferenceUpdate;
+    let od_sol_remaining = odp
+        .process_arc(*od_sol.estimates.last().unwrap(), &remaining)
+        .unwrap();
+
+    od_sol = od_sol.merge(od_sol_remaining);
 
     od_sol
         .to_parquet(
             path.with_file_name("robustness_test_one_way.parquet"),
-            ExportCfg::timestamped(),
+            ExportCfg::default(),
         )
         .unwrap();
 
@@ -244,7 +252,7 @@ fn od_robust_test_ekf_realistic_one_way_cov_test(almanac: Arc<Almanac>) {
     );
 }
 
-#[ignore = "large state deviations to be handled in #416"]
+// #[ignore = "large state deviations to be handled in #416"]
 #[allow(clippy::identity_op)]
 #[rstest]
 fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
@@ -259,7 +267,7 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
 
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
-    let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+    let dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
     let initial_state = Spacecraft::from(Orbit::keplerian(
         22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k,
     ));
@@ -294,7 +302,7 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
     // Disperse the initial state based on some orbital elements errors given from ULA Atlas 5 user guide, table 2.3.3-1 <https://www.ulalaunch.com/docs/default-source/rockets/atlasvusersguide2010a.pdf>
     // This assumes that the errors are ONE TENTH of the values given in the table. It assumes that the launch provider has provided an initial state vector, whose error is lower than the injection errors.
     // The initial covariance is computed based on the realized dispersions.
-    let initial_estimate = KfEstimate::disperse_from_diag(
+    let mut initial_estimate = KfEstimate::disperse_from_diag(
         initial_state,
         vec![
             StateDispersion::zero_mean(StateParameter::Inclination, 0.0025),
@@ -304,6 +312,8 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
         Some(0),
     )
     .unwrap();
+
+    initial_estimate.covar *= 1e6;
 
     println!("Initial estimate:\n{}", initial_estimate);
 
@@ -322,7 +332,10 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
 
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER, SATURN_BARYCENTER];
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
-    let truth_setup = Propagator::default(SpacecraftDynamics::new(orbital_dyn));
+    let truth_setup = Propagator::rk89(
+        SpacecraftDynamics::new(orbital_dyn),
+        IntegratorOptions::builder().max_step(10.minutes()).build(),
+    );
     let (_, traj) = truth_setup
         .with(initial_state, almanac.clone())
         .for_duration_with_traj(prop_time)
@@ -353,20 +366,26 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
     // We expect the estimated orbit to be _nearly_ perfect because we've removed SATURN_BARYCENTER from the estimated trajectory
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let estimator = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
-    let setup = Propagator::default(estimator);
-    let prop_est = setup.with(initial_state_dev.with_stm(), almanac.clone());
+    let setup = Propagator::rk89(
+        estimator,
+        IntegratorOptions::builder().max_step(10.minutes()).build(),
+    );
 
     // Define the process noise to assume an unmodeled acceleration on X, Y and Z in the ECI frame
-    let sigma_q = 5e-16_f64.powi(2);
+    let sigma_q = 5e-12_f64.powi(2);
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
 
-    let kf = KalmanFilter::new(initial_estimate, KalmanVariant::ReferenceUpdate)
-        .with_process_noise(process_noise);
+    let odp = SpacecraftKalmanOD::new(
+        setup,
+        KalmanVariant::ReferenceUpdate,
+        None,
+        devices,
+        almanac,
+    )
+    .with_process_noise(process_noise);
 
-    let mut odp = SpacecraftKalmanOD::new(prop_est, kf, devices, None, almanac);
-
-    let od_sol = odp.process_arc(&arc).unwrap();
+    let od_sol = odp.process_arc(initial_estimate, &arc).unwrap();
 
     let mut num_residual_none = 0;
     let mut num_residual_some = 0;
@@ -401,7 +420,7 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
     // Export as Parquet
     let timestamped_path = od_sol
         .to_parquet(
-            path.with_file_name("robustness_test_two_way.parquet"),
+            path.join("robustness_test_two_way.parquet"),
             ExportCfg::default(),
         )
         .unwrap();
