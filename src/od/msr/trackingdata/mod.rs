@@ -184,7 +184,8 @@ impl TrackingDataArc {
         self
     }
 
-    /// Returns a new tracking arc that only contains measurements that fall within the given offset from the first epoch
+    /// Returns a new tracking arc that only contains measurements that fall within the given offset from the first epoch.
+    /// For example, a bound of 30.minutes()..90.minutes() will only read measurements from the start of the arc + 30 minutes until start + 90 minutes.
     pub fn filter_by_offset<R: RangeBounds<Duration>>(self, bound: R) -> Self {
         if self.is_empty() {
             return self;
@@ -197,7 +198,7 @@ impl TrackingDataArc {
 
         let end = match bound.end_bound() {
             Unbounded => self.end_epoch().unwrap(),
-            Included(offset) | Excluded(offset) => self.end_epoch().unwrap() - *offset,
+            Included(offset) | Excluded(offset) => self.start_epoch().unwrap() + *offset,
         };
 
         self.filter_by_epoch(start..end)
@@ -260,6 +261,20 @@ impl TrackingDataArc {
         );
 
         self.measurements = new_measurements;
+        self
+    }
+
+    /// Returns a new tracking arc that contains measurements from all trackers except the one provided
+    pub fn exclude_measurement_type(mut self, excluded_type: MeasurementType) -> Self {
+        self.measurements = self
+            .measurements
+            .iter_mut()
+            .map(|(epoch, msr)| {
+                msr.data.retain(|msr_type, _| *msr_type != excluded_type);
+
+                (*epoch, msr.clone())
+            })
+            .collect::<BTreeMap<Epoch, Measurement>>();
         self
     }
 

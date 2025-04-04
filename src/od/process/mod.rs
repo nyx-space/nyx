@@ -144,7 +144,6 @@ where
             almanac
         );
         me.process_noise.push(process_noise);
-        
         me
     }
 
@@ -219,7 +218,6 @@ where
             prop_instance.set_step(max_step, false);
         }
 
-        
         let prop_time = arc.end_epoch().unwrap() - initial_estimate.epoch();
         info!("Navigation propagating for a total of {prop_time} with step size {max_step}");
 
@@ -253,6 +251,7 @@ where
         let mut traj: Traj<D::StateType> = Traj::new();
 
         let mut msr_accepted_cnt: usize = 0;
+        let mut msr_rejected_cnt: usize = 0;
         let tick = Epoch::now().unwrap();
 
         for (msr_cnt, (epoch_ref, msr)) in measurements.iter().enumerate() {
@@ -378,37 +377,36 @@ where
                                         real_obs += obs_ambiguity;
                                     }
 
-                                    match kf.measurement_update(
+                                    let (estimate, mut residual, gain) = kf.measurement_update(
                                         nominal_state,
                                         real_obs,
                                         computed_obs,
                                         measurement_covar,
                                         h_tilde,
                                         resid_crit,
-                                    ) {
-                                        Ok((estimate, mut residual, gain)) => {
-                                            debug!("processed measurement #{msr_cnt} for {cur_msr_types:?} @ {epoch} from {}", device.name());
+                                    )?;
 
-                                            residual.tracker = Some(device.name());
-                                            residual.msr_types = cur_msr_types;
+                                    debug!("processed measurement #{msr_cnt} for {cur_msr_types:?} @ {epoch} from {}", device.name());
 
-                                            if residual.rejected {
-                                                msr_rejected = true;
-                                            }
+                                    residual.tracker = Some(device.name());
+                                    residual.msr_types = cur_msr_types;
 
-                                            if kf.replace_state() {
-                                                prop_instance.state = estimate.state();
-                                            }
-
-                                            prop_instance.state.reset_stm();
-
-                                            od_sol
-                                                .push_measurement_update(estimate, residual, gain);
-                                        }
-                                        Err(e) => return Err(e),
+                                    if residual.rejected {
+                                        msr_rejected = true;
                                     }
+
+                                    if kf.replace_state() {
+                                        prop_instance.state = estimate.state();
+                                    }
+
+                                    prop_instance.state.reset_stm();
+
+                                    od_sol
+                                        .push_measurement_update(estimate, residual, gain);
                                 }
-                                if !msr_rejected {
+                                if msr_rejected {
+                                    msr_rejected_cnt += 1;
+                                } else {
                                     msr_accepted_cnt += 1;
                                 }
                             } else {
@@ -425,12 +423,11 @@ where
 
                     let msr_prct = (10.0 * (msr_cnt as f64) / (num_msrs as f64)) as usize;
                     if !reported[msr_prct] {
-                        let num_rejected = msr_cnt - msr_accepted_cnt.saturating_sub(1);
                         let msg = format!(
                             "{:>3}% done - {msr_accepted_cnt:.0} measurements accepted, {:.0} rejected",
-                            10 * msr_prct, num_rejected
+                            10 * msr_prct, msr_rejected_cnt
                         );
-                        if msr_accepted_cnt < num_rejected {
+                        if msr_accepted_cnt < msr_rejected_cnt {
                             warn!("{msg}");
                         } else {
                             info!("{msg}");

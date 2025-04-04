@@ -276,18 +276,30 @@ where
         hdrs.append(&mut msr_fields);
 
         // Add the filter gain columns
-        for i in 0..state_items.len() {
-            for f in &self.measurement_types {
-                hdrs.push(Field::new(
-                    format!(
-                        "Gain {}*{f:?} ({}*{})",
-                        state_items[i],
-                        cov_units[i],
-                        f.unit()
-                    ),
-                    DataType::Float64,
-                    true,
-                ));
+        if self.measurement_types.len() == MsrSize::USIZE {
+            for i in 0..state_items.len() {
+                for f in &self.measurement_types {
+                    hdrs.push(Field::new(
+                        format!(
+                            "Gain {}*{f:?} ({}*{})",
+                            state_items[i],
+                            cov_units[i],
+                            f.unit()
+                        ),
+                        DataType::Float64,
+                        true,
+                    ));
+                }
+            }
+        } else {
+            for state_item in &state_items {
+                for j in 0..MsrSize::USIZE {
+                    hdrs.push(Field::new(
+                        format!("Gain {}*[{j}]", state_item),
+                        DataType::Float64,
+                        true,
+                    ));
+                }
             }
         }
 

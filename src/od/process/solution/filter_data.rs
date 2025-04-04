@@ -265,10 +265,7 @@ where
     pub fn at(&self, epoch: Epoch) -> Option<ODRecord<StateType, EstType, MsrSize>> {
         if let Ok(index) = self
             .estimates
-            .iter()
-            .map(|est| est.epoch())
-            .collect::<Vec<Epoch>>()
-            .binary_search(&epoch)
+            .binary_search_by(|est| est.epoch().cmp(&epoch))
         {
             Some(ODRecord {
                 estimate: self.estimates[index].clone(),

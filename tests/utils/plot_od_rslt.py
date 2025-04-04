@@ -66,7 +66,13 @@ def main(path: str, wstats: bool):
         fig.update_layout(yaxis_title=unit)
         fig.show()
 
+    # Plot the residual ratios
+    px.scatter(df, x="Epoch (UTC)", y="Residual ratio", color="Tracker").show()
+
     if wstats:
+        for msr in msr_types:
+            px.scatter(df, x="Epoch (UTC)", y=[f"Real observation: {msr}", f"Computed observation: {msr}"]).show()
+
         # Convert the Polars column to a NumPy array for compatibility with scipy and Plotly
         residual_ratio = df["Residual ratio"].drop_nulls().to_numpy()
 
@@ -111,9 +117,6 @@ def main(path: str, wstats: bool):
             marginal="rug",  # can be `box`, `violin`
             hover_data=df.columns,
         ).show()
-
-        # Plot the residual ratios and whether they were accepted.
-        px.scatter(df, x="Epoch (UTC)", y="Residual ratio", color="Tracker").show()
 
         # Plot the filter gains or filter-smoother ratios
         if is_filter_run:
