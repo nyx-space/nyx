@@ -1190,17 +1190,14 @@ fn od_tb_ckf_map_covar(almanac: Arc<Almanac>) {
 
     let initial_estimate = KfEstimate::from_covar(Spacecraft::from(initial_state), init_covar);
 
-    let odp: SpacecraftKalmanOD = SpacecraftKalmanOD::new(
-        setup,
-        KalmanVariant::DeviationTracking,
-        None,
-        BTreeMap::new(),
-        almanac,
-    );
+    let odp = SpacecraftKalmanOD::builder()
+        .prop(setup)
+        .kf_variant(KalmanVariant::DeviationTracking)
+        .max_step(30.seconds())
+        .almanac(almanac)
+        .build();
 
-    let od_sol = odp
-        .predict_for(initial_estimate, 30.seconds(), duration)
-        .unwrap();
+    let od_sol = odp.predict_for(initial_estimate, duration).unwrap();
 
     // Check that the covariance inflated (we don't get the norm of the estimate because it's zero without any truth data)
     let estimates = od_sol.estimates;

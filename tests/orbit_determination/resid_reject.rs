@@ -178,7 +178,7 @@ fn initial_estimate(traj: Traj<Spacecraft>) -> KfEstimate<Spacecraft> {
     initial_estimate
 }
 
-#[ignore = "large state deviations to be handled in #416"]
+// #[ignore = "large state deviations to be handled in #416"]
 #[rstest]
 fn od_resid_reject_inflated_snc_ckf_two_way(
     traj: Traj<Spacecraft>,

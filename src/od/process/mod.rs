@@ -33,18 +33,19 @@ use solution::kalman::KalmanVariant;
 use std::collections::BTreeMap;
 use std::marker::PhantomData;
 use std::ops::Add;
+use typed_builder::TypedBuilder;
 
-mod conf;
-pub use conf::{IterationConf, SmoothingArc};
 mod rejectcrit;
 use self::kalman::KalmanFilter;
 use self::msr::TrackingDataArc;
 pub use self::rejectcrit::ResidRejectCrit;
 mod solution;
 pub use solution::ODSolution;
+mod initializers;
 
 /// An orbit determination process (ODP) which filters OD measurements through a Kalman filter.
-#[derive(Clone)]
+#[derive(Clone, TypedBuilder)]
+#[builder(doc)]
 #[allow(clippy::upper_case_acronyms)]
 pub struct KalmanODProcess<
     D: Dynamics,
@@ -72,14 +73,25 @@ pub struct KalmanODProcess<
     /// Propagator used for the estimation
     pub prop: Propagator<D>,
     /// Kalman filter variant
+    #[builder(default)]
     pub kf_variant: KalmanVariant,
     /// Residual rejection criteria allows preventing bad measurements from affecting the estimation.
+    #[builder(default, setter(strip_option))]
     pub resid_crit: Option<ResidRejectCrit>,
     /// Tracking devices
+    #[builder(default_code = "BTreeMap::new()")]
     pub devices: BTreeMap<String, Trk>,
     /// A sets of process noise (usually noted Q), must be ordered chronologically
+    #[builder(default_code = "vec![]")]
     pub process_noise: Vec<ProcessNoise<Accel>>,
+    /// Maximum step size where the STM linearization is assumed correct (1 minute is usually fine)
+    #[builder(default_code = "1 * Unit::Minute")]
+    pub max_step: Duration,
+    /// Precision of the measurement epoch when processing measurements.
+    #[builder(default_code = "1 * Unit::Microsecond")]
+    pub epoch_precision: Duration,
     pub almanac: Arc<Almanac>,
+    #[builder(default_code = "PhantomData::<MsrSize>")]
     _msr_size: PhantomData<MsrSize>,
 }
 
@@ -108,58 +120,6 @@ where
         + Allocator<Accel, <D::StateType as State>::Size>
         + Allocator<nalgebra::Const<1>, MsrSize>,
 {
-    /// Initialize a new orbit determination process with an optional trigger to switch from a CKF to an EKF.
-    pub fn new(
-        prop: Propagator<D>,
-        kf_variant: KalmanVariant,
-        resid_crit: Option<ResidRejectCrit>,
-        devices: BTreeMap<String, Trk>,
-        almanac: Arc<Almanac>,
-    ) -> Self {
-        Self {
-            prop,
-            kf_variant,
-            devices,
-            resid_crit,
-            process_noise: vec![],
-            almanac,
-            _msr_size: PhantomData::<MsrSize>,
-        }
-    }
-
-    /// Set (or replaces) the existing process noise configuration.
-    pub fn from_process_noise(
-        prop: Propagator<D>,
-        kf_variant: KalmanVariant,
-        devices: BTreeMap<String, Trk>,
-        resid_crit: Option<ResidRejectCrit>,
-        process_noise: ProcessNoise<Accel>,
-        almanac: Arc<Almanac>,
-    ) -> Self {
-        let mut me = Self::new(
-            prop,
-            kf_variant,
-            resid_crit,
-            devices,
-            almanac
-        );
-        me.process_noise.push(process_noise);
-        me
-    }
-
-    /// Set (or replaces) the existing process noise configuration.
-    pub fn with_process_noise(mut self, process_noise: ProcessNoise<Accel>) -> Self {
-        self.process_noise.clear();
-        self.process_noise.push(process_noise);
-        self
-    }
-
-    /// Pushes the provided process noise to the list the existing process noise configurations.
-    pub fn and_with_process_noise(mut self, process_noise: ProcessNoise<Accel>) -> Self {
-        self.process_noise.push(process_noise);
-        self
-    }
-
     /// Process the provided tracking arc for this orbit determination process.
     #[allow(clippy::erasing_op)]
     pub fn process_arc(
@@ -179,19 +139,9 @@ where
             }
         );
 
-        let max_step = match arc.min_duration_sep() {
-            Some(step_size) => step_size,
-            None => {
-                return Err(ODError::TooFewMeasurements {
-                    action: "determining the minimum step size",
-                    need: 2,
-                })
-            }
-        };
-
         ensure!(
-            !max_step.is_negative() && max_step != Duration::ZERO,
-            StepSizeSnafu { step: max_step }
+            !self.max_step.is_negative() && self.max_step != Duration::ZERO,
+            StepSizeSnafu { step: self.max_step }
         );
 
         // Check proper configuration.
@@ -215,11 +165,11 @@ where
 
         // Update the step size of the navigation propagator if it isn't already fixed step
         if !prop_instance.fixed_step {
-            prop_instance.set_step(max_step, false);
+            prop_instance.set_step(self.max_step, false);
         }
 
         let prop_time = arc.end_epoch().unwrap() - initial_estimate.epoch();
-        info!("Navigation propagating for a total of {prop_time} with step size {max_step}");
+        info!("Navigation propagating for a total of {prop_time} with step size {}", self.max_step);
 
         let resid_crit = if arc.force_reject {
             warn!("Rejecting all measurements from {arc} as requested");
@@ -262,7 +212,7 @@ where
                 let delta_t = next_msr_epoch - epoch;
 
                 // Propagator for the minimum time between the maximum step size, the next step size, and the duration to the next measurement.
-                let next_step_size = delta_t.min(prop_instance.step_size).min(max_step);
+                let next_step_size = delta_t.min(prop_instance.step_size).min(self.max_step);
 
                 // Remove old states from the trajectory
                 // This is a manual implementation of `retaint` because we know it's a sorted vec, so no need to resort every time
@@ -294,8 +244,7 @@ where
                 epoch = nominal_state.epoch();
 
                 // Perform a measurement update, accounting for possible errors in measurement timestamps
-                // TODO: Move epoch precision to process configuration.
-                if (nominal_state.epoch() - next_msr_epoch).abs() < Unit::Microsecond * 1 {
+                if (nominal_state.epoch() - next_msr_epoch).abs() < self.epoch_precision {
                     // Get the computed observations
                     match devices.get_mut(&msr.tracker) {
                         Some(device) => {
@@ -467,7 +416,6 @@ where
     pub fn predict_until(
         &self,
         initial_estimate: KfEstimate<D::StateType>,
-        step: Duration,
         end_epoch: Epoch,
     ) -> Result<ODSolution<D::StateType, KfEstimate<D::StateType>, MsrSize, Trk>, ODError> {
         // Initialize the solution with no measurement types.
@@ -486,10 +434,10 @@ where
         };
 
         let prop_time = end_epoch - kf.previous_estimate().epoch();
-        info!("Mapping covariance for {prop_time} until {end_epoch} with {step} step");
+        info!("Mapping covariance for {prop_time} every {} until {end_epoch}", self.max_step);
 
         loop {
-            let nominal_state = prop_instance.for_duration(step).context(ODPropSnafu)?;
+            let nominal_state = prop_instance.for_duration(self.max_step).context(ODPropSnafu)?;
             // Extract the state and update the STM in the filter.
             // Get the datetime and info needed to compute the theoretical measurement according to the model
             let epoch = nominal_state.epoch();
@@ -514,10 +462,9 @@ where
     pub fn predict_for(
         &self,
         initial_estimate: KfEstimate<D::StateType>,
-        step: Duration,
         duration: Duration,
     ) -> Result<ODSolution<D::StateType, KfEstimate<D::StateType>, MsrSize, Trk>, ODError> {
         let end_epoch = initial_estimate.nominal_state().epoch() + duration;
-        self.predict_until(initial_estimate, step, end_epoch)
+        self.predict_until(initial_estimate, end_epoch)
     }
 }

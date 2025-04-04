@@ -121,10 +121,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         almanac.clone(),
     );
 
-    // Define the prediction step, i.e. how often we want to know the covariance.
-    let step = 1_i64.minutes();
+    // The prediction step is 1 minute by default, configured in the OD process, i.e. how often we want to know the covariance.
+    assert_eq!(odp.max_step, 1_i64.minutes());
     // Finally, predict, and export the trajectory with covariance to a parquet file.
-    let od_sol = odp.predict_for(jwst_estimate, step, prediction_duration)?;
+    let od_sol = odp.predict_for(jwst_estimate, prediction_duration)?;
     od_sol.to_parquet("./02_jwst_covar_map.parquet", ExportCfg::default())?;
 
     // === Monte Carlo framework ===
