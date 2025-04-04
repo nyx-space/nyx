@@ -239,7 +239,7 @@ mod trkconfig_ut {
         let trkconfg_yaml: PathBuf = [
             &env::var("CARGO_MANIFEST_DIR").unwrap(),
             "data",
-            "tests",
+            "03_tests",
             "config",
             "tracking_cfg.yaml",
         ]

@@ -19,10 +19,10 @@ use nyx::{
     io::{ConfigRepr, ExportCfg},
     md::prelude::{HarmonicsMem, Traj},
     od::{
-        prelude::{TrackingArcSim, TrkConfig, KF},
-        process::{EkfTrigger, Estimate, NavSolution, ResidRejectCrit, SpacecraftUncertainty},
+        prelude::{KalmanVariant, TrackingArcSim, TrkConfig},
+        process::{Estimate, NavSolution, ResidRejectCrit, SpacecraftUncertainty},
         snc::ProcessNoise3D,
-        GroundStation, SpacecraftODProcess,
+        GroundStation, SpacecraftKalmanOD,
     },
     propagators::Propagator,
     Orbit, Spacecraft, State,
@@ -257,38 +257,42 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("{process_noise}");
 
-    let kf = KF::new(
-        // Increase the initial covariance to account for larger deviation.
-        initial_estimate,
-        process_noise,
-    );
-
     // We'll set up the OD process to reject measurements whose residuals are move than 3 sigmas away from what we expect.
-    let mut odp = SpacecraftODProcess::ekf(
-        setup.with(initial_estimate.state().with_stm(), almanac.clone()),
-        kf,
-        devices,
-        EkfTrigger::new(0, Unit::Hour * 1),
+    let odp = SpacecraftKalmanOD::new(
+        setup,
+        KalmanVariant::ReferenceUpdate,
         Some(ResidRejectCrit::default()),
+        devices,
         almanac.clone(),
-    );
+    )
+    .with_process_noise(process_noise);
 
-    odp.process_arc(&arc)?;
+    let od_sol = odp.process_arc(initial_estimate, &arc)?;
 
     let ric_err = traj_as_flown
-        .at(odp.estimates.last().unwrap().epoch())?
+        .at(od_sol.estimates.last().unwrap().epoch())?
         .orbit
-        .ric_difference(&odp.estimates.last().unwrap().orbital_state())?;
+        .ric_difference(&od_sol.estimates.last().unwrap().orbital_state())?;
     println!("== RIC at end ==");
     println!("RIC Position (m): {}", ric_err.radius_km * 1e3);
     println!("RIC Velocity (m/s): {}", ric_err.velocity_km_s * 1e3);
 
-    odp.to_parquet(&arc, "./04_lro_od_results.parquet", ExportCfg::default())?;
+    println!(
+        "Num residuals rejected: #{}",
+        od_sol.rejected_residuals().len()
+    );
+    println!(
+        "Percentage within +/-3: {}",
+        od_sol.residual_ratio_within_threshold(3.0).unwrap()
+    );
+    println!("Ratios normal? {}", od_sol.is_normal(None).unwrap());
+
+    od_sol.to_parquet("./04_lro_od_results.parquet", ExportCfg::default())?;
 
     // In our case, we have the truth trajectory from NASA.
     // So we can compute the RIC state difference between the real LRO ephem and what we've just estimated.
     // Export the OD trajectory first.
-    let od_trajectory = odp.to_traj()?;
+    let od_trajectory = od_sol.to_traj()?;
     // Build the RIC difference.
     od_trajectory.ric_diff_to_parquet(
         &traj_as_flown,

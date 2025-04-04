@@ -644,7 +644,7 @@ mod ut_ccsds_oem {
         let path: PathBuf = [
             env!("CARGO_MANIFEST_DIR"),
             "data",
-            "tests",
+            "03_tests",
             "ccsds",
             "oem",
             "LEO_10s.oem",
@@ -667,7 +667,7 @@ mod ut_ccsds_oem {
         let path: PathBuf = [
             env!("CARGO_MANIFEST_DIR"),
             "data",
-            "tests",
+            "03_tests",
             "ccsds",
             "oem",
             "MEO_60s.oem",
@@ -692,7 +692,7 @@ mod ut_ccsds_oem {
         let path: PathBuf = [
             env!("CARGO_MANIFEST_DIR"),
             "data",
-            "tests",
+            "03_tests",
             "ccsds",
             "oem",
             "GEO_20s.oem",
@@ -718,7 +718,8 @@ mod ut_ccsds_oem {
 
         let path: PathBuf = [
             env!("CARGO_MANIFEST_DIR"),
-            "output_data",
+            "data",
+            "04_output",
             "GEO_20s_rebuilt.oem",
         ]
         .iter()
@@ -770,11 +771,15 @@ mod ut_ccsds_oem {
         let almanac = Almanac::new(
             &manifest_dir
                 .clone()
-                .join("data/pck08.pca")
+                .join("data/01_planetary/pck08.pca")
                 .to_string_lossy(),
         )
         .unwrap()
-        .load(&manifest_dir.join("data/de440s.bsp").to_string_lossy())
+        .load(
+            &manifest_dir
+                .join("data/01_planetary/de440s.bsp")
+                .to_string_lossy(),
+        )
         .unwrap();
 
         let epoch = Epoch::from_str("2022-06-13T12:00:00").unwrap();
@@ -800,9 +805,14 @@ mod ut_ccsds_oem {
         traj.name = Some("TEST_MOON_OBJ".to_string());
 
         // Export CCSDS OEM file
-        let path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "output_data", "moon_45days.oem"]
-            .iter()
-            .collect();
+        let path: PathBuf = [
+            env!("CARGO_MANIFEST_DIR"),
+            "data",
+            "04_output",
+            "moon_45days.oem",
+        ]
+        .iter()
+        .collect();
 
         let out_path = traj.to_oem_file(path, ExportCfg::default()).unwrap();
 

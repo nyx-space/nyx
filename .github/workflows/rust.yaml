@@ -36,7 +36,6 @@ jobs:
     strategy:
       matrix:
         rust:
-          #- { version: "1.70", name: MSRV } # Reenable this before stablizing version 2.0
           - { version: stable, name: stable }
 
     runs-on: ubuntu-latest
@@ -53,10 +52,9 @@ jobs:
 
       - name: Download data
         run: |
-          wget -O data/de440s.bsp http://public-data.nyxspace.com/anise/de440s.bsp
-          wget -O data/de440s.bsp http://public-data.nyxspace.com/anise/de438.bsp # GMAT validation cases
-          wget -O data/pck08.pca http://public-data.nyxspace.com/anise/v0.4/pck08.pca
-          wget -O data/earth_latest_high_prec.bpc http://public-data.nyxspace.com/anise/ci/earth_latest_high_prec-2023-09-08.bpc
+          wget -O data/01_planetary/de440s.bsp http://public-data.nyxspace.com/anise/de440s.bsp
+          wget -O data/01_planetary/pck08.pca http://public-data.nyxspace.com/anise/v0.5/pck08.pca
+          wget -O data/01_planetary/earth_latest_high_prec.bpc http://public-data.nyxspace.com/anise/ci/earth_latest_high_prec-2023-09-08.bpc
 
       - name: Set up cargo cache
         uses: actions/cache@v3
@@ -73,11 +71,7 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo-
 
       - name: Unit Test (debug)
-        run: |
-         cat /home/runner/work/nyx/nyx/data/tests/config/many_ground_stations.yaml
-         cat /home/runner/work/nyx/nyx/data/tests/config/one_ground_station.yaml
-         ls -lh /home/runner/work/nyx/nyx/data/tests/config/
-         cargo test --lib
+        run: ls -lR data/ && cargo test --lib
 
       - name: All integration tests (release)
         run: cargo test --release --test "*"
@@ -109,10 +103,9 @@ jobs:
 
       - name: Download data
         run: |
-          wget -O data/de440s.bsp http://public-data.nyxspace.com/anise/de440s.bsp
-          wget -O data/de440s.bsp http://public-data.nyxspace.com/anise/de438.bsp # GMAT validation cases
-          wget -O data/pck08.pca http://public-data.nyxspace.com/anise/v0.4/pck08.pca
-          wget -O data/earth_latest_high_prec.bpc http://public-data.nyxspace.com/anise/ci/earth_latest_high_prec-2023-09-08.bpc
+          wget -O data/01_planetary/de440s.bsp http://public-data.nyxspace.com/anise/de440s.bsp
+          wget -O data/01_planetary/pck08.pca http://public-data.nyxspace.com/anise/v0.5/pck08.pca
+          wget -O data/01_planetary/earth_latest_high_prec.bpc http://public-data.nyxspace.com/anise/ci/earth_latest_high_prec-2023-09-08.bpc
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov

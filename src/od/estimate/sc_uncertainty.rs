@@ -110,12 +110,12 @@ impl SpacecraftUncertainty {
             ]));
 
         let other_cov = SMatrix::<f64, 6, 6>::from_diagonal(&SVector::<f64, 6>::from_iterator([
-            orbit_vec[0],
-            orbit_vec[1],
-            orbit_vec[2],
-            orbit_vec[3],
-            orbit_vec[4],
-            orbit_vec[5],
+            orbit_vec[0].powi(2),
+            orbit_vec[1].powi(2),
+            orbit_vec[2].powi(2),
+            orbit_vec[3].powi(2),
+            orbit_vec[4].powi(2),
+            orbit_vec[5].powi(2),
         ]));
 
         let rot_covar =
@@ -123,7 +123,7 @@ impl SpacecraftUncertainty {
 
         for i in 0..6 {
             for j in 0..6 {
-                init_covar[(i, j)] = rot_covar[(i, j)].powi(2);
+                init_covar[(i, j)] = rot_covar[(i, j)];
             }
         }
 
@@ -254,7 +254,7 @@ mod ut_sc_uncertainty {
         println!("{estimate}");
 
         let sma_sigma_km = estimate.sigma_for(StateParameter::SMA).unwrap();
-        assert!((sma_sigma_km - 1.352808889337306).abs() < f64::EPSILON);
+        assert!((sma_sigma_km - 1.3528088887049263).abs() < f64::EPSILON);
 
         let covar_keplerian = estimate.keplerian_covar();
         for i in 1..=3 {

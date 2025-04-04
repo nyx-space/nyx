@@ -21,6 +21,7 @@ pub use crate::dynamics::{Dynamics, NyxError};
 use crate::errors::StateError;
 use crate::io::{ConfigError, InputOutputError};
 use crate::linalg::OVector;
+use crate::md::prelude::SpacecraftDynamics;
 use crate::md::trajectory::TrajError;
 use crate::propagators::PropagationError;
 use crate::time::Epoch;
@@ -31,8 +32,7 @@ use hifitime::Duration;
 use snafu::prelude::Snafu;
 use std::sync::Arc;
 
-pub mod filter;
-pub use filter::Filter;
+pub mod kalman;
 
 /// Provides a range and range rate measuring models.
 mod ground_station;
@@ -59,30 +59,27 @@ pub use simulator::TrackingDevice;
 pub mod snc;
 
 /// A helper type for spacecraft orbit determination.
-pub type SpacecraftODProcess<'a> = self::process::ODProcess<
-    'a,
-    crate::md::prelude::SpacecraftDynamics,
+pub type SpacecraftKalmanOD = self::process::KalmanODProcess<
+    SpacecraftDynamics,
     nalgebra::Const<2>,
     nalgebra::Const<3>,
-    filter::kalman::KF<crate::Spacecraft, nalgebra::Const<3>>,
     GroundStation,
 >;
 
 /// A helper type for spacecraft orbit determination sequentially processing measurements
-pub type SpacecraftODProcessSeq<'a> = self::process::ODProcess<
-    'a,
-    crate::md::prelude::SpacecraftDynamics,
+pub type SpacecraftKalmanScalarOD = self::process::KalmanODProcess<
+    SpacecraftDynamics,
     nalgebra::Const<1>,
     nalgebra::Const<3>,
-    filter::kalman::KF<crate::Spacecraft, nalgebra::Const<3>>,
     GroundStation,
 >;
 
 #[allow(unused_imports)]
 pub mod prelude {
     pub use super::estimate::*;
-    pub use super::filter::kalman::*;
     pub use super::ground_station::*;
+    pub use super::kalman::KalmanVariant;
+    pub use super::kalman::*;
     pub use super::msr::*;
     pub use super::noise::{GaussMarkov, StochasticNoise, WhiteNoise};
     pub use super::process::*;

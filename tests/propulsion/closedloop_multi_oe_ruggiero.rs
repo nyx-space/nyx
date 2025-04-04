@@ -384,7 +384,7 @@ fn qlaw_as_ruggiero_case_f(almanac: Arc<Almanac>) {
         .unwrap();
 
     // Save as parquet
-    traj.to_parquet_simple("output_data/rugg_case_f.parquet", almanac)
+    traj.to_parquet_simple("data/04_output/rugg_case_f.parquet", almanac)
         .unwrap();
 
     let prop_usage = prop_mass - final_state.mass.prop_mass_kg;

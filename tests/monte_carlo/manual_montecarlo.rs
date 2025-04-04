@@ -39,7 +39,8 @@ fn multi_thread_monte_carlo_demo(almanac: Arc<Almanac>) {
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
 
-    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
+    let earth_sph_harm =
+        HarmonicsMem::from_cof("data/01_planetary/JGM3.cof.gz", 70, 70, true).unwrap();
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm);
 
     let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);

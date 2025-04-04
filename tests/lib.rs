@@ -23,13 +23,13 @@ fn base_almanac() -> Almanac {
     Almanac::new(
         &manifest_dir
             .clone()
-            .join("data/pck08.pca")
+            .join("data/01_planetary/pck08.pca")
             .to_string_lossy(),
     )
     .unwrap()
     .load(
         &manifest_dir
-            .join("data/earth_latest_high_prec.bpc")
+            .join("data/01_planetary/earth_latest_high_prec.bpc")
             .to_string_lossy(),
     )
     .unwrap()
@@ -42,7 +42,11 @@ pub fn test_almanac() -> Almanac {
         PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string()));
 
     base_almanac()
-        .load(&manifest_dir.join("data/de440s.bsp").to_string_lossy())
+        .load(
+            &manifest_dir
+                .join("data/01_planetary/de440s.bsp")
+                .to_string_lossy(),
+        )
         .unwrap()
 }
 

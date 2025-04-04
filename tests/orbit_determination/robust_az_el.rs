@@ -250,11 +250,6 @@ fn od_robust_test_ekf_rng_dop_az_el(
 ) {
     let _ = pretty_env_logger::try_init();
 
-    // Define the ground stations.
-    let ekf_num_meas = 10;
-    // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 30 * Unit::Minute;
-
     // Define the tracking configurations
     let mut configs = BTreeMap::new();
     for name in devices.keys() {
@@ -291,7 +286,8 @@ fn od_robust_test_ekf_rng_dop_az_el(
     // And serialize to disk
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "output_data",
+        "data",
+        "04_output",
         "ekf_rng_dpl_az_el_arc.parquet",
     ]
     .iter()
@@ -304,43 +300,32 @@ fn od_robust_test_ekf_rng_dop_az_el(
     let reloaded = TrackingDataArc::from_parquet(&path).unwrap();
     assert_eq!(reloaded, arc);
 
-    let prop_est = estimator_setup.with(initial_state_dev.with_stm(), almanac.clone());
-
     // Define the process noise to assume an unmodeled acceleration on X, Y and Z in the EME2000 frame
     let sigma_q = 5e-10_f64.powi(2);
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
 
-    let trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
-
     // Run with all data simultaneously
-    let mut odp_simul = ODProcess::<
-        SpacecraftDynamics,
-        Const<4>,
-        Const<3>,
-        KF<Spacecraft, Const<3>>,
-        GroundStation,
-    >::ekf(
-        prop_est,
-        KF::new(initial_estimate, process_noise.clone()),
-        devices.clone(),
-        trig,
+    let odp_simul = KalmanODProcess::<SpacecraftDynamics, Const<4>, Const<3>, GroundStation>::new(
+        estimator_setup.clone(),
+        KalmanVariant::ReferenceUpdate,
         Some(ResidRejectCrit::default()),
+        devices.clone(),
         almanac.clone(),
-    );
+    )
+    .with_process_noise(process_noise.clone());
 
-    odp_simul.process_arc(&arc).unwrap();
+    let od_simul_sol = odp_simul.process_arc(initial_estimate, &arc).unwrap();
 
-    odp_simul
+    od_simul_sol
         .to_parquet(
-            &arc,
             path.with_file_name("ekf_rng_dpl_az_el_odp.parquet"),
             ExportCfg::default(),
         )
         .unwrap();
 
     // Check that the covariance deflated
-    let est = &odp_simul.estimates[odp_simul.estimates.len() - 1];
+    let est = &od_simul_sol.estimates[od_simul_sol.estimates.len() - 1];
     let final_truth_state = traj.at(est.epoch()).unwrap();
 
     println!("Estimate:\n{}", est);
@@ -392,18 +377,17 @@ fn od_robust_test_ekf_rng_dop_az_el(
     }
 
     // We get the best results with all data simultaneously, let's rerun with then two-by-two.
-    let prop_est = estimator_setup.with(initial_state_dev.with_stm(), almanac.clone());
-    let mut odp_2by2 = SpacecraftODProcess::ekf(
-        prop_est,
-        KF::new(initial_estimate, process_noise.clone()),
-        devices.clone(),
-        trig,
+    let odp_2by2 = SpacecraftKalmanOD::new(
+        estimator_setup.clone(),
+        KalmanVariant::ReferenceUpdate,
         None,
+        devices.clone(),
         almanac.clone(),
-    );
+    )
+    .with_process_noise(process_noise.clone());
 
-    odp_2by2.process_arc(&arc).unwrap();
-    let est_2by2 = &odp_2by2.estimates[odp_2by2.estimates.len() - 1];
+    let od_2by2_sol = odp_2by2.process_arc(initial_estimate, &arc).unwrap();
+    let est_2by2 = &od_2by2_sol.estimates[od_2by2_sol.estimates.len() - 1];
 
     let delta = (est_2by2.state().orbit - final_truth_state.orbit).unwrap();
     println!(
@@ -439,18 +423,17 @@ fn od_robust_test_ekf_rng_dop_az_el(
         );
     }
     // Rerun processing measurements one by one like in ODTK
-    let prop_est = estimator_setup.with(initial_state_dev.with_stm(), almanac.clone());
-    let mut odp_1by1 = SpacecraftODProcessSeq::ekf(
-        prop_est,
-        KF::new(initial_estimate, process_noise.clone()),
-        devices,
-        trig,
+    let odp_1by1 = SpacecraftKalmanScalarOD::new(
+        estimator_setup,
+        KalmanVariant::ReferenceUpdate,
         None,
+        devices,
         almanac,
-    );
+    )
+    .with_process_noise(process_noise.clone());
 
-    odp_1by1.process_arc(&arc).unwrap();
-    let est_1by1 = &odp_1by1.estimates[odp_1by1.estimates.len() - 1];
+    let od_1by1_sol = odp_1by1.process_arc(initial_estimate, &arc).unwrap();
+    let est_1by1 = &od_1by1_sol.estimates[od_1by1_sol.estimates.len() - 1];
 
     let delta = (est_1by1.state().orbit - final_truth_state.orbit).unwrap();
     println!(
