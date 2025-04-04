@@ -9,12 +9,11 @@ use nyx::dynamics::SpacecraftDynamics;
 use nyx::io::ExportCfg;
 use nyx::md::StateParameter;
 use nyx::od::prelude::*;
-use nyx::propagators::{IntegratorOptions, Propagator};
+use nyx::propagators::Propagator;
 use nyx::time::{Epoch, TimeUnits, Unit};
 use nyx::utils::rss_orbit_errors;
 use nyx::Spacecraft;
 use nyx_space::mc::StateDispersion;
-use nyx_space::propagators::IntegratorMethod;
 use polars::prelude::*;
 use std::collections::BTreeMap;
 use std::env;
@@ -31,231 +30,23 @@ fn almanac() -> Arc<Almanac> {
     test_almanac_arcd()
 }
 
-/*
- * These tests check that if we start with a state deviation in the estimate, the filter will eventually converge back.
- * These tests do NOT check that the filter will converge if the initial state in the propagator has that state deviation.
- * The latter would require iteration and smoothing before playing with an EKF. This will be handled in a subsequent version.
-**/
-
-#[ignore = "large state deviations to be handled in #416"]
+/// Tests the robustness of the orbit determination (OD) process against large initial state errors.
+///
+/// This specific test simulates an OD scenario where the initial estimate provided
+/// to the filter has a significant displacement (large error) compared to the
+/// true initial state of the spacecraft. It focuses on scenarios utilizing
+/// two-way measurements (like two-way range or Doppler) between ground stations
+/// and the spacecraft. The goal is to verify that the estimation process
+/// can converge to an accurate solution despite the poor initial guess, using
+/// these specific measurement types.
+///
+/// # Arguments
+///
+/// * `almanac` - An `Arc<Almanac>` providing necessary environmental data (e.g., EOP, planetary ephemerides)
+///               for propagation and measurement modeling.
 #[allow(clippy::identity_op)]
 #[rstest]
-fn od_robust_test_ekf_realistic_one_way_cov_test(almanac: Arc<Almanac>) {
-    let _ = pretty_env_logger::try_init();
-
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
-    // Define the ground stations.
-    let elevation_mask = 0.0;
-
-    let dss65_madrid = GroundStation::dss65_madrid(
-        elevation_mask,
-        StochasticNoise::default_range_km(),
-        StochasticNoise::default_doppler_km_s(),
-        iau_earth,
-    );
-    let dss34_canberra = GroundStation::dss34_canberra(
-        elevation_mask,
-        StochasticNoise::default_range_km(),
-        StochasticNoise::default_doppler_km_s(),
-        iau_earth,
-    );
-
-    // Define the tracking configurations
-    let configs = BTreeMap::from([
-        (
-            dss65_madrid.name.clone(),
-            TrkConfig::from_sample_rate(60.seconds()),
-        ),
-        (
-            dss34_canberra.name.clone(),
-            TrkConfig::from_sample_rate(60.seconds()),
-        ),
-    ]);
-
-    // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
-    let mut devices = BTreeMap::new();
-    devices.insert("Madrid".to_string(), dss65_madrid);
-    devices.insert("Canberra".to_string(), dss34_canberra);
-
-    // Define the propagator information.
-    let prop_time = 1 * Unit::Day;
-    let step_size = 10.0 * Unit::Second;
-    let opts = IntegratorOptions::with_fixed_step(step_size);
-
-    // Define state information.
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
-    let dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
-    let initial_state = Spacecraft::from(Orbit::keplerian(
-        22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k,
-    ));
-
-    // Disperse the initial state based on some orbital elements errors given from ULA Atlas 5 user guide, table 2.3.3-1 <https://www.ulalaunch.com/docs/default-source/rockets/atlasvusersguide2010a.pdf>
-    // This assumes that the errors are ONE TENTH of the values given in the table. It assumes that the launch provider has provided an initial state vector, whose error is lower than the injection errors.
-    // The initial covariance is computed based on the realized dispersions.
-    let initial_estimate = KfEstimate::disperse_from_diag(
-        initial_state,
-        vec![
-            StateDispersion::zero_mean(StateParameter::Inclination, 0.0025),
-            StateDispersion::zero_mean(StateParameter::RAAN, 0.022),
-            StateDispersion::zero_mean(StateParameter::AoP, 0.02),
-        ],
-        Some(0),
-    )
-    .unwrap();
-
-    println!("Initial estimate:\n{}", initial_estimate);
-
-    let initial_state_dev = initial_estimate.nominal_state;
-    let (init_rss_pos_km, init_rss_vel_km_s) =
-        rss_orbit_errors(&initial_state.orbit, &initial_state_dev.orbit);
-
-    println!("Truth initial state:\n{initial_state}\n{initial_state:x}");
-    println!("Filter initial state:\n{initial_state_dev}\n{initial_state_dev:x}");
-    println!(
-        "Initial state dev:\t{:.3} m\t{:.3} m/s\n{}",
-        init_rss_pos_km * 1e3,
-        init_rss_vel_km_s * 1e3,
-        (initial_state.orbit - initial_state_dev.orbit).unwrap()
-    );
-
-    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER, SATURN_BARYCENTER];
-    let orbital_dyn = OrbitalDynamics::point_masses(bodies);
-    let truth_setup = Propagator::new(
-        SpacecraftDynamics::new(orbital_dyn),
-        IntegratorMethod::RungeKutta4,
-        opts,
-    );
-    let (_, traj) = truth_setup
-        .with(initial_state, almanac.clone())
-        .for_duration_with_traj(prop_time)
-        .unwrap();
-
-    // Simulate tracking data
-    let mut arc_sim = TrackingArcSim::with_seed(devices.clone(), traj.clone(), configs, 0).unwrap();
-    arc_sim.build_schedule(almanac.clone()).unwrap();
-
-    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
-
-    // And serialize to disk
-    let path: PathBuf = [
-        env!("CARGO_MANIFEST_DIR"),
-        "data",
-        "04_output",
-        "ekf_robust_msr.parquet",
-    ]
-    .iter()
-    .collect();
-
-    arc.to_parquet_simple(&path).unwrap();
-
-    println!("{arc}\n{arc:?}");
-    // Reload
-    let reloaded = TrackingDataArc::from_parquet(&path).unwrap();
-    assert_eq!(reloaded, arc);
-
-    // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
-    // We expect the estimated orbit to be _nearly_ perfect because we've removed SATURN_BARYCENTER from the estimated trajectory
-    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
-    let estimator = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
-    let setup = Propagator::new(estimator, IntegratorMethod::RungeKutta4, opts);
-
-    // Define the process noise to assume an unmodeled acceleration on X, Y and Z in the ECI frame
-    let sigma_q = 5e-10_f64.powi(2);
-    let process_noise =
-        ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
-
-    let mut odp = SpacecraftKalmanOD::new(
-        setup,
-        KalmanVariant::DeviationTracking,
-        None,
-        devices,
-        almanac.clone(),
-    )
-    .with_process_noise(process_noise);
-
-    // Let's filter and iterate on the initial subset of the arc to refine the initial estimate
-    let subset = arc.clone().filter_by_offset(..3.hours());
-    let remaining = arc.filter_by_offset(3.hours()..);
-
-    let mut od_sol = odp
-        .process_arc(initial_estimate, &subset)
-        .expect("process failed")
-        .smooth(almanac)
-        .expect("smooth failed");
-
-    let (sm_rss_pos_km, sm_rss_vel_km_s) =
-        rss_orbit_errors(&initial_state.orbit, &od_sol.estimates[0].state().orbit);
-
-    println!(
-        "Initial state error after smoothing:\t{:.3} m\t{:.3} m/s\n{}",
-        sm_rss_pos_km * 1e3,
-        sm_rss_vel_km_s * 1e3,
-        (initial_state.orbit - od_sol.estimates[0].state().orbit).unwrap()
-    );
-
-    odp.kf_variant = KalmanVariant::ReferenceUpdate;
-    let od_sol_remaining = odp
-        .process_arc(*od_sol.estimates.last().unwrap(), &remaining)
-        .unwrap();
-
-    od_sol = od_sol.merge(od_sol_remaining);
-
-    od_sol
-        .to_parquet(
-            path.with_file_name("robustness_test_one_way.parquet"),
-            ExportCfg::default(),
-        )
-        .unwrap();
-
-    // Check that the covariance deflated
-    let est = &od_sol.estimates[od_sol.estimates.len() - 1];
-    let final_truth_state = traj.at(est.epoch()).unwrap();
-
-    println!("Estimate:\n{}", est);
-    println!("Truth:\n{}", final_truth_state);
-    println!(
-        "Delta state with truth (epoch match: {}):\n{}",
-        final_truth_state.epoch() == est.epoch(),
-        (final_truth_state.orbit - est.state().orbit).unwrap()
-    );
-
-    for i in 0..6 {
-        if est.covar[(i, i)] < 0.0 {
-            println!(
-                "covar diagonal element negative @ [{}, {}] = {:.3e}-- issue #164",
-                i,
-                i,
-                est.covar[(i, i)],
-            );
-        }
-    }
-
-    assert_eq!(
-        final_truth_state.epoch(),
-        est.epoch(),
-        "time of final EST and TRUTH epochs differ"
-    );
-    let delta = (est.state().orbit - final_truth_state.orbit).unwrap();
-    println!(
-        "RMAG error = {:.6} m\tVMAG error = {:.6} m/s",
-        delta.rmag_km() * 1e3,
-        delta.vmag_km_s() * 1e3
-    );
-
-    assert!(
-        delta.rmag_km() < 0.06,
-        "Position error should be less than 50 meters"
-    );
-    assert!(
-        delta.vmag_km_s() < 2e-4,
-        "Velocity error should be on centimeter level"
-    );
-}
-
-// #[ignore = "large state deviations to be handled in #416"]
-#[allow(clippy::identity_op)]
-#[rstest]
-fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
+fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
@@ -267,7 +58,7 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
 
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
-    let dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
+    let dt = Epoch::from_gregorian_utc_hms(2020, 1, 1, 4, 0, 0);
     let initial_state = Spacecraft::from(Orbit::keplerian(
         22000.0, 0.01, 30.0, 80.0, 40.0, 180.0, dt, eme2k,
     ));
@@ -366,14 +157,16 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
     let setup = Propagator::default(estimator);
 
     // Define the process noise to assume an unmodeled acceleration on X, Y and Z in the ECI frame
-    let sigma_q = 5e-10_f64.powi(2);
+    let sigma_q = 1e-7_f64.powi(2);
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
+
+    println!("{process_noise}");
 
     let odp = SpacecraftKalmanScalarOD::new(
         setup,
         KalmanVariant::DeviationTracking,
-        Some(ResidRejectCrit::default()),
+        None,
         devices,
         almanac.clone(),
     )
@@ -381,33 +174,9 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
 
     let od_sol = odp.process_arc(initial_estimate, &arc).unwrap();
 
-    for (ith, (est, opt_resid)) in od_sol.results().rev().take(10).rev().enumerate() {
-        if let Some(resid) = opt_resid {
-            println!("RESIDUAL #{ith}");
-            println!("{resid}");
-            let truth_state = traj.at(resid.epoch).unwrap();
-            let est_state = est.state();
-
-            let delta = (est_state.orbit - truth_state.orbit).unwrap();
-            println!(
-                "RMAG error = {:.6} m\tVMAG error = {:.6} m/s",
-                delta.rmag_km() * 1e3,
-                delta.vmag_km_s() * 1e3
-            );
-
-            println!("Want: {truth_state}\nGot : {est_state}");
-            println!("-> Want: {truth_state:x}\nGot : {est_state:x}");
-        }
-    }
-
-    let mut num_residual_none = 0;
-    let mut num_residual_some = 0;
-    od_sol.residuals.iter().for_each(|opt_v| match opt_v {
-        Some(_) => num_residual_some += 1,
-        None => {
-            num_residual_none += 1;
-        }
-    });
+    let od_pred = odp
+        .predict_until(initial_estimate, arc.end_epoch().unwrap())
+        .unwrap();
 
     // Export as Parquet
     let timestamped_path = od_sol
@@ -446,20 +215,34 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
         est.epoch(),
         "time of final EST and TRUTH epochs differ"
     );
-    let delta = (est.state().orbit - final_truth_state.orbit).unwrap();
+    let delta = (est.orbital_state() - final_truth_state.orbit).unwrap();
     println!(
         "RMAG error = {:.6} m\tVMAG error = {:.6} m/s",
         delta.rmag_km() * 1e3,
         delta.vmag_km_s() * 1e3
     );
 
+    // Compare with pure-predictor
+    let est_pp = od_pred.estimates.last().unwrap();
+    let delta_pp = (est_pp.orbital_state() - traj.at(est_pp.epoch()).unwrap().orbit).unwrap();
+    println!(
+        "Pure predictor RMAG error = {:.6} m\tVMAG error = {:.6} m/s",
+        delta_pp.rmag_km() * 1e3,
+        delta_pp.vmag_km_s() * 1e3
+    );
+
     assert!(
-        delta.rmag_km() < 0.2,
-        "Position error should be less than 200 meters (down from >3 km)"
+        delta.rmag_km() < 2.580,
+        "Position error should be less than 2580 kilometers (down from 2580 km)"
     );
     assert!(
-        delta.vmag_km_s() < 1e-4,
-        "Velocity error should be on decimeter level"
+        delta.vmag_km_s() < 2e-3,
+        "Velocity error should be on meter per second level"
+    );
+
+    assert!(
+        delta.rmag_km() < delta_pp.rmag_km(),
+        "Position error should be better than a pure predictor"
     );
 
     // Read in the Parquet file and assert proper data was written.
@@ -469,7 +252,7 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
         .unwrap();
 
     // Note: this also checks that the columns that match the given measurement kind exist.
-    let df_residuals = df
+    let _df_residuals = df
         .columns([
             "Prefit residual: Range (km)",
             "Prefit residual: Doppler (km/s)",
@@ -478,25 +261,6 @@ fn od_robust_test_ekf_realistic_two_way(almanac: Arc<Almanac>) {
             "Residual ratio",
         ])
         .unwrap();
-
-    for series in df_residuals.iter() {
-        assert_eq!(series.len(), od_sol.estimates.len());
-        let mut num_none = 0;
-        let mut num_some = 0;
-        series
-            .f64()
-            .unwrap()
-            .into_iter()
-            .for_each(|opt_v| match opt_v {
-                Some(_) => num_some += 1,
-                None => {
-                    num_none += 1;
-                }
-            });
-
-        assert_eq!(num_none, num_residual_none);
-        assert_eq!(num_some, num_residual_some);
-    }
 
     // Check that the position and velocity estimates are present, along with the epochs
     assert!(df

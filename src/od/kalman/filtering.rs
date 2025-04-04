@@ -195,7 +195,87 @@ where
         let stm = nominal_state.stm().context(ODDynamicsSnafu)?;
 
         // Propagate the covariance.
-        let covar_bar = stm * self.prev_estimate.covar * stm.transpose();
+        let mut covar_bar = stm * self.prev_estimate.covar * stm.transpose();
+
+        // Apply any process noise as in a normal time update, if applicable
+        for (i, snc) in self.process_noise.iter().enumerate().rev() {
+            if let Some(mut snc_matrix) = snc.to_matrix(epoch) {
+                if let Some(local_frame) = snc.local_frame {
+                    // Rotate the SNC from the definition frame into the state frame.
+                    let dcm = local_frame
+                        .dcm_to_inertial(nominal_state.orbit())
+                        .context(AstroPhysicsSnafu)
+                        .context(StateAstroSnafu {
+                            param: StateParameter::Epoch,
+                        })
+                        .context(ODStateSnafu {
+                            action: "rotating SNC from definition frame into state frame",
+                        })?;
+
+                    // Note: the SNC must be a diagonal matrix, so we only update the diagonals!
+                    match A::USIZE {
+                        3 => {
+                            let new_snc = dcm.rot_mat
+                                * snc_matrix.fixed_view::<3, 3>(0, 0)
+                                * dcm.rot_mat.transpose();
+                            for i in 0..A::USIZE {
+                                snc_matrix[(i, i)] = new_snc[(i, i)];
+                            }
+                        }
+                        6 => {
+                            let new_snc = dcm.state_dcm()
+                                * snc_matrix.fixed_view::<6, 6>(0, 0)
+                                * dcm.transpose().state_dcm();
+                            for i in 0..A::USIZE {
+                                snc_matrix[(i, i)] = new_snc[(i, i)];
+                            }
+                        }
+                        _ => {
+                            return Err(ODError::ODLimitation {
+                                action: "only process noises of size 3x3 or 6x6 are supported",
+                            })
+                        }
+                    }
+                }
+                // Check if we're using another SNC than the one before
+                if self.prev_used_snc != i {
+                    info!("Switched to {}-th {}", i, snc);
+                    self.prev_used_snc = i;
+                }
+
+                // Let's compute the Gamma matrix, an approximation of the time integral
+                // which assumes that the acceleration is constant between these two measurements.
+                let mut gamma = OMatrix::<f64, <T as State>::Size, A>::zeros();
+                let delta_t = (nominal_state.epoch() - self.prev_estimate.epoch()).to_seconds();
+                for blk in 0..A::dim() / 3 {
+                    for i in 0..3 {
+                        let idx_i = i + A::dim() * blk;
+                        let idx_j = i + 3 * blk;
+                        let idx_k = i + 3 + A::dim() * blk;
+                        // For first block
+                        // (0, 0) (1, 1) (2, 2) <=> \Delta t^2/2
+                        // (3, 0) (4, 1) (5, 2) <=> \Delta t
+                        // Second block
+                        // (6, 3) (7, 4) (8, 5) <=> \Delta t^2/2
+                        // (9, 3) (10, 4) (11, 5) <=> \Delta t
+                        // * \Delta t^2/2
+                        // (i, i) when blk = 0
+                        // (i + A::dim() * blk, i + 3) when blk = 1
+                        // (i + A::dim() * blk, i + 3 * blk)
+                        // * \Delta t
+                        // (i + 3, i) when blk = 0
+                        // (i + 3, i + 9) when blk = 1 (and I think i + 12 + 3)
+                        // (i + 3 + A::dim() * blk, i + 3 * blk)
+                        gamma[(idx_i, idx_j)] = delta_t.powi(2) / 2.0;
+                        gamma[(idx_k, idx_j)] = delta_t;
+                    }
+                }
+                // Let's add the process noise
+                covar_bar += &gamma * snc_matrix * &gamma.transpose();
+                // And break so we don't add any more process noise
+                break;
+            }
+        }
 
         // Project the propagated covariance into the measurement space.
         let h_p_ht = &h_tilde * covar_bar * &h_tilde.transpose();
@@ -316,6 +396,7 @@ where
         for snc in &mut self.process_noise {
             snc.prev_epoch = Some(self.prev_estimate.epoch());
         }
+
         Ok((estimate, res, Some(gain)))
     }
 

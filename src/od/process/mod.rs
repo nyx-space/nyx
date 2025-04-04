@@ -404,8 +404,7 @@ where
         if !reported[10] {
             let tock_time = Epoch::now().unwrap() - tick;
             info!(
-                "100% done - {msr_accepted_cnt:.0} measurements accepted, {:.0} rejected (done in {tock_time})",
-                num_msrs - msr_accepted_cnt
+                "100% done - {msr_accepted_cnt} measurements accepted, {msr_rejected_cnt} rejected (done in {tock_time})",
             );
         }
 
