@@ -95,4 +95,10 @@ where
         self.process_noise.push(process_noise);
         self
     }
+
+    pub(crate) fn initialize_process_noises(&mut self) {
+        for process_noise in &mut self.process_noise {
+            process_noise.init_epoch = Some(self.prev_estimate.epoch());
+        }
+    }
 }

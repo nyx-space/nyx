@@ -890,7 +890,7 @@ fn od_tb_val_az_el_ckf_fixed_step_perfect_stations(
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn od_tb_ckf_fixed_step_iteration_test(
+fn od_tb_fixed_step_smooth_test(
     almanac: Arc<Almanac>,
     sim_devices: BTreeMap<String, GroundStation>,
     proc_devices: BTreeMap<String, GroundStation>,
@@ -959,7 +959,7 @@ fn od_tb_ckf_fixed_step_iteration_test(
 
     let odp = SpacecraftKalmanOD::new(
         setup,
-        KalmanVariant::DeviationTracking,
+        KalmanVariant::ReferenceUpdate,
         None,
         proc_devices,
         almanac.clone(),
@@ -1027,7 +1027,7 @@ fn od_tb_ckf_fixed_step_iteration_test(
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map(
+fn od_tb_fixed_step_perfect_stations_snc_covar_map(
     almanac: Arc<Almanac>,
     sim_devices: BTreeMap<String, GroundStation>,
     proc_devices: BTreeMap<String, GroundStation>,
@@ -1344,7 +1344,7 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect_cov_test(
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map(
+fn od_tb_fixed_step_perfect_stations_several_snc_covar_map(
     almanac: Arc<Almanac>,
     sim_devices: BTreeMap<String, GroundStation>,
     proc_devices: BTreeMap<String, GroundStation>,

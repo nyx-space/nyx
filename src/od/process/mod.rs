@@ -195,6 +195,8 @@ where
             prev_used_snc: 0,
         };
 
+        kf.initialize_process_noises();
+
         let mut devices = self.devices.clone();
 
         // We'll build a trajectory of the estimated states. This will be used to compute the measurements.
