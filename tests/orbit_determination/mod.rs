@@ -1,11 +1,11 @@
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
+use nyx::linalg::{Matrix2, SMatrix, Vector2};
+use nyx::od::prelude::{Estimate, KalmanFilter, KalmanVariant, KfEstimate};
 use nyx::od::ODError;
 use nyx::Spacecraft;
-
-use self::nyx::od::prelude::{Estimate, KalmanFilter, KalmanVariant, KfEstimate};
-use self::nyx::State;
+use nyx::State;
 
 mod measurements;
 mod multi_body;
@@ -16,9 +16,6 @@ mod simulator;
 mod spacecraft;
 mod trackingarc;
 mod two_body;
-mod xhat_dev;
-
-use self::nyx::linalg::{Matrix2, SMatrix, Vector2};
 
 macro_rules! f64_nil {
     ($x:expr, $msg:expr) => {
