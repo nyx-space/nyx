@@ -157,10 +157,40 @@ where
         let mut measurement_types_found = IndexSet::new();
 
         let state_size = <Spacecraft as State>::Size::USIZE;
-        let msr_size = MsrSize::USIZE;
 
         // State item names used in column naming
         let state_items = ["X", "Y", "Z", "Vx", "Vy", "Vz", "Cr", "Cd", "Mass"];
+        let mut cov_units = vec![];
+
+        for i in 0..state_items.len() {
+            for j in i..state_items.len() {
+                let cov_unit = if i < 3 {
+                    if j < 3 {
+                        "km^2"
+                    } else if (3..6).contains(&j) {
+                        "km^2/s"
+                    } else if j == 8 {
+                        "km*kg"
+                    } else {
+                        "km"
+                    }
+                } else if (3..6).contains(&i) {
+                    if (3..6).contains(&j) {
+                        "km^2/s^2"
+                    } else if j == 8 {
+                        "km/s*kg"
+                    } else {
+                        "km/s"
+                    }
+                } else if i == 8 || j == 8 {
+                    "kg^2"
+                } else {
+                    "unitless"
+                };
+
+                cov_units.push(cov_unit);
+            }
+        }
 
         // --- Pre-parse Measurement Types from Schema ---
         // Infer measurement types from residual column names
@@ -270,30 +300,35 @@ where
             // Gain columns (store for iteration)
             let mut gain_cols: Vec<Option<Float64Array>> = Vec::new();
             let mut gain_available = true;
-            for state_item in state_items.iter().take(state_size) {
-                for j in 0..msr_size {
+            for i in 0..state_size {
+                for f in &measurement_types_found {
                     // Guessing format - needs robust parsing or metadata
-                    let base_name = format!("Gain {}*[{}]", state_item, j); // Simplified guess
-                     let col_name = schema.fields().iter()
+                    let base_name = format!(
+                        "Gain {}*{f:?} ({}*{})",
+                        state_items[i],
+                        cov_units[i],
+                        f.unit()
+                    );
+                    let col_name = schema.fields().iter()
                          .find(|f| f.name().starts_with(&base_name))
                          .map(|f| f.name().as_str());
 
-                     if let Some(name) = col_name {
+                    if let Some(name) = col_name {
                           if let Ok(col) = get_col(name) {
                                gain_cols.push(col.as_any().downcast_ref::<Float64Array>().cloned());
                           } else {
                                gain_cols.push(None); // Column missing
                                gain_available = false;
                           }
-                     } else {
+                    } else {
                           // If *any* gain column is missing, assume no gains were stored (e.g., smoother run)
                           gain_available = false;
                           break; // No need to check further gain columns
-                     }
+                    }
                 }
-                 if !gain_available { break; }
+                if !gain_available { break; }
             }
-             if !gain_available { gain_cols.clear(); } // Ensure empty if incomplete
+            if !gain_available { gain_cols.clear(); } // Ensure empty if incomplete
 
 
             // FSR columns (store for iteration)
@@ -391,11 +426,11 @@ where
                      let mut noise_vec = OVector::<f64, MsrSize>::zeros();
                      let mut real_obs_vec = OVector::<f64, MsrSize>::zeros();
                      let mut comp_obs_vec = OVector::<f64, MsrSize>::zeros();
-                     let mut current_msr_types = IndexSet::with_capacity(msr_size);
+                     let mut current_msr_types = IndexSet::with_capacity(MsrSize::USIZE);
 
                      let mut msr_idx = 0;
                      for (msr_type, type_cols) in &residual_data_cols {
-                           if msr_idx >= msr_size { break; } // Should not happen if MsrSize matches data
+                           if msr_idx >= MsrSize::USIZE { break; } // Should not happen if MsrSize matches data
 
                            // Check if data exists for this type *at this row*
                            let prefit_val = type_cols.get("Prefit residual").and_then(|col| if col.is_valid(i) { Some(col.value(i)) } else { None });
@@ -447,7 +482,7 @@ where
                      let mut all_valid = true;
                      let mut col_idx = 0;
                      'gain_outer: for row in 0..state_size {
-                          for col in 0..msr_size {
+                          for col in 0..MsrSize::USIZE {
                                if let Some(gain_col) = &gain_cols[col_idx] {
                                     if gain_col.is_valid(i) {
                                          gain_mat[(row, col)] = gain_col.value(i);

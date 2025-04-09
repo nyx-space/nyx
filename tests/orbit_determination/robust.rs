@@ -3,7 +3,7 @@ extern crate pretty_env_logger;
 
 use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SATURN_BARYCENTER, SUN};
 use anise::constants::frames::IAU_EARTH_FRAME;
-use nalgebra::U2;
+use nalgebra::U1;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::SpacecraftDynamics;
@@ -192,7 +192,7 @@ fn od_robust_large_disp_test_two_way_cov_test(almanac: Arc<Almanac>) {
 
     // Reload OD Solution
     let od_sol_reloaded =
-        ODSolution::<Spacecraft, KfEstimate<Spacecraft>, U2, GroundStation>::from_parquet(
+        ODSolution::<Spacecraft, KfEstimate<Spacecraft>, U1, GroundStation>::from_parquet(
             sol_path.clone(),
             devices,
         )
@@ -204,13 +204,7 @@ fn od_robust_large_disp_test_two_way_cov_test(almanac: Arc<Almanac>) {
         od_sol_reloaded.filter_smoother_ratios.len(),
         od_sol.filter_smoother_ratios.len()
     );
-    od_sol_reloaded
-        .to_parquet(
-            path.join("robustness_test_two_way_reloaded.parquet"),
-            ExportCfg::default(),
-        )
-        .unwrap();
-    // assert!(od_sol_reloaded == od_sol, "womp womp");
+    assert!(od_sol_reloaded == od_sol, "womp womp");
 
     // Test the results
     // Check that the covariance deflated
@@ -267,8 +261,8 @@ fn od_robust_large_disp_test_two_way_cov_test(almanac: Arc<Almanac>) {
     );
 
     assert!(
-        delta.rmag_km() / delta_pp.rmag_km() < 100.0,
-        "Position error should be 100x better than a pure predictor"
+        delta_pp.rmag_km() / delta.rmag_km() > 15.0,
+        "Position error should be at least 15x better than a pure predictor"
     );
 
     // Read in the Parquet file and assert proper data was written.

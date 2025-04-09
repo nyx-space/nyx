@@ -56,7 +56,7 @@ mod stats;
 /// Implementation detail: these are not stored in vectors to allow for multiple estimates at the same time, e.g. when
 /// there are simultaneous measurements of angles and the filter processes each as a scalar.
 ///
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 #[allow(clippy::upper_case_acronyms)]
 pub struct ODSolution<StateType, EstType, MsrSize, Trk>
 where
@@ -192,5 +192,51 @@ where
     }
 }
 
-// TODO: Allow importing from parquet and initialization of a process, thereby allowing this to serve as a record, but the devices will need to be manually passed in
-// because they depend on the almanac.
+impl<StateType, EstType, MsrSize, Trk> PartialEq for ODSolution<StateType, EstType, MsrSize, Trk>
+where
+    StateType: Interpolatable + Add<OVector<f64, <StateType as State>::Size>, Output = StateType>,
+    EstType: Estimate<StateType>,
+    MsrSize: DimName,
+    Trk: TrackerSensitivity<StateType, StateType> + PartialEq,
+    <DefaultAllocator as Allocator<<StateType as State>::VecLength>>::Buffer<f64>: Send,
+    DefaultAllocator: Allocator<<StateType as State>::Size>
+        + Allocator<<StateType as State>::VecLength>
+        + Allocator<MsrSize>
+        + Allocator<MsrSize, <StateType as State>::Size>
+        + Allocator<MsrSize, MsrSize>
+        + Allocator<<StateType as State>::Size, <StateType as State>::Size>
+        + Allocator<<StateType as State>::Size, MsrSize>,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.estimates.len() == other.estimates.len()
+            && self.residuals == other.residuals
+            && self.gains.len() == other.gains.len()
+            && self.filter_smoother_ratios.len() == other.filter_smoother_ratios.len()
+            && self.devices == other.devices
+            && self.measurement_types == other.measurement_types
+            // Now check for near equality of gains
+            && self.gains.iter().zip(other.gains.iter()).all(|(my_k, other_k)| {
+                if let Some(my_k) = my_k {
+                    if let Some(other_k) = other_k {
+                        (my_k - other_k).norm() < 1e-9
+                    } else {
+                        false
+                    }
+                } else {
+                    other_k.is_none()
+                }
+            })
+            // Now check for near equality of F-S ratios
+            && self.filter_smoother_ratios.iter().zip(other.filter_smoother_ratios.iter()).all(|(my_fs, other_fs)| {
+                if let Some(my_fs) = my_fs {
+                    if let Some(other_fs) = other_fs {
+                        (my_fs - other_fs).norm() < 1e-9
+                    } else {
+                        false
+                    }
+                } else {
+                    other_fs.is_none()
+                }
+            })
+    }
+}
