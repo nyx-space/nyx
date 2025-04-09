@@ -19,9 +19,9 @@
 use anise::astro::AzElRange;
 use arrow::datatypes::{DataType, Field};
 use serde_derive::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
-use crate::od::ODError;
+use crate::{io::InputOutputError, od::ODError};
 
 #[derive(Copy, Clone, Debug, Hash, Serialize, Deserialize, PartialEq, Eq)]
 pub enum MeasurementType {
@@ -115,6 +115,22 @@ impl MeasurementType {
             }
             Self::ReceiveFrequency | Self::TransmitFrequency => Err(ODError::MeasurementSimError {
                 details: format!("{self:?} is only supported in CCSDS TDM parsing"),
+            }),
+        }
+    }
+}
+
+impl FromStr for MeasurementType {
+    type Err = InputOutputError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "range" => Ok(Self::Range),
+            "doppler" => Ok(Self::Doppler),
+            "azimuth" => Ok(Self::Azimuth),
+            "elevation" => Ok(Self::Elevation),
+            _ => Err(InputOutputError::UnsupportedData {
+                which: s.to_string(),
             }),
         }
     }

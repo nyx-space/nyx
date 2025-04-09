@@ -66,9 +66,19 @@ def main(path: str, wstats: bool):
         fig.update_layout(yaxis_title=unit)
         fig.show()
 
+    # Plot the residual ratios
+    px.scatter(df, x="Epoch (UTC)", y="Residual ratio", color="Tracker").show()
+
     if wstats:
+        for msr in msr_types:
+            px.scatter(df, x="Epoch (UTC)", y=[f"Real observation: {msr}", f"Computed observation: {msr}"]).show()
+
         # Convert the Polars column to a NumPy array for compatibility with scipy and Plotly
         residual_ratio = df["Residual ratio"].drop_nulls().to_numpy()
+
+        gain_columns = [c for c in df.columns if "Gain" in c]
+        fs_ratio_columns = [c for c in df.columns if "Filter-smoother ratio" in c]
+        is_filter_run = len(df[gain_columns].drop_nulls()) > 0
 
         # Create QQ plot
         qq = stats.probplot(residual_ratio)
@@ -108,8 +118,16 @@ def main(path: str, wstats: bool):
             hover_data=df.columns,
         ).show()
 
-        # Plot the residual ratios and whether they were accepted.
-        px.scatter(df, x="Epoch (UTC)", y="Residual ratio", color="Tracker").show()
+        # Plot the filter gains or filter-smoother ratios
+        if is_filter_run:
+            px.scatter(df, x="Epoch (UTC)", y=gain_columns).show()
+        else:
+            px.scatter(df, x="Epoch (UTC)", y=fs_ratio_columns).show()
+        
+        # Plot the RIC uncertainty
+        px.line(
+            df, x="Epoch (UTC)", y=["Sigma X (RIC) (km)", "Sigma Y (RIC) (km)", "Sigma Z (RIC) (km)"]
+        ).show()
 
 
 if __name__ == "__main__":

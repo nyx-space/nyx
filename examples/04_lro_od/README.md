@@ -183,13 +183,9 @@ The filter is configured with the default automatic residual rejection of Nyx wh
 
 ## Residual ratios
 
-One of the key metrics to determine whether an OD result is correct is to look at the residual ratios. Some orbit determination software, like ODTK (as specified in their MathSpec), treats all measurements as scalars. This could be problematic because the order in which the measurements are processed at each time step will lead to variations in the covariance. For example, if there is an excellent range measurement and an average Doppler measurement for that same time step, then the state covariance will decrease and that greater model filter confidence may cause the Doppler measurement to be rejected. _Instead_, Nyx treats all simultaneous measurements simultaneously, ensuring that the order in which each measurement is processed is not a concern. This mathematically correct approach leads to the loss of the sign of the residual because the ratio is computed as `y_k^T * R_k^{-1} * y_k`, where `y_k` is prefit residual (using the nomenclature from the [Nyx Kalman filter MathSpec](https://nyxspace.com/nyxspace/MathSpec/orbit_determination/kalman/?utm_source=github-lro-rr)). **Therefore, the goodness test of the residual ratios is Chi Square test** with a degree of freedom of 2 (range and Doppler).
+One of the key metrics to determine whether an OD result is correct is to look at the residual ratios.
 
-We can see that nearly all of the residuals are within the Chi Square distribution, although the tail-end of 4 sigmas is larger than it should be. This is entirely due to the models not matching perfectly, as can be seen in the plot of the residuals rejected over time: the further we are from the start of the OD track, the more measurements are rejected.
-
-![Chi-Squared](./plots/resid-chi-square.png)
-
-![Rejection](./plots/resid-rejections.png)
+![Residual ratios](./plots/resid-ratio.png)
 
 ![Per tracker](./plots/resid-per-tracker.png)
 

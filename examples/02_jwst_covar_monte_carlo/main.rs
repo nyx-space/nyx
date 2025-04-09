@@ -16,7 +16,7 @@ use nyx::{
     dynamics::{guidance::LocalFrame, OrbitalDynamics, SolarPressure, SpacecraftDynamics},
     io::ExportCfg,
     mc::MonteCarlo,
-    od::{msr::TrackingDataArc, prelude::KF, process::SpacecraftUncertainty, SpacecraftODProcess},
+    od::{prelude::KalmanVariant, process::SpacecraftUncertainty, SpacecraftKalmanOD},
     propagators::Propagator,
     Spacecraft, State,
 };
@@ -110,23 +110,22 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // === Covariance mapping ===
     // For the covariance mapping / prediction, we'll use the common orbit determination approach.
-    // This is done by setting up a spacecraft OD process, and predicting for the analysis duration.
-
-    let ckf = KF::no_snc(jwst_estimate);
+    // This is done by setting up a spacecraft Kalman filter OD process, and predicting for the analysis duration.
 
     // Build the propagation instance for the OD process.
-    let prop = setup.with(jwst.with_stm(), almanac.clone());
-    let mut odp = SpacecraftODProcess::ckf(prop, ckf, BTreeMap::new(), None, almanac.clone());
+    let odp = SpacecraftKalmanOD::new(
+        setup.clone(),
+        KalmanVariant::DeviationTracking,
+        None,
+        BTreeMap::new(),
+        almanac.clone(),
+    );
 
-    // Define the prediction step, i.e. how often we want to know the covariance.
-    let step = 1_i64.minutes();
+    // The prediction step is 1 minute by default, configured in the OD process, i.e. how often we want to know the covariance.
+    assert_eq!(odp.max_step, 1_i64.minutes());
     // Finally, predict, and export the trajectory with covariance to a parquet file.
-    odp.predict_for(step, prediction_duration)?;
-    odp.to_parquet(
-        &TrackingDataArc::default(),
-        "./02_jwst_covar_map.parquet",
-        ExportCfg::default(),
-    )?;
+    let od_sol = odp.predict_for(jwst_estimate, prediction_duration)?;
+    od_sol.to_parquet("./02_jwst_covar_map.parquet", ExportCfg::default())?;
 
     // === Monte Carlo framework ===
     // Nyx comes with a complete multi-threaded Monte Carlo frame. It's blazing fast.

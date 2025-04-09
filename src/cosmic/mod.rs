@@ -58,11 +58,21 @@ where
     /// Return this state as a vector for the propagation/estimation
     fn to_vector(&self) -> OVector<f64, Self::VecLength>;
 
+    /// Returns strictly the state vector without any STM, if set.
+    fn to_state_vector(&self) -> OVector<f64, Self::Size> {
+        OVector::<f64, Self::Size>::from_iterator(
+            self.to_vector().iter().copied().take(Self::Size::USIZE),
+        )
+    }
+
     /// Return this state as a vector for the propagation/estimation
     /// By default, this is not implemented. This function must be implemented when filtering on this state.
     fn stm(&self) -> Result<OMatrix<f64, Self::Size, Self::Size>, DynamicsError> {
         Err(DynamicsError::StateTransitionMatrixUnset)
     }
+
+    /// Copies the current state but sets the STM to identity
+    fn with_stm(self) -> Self;
 
     /// Return this state as a vector for the propagation/estimation
     /// By default, this is not implemented. This function must be implemented when filtering on this state.

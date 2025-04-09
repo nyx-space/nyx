@@ -1,24 +1,19 @@
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
+use nyx::linalg::{Matrix2, SMatrix, Vector2};
+use nyx::od::prelude::{Estimate, KalmanFilter, KalmanVariant, KfEstimate};
 use nyx::od::ODError;
 use nyx::Spacecraft;
-
-use self::nyx::od::prelude::{Estimate, Filter, KfEstimate, KF};
-use self::nyx::State;
+use nyx::State;
 
 mod measurements;
 mod multi_body;
-mod resid_reject;
 mod robust;
-mod robust_az_el;
 mod simulator;
 mod spacecraft;
 mod trackingarc;
 mod two_body;
-mod xhat_dev;
-
-use self::nyx::linalg::{Matrix2, SMatrix, Vector2};
 
 macro_rules! f64_nil {
     ($x:expr, $msg:expr) => {
@@ -49,7 +44,7 @@ fn filter_errors() {
     let computed_obs = Vector2::zeros();
     let sensitivity = SMatrix::<f64, 2, 9>::zeros();
 
-    let mut ckf = KF::no_snc(initial_estimate);
+    let mut ckf = KalmanFilter::new(initial_estimate, KalmanVariant::DeviationTracking);
 
     match ckf.measurement_update(
         Spacecraft::zeros().with_stm(),

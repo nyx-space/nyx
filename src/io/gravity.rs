@@ -470,11 +470,22 @@ impl HarmonicsMem {
 
 #[test]
 fn test_load_harmonic_files() {
-    HarmonicsMem::from_cof("data/JGM3.cof.gz", 50, 50, true).expect("could not load JGM3");
+    HarmonicsMem::from_cof("data/01_planetary/JGM3.cof.gz", 50, 50, true)
+        .expect("could not load JGM3");
 
-    HarmonicsMem::from_egm("data/EGM2008_to2190_TideFree.gz", 120, 120, true)
-        .expect("could not load EGM2008");
+    HarmonicsMem::from_egm(
+        "data/01_planetary/EGM2008_to2190_TideFree.gz",
+        120,
+        120,
+        true,
+    )
+    .expect("could not load EGM2008");
 
-    HarmonicsMem::from_shadr("data/Luna_jggrx_1500e_sha.tab.gz", 1500, 1500, true)
-        .expect("could not load jggrx");
+    HarmonicsMem::from_shadr(
+        "data/01_planetary/Luna_jggrx_1500e_sha.tab.gz",
+        1500,
+        1500,
+        true,
+    )
+    .expect("could not load jggrx");
 }
