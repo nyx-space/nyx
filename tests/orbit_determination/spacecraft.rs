@@ -411,7 +411,7 @@ fn od_val_sc_srp_estimation_cov_test(
         setup,
         KalmanVariant::ReferenceUpdate,
         None,
-        proc_devices,
+        proc_devices.clone(),
         almanac.clone(),
     );
 
@@ -463,8 +463,20 @@ fn od_val_sc_srp_estimation_cov_test(
     let pre_smooth_postfit_rms = od_sol.rms_postfit_residuals();
 
     od_sol
-        .to_parquet("./od_srp_val.parquet", ExportCfg::default())
+        .to_parquet("./data/04_output/od_srp_val.parquet", ExportCfg::default())
         .unwrap();
+
+    // Reload OD Solution
+    let od_sol_reloaded =
+        ODSolution::from_parquet("./data/04_output/od_srp_val.parquet", proc_devices).unwrap();
+    assert_eq!(od_sol_reloaded.estimates.len(), od_sol.estimates.len());
+    assert_eq!(od_sol_reloaded.residuals.len(), od_sol.residuals.len());
+    assert_eq!(od_sol_reloaded.gains.len(), od_sol.gains.len());
+    assert_eq!(
+        od_sol_reloaded.filter_smoother_ratios.len(),
+        od_sol.filter_smoother_ratios.len()
+    );
+    assert!(od_sol_reloaded == od_sol, "womp womp");
 
     println!(
         "Num residuals accepted: #{}",

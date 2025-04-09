@@ -3,7 +3,6 @@ extern crate pretty_env_logger;
 
 use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SATURN_BARYCENTER, SUN};
 use anise::constants::frames::IAU_EARTH_FRAME;
-use nalgebra::U1;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::SpacecraftDynamics;
@@ -47,7 +46,7 @@ fn almanac() -> Arc<Almanac> {
 ///               for propagation and measurement modeling.
 #[allow(clippy::identity_op)]
 #[rstest]
-fn od_robust_large_disp_test_two_way_cov_test(almanac: Arc<Almanac>) {
+fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
@@ -189,22 +188,6 @@ fn od_robust_large_disp_test_two_way_cov_test(almanac: Arc<Almanac>) {
             ExportCfg::default(),
         )
         .unwrap();
-
-    // Reload OD Solution
-    let od_sol_reloaded =
-        ODSolution::<Spacecraft, KfEstimate<Spacecraft>, U1, GroundStation>::from_parquet(
-            sol_path.clone(),
-            devices,
-        )
-        .unwrap();
-    assert_eq!(od_sol_reloaded.estimates.len(), od_sol.estimates.len());
-    assert_eq!(od_sol_reloaded.residuals.len(), od_sol.residuals.len());
-    assert_eq!(od_sol_reloaded.gains.len(), od_sol.gains.len());
-    assert_eq!(
-        od_sol_reloaded.filter_smoother_ratios.len(),
-        od_sol.filter_smoother_ratios.len()
-    );
-    assert!(od_sol_reloaded == od_sol, "womp womp");
 
     // Test the results
     // Check that the covariance deflated

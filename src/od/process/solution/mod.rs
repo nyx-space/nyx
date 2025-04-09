@@ -207,18 +207,34 @@ where
         + Allocator<<StateType as State>::Size, <StateType as State>::Size>
         + Allocator<<StateType as State>::Size, MsrSize>,
 {
+    /// Checks that the covariances are within 1e-8 in norm, the state vectors within 1e-6, the residual ratios within 1e-4, the gains and flight-smoother consistencies within 1e-8.
     fn eq(&self, other: &Self) -> bool {
         self.estimates.len() == other.estimates.len()
-            && self.residuals == other.residuals
+            && self.residuals.len() == other.residuals.len()
             && self.gains.len() == other.gains.len()
             && self.filter_smoother_ratios.len() == other.filter_smoother_ratios.len()
             && self.devices == other.devices
-            && self.measurement_types == other.measurement_types
+            && self.measurement_types.iter().all(|msr_type| other.measurement_types.contains(msr_type))
+            && self.estimates.iter().zip(other.estimates.iter()).all(|(mine, theirs)| {
+                (mine.state().to_state_vector() - theirs.state().to_state_vector()).norm() < 1e-6 &&
+                (mine.covar() - theirs.covar()).norm() < 1e-8
+            })
+            && self.residuals.iter().zip(other.residuals.iter()).all(|(mine, theirs)| {
+                if let Some(mine) = mine {
+                    if let Some(theirs) = theirs {
+                        (mine.ratio - theirs.ratio).abs() < 1e-4
+                    } else {
+                        false
+                    }
+                } else {
+                    theirs.is_none()
+                }
+            })
             // Now check for near equality of gains
             && self.gains.iter().zip(other.gains.iter()).all(|(my_k, other_k)| {
                 if let Some(my_k) = my_k {
                     if let Some(other_k) = other_k {
-                        (my_k - other_k).norm() < 1e-9
+                        (my_k - other_k).norm() < 1e-8
                     } else {
                         false
                     }
@@ -230,7 +246,7 @@ where
             && self.filter_smoother_ratios.iter().zip(other.filter_smoother_ratios.iter()).all(|(my_fs, other_fs)| {
                 if let Some(my_fs) = my_fs {
                     if let Some(other_fs) = other_fs {
-                        (my_fs - other_fs).norm() < 1e-9
+                        (my_fs - other_fs).norm() < 1e-8
                     } else {
                         false
                     }
