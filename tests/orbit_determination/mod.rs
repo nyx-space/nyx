@@ -9,7 +9,6 @@ use nyx::State;
 
 mod measurements;
 mod multi_body;
-mod resid_reject;
 mod robust;
 mod robust_az_el;
 mod simulator;
