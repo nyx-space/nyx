@@ -468,12 +468,6 @@ impl Traj<Spacecraft> {
             (StateParameter::PropMass, false),
         ];
 
-        let file = File::open(path).context(StdIOSnafu {
-            action: "opening output trajectory file",
-        })?;
-
-        let builder = ParquetRecordBatchReaderBuilder::try_new(file).unwrap();
-
         let reader = builder.build().context(ParquetSnafu {
             action: "building output trajectory file",
         })?;

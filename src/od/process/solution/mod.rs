@@ -34,6 +34,7 @@ use self::msr::MeasurementType;
 mod display;
 mod export;
 mod filter_data;
+mod import;
 mod smooth;
 mod stats;
 

@@ -115,17 +115,41 @@ where
 
         let frame = self.estimates[0].state().frame();
 
-        let more_meta = Some(vec![(
-            "Frame".to_string(),
-            serde_dhall::serialize(&frame)
-                .to_string()
-                .map_err(|e| ODError::ODIOError {
-                    source: InputOutputError::SerializeDhall {
-                        what: format!("frame `{frame}`"),
-                        err: e.to_string(),
-                    },
-                })?,
-        )]);
+        let more_meta = Some(vec![
+            (
+                "Frame".to_string(),
+                serde_dhall::serialize(&frame)
+                    .to_string()
+                    .map_err(|e| ODError::ODIOError {
+                        source: InputOutputError::SerializeDhall {
+                            what: format!("frame `{frame}`"),
+                            err: e.to_string(),
+                        },
+                    })?,
+            ),
+            (
+                "SRP Area (m2)".to_string(),
+                self.estimates
+                    .first()
+                    .as_ref()
+                    .unwrap()
+                    .nominal_state()
+                    .srp
+                    .area_m2
+                    .to_string(),
+            ),
+            (
+                "Drag Area (m2)".to_string(),
+                self.estimates
+                    .first()
+                    .as_ref()
+                    .unwrap()
+                    .nominal_state()
+                    .drag
+                    .area_m2
+                    .to_string(),
+            ),
+        ]);
 
         let mut fields = match cfg.fields {
             Some(fields) => fields,
