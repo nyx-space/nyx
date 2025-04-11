@@ -12,7 +12,7 @@ use nyx::io::gravity::*;
 use nyx::time::{Epoch, Unit};
 use nyx::State;
 use nyx::{propagators::*, Spacecraft};
-use rand::thread_rng;
+use rand::rng;
 use rand_distr::{Distribution, Normal};
 use rayon::prelude::*;
 use std::sync::Arc;
@@ -59,7 +59,7 @@ fn multi_thread_monte_carlo_demo(almanac: Arc<Almanac>) {
 
     // Generate all 100 initial states
     let init_states: Vec<Spacecraft> = sma_dist
-        .sample_iter(&mut thread_rng())
+        .sample_iter(&mut rng())
         .take(100)
         .map(|delta_sma| {
             Spacecraft::from(
