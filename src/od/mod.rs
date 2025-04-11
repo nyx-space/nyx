@@ -58,6 +58,9 @@ pub use simulator::TrackingDevice;
 /// Provides all state noise compensation functionality
 pub mod snc;
 
+/// Provides the Batch least squares initial state solver.
+pub mod blse;
+
 /// A helper type for spacecraft orbit determination.
 pub type SpacecraftKalmanOD = self::process::KalmanODProcess<
     SpacecraftDynamics,
