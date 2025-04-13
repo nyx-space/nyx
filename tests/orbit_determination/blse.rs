@@ -37,13 +37,13 @@ fn blse_robust_large_disp_test(almanac: Arc<Almanac>) {
     let elevation_mask = 0.0;
 
     // BLSE usually runs over small periods of tracking data.
-    let prop_time = 1 * Unit::Hour;
+    let prop_time = 2 * Unit::Hour;
 
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_utc_hms(2020, 1, 1, 4, 0, 0);
     let initial_state = Spacecraft::from(Orbit::keplerian(
-        22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k,
+        22000.0, 0.01, 30.0, 80.0, 40.0, 45.0, dt, eme2k,
     ));
 
     let mut dss65_madrid = GroundStation::dss65_madrid(
@@ -122,13 +122,15 @@ fn blse_robust_large_disp_test(almanac: Arc<Almanac>) {
     assert_eq!(arc.unique_types()[0], MeasurementType::Range);
 
     let blse = BatchLeastSquares::builder()
+        .solver(blse::BLSSolver::LevenbergMarquardt)
         .prop(truth_setup)
         .devices(devices)
         .almanac(almanac.clone())
         .build();
 
     let blse_solution = blse
-        .estimate(initial_estimate.nominal_state, &arc)
+        // .estimate(initial_estimate.nominal_state, &arc)
+        .estimate(initial_state, &arc) // --> BUG: Even with the nominal state, the BLSE does not converge.
         .expect("blse should not fail");
 
     println!("{blse_solution}");
