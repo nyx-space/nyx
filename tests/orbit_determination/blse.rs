@@ -37,7 +37,7 @@ fn blse_robust_large_disp_test(almanac: Arc<Almanac>) {
     let elevation_mask = 0.0;
 
     // BLSE usually runs over small periods of tracking data.
-    let prop_time = 0.2 * Unit::Hour;
+    let prop_time = 2 * Unit::Hour;
 
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
@@ -76,9 +76,9 @@ fn blse_robust_large_disp_test(almanac: Arc<Almanac>) {
     let initial_estimate = KfEstimate::disperse_from_diag(
         initial_state,
         vec![
-            StateDispersion::zero_mean(StateParameter::SMA, 0.002),
-            StateDispersion::zero_mean(StateParameter::RAAN, 0.002),
-            StateDispersion::zero_mean(StateParameter::Inclination, 0.002),
+            StateDispersion::zero_mean(StateParameter::SMA, 0.02),
+            StateDispersion::zero_mean(StateParameter::RAAN, 0.02),
+            StateDispersion::zero_mean(StateParameter::Inclination, 0.02),
             StateDispersion::zero_mean(StateParameter::Eccentricity, 0.0002),
         ],
         Some(0),
@@ -114,23 +114,15 @@ fn blse_robust_large_disp_test(almanac: Arc<Almanac>) {
 
     let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
-    // In a large Earth orbit, range data is _by far_ the more informative measurement type.
-    // let arc = arc
-    //     .clone()
-    //     .exclude_measurement_type(MeasurementType::Doppler);
-    // assert_eq!(arc.unique_types().len(), 1);
-    // assert_eq!(arc.unique_types()[0], MeasurementType::Range);
-
     let blse = BatchLeastSquares::builder()
-        //.solver(blse::BLSSolver::LevenbergMarquardt)
+        // .solver(blse::BLSSolver::LevenbergMarquardt)
         .prop(truth_setup)
         .devices(devices)
         .almanac(almanac.clone())
         .build();
 
     let blse_solution = blse
-        // .estimate(initial_estimate.nominal_state, &arc)
-        .estimate(initial_state, &arc) // --> BUG: Even with the nominal state, the BLSE does not converge.
+        .estimate(initial_estimate.nominal_state, &arc)
         .expect("blse should not fail");
 
     println!("{blse_solution}");
@@ -149,7 +141,9 @@ fn blse_robust_large_disp_test(almanac: Arc<Almanac>) {
 }
 
 /*
-Removing the weight leads to better results, but the algorithm should probably account for the weight.
-Moreover, the initial estimate makes a large correction in the wrong direction (720 -> 766 m)
-and spends the next 9 iterations making that initial correcting better but still failing (760 m).
+1. Understand why including the weight leads to a worse solution
+2. Change all errors to ODError
+3. Convergence should also include no improvement in RMS
+4. Stop if RMS increases.
+--> Issue is with STM, probably. I'm trying to avoid having it go instable but it means the error stays about the same. I need to check this STM.
 */

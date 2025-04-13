@@ -151,15 +151,12 @@ pub struct BatchLeastSquares<
     /// Use diagonal scaling (D = sqrt(diag(H^T W H))) in LM
     #[builder(default = true)]
     pub lm_use_diag_scaling: bool,
-    /// Precision for comparing epochs during trajectory generation (optional)
-    #[builder(default = 1 * Unit::Microsecond)]
-    pub epoch_precision: Duration,
-    /// Almanac for environmental models
     pub almanac: Arc<Almanac>,
-    // Keep PhantomData for Dynamics type D if needed, although Trk might imply it
-    #[builder(default, setter(skip))]
-    _dynamics: PhantomData<D>,
 }
+
+#[allow(type_alias_bounds)]
+type StateMatrix<D: Dynamics> =
+    OMatrix<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>;
 
 impl<D, Trk> BatchLeastSquares<D, Trk>
 where
@@ -216,11 +213,14 @@ where
 
             // Re-initialize matrices for this iteration
             // Information Matrix: Lambda = H^T * W * H
-            let mut info_matrix = OMatrix::<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>::identity();
+            let mut info_matrix = StateMatrix::<D>::identity();
             // Normal Matrix: N = H^T * W * dy
             let mut normal_matrix = OVector::<f64, <D::StateType as State>::Size>::zeros();
             // Sum of squares of weighted residuals for RMS calculation and LM cost
             let mut sum_sq_weighted_residuals = 0.0;
+
+            let mut state_at_msr = current_estimate;
+            let mut stm = StateMatrix::<D>::identity();
 
             for (msr_idx, (epoch_ref, msr)) in measurements.iter().enumerate() {
                 let msr_epoch = *epoch_ref;
@@ -230,14 +230,13 @@ where
                 // but potentially slow. A full trajectory propagation per iteration is faster
                 // but needs careful state storage/retrieval. Let's stick to this simpler way first.
                 // Reset instance state to the start of the iteration's estimate
-                let mut state_to_prop = current_estimate.with_stm();
-                state_to_prop.reset_stm();
 
-                let mut prop_to_msr = self.prop.with(state_to_prop, self.almanac.clone()).quiet();
-                let state_at_msr = prop_to_msr.until_epoch(msr_epoch).expect("TODO:");
+                let mut prop_to_msr = self.prop.with(state_at_msr.with_stm(), self.almanac.clone()).quiet();
+                state_at_msr = prop_to_msr.until_epoch(msr_epoch).expect("TODO:");
 
                 // Get the STM Phi(t_i, t_0) from the propagated state
-                let stm = state_at_msr.stm().expect("TODO:");
+                let this_stm = state_at_msr.stm().expect("TODO:");
+                stm = this_stm * stm.transpose();
 
                 // Get the correct tracking device
                 let device = match devices.get_mut(&msr.tracker) {
@@ -293,9 +292,9 @@ where
                         .map_err(|e| BLSError::MeasurementCovarError { source: e })?;
                     let r_variance = r_matrix[(0, 0)];
                     ensure!(r_variance > 0.0, SingularMatrixSnafu {
-                        details: format!("Zero measurement variance R for msr {} @ {}", msr_idx, msr_epoch)
+                        details: format!("Zero measurement variance R for msr {msr_idx} @ {msr_epoch}")
                     });
-                    let weight = 1.0; // / r_variance; // TODO: R^-1 to be fixed.
+                    let weight = 1.0 / r_variance;
 
                     // Compute H_matrix = H_tilde * Phi(t_i, t_0) (sensitivity wrt initial state X_0)
                     let h_matrix = h_tilde * stm;
@@ -306,14 +305,14 @@ where
 
                     // Accumulate Normal Matrix: normal_matrix += H^T * W * y
                     normal_matrix += h_matrix.transpose() * residual * weight;
- 
+
                     // Accumulate sum of squares of weighted residuals
                     sum_sq_weighted_residuals += weight * residual * residual;
                 }
             }
 
             // --- Solve for State Correction dx ---
-            let orbit_correction: OVector<f64, <D::StateType as State>::Size>;
+            let state_correction: OVector<f64, <D::StateType as State>::Size>;
             let iteration_cost_decreased; // For LM logic
 
             // Use num_measurements for consistency
@@ -324,9 +323,9 @@ where
                     // Solve Lambda * dx = N => dx = Lambda^-1 * N
                     let info_matrix_chol = match info_matrix.cholesky() {
                          Some(chol) => chol,
-                         None => return Err(BLSError::SingularMatrix{ details: format!("Information matrix H^TWH is singular in iteration {}", iter+1)})
+                         None => return Err(BLSError::SingularMatrix{ details: format!("Information matrix H^TWH is singular in iteration {iter}")})
                     };
-                    orbit_correction = info_matrix_chol.solve(&normal_matrix);
+                    state_correction = info_matrix_chol.solve(&normal_matrix);
                     // Assume NE always decreases cost locally
                     iteration_cost_decreased = true;
                     current_rms = current_iter_rms;
@@ -335,7 +334,7 @@ where
                      // Solve (Lambda + lambda * D^T D) * dx = N
                      // D^T D is a diagonal scaling matrix.
                      // Common choices: D^T D = I or D^T D = diag(Lambda)
-                    let mut d_sq = OMatrix::<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>::identity();
+                    let mut d_sq = StateMatrix::<D>::identity();
                     if self.lm_use_diag_scaling {
                         // Use D^T D = diag(Lambda)
                         for i in 0..6 {
@@ -345,7 +344,7 @@ where
                         for i in 0..6 {
                             if d_sq[(i, i)] <= 0.0 {
                                 d_sq[(i, i)] = 1e-6; // Set a small positive floor
-                                warn!("LM Scaling: Found non-positive diagonal element {} in H^TWH, using floor.", info_matrix[(i,i)]);
+                                warn!("LM Scaling: Found non-positive diagonal element {} in H^TWH, using floor.", info_matrix[(i, i)]);
                             }
                         }
                     } // else d_sq remains Identity
@@ -354,7 +353,7 @@ where
                     let augmented_matrix = info_matrix + d_sq * lambda;
 
                     if let Some(aug_chol) = augmented_matrix.cholesky() {
-                        orbit_correction = aug_chol.solve(&normal_matrix);
+                        state_correction = aug_chol.solve(&normal_matrix);
 
                         // --- LM Lambda Update Logic ---
                         // Simple strategy: Check if RMS decreased. More robust methods exist.
@@ -366,71 +365,64 @@ where
                             lambda /= self.lm_lambda_decrease;
                             // Clamp to min
                             lambda = lambda.max(self.lm_lambda_min);
-                            debug!("LM: Cost decreased (RMS {} -> {}). Decreasing lambda to {}", current_rms, current_iter_rms, lambda);
-                            current_rms = current_iter_rms; // Update RMS baseline
+                            debug!("LM: Cost decreased (RMS {current_rms} -> {current_iter_rms}). Decreasing lambda to {lambda}");
+                            current_rms = current_iter_rms;
                         } else {
                              // Cost increased or stalled
                              iteration_cost_decreased = false;
-                             lambda *= self.lm_lambda_increase; // Increase damping
-                             lambda = lambda.min(self.lm_lambda_max); // Clamp to max
-                             debug!("LM: Cost increased/stalled (RMS {} -> {}). Increasing lambda to {}", current_rms, current_iter_rms, lambda);
+                             // Increase damping
+                             lambda *= self.lm_lambda_increase;
+                             // Clamp to max
+                             lambda = lambda.min(self.lm_lambda_max);
+                             debug!("LM: Cost increased/stalled (RMS {current_rms} -> {current_iter_rms}). Increasing lambda to {lambda}");
                              // Don't update current_rms baseline if cost increased
                         }
 
                     } else {
                         // Augmented matrix is singular, increase lambda significantly and retry
-                        warn!("LM: Augmented matrix (H^TWH + lambda*D^2) singular with lambda={}. Increasing lambda.", lambda);
+                        warn!("LM: Augmented matrix (H^TWH + lambda*D^2) singular with lambda={lambda}. Increasing lambda.");
                         lambda *= self.lm_lambda_increase * 10.0; // Increase more aggressively
                         lambda = lambda.min(self.lm_lambda_max);
                         // Skip update in this iteration, force retry with larger lambda next time if possible
-                        continue; // Skip the rest of the loop and go to next iteration
+                        // Skip the rest of the loop and go to next iteration
+                        continue;
                     }
                 }
             }
-
 
             // --- Update State Estimate ---
             // Only update if the step is considered successful (esp. for LM)
             // Also hit if using normal equations because iteration_cost_decreased is forced to true
             if iteration_cost_decreased {
-                let mut state_correction = OVector::<f64, <D::StateType as State>::Size>::zeros();
-                for i in 0..6 {
-                    state_correction[i] = orbit_correction[i];
-                }
                 current_estimate = current_estimate + state_correction;
                 info!(
                     "[{iter}/{}] RMS: {current_iter_rms:.3}; corrections: {:.3} m\t{:.3} m/s",
                     self.max_iterations,
-                    orbit_correction.fixed_rows::<3>(0).norm() * 1e3,
-                    orbit_correction.fixed_rows::<3>(3).norm() * 1e3
+                    state_correction.fixed_rows::<3>(0).norm() * 1e3,
+                    state_correction.fixed_rows::<3>(3).norm() * 1e3
                 );
-                debug!("Updated estimate: {}", current_estimate.orbit());
 
-                 last_correction_norm = orbit_correction.norm();
+                last_correction_norm = state_correction.norm();
 
                 // --- Check Convergence ---
                 if last_correction_norm < self.tolerance {
-                    info!(
-                        "Converged in {iter} iterations. Final correction norm: {:.3e}",
-                        last_correction_norm
-                    );
+                    info!("Converged in {iter} iterations.");
                     converged = true;
                     break;
                 }
             } else if self.solver == BLSSolver::LevenbergMarquardt {
                  // LM step was rejected (cost increased)
-                 info!("LM: Step rejected in iteration {iter}. Retrying with increased lambda.");
+                 info!("[{iter}/{}] LM: Step rejected, increasing lambda.", self.max_iterations);
                  // Reset correction norm as step was bad
                  last_correction_norm = f64::MAX;
                  // The loop will continue with the increased lambda
             }
-
         }
 
         if !converged {
             warn!(
-                "Maximum iterations ({}) reached without convergence. Last correction norm: {:.3e}",
-                self.max_iterations, last_correction_norm
+                "Maximum iterations ({}) reached without convergence. Last correction norm: {last_correction_norm:.3e}",
+                self.max_iterations
             );
             // Optionally return error or the last state
             // return Err(BLSError::MaxIterationsReached { max_iter: self.max_iterations });
@@ -438,31 +430,28 @@ where
 
         // Compute final covariance P = (H^T W H)^-1
         // Need to recompute H^T W H using the *final* estimate
-        info!("Computing final covariance matrix");
-        let mut final_info_matrix = OMatrix::<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>::identity();
+        let mut final_info_matrix = StateMatrix::<D>::identity();
 
-         // Propagate final reference trajectory
-         let final_prop = self.prop.clone();
-         let mut final_prop_instance = final_prop.with(current_estimate.with_stm(), self.almanac.clone()).quiet();
-         final_prop_instance.state.reset_stm(); // Ensure STM starts as identity
+        // Propagate final reference trajectory
+        let mut state_at_msr = current_estimate;
+        let mut stm = StateMatrix::<D>::identity();
 
         for (epoch_ref, msr) in measurements.iter() {
             let msr_epoch = *epoch_ref;
 
             // Similar propagation as in the iteration loop, but using the final converged estimate
-            let mut state_to_prop = current_estimate.with_stm();
-            state_to_prop.reset_stm();
+            let mut prop_to_msr = self.prop.with(state_at_msr.with_stm(), self.almanac.clone()).quiet();
+            state_at_msr = prop_to_msr.until_epoch(msr_epoch).expect("TODO:");
 
-            let mut prop_to_msr = self.prop.with(state_to_prop, self.almanac.clone()).quiet();
-            let state_at_msr = prop_to_msr.until_epoch(msr_epoch).expect("TODO:");
+            // Get the STM Phi(t_i, t_0) from the propagated state
+            let this_stm = state_at_msr.stm().expect("TODO:");
+            stm *= this_stm;
 
             for msr_type in msr.data.keys().copied() {
                 let mut msr_types = IndexSet::new();
                 msr_types.insert(msr_type);
 
-                let stm = state_at_msr.stm().expect("TODO:");
                 let device = devices.get(&msr.tracker).ok_or_else(|| BLSError::DeviceNotFound { device_name: msr.tracker.clone() })?;
-
 
                 let h_tilde = device
                     .h_tilde::<U1>(msr, &msr_types, &state_at_msr, self.almanac.clone())
@@ -477,20 +466,13 @@ where
             }
         }
 
-        let final_covariance = match final_info_matrix.try_inverse() {
+        let covariance = match final_info_matrix.try_inverse() {
              Some(cov) => cov,
              None => {
                  warn!("Final information matrix H^TWH is singular. Returning identity covariance.");
-                 OMatrix::<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>::identity()
+                 StateMatrix::<D>::identity()
              }
         };
-
-        let mut covariance = OMatrix::<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>::zeros();
-        for i in 0..6 {
-            for j in 0..6 {
-                covariance[(i, i)] = final_covariance[(i, j)];
-            }
-        }
 
         info!("Batch Least Squares estimation completed.");
         Ok(BLSSolution {
