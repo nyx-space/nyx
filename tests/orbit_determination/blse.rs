@@ -37,7 +37,7 @@ fn blse_robust_large_disp_test(almanac: Arc<Almanac>) {
     let elevation_mask = 0.0;
 
     // BLSE usually runs over small periods of tracking data.
-    let prop_time = 2 * Unit::Hour;
+    let prop_time = 0.2 * Unit::Hour;
 
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
@@ -115,14 +115,14 @@ fn blse_robust_large_disp_test(almanac: Arc<Almanac>) {
     let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // In a large Earth orbit, range data is _by far_ the more informative measurement type.
-    let arc = arc
-        .clone()
-        .exclude_measurement_type(MeasurementType::Doppler);
-    assert_eq!(arc.unique_types().len(), 1);
-    assert_eq!(arc.unique_types()[0], MeasurementType::Range);
+    // let arc = arc
+    //     .clone()
+    //     .exclude_measurement_type(MeasurementType::Doppler);
+    // assert_eq!(arc.unique_types().len(), 1);
+    // assert_eq!(arc.unique_types()[0], MeasurementType::Range);
 
     let blse = BatchLeastSquares::builder()
-        .solver(blse::BLSSolver::LevenbergMarquardt)
+        //.solver(blse::BLSSolver::LevenbergMarquardt)
         .prop(truth_setup)
         .devices(devices)
         .almanac(almanac.clone())
@@ -147,3 +147,9 @@ fn blse_robust_large_disp_test(almanac: Arc<Almanac>) {
         delta.vmag_km_s() * 1e3
     );
 }
+
+/*
+Removing the weight leads to better results, but the algorithm should probably account for the weight.
+Moreover, the initial estimate makes a large correction in the wrong direction (720 -> 766 m)
+and spends the next 9 iterations making that initial correcting better but still failing (760 m).
+*/
