@@ -361,7 +361,7 @@ where
                                     msr_accepted_cnt += 1;
                                 }
                             } else {
-                                debug!("ignoring observation @ {epoch} because simulated {} does not expect it", msr.tracker);
+                                debug!("Device {} does not expect measurement at {epoch}, skipping", msr.tracker);
                             }
                         }
                         None => {

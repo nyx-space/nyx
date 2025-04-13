@@ -110,8 +110,8 @@ pub struct BatchLeastSquares<
     <D::StateType as State>::Size: DimName, // Add DimName bound for state size
     // Add Allocator constraints similar to KalmanODProcess, but using U1 for MsrSize
     <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
-    <DefaultAllocator as Allocator<<D::StateType as State>::Size>>::Buffer<f64>: Copy + Send + Sync,
-    <DefaultAllocator as Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>>::Buffer<f64>: Copy + Send + Sync,
+    <DefaultAllocator as Allocator<<D::StateType as State>::Size>>::Buffer<f64>: Copy,
+    <DefaultAllocator as Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>>::Buffer<f64>: Copy,
     DefaultAllocator: Allocator<<D::StateType as State>::Size>
         + Allocator<<D::StateType as State>::VecLength>
         + Allocator<U1> // MsrSize is U1
@@ -170,8 +170,8 @@ where
         + std::fmt::Debug, // Add Debug for logging
     <D::StateType as State>::Size: DimName,
     <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
-    <DefaultAllocator as Allocator<<D::StateType as State>::Size>>::Buffer<f64>: Copy + Send + Sync,
-    <DefaultAllocator as Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>>::Buffer<f64>: Copy + Send + Sync,
+    <DefaultAllocator as Allocator<<D::StateType as State>::Size>>::Buffer<f64>: Copy,
+    <DefaultAllocator as Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>>::Buffer<f64>: Copy,
     DefaultAllocator: Allocator<<D::StateType as State>::Size>
         + Allocator<<D::StateType as State>::VecLength>
         + Allocator<U1>
@@ -202,40 +202,36 @@ where
             "Starting Batch Least Squares estimation with {} measurements",
             num_measurements
         );
-        info!("Initial guess @ {}: {:?}", initial_guess.epoch(), initial_guess.orbit()); // Example state info
+        info!("Initial guess: {}", initial_guess.orbit());
+        info!("Initial guess: {:x}", initial_guess.orbit());
 
         let mut current_estimate = initial_guess;
-        let initial_epoch = initial_guess.epoch();
         let mut converged = false;
         let mut last_correction_norm = f64::MAX;
-        let mut lambda = self.lm_lambda_init; // LM parameter
-        let mut current_rms = f64::MAX; // Store RMS of weighted residuals
+        let mut lambda = self.lm_lambda_init;
+        let mut current_rms = f64::MAX;
+        let mut iter: usize = 0;
 
         // --- Iteration Loop ---
-        for iter in 0..self.max_iterations {
-            info!("Iteration {} / {}", iter + 1, self.max_iterations);
-            debug!("Current estimate @ {}: {:?}", current_estimate.epoch(), current_estimate.orbit());
+        while iter < self.max_iterations {
+            iter += 1;
+            info!("[{iter}/{}] Current estimate: {}", self.max_iterations, current_estimate.orbit());
 
             // Re-initialize matrices for this iteration
             // Information Matrix: Lambda = H^T * W * H
-            let mut info_matrix = OMatrix::<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>::zeros();
+            let mut info_matrix = OMatrix::<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>::identity();
             // Normal Matrix: N = H^T * W * dy
             let mut normal_matrix = OVector::<f64, <D::StateType as State>::Size>::zeros();
             // Sum of squares of weighted residuals for RMS calculation and LM cost
             let mut sum_sq_weighted_residuals = 0.0;
             let mut total_weight = 0.0; // For RMS
 
-            // --- Propagate Reference Trajectory for this Iteration ---
-            // We need the state *and* STM at each measurement time, relative to the initial epoch.
-            // Propagate the current_estimate (with identity STM at initial_epoch) to all measurement epochs.
-            // Storing the entire trajectory might be memory intensive for long arcs.
-            // Alternative: Propagate point-to-point within the measurement loop. Let's do that.
+            // Propagate Reference Trajectory for this Iteration
 
             // Create a propagator instance for this iteration's reference state
-             let prop = self.prop.clone();
-             let mut prop_instance = prop.with(current_estimate.with_stm(), self.almanac.clone()).quiet();
-             prop_instance.state.reset_stm(); // Ensure STM starts as identity at initial_epoch
-
+            let prop = self.prop.clone();
+            let mut prop_instance = prop.with(current_estimate.with_stm(), self.almanac.clone()).quiet();
+            prop_instance.state.reset_stm();
 
             // --- Measurement Loop ---
             for (msr_idx, (epoch_ref, msr)) in measurements.iter().enumerate() {
@@ -246,11 +242,12 @@ where
                 // but potentially slow. A full trajectory propagation per iteration is faster
                 // but needs careful state storage/retrieval. Let's stick to this simpler way first.
                 // Reset instance state to the start of the iteration's estimate
-                let mut state_to_prop = current_estimate.clone().with_stm();
-                state_to_prop.reset_stm(); // Ensure STM starts as identity at initial_epoch
+                let mut state_to_prop = current_estimate.with_stm();
+                state_to_prop.reset_stm();
 
-                let prop_to_msr = self.prop.clone();
-                let state_at_msr = prop_to_msr.with(state_to_prop, self.almanac.clone()).quiet().until_epoch(msr_epoch).expect("TODO:");
+                // let prop_to_msr = self.prop.clone();
+                let mut prop_to_msr = self.prop.with(state_to_prop, self.almanac.clone()).quiet();
+                let state_at_msr = prop_to_msr.until_epoch(msr_epoch).expect("TODO:");
 
                 // Get the STM Phi(t_i, t_0) from the propagated state
                 let stm = state_at_msr.stm().expect("TODO:");
@@ -266,36 +263,32 @@ where
                 // as device.measure might expect it.
                 // TODO: Check if device.measure can work with just a single StateType.
                 // If not, we need this temporary Traj.
-                let mut temp_traj = Traj::new();
-                temp_traj.states.push(state_at_msr);
 
                 // TODO: Iterate over each measurement
                 let msr_types = msr.data.iter().map(|(k, _v)| *k).collect::<IndexSet<MeasurementType>>();
 
                 let h_tilde = device
-                    .h_tilde::<U1>(&msr, &msr_types, &state_at_msr, self.almanac.clone()) // Pass temp_traj or state_at_msr
+                    .h_tilde::<U1>(msr, &msr_types, &state_at_msr, self.almanac.clone())
                     .map_err(|e| BLSError::SensitivityError { source: e })?;
 
                 // Compute expected measurement H(X(t_i))
-                // Assuming measure needs a Traj - adjust if it takes state directly
                 let computed_meas_opt = device
-                    .measure(msr_epoch, &temp_traj, None, self.almanac.clone())
+                    .measure_instantaneous(state_at_msr, None, self.almanac.clone())
                     .map_err(|e| BLSError::MeasurementError { source: e })?;
 
                 let computed_meas = match computed_meas_opt {
                     Some(cm) => cm,
                     None => {
-                         debug!("Device {} does not expect measurement at epoch {}, skipping", msr.tracker, msr_epoch);
+                         debug!("Device {} does not expect measurement at epoch {msr_epoch}, skipping", msr.tracker);
                          continue;
-                     } // Skip if device doesn't expect measurement (e.g., visibility)
+                     }
                 };
 
-                 // Get the computed observation value (it's U1)
-                 // Assume computed_meas.observation::<U1>() exists and handles bias internally if needed
-                 let computed_obs = computed_meas.observation::<U1>(&msr_types)[0]; // Get scalar value
+                // Get the computed observation value
+                let computed_obs = computed_meas.observation::<U1>(&msr_types)[0];
 
                 // Get real observation y_i
-                let real_obs_vec = msr.observation::<U1>(&msr_types); // Get U1 vector
+                let real_obs_vec = msr.observation::<U1>(&msr_types);
                 let real_obs = real_obs_vec[0]; // Get scalar value
 
                 // Sanity check measurement value
@@ -312,36 +305,43 @@ where
                     .measurement_covar_matrix(&msr_types, msr_epoch)
                     .map_err(|e| BLSError::MeasurementCovarError { source: e })?;
                 let r_variance = r_matrix[(0, 0)];
-                ensure!(r_variance > 0.0, SingularMatrixSnafu { details: format!("Zero measurement variance R for msr {} @ {}", msr_idx, msr_epoch)});
+                ensure!(r_variance > 0.0, SingularMatrixSnafu {
+                    details: format!("Zero measurement variance R for msr {} @ {}", msr_idx, msr_epoch)
+                });
                 let weight = 1.0 / r_variance;
 
                 // Compute H_matrix = H_tilde * Phi(t_i, t_0) (sensitivity wrt initial state X_0)
-                // H_tilde is [1 x state_size], Phi is [state_size x state_size]
-                // H_matrix is [1 x state_size]
-                let h_matrix = h_tilde * stm; // Matrix multiplication
+                let h_matrix = h_tilde * stm;
 
                 // Accumulate Information Matrix: info_matrix += H^T * W * H
                 // H^T is [state_size x 1], W is scalar, H is [1 x state_size]
                 // H^T * W * H is [state_size x state_size]
                 // Need to compute H^T * H first, then scale by W
-                info_matrix.gemm(weight, &h_matrix.transpose(), &h_matrix, 1.0); // info += W * H^T * H
+                // info += W * H^T * H
+                info_matrix.gemm(weight, &h_matrix.transpose(), &h_matrix, 1.0);
 
                 // Accumulate Normal Matrix: normal_matrix += H^T * W * dy
                 // H^T is [state_size x 1], W is scalar, dy is scalar
                 // H^T * W * dy is [state_size x 1]
-                normal_matrix.axpy(weight * residual, &h_matrix.transpose(), 1.0); // normal += (W*dy) * H^T
+                // normal += (W*dy) * H^T
+                normal_matrix.axpy(weight * residual, &h_matrix.transpose(), 1.0);
 
                 // Accumulate sum of squares of weighted residuals
                 sum_sq_weighted_residuals += weight * residual * residual;
                 total_weight += weight;
-            } // End of measurement loop
+            }
 
             // --- Solve for State Correction dx ---
             let state_correction: OVector<f64, <D::StateType as State>::Size>;
             let iteration_cost_decreased; // For LM logic
 
-            let current_iter_rms = if total_weight > 0.0 { (sum_sq_weighted_residuals / num_measurements as f64).sqrt() } else { 0.0 }; // Use num_measurements for consistency
-            debug!("Iteration {} RMS: {}", iter + 1, current_iter_rms);
+            // Use num_measurements for consistency
+            let current_iter_rms = if total_weight > 0.0 {
+                (sum_sq_weighted_residuals / num_measurements as f64).sqrt()
+            } else {
+                0.0
+            };
+            debug!("Iteration {} RMS: {}", iter, current_iter_rms);
 
             match self.solver {
                 BLSSolver::NormalEquations => {
@@ -351,7 +351,9 @@ where
                          None => return Err(BLSError::SingularMatrix{ details: format!("Information matrix H^TWH is singular in iteration {}", iter+1)})
                     };
                     state_correction = info_matrix_chol.solve(&normal_matrix);
-                    iteration_cost_decreased = true; // Assume NE always decreases cost locally
+                    // Assume NE always decreases cost locally
+                    iteration_cost_decreased = true;
+                    current_rms = current_iter_rms;
                 }
                 BLSSolver::LevenbergMarquardt => {
                      // Solve (Lambda + lambda * D^T D) * dx = N
@@ -367,7 +369,7 @@ where
                         for i in 0..state_size {
                             if d_sq[(i, i)] <= 0.0 {
                                 d_sq[(i, i)] = 1e-6; // Set a small positive floor
-                                warn!("LM Scaling: Found non-positive diagonal element {} in H^TWH at index {}, using floor.", info_matrix[(i,i)], i);
+                                warn!("LM Scaling: Found non-positive diagonal element {} in H^TWH, using floor.", info_matrix[(i,i)]);
                             }
                         }
                     } // else d_sq remains Identity
@@ -384,8 +386,10 @@ where
                         if current_iter_rms < current_rms || iter == 0 {
                             // Cost (approximated by RMS) decreased or first iteration
                             iteration_cost_decreased = true;
-                            lambda /= self.lm_lambda_decrease; // Decrease damping
-                            lambda = lambda.max(self.lm_lambda_min); // Clamp to min
+                            // Decrease damping
+                            lambda /= self.lm_lambda_decrease;
+                            // Clamp to min
+                            lambda = lambda.max(self.lm_lambda_min);
                             debug!("LM: Cost decreased (RMS {} -> {}). Decreasing lambda to {}", current_rms, current_iter_rms, lambda);
                             current_rms = current_iter_rms; // Update RMS baseline
                         } else {
@@ -406,24 +410,23 @@ where
                         continue; // Skip the rest of the loop and go to next iteration
                     }
                 }
-            } // End solver match
+            }
 
 
             // --- Update State Estimate ---
             // Only update if the step is considered successful (esp. for LM)
-            if iteration_cost_decreased || self.solver == BLSSolver::NormalEquations {
-                 let prev_estimate = current_estimate.clone(); // Keep copy for debugging/potential revert
-                 current_estimate = current_estimate + state_correction.clone(); // Requires State + OVector impl
-                 debug!("  Correction norm: {:.3e}", state_correction.norm());
-                 debug!("  Updated estimate @ {}: {:?}", current_estimate.epoch(), current_estimate.orbit());
+            // Also hit if using normal equations because iteration_cost_decreased is forced to true
+            if iteration_cost_decreased {
+                 current_estimate = current_estimate + state_correction;
+                 debug!("Correction norm: {:.3e}", state_correction.norm());
+                 debug!("Updated estimate: {}", current_estimate.orbit());
 
                  last_correction_norm = state_correction.norm();
 
                 // --- Check Convergence ---
                 if last_correction_norm < self.tolerance {
                     info!(
-                        "Converged in {} iterations. Final correction norm: {:.3e}",
-                        iter + 1,
+                        "Converged in {iter} iterations. Final correction norm: {:.3e}",
                         last_correction_norm
                     );
                     converged = true;
@@ -431,27 +434,26 @@ where
                 }
             } else if self.solver == BLSSolver::LevenbergMarquardt {
                  // LM step was rejected (cost increased)
-                 info!("LM: Step rejected in iteration {}. Retrying with increased lambda.", iter + 1);
+                 info!("LM: Step rejected in iteration {iter}. Retrying with increased lambda.");
                  last_correction_norm = f64::MAX; // Reset correction norm as step was bad
                  // The loop will continue with the increased lambda
             }
 
-        } // End of iteration loop
+        }
 
-        // --- Finalization ---
         if !converged {
             warn!(
                 "Maximum iterations ({}) reached without convergence. Last correction norm: {:.3e}",
                 self.max_iterations, last_correction_norm
             );
-             // Optionally return error or the last state
-             // return Err(BLSError::MaxIterationsReached { max_iter: self.max_iterations });
+            // Optionally return error or the last state
+            // return Err(BLSError::MaxIterationsReached { max_iter: self.max_iterations });
         }
 
         // Compute final covariance P = (H^T W H)^-1
         // Need to recompute H^T W H using the *final* estimate
-        info!("Computing final covariance matrix...");
-        let mut final_info_matrix = OMatrix::<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>::zeros();
+        info!("Computing final covariance matrix");
+        let mut final_info_matrix = OMatrix::<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>::identity();
 
          // Propagate final reference trajectory
          let final_prop = self.prop.clone();
@@ -459,13 +461,14 @@ where
          final_prop_instance.state.reset_stm(); // Ensure STM starts as identity
 
         for (epoch_ref, msr) in measurements.iter() {
-             let msr_epoch = *epoch_ref;
+            let msr_epoch = *epoch_ref;
 
-             // Similar propagation as in the iteration loop, but using the final converged estimate
-             let mut state_to_prop = current_estimate.clone().with_stm();
-             state_to_prop.reset_stm();
-             let prop_to_msr = self.prop.clone();
-             let state_at_msr = prop_to_msr.with(state_to_prop, self.almanac.clone()).quiet().until_epoch(msr_epoch).expect("TODO:");
+            // Similar propagation as in the iteration loop, but using the final converged estimate
+            let mut state_to_prop = current_estimate.with_stm();
+            state_to_prop.reset_stm();
+
+            let mut prop_to_msr = self.prop.with(state_to_prop, self.almanac.clone()).quiet();
+            let state_at_msr = prop_to_msr.until_epoch(msr_epoch).expect("TODO:");
 
             // TODO: Iterate over each measurement
             let msr_types = msr.data.iter().map(|(k, _v)| *k).collect::<IndexSet<MeasurementType>>();
@@ -475,7 +478,7 @@ where
 
 
              let h_tilde = device
-             .h_tilde::<U1>(&msr, &msr_types, &state_at_msr, self.almanac.clone()) // Pass temp_traj or state_at_msr
+             .h_tilde::<U1>(msr, &msr_types, &state_at_msr, self.almanac.clone())
              .map_err(|e| BLSError::SensitivityError { source: e })?;
 
             let r_matrix = device
@@ -499,19 +502,8 @@ where
         Ok(BLSSolution {
             estimated_state: current_estimate,
             covariance: final_covariance,
-            num_iterations: if converged {
-                (0..self.max_iterations)
-                    .find(|&iter| {
-                        // Find the actual iteration count based on last_correction_norm logic
-                        // This is a bit tricky, might be better to store the iter count when convergence breaks
-                        // For now, approximate:
-                        if last_correction_norm < self.tolerance { iter < self.max_iterations } else { true }
-                    })
-                    .unwrap_or(self.max_iterations) // Fallback
-            } else {
-                self.max_iterations
-            },
-            final_rms: current_rms, // Use the last computed RMS
+            num_iterations: iter,
+            final_rms: current_rms,
             final_correction_norm: last_correction_norm,
             converged,
         })

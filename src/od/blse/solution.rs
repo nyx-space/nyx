@@ -67,15 +67,10 @@ where
         + Allocator<<StateType as State>::VecLength>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Converged: {}", self.converged);
-        write!(f, "Iterations: {}", self.num_iterations);
-        write!(f, "Final RMS: {}", self.final_rms);
-        write!(
-            f,
-            "Final State @ {}: {:?}",
-            self.estimated_state.epoch(),
-            self.estimated_state.orbit()
-        );
-        write!(f, "Final Covariance:\n{}", self.covariance)
+        writeln!(f, "Converged: {}", self.converged)?;
+        writeln!(f, "Iterations: {}", self.num_iterations)?;
+        writeln!(f, "Final RMS: {}", self.final_rms)?;
+        writeln!(f, "Final State: {}", self.estimated_state.orbit())?;
+        write!(f, "Final Covariance:\n{:.3e}", self.covariance)
     }
 }

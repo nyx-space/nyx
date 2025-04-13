@@ -7,6 +7,7 @@ use nyx::od::ODError;
 use nyx::Spacecraft;
 use nyx::State;
 
+mod blse;
 mod measurements;
 mod multi_body;
 mod robust;
