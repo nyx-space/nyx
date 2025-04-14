@@ -225,16 +225,11 @@ where
             for (msr_idx, (epoch_ref, msr)) in measurements.iter().enumerate() {
                 let msr_epoch = *epoch_ref;
 
-                // Propagate reference state from initial_epoch to msr_epoch
-                // NOTE: This re-propagates from t0 each time, which is conceptually clean for BLS
-                // but potentially slow. A full trajectory propagation per iteration is faster
-                // but needs careful state storage/retrieval. Let's stick to this simpler way first.
-                // Reset instance state to the start of the iteration's estimate
+                // Propagate reference state from the previous state to msr_epoch
+                let prop_to_msr = self.prop.with(state_at_msr.with_stm(), self.almanac.clone());
+                state_at_msr = prop_to_msr.quiet().until_epoch(msr_epoch).expect("TODO:");
 
-                let mut prop_to_msr = self.prop.with(state_at_msr.with_stm(), self.almanac.clone()).quiet();
-                state_at_msr = prop_to_msr.until_epoch(msr_epoch).expect("TODO:");
-
-                // Get the STM Phi(t_i, t_0) from the propagated state
+                // Compute the STM Phi(t_i, t_0) from the propagated state's STM.
                 let this_stm = state_at_msr.stm().expect("TODO:");
                 stm = this_stm * stm.transpose();
 
@@ -243,12 +238,6 @@ where
                     Some(d) => d,
                     None => return Err(BLSError::DeviceNotFound { device_name: msr.tracker.clone() }),
                 };
-
-                // Compute H_tilde = dH/dX(t_i) at measurement time t_i
-                // Create a temporary Traj containing only the state at measurement time,
-                // as device.measure might expect it.
-                // TODO: Check if device.measure can work with just a single StateType.
-                // If not, we need this temporary Traj.
 
                 for msr_type in msr.data.keys().copied() {
                     let mut msr_types = IndexSet::new();
@@ -440,8 +429,8 @@ where
             let msr_epoch = *epoch_ref;
 
             // Similar propagation as in the iteration loop, but using the final converged estimate
-            let mut prop_to_msr = self.prop.with(state_at_msr.with_stm(), self.almanac.clone()).quiet();
-            state_at_msr = prop_to_msr.until_epoch(msr_epoch).expect("TODO:");
+            let prop_to_msr = self.prop.with(state_at_msr.with_stm(), self.almanac.clone());
+            state_at_msr = prop_to_msr.quiet().until_epoch(msr_epoch).expect("TODO:");
 
             // Get the STM Phi(t_i, t_0) from the propagated state
             let this_stm = state_at_msr.stm().expect("TODO:");

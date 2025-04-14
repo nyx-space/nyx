@@ -9,7 +9,7 @@ use nyx::dynamics::SpacecraftDynamics;
 use nyx::md::StateParameter;
 use nyx::od::prelude::*;
 use nyx::propagators::Propagator;
-use nyx::time::{Epoch, TimeUnits, Unit};
+use nyx::time::{Epoch, Unit};
 use nyx::utils::rss_orbit_errors;
 use nyx::Spacecraft;
 use nyx_space::mc::StateDispersion;
@@ -43,24 +43,22 @@ fn blse_robust_large_disp_test(almanac: Arc<Almanac>) {
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_utc_hms(2020, 1, 1, 4, 0, 0);
     let initial_state = Spacecraft::from(Orbit::keplerian(
-        22000.0, 0.01, 30.0, 80.0, 40.0, 45.0, dt, eme2k,
+        22000.0, 0.01, 30.0, 80.0, 40.0, 170.0, dt, eme2k,
     ));
 
-    let mut dss65_madrid = GroundStation::dss65_madrid(
+    let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
         StochasticNoise::default_range_km(),
         StochasticNoise::default_doppler_km_s(),
         iau_earth,
     );
-    // Set the integration time so as to generate two way measurements
-    dss65_madrid.integration_time = Some(60.seconds());
-    let mut dss34_canberra = GroundStation::dss34_canberra(
+
+    let dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
         StochasticNoise::default_range_km(),
         StochasticNoise::default_doppler_km_s(),
         iau_earth,
     );
-    dss34_canberra.integration_time = Some(60.seconds());
 
     // Define the tracking configurations
     let configs = BTreeMap::from([
@@ -141,9 +139,7 @@ fn blse_robust_large_disp_test(almanac: Arc<Almanac>) {
 }
 
 /*
-1. Understand why including the weight leads to a worse solution
 2. Change all errors to ODError
 3. Convergence should also include no improvement in RMS
 4. Stop if RMS increases.
---> Issue is with STM, probably. I'm trying to avoid having it go instable but it means the error stays about the same. I need to check this STM.
 */
