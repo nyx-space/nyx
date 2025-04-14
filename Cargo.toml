@@ -54,7 +54,7 @@ parquet = { version = "54.0.0", default-features = false, features = [
     "arrow",
     "zstd",
 ] }
-arrow = "54.0.0"
+arrow = "55.0.0"
 shadow-rs = { version = "1.0.1", default-features = false }
 serde_yml = "0.0.12"
 whoami = "1.3.0"
