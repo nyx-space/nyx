@@ -29,9 +29,14 @@ fn almanac() -> Arc<Almanac> {
 /// Tests the robustness of the Batch least squares estimator against large initial state errors.
 #[allow(clippy::identity_op)]
 #[rstest]
-// #[case(BLSSolver::NormalEquations)]
-#[case(BLSSolver::LevenbergMarquardt)]
-fn blse_robust_large_disp_test(#[case] solver: BLSSolver, almanac: Arc<Almanac>) {
+#[case(BLSSolver::NormalEquations, 60.seconds(), 2.minutes())]
+#[case(BLSSolver::LevenbergMarquardt, 10.seconds(), 10.minutes())]
+fn blse_robust_large_disp_cov_test(
+    #[case] solver: BLSSolver,
+    #[case] sample: Duration,
+    #[case] offset: Duration,
+    almanac: Arc<Almanac>,
+) {
     let _ = pretty_env_logger::try_init();
 
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
@@ -63,8 +68,14 @@ fn blse_robust_large_disp_test(#[case] solver: BLSSolver, almanac: Arc<Almanac>)
 
     // Define the tracking configurations
     let configs = BTreeMap::from([
-        (dss65_madrid.name.clone(), TrkConfig::default()),
-        (dss34_canberra.name.clone(), TrkConfig::default()),
+        (
+            dss65_madrid.name.clone(),
+            TrkConfig::from_sample_rate(sample),
+        ),
+        (
+            dss34_canberra.name.clone(),
+            TrkConfig::from_sample_rate(sample),
+        ),
     ]);
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
@@ -121,7 +132,10 @@ fn blse_robust_large_disp_test(#[case] solver: BLSSolver, almanac: Arc<Almanac>)
         .build();
 
     let blse_solution = blse
-        .estimate(initial_estimate.nominal_state, &arc)
+        .estimate(
+            initial_estimate.nominal_state,
+            &arc.filter_by_offset(..offset),
+        )
         .expect("blse should not fail");
 
     println!("{blse_solution}");

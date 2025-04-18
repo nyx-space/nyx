@@ -156,7 +156,7 @@ where
             num_measurements >= 2,
             TooFewMeasurementsSnafu {
                 need: 2_usize,
-                action: "bLSE"
+                action: "BLSE"
             }
         );
 
@@ -194,14 +194,8 @@ where
             // Store the STM to the start of the batch.
             let mut stm = StateMatrix::<D>::identity();
 
-            for (cnt, (epoch_ref, msr)) in measurements.iter().enumerate() {
+            for (epoch_ref, msr) in measurements.iter() {
                 let msr_epoch = *epoch_ref;
-
-                if cnt > 1 { // HACK.
-                    println!("end batch at {epoch_ref}");
-                    break;
-                }
-                println!("processing {epoch_ref}");
 
                 loop {
                     let delta_t = msr_epoch - epoch;
