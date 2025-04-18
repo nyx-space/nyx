@@ -213,7 +213,7 @@ where
             loop {
                 let delta_t = next_msr_epoch - epoch;
 
-                // Propagator for the minimum time between the maximum step size, the next step size, and the duration to the next measurement.
+                // Propagate for the minimum time between the maximum step size, the next step size, and the duration to the next measurement.
                 let next_step_size = delta_t.min(prop_instance.step_size).min(self.max_step);
 
                 // Remove old states from the trajectory

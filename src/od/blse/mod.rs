@@ -194,93 +194,105 @@ where
             // Store the STM to the start of the batch.
             let mut stm = StateMatrix::<D>::identity();
 
-            for (epoch_ref, msr) in measurements.iter() {
+            for (cnt, (epoch_ref, msr)) in measurements.iter().enumerate() {
                 let msr_epoch = *epoch_ref;
 
-                let delta_t = msr_epoch - epoch;
+                if cnt > 1 { // HACK.
+                    println!("end batch at {epoch_ref}");
+                    break;
+                }
+                println!("processing {epoch_ref}");
 
-                // Propagator for the minimum time between the maximum step size, the next step size, and the duration to the next measurement.
-                let next_step = delta_t.min(prop_inst.step_size).min(self.max_step);
+                loop {
+                    let delta_t = msr_epoch - epoch;
+                    if delta_t <= Duration::ZERO {
+                        // Move onto the next measurement.
+                        break;
+                    }
 
-                // Propagate reference state from the previous state to msr_epoch
-                let this_state = prop_inst.for_duration(next_step).context(ODPropSnafu)?;
-                epoch = this_state.epoch();
+                    // Propagate for the minimum time between the maximum step size, the next step size, and the duration to the next measurement.
+                    let next_step = delta_t.min(prop_inst.step_size).min(self.max_step);
 
-                // Grab the STM Phi(t_i, t_{i+1}) from the propagated state's STM.
-                let this_stm = this_state.stm().expect("STM unavailable");
-                // Compute the STM Phi(t_{i+1}, t_0) = Phi(t_i, t_{i+1})^T * Phi(t_i, t_0)
-                stm = this_stm.transpose() * stm;
+                    // Propagate reference state from the previous state to msr_epoch
+                    let this_state = prop_inst.for_duration(next_step).context(ODPropSnafu)?;
+                    epoch = this_state.epoch();
 
-                if (epoch - msr_epoch).abs() < self.epoch_precision {
-                    // Get the correct tracking device
-                    let device = match devices.get_mut(&msr.tracker) {
-                        Some(d) => d,
-                        None => {
-                            error!(
-                                "Tracker {} is not in the list of configured devices",
-                                msr.tracker
-                            );
-                            continue;
-                        }
-                    };
+                    // Grab the STM Phi(t_{i+1}, t_i) from the propagated state's STM.
+                    let step_stm = this_state.stm().expect("STM unavailable");
+                    // Compute the STM Phi(t_{i+1}, t_0) = Phi(t_{i+1}, t_i) * Phi(t_i, t_0)
+                    stm = step_stm * stm;
 
-                    for msr_type in msr.data.keys().copied() {
-                        let mut msr_types = IndexSet::new();
-                        msr_types.insert(msr_type);
-
-                        let h_tilde = device
-                        .h_tilde::<U1>(msr, &msr_types, &this_state, self.almanac.clone())?;
-
-                        // Compute expected measurement H(X(t_i))
-                        let computed_meas_opt = device
-                            .measure_instantaneous(this_state, None, self.almanac.clone())?;
-
-                        let computed_meas = match computed_meas_opt {
-                            Some(cm) => cm,
+                    if (epoch - msr_epoch).abs() < self.epoch_precision {
+                        // Get the correct tracking device
+                        let device = match devices.get_mut(&msr.tracker) {
+                            Some(d) => d,
                             None => {
-                                debug!("Device {} does not expect measurement at epoch {msr_epoch}, skipping", msr.tracker);
+                                error!(
+                                    "Tracker {} is not in the list of configured devices",
+                                    msr.tracker
+                                );
                                 continue;
                             }
                         };
 
-                        // Get the computed observation value
-                        let computed_obs = computed_meas.observation::<U1>(&msr_types)[0];
+                        for msr_type in msr.data.keys().copied() {
+                            let mut msr_types = IndexSet::new();
+                            msr_types.insert(msr_type);
 
-                        // Get real observation y_i
-                        let real_obs = msr.observation::<U1>(&msr_types)[0];
+                            let h_tilde = device
+                            .h_tilde::<U1>(msr, &msr_types, &this_state, self.almanac.clone())?;
 
-                        // Sanity check measurement value
-                        ensure!(
-                            real_obs.is_finite(),
-                            InvalidMeasurementSnafu {
-                                epoch: msr_epoch,
-                                val: real_obs
-                            }
-                        );
+                            // Compute expected measurement H(X(t_i))
+                            let computed_meas_opt = device
+                                .measure_instantaneous(this_state, None, self.almanac.clone())?;
 
-                        // Compute residual dy = y_i - H(X(t_i))
-                        let residual = real_obs - computed_obs;
+                            let computed_meas = match computed_meas_opt {
+                                Some(cm) => cm,
+                                None => {
+                                    debug!("Device {} does not expect measurement at epoch {msr_epoch}, skipping", msr.tracker);
+                                    continue;
+                                }
+                            };
 
-                        // Get measurement variance R (assuming 1x1 matrix) and weight W = 1/R
-                        let r_matrix = device
-                            .measurement_covar_matrix::<U1>(&msr_types, msr_epoch)?;
-                        let r_variance = r_matrix[(0, 0)];
+                            // Get the computed observation value
+                            let computed_obs = computed_meas.observation::<U1>(&msr_types)[0];
 
-                        ensure!(r_variance > 0.0, SingularNoiseRkSnafu);
-                        let weight = 1.0 / r_variance;
+                            // Get real observation y_i
+                            let real_obs = msr.observation::<U1>(&msr_types)[0];
 
-                        // Compute H_matrix = H_tilde * Phi(t_i, t_0) (sensitivity wrt initial state X_0)
-                        let h_matrix = h_tilde * stm;
+                            // Sanity check measurement value
+                            ensure!(
+                                real_obs.is_finite(),
+                                InvalidMeasurementSnafu {
+                                    epoch: msr_epoch,
+                                    val: real_obs
+                                }
+                            );
 
-                        // Accumulate Information Matrix: info_matrix += H^T * W * H
-                        // Recall that the weight is a scalar, so we can move it to the end of the operation.
-                        info_matrix += h_matrix.transpose() * &h_matrix * weight;
+                            // Compute residual dy = y_i - H(X(t_i))
+                            let residual = real_obs - computed_obs;
 
-                        // Accumulate Normal Matrix: normal_matrix += H^T * W * y
-                        normal_matrix += h_matrix.transpose() * residual * weight;
+                            // Get measurement variance R (assuming 1x1 matrix) and weight W = 1/R
+                            let r_matrix = device
+                                .measurement_covar_matrix::<U1>(&msr_types, msr_epoch)?;
+                            let r_variance = r_matrix[(0, 0)];
 
-                        // Accumulate sum of squares of weighted residuals
-                        sum_sq_weighted_residuals += weight * residual * residual;
+                            ensure!(r_variance > 0.0, SingularNoiseRkSnafu);
+                            let weight = 1.0 / r_variance;
+
+                            // Compute H_matrix = H_tilde * Phi(t_i, t_0) (sensitivity wrt initial state X_0)
+                            let h_matrix = h_tilde * stm;
+
+                            // Accumulate Information Matrix: info_matrix += H^T * W * H
+                            // Recall that the weight is a scalar, so we can move it to the end of the operation.
+                            info_matrix += h_matrix.transpose() * &h_matrix * weight;
+
+                            // Accumulate Normal Matrix: normal_matrix += H^T * W * y
+                            normal_matrix += h_matrix.transpose() * residual * weight;
+
+                            // Accumulate sum of squares of weighted residuals
+                            sum_sq_weighted_residuals += weight * residual * residual;
+                        }
                     }
                 }
             }
