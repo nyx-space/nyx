@@ -54,7 +54,6 @@ pub enum BLSSolver {
     NormalEquations,
     /// Levenberg-Marquardt: (H^T W H + lambda * D^T D) dx = H^T W dy
     LevenbergMarquardt,
-    // Could add more later, e.g., QR decomposition based
 }
 
 /// Configuration for the Batch Least Squares estimator
@@ -92,6 +91,13 @@ pub struct BatchLeastSquares<
     /// Maximum number of iterations
     #[builder(default = 10)]
     pub max_iterations: usize,
+    /// Maximum step size where the STM linearization is assumed correct
+    /// (30 seconds is usually fine, but too large and info matrix could be singular)
+    #[builder(default_code = "30 * Unit::Second")]
+    pub max_step: Duration,
+    /// Precision of the measurement epoch when processing measurements.
+    #[builder(default_code = "1 * Unit::Microsecond")]
+    pub epoch_precision: Duration,
     /// Initial damping factor for Levenberg-Marquardt
     #[builder(default = 10.0)]
     pub lm_lambda_init: f64,
@@ -160,6 +166,7 @@ where
         info!("Initial guess: {}", initial_guess.orbit());
 
         let mut current_estimate = initial_guess;
+        let mut current_covariance = StateMatrix::<D>::zeros();
         let mut converged = false;
         let mut last_correction_norm = f64::MAX;
         let mut lambda = self.lm_lambda_init;
@@ -179,89 +186,101 @@ where
             // Sum of squares of weighted residuals for RMS calculation and LM cost
             let mut sum_sq_weighted_residuals = 0.0;
 
-            let mut state_at_msr = current_estimate;
+            // Set up a single propagator for the whole iteration.
+            let mut prop_inst = self.prop.with(current_estimate.with_stm(), self.almanac.clone()).quiet();
+            let mut epoch = current_estimate.epoch();
+
+            // Store the STM to the start of the batch.
             let mut stm = StateMatrix::<D>::identity();
 
             for (epoch_ref, msr) in measurements.iter() {
                 let msr_epoch = *epoch_ref;
 
+                let delta_t = msr_epoch - epoch;
+
+                // Propagator for the minimum time between the maximum step size, the next step size, and the duration to the next measurement.
+                let next_step = delta_t.min(prop_inst.step_size).min(self.max_step);
+
                 // Propagate reference state from the previous state to msr_epoch
-                let prop_to_msr = self.prop.with(state_at_msr.with_stm(), self.almanac.clone());
-                state_at_msr = prop_to_msr.quiet().until_epoch(msr_epoch).expect("TODO:");
+                let this_state = prop_inst.for_duration(next_step).context(ODPropSnafu)?;
+                epoch = this_state.epoch();
 
-                // Compute the STM Phi(t_i, t_0) from the propagated state's STM.
-                let this_stm = state_at_msr.stm().expect("TODO:");
-                stm = this_stm * stm.transpose();
+                // Grab the STM Phi(t_i, t_{i+1}) from the propagated state's STM.
+                let this_stm = this_state.stm().expect("STM unavailable");
+                // Compute the STM Phi(t_{i+1}, t_0) = Phi(t_i, t_{i+1})^T * Phi(t_i, t_0)
+                stm = this_stm.transpose() * stm;
 
-                // Get the correct tracking device
-                let device = match devices.get_mut(&msr.tracker) {
-                    Some(d) => d,
-                    None => {
-                        error!(
-                            "Tracker {} is not in the list of configured devices",
-                            msr.tracker
-                        );
-                        continue;
-                    }
-                };
-
-                for msr_type in msr.data.keys().copied() {
-                    let mut msr_types = IndexSet::new();
-                    msr_types.insert(msr_type);
-
-                    let h_tilde = device
-                    .h_tilde::<U1>(msr, &msr_types, &state_at_msr, self.almanac.clone())?;
-
-                    // Compute expected measurement H(X(t_i))
-                    let computed_meas_opt = device
-                        .measure_instantaneous(state_at_msr, None, self.almanac.clone())?;
-
-                    let computed_meas = match computed_meas_opt {
-                        Some(cm) => cm,
+                if (epoch - msr_epoch).abs() < self.epoch_precision {
+                    // Get the correct tracking device
+                    let device = match devices.get_mut(&msr.tracker) {
+                        Some(d) => d,
                         None => {
-                            debug!("Device {} does not expect measurement at epoch {msr_epoch}, skipping", msr.tracker);
+                            error!(
+                                "Tracker {} is not in the list of configured devices",
+                                msr.tracker
+                            );
                             continue;
                         }
                     };
 
-                    // Get the computed observation value
-                    let computed_obs = computed_meas.observation::<U1>(&msr_types)[0];
+                    for msr_type in msr.data.keys().copied() {
+                        let mut msr_types = IndexSet::new();
+                        msr_types.insert(msr_type);
 
-                    // Get real observation y_i
-                    let real_obs = msr.observation::<U1>(&msr_types)[0];
+                        let h_tilde = device
+                        .h_tilde::<U1>(msr, &msr_types, &this_state, self.almanac.clone())?;
 
-                    // Sanity check measurement value
-                    ensure!(
-                        real_obs.is_finite(),
-                        InvalidMeasurementSnafu {
-                            epoch: msr_epoch,
-                            val: real_obs
-                        }
-                    );
+                        // Compute expected measurement H(X(t_i))
+                        let computed_meas_opt = device
+                            .measure_instantaneous(this_state, None, self.almanac.clone())?;
 
-                    // Compute residual dy = y_i - H(X(t_i))
-                    let residual = real_obs - computed_obs;
+                        let computed_meas = match computed_meas_opt {
+                            Some(cm) => cm,
+                            None => {
+                                debug!("Device {} does not expect measurement at epoch {msr_epoch}, skipping", msr.tracker);
+                                continue;
+                            }
+                        };
 
-                    // Get measurement variance R (assuming 1x1 matrix) and weight W = 1/R
-                    let r_matrix = device
-                        .measurement_covar_matrix::<U1>(&msr_types, msr_epoch)?;
-                    let r_variance = r_matrix[(0, 0)];
+                        // Get the computed observation value
+                        let computed_obs = computed_meas.observation::<U1>(&msr_types)[0];
 
-                    ensure!(r_variance > 0.0, SingularNoiseRkSnafu);
-                    let weight = 1.0 / r_variance;
+                        // Get real observation y_i
+                        let real_obs = msr.observation::<U1>(&msr_types)[0];
 
-                    // Compute H_matrix = H_tilde * Phi(t_i, t_0) (sensitivity wrt initial state X_0)
-                    let h_matrix = h_tilde * stm;
+                        // Sanity check measurement value
+                        ensure!(
+                            real_obs.is_finite(),
+                            InvalidMeasurementSnafu {
+                                epoch: msr_epoch,
+                                val: real_obs
+                            }
+                        );
 
-                    // Accumulate Information Matrix: info_matrix += H^T * W * H
-                    // Recall that the weight is a scalar, so we can move it to the end of the operation.
-                    info_matrix += h_matrix.transpose() * &h_matrix * weight;
+                        // Compute residual dy = y_i - H(X(t_i))
+                        let residual = real_obs - computed_obs;
 
-                    // Accumulate Normal Matrix: normal_matrix += H^T * W * y
-                    normal_matrix += h_matrix.transpose() * residual * weight;
+                        // Get measurement variance R (assuming 1x1 matrix) and weight W = 1/R
+                        let r_matrix = device
+                            .measurement_covar_matrix::<U1>(&msr_types, msr_epoch)?;
+                        let r_variance = r_matrix[(0, 0)];
 
-                    // Accumulate sum of squares of weighted residuals
-                    sum_sq_weighted_residuals += weight * residual * residual;
+                        ensure!(r_variance > 0.0, SingularNoiseRkSnafu);
+                        let weight = 1.0 / r_variance;
+
+                        // Compute H_matrix = H_tilde * Phi(t_i, t_0) (sensitivity wrt initial state X_0)
+                        let h_matrix = h_tilde * stm;
+
+                        // Accumulate Information Matrix: info_matrix += H^T * W * H
+                        // Recall that the weight is a scalar, so we can move it to the end of the operation.
+                        info_matrix += h_matrix.transpose() * &h_matrix * weight;
+
+                        // Accumulate Normal Matrix: normal_matrix += H^T * W * y
+                        normal_matrix += h_matrix.transpose() * residual * weight;
+
+                        // Accumulate sum of squares of weighted residuals
+                        sum_sq_weighted_residuals += weight * residual * residual;
+                    }
                 }
             }
 
@@ -357,6 +376,14 @@ where
                 );
 
                 last_correction_norm = state_correction.norm();
+                // Update the covariance
+                current_covariance = match info_matrix.try_inverse() {
+                    Some(cov) => cov,
+                    None => {
+                        warn!("Information matrix H^TWH is singular.");
+                        StateMatrix::<D>::identity()
+                    }
+               };
 
                 // --- Check Convergence ---
                 if last_correction_norm < self.tolerance {
@@ -374,62 +401,13 @@ where
         }
 
         if !converged {
-            warn!(
-                "Maximum iterations ({}) reached without convergence. Last correction norm: {last_correction_norm:.3e}",
-                self.max_iterations
-            );
-            // Optionally return error or the last state
-            // return Err(BLSError::MaxIterationsReached { max_iter: self.max_iterations });
+            warn!("Not converged after {} iterations.", self.max_iterations);
         }
-
-        // Compute final covariance P = (H^T W H)^-1
-        // Need to recompute H^T W H using the *final* estimate
-        let mut final_info_matrix = StateMatrix::<D>::identity();
-
-        // Propagate final reference trajectory
-        let mut state_at_msr = current_estimate;
-        let mut stm = StateMatrix::<D>::identity();
-
-        for (epoch_ref, msr) in measurements.iter() {
-            let msr_epoch = *epoch_ref;
-
-            // Similar propagation as in the iteration loop, but using the final converged estimate
-            let prop_to_msr = self.prop.with(state_at_msr.with_stm(), self.almanac.clone());
-            state_at_msr = prop_to_msr.quiet().until_epoch(msr_epoch).expect("TODO:");
-
-            // Get the STM Phi(t_i, t_0) from the propagated state
-            let this_stm = state_at_msr.stm().expect("TODO:");
-            stm *= this_stm;
-
-            for msr_type in msr.data.keys().copied() {
-                let mut msr_types = IndexSet::new();
-                msr_types.insert(msr_type);
-
-                let device = devices.get(&msr.tracker).expect("new tracker after BLSE!?");
-
-                let h_tilde = device
-                    .h_tilde::<U1>(msr, &msr_types, &state_at_msr, self.almanac.clone())?;
-
-                let r_matrix = device
-                    .measurement_covar_matrix::<U1>(&msr_types, msr_epoch)?;
-                let weight = 1.0 / r_matrix[(0, 0)];
-                let h_matrix = h_tilde * stm;
-                final_info_matrix.gemm(weight, &h_matrix.transpose(), &h_matrix, 1.0);
-            }
-        }
-
-        let covariance = match final_info_matrix.try_inverse() {
-             Some(cov) => cov,
-             None => {
-                 warn!("Final information matrix H^TWH is singular. Returning identity covariance.");
-                 StateMatrix::<D>::identity()
-             }
-        };
 
         info!("Batch Least Squares estimation completed.");
         Ok(BLSSolution {
             estimated_state: current_estimate,
-            covariance,
+            covariance: current_covariance,
             num_iterations: iter,
             final_rms: current_rms,
             final_correction_norm: last_correction_norm,

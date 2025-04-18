@@ -7,13 +7,13 @@ use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::SpacecraftDynamics;
 use nyx::md::StateParameter;
+use nyx::od::blse::*;
 use nyx::od::prelude::*;
 use nyx::propagators::Propagator;
-use nyx::time::{Epoch, Unit};
+use nyx::time::Epoch;
 use nyx::utils::rss_orbit_errors;
 use nyx::Spacecraft;
 use nyx_space::mc::StateDispersion;
-use nyx_space::od::blse::BatchLeastSquares;
 use nyx_space::propagators::IntegratorOptions;
 use std::collections::BTreeMap;
 
@@ -30,7 +30,9 @@ fn almanac() -> Arc<Almanac> {
 /// Tests the robustness of the Batch least squares estimator against large initial state errors.
 #[allow(clippy::identity_op)]
 #[rstest]
-fn blse_robust_large_disp_test(almanac: Arc<Almanac>) {
+#[case(BLSSolver::NormalEquations)]
+#[case(BLSSolver::LevenbergMarquardt)]
+fn blse_robust_large_disp_test(#[case] solver: BLSSolver, almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
     let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
@@ -44,8 +46,7 @@ fn blse_robust_large_disp_test(almanac: Arc<Almanac>) {
         22000.0, 0.01, 30.0, 80.0, 40.0, 170.0, dt, eme2k,
     ));
 
-    // let prop_time = initial_state.orbit.period().unwrap();
-    let prop_time = 6000.seconds();
+    let prop_time = initial_state.orbit.period().unwrap();
 
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
@@ -120,9 +121,8 @@ fn blse_robust_large_disp_test(almanac: Arc<Almanac>) {
     let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     let blse = BatchLeastSquares::builder()
-        // .solver(blse::BLSSolver::LevenbergMarquardt)
+        .solver(solver)
         .prop(truth_setup)
-        .max_iterations(3)
         .devices(devices)
         .almanac(almanac.clone())
         .build();
@@ -140,14 +140,26 @@ fn blse_robust_large_disp_test(almanac: Arc<Almanac>) {
     );
     let delta = (blse_solution.estimated_state.orbit - initial_state.orbit).unwrap();
     println!(
-        "RMAG error = {:.6} m\tVMAG error = {:.6} m/s",
+        "RMAG error = {:.3} m\tVMAG error = {:.3} m/s",
         delta.rmag_km() * 1e3,
         delta.vmag_km_s() * 1e3
+    );
+    let rmag_km_imp = init_rss_pos_km - delta.rmag_km();
+    let vmag_km_s_imp = init_rss_vel_km_s - delta.vmag_km_s();
+    println!(
+        "Improvement of |R| = {:.3} m\t|V| = {:.3} m/s",
+        rmag_km_imp * 1e3,
+        vmag_km_s_imp * 1e3,
+    );
+
+    assert!(
+        rmag_km_imp > 0.0,
+        "Position estimate not any better after BLSE"
     );
 }
 
 /*
-2. Change all errors to ODError
 3. Convergence should also include no improvement in RMS
-4. Stop if RMS increases.
+4. Stop if RMS increases
+6. Convert BLS Solution into KF Estimate
 */
