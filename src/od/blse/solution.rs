@@ -52,11 +52,8 @@ where
     pub covariance: OMatrix<f64, <StateType as State>::Size, <StateType as State>::Size>,
     pub num_iterations: usize,
     pub final_rms: f64,
-    pub final_correction_norm: f64,
+    pub final_corr_pos_km: f64,
     pub converged: bool,
-    // Store final residuals for analysis?
-    // pub residuals: Vec<f64>,
-    // pub weighted_residuals: Vec<f64>,
 }
 
 impl<StateType> fmt::Display for BLSSolution<StateType>
@@ -72,5 +69,25 @@ where
         writeln!(f, "Final RMS: {}", self.final_rms)?;
         writeln!(f, "Final State: {}", self.estimated_state.orbit())?;
         write!(f, "Final Covariance:\n{:.3e}", self.covariance)
+    }
+}
+
+impl<StateType: State> From<BLSSolution<StateType>> for KfEstimate<StateType>
+where
+    DefaultAllocator: Allocator<<StateType as State>::Size>
+        + Allocator<<StateType as State>::Size, <StateType as State>::Size>
+        + Allocator<<StateType as State>::VecLength>,
+    <DefaultAllocator as Allocator<<StateType as State>::Size>>::Buffer<f64>: Copy,
+    <DefaultAllocator as Allocator<<StateType as State>::Size, <StateType as State>::Size>>::Buffer<
+        f64,
+    >: Copy,
+{
+    fn from(mut bls: BLSSolution<StateType>) -> Self {
+        // Set the uncertainty on Cr, Cd, mass to zero
+        bls.covariance[(6, 6)] = 0.0;
+        bls.covariance[(7, 7)] = 0.0;
+        bls.covariance[(8, 8)] = 0.0;
+
+        Self::from_covar(bls.estimated_state, bls.covariance)
     }
 }

@@ -63,5 +63,3 @@ where
         }
     }
 }
-
-// TODO: Allow importing from parquet and initialization of a process, thereby allowing this to serve as a record!!

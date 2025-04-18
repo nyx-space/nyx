@@ -14,7 +14,6 @@ use nyx::time::Epoch;
 use nyx::utils::rss_orbit_errors;
 use nyx::Spacecraft;
 use nyx_space::mc::StateDispersion;
-use nyx_space::propagators::IntegratorOptions;
 use std::collections::BTreeMap;
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
@@ -102,13 +101,7 @@ fn blse_robust_large_disp_test(#[case] solver: BLSSolver, almanac: Arc<Almanac>)
 
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
-    let truth_setup = Propagator::rk89(
-        SpacecraftDynamics::new(orbital_dyn),
-        IntegratorOptions::builder()
-            .fixed_step(true)
-            .max_step(60.seconds())
-            .build(),
-    );
+    let truth_setup = Propagator::default(SpacecraftDynamics::new(orbital_dyn));
     let (_, traj) = truth_setup
         .with(initial_state, almanac.clone())
         .for_duration_with_traj(prop_time)
@@ -156,10 +149,7 @@ fn blse_robust_large_disp_test(#[case] solver: BLSSolver, almanac: Arc<Almanac>)
         rmag_km_imp > 0.0,
         "Position estimate not any better after BLSE"
     );
-}
 
-/*
-3. Convergence should also include no improvement in RMS
-4. Stop if RMS increases
-6. Convert BLS Solution into KF Estimate
-*/
+    let kf_est: KfEstimate<Spacecraft> = blse_solution.into();
+    println!("{kf_est}");
+}

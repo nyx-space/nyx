@@ -85,9 +85,9 @@ pub struct BatchLeastSquares<
     /// Solver method
     #[builder(default = BLSSolver::NormalEquations)]
     pub solver: BLSSolver,
-    /// Convergence tolerance on the norm of the state correction vector (dx)
-    #[builder(default = 1e-3)]
-    pub tolerance: f64,
+    /// Convergence tolerance on the norm of the correction on position, in kilometers
+    #[builder(default = 1e-4)]
+    pub tolerance_pos_km: f64,
     /// Maximum number of iterations
     #[builder(default = 10)]
     pub max_iterations: usize,
@@ -161,14 +161,15 @@ where
         );
 
         info!(
-            "Starting Batch Least Squares estimation with {num_measurements} measurements",
+            "Using {:?} in the Batch Least Squares estimation with {num_measurements} measurements",
+            self.solver
         );
         info!("Initial guess: {}", initial_guess.orbit());
 
         let mut current_estimate = initial_guess;
         let mut current_covariance = StateMatrix::<D>::zeros();
         let mut converged = false;
-        let mut last_correction_norm = f64::MAX;
+        let mut corr_pos_km = f64::MAX;
         let mut lambda = self.lm_lambda_init;
         let mut current_rms = f64::MAX;
         let mut iter: usize = 0;
@@ -368,14 +369,16 @@ where
             // Also hit if using normal equations because iteration_cost_decreased is forced to true
             if iteration_cost_decreased {
                 current_estimate = current_estimate + state_correction;
+                corr_pos_km = state_correction.fixed_rows::<3>(0).norm();
+
+                let corr_vel_km_s = state_correction.fixed_rows::<3>(3).norm();
                 info!(
                     "[{iter}/{}] RMS: {current_iter_rms:.3}; corrections: {:.3} m\t{:.3} m/s",
                     self.max_iterations,
-                    state_correction.fixed_rows::<3>(0).norm() * 1e3,
-                    state_correction.fixed_rows::<3>(3).norm() * 1e3
+                    corr_pos_km * 1e3,
+                    corr_vel_km_s * 1e3
                 );
 
-                last_correction_norm = state_correction.norm();
                 // Update the covariance
                 current_covariance = match info_matrix.try_inverse() {
                     Some(cov) => cov,
@@ -386,7 +389,7 @@ where
                };
 
                 // --- Check Convergence ---
-                if last_correction_norm < self.tolerance {
+                if corr_pos_km < self.tolerance_pos_km {
                     info!("Converged in {iter} iterations.");
                     converged = true;
                     break;
@@ -395,7 +398,7 @@ where
                  // LM step was rejected (cost increased)
                  info!("[{iter}/{}] LM: Step rejected, increasing lambda.", self.max_iterations);
                  // Reset correction norm as step was bad
-                 last_correction_norm = f64::MAX;
+                 corr_pos_km = f64::MAX;
                  // The loop will continue with the increased lambda
             }
         }
@@ -410,7 +413,7 @@ where
             covariance: current_covariance,
             num_iterations: iter,
             final_rms: current_rms,
-            final_correction_norm: last_correction_norm,
+            final_corr_pos_km: corr_pos_km,
             converged,
         })
     }
