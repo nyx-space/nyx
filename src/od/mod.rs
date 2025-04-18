@@ -113,6 +113,8 @@ pub enum ODError {
     InvalidMeasurement { epoch: Epoch, val: f64 },
     #[snafu(display("Kalman gain is singular"))]
     SingularKalmanGain,
+    #[snafu(display("Information matrix is singular"))]
+    SingularInformationMatrix,
     #[snafu(display("noise matrix is singular"))]
     SingularNoiseRk,
     #[snafu(display("{kind} noise not configured"))]
@@ -145,6 +147,8 @@ pub enum ODError {
         source: Box<StateError>,
         action: &'static str,
     },
+    #[snafu(display("Maximum iterations ({max_iter}) reached without convergence"))]
+    ODMaxIterations { max_iter: usize },
     #[snafu(display("Nyx orbit determination limitation: {action}"))]
     ODLimitation { action: &'static str },
 }

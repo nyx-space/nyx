@@ -47,47 +47,6 @@ pub use solution::BLSSolution;
 
 use self::msr::TrackingDataArc;
 
-// Define potential errors
-#[derive(Debug, Snafu)]
-#[snafu(visibility(pub(crate)))]
-pub enum BLSError {
-    #[snafu(display("Propagation failed: {source}"))]
-    Propagation { source: ODError },
-
-    #[snafu(display("Device '{device_name}' not found in configuration"))]
-    DeviceNotFound { device_name: String },
-
-    #[snafu(display("Measurement error from device: {source}"))]
-    MeasurementError { source: ODError },
-
-    #[snafu(display("Sensitivity (H_tilde) computation error: {source}"))]
-    SensitivityError { source: ODError },
-
-    #[snafu(display("Could not get measurement covariance: {source}"))]
-    MeasurementCovarError { source: ODError },
-
-    #[snafu(display("State does not contain STM at epoch {epoch:?}"))]
-    MissingSTM { epoch: Epoch },
-
-    #[snafu(display("Measurement at epoch {epoch:?} could not be computed"))]
-    MeasurementComputationFailed { epoch: Epoch },
-
-    #[snafu(display("Singular matrix encountered: {details}"))]
-    SingularMatrix { details: String },
-
-    #[snafu(display("Too few measurements ({count}) to estimate state"))]
-    TooFewMeasurements { count: usize },
-
-    #[snafu(display("Maximum iterations ({max_iter}) reached without convergence"))]
-    MaxIterationsReached { max_iter: usize },
-
-    #[snafu(display("Levenberg-Marquardt failed: {details}"))]
-    LMFailure { details: String },
-
-    #[snafu(display("Invalid measurement value {val} at epoch {epoch:?}"))]
-    InvalidMeasurementValue { epoch: Epoch, val: f64 },
-}
-
 /// Solver choice for the Batch Least Squares estimator
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BLSSolver {
@@ -182,7 +141,7 @@ where
         &self,
         initial_guess: D::StateType,
         arc: &TrackingDataArc,
-    ) -> Result<BLSSolution<D::StateType>, BLSError> {
+    ) -> Result<BLSSolution<D::StateType>, ODError> {
         let measurements = &arc.measurements;
         let num_measurements = measurements.len();
         let mut devices = self.devices.clone();
@@ -190,7 +149,8 @@ where
         ensure!(
             num_measurements >= 2,
             TooFewMeasurementsSnafu {
-                count: num_measurements
+                need: 2_usize,
+                action: "bLSE"
             }
         );
 
@@ -222,7 +182,7 @@ where
             let mut state_at_msr = current_estimate;
             let mut stm = StateMatrix::<D>::identity();
 
-            for (msr_idx, (epoch_ref, msr)) in measurements.iter().enumerate() {
+            for (epoch_ref, msr) in measurements.iter() {
                 let msr_epoch = *epoch_ref;
 
                 // Propagate reference state from the previous state to msr_epoch
@@ -236,7 +196,13 @@ where
                 // Get the correct tracking device
                 let device = match devices.get_mut(&msr.tracker) {
                     Some(d) => d,
-                    None => return Err(BLSError::DeviceNotFound { device_name: msr.tracker.clone() }),
+                    None => {
+                        error!(
+                            "Tracker {} is not in the list of configured devices",
+                            msr.tracker
+                        );
+                        continue;
+                    }
                 };
 
                 for msr_type in msr.data.keys().copied() {
@@ -244,13 +210,11 @@ where
                     msr_types.insert(msr_type);
 
                     let h_tilde = device
-                    .h_tilde::<U1>(msr, &msr_types, &state_at_msr, self.almanac.clone())
-                    .map_err(|e| BLSError::SensitivityError { source: e })?;
+                    .h_tilde::<U1>(msr, &msr_types, &state_at_msr, self.almanac.clone())?;
 
                     // Compute expected measurement H(X(t_i))
                     let computed_meas_opt = device
-                        .measure_instantaneous(state_at_msr, None, self.almanac.clone())
-                        .map_err(|e| BLSError::MeasurementError { source: e })?;
+                        .measure_instantaneous(state_at_msr, None, self.almanac.clone())?;
 
                     let computed_meas = match computed_meas_opt {
                         Some(cm) => cm,
@@ -269,7 +233,10 @@ where
                     // Sanity check measurement value
                     ensure!(
                         real_obs.is_finite(),
-                        InvalidMeasurementValueSnafu { epoch: msr_epoch, val: real_obs }
+                        InvalidMeasurementSnafu {
+                            epoch: msr_epoch,
+                            val: real_obs
+                        }
                     );
 
                     // Compute residual dy = y_i - H(X(t_i))
@@ -277,12 +244,10 @@ where
 
                     // Get measurement variance R (assuming 1x1 matrix) and weight W = 1/R
                     let r_matrix = device
-                        .measurement_covar_matrix(&msr_types, msr_epoch)
-                        .map_err(|e| BLSError::MeasurementCovarError { source: e })?;
+                        .measurement_covar_matrix::<U1>(&msr_types, msr_epoch)?;
                     let r_variance = r_matrix[(0, 0)];
-                    ensure!(r_variance > 0.0, SingularMatrixSnafu {
-                        details: format!("Zero measurement variance R for msr {msr_idx} @ {msr_epoch}")
-                    });
+
+                    ensure!(r_variance > 0.0, SingularNoiseRkSnafu);
                     let weight = 1.0 / r_variance;
 
                     // Compute H_matrix = H_tilde * Phi(t_i, t_0) (sensitivity wrt initial state X_0)
@@ -312,7 +277,7 @@ where
                     // Solve Lambda * dx = N => dx = Lambda^-1 * N
                     let info_matrix_chol = match info_matrix.cholesky() {
                          Some(chol) => chol,
-                         None => return Err(BLSError::SingularMatrix{ details: format!("Information matrix H^TWH is singular in iteration {iter}")})
+                         None => return Err(ODError::SingularInformationMatrix)
                     };
                     state_correction = info_matrix_chol.solve(&normal_matrix);
                     // Assume NE always decreases cost locally
@@ -440,15 +405,13 @@ where
                 let mut msr_types = IndexSet::new();
                 msr_types.insert(msr_type);
 
-                let device = devices.get(&msr.tracker).ok_or_else(|| BLSError::DeviceNotFound { device_name: msr.tracker.clone() })?;
+                let device = devices.get(&msr.tracker).expect("new tracker after BLSE!?");
 
                 let h_tilde = device
-                    .h_tilde::<U1>(msr, &msr_types, &state_at_msr, self.almanac.clone())
-                    .map_err(|e| BLSError::SensitivityError { source: e })?;
+                    .h_tilde::<U1>(msr, &msr_types, &state_at_msr, self.almanac.clone())?;
 
                 let r_matrix = device
-                    .measurement_covar_matrix(&msr_types, msr_epoch)
-                    .map_err(|e| BLSError::MeasurementCovarError { source: e })?;
+                    .measurement_covar_matrix::<U1>(&msr_types, msr_epoch)?;
                 let weight = 1.0 / r_matrix[(0, 0)];
                 let h_matrix = h_tilde * stm;
                 final_info_matrix.gemm(weight, &h_matrix.transpose(), &h_matrix, 1.0);

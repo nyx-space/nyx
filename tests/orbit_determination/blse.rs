@@ -14,6 +14,7 @@ use nyx::utils::rss_orbit_errors;
 use nyx::Spacecraft;
 use nyx_space::mc::StateDispersion;
 use nyx_space::od::blse::BatchLeastSquares;
+use nyx_space::propagators::IntegratorOptions;
 use std::collections::BTreeMap;
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
@@ -36,15 +37,15 @@ fn blse_robust_large_disp_test(almanac: Arc<Almanac>) {
     // Define the ground stations.
     let elevation_mask = 0.0;
 
-    // BLSE usually runs over small periods of tracking data.
-    let prop_time = 2 * Unit::Hour;
-
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_utc_hms(2020, 1, 1, 4, 0, 0);
     let initial_state = Spacecraft::from(Orbit::keplerian(
         22000.0, 0.01, 30.0, 80.0, 40.0, 170.0, dt, eme2k,
     ));
+
+    // let prop_time = initial_state.orbit.period().unwrap();
+    let prop_time = 6000.seconds();
 
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
@@ -100,7 +101,13 @@ fn blse_robust_large_disp_test(almanac: Arc<Almanac>) {
 
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
-    let truth_setup = Propagator::default(SpacecraftDynamics::new(orbital_dyn));
+    let truth_setup = Propagator::rk89(
+        SpacecraftDynamics::new(orbital_dyn),
+        IntegratorOptions::builder()
+            .fixed_step(true)
+            .max_step(60.seconds())
+            .build(),
+    );
     let (_, traj) = truth_setup
         .with(initial_state, almanac.clone())
         .for_duration_with_traj(prop_time)
@@ -115,6 +122,7 @@ fn blse_robust_large_disp_test(almanac: Arc<Almanac>) {
     let blse = BatchLeastSquares::builder()
         // .solver(blse::BLSSolver::LevenbergMarquardt)
         .prop(truth_setup)
+        .max_iterations(3)
         .devices(devices)
         .almanac(almanac.clone())
         .build();
