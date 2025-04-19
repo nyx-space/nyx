@@ -65,7 +65,7 @@ where
         )
     }
 
-    /// Return this state as a vector for the propagation/estimation
+    /// Return the state's _step_ state transition matrix.
     /// By default, this is not implemented. This function must be implemented when filtering on this state.
     fn stm(&self) -> Result<OMatrix<f64, Self::Size, Self::Size>, DynamicsError> {
         Err(DynamicsError::StateTransitionMatrixUnset)
@@ -74,8 +74,7 @@ where
     /// Copies the current state but sets the STM to identity
     fn with_stm(self) -> Self;
 
-    /// Return this state as a vector for the propagation/estimation
-    /// By default, this is not implemented. This function must be implemented when filtering on this state.
+    /// Resets the STM, unimplemented by default.
     fn reset_stm(&mut self) {
         unimplemented!()
     }
@@ -102,6 +101,7 @@ where
 
     /// Retrieve the Epoch
     fn epoch(&self) -> Epoch;
+
     /// Set the Epoch
     fn set_epoch(&mut self, epoch: Epoch);
 
