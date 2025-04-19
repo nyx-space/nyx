@@ -29,12 +29,15 @@ fn almanac() -> Arc<Almanac> {
 /// Tests the robustness of the Batch least squares estimator against large initial state errors.
 #[allow(clippy::identity_op)]
 #[rstest]
-#[case(BLSSolver::NormalEquations, 60.seconds(), 2.minutes())]
-#[case(BLSSolver::LevenbergMarquardt, 10.seconds(), 10.minutes())]
+#[case(BLSSolver::NormalEquations, 60.seconds(), 2.minutes(), false)]
+#[case(BLSSolver::LevenbergMarquardt, 10.seconds(), 10.minutes(), false)]
+#[case(BLSSolver::NormalEquations, 60.seconds(), 2.minutes(), true)]
+#[case(BLSSolver::LevenbergMarquardt, 10.seconds(), 10.minutes(), true)]
 fn blse_robust_large_disp_cov_test(
     #[case] solver: BLSSolver,
     #[case] sample: Duration,
     #[case] offset: Duration,
+    #[case] disperse: bool,
     almanac: Arc<Almanac>,
 ) {
     let _ = pretty_env_logger::try_init();
@@ -133,7 +136,11 @@ fn blse_robust_large_disp_cov_test(
 
     let blse_solution = blse
         .estimate(
-            initial_estimate.nominal_state,
+            if disperse {
+                initial_estimate.nominal_state
+            } else {
+                initial_state
+            },
             &arc.filter_by_offset(..offset),
         )
         .expect("blse should not fail");
@@ -159,10 +166,18 @@ fn blse_robust_large_disp_cov_test(
         vmag_km_s_imp * 1e3,
     );
 
-    assert!(
-        rmag_km_imp > 0.0,
-        "Position estimate not any better after BLSE"
-    );
+    if disperse {
+        assert!(
+            rmag_km_imp > 0.0,
+            "Position estimate not any better after BLSE"
+        );
+    } else {
+        // The RMAG error should be centimeter level, roughly the noise.
+        assert!(
+            delta.rmag_km() < 0.1,
+            "Position estimate without dispersions too large"
+        );
+    }
 
     let kf_est: KfEstimate<Spacecraft> = blse_solution.into();
     println!("{kf_est}");
