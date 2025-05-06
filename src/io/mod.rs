@@ -33,7 +33,7 @@ use serde_yml::Error as YamlError;
 use std::collections::{BTreeMap, HashMap};
 use std::convert::From;
 use std::fmt::Debug;
-use std::fs::File;
+use std::fs::{create_dir_all, File};
 use std::io::BufReader;
 use std::io::Error as IoError;
 use std::path::{Path, PathBuf};
@@ -67,6 +67,9 @@ pub struct ExportCfg {
     /// Set to true to append the timestamp to the filename
     #[builder(default)]
     pub timestamp: bool,
+    /// Timestamp separator, if timestamp is set to true.
+    #[builder(default = "-".to_string())]
+    pub timestamp_sep: String,
 }
 
 impl ExportCfg {
@@ -111,8 +114,15 @@ impl ExportCfg {
                         );
                         let ext = extension.to_str().unwrap();
                         let file_name = file_name_str.replace(&format!(".{ext}"), "");
-                        let new_file_name = format!("{file_name}-{stamp}.{}", ext);
+                        let new_file_name =
+                            format!("{file_name}{}{stamp}.{ext}", self.timestamp_sep);
                         path_buf.set_file_name(new_file_name);
+
+                        if let Some(parent_dir) = path_buf.parent() {
+                            if !parent_dir.exists() {
+                                create_dir_all(parent_dir).unwrap();
+                            }
+                        }
                     }
                 }
             }
