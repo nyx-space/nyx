@@ -48,7 +48,7 @@ regex = "1.5"
 rayon = "1.6"
 approx = "0.5"
 rand_pcg = "0.9"
-indicatif = { version = "0.17", features = ["rayon"], default-features = false }
+indicatif = { version = "0.18", features = ["rayon"], default-features = false }
 rstats = "2.0.1"
 parquet = { version = "55.0.0", default-features = false, features = [
     "arrow",
