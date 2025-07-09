@@ -72,7 +72,7 @@ statrs = "0.18.0"
 polars = { version = "0.49.0", features = ["parquet"] }
 rstest = "0.25.0"
 pretty_env_logger = "0.5"
-toml = "0.8.14"
+toml = "0.9.0"
 
 [build-dependencies]
 shadow-rs = "1.0.1"
