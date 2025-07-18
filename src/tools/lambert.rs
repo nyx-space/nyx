@@ -278,7 +278,7 @@ fn test_lambert_izzo_retrograde() {
 /// Solve the Lambert boundary problem using Izzo's method.
 ///
 /// This is an implementation of D. Izzo's method for solving Lambert's problem, as described in "Revisiting Lambert’s problem".
-/// The code was adapted from the Python version available in ESA's lamberthub, which is released under the MIT license.
+/// The code was adapted from the Python version available in jorgepiloto's [lamberthub](https://github.com/jorgepiloto/lamberthub/blob/main/src/lamberthub/universal_solvers/izzo.py), which is released under the GPL v3 license, compatible with Nyx's AGPL v3 license.
 /// Given the initial and final radii, a time of flight, and a gravitational parameters, it returns the needed initial and final velocities.
 ///
 /// # Arguments
