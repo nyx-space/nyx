@@ -46,37 +46,45 @@ pub fn izzo(
     mu_km3_s2: f64,
     kind: TransferKind,
 ) -> Result<LambertSolution, NyxError> {
-    let r1_norm = r_init.norm();
-    let r2_norm = r_final.norm();
+    let ri_norm = r_init.norm();
+    let rf_norm = r_final.norm();
 
     let chord = r_final - r_init;
     let c_norm = chord.norm();
 
     // Semi parameter
-    let s = (r1_norm + r2_norm + c_norm) * 0.5;
+    let s = (ri_norm + rf_norm + c_norm) * 0.5;
 
     // Versors
-    let r1_unit = r_init / r1_norm;
-    let r2_unit = r_final / r2_norm;
+    let i_r1 = r_init / ri_norm;
+    let i_r2 = r_final / rf_norm;
 
-    let mut h_unit = r1_unit.cross(&r2_unit);
-    h_unit /= h_unit.norm(); // Ensure normalization
+    let mut i_h = i_r1.cross(&i_r2);
+    i_h /= i_h.norm(); // Ensure normalization
 
     // Geometry of the problem
-    let mut ll = (1.0 - 1.0_f64.min(c_norm / s)).sqrt();
-    let (t1_unit, t2_unit) = if h_unit.z < 0.0 {
-        ll = -ll;
-        (r1_unit.cross(&h_unit), r2_unit.cross(&h_unit))
+    let lambda = 1.0 - c_norm / s;
+    let mut m_lambda = lambda.sqrt();
+
+    let retrograde = matches!(kind, TransferKind::LongWay);
+
+    let (mut i_t1, mut i_t2) = if i_h.z < 0.0 || retrograde {
+        // Transfer angle greater than 180 degrees
+        m_lambda = -m_lambda;
+        (i_r1.cross(&i_h), i_r2.cross(&i_h))
     } else {
-        (h_unit.cross(&r1_unit), h_unit.cross(&r2_unit))
+        (i_h.cross(&i_r1), i_h.cross(&i_r2))
     };
+    // Ensure unit vector
+    i_t1 /= i_t1.norm();
+    i_t2 /= i_t2.norm();
 
     // Always assume prograde for now
     let t = (2.0 * mu_km3_s2 / s.powi(3)).sqrt() * tof_s;
 
     // Find then filter solutions.
     let (x, y) = find_xy(
-        ll,
+        m_lambda,
         t,
         match kind {
             TransferKind::NRevs(revs) => revs.into(),
@@ -94,16 +102,16 @@ pub fn izzo(
 
     // Reconstruct
     let gamma = (mu_km3_s2 * s / 2.0).sqrt();
-    let rho = (r1_norm - r2_norm) / c_norm;
+    let rho = (ri_norm - rf_norm) / c_norm;
     let sigma = (1.0 - rho.powi(2)).sqrt();
 
     // Compute the radial and tangential components at initial and final
     // position vectors
-    let (v_r1, v_r2, v_t1, v_t2) = reconstruct(x, y, r1_norm, r2_norm, ll, gamma, rho, sigma);
+    let (v_r1, v_r2, v_t1, v_t2) = reconstruct(x, y, ri_norm, rf_norm, m_lambda, gamma, rho, sigma);
 
     // Solve for the initial and final velocity
-    let v_init = v_r1 * (r_init / r1_norm) + v_t1 * t1_unit;
-    let v_final = v_r2 * (r_final / r2_norm) + v_t2 * t2_unit;
+    let v_init = v_r1 * (r_init / ri_norm) + v_t1 * i_t1;
+    let v_final = v_r2 * (r_final / rf_norm) + v_t2 * i_t2;
 
     Ok(LambertSolution {
         v_init,
@@ -431,10 +439,10 @@ fn test_lambert_izzo_shortway() {
 
     let sol = izzo(ri, rf, tof_s, mu_km3_s2, TransferKind::ShortWay).unwrap();
 
-    println!("{sol:?}");
+    println!("{sol:?}\t{exp_vi}\t{exp_vf}");
 
-    assert!((dbg!(sol.v_init) - exp_vi).norm() < 1e-5);
-    assert!((dbg!(sol.v_final) - exp_vf).norm() < 1e-5);
+    assert!((sol.v_init - exp_vi).norm() < 1e-5);
+    assert!((sol.v_final - exp_vf).norm() < 1e-5);
 }
 
 #[test]
