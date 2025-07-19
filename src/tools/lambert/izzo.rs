@@ -72,7 +72,7 @@ pub fn izzo(
     };
 
     // Always assume prograde for now
-    let t = (2.0 * mu_km3_s2 / s.powi(2)).sqrt() * tof_s;
+    let t = (2.0 * mu_km3_s2 / s.powi(3)).sqrt() * tof_s;
 
     // Find then filter solutions.
     let (x, y) = find_xy(
