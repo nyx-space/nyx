@@ -17,8 +17,8 @@
 */
 
 use super::{
-    LambertError, LambertSolution, TransferKind, Vector3, LAMBERT_EPSILON, LAMBERT_EPSILON_RAD,
-    LAMBERT_EPSILON_TIME, MAX_ITERATIONS,
+    LambertError, LambertInput, LambertSolution, TransferKind, LAMBERT_EPSILON,
+    LAMBERT_EPSILON_RAD, LAMBERT_EPSILON_TIME, MAX_ITERATIONS,
 };
 
 use core::f64::consts::PI;
@@ -41,13 +41,12 @@ use core::f64::consts::PI;
 /// # Returns
 ///
 /// `Result<LambertSolution, NyxError>` - The solution to the Lambert problem or an error if the problem could not be solved.
-pub fn gooding(
-    r_init: Vector3<f64>,
-    r_final: Vector3<f64>,
-    tof_s: f64,
-    mu_km3_s2: f64,
-    kind: TransferKind,
-) -> Result<LambertSolution, LambertError> {
+pub fn gooding(input: LambertInput, kind: TransferKind) -> Result<LambertSolution, LambertError> {
+    let r_init = input.initial_state.radius_km;
+    let r_final = input.final_state.radius_km;
+    let tof_s = (input.final_state.epoch - input.initial_state.epoch).to_seconds();
+    let mu_km3_s2 = input.mu_km2_s3();
+
     let r_init_norm = r_init.norm();
     let r_final_norm = r_final.norm();
     let r_norm_product = r_init_norm * r_final_norm;
@@ -133,18 +132,73 @@ pub fn gooding(
     })
 }
 
-#[test]
-fn test_lambert_vallado_shortway() {
-    let ri = Vector3::new(15945.34, 0.0, 0.0);
-    let rf = Vector3::new(12214.83899, 10249.46731, 0.0);
-    let tof_s = 76.0 * 60.0;
-    let mu_km3_s2 = 3.98600433e5;
+#[cfg(test)]
+mod ut_lambert_gooding {
 
-    let exp_vi = Vector3::new(2.058913, 2.915965, 0.0);
-    let exp_vf = Vector3::new(-3.451565, 0.910315, 0.0);
+    use super::{gooding, TransferKind};
+    use crate::{linalg::Vector3, tools::lambert::LambertInput};
+    use anise::{frames::Frame, prelude::Orbit};
+    use hifitime::{Epoch, Unit};
+    #[test]
+    fn test_lambert_vallado_shortway() {
+        let frame = Frame {
+            ephemeris_id: 301,
+            orientation_id: 0,
+            mu_km3_s2: Some(3.98600433e5),
+            shape: None,
+        };
+        let initial_state = Orbit {
+            radius_km: Vector3::new(15945.34, 0.0, 0.0),
+            velocity_km_s: Vector3::zeros(),
+            epoch: Epoch::from_gregorian_utc_at_midnight(2025, 1, 1),
+            frame,
+        };
+        let final_state = Orbit {
+            radius_km: Vector3::new(12214.83899, 10249.46731, 0.0),
+            velocity_km_s: Vector3::zeros(),
+            epoch: Epoch::from_gregorian_utc_at_midnight(2025, 1, 1) + Unit::Minute * 76.0,
+            frame,
+        };
 
-    let sol = gooding(ri, rf, tof_s, mu_km3_s2, TransferKind::ShortWay).unwrap();
+        let input = LambertInput::from_planetary_states(initial_state, final_state).unwrap();
 
-    assert!(dbg!(sol.v_init - exp_vi).norm() < 1e-6);
-    assert!(dbg!(sol.v_final - exp_vf).norm() < 1e-6);
+        let exp_vi = Vector3::new(2.058913, 2.915965, 0.0);
+        let exp_vf = Vector3::new(-3.451565, 0.910315, 0.0);
+
+        let sol = gooding(input, TransferKind::ShortWay).unwrap();
+
+        assert!((sol.v_init - exp_vi).norm() < 1e-6);
+        assert!((sol.v_final - exp_vf).norm() < 1e-6);
+    }
+
+    #[test]
+    fn test_lambert_vallado_longway() {
+        let frame = Frame {
+            ephemeris_id: 301,
+            orientation_id: 0,
+            mu_km3_s2: Some(3.98600433e5),
+            shape: None,
+        };
+        let initial_state = Orbit {
+            radius_km: Vector3::new(15945.34, 0.0, 0.0),
+            velocity_km_s: Vector3::zeros(),
+            epoch: Epoch::from_gregorian_utc_at_midnight(2025, 1, 1),
+            frame,
+        };
+        let final_state = Orbit {
+            radius_km: Vector3::new(12214.83899, 10249.46731, 0.0),
+            velocity_km_s: Vector3::zeros(),
+            epoch: Epoch::from_gregorian_utc_at_midnight(2025, 1, 1) + Unit::Minute * 76.0,
+            frame,
+        };
+
+        let input = LambertInput::from_planetary_states(initial_state, final_state).unwrap();
+        let exp_vi = Vector3::new(-3.811158, -2.003854, 0.0);
+        let exp_vf = Vector3::new(4.207569, 0.914724, 0.0);
+
+        let sol = gooding(input, TransferKind::LongWay).unwrap();
+
+        assert!((sol.v_init - exp_vi).norm() < 1e-6);
+        assert!((sol.v_final - exp_vf).norm() < 1e-6);
+    }
 }

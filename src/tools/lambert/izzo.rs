@@ -20,7 +20,7 @@ use core::f64::consts::PI;
 
 use crate::errors::LambertError;
 
-use super::{LambertSolution, TransferKind, Vector3, LAMBERT_EPSILON, MAX_ITERATIONS};
+use super::{LambertInput, LambertSolution, TransferKind, LAMBERT_EPSILON, MAX_ITERATIONS};
 
 /// Solve the Lambert boundary problem using Izzo's method.
 ///
@@ -41,13 +41,12 @@ use super::{LambertSolution, TransferKind, Vector3, LAMBERT_EPSILON, MAX_ITERATI
 /// # Returns
 ///
 /// `Result<LambertSolution, NyxError>` - The solution to the Lambert problem or an error if the problem could not be solved.
-pub fn izzo(
-    r_init: Vector3<f64>,
-    r_final: Vector3<f64>,
-    tof_s: f64,
-    mu_km3_s2: f64,
-    kind: TransferKind,
-) -> Result<LambertSolution, LambertError> {
+pub fn izzo(input: LambertInput, kind: TransferKind) -> Result<LambertSolution, LambertError> {
+    let r_init = input.initial_state.radius_km;
+    let r_final = input.final_state.radius_km;
+    let tof_s = (input.final_state.epoch - input.initial_state.epoch).to_seconds();
+    let mu_km3_s2 = input.mu_km2_s3();
+
     let ri_norm = r_init.norm();
     let rf_norm = r_final.norm();
 
@@ -421,38 +420,79 @@ pub fn householder(
     Err(LambertError::SolverMaxIter { maxiter })
 }
 
-#[test]
-fn test_lambert_izzo_shortway() {
-    // Test case from Vallado, Example 7-1, p. 462
-    let ri = Vector3::new(15945.34, 0.0, 0.0);
-    let rf = Vector3::new(12214.83899, 10249.46731, 0.0);
-    let tof_s = 76.0 * 60.0;
-    let mu_km3_s2 = 3.98600433e5;
+#[cfg(test)]
+mod ut_lambert_izzo {
+    use super::{izzo, LambertInput, TransferKind};
+    use crate::linalg::Vector3;
+    use anise::prelude::{Frame, Orbit};
+    use hifitime::{Epoch, Unit};
 
-    let exp_vi = Vector3::new(2.058913, 2.915965, 0.0);
-    let exp_vf = Vector3::new(-3.451565, 0.910315, 0.0);
+    #[test]
+    fn test_lambert_izzo_shortway() {
+        // Test case from Vallado, Example 7-1, p. 462
 
-    let sol = izzo(ri, rf, tof_s, mu_km3_s2, TransferKind::ShortWay).unwrap();
+        let frame = Frame {
+            ephemeris_id: 301,
+            orientation_id: 0,
+            mu_km3_s2: Some(3.98600433e5),
+            shape: None,
+        };
+        let initial_state = Orbit {
+            radius_km: Vector3::new(15945.34, 0.0, 0.0),
+            velocity_km_s: Vector3::zeros(),
+            epoch: Epoch::from_gregorian_utc_at_midnight(2025, 1, 1),
+            frame,
+        };
+        let final_state = Orbit {
+            radius_km: Vector3::new(12214.83899, 10249.46731, 0.0),
+            velocity_km_s: Vector3::zeros(),
+            epoch: Epoch::from_gregorian_utc_at_midnight(2025, 1, 1) + Unit::Minute * 76.0,
+            frame,
+        };
 
-    println!("{sol:?}\t{exp_vi}\t{exp_vf}");
+        let input = LambertInput::from_planetary_states(initial_state, final_state).unwrap();
 
-    assert!((sol.v_init - exp_vi).norm() < 1e-5);
-    assert!((sol.v_final - exp_vf).norm() < 1e-5);
-}
+        let exp_vi = Vector3::new(2.058913, 2.915965, 0.0);
+        let exp_vf = Vector3::new(-3.451565, 0.910315, 0.0);
 
-#[test]
-fn test_lambert_izzo_longway() {
-    // Test case from Vallado, Example 7-1, p. 462
-    let ri = Vector3::new(15945.34, 0.0, 0.0);
-    let rf = Vector3::new(12214.83899, 10249.46731, 0.0);
-    let tof_s = 76.0 * 60.0;
-    let mu_km3_s2 = 3.98600433e5;
+        let sol = izzo(input, TransferKind::ShortWay).unwrap();
 
-    let exp_vi = Vector3::new(-3.811158, -2.003854, 0.0);
-    let exp_vf = Vector3::new(4.207569, 0.914724, 0.0);
+        println!("{sol:?}\t{exp_vi}\t{exp_vf}");
 
-    let sol = izzo(ri, rf, tof_s, mu_km3_s2, TransferKind::LongWay).unwrap();
+        assert!((sol.v_init - exp_vi).norm() < 1e-5);
+        assert!((sol.v_final - exp_vf).norm() < 1e-5);
+    }
 
-    assert!((sol.v_init - exp_vi).norm() < 1e-5);
-    assert!((sol.v_final - exp_vf).norm() < 1e-5);
+    #[test]
+    fn test_lambert_izzo_longway() {
+        // Test case from Vallado, Example 7-1, p. 462
+        let frame = Frame {
+            ephemeris_id: 301,
+            orientation_id: 0,
+            mu_km3_s2: Some(3.98600433e5),
+            shape: None,
+        };
+        let initial_state = Orbit {
+            radius_km: Vector3::new(15945.34, 0.0, 0.0),
+            velocity_km_s: Vector3::zeros(),
+            epoch: Epoch::from_gregorian_utc_at_midnight(2025, 1, 1),
+            frame,
+        };
+        let final_state = Orbit {
+            radius_km: Vector3::new(12214.83899, 10249.46731, 0.0),
+            velocity_km_s: Vector3::zeros(),
+            epoch: Epoch::from_gregorian_utc_at_midnight(2025, 1, 1) + Unit::Minute * 76.0,
+            frame,
+        };
+
+        let input = LambertInput::from_planetary_states(initial_state, final_state).unwrap();
+
+        let exp_vi = Vector3::new(-3.811158, -2.003854, 0.0);
+        let exp_vf = Vector3::new(4.207569, 0.914724, 0.0);
+
+        let sol = izzo(input, TransferKind::LongWay).unwrap();
+
+        assert!((sol.v_init - exp_vi).norm() < 1e-5);
+        assert!((sol.v_final - exp_vf).norm() < 1e-5);
+    }
 }

@@ -27,7 +27,6 @@ mod izzo;
 use anise::errors::PhysicsError;
 use anise::prelude::Orbit;
 pub use godding::gooding;
-use hifitime::Duration;
 pub use izzo::izzo;
 
 const TAU: f64 = 2.0 * PI;
@@ -86,25 +85,11 @@ impl TransferKind {
 
 #[derive(Debug)]
 pub struct LambertInput {
-    pub r_init: Vector3<f64>,
-    pub r_final: Vector3<f64>,
-    pub tof: Duration,
-    pub mu_km2_s3: f64,
+    pub initial_state: Orbit,
+    pub final_state: Orbit,
 }
 
 impl LambertInput {
-    /// Declination of the difference between the final and initial vector
-    pub fn declination_deg(&self) -> f64 {
-        let r_delta = self.r_final - self.r_init;
-        (r_delta.z / r_delta.norm()).asin().to_degrees()
-    }
-
-    /// Right ascension of the difference between the final and initial vector
-    pub fn right_ascension_deg(&self) -> f64 {
-        let r_delta = self.r_final - self.r_init;
-        r_delta.y.atan2(r_delta.x).to_degrees()
-    }
-
     pub fn from_planetary_states(
         initial_state: Orbit,
         final_state: Orbit,
@@ -118,15 +103,21 @@ impl LambertInput {
                 },
             });
         }
+        // Ensure that the GM is set
+        initial_state
+            .frame
+            .mu_km3_s2()
+            .map_err(|e| AstroError::AstroPhysics { source: e })?;
+
         Ok(Self {
-            r_init: initial_state.radius_km,
-            r_final: final_state.radius_km,
-            tof: final_state.epoch - initial_state.epoch,
-            mu_km2_s3: initial_state
-                .frame
-                .mu_km3_s2()
-                .map_err(|e| AstroError::AstroPhysics { source: e })?,
+            initial_state,
+            final_state,
         })
+    }
+
+    /// Return the gravitational parameter of this Lambert problem
+    pub fn mu_km2_s3(&self) -> f64 {
+        self.initial_state.frame.mu_km3_s2().unwrap()
     }
 }
 
@@ -135,20 +126,4 @@ pub struct LambertSolution {
     pub v_init: Vector3<f64>,
     pub v_final: Vector3<f64>,
     pub phi: f64,
-}
-
-#[test]
-fn test_lambert_vallado_lonway() {
-    let ri = Vector3::new(15945.34, 0.0, 0.0);
-    let rf = Vector3::new(12214.83899, 10249.46731, 0.0);
-    let tof_s = 76.0 * 60.0;
-    let mu_km3_s2 = 3.98600433e5;
-
-    let exp_vi = Vector3::new(-3.811158, -2.003854, 0.0);
-    let exp_vf = Vector3::new(4.207569, 0.914724, 0.0);
-
-    let sol = gooding(ri, rf, tof_s, mu_km3_s2, TransferKind::LongWay).unwrap();
-
-    assert!((sol.v_init - exp_vi).norm() < 1e-6);
-    assert!((sol.v_final - exp_vf).norm() < 1e-6);
 }
