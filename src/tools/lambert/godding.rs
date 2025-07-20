@@ -126,9 +126,10 @@ pub fn gooding(input: LambertInput, kind: TransferKind) -> Result<LambertSolutio
     let g = a * (y / mu_km3_s2).sqrt();
 
     Ok(LambertSolution {
-        v_init: (r_final - f * r_init) / g,
-        v_final: (1.0 / g) * (g_dot * r_final - r_init),
-        phi,
+        v_init_km_s: (r_final - f * r_init) / g,
+        v_final_km_s: (1.0 / g) * (g_dot * r_final - r_init),
+        phi_rad: phi,
+        input,
     })
 }
 
@@ -167,8 +168,17 @@ mod ut_lambert_gooding {
 
         let sol = gooding(input, TransferKind::ShortWay).unwrap();
 
-        assert!((sol.v_init - exp_vi).norm() < 1e-6);
-        assert!((sol.v_final - exp_vf).norm() < 1e-6);
+        assert!((sol.v_init_km_s - exp_vi).norm() < 1e-6);
+        assert!((sol.v_final_km_s - exp_vf).norm() < 1e-6);
+
+        println!("{sol:?}");
+        println!("{}\n{}", sol.transfer_orbit(), sol.arrival_orbit());
+        println!(
+            "v_inf+ = {} km/s -- c3 = {} km^2/s^2",
+            sol.v_inf_depart_km_s().norm(),
+            sol.c3_km2_s2()
+        );
+        println!("v_inf- = {} km/s", sol.v_inf_arrive_km_s().norm());
     }
 
     #[test]
@@ -198,7 +208,7 @@ mod ut_lambert_gooding {
 
         let sol = gooding(input, TransferKind::LongWay).unwrap();
 
-        assert!((sol.v_init - exp_vi).norm() < 1e-6);
-        assert!((sol.v_final - exp_vf).norm() < 1e-6);
+        assert!((sol.v_init_km_s - exp_vi).norm() < 1e-6);
+        assert!((sol.v_final_km_s - exp_vf).norm() < 1e-6);
     }
 }

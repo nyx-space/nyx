@@ -83,7 +83,7 @@ impl TransferKind {
     }
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct LambertInput {
     pub initial_state: Orbit,
     pub final_state: Orbit,
@@ -121,9 +121,47 @@ impl LambertInput {
     }
 }
 
-#[derive(Debug)]
+/// A solution to the Lambert problem.
+#[derive(Copy, Clone, Debug)]
 pub struct LambertSolution {
-    pub v_init: Vector3<f64>,
-    pub v_final: Vector3<f64>,
-    pub phi: f64,
+    pub v_init_km_s: Vector3<f64>,
+    pub v_final_km_s: Vector3<f64>,
+    /// Turn angle ONLY computed with Godding method
+    pub phi_rad: f64,
+    pub input: LambertInput,
+}
+
+impl LambertSolution {
+    /// Return the v infinity vector at departure, in km/s
+    pub fn v_inf_depart_km_s(&self) -> Vector3<f64> {
+        self.input.initial_state.velocity_km_s - self.v_init_km_s
+    }
+
+    /// Return v infinity vector at arrival, in km/s
+    pub fn v_inf_arrive_km_s(&self) -> Vector3<f64> {
+        self.input.final_state.velocity_km_s - self.v_final_km_s
+    }
+
+    /// Return the transfer orbit computed from adding the departure velocity to the initial state.
+    pub fn transfer_orbit(mut self) -> Orbit {
+        self.input.initial_state.velocity_km_s += self.v_init_km_s;
+        self.input.initial_state
+    }
+
+    /// Return the arrival orbit computed from subtracting the arrival velocity to the final state.
+    pub fn arrival_orbit(mut self) -> Orbit {
+        self.input.final_state.velocity_km_s -= self.v_final_km_s;
+        self.input.final_state
+    }
+
+    /// Return the declination of the departure v infinity, in degrees
+    pub fn v_inf_depart_declination_deg(&self) -> f64 {
+        let v_inf_km_s = self.v_inf_depart_km_s();
+        (v_inf_km_s.z / v_inf_km_s.norm()).asin().to_degrees()
+    }
+
+    /// Returns the c3 computed as the departure v infinity norm squared
+    pub fn c3_km2_s2(&self) -> f64 {
+        self.v_inf_depart_km_s().norm_squared()
+    }
 }

@@ -110,9 +110,10 @@ pub fn izzo(input: LambertInput, kind: TransferKind) -> Result<LambertSolution, 
     let v_final = v_r2 * (r_final / rf_norm) + v_t2 * i_t2;
 
     Ok(LambertSolution {
-        v_init,
-        v_final,
-        phi: 0.0,
+        v_init_km_s: v_init,
+        v_final_km_s: v_final,
+        phi_rad: 0.0,
+        input,
     })
 }
 
@@ -459,8 +460,8 @@ mod ut_lambert_izzo {
 
         println!("{sol:?}\t{exp_vi}\t{exp_vf}");
 
-        assert!((sol.v_init - exp_vi).norm() < 1e-5);
-        assert!((sol.v_final - exp_vf).norm() < 1e-5);
+        assert!((sol.v_init_km_s - exp_vi).norm() < 1e-5);
+        assert!((sol.v_final_km_s - exp_vf).norm() < 1e-5);
     }
 
     #[test]
@@ -492,7 +493,7 @@ mod ut_lambert_izzo {
 
         let sol = izzo(input, TransferKind::LongWay).unwrap();
 
-        assert!((sol.v_init - exp_vi).norm() < 1e-5);
-        assert!((sol.v_final - exp_vf).norm() < 1e-5);
+        assert!((sol.v_init_km_s - exp_vi).norm() < 1e-5);
+        assert!((sol.v_final_km_s - exp_vf).norm() < 1e-5);
     }
 }
