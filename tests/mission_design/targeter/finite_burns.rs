@@ -53,7 +53,7 @@ fn thrust_dir_tgt_sma_aop_raan(almanac: Arc<Almanac>) {
 
     let tgt = Targeter::thrust_dir(&setup, objectives);
 
-    println!("{}", tgt);
+    println!("{tgt}");
 
     let achievement_epoch = orig_dt + target_delta_t;
 
@@ -61,7 +61,7 @@ fn thrust_dir_tgt_sma_aop_raan(almanac: Arc<Almanac>) {
         .try_achieve_from(spacecraft, orig_dt, achievement_epoch, almanac)
         .unwrap();
 
-    println!("Finite differencing solution: {}", solution_fd);
+    println!("Finite differencing solution: {solution_fd}");
 }
 
 #[rstest]
@@ -99,7 +99,7 @@ fn thrust_dir_rate_tgt_sma_aop_raan(almanac: Arc<Almanac>) {
 
     let tgt = Targeter::thrust_dir_rate(&setup, objectives);
 
-    println!("{}", tgt);
+    println!("{tgt}");
 
     let achievement_epoch = orig_dt + target_delta_t;
 
@@ -107,7 +107,7 @@ fn thrust_dir_rate_tgt_sma_aop_raan(almanac: Arc<Almanac>) {
         .try_achieve_from(spacecraft, orig_dt, achievement_epoch, almanac.clone())
         .unwrap();
 
-    println!("Finite differencing solution: {}", solution);
+    println!("Finite differencing solution: {solution}");
     tgt.apply(&solution, almanac).unwrap();
 }
 
@@ -147,7 +147,7 @@ fn thrust_profile_tgt_sma_aop_raan_cov_test(almanac: Arc<Almanac>) {
 
     let tgt = Targeter::thrust_profile(&setup, objectives);
 
-    println!("{}", tgt);
+    println!("{tgt}");
 
     let achievement_epoch = orig_dt + target_delta_t;
 
@@ -155,7 +155,7 @@ fn thrust_profile_tgt_sma_aop_raan_cov_test(almanac: Arc<Almanac>) {
         .try_achieve_from(spacecraft, orig_dt, achievement_epoch, almanac)
         .unwrap();
 
-    println!("Finite differencing solution: {}", solution_fd);
+    println!("Finite differencing solution: {solution_fd}");
 }
 
 #[ignore]
@@ -213,7 +213,7 @@ fn val_tgt_finite_burn(almanac: Arc<Almanac>) {
         .with(sc_state, almanac.clone())
         .for_duration(prop_time)
         .unwrap();
-    println!("started: {}\nended   :{}", sc_state, sc_xf_desired);
+    println!("started: {sc_state}\nended   :{sc_xf_desired}");
 
     // Build an impulsive targeter for this known solution
     let sc_no_thrust = SpacecraftDynamics::new(orbital_dyn);
@@ -235,8 +235,8 @@ fn val_tgt_finite_burn(almanac: Arc<Almanac>) {
     )
     .unwrap();
 
-    println!("{}", impulsive_tgt);
-    println!("\n\nKNOWN SOLUTION\n{}", mnvr0);
+    println!("{impulsive_tgt}");
+    println!("\n\nKNOWN SOLUTION\n{mnvr0}");
 
     // Solve for this known solution
     // let fb_mnvr =

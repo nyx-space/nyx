@@ -438,9 +438,9 @@ mod ut_poly {
         let p = Polynomial {
             coefficients: [101.0, -2.0, 3.0],
         };
-        println!("{}", p);
+        println!("{p}");
         assert_eq!(
-            format!("{}", p),
+            format!("{p}"),
             format!("{}", CommonPolynomial::Quadratic(3.0, -2.0, 101.0))
         );
     }
@@ -461,7 +461,7 @@ mod ut_poly {
 
         // let p3 = add::<4, 3>(p2, p1);
         let p3 = p1 + p2;
-        println!("p3 = {:x}\npe = {:x}", p3, p_expected);
+        println!("p3 = {p3:x}\npe = {p_expected:x}");
         assert_eq!(p3, p_expected);
         // Check this is correct
         for i in -100..=100 {
@@ -489,7 +489,7 @@ mod ut_poly {
         };
 
         let p3 = p1 - p2;
-        println!("p3 = {:x}\npe = {:x}", p3, p_expected);
+        println!("p3 = {p3:x}\npe = {p_expected:x}");
         assert_eq!(p3, p_expected);
         // Check this is correct
         for i in -100..=100 {

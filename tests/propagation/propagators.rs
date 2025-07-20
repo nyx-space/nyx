@@ -75,8 +75,7 @@ fn regress_leo_day_adaptive(almanac: Arc<Almanac>) {
     if prev_details.error > accuracy {
         assert_eq!(
             prev_details.step, min_step,
-            "step size should be at its minimum because error is higher than tolerance: {:?}",
-            prev_details
+            "step size should be at its minimum because error is higher than tolerance: {prev_details:?}"
         );
     }
 }
@@ -171,8 +170,7 @@ fn gmat_val_leo_day_adaptive(almanac: Arc<Almanac>) {
         if prev_details.error > accuracy {
             assert_eq!(
                 prev_details.step, min_step,
-                "step size should be at its minimum because error is higher than tolerance: {:?}",
-                prev_details
+                "step size should be at its minimum because error is higher than tolerance: {prev_details:?}"
             );
         }
         assert_orbit_eq_or_abs(
@@ -233,8 +231,7 @@ fn gmat_val_leo_day_adaptive(almanac: Arc<Almanac>) {
         if prev_details.error > accuracy {
             assert_eq!(
                 prev_details.step, min_step,
-                "step size should be at its minimum because error is higher than tolerance: {:?}",
-                prev_details
+                "step size should be at its minimum because error is higher than tolerance: {prev_details:?}"
             );
         }
     }
@@ -266,8 +263,7 @@ fn gmat_val_leo_day_adaptive(almanac: Arc<Almanac>) {
         if prev_details.error > accuracy {
             assert_eq!(
                 prev_details.step, min_step,
-                "step size should be at its minimum because error is higher than tolerance: {:?}",
-                prev_details
+                "step size should be at its minimum because error is higher than tolerance: {prev_details:?}"
             );
         }
     }
@@ -299,8 +295,7 @@ fn gmat_val_leo_day_adaptive(almanac: Arc<Almanac>) {
         if prev_details.error > accuracy {
             assert_eq!(
                 prev_details.step, min_step,
-                "step size should be at its minimum because error is higher than tolerance: {:?}",
-                prev_details
+                "step size should be at its minimum because error is higher than tolerance: {prev_details:?}"
             );
         }
     }

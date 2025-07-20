@@ -101,12 +101,11 @@ fn val_transfer_schedule_no_depl(almanac: Arc<Almanac>) {
     println!();
 
     println!(
-        "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s",
-        err_r, err_v,
+        "RSS errors:\tpos = {err_r:.5e} km\tvel = {err_v:.5e} km/s",
     );
 
-    assert!(err_r < 5e-10, "finite burn position wrong: {:.5e}", err_r);
-    assert!(err_v < 6e-13, "finite burn velocity wrong: {:.5e}", err_v);
+    assert!(err_r < 5e-10, "finite burn position wrong: {err_r:.5e}");
+    assert!(err_v < 6e-13, "finite burn velocity wrong: {err_v:.5e}");
 
     // Ensure that there was no change in prop mass since tank depletion was off
     assert!(
@@ -195,15 +194,14 @@ fn val_transfer_schedule_depl_cov_test(almanac: Arc<Almanac>) {
     println!();
 
     println!(
-        "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s",
-        err_r, err_v,
+        "RSS errors:\tpos = {err_r:.5e} km\tvel = {err_v:.5e} km/s",
     );
 
-    assert!(err_r < 5e-10, "finite burn position wrong: {:.5e}", err_r);
-    assert!(err_v < 5e-13, "finite burn velocity wrong: {:.5e}", err_v);
+    assert!(err_r < 5e-10, "finite burn position wrong: {err_r:.5e}");
+    assert!(err_v < 5e-13, "finite burn velocity wrong: {err_v:.5e}");
 
     let delta_prop_mass = (final_state.mass.prop_mass_kg - rslt_prop_mass).abs();
-    println!("Absolute prop mass error: {:.0e} kg", delta_prop_mass);
+    println!("Absolute prop mass error: {delta_prop_mass:.0e} kg");
     assert!(delta_prop_mass < 2e-10, "incorrect prop mass");
 
     // Now, test that backward propagation of maneuvers also works.
@@ -211,7 +209,7 @@ fn val_transfer_schedule_depl_cov_test(almanac: Arc<Almanac>) {
         .with(final_state, almanac)
         .for_duration(-prop_time)
         .unwrap();
-    println!("Reached: {}\nWanted:  {}", backward_state, sc_state);
+    println!("Reached: {backward_state}\nWanted:  {sc_state}");
 
     let (err_r, err_v) = rss_orbit_vec_errors(
         &backward_state.orbit.to_cartesian_pos_vel(),
@@ -225,19 +223,16 @@ fn val_transfer_schedule_depl_cov_test(almanac: Arc<Almanac>) {
     println!();
 
     println!(
-        "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s",
-        err_r, err_v,
+        "RSS errors:\tpos = {err_r:.5e} km\tvel = {err_v:.5e} km/s",
     );
 
     assert!(
         err_r < 1.0,
-        "finite burn backprop position wrong: {:.5e}",
-        err_r
+        "finite burn backprop position wrong: {err_r:.5e}"
     );
     assert!(
         err_v < 1e-3,
-        "finite burn backprop velocity wrong: {:.5e}",
-        err_v
+        "finite burn backprop velocity wrong: {err_v:.5e}"
     );
 }
 
@@ -326,15 +321,14 @@ fn val_transfer_single_maneuver_depl_cov_test(almanac: Arc<Almanac>) {
     println!();
 
     println!(
-        "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s",
-        err_r, err_v,
+        "RSS errors:\tpos = {err_r:.5e} km\tvel = {err_v:.5e} km/s",
     );
 
-    assert!(err_r < 5e-10, "finite burn position wrong: {:.5e}", err_r);
-    assert!(err_v < 5e-13, "finite burn velocity wrong: {:.5e}", err_v);
+    assert!(err_r < 5e-10, "finite burn position wrong: {err_r:.5e}");
+    assert!(err_v < 5e-13, "finite burn velocity wrong: {err_v:.5e}");
 
     let delta_prop_mass = (final_state.mass.prop_mass_kg - rslt_prop_mass).abs();
-    println!("Absolute prop mass error: {:.0e} kg", delta_prop_mass);
+    println!("Absolute prop mass error: {delta_prop_mass:.0e} kg");
     assert!(delta_prop_mass < 2e-10, "incorrect prop mass");
 
     // Now, test that backward propagation of maneuvers also works.
@@ -342,7 +336,7 @@ fn val_transfer_single_maneuver_depl_cov_test(almanac: Arc<Almanac>) {
         .with(final_state, almanac)
         .for_duration(-prop_time)
         .unwrap();
-    println!("Reached: {}\nWanted:  {}", backward_state, sc_state);
+    println!("Reached: {backward_state}\nWanted:  {sc_state}");
 
     let (err_r, err_v) = rss_orbit_vec_errors(
         &backward_state.orbit.to_cartesian_pos_vel(),
@@ -356,18 +350,15 @@ fn val_transfer_single_maneuver_depl_cov_test(almanac: Arc<Almanac>) {
     println!();
 
     println!(
-        "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s",
-        err_r, err_v,
+        "RSS errors:\tpos = {err_r:.5e} km\tvel = {err_v:.5e} km/s",
     );
 
     assert!(
         err_r < 1.0,
-        "finite burn backprop position wrong: {:.5e}",
-        err_r
+        "finite burn backprop position wrong: {err_r:.5e}"
     );
     assert!(
         err_v < 1e-3,
-        "finite burn backprop velocity wrong: {:.5e}",
-        err_v
+        "finite burn backprop velocity wrong: {err_v:.5e}"
     );
 }

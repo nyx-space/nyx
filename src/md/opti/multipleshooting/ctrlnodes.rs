@@ -215,7 +215,7 @@ orientation_id = 1
     };
     let toml_ser = toml::to_string(&v).unwrap();
 
-    println!("GOT\n{}\n\nWANTED:{}", toml_ser, str_nodes);
+    println!("GOT\n{toml_ser}\n\nWANTED:{str_nodes}");
 
     assert_eq!(toml_ser, str_nodes);
 }

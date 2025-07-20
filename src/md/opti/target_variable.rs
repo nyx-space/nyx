@@ -145,7 +145,7 @@ impl Variable {
                 "{:?}: max step is negative: {}",
                 self.component, self.max_step
             );
-            error!("{}", msg);
+            error!("{msg}");
             return Err(TargetingError::VariableError { msg });
         }
         if self.max_value < 0.0 {
@@ -153,7 +153,7 @@ impl Variable {
                 "{:?}: max value is negative: {}",
                 self.component, self.max_value
             );
-            error!("{}", msg);
+            error!("{msg}");
             return Err(TargetingError::VariableError { msg });
         }
         if self.min_value > self.max_value {
@@ -161,7 +161,7 @@ impl Variable {
                 "{:?}: min value is greater than max value: {} > {}",
                 self.component, self.min_value, self.max_value
             );
-            error!("{}", msg);
+            error!("{msg}");
             return Err(TargetingError::VariableError { msg });
         }
         Ok(())

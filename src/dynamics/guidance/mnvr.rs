@@ -101,8 +101,7 @@ impl fmt::Display for MnvrRepr {
             MnvrRepr::Vector(vector) => write!(f, "{vector}"),
             MnvrRepr::Angles { azimuth, elevation } => write!(
                 f,
-                "\tazimuth (in-plane) α: {}\n\televation (out-of-plane) β: {}",
-                azimuth, elevation
+                "\tazimuth (in-plane) α: {azimuth}\n\televation (out-of-plane) β: {elevation}"
             ),
         }
     }

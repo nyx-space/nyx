@@ -134,7 +134,7 @@ fn alt_orbit_raising_cov_test(almanac: Arc<Almanac>) {
     let solution = &multishoot_sol.solutions[node_count - 1];
     let sc_sol = solution.achieved_state;
 
-    println!("{}", multishoot_sol);
+    println!("{multishoot_sol}");
 
     // Compute the total delta-v of the solution
     let mut dv_ms = 0.0;
@@ -142,8 +142,7 @@ fn alt_orbit_raising_cov_test(almanac: Arc<Almanac>) {
         dv_ms += sol.correction.norm() * 1e3;
     }
     println!(
-        "Multiple shooting solution requires a total of {:.3} m/s",
-        dv_ms
+        "Multiple shooting solution requires a total of {dv_ms:.3} m/s"
     );
 
     // Propagate the initial orbit too
@@ -327,7 +326,7 @@ fn vmag_orbit_raising(almanac: Arc<Almanac>) {
     let solution = &multishoot_sol.solutions[node_count - 1];
     let sc_sol = solution.achieved_state;
 
-    println!("{}", multishoot_sol);
+    println!("{multishoot_sol}");
 
     // Compute the total delta-v of the solution
     let mut dv_ms = 0.0;
@@ -335,8 +334,7 @@ fn vmag_orbit_raising(almanac: Arc<Almanac>) {
         dv_ms += sol.correction.norm() * 1e3;
     }
     println!(
-        "Multiple shooting solution requires a total of {:.3} m/s",
-        dv_ms
+        "Multiple shooting solution requires a total of {dv_ms:.3} m/s"
     );
 
     assert!((dv_ms - 735.9).abs() < 0.1, "Wrong total DV");
@@ -411,7 +409,7 @@ fn vmag_orbit_raising(almanac: Arc<Almanac>) {
         .enumerate()
     {
         traj.to_parquet_with_step(
-            format!("multishoot_to_node_{}.parquet", i),
+            format!("multishoot_to_node_{i}.parquet"),
             2 * Unit::Second,
             almanac.clone(),
         )

@@ -97,7 +97,7 @@ where
 
         if self.log_progress {
             // Prevent the print spam for orbit determination cases
-            info!("Propagating for {} until {}", duration, stop_time);
+            info!("Propagating for {duration} until {stop_time}");
         }
         // Call `finally` on the current state to set anything up
         self.state = self
@@ -154,7 +154,7 @@ where
                     {
                         if self.log_progress {
                             let tock: Duration = tick.elapsed().into();
-                            debug!("Done in {}", tock);
+                            debug!("Done in {tock}");
                         }
                     }
 
@@ -182,7 +182,7 @@ where
                 // Publish to channel if provided
                 if let Some(ref chan) = maybe_tx_chan {
                     if let Err(e) = chan.send(self.state) {
-                        warn!("{} when sending on channel", e)
+                        warn!("{e} when sending on channel")
                     }
                 }
 
@@ -197,7 +197,7 @@ where
                 {
                     if self.log_progress {
                         let tock: Duration = tick.elapsed().into();
-                        info!("\t... done in {}", tock);
+                        info!("\t... done in {tock}");
                     }
                 }
 
@@ -235,7 +235,7 @@ where
                 // Publish to channel if provided
                 if let Some(ref chan) = maybe_tx_chan {
                     if let Err(e) = chan.send(self.state) {
-                        warn!("{} when sending on channel", e)
+                        warn!("{e} when sending on channel")
                     }
                 }
             }
@@ -347,7 +347,7 @@ where
         <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
         D::StateType: Interpolatable,
     {
-        info!("Searching for {}", event);
+        info!("Searching for {event}");
 
         let (_, traj) = self.for_duration_with_traj(max_duration)?;
         // Now, find the requested event

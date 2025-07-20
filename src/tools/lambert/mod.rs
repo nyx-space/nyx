@@ -26,7 +26,6 @@ mod izzo;
 
 use anise::errors::PhysicsError;
 use anise::prelude::Orbit;
-use arrow::ipc::size_prefixed_root_as_sparse_tensor_with_opts;
 pub use godding::gooding;
 use hifitime::Duration;
 pub use izzo::izzo;

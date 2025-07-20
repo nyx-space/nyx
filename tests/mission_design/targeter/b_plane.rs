@@ -51,7 +51,7 @@ fn tgt_b_plane_earth_gravity_assist_no_propagation(almanac: Arc<Almanac>) {
         .try_achieve_from(spacecraft, epoch, epoch, almanac.clone())
         .unwrap();
 
-    println!("{}", sol);
+    println!("{sol}");
 
     // This is the exact GMAT data from EarthGA.script
     let gmat_sol = 0.31909814507892165;
@@ -100,7 +100,7 @@ fn tgt_b_plane_lunar_transfer(almanac: Arc<Almanac>) {
     )));
 
     let spacecraft = Spacecraft::from_srp_defaults(orbit, 1000.0, 0.0);
-    println!("{}", spacecraft);
+    println!("{spacecraft}");
 
     // Propagate to periapsis
     let periapse_spacecraft = prop
@@ -153,7 +153,7 @@ fn tgt_b_plane_lunar_transfer(almanac: Arc<Almanac>) {
         .try_achieve_from(periapse_spacecraft, tcm_epoch, loi_epoch, almanac.clone())
         .unwrap();
 
-    println!("{}", sol);
+    println!("{sol}");
     let gmat_sol = 2.2883182823767747;
     // GMAT validation
     assert!(
@@ -212,7 +212,7 @@ fn tgt_b_plane_earth_gravity_assist_with_propagation(almanac: Arc<Almanac>) {
         .try_achieve_from(prior_sc, prior_sc.epoch(), epoch, almanac.clone())
         .unwrap();
 
-    println!("{}", sol);
+    println!("{sol}");
 
     // As expected, the further out we are, the better the less delta-V is needed to match a B-Plane
     assert!(sol.correction.norm() <= 225.309e-3);

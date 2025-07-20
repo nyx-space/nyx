@@ -60,7 +60,7 @@ fn stm_fixed_step(almanac: Arc<Almanac>) {
 
         println!("HD ten_steps.stm() = {}", ten_steps.stm().unwrap());
 
-        println!("HD stm_err_ten_steps = {}", stm_err_ten_steps);
+        println!("HD stm_err_ten_steps = {stm_err_ten_steps}");
 
         // Compare with finite differencing
         let mut stm_fd = Matrix6::<f64>::zeros();
@@ -90,20 +90,20 @@ fn stm_fixed_step(almanac: Arc<Almanac>) {
             }
         }
 
-        println!("FD stm_fd = {}", stm_fd);
+        println!("FD stm_fd = {stm_fd}");
 
         let stm_fd_err_ten_steps = stm_fd * init.orbit.to_cartesian_pos_vel() - nominal;
 
-        println!("FD stm_fd_err_ten_steps = {}", stm_fd_err_ten_steps);
+        println!("FD stm_fd_err_ten_steps = {stm_fd_err_ten_steps}");
 
         let delta = stm_err_ten_steps - stm_fd_err_ten_steps;
 
-        println!("Error between hyperdual and finite diff: {}", delta);
+        println!("Error between hyperdual and finite diff: {delta}");
 
         // Check that each component is less than 1 km or 1 km/s of difference, OR that the hyperdual computation is better than the finite differencing
         for i in 0..6 {
             if delta[i].abs() > 1.0 {
-                assert!(delta[i] < 0.0, "FD more precise than HD?! {}", delta);
+                assert!(delta[i] < 0.0, "FD more precise than HD?! {delta}");
             }
         }
     }
@@ -141,7 +141,7 @@ fn stm_variable_step(almanac: Arc<Almanac>) {
 
         println!("HD ten_steps.stm() = {}", ten_steps.stm().unwrap());
 
-        println!("HD stm_err_ten_steps = {}", stm_err_ten_steps);
+        println!("HD stm_err_ten_steps = {stm_err_ten_steps}");
 
         // Compare with finite differencing
         let mut stm_fd = Matrix6::<f64>::zeros();
@@ -171,20 +171,20 @@ fn stm_variable_step(almanac: Arc<Almanac>) {
             }
         }
 
-        println!("FD stm_fd = {}", stm_fd);
+        println!("FD stm_fd = {stm_fd}");
 
         let stm_fd_err_ten_steps = stm_fd * init.orbit.to_cartesian_pos_vel() - nominal;
 
-        println!("FD stm_fd_err_ten_steps = {}", stm_fd_err_ten_steps);
+        println!("FD stm_fd_err_ten_steps = {stm_fd_err_ten_steps}");
 
         let delta = stm_err_ten_steps - stm_fd_err_ten_steps;
 
-        println!("Error between hyperdual and finite diff: {}", delta);
+        println!("Error between hyperdual and finite diff: {delta}");
 
         // Check that each component is less than 1 km or 1 km/s of difference, OR that the hyperdual computation is better than the finite differencing
         for i in 0..6 {
             if delta[i].abs() > 1.0 {
-                assert!(delta[i] < 0.0, "FD more precise than HD?! {}", delta);
+                assert!(delta[i] < 0.0, "FD more precise than HD?! {delta}");
             }
         }
     }
@@ -235,7 +235,7 @@ fn stm_between_steps(almanac: Arc<Almanac>) {
 
         let phi_t100_t50_prime = phi_t100_t0 * phi_t50_t0.try_inverse().unwrap();
 
-        println!("{}{}", phi_t50_t0, phi_t100_t50);
+        println!("{phi_t50_t0}{phi_t100_t50}");
         let delta = phi_t100_t50_prime - phi_t100_t50;
 
         // NOTE: We don't check the state partials wrt velocity because the upper right is identity and therefore depends on the step size.
@@ -284,7 +284,7 @@ fn stm_hifi_variable_step(almanac: Arc<Almanac>) {
 
         println!("HD ten_steps.stm() = {}", ten_steps.stm().unwrap());
 
-        println!("HD stm_err_ten_steps = {}", stm_err_ten_steps);
+        println!("HD stm_err_ten_steps = {stm_err_ten_steps}");
 
         // Compare with finite differencing
         let mut stm_fd = Matrix6::<f64>::zeros();
@@ -314,20 +314,20 @@ fn stm_hifi_variable_step(almanac: Arc<Almanac>) {
             }
         }
 
-        println!("FD stm_fd = {}", stm_fd);
+        println!("FD stm_fd = {stm_fd}");
 
         let stm_fd_err_ten_steps = stm_fd * init.orbit.to_cartesian_pos_vel() - nominal;
 
-        println!("FD stm_fd_err_ten_steps = {}", stm_fd_err_ten_steps);
+        println!("FD stm_fd_err_ten_steps = {stm_fd_err_ten_steps}");
 
         let delta = stm_err_ten_steps - stm_fd_err_ten_steps;
 
-        println!("Error between hyperdual and finite diff: {}", delta);
+        println!("Error between hyperdual and finite diff: {delta}");
 
         // Check that each component is less than 1 km or 1 km/s of difference, OR that the hyperdual computation is better than the finite differencing
         for i in 0..6 {
             if delta[i].abs() > 1.0 {
-                assert!(delta[i] < 0.0, "FD more precise than HD?! {}", delta);
+                assert!(delta[i] < 0.0, "FD more precise than HD?! {delta}");
             }
         }
     }

@@ -42,7 +42,7 @@ fn srp_earth_full_vis(almanac: Arc<Almanac>) {
 
     // Create a spacecraft with SRP model
     let sc_dyn = SpacecraftDynamics::from_model(OrbitalDynamics::two_body(), srp);
-    println!("{:x}", orbit);
+    println!("{orbit:x}");
 
     let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 16.0);
 
@@ -50,7 +50,7 @@ fn srp_earth_full_vis(almanac: Arc<Almanac>) {
     let mut prop = setup.with(sc, almanac);
     let final_state = prop.for_duration(prop_time).unwrap();
 
-    println!("{}", final_state);
+    println!("{final_state}");
 
     // GMAT result
     let rslt = Vector6::new(
@@ -94,7 +94,7 @@ fn srp_earth_leo(almanac: Arc<Almanac>) {
 
     // Create a spacecraft with SRP model
     let sc_dyn = SpacecraftDynamics::from_model(OrbitalDynamics::two_body(), srp);
-    println!("{:x}", orbit);
+    println!("{orbit:x}");
 
     let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 16.0);
 
@@ -102,7 +102,7 @@ fn srp_earth_leo(almanac: Arc<Almanac>) {
     let mut prop = setup.with(sc, almanac);
     let final_state = prop.for_duration(prop_time).unwrap();
 
-    println!("{}", final_state);
+    println!("{final_state}");
 
     // GMAT result
     let rslt = Vector6::new(
@@ -148,7 +148,7 @@ fn srp_earth_meo_ecc_inc(almanac: Arc<Almanac>) {
 
     // Create a spacecraft with SRP model
     let sc_dyn = SpacecraftDynamics::from_model(OrbitalDynamics::two_body(), srp);
-    println!("{:x}", orbit);
+    println!("{orbit:x}");
 
     let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 16.0);
 
@@ -156,7 +156,7 @@ fn srp_earth_meo_ecc_inc(almanac: Arc<Almanac>) {
     let mut prop = setup.with(sc, almanac.clone());
     let final_state = prop.for_duration(prop_time).unwrap();
 
-    println!("{}", final_state);
+    println!("{final_state}");
 
     // GMAT result
     let rslt = Vector6::new(
@@ -182,7 +182,7 @@ fn srp_earth_meo_ecc_inc(almanac: Arc<Almanac>) {
     // Note that we also test here that we're setting the GM and shape of the integration frame as defined
     // and not just grabbing that data from the almanac.
     let orbit = almanac.transform_to(orbit, MOON_J2000, None).unwrap();
-    println!("{:x}", orbit);
+    println!("{orbit:x}");
 
     let sc_moon = Spacecraft::from_srp_defaults(orbit, dry_mass, 16.0);
 
@@ -194,7 +194,7 @@ fn srp_earth_meo_ecc_inc(almanac: Arc<Almanac>) {
         final_moon_state.frame().ephem_origin_match(MOON_J2000),
         "expected a result in the Moon frame"
     );
-    println!("{}", final_moon_state);
+    println!("{final_moon_state}");
 
     let final_earth_orbit = almanac
         .transform_to(final_moon_state.orbit, EARTH_J2000, None)
@@ -275,7 +275,7 @@ fn exp_drag_earth(almanac: Arc<Almanac>) {
 
     // Build a spacecraft with SRP and Drag enabled.
     let sc_dyn = SpacecraftDynamics::from_models(OrbitalDynamics::two_body(), vec![srp, drag]);
-    println!("{:x}", orbit);
+    println!("{orbit:x}");
 
     let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 1.0).with_drag(1.0, 2.0);
 
@@ -284,7 +284,7 @@ fn exp_drag_earth(almanac: Arc<Almanac>) {
     prop.for_duration(prop_time).unwrap();
 
     let final_state = prop.state;
-    println!("{}", final_state);
+    println!("{final_state}");
     println!("{}", final_state.orbit);
 }
 
@@ -310,7 +310,7 @@ fn std_atm_drag_earth(almanac: Arc<Almanac>) {
 
     // Build a spacecraft with SRP and Drag enabled.
     let sc_dyn = SpacecraftDynamics::from_models(OrbitalDynamics::two_body(), vec![srp, drag]);
-    println!("{:x}", orbit);
+    println!("{orbit:x}");
 
     let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 1.0).with_drag(1.0, 2.0);
 
@@ -319,7 +319,7 @@ fn std_atm_drag_earth(almanac: Arc<Almanac>) {
     prop.for_duration(prop_time).unwrap();
 
     let final_state = prop.state;
-    println!("{}", final_state);
+    println!("{final_state}");
     println!("{}", final_state.orbit);
 
     /*
@@ -358,7 +358,7 @@ fn std_atm_drag_earth_low(almanac: Arc<Almanac>) {
 
     // Build a spacecraft with SRP and Drag enabled.
     let sc_dyn = SpacecraftDynamics::from_models(OrbitalDynamics::two_body(), vec![srp, drag]);
-    println!("{:x}", orbit);
+    println!("{orbit:x}");
 
     let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 1.0).with_drag(1.0, 2.0);
 
@@ -367,7 +367,7 @@ fn std_atm_drag_earth_low(almanac: Arc<Almanac>) {
     prop.for_duration(prop_time).unwrap();
 
     let final_state = prop.state;
-    println!("{}", final_state);
+    println!("{final_state}");
     println!("{}", final_state.orbit);
 
     /*

@@ -189,7 +189,7 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
             traj1_msr_cnt += 1;
         }
     }
-    println!("Generated {} measurements for cislunar1", traj1_msr_cnt);
+    println!("Generated {traj1_msr_cnt} measurements for cislunar1");
     // GMAT generates 302 measurements but Nyx generates 303. GMAT generates the same measurement twice at the start of the file... like wut?
     assert_eq!(
         traj1_msr_cnt, 303,
@@ -273,7 +273,7 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
         }
     }
 
-    println!("Generated {} measurements for cislunar2", traj2_msr_cnt);
+    println!("Generated {traj2_msr_cnt} measurements for cislunar2");
     assert_eq!(
         traj2_msr_cnt, 249,
         "incorrect number of measurements generated"

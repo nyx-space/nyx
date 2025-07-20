@@ -209,7 +209,7 @@ where
         if measurement_types_found.is_empty() {
              warn!("Could not automatically detect any measurement types from Parquet column names. Residuals may not be loaded correctly.");
         } else {
-             info!("Detected measurement types: {:?}", measurement_types_found);
+             info!("Detected measurement types: {measurement_types_found:?}");
         }
 
 
@@ -337,7 +337,7 @@ where
             // for i in 0..state_size {
             for state_item in state_items.iter().take(state_size) {
                  // Guessing format
-                 let base_name = format!("Filter-smoother ratio {}", state_item);
+                 let base_name = format!("Filter-smoother ratio {state_item}");
                  let col_name = schema.fields().iter()
                      .find(|f| f.name().starts_with(&base_name))
                      .map(|f| f.name().as_str());

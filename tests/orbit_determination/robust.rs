@@ -102,7 +102,7 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
     )
     .unwrap();
 
-    println!("Initial estimate:\n{}", initial_estimate);
+    println!("Initial estimate:\n{initial_estimate}");
 
     let initial_state_dev = initial_estimate.nominal_state;
     let (init_rss_pos_km, init_rss_vel_km_s) =
@@ -194,8 +194,8 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
     let est = &od_sol.estimates[od_sol.estimates.len() - 1];
     let final_truth_state = traj.at(est.epoch()).unwrap();
 
-    println!("Estimate:\n{}", est);
-    println!("Truth:\n{}", final_truth_state);
+    println!("Estimate:\n{est}");
+    println!("Truth:\n{final_truth_state}");
     println!(
         "Delta state with truth (epoch match: {}):\n{}",
         final_truth_state.epoch() == est.epoch(),

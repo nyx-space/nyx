@@ -241,9 +241,7 @@ fn od_val_sc_mb_srp_reals_duals_models(
         for i in 0..6 {
             assert!(
                 est.covar[(i, i)] >= 0.0,
-                "covar diagonal element negative @ [{}, {}]",
-                i,
-                i
+                "covar diagonal element negative @ [{i}, {i}]"
             );
         }
         assert!(
@@ -256,8 +254,7 @@ fn od_val_sc_mb_srp_reals_duals_models(
     for res in od_sol.residuals.iter().flatten() {
         assert!(
             res.postfit.norm() < 1e-5,
-            "postfit should be zero (perfect dynamics) ({:e})",
-            res
+            "postfit should be zero (perfect dynamics) ({res:e})"
         );
     }
 
@@ -451,9 +448,7 @@ fn od_val_sc_srp_estimation_cov_test(
         for i in 0..6 {
             assert!(
                 est.covar[(i, i)] >= 0.0,
-                "covar diagonal element negative @ [{}, {}]",
-                i,
-                i
+                "covar diagonal element negative @ [{i}, {i}]"
             );
         }
     }
