@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use crate::cosmic::AstroError;
 use crate::errors::LambertError;
 use crate::linalg::Vector3;
 use std::f64::consts::PI;
@@ -23,7 +24,11 @@ use std::f64::consts::PI;
 mod godding;
 mod izzo;
 
+use anise::errors::PhysicsError;
+use anise::prelude::Orbit;
+use arrow::ipc::size_prefixed_root_as_sparse_tensor_with_opts;
 pub use godding::gooding;
+use hifitime::Duration;
 pub use izzo::izzo;
 
 const TAU: f64 = 2.0 * PI;
@@ -77,6 +82,52 @@ impl TransferKind {
             TransferKind::LongWay => Ok(-1.0),
             _ => Err(LambertError::MultiRevNotSupported),
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct LambertInput {
+    pub r_init: Vector3<f64>,
+    pub r_final: Vector3<f64>,
+    pub tof: Duration,
+    pub mu_km2_s3: f64,
+}
+
+impl LambertInput {
+    /// Declination of the difference between the final and initial vector
+    pub fn declination_deg(&self) -> f64 {
+        let r_delta = self.r_final - self.r_init;
+        (r_delta.z / r_delta.norm()).asin().to_degrees()
+    }
+
+    /// Right ascension of the difference between the final and initial vector
+    pub fn right_ascension_deg(&self) -> f64 {
+        let r_delta = self.r_final - self.r_init;
+        r_delta.y.atan2(r_delta.x).to_degrees()
+    }
+
+    pub fn from_planetary_states(
+        initial_state: Orbit,
+        final_state: Orbit,
+    ) -> Result<Self, AstroError> {
+        if final_state.frame != initial_state.frame {
+            return Err(AstroError::AstroPhysics {
+                source: PhysicsError::FrameMismatch {
+                    action: "Lambert solver requires both states to be in the same frame",
+                    frame1: final_state.frame.into(),
+                    frame2: initial_state.frame.into(),
+                },
+            });
+        }
+        Ok(Self {
+            r_init: initial_state.radius_km,
+            r_final: final_state.radius_km,
+            tof: final_state.epoch - initial_state.epoch,
+            mu_km2_s3: initial_state
+                .frame
+                .mu_km3_s2()
+                .map_err(|e| AstroError::AstroPhysics { source: e })?,
+        })
     }
 }
 
