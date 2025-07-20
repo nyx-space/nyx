@@ -32,12 +32,6 @@ pub enum NyxError {
     MaxIterReached { msg: String },
     #[snafu(display("Covariance is not positive semi definite"))]
     CovarianceMatrixNotPsd,
-    #[snafu(display("Lambert too close: Δν ~=0 and A ~=0"))]
-    TargetsTooClose,
-    #[snafu(display("No reasonable phi found to connect both radii"))]
-    LambertNotReasonablePhi,
-    #[snafu(display("Use the Izzo algorithm for multi-rev transfers"))]
-    LambertMultiRevNotSupported,
     #[snafu(display("Unavailable parameter {param:?}: {msg}"))]
     StateParameterUnavailable { param: StateParameter, msg: String },
     #[snafu(display("Could not load file: {msg}"))]
@@ -152,4 +146,19 @@ pub enum MonteCarloError {
         action: &'static str,
         num_runs: usize,
     },
+}
+
+#[derive(Debug, PartialEq, Snafu)]
+#[snafu(visibility(pub(crate)))]
+pub enum LambertError {
+    #[snafu(display("Lambert too close: Δν ~=0 and A ~=0"))]
+    TargetsTooClose,
+    #[snafu(display("No reasonable phi found to connect both radii"))]
+    NotReasonablePhi,
+    #[snafu(display("Use the Izzo algorithm for multi-rev transfers"))]
+    MultiRevNotSupported,
+    #[snafu(display("no feasible solution in {m} revolutions, max is {m_max}"))]
+    MultiRevNotFeasible { m: u32, m_max: u32 },
+    #[snafu(display("Izzo method failed to converge after {maxiter} iterations"))]
+    SolverMaxIter { maxiter: usize },
 }

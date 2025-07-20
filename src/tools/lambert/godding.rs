@@ -17,7 +17,7 @@
 */
 
 use super::{
-    LambertSolution, NyxError, TransferKind, Vector3, LAMBERT_EPSILON, LAMBERT_EPSILON_RAD,
+    LambertError, LambertSolution, TransferKind, Vector3, LAMBERT_EPSILON, LAMBERT_EPSILON_RAD,
     LAMBERT_EPSILON_TIME, MAX_ITERATIONS,
 };
 
@@ -47,7 +47,7 @@ pub fn gooding(
     tof_s: f64,
     mu_km3_s2: f64,
     kind: TransferKind,
-) -> Result<LambertSolution, NyxError> {
+) -> Result<LambertSolution, LambertError> {
     let r_init_norm = r_init.norm();
     let r_final_norm = r_final.norm();
     let r_norm_product = r_init_norm * r_final_norm;
@@ -61,7 +61,7 @@ pub fn gooding(
     let a = dm * (r_norm_product * (1.0 + cos_dnu)).sqrt();
 
     if nu_final - nu_init < LAMBERT_EPSILON_RAD && a.abs() < LAMBERT_EPSILON {
-        return Err(NyxError::TargetsTooClose);
+        return Err(LambertError::TargetsTooClose);
     }
 
     let mut phi_upper = 4.0 * PI.powi(2);
@@ -76,8 +76,8 @@ pub fn gooding(
 
     while (cur_tof - tof_s).abs() > LAMBERT_EPSILON_TIME {
         if iter > MAX_ITERATIONS {
-            return Err(NyxError::MaxIterReached {
-                msg: format!("Lambert solver failed after {MAX_ITERATIONS} iterations"),
+            return Err(LambertError::SolverMaxIter {
+                maxiter: MAX_ITERATIONS,
             });
         }
         iter += 1;
@@ -92,7 +92,7 @@ pub fn gooding(
                 }
             }
             if y < 0.0 {
-                return Err(NyxError::LambertNotReasonablePhi);
+                return Err(LambertError::NotReasonablePhi);
             }
         }
 

@@ -18,7 +18,9 @@
 
 use core::f64::consts::PI;
 
-use super::{LambertSolution, NyxError, TransferKind, Vector3, LAMBERT_EPSILON, MAX_ITERATIONS};
+use crate::errors::LambertError;
+
+use super::{LambertSolution, TransferKind, Vector3, LAMBERT_EPSILON, MAX_ITERATIONS};
 
 /// Solve the Lambert boundary problem using Izzo's method.
 ///
@@ -45,7 +47,7 @@ pub fn izzo(
     tof_s: f64,
     mu_km3_s2: f64,
     kind: TransferKind,
-) -> Result<LambertSolution, NyxError> {
+) -> Result<LambertSolution, LambertError> {
     let ri_norm = r_init.norm();
     let rf_norm = r_final.norm();
 
@@ -94,12 +96,7 @@ pub fn izzo(
         LAMBERT_EPSILON,
         LAMBERT_EPSILON,
         true,
-    )
-    .map_err(|e| {
-        eprintln!("{e}");
-        NyxError::LambertNotReasonablePhi
-    })?;
-
+    )?;
     // Reconstruct
     let gamma = (mu_km3_s2 * s / 2.0).sqrt();
     let rho = (ri_norm - rf_norm) / c_norm;
@@ -148,22 +145,21 @@ pub fn reconstruct(
 pub fn find_xy(
     ll: f64,
     t: f64,
-    m: i32,
+    m: u32,
     maxiter: usize,
     atol: f64,
     rtol: f64,
     low_path: bool,
-) -> Result<(f64, f64), &'static str> {
+) -> Result<(f64, f64), LambertError> {
     // For abs(ll) == 1 the derivative is not continuous.
     // An assertion is used for documenting an unrecoverable precondition.
     assert!(ll.abs() < 1.0, "|ll| must be less than 1");
 
-    let mut m_max = (t / PI).floor() as i32;
+    let mut m_max = (t / PI).floor() as u32;
     let t_00 = ll.acos() + ll * (1.0 - ll.powi(2)).sqrt(); // T_xM
 
     // Refine maximum number of revolutions if necessary
     if t < t_00 + (m_max as f64) * PI && m_max > 0 {
-        // The '?' operator will propagate an error from compute_t_min.
         let (_, t_min) = compute_t_min(ll, m_max, maxiter, atol, rtol)?;
         if t < t_min {
             m_max -= 1;
@@ -172,7 +168,7 @@ pub fn find_xy(
 
     // Check if a feasible solution exists for the given number of revolutions
     if m > m_max {
-        return Err("No feasible solution, try lower M!");
+        return Err(LambertError::MultiRevNotFeasible { m, m_max });
     }
 
     // Initial guess
@@ -208,13 +204,13 @@ fn compute_psi(x: f64, y: f64, ll: f64) -> f64 {
 }
 
 /// Time of flight equation.
-fn tof_equation(x: f64, t0: f64, ll: f64, m: i32) -> f64 {
+fn tof_equation(x: f64, t0: f64, ll: f64, m: u32) -> f64 {
     let y = compute_y(x, ll);
     tof_equation_y(x, y, t0, ll, m)
 }
 
 /// Time of flight equation with externally computed y.
-fn tof_equation_y(x: f64, y: f64, t0: f64, ll: f64, m: i32) -> f64 {
+fn tof_equation_y(x: f64, y: f64, t0: f64, ll: f64, m: u32) -> f64 {
     let t_ = if m == 0 && x.powi(2) > 0.6 && x.powi(2) < 1.4 {
         let eta = y - ll * x;
         let s_1 = (1.0 - ll - x * eta) * 0.5;
@@ -253,11 +249,11 @@ fn tof_equation_p3(x: f64, y: f64, _t: f64, dt: f64, ddt: f64, ll: f64) -> f64 {
 /// Returns a tuple of `(x_T_min, T_min)`.
 fn compute_t_min(
     ll: f64,
-    m: i32,
+    m: u32,
     maxiter: usize,
     atol: f64,
     rtol: f64,
-) -> Result<(f64, f64), &'static str> {
+) -> Result<(f64, f64), LambertError> {
     // Use an epsilon for floating point comparison
     if (ll - 1.0).abs() < 1e-9 {
         let x_t_min = 0.0;
@@ -293,7 +289,7 @@ fn compute_t_min(
 ///
 /// An `f64` value representing the initial guess `x_0`.
 ///
-fn initial_guess(tof_s: f64, ll: f64, m: i32, low_path: bool) -> f64 {
+fn initial_guess(tof_s: f64, ll: f64, m: u32, low_path: bool) -> f64 {
     if m == 0 {
         // --- Single revolution case ---
         let t_0 = ll.acos() + ll * (1.0 - ll.powi(2)).sqrt(); // Eq. 19 (for m=0)
@@ -363,7 +359,7 @@ pub fn halley(
     atol: f64,
     rtol: f64,
     maxiter: usize,
-) -> Result<f64, &'static str> {
+) -> Result<f64, LambertError> {
     for _ in 1..=maxiter {
         let y = compute_y(p0, ll);
         let fder = tof_equation_p(p0, y, t0, ll);
@@ -371,7 +367,7 @@ pub fn halley(
 
         // Avoid division by zero
         if fder2.abs() < 1e-14 {
-            return Err("Derivative was zero");
+            return Err(LambertError::TargetsTooClose);
         }
 
         let fder3 = tof_equation_p3(p0, y, t0, fder, fder2, ll);
@@ -385,7 +381,7 @@ pub fn halley(
         p0 = p;
     }
 
-    Err("Failed to converge in Halley's method")
+    Err(LambertError::SolverMaxIter { maxiter })
 }
 
 /// Finds a zero of time of flight equation using Householder's method.
@@ -394,11 +390,11 @@ pub fn householder(
     mut p0: f64,
     t0: f64,
     ll: f64,
-    m: i32,
+    m: u32,
     atol: f64,
     rtol: f64,
     maxiter: usize,
-) -> Result<f64, &'static str> {
+) -> Result<f64, LambertError> {
     for _ in 1..=maxiter {
         let y = compute_y(p0, ll);
         let fval = tof_equation_y(p0, y, t0, ll, m);
@@ -412,7 +408,7 @@ pub fn householder(
         let den = fder * (fder.powi(2) - fval * fder2) + fder3 * fval.powi(2) / 6.0;
 
         if den.abs() < 1e-14 {
-            return Err("Denominator in Householder step was zero");
+            return Err(LambertError::TargetsTooClose);
         }
 
         let p = p0 - fval * (num / den);
@@ -422,8 +418,7 @@ pub fn householder(
         }
         p0 = p;
     }
-
-    Err("Failed to converge in Householder's method")
+    Err(LambertError::SolverMaxIter { maxiter })
 }
 
 #[test]
@@ -458,10 +453,8 @@ fn test_lambert_izzo_longway() {
 
     let sol = izzo(ri, rf, tof_s, mu_km3_s2, TransferKind::LongWay).unwrap();
 
-    println!("{sol:?}");
-
-    assert!(dbg!(sol.v_init - exp_vi).norm() < 1e-5);
-    assert!(dbg!(sol.v_final - exp_vf).norm() < 1e-5);
+    assert!((sol.v_init - exp_vi).norm() < 1e-5);
+    assert!((sol.v_final - exp_vf).norm() < 1e-5);
 }
 
 #[test]
@@ -498,6 +491,6 @@ fn test_lambert_izzo_retrograde() {
 
     println!("{sol:?}");
 
-    assert!((sol.v_init - exp_v1).norm() < 1e-5);
-    assert!((sol.v_final - exp_v2).norm() < 1e-5);
+    assert!(dbg!(sol.v_init - exp_v1).norm() < 1e-5);
+    assert!(dbg!(sol.v_final - exp_v2).norm() < 1e-5);
 }

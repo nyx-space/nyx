@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::errors::NyxError;
+use crate::errors::LambertError;
 use crate::linalg::Vector3;
 use std::f64::consts::PI;
 
@@ -57,7 +57,7 @@ impl TransferKind {
         self,
         r_final: &Vector3<f64>,
         r_init: &Vector3<f64>,
-    ) -> Result<f64, NyxError> {
+    ) -> Result<f64, LambertError> {
         match self {
             TransferKind::Auto => {
                 let mut dnu = r_final[1].atan2(r_final[0]) - r_init[1].atan2(r_final[1]);
@@ -75,7 +75,7 @@ impl TransferKind {
             }
             TransferKind::ShortWay => Ok(1.0),
             TransferKind::LongWay => Ok(-1.0),
-            _ => Err(NyxError::LambertMultiRevNotSupported),
+            _ => Err(LambertError::MultiRevNotSupported),
         }
     }
 }
