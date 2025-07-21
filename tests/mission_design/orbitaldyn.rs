@@ -65,8 +65,7 @@ fn energy_conservation(almanac: Arc<Almanac>) {
         rk89_final.orbit.energy_km2_s2().unwrap() - start_state.energy_km2_s2().unwrap();
 
     println!(
-        "[RK89] ==> energy_conservation absolute errors with RK89 val state\tenergy bleed = {:e}",
-        rk89_energy_bleed
+        "[RK89] ==> energy_conservation absolute errors with RK89 val state\tenergy bleed = {rk89_energy_bleed:e}"
     );
     let delta = rk89_final.orbit.to_cartesian_pos_vel() - rslt.to_cartesian_pos_vel();
     for i in 0..6 {
@@ -87,8 +86,7 @@ fn energy_conservation(almanac: Arc<Almanac>) {
         dp78_final.orbit.energy_km2_s2().unwrap() - start_state.energy_km2_s2().unwrap();
 
     println!(
-        "[DP78] ==> energy_conservation absolute errors with RK89 val state\tenergy bleed = {:e}",
-        dp78_energy_bleed
+        "[DP78] ==> energy_conservation absolute errors with RK89 val state\tenergy bleed = {dp78_energy_bleed:e}"
     );
     let delta = dp78_final.orbit.to_cartesian_pos_vel() - rslt.to_cartesian_pos_vel();
     for i in 0..6 {
@@ -236,8 +234,8 @@ fn val_halo_earth_moon_dynamics(almanac_gmat: Arc<Almanac>) {
         prop.state
     );
 
-    assert!(err_r < 5e-5, "multi body failed in position: {:.5e}", err_r);
-    assert!(err_v < 1e-9, "multi body failed in velocity: {:.5e}", err_v);
+    assert!(err_r < 5e-5, "multi body failed in position: {err_r:.5e}");
+    assert!(err_v < 1e-9, "multi body failed in velocity: {err_v:.5e}");
 }
 
 #[allow(clippy::identity_op)]
@@ -297,12 +295,8 @@ fn val_halo_earth_moon_dynamics_adaptive(almanac_gmat: Arc<Almanac>) {
         prop.state
     );
 
-    assert!(err_r < 1e-6, "multi body failed in position: {:.5e}", err_r);
-    assert!(
-        err_v < 1e-11,
-        "multi body failed in velocity: {:.5e}",
-        err_v
-    );
+    assert!(err_r < 1e-6, "multi body failed in position: {err_r:.5e}");
+    assert!(err_v < 1e-11, "multi body failed in velocity: {err_v:.5e}");
 }
 
 #[allow(clippy::identity_op)]
@@ -363,8 +357,8 @@ fn val_llo_earth_moon_dynamics_adaptive(almanac_gmat: Arc<Almanac>) {
         prop.state
     );
 
-    assert!(err_r < 1e-5, "multi body failed in position: {:.5e}", err_r);
-    assert!(err_v < 1e-8, "multi body failed in velocity: {:.5e}", err_v);
+    assert!(err_r < 1e-5, "multi body failed in position: {err_r:.5e}");
+    assert!(err_v < 1e-8, "multi body failed in velocity: {err_v:.5e}");
 }
 
 #[allow(clippy::identity_op)]
@@ -428,8 +422,8 @@ fn val_halo_multi_body_dynamics(almanac_gmat: Arc<Almanac>) {
         prop.state
     );
 
-    assert!(err_r < 5e-5, "multi body failed in position: {:.5e}", err_r);
-    assert!(err_v < 1e-9, "multi body failed in velocity: {:.5e}", err_v);
+    assert!(err_r < 5e-5, "multi body failed in position: {err_r:.5e}");
+    assert!(err_v < 1e-9, "multi body failed in velocity: {err_v:.5e}");
 }
 
 #[allow(clippy::identity_op)]
@@ -491,12 +485,8 @@ fn val_halo_multi_body_dynamics_adaptive(almanac_gmat: Arc<Almanac>) {
         prop.state
     );
 
-    assert!(err_r < 1e-6, "multi body failed in position: {:.5e}", err_r);
-    assert!(
-        err_v < 1e-11,
-        "multi body failed in velocity: {:.5e}",
-        err_v
-    );
+    assert!(err_r < 1e-6, "multi body failed in position: {err_r:.5e}");
+    assert!(err_v < 1e-11, "multi body failed in velocity: {err_v:.5e}");
 }
 
 #[allow(clippy::identity_op)]
@@ -558,8 +548,8 @@ fn val_llo_multi_body_dynamics_adaptive(almanac_gmat: Arc<Almanac>) {
         prop.state
     );
 
-    assert!(err_r < 2e-6, "multi body failed in position: {:.5e}", err_r);
-    assert!(err_v < 1e-9, "multi body failed in velocity: {:.5e}", err_v);
+    assert!(err_r < 2e-6, "multi body failed in position: {err_r:.5e}");
+    assert!(err_v < 1e-9, "multi body failed in velocity: {err_v:.5e}");
 }
 
 #[allow(clippy::identity_op)]
@@ -614,12 +604,8 @@ fn val_leo_multi_body_dynamics_adaptive_wo_moon(almanac_gmat: Arc<Almanac>) {
         prop.state
     );
 
-    assert!(err_r < 5e-7, "multi body failed in position: {:.5e}", err_r);
-    assert!(
-        err_v < 5e-10,
-        "multi body failed in velocity: {:.5e}",
-        err_v
-    );
+    assert!(err_r < 5e-7, "multi body failed in position: {err_r:.5e}");
+    assert!(err_v < 5e-10, "multi body failed in velocity: {err_v:.5e}");
 }
 
 #[allow(clippy::identity_op)]
@@ -674,8 +660,8 @@ fn val_leo_multi_body_dynamics_adaptive(almanac_gmat: Arc<Almanac>) {
         prop.state
     );
 
-    assert!(err_r < 3e-6, "multi body failed in position: {:.5e}", err_r);
-    assert!(err_v < 3e-9, "multi body failed in velocity: {:.5e}", err_v);
+    assert!(err_r < 3e-6, "multi body failed in position: {err_r:.5e}");
+    assert!(err_v < 3e-9, "multi body failed in velocity: {err_v:.5e}");
 }
 
 #[allow(clippy::identity_op)]
@@ -927,7 +913,7 @@ fn val_earth_sph_harmonics_j2(almanac: Arc<Almanac>) {
         .for_duration(1 * Unit::Day)
         .unwrap();
 
-    println!("{}", prop_state);
+    println!("{prop_state}");
 
     println!("==> val_earth_sph_harmonics_j2 absolute errors (MONTE)");
     let delta = prop_state.orbit.to_cartesian_pos_vel() - rslt_monte;
@@ -939,8 +925,8 @@ fn val_earth_sph_harmonics_j2(almanac: Arc<Almanac>) {
     let (err_r, err_v) =
         rss_orbit_vec_errors(&prop_state.orbit.to_cartesian_pos_vel(), &rslt_monte);
 
-    assert!(err_r < 1e-1, "J2 failed in position: {:.5e}", err_r);
-    assert!(err_v < 1e-4, "J2 failed in velocity: {:.5e}", err_v);
+    assert!(err_r < 1e-1, "J2 failed in position: {err_r:.5e}");
+    assert!(err_v < 1e-4, "J2 failed in velocity: {err_v:.5e}");
 }
 
 #[allow(clippy::identity_op)]
@@ -983,7 +969,7 @@ fn val_earth_sph_harmonics_12x12(almanac_gmat: Arc<Almanac>) {
         .for_duration(prop_time)
         .unwrap();
 
-    println!("{}", final_state);
+    println!("{final_state}");
 
     println!("==> val_earth_sph_harmonics_12x12 absolute errors");
     let delta = final_state.orbit.to_cartesian_pos_vel() - rslt_gmat;
@@ -995,8 +981,8 @@ fn val_earth_sph_harmonics_12x12(almanac_gmat: Arc<Almanac>) {
     let (err_r, err_v) =
         rss_orbit_vec_errors(&final_state.orbit.to_cartesian_pos_vel(), &rslt_gmat);
 
-    assert!(err_r < 1e-1, "12x12 failed in position: {:.5e}", err_r);
-    assert!(err_v < 1e-4, "12x12 failed in velocity: {:.5e}", err_v);
+    assert!(err_r < 1e-1, "12x12 failed in position: {err_r:.5e}");
+    assert!(err_v < 1e-4, "12x12 failed in velocity: {err_v:.5e}");
 
     // We set up a new propagator with a fixed step. Without the fixed step, the error control
     // on the STM leads to a difference of 1.04 meters in this one day propagation.
@@ -1069,7 +1055,7 @@ fn val_earth_sph_harmonics_70x70(almanac_gmat: Arc<Almanac>) {
         .for_duration(1 * Unit::Day)
         .unwrap();
 
-    println!("{}", prop_rslt);
+    println!("{prop_rslt}");
 
     println!("==> val_earth_sph_harmonics_70x70 absolute errors");
     let delta = prop_rslt.orbit.to_cartesian_pos_vel() - rslt_gmat;
@@ -1080,12 +1066,8 @@ fn val_earth_sph_harmonics_70x70(almanac_gmat: Arc<Almanac>) {
 
     let (err_r, err_v) = rss_orbit_vec_errors(&prop_rslt.orbit.to_cartesian_pos_vel(), &rslt_gmat);
 
-    assert!(dbg!(err_r) < 0.2, "70x70 failed in position: {:.5e}", err_r);
-    assert!(
-        dbg!(err_v) < 1e-3,
-        "70x70 failed in velocity: {:.5e}",
-        err_v
-    );
+    assert!(dbg!(err_r) < 0.2, "70x70 failed in position: {err_r:.5e}");
+    assert!(dbg!(err_v) < 1e-3, "70x70 failed in velocity: {err_v:.5e}");
 }
 
 #[allow(clippy::identity_op)]
@@ -1126,7 +1108,7 @@ fn val_earth_sph_harmonics_70x70_partials(almanac_gmat: Arc<Almanac>) {
         .for_duration(1 * Unit::Day)
         .unwrap();
 
-    println!("{}", prop_rslt);
+    println!("{prop_rslt}");
 
     println!("==> val_earth_sph_harmonics_70x70_partials absolute errors");
     let delta = prop_rslt.orbit.to_cartesian_pos_vel() - rslt_gmat;
@@ -1137,12 +1119,8 @@ fn val_earth_sph_harmonics_70x70_partials(almanac_gmat: Arc<Almanac>) {
 
     let (err_r, err_v) = rss_orbit_vec_errors(&prop_rslt.orbit.to_cartesian_pos_vel(), &rslt_gmat);
 
-    assert!(dbg!(err_r) < 0.2, "12x12 failed in position: {:.5e}", err_r);
-    assert!(
-        dbg!(err_v) < 1e-3,
-        "12x12 failed in velocity: {:.5e}",
-        err_v
-    );
+    assert!(dbg!(err_r) < 0.2, "12x12 failed in position: {err_r:.5e}");
+    assert!(dbg!(err_v) < 1e-3, "12x12 failed in velocity: {err_v:.5e}");
 }
 
 #[rstest]
@@ -1178,7 +1156,7 @@ fn hf_prop(almanac: Arc<Almanac>) {
         .for_duration(30.0 * Unit::Day)
         .unwrap();
 
-    println!("{}\n{:x}", rslt, rslt);
+    println!("{rslt}\n{rslt:x}");
 }
 
 #[rstest]
@@ -1243,12 +1221,10 @@ fn val_cislunar_dynamics(almanac_gmat: Arc<Almanac>) {
 
     assert!(
         err_r < 3e-6,
-        "val_cislunar_dynamics failed in position: {:.5e}",
-        err_r
+        "val_cislunar_dynamics failed in position: {err_r:.5e}"
     );
     assert!(
         err_v < 3e-9,
-        "val_cislunar_dynamics failed in velocity: {:.5e}",
-        err_v
+        "val_cislunar_dynamics failed in velocity: {err_v:.5e}"
     );
 }

@@ -348,9 +348,9 @@ impl Traj<Spacecraft> {
         writeln!(writer, "META_START").map_err(err_hdlr)?;
         // Write optional metadata
         if let Some(object_name) = metadata.get("object_name") {
-            writeln!(writer, "\tOBJECT_NAME = {}", object_name).map_err(err_hdlr)?;
+            writeln!(writer, "\tOBJECT_NAME = {object_name}").map_err(err_hdlr)?;
         } else if let Some(object_name) = &self.name {
-            writeln!(writer, "\tOBJECT_NAME = {}", object_name).map_err(err_hdlr)?;
+            writeln!(writer, "\tOBJECT_NAME = {object_name}").map_err(err_hdlr)?;
         }
 
         let first_orbit = states[0].orbit;

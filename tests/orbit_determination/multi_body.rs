@@ -169,9 +169,7 @@ fn od_val_multi_body_ckf_perfect_stations(
         for i in 0..6 {
             assert!(
                 est.covar[(i, i)] >= 0.0,
-                "covar diagonal element negative @ [{}, {}]",
-                i,
-                i
+                "covar diagonal element negative @ [{i}, {i}]"
             );
         }
         assert!(
@@ -186,8 +184,7 @@ fn od_val_multi_body_ckf_perfect_stations(
     for res in od_sol.residuals.iter().flatten() {
         assert!(
             res.postfit.norm() < f64::EPSILON,
-            "postfit should be zero (perfect dynamics) ({:e})",
-            res
+            "postfit should be zero (perfect dynamics) ({res:e})"
         );
     }
 
@@ -311,9 +308,7 @@ fn multi_body_ckf_covar_map_cov_test(
         for i in 0..6 {
             assert!(
                 est.covar[(i, i)] >= 0.0,
-                "covar diagonal element negative @ [{}, {}]",
-                i,
-                i
+                "covar diagonal element negative @ [{i}, {i}]"
             );
         }
     }
@@ -322,8 +317,7 @@ fn multi_body_ckf_covar_map_cov_test(
     for res in od_sol.residuals.iter().flatten() {
         assert!(
             res.postfit.norm() < f64::EPSILON,
-            "postfit should be zero (perfect dynamics) ({:e})",
-            res
+            "postfit should be zero (perfect dynamics) ({res:e})"
         );
     }
 

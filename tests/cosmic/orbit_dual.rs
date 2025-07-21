@@ -29,7 +29,7 @@ fn orbit_dual_test(almanac: Almanac) {
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 1.0, dt, eme2k,
     );
 
-    println!("{:x}", cart);
+    println!("{cart:x}");
 
     let cart_dual = OrbitDual::from(cart);
     println!("{}", eme2k.mu_km3_s2().unwrap());

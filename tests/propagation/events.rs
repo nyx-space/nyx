@@ -59,7 +59,7 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
                 );
                 output
             });
-        println!("[ta_tracker] {} =>\n{}", e, pretty);
+        println!("[ta_tracker] {e} =>\n{pretty}");
     }
 
     // Find all eclipses!
@@ -86,7 +86,7 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
         let new_e_state = e_loc.compute(state.orbit, almanac.clone()).unwrap();
         if let Some(prev_state) = e_state {
             if prev_state.percentage != new_e_state.percentage {
-                println!("{:x}\t{}", state, new_e_state);
+                println!("{state:x}\t{new_e_state}");
                 e_state = Some(new_e_state);
             }
         } else {
@@ -109,8 +109,8 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
         }
     }
 
-    println!("Min elevation {} degrees @ {}", min_el, min_dt);
-    println!("Max elevation {} degrees @ {}", max_el, max_dt);
+    println!("Min elevation {min_el} degrees @ {min_dt}");
+    println!("Max elevation {max_el} degrees @ {max_dt}");
 
     let umbra_event_loc = e_loc.to_umbra_event();
     let umbra_events = traj.find(&umbra_event_loc, almanac.clone()).unwrap();
@@ -140,7 +140,7 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
             );
             output
         });
-    println!("[eclipses] {} =>\n{}", umbra_event_loc, pretty);
+    println!("[eclipses] {umbra_event_loc} =>\n{pretty}");
 
     let penumbra_event_loc = e_loc.to_penumbra_event();
     let penumbra_events = traj.find(&penumbra_event_loc, almanac.clone()).unwrap();
@@ -169,5 +169,5 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
             );
             output
         });
-    println!("[eclipses] {} =>\n{}", penumbra_event_loc, pretty);
+    println!("[eclipses] {penumbra_event_loc} =>\n{pretty}");
 }

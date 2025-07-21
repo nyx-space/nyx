@@ -39,13 +39,13 @@ fn tgt_vnc_c3_decl_cov_test(almanac: Arc<Almanac>) {
 
     let tgt = Targeter::vnc(&setup, objectives);
 
-    println!("{}", tgt);
+    println!("{tgt}");
 
     let solution_fd = tgt
         .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t, almanac)
         .unwrap();
 
-    println!("Finite differencing solution: {}", solution_fd);
+    println!("Finite differencing solution: {solution_fd}");
 
     let gmat_sol = 2.385704523944014;
     println!(
@@ -107,13 +107,13 @@ fn tgt_vnc_sma_ecc_cov_test(almanac: Arc<Almanac>) {
         objectives,
     );
 
-    println!("{}", tgt);
+    println!("{tgt}");
 
     let solution_fd = tgt
         .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t, almanac)
         .unwrap();
 
-    println!("Finite differencing solution: {}", solution_fd);
+    println!("Finite differencing solution: {solution_fd}");
 
     let gmat_sol = 3.1160765514523914;
     println!(

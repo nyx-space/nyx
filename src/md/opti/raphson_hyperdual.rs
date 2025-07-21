@@ -263,9 +263,9 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                     achieved_objectives: self.objectives,
                     iterations: it,
                 };
-                info!("Targeter -- CONVERGED in {} iterations", it);
+                info!("Targeter -- CONVERGED in {it} iterations");
                 for obj in &objmsg {
-                    info!("{}", obj);
+                    info!("{obj}");
                 }
                 return Ok(sol);
             }
@@ -280,16 +280,16 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
             }
             prev_err_norm = err_vector.norm();
 
-            debug!("Jacobian {}", jac);
+            debug!("Jacobian {jac}");
 
             // Perform the pseudo-inverse if needed, else just inverse
             let jac_inv = pseudo_inverse!(&jac)?;
 
-            debug!("Inverse Jacobian {}", jac_inv);
+            debug!("Inverse Jacobian {jac_inv}");
 
             let mut delta = jac_inv * err_vector;
 
-            debug!("Error vector: {}\nRaw correction: {}", err_vector, delta);
+            debug!("Error vector: {err_vector}\nRaw correction: {delta}");
 
             // And finally apply it to the xi
             for (i, var) in self.variables.iter().enumerate() {
@@ -334,12 +334,12 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                 }
             }
             total_correction += delta;
-            debug!("Total correction: {:e}", total_correction);
+            debug!("Total correction: {total_correction:e}");
 
             // Log progress
-            info!("Targeter -- Iteration #{} -- {}", it, achievement_epoch);
+            info!("Targeter -- Iteration #{it} -- {achievement_epoch}");
             for obj in &objmsg {
-                info!("{}", obj);
+                info!("{obj}");
             }
         }
 

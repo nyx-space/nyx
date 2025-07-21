@@ -83,8 +83,8 @@ fn test_monte_carlo_epoch_cov_test(almanac: Arc<Almanac>) {
         .amean()
         .unwrap();
 
-    println!("Average SMA dispersion = {} km", average_sma_dispersion);
-    println!("Average initial SMA = {} km", average_initial_sma);
-    println!("Average final SMA = {} km", average_final_sma);
-    println!("Average SMA = {} km", average_sma);
+    println!("Average SMA dispersion = {average_sma_dispersion} km");
+    println!("Average initial SMA = {average_initial_sma} km");
+    println!("Average final SMA = {average_final_sma} km");
+    println!("Average SMA = {average_sma} km");
 }

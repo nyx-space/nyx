@@ -72,7 +72,7 @@ fn traj_ephem_forward_cov_test(almanac: Arc<Almanac>) {
         "Expected to be outside of interpolation window!"
     );
 
-    println!("Ephem: {}", ephem);
+    println!("Ephem: {ephem}");
 
     // Now let's re-generate the truth data and ensure that each state we generate is in the ephemeris and matches the expected state within tolerance.
 
@@ -186,7 +186,7 @@ fn traj_ephem_forward_cov_test(almanac: Arc<Almanac>) {
 
     // And let's convert into another frame and back to check the error
     let ephem_luna = ephem.to_frame(MOON_J2000, almanac.clone()).unwrap();
-    println!("ephem_luna {}", ephem_luna);
+    println!("ephem_luna {ephem_luna}");
     assert!(
         (ephem.first().epoch() - ephem_luna.first().epoch()).abs() < 1.microseconds(),
         "Start time differ!"
@@ -197,7 +197,7 @@ fn traj_ephem_forward_cov_test(almanac: Arc<Almanac>) {
     );
     // And convert back, to see the error this leads to
     let ephem_back_to_earth = ephem_luna.to_frame(eme2k, almanac.clone()).unwrap();
-    println!("Ephem back: {}", ephem_back_to_earth);
+    println!("Ephem back: {ephem_back_to_earth}");
     assert!(
         (ephem.first().epoch() - ephem_back_to_earth.first().epoch()).abs() < 1.microseconds(),
         "Start time differ after double conversion!"
@@ -330,7 +330,7 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
 
     // === Below is the validation of the ephemeris == //
 
-    println!("{}", traj);
+    println!("{traj}");
     assert_eq!(traj.first(), &start_state, "Wrong initial state");
     assert_eq!(traj.last(), &end_state, "Wrong final state");
     assert!(
@@ -453,7 +453,7 @@ fn traj_ephem_backward(almanac: Arc<Almanac>) {
         // sum_sma += state.sma();
         match ephem.at(epoch) {
             Ok(state) => sum_sma += state.orbit.sma_km().unwrap(),
-            Err(e) => println!("{}", e),
+            Err(e) => println!("{e}"),
         }
     }
     println!("Average SMA: {:.3} km", sum_sma / cnt);
@@ -500,7 +500,7 @@ fn traj_ephem_backward(almanac: Arc<Almanac>) {
         - start_state.to_cartesian_pos_vel())
     .norm();
 
-    println!("{}", ephem);
+    println!("{ephem}");
 
     while let Ok(prop_state) = rx.recv() {
         let eval_state = ephem.at(prop_state.epoch()).unwrap();

@@ -53,7 +53,7 @@ fn val_b_plane_gmat(almanac: Arc<Almanac>) {
         .until_event(1.1 * orbit.period().unwrap(), &Event::periapsis())
         .unwrap();
 
-    println!("{}\n{:x}", out, out);
+    println!("{out}\n{out:x}");
 
     // Here is the GMAT B Plane data from that initial state until periapse
     // We accept an error of less than 500 meters in the B Plane computation.
@@ -147,8 +147,8 @@ fn val_b_plane_gmat(almanac: Arc<Almanac>) {
         let state = almanac.transform_to(eme2k_state, MOON_J2000, None).unwrap();
         // NOTE: The transformed state is _not_ hyperbolic with de440s! Eccentricity is 0.17.
         // Compare with Cosm to understand why this state is no longer hyperbolic, the code looks to be identical.
-        println!("EME2K = {}\nEME2K = {:x}", eme2k_state, eme2k_state);
-        println!("STATE = {}\nSTATE = {:x}", state, state);
+        println!("EME2K = {eme2k_state}\nEME2K = {eme2k_state:x}");
+        println!("STATE = {state}\nSTATE = {state:x}");
         assert!(
             dbg!(eme2k_state.c3_km2_s2().unwrap() - data.c3).abs() < 1e-5,
             "invalid c3 at {}",
@@ -224,7 +224,7 @@ fn b_plane_davis(almanac: Arc<Almanac>) {
         BPlaneTarget::from_bt_br(13135.7982982557, 5022.26511510685),
     )
     .unwrap();
-    println!("DV (km/s) {} leads to {}", delta_v, achieved_b_plane);
+    println!("DV (km/s) {delta_v} leads to {achieved_b_plane}");
 
     assert!((delta_v[0] - -0.25386251697606466).abs() < 1e-9);
     assert!((delta_v[1] - -0.18774460089778605).abs() < 1e-9);

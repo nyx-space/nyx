@@ -61,8 +61,8 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
             .until_epoch(correction_epoch)
             .context(PropSnafu)?;
 
-        debug!("initial_state = {}", initial_state);
-        debug!("xi_start = {}", xi_start);
+        debug!("initial_state = {initial_state}");
+        debug!("xi_start = {xi_start}");
 
         let mut xi = xi_start;
         // We'll store the initial state correction here.
@@ -96,7 +96,7 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                     self.correction_frame.unwrap(),
                     var.component
                 );
-                error!("{}", msg);
+                error!("{msg}");
                 return Err(TargetingError::FrameError { msg });
             }
 
@@ -157,7 +157,7 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                     }
                     _ => unreachable!(),
                 }
-                info!("Initial maneuver guess: {}", mnvr);
+                info!("Initial maneuver guess: {mnvr}");
             } else {
                 state_correction[var.component.vec_index()] += var.init_guess;
                 // Now, let's apply the correction to the initial state
@@ -213,7 +213,7 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
 
             // If we are targeting a finite burn, let's set propagate in several steps to make sure we don't miss the burn
             let xf = if finite_burn_target {
-                info!("#{} {}", it, mnvr);
+                info!("#{it} {mnvr}");
                 let mut prop = self.prop.clone();
                 let prop_opts = prop.opts;
                 let pre_mnvr = prop
@@ -556,10 +556,10 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                 if it == 1 {
                     info!("Targeter -- CONVERGED in 1 iteration");
                 } else {
-                    info!("Targeter -- CONVERGED in {} iterations", it);
+                    info!("Targeter -- CONVERGED in {it} iterations");
                 }
                 for obj in &objmsg {
-                    info!("{}", obj);
+                    info!("{obj}");
                 }
                 return Ok(sol);
             }
@@ -574,12 +574,12 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
             }
             prev_err_norm = err_vector.norm();
 
-            debug!("Jacobian {}", jac);
+            debug!("Jacobian {jac}");
 
             // Perform the pseudo-inverse if needed, else just inverse
             let jac_inv = pseudo_inverse!(&jac)?;
 
-            debug!("Inverse Jacobian {}", jac_inv);
+            debug!("Inverse Jacobian {jac_inv}");
 
             let mut delta = jac_inv * err_vector;
 
@@ -713,12 +713,12 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                 xi = xi + state_correction;
             }
             total_correction += delta;
-            debug!("Total correction: {:e}", total_correction);
+            debug!("Total correction: {total_correction:e}");
 
             // Log progress to debug
-            info!("Targeter -- Iteration #{} -- {}", it, achievement_epoch);
+            info!("Targeter -- Iteration #{it} -- {achievement_epoch}");
             for obj in &objmsg {
-                info!("{}", obj);
+                info!("{obj}");
             }
         }
 

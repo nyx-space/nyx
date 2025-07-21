@@ -168,7 +168,7 @@ where
         if let Some(start_time) = self.start_time {
             if start_time > epoch {
                 // This SNC applies only later
-                debug!("@{} SNC starts at {}", epoch, start_time);
+                debug!("@{epoch} SNC starts at {start_time}");
                 return None;
             }
         }
@@ -240,14 +240,14 @@ fn test_snc_init() {
         &[1e-6, 1e-6, 1e-6],
         &[3600.0, 3600.0, 3600.0],
     );
-    println!("{}", snc_expo);
+    println!("{snc_expo}");
 
     let snc_std = ProcessNoise3D::with_start_time(
         2 * Unit::Minute,
         &[1e-6, 1e-6, 1e-6],
         Epoch::from_et_seconds(3600.0),
     );
-    println!("{}", snc_std);
+    println!("{snc_std}");
 
     let snc_vel = ProcessNoise3D::from_velocity_km_s(
         &[1e-2, 1e-2, 1e-2],

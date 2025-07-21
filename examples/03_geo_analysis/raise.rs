@@ -111,7 +111,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let sc_dynamics = SpacecraftDynamics::from_model(orbital_dyn, srp_dyn)
         .with_guidance_law(ruggiero_ctrl.clone());
 
-    println!("{:x}", orbit);
+    println!("{orbit:x}");
 
     // We specify a minimum step in the propagator because the Ruggiero control would otherwise drive this step very low.
     let (final_state, traj) = Propagator::rk89(
@@ -126,7 +126,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let prop_usage = sc.mass.prop_mass_kg - final_state.mass.prop_mass_kg;
     println!("{:x}", final_state.orbit);
-    println!("prop usage: {:.3} kg", prop_usage);
+    println!("prop usage: {prop_usage:.3} kg");
 
     // Finally, export the results for analysis, including the penumbra percentage throughout the orbit raise.
     traj.to_parquet(

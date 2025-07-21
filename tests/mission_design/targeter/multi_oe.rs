@@ -41,7 +41,7 @@ fn tgt_c3_decl(almanac: Arc<Almanac>) {
 
     let tgt = Targeter::delta_v(&setup, objectives);
 
-    println!("{}", tgt);
+    println!("{tgt}");
 
     let solution_fd = tgt
         .try_achieve_from(
@@ -52,7 +52,7 @@ fn tgt_c3_decl(almanac: Arc<Almanac>) {
         )
         .unwrap();
 
-    println!("Finite differencing solution: {}", solution_fd);
+    println!("Finite differencing solution: {solution_fd}");
 
     tgt.apply(&solution_fd, almanac).unwrap();
 
@@ -130,7 +130,7 @@ fn conv_tgt_sma_ecc(almanac: Arc<Almanac>) {
         objectives,
     );
 
-    println!("{}", tgt);
+    println!("{tgt}");
 
     let achievement_epoch = orig_dt + target_delta_t;
 
@@ -138,7 +138,7 @@ fn conv_tgt_sma_ecc(almanac: Arc<Almanac>) {
         .try_achieve_from(spacecraft, orig_dt, achievement_epoch, almanac)
         .unwrap();
 
-    println!("Finite differencing solution: {}", solution_fd);
+    println!("Finite differencing solution: {solution_fd}");
 
     let gmat_sol = 3.1160765514523914;
     println!(
@@ -233,13 +233,13 @@ fn tgt_hd_sma_ecc_cov_test(almanac: Arc<Almanac>) {
         objectives,
     );
 
-    println!("{}", tgt);
+    println!("{tgt}");
 
     let solution_fd = tgt
         .try_achieve_dual(spacecraft, orig_dt, orig_dt + target_delta_t, almanac)
         .unwrap();
 
-    println!("Finite differencing solution: {}", solution_fd);
+    println!("Finite differencing solution: {solution_fd}");
 
     let gmat_sol = 3.1160765514523914;
     println!(

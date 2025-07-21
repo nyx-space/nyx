@@ -131,10 +131,9 @@ where
 pub fn assert_orbit_eq_or_abs(left: &Orbit, right: &Orbit, epsilon: f64, msg: &str) {
     if !left.eq_within(right, epsilon, epsilon) {
         panic!(
-            r#"assertion failed: {}
-  left: `{:?}`,
- right: `{:?}`"#,
-            msg, left, right
+            r#"assertion failed: {msg}
+  left: `{left:?}`,
+ right: `{right:?}`"#
         )
     }
 }

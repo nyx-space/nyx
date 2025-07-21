@@ -759,7 +759,7 @@ fn test_serde() {
     let sc = Spacecraft::new(orbit, 500.0, 159.0, 2.0, 2.0, 1.8, 2.2);
 
     let serialized_sc = serde_yml::to_string(&sc).unwrap();
-    println!("{}", serialized_sc);
+    println!("{serialized_sc}");
 
     let deser_sc: Spacecraft = serde_yml::from_str(&serialized_sc).unwrap();
 

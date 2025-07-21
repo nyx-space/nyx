@@ -319,7 +319,7 @@ where
             for state_item in &state_items {
                 for j in 0..MsrSize::USIZE {
                     hdrs.push(Field::new(
-                        format!("Gain {}*[{j}]", state_item),
+                        format!("Gain {state_item}*[{j}]"),
                         DataType::Float64,
                         true,
                     ));

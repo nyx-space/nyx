@@ -280,7 +280,7 @@ mod ut_sc_uncertainty {
         // Rotate back into the RIC frame
         let ric_covar = dcm_ric2inertial * orbit_cov * dcm_ric2inertial.transpose();
 
-        println!("{:.9}", ric_covar);
+        println!("{ric_covar:.9}");
         for i in 0..6 {
             for j in 0..6 {
                 if i == j {

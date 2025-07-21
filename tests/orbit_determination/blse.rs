@@ -98,7 +98,7 @@ fn blse_robust_large_disp_cov_test(
     )
     .unwrap();
 
-    println!("Initial estimate:\n{}", initial_estimate);
+    println!("Initial estimate:\n{initial_estimate}");
 
     let initial_state_dev = initial_estimate.nominal_state;
     let (init_rss_pos_km, init_rss_vel_km_s) =

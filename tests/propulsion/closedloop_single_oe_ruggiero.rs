@@ -52,7 +52,7 @@ fn rugg_sma(almanac: Arc<Almanac>) {
         Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
-    println!("[rugg_sma] {:x}", orbit);
+    println!("[rugg_sma] {orbit:x}");
 
     let final_state = Propagator::new(
         sc.clone(),
@@ -65,7 +65,7 @@ fn rugg_sma(almanac: Arc<Almanac>) {
 
     let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[rugg_sma] {:x}", final_state.orbit);
-    println!("[rugg_sma] prop usage: {:.3} kg", prop_usage);
+    println!("[rugg_sma] prop usage: {prop_usage:.3} kg");
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
@@ -105,7 +105,7 @@ fn rugg_sma_regress_threshold(almanac: Arc<Almanac>) {
             Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
         let sc = SpacecraftDynamics::from_guidance_law(OrbitalDynamics::two_body(), guid_law);
-        println!("[rugg_sma_regress] {:x}", orbit);
+        println!("[rugg_sma_regress] {orbit:x}");
 
         let final_state = Propagator::new(
             sc.clone(),
@@ -118,7 +118,7 @@ fn rugg_sma_regress_threshold(almanac: Arc<Almanac>) {
 
         let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
         println!("[rugg_sma_regress] {:x}", final_state.orbit);
-        println!("[rugg_sma_regress] prop usage: {:.3} kg", prop_usage);
+        println!("[rugg_sma_regress] prop usage: {prop_usage:.3} kg");
 
         assert!(
             sc.guidance_achieved(&final_state).unwrap(),
@@ -162,7 +162,7 @@ fn rugg_sma_decr(almanac: Arc<Almanac>) {
         Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
-    println!("[rugg_sma_decr] {:x}", orbit);
+    println!("[rugg_sma_decr] {orbit:x}");
 
     let final_state = Propagator::new(
         sc.clone(),
@@ -175,7 +175,7 @@ fn rugg_sma_decr(almanac: Arc<Almanac>) {
 
     let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[rugg_sma_decr] {:x}", final_state.orbit);
-    println!("[rugg_sma_decr] prop usage: {:.3} kg", prop_usage);
+    println!("[rugg_sma_decr] prop usage: {prop_usage:.3} kg");
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
@@ -220,7 +220,7 @@ fn rugg_inc(almanac: Arc<Almanac>) {
         Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
-    println!("[rugg_inc] {:x}", orbit);
+    println!("[rugg_inc] {orbit:x}");
 
     let final_state = Propagator::new(
         sc.clone(),
@@ -233,7 +233,7 @@ fn rugg_inc(almanac: Arc<Almanac>) {
 
     let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[rugg_inc] {:x}", final_state.orbit);
-    println!("[rugg_inc] prop usage: {:.3} kg", prop_usage);
+    println!("[rugg_inc] prop usage: {prop_usage:.3} kg");
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
@@ -279,7 +279,7 @@ fn rugg_inc_threshold(almanac: Arc<Almanac>) {
         Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
-    println!("[rugg_inc_threshold] {:x}", orbit);
+    println!("[rugg_inc_threshold] {orbit:x}");
 
     let final_state = Propagator::new(
         sc.clone(),
@@ -292,7 +292,7 @@ fn rugg_inc_threshold(almanac: Arc<Almanac>) {
 
     let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[rugg_inc_threshold] {:x}", final_state.orbit);
-    println!("[rugg_inc_threshold] prop usage: {:.3} kg", prop_usage);
+    println!("[rugg_inc_threshold] prop usage: {prop_usage:.3} kg");
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
@@ -337,7 +337,7 @@ fn rugg_inc_decr(almanac: Arc<Almanac>) {
         Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
-    println!("[rugg_inc_decr] {:x}", orbit);
+    println!("[rugg_inc_decr] {orbit:x}");
 
     let final_state = Propagator::new(
         sc.clone(),
@@ -350,7 +350,7 @@ fn rugg_inc_decr(almanac: Arc<Almanac>) {
 
     let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[rugg_inc_decr] {:x}", final_state.orbit);
-    println!("[rugg_inc_decr] prop usage: {:.3} kg", prop_usage);
+    println!("[rugg_inc_decr] prop usage: {prop_usage:.3} kg");
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
@@ -395,7 +395,7 @@ fn rugg_ecc(almanac: Arc<Almanac>) {
         Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
-    println!("[rugg_ecc] {:x}", orbit);
+    println!("[rugg_ecc] {orbit:x}");
 
     let final_state = Propagator::new(
         sc.clone(),
@@ -408,7 +408,7 @@ fn rugg_ecc(almanac: Arc<Almanac>) {
 
     let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[rugg_ecc] {:x}", final_state.orbit);
-    println!("[rugg_ecc] prop usage: {:.3} kg", prop_usage);
+    println!("[rugg_ecc] prop usage: {prop_usage:.3} kg");
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
@@ -452,7 +452,7 @@ fn rugg_ecc_regress_threshold(almanac: Arc<Almanac>) {
             Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
         let sc = SpacecraftDynamics::from_guidance_law(OrbitalDynamics::two_body(), guid_law);
-        println!("[rugg_ecc_regress] {:x}", orbit);
+        println!("[rugg_ecc_regress] {orbit:x}");
 
         let final_state = Propagator::new(
             sc.clone(),
@@ -465,7 +465,7 @@ fn rugg_ecc_regress_threshold(almanac: Arc<Almanac>) {
 
         let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
         println!("[rugg_ecc_regress] {:x}", final_state.orbit);
-        println!("[rugg_ecc_regress] prop usage: {:.3} kg", prop_usage);
+        println!("[rugg_ecc_regress] prop usage: {prop_usage:.3} kg");
 
         assert!(
             sc.guidance_achieved(&final_state).unwrap(),
@@ -511,7 +511,7 @@ fn rugg_ecc_decr(almanac: Arc<Almanac>) {
         Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
-    println!("[rugg_ecc_decr] {:x}", orbit);
+    println!("[rugg_ecc_decr] {orbit:x}");
 
     let final_state = Propagator::new(
         sc.clone(),
@@ -524,7 +524,7 @@ fn rugg_ecc_decr(almanac: Arc<Almanac>) {
 
     let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[rugg_ecc_decr] {:x}", final_state.orbit);
-    println!("[rugg_ecc_decr] prop usage: {:.3} kg", prop_usage);
+    println!("[rugg_ecc_decr] prop usage: {prop_usage:.3} kg");
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
@@ -571,7 +571,7 @@ fn rugg_aop(almanac: Arc<Almanac>) {
         Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
-    println!("[rugg_aop] {:x}", orbit);
+    println!("[rugg_aop] {orbit:x}");
 
     let final_state = Propagator::new(
         sc.clone(),
@@ -584,7 +584,7 @@ fn rugg_aop(almanac: Arc<Almanac>) {
 
     let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[rugg_aop] {:x}", final_state.orbit);
-    println!("[rugg_aop] prop usage: {:.3} kg", prop_usage);
+    println!("[rugg_aop] prop usage: {prop_usage:.3} kg");
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
@@ -630,7 +630,7 @@ fn rugg_aop_decr(almanac: Arc<Almanac>) {
         Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
-    println!("[rugg_aop_decr] {:x}", orbit);
+    println!("[rugg_aop_decr] {orbit:x}");
 
     let final_state = Propagator::new(
         sc.clone(),
@@ -643,7 +643,7 @@ fn rugg_aop_decr(almanac: Arc<Almanac>) {
 
     let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[rugg_aop_decr] {:x}", final_state.orbit);
-    println!("[rugg_aop_decr] prop usage: {:.3} kg", prop_usage);
+    println!("[rugg_aop_decr] prop usage: {prop_usage:.3} kg");
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
@@ -686,7 +686,7 @@ fn rugg_raan(almanac: Arc<Almanac>) {
         Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, guid_law);
-    println!("[rugg_raan] {:x}", orbit);
+    println!("[rugg_raan] {orbit:x}");
 
     let setup = Propagator::new(
         sc.clone(),
@@ -699,7 +699,7 @@ fn rugg_raan(almanac: Arc<Almanac>) {
     println!("[rugg_raan] {:x}", final_state.orbit);
     let event = Event::new(StateParameter::RAAN, 5.0);
     println!("[rugg_raan] {} => {:?}", event, traj.find(&event, almanac));
-    println!("[rugg_raan] prop usage: {:.3} kg", prop_usage);
+    println!("[rugg_raan] prop usage: {prop_usage:.3} kg");
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
@@ -739,7 +739,7 @@ fn rugg_raan_regress_threshold(almanac: Arc<Almanac>) {
             Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
         let sc = SpacecraftDynamics::from_guidance_law(OrbitalDynamics::two_body(), guid_law);
-        println!("[rugg_raan_regress] {:x}", orbit);
+        println!("[rugg_raan_regress] {orbit:x}");
 
         let final_state = Propagator::new(
             sc.clone(),
@@ -752,7 +752,7 @@ fn rugg_raan_regress_threshold(almanac: Arc<Almanac>) {
 
         let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
         println!("[rugg_raan_regress] {:x}", final_state.orbit);
-        println!("[rugg_raan_regress] prop usage: {:.3} kg", prop_usage);
+        println!("[rugg_raan_regress] prop usage: {prop_usage:.3} kg");
 
         assert!(
             sc.guidance_achieved(&final_state).unwrap(),

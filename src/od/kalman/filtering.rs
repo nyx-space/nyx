@@ -104,7 +104,7 @@ where
                 }
                 // Check if we're using another SNC than the one before
                 if self.prev_used_snc != i {
-                    info!("Switched to {}-th {}", i, snc);
+                    info!("Switched to {i}-th {snc}");
                     self.prev_used_snc = i;
                 }
 
@@ -239,7 +239,7 @@ where
                 }
                 // Check if we're using another SNC than the one before
                 if self.prev_used_snc != i {
-                    info!("Switched to {}-th {}", i, snc);
+                    info!("Switched to {i}-th {snc}");
                     self.prev_used_snc = i;
                 }
 

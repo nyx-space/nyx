@@ -331,11 +331,7 @@ impl TrackingDataArc {
         let measurements: Vec<_> = self.measurements.iter().collect();
 
         for (i, (epoch, _)) in measurements.iter().enumerate().step_by(window_size) {
-            let start = if i >= window_size / 2 {
-                i - window_size / 2
-            } else {
-                0
-            };
+            let start = i.saturating_sub(window_size / 2);
             let end = (i + window_size / 2 + 1).min(measurements.len());
             let window = &measurements[start..end];
 

@@ -42,7 +42,7 @@ fn tgt_sma_from_apo(almanac: Arc<Almanac>) {
 
     let tgt = Targeter::delta_v(&setup, objectives);
 
-    println!("{}", tgt);
+    println!("{tgt}");
 
     let solution_fd = tgt
         .try_achieve_from(
@@ -53,7 +53,7 @@ fn tgt_sma_from_apo(almanac: Arc<Almanac>) {
         )
         .unwrap();
 
-    println!("Finite differencing solution: {}", solution_fd);
+    println!("Finite differencing solution: {solution_fd}");
 
     let gmat_sol = 0.05312024615278713;
     // GMAT validation
@@ -102,7 +102,7 @@ fn tgt_sma_from_peri_fd(almanac: Arc<Almanac>) {
 
     let tgt = Targeter::delta_v(&setup, objectives);
 
-    println!("{}", tgt);
+    println!("{tgt}");
 
     let solution_fd = tgt
         .try_achieve_from(
@@ -113,7 +113,7 @@ fn tgt_sma_from_peri_fd(almanac: Arc<Almanac>) {
         )
         .unwrap();
 
-    println!("Finite differencing solution: {}", solution_fd);
+    println!("Finite differencing solution: {solution_fd}");
 
     let gmat_sol = 0.03550369448069638;
     println!(
@@ -161,7 +161,7 @@ fn tgt_hd_sma_from_peri(almanac: Arc<Almanac>) {
     let mut tgt = Targeter::delta_v(&setup, objectives);
     tgt.iterations = 5;
 
-    println!("{}", tgt);
+    println!("{tgt}");
 
     let solution_fd = tgt
         .try_achieve_dual(
@@ -172,7 +172,7 @@ fn tgt_hd_sma_from_peri(almanac: Arc<Almanac>) {
         )
         .unwrap();
 
-    println!("Finite differencing solution: {}", solution_fd);
+    println!("Finite differencing solution: {solution_fd}");
 
     let gmat_sol = 0.03550369448069638;
     println!(
@@ -287,7 +287,7 @@ fn tgt_ecc_from_apo(almanac: Arc<Almanac>) {
         [Objective::new(StateParameter::Eccentricity, xf_desired_ecc)],
     );
 
-    println!("{}", tgt);
+    println!("{tgt}");
 
     let solution_fd = tgt
         .try_achieve_from(
@@ -298,7 +298,7 @@ fn tgt_ecc_from_apo(almanac: Arc<Almanac>) {
         )
         .unwrap();
 
-    println!("Finite differencing solution: {}", solution_fd);
+    println!("Finite differencing solution: {solution_fd}");
 
     let gmat_sol = 0.7721483022815125;
     println!(
@@ -361,7 +361,7 @@ fn tgt_ecc_from_peri(almanac: Arc<Almanac>) {
         [Objective::new(StateParameter::Eccentricity, xf_desired_ecc)],
     );
 
-    println!("{}", tgt);
+    println!("{tgt}");
 
     let solution_fd = tgt
         .try_achieve_from(
@@ -372,7 +372,7 @@ fn tgt_ecc_from_peri(almanac: Arc<Almanac>) {
         )
         .unwrap();
 
-    println!("Finite differencing solution: {}", solution_fd);
+    println!("Finite differencing solution: {solution_fd}");
 
     let gmat_sol = 0.6926746704643234;
     println!(
@@ -415,7 +415,7 @@ fn tgt_raan_from_apo(almanac: Arc<Almanac>) {
 
     let tgt = Targeter::delta_v(&setup, objectives);
 
-    println!("{}", tgt);
+    println!("{tgt}");
 
     let solution_fd = tgt
         .try_achieve_from(
@@ -426,7 +426,7 @@ fn tgt_raan_from_apo(almanac: Arc<Almanac>) {
         )
         .unwrap();
 
-    println!("Finite differencing solution: {}", solution_fd);
+    println!("Finite differencing solution: {solution_fd}");
 
     let gmat_sol = 0.30344716711198855;
     println!(
@@ -488,7 +488,7 @@ fn tgt_raan_from_peri(almanac: Arc<Almanac>) {
         objectives,
     );
 
-    println!("{}", tgt);
+    println!("{tgt}");
 
     let solution_fd = tgt
         .try_achieve_from(
@@ -499,7 +499,7 @@ fn tgt_raan_from_peri(almanac: Arc<Almanac>) {
         )
         .unwrap();
 
-    println!("Finite differencing solution: {}", solution_fd);
+    println!("Finite differencing solution: {solution_fd}");
 
     let gmat_sol = 0.45110541873478793;
     println!(
@@ -542,7 +542,7 @@ fn tgt_aop_from_apo(almanac: Arc<Almanac>) {
 
     let tgt = Targeter::delta_v(&setup, objectives);
 
-    println!("{}", tgt);
+    println!("{tgt}");
 
     let solution_fd = tgt
         .try_achieve_from(
@@ -553,7 +553,7 @@ fn tgt_aop_from_apo(almanac: Arc<Almanac>) {
         )
         .unwrap();
 
-    println!("Finite differencing solution: {}", solution_fd);
+    println!("Finite differencing solution: {solution_fd}");
 
     let gmat_sol = 0.11772316331182386;
     println!(
@@ -595,7 +595,7 @@ fn tgt_aop_from_peri_cov_test(almanac: Arc<Almanac>) {
 
     let tgt = Targeter::delta_v(&setup, objectives);
 
-    println!("{}", tgt);
+    println!("{tgt}");
 
     let solution_fd = tgt
         .try_achieve_from(
@@ -606,7 +606,7 @@ fn tgt_aop_from_peri_cov_test(almanac: Arc<Almanac>) {
         )
         .unwrap();
 
-    println!("Finite differencing solution: {}", solution_fd);
+    println!("Finite differencing solution: {solution_fd}");
 
     let gmat_sol = 0.12197875695918228;
     println!(

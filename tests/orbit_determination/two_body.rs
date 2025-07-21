@@ -135,7 +135,7 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(
 
     let mut prop = setup.with(initial_state.into(), almanac.clone());
     let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
-    println!("{}", final_truth);
+    println!("{final_truth}");
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 0).unwrap();
@@ -163,7 +163,7 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(
 
     // Define the initial estimate
     let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
-    println!("initial estimate:\n{}", initial_estimate);
+    println!("initial estimate:\n{initial_estimate}");
 
     let odp = SpacecraftKalmanOD::new(
         setup,
@@ -186,9 +186,7 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(
     for i in 0..6 {
         assert!(
             est.covar[(i, i)] >= 0.0,
-            "covar diagonal element negative @ [{}, {}]",
-            i,
-            i
+            "covar diagonal element negative @ [{i}, {i}]"
         );
     }
     for i in 0..6 {
@@ -257,7 +255,7 @@ fn od_tb_val_with_arc(
 
     let mut prop = setup.with(initial_state.into(), almanac.clone());
     let (final_truth, traj) = prop.for_duration_with_traj(duration).unwrap();
-    println!("{}", final_truth);
+    println!("{final_truth}");
 
     // Save the trajectory to parquet
     let path: PathBuf = [
@@ -321,7 +319,7 @@ fn od_tb_val_with_arc(
 
     // Define the initial estimate
     let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
-    println!("initial estimate:\n{}", initial_estimate);
+    println!("initial estimate:\n{initial_estimate}");
 
     let odp = SpacecraftKalmanOD::new(
         setup,
@@ -344,9 +342,7 @@ fn od_tb_val_with_arc(
     for i in 0..6 {
         assert!(
             est.covar[(i, i)] >= 0.0,
-            "covar diagonal element negative @ [{}, {}]",
-            i,
-            i
+            "covar diagonal element negative @ [{i}, {i}]"
         );
     }
     for i in 0..6 {
@@ -538,16 +534,14 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
     for res in od_sol.residuals.iter().flatten() {
         assert!(
             res.prefit.norm() < 1e-12,
-            "prefit should be zero (perfect dynamics) ({:e})",
-            res
+            "prefit should be zero (perfect dynamics) ({res:e})"
         );
     }
 
     for res in od_sol.residuals.iter().flatten() {
         assert!(
             res.postfit.norm() < 1e-12,
-            "postfit should be zero (perfect dynamics) ({:e})",
-            res
+            "postfit should be zero (perfect dynamics) ({res:e})"
         );
     }
 
@@ -801,16 +795,14 @@ fn od_tb_val_az_el_ckf_fixed_step_perfect_stations(
     for res in od_sol.residuals.iter().flatten() {
         assert!(
             res.prefit.norm() < 1e-12,
-            "prefit should be zero (perfect dynamics) ({:e})",
-            res
+            "prefit should be zero (perfect dynamics) ({res:e})"
         );
     }
 
     for res in od_sol.residuals.iter().flatten() {
         assert!(
             res.postfit.norm() < 1e-12,
-            "postfit should be zero (perfect dynamics) ({:e})",
-            res
+            "postfit should be zero (perfect dynamics) ({res:e})"
         );
     }
 
@@ -1107,7 +1099,7 @@ fn od_tb_fixed_step_perfect_stations_snc_covar_map(
     // Let's check that the covariance never falls below our sigma squared values
     for (no, est) in od_sol.estimates.iter().enumerate() {
         if no == 1 {
-            println!("{}", est);
+            println!("{est}");
         }
         assert!(
             est.state_deviation().norm() < 1e-12,
@@ -1118,9 +1110,7 @@ fn od_tb_fixed_step_perfect_stations_snc_covar_map(
         for i in 0..6 {
             assert!(
                 est.covar[(i, i)] >= 0.0,
-                "covar diagonal element negative @ [{}, {}]",
-                i,
-                i
+                "covar diagonal element negative @ [{i}, {i}]"
             );
         }
 
@@ -1205,9 +1195,7 @@ fn od_tb_ckf_map_covar(almanac: Arc<Almanac>) {
     for i in 0..6 {
         assert!(
             est.covar[(i, i)] >= 0.0,
-            "covar diagonal element negative @ [{}, {}]",
-            i,
-            i
+            "covar diagonal element negative @ [{i}, {i}]"
         );
     }
     for i in 0..6 {
@@ -1305,14 +1293,12 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect_cov_test(
     // Let's check that the covariance never falls below our sigma squared values
     for (no, est) in od_sol.estimates.iter().enumerate() {
         if no == 1 {
-            println!("{}", est);
+            println!("{est}");
         }
         for i in 0..6 {
             assert!(
                 est.covar[(i, i)] >= 0.0,
-                "covar diagonal element negative @ [{}, {}]",
-                i,
-                i
+                "covar diagonal element negative @ [{i}, {i}]"
             );
         }
         assert!(
@@ -1433,7 +1419,7 @@ fn od_tb_fixed_step_perfect_stations_several_snc_covar_map(
     // Let's check that the covariance never falls below our sigma squared values
     for (no, est) in od_sol.estimates.iter().enumerate() {
         if no == 1 {
-            println!("{}", est);
+            println!("{est}");
         }
         assert!(
             est.state_deviation().norm() < 1e-6,
@@ -1444,9 +1430,7 @@ fn od_tb_fixed_step_perfect_stations_several_snc_covar_map(
         for i in 0..6 {
             assert!(
                 est.covar[(i, i)] >= 0.0,
-                "covar diagonal element negative @ [{}, {}]",
-                i,
-                i
+                "covar diagonal element negative @ [{i}, {i}]"
             );
         }
     }

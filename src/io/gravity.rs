@@ -303,14 +303,10 @@ impl HarmonicsMem {
         }
         if max_degree < degree || max_order < order {
             warn!(
-                "{} only contained (degree, order) of ({}, {}) instead of requested ({}, {})",
-                filepath, max_degree, max_order, degree, order
+                "{filepath} only contained (degree, order) of ({max_degree}, {max_order}) instead of requested ({degree}, {order})"
             );
         } else {
-            info!(
-                "{} loaded with (degree, order) = ({}, {})",
-                filepath, degree, order
-            );
+            info!("{filepath} loaded with (degree, order) = ({degree}, {order})");
         }
         Ok(HarmonicsMem {
             degree: max_degree,

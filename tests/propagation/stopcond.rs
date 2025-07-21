@@ -58,7 +58,7 @@ fn stop_cond_3rd_apo_cov_test(almanac: Arc<Almanac>) {
     let min_epoch = start_dt + 2.0 * period;
     let max_epoch = start_dt + 3.0 * period;
 
-    println!("{}\t{}\t\t{:x}", min_epoch, max_epoch, third_apo);
+    println!("{min_epoch}\t{max_epoch}\t\t{third_apo:x}");
     // Confirm that this is the third apoapse event which is found
     // We use a weird check because it actually converged on a time that's 0.00042 nanoseconds _after_ the max time
     assert!(
@@ -110,7 +110,7 @@ fn stop_cond_3rd_peri(almanac: Arc<Almanac>) {
     let min_epoch = start_dt + 2.0 * period;
     let max_epoch = start_dt + 3.0 * period;
 
-    println!("{}\t{}\t\t{:x}", min_epoch, max_epoch, third_peri);
+    println!("{min_epoch}\t{max_epoch}\t\t{third_peri:x}");
     // Confirm that this is the third apoapse event which is found
     // We use a weird check because it actually converged on a time that's 0.00042 nanoseconds _after_ the max time
     assert!(
@@ -151,10 +151,7 @@ fn stop_cond_nrho_apo(almanac: Arc<Almanac>) {
     );
 
     let state_luna = almanac.transform_to(state, MOON_J2000, None).unwrap();
-    println!(
-        "Start state (dynamics: Earth, Moon, Sun gravity):\n{}",
-        state_luna
-    );
+    println!("Start state (dynamics: Earth, Moon, Sun gravity):\n{state_luna}");
 
     let bodies = vec![EARTH, SUN];
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
@@ -372,7 +369,7 @@ fn event_and_combination(almanac: Arc<Almanac>) {
                 .state
                 .value(StateParameter::Declination)
                 .unwrap();
-            println!("{sc_decl_zero} => decl = {} deg", decl_deg,);
+            println!("{sc_decl_zero} => decl = {decl_deg} deg",);
             assert!((decl_deg - 6.0).abs() < 3.0);
         }
 
@@ -386,7 +383,7 @@ fn event_and_combination(almanac: Arc<Almanac>) {
                     .state
                     .value(StateParameter::Declination)
                     .unwrap();
-                println!("{sc_decl_zero} => decl = {} deg", found_decl_deg);
+                println!("{sc_decl_zero} => decl = {found_decl_deg} deg");
                 assert!((decl_deg - found_decl_deg).abs() < 1.0);
             }
         }

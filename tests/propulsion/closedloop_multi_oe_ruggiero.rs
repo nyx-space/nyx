@@ -65,7 +65,7 @@ fn qlaw_as_ruggiero_case_a(almanac: Arc<Almanac>) {
         Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
-    println!("[qlaw_as_ruggiero_case_a] {:x}", orbit);
+    println!("[qlaw_as_ruggiero_case_a] {orbit:x}");
 
     let setup = Propagator::new(
         sc.clone(),
@@ -76,7 +76,7 @@ fn qlaw_as_ruggiero_case_a(almanac: Arc<Almanac>) {
     let (final_state, traj) = prop.for_duration_with_traj(prop_time).unwrap();
     let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[qlaw_as_ruggiero_case_a] {:x}", final_state.orbit);
-    println!("[qlaw_as_ruggiero_case_a] prop usage: {:.3} kg", prop_usage);
+    println!("[qlaw_as_ruggiero_case_a] prop usage: {prop_usage:.3} kg");
     // Find all of the events
     for e in &events {
         println!(
@@ -130,7 +130,7 @@ fn qlaw_as_ruggiero_case_b(almanac: Arc<Almanac>) {
         Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
-    println!("[qlaw_as_ruggiero_case_b] {:x}", orbit);
+    println!("[qlaw_as_ruggiero_case_b] {orbit:x}");
 
     let final_state = Propagator::new(
         sc.clone(),
@@ -143,7 +143,7 @@ fn qlaw_as_ruggiero_case_b(almanac: Arc<Almanac>) {
 
     let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[qlaw_as_ruggiero_case_b] {:x}", final_state.orbit);
-    println!("[qlaw_as_ruggiero_case_b] prop usage: {:.3} kg", prop_usage);
+    println!("[qlaw_as_ruggiero_case_b] prop usage: {prop_usage:.3} kg");
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
@@ -188,7 +188,7 @@ fn qlaw_as_ruggiero_case_c_cov_test(almanac: Arc<Almanac>) {
         Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
-    println!("[qlaw_as_ruggiero_case_c] {:x}", orbit);
+    println!("[qlaw_as_ruggiero_case_c] {orbit:x}");
 
     let final_state = Propagator::new(
         sc.clone(),
@@ -201,7 +201,7 @@ fn qlaw_as_ruggiero_case_c_cov_test(almanac: Arc<Almanac>) {
 
     let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[qlaw_as_ruggiero_case_c] {:x}", final_state.orbit);
-    println!("[qlaw_as_ruggiero_case_c] prop usage: {:.3} kg", prop_usage);
+    println!("[qlaw_as_ruggiero_case_c] prop usage: {prop_usage:.3} kg");
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
@@ -249,7 +249,7 @@ fn qlaw_as_ruggiero_case_d(almanac: Arc<Almanac>) {
         Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
-    println!("[qlaw_as_ruggiero_case_d] {:x}", orbit);
+    println!("[qlaw_as_ruggiero_case_d] {orbit:x}");
 
     let final_state = Propagator::new(
         sc.clone(),
@@ -262,7 +262,7 @@ fn qlaw_as_ruggiero_case_d(almanac: Arc<Almanac>) {
 
     let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[qlaw_as_ruggiero_case_d] {:x}", final_state.orbit);
-    println!("[qlaw_as_ruggiero_case_d] prop usage: {:.3} kg", prop_usage);
+    println!("[qlaw_as_ruggiero_case_d] prop usage: {prop_usage:.3} kg");
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
@@ -312,7 +312,7 @@ fn qlaw_as_ruggiero_case_e(almanac: Arc<Almanac>) {
         Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
-    println!("[qlaw_as_ruggiero_case_e] {:x}", orbit);
+    println!("[qlaw_as_ruggiero_case_e] {orbit:x}");
 
     let final_state = Propagator::new(
         sc.clone(),
@@ -325,7 +325,7 @@ fn qlaw_as_ruggiero_case_e(almanac: Arc<Almanac>) {
 
     let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[qlaw_as_ruggiero_case_e] {:x}", final_state.orbit);
-    println!("[qlaw_as_ruggiero_case_e] prop usage: {:.3} kg", prop_usage);
+    println!("[qlaw_as_ruggiero_case_e] prop usage: {prop_usage:.3} kg");
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
@@ -371,7 +371,7 @@ fn qlaw_as_ruggiero_case_f(almanac: Arc<Almanac>) {
         Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
-    println!("[qlaw_as_ruggiero_case_f] {:x}", orbit);
+    println!("[qlaw_as_ruggiero_case_f] {orbit:x}");
 
     let setup = Propagator::new(
         sc.clone(),
@@ -389,7 +389,7 @@ fn qlaw_as_ruggiero_case_f(almanac: Arc<Almanac>) {
 
     let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[qlaw_as_ruggiero_case_f] {:x}", final_state.orbit);
-    println!("[qlaw_as_ruggiero_case_f] prop usage: {:.3} kg", prop_usage);
+    println!("[qlaw_as_ruggiero_case_f] prop usage: {prop_usage:.3} kg");
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
@@ -434,7 +434,7 @@ fn ruggiero_iepc_2011_102(almanac: Arc<Almanac>) {
         Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
-    println!("[ruggiero_iepc_2011_102] {:x}", orbit);
+    println!("[ruggiero_iepc_2011_102] {orbit:x}");
 
     let final_state = Propagator::new(
         sc.clone(),
@@ -447,7 +447,7 @@ fn ruggiero_iepc_2011_102(almanac: Arc<Almanac>) {
 
     let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[ruggiero_iepc_2011_102] {:x}", final_state.orbit);
-    println!("[ruggiero_iepc_2011_102] prop usage: {:.3} kg", prop_usage);
+    println!("[ruggiero_iepc_2011_102] prop usage: {prop_usage:.3} kg");
 
     assert!(
         sc.guidance_achieved(&final_state).unwrap(),
