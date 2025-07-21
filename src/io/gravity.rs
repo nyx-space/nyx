@@ -306,9 +306,7 @@ impl HarmonicsMem {
                 "{filepath} only contained (degree, order) of ({max_degree}, {max_order}) instead of requested ({degree}, {order})"
             );
         } else {
-            info!(
-                "{filepath} loaded with (degree, order) = ({degree}, {order})"
-            );
+            info!("{filepath} loaded with (degree, order) = ({degree}, {order})");
         }
         Ok(HarmonicsMem {
             degree: max_degree,

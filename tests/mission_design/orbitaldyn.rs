@@ -296,10 +296,7 @@ fn val_halo_earth_moon_dynamics_adaptive(almanac_gmat: Arc<Almanac>) {
     );
 
     assert!(err_r < 1e-6, "multi body failed in position: {err_r:.5e}");
-    assert!(
-        err_v < 1e-11,
-        "multi body failed in velocity: {err_v:.5e}"
-    );
+    assert!(err_v < 1e-11, "multi body failed in velocity: {err_v:.5e}");
 }
 
 #[allow(clippy::identity_op)]
@@ -489,10 +486,7 @@ fn val_halo_multi_body_dynamics_adaptive(almanac_gmat: Arc<Almanac>) {
     );
 
     assert!(err_r < 1e-6, "multi body failed in position: {err_r:.5e}");
-    assert!(
-        err_v < 1e-11,
-        "multi body failed in velocity: {err_v:.5e}"
-    );
+    assert!(err_v < 1e-11, "multi body failed in velocity: {err_v:.5e}");
 }
 
 #[allow(clippy::identity_op)]
@@ -611,10 +605,7 @@ fn val_leo_multi_body_dynamics_adaptive_wo_moon(almanac_gmat: Arc<Almanac>) {
     );
 
     assert!(err_r < 5e-7, "multi body failed in position: {err_r:.5e}");
-    assert!(
-        err_v < 5e-10,
-        "multi body failed in velocity: {err_v:.5e}"
-    );
+    assert!(err_v < 5e-10, "multi body failed in velocity: {err_v:.5e}");
 }
 
 #[allow(clippy::identity_op)]
@@ -1076,10 +1067,7 @@ fn val_earth_sph_harmonics_70x70(almanac_gmat: Arc<Almanac>) {
     let (err_r, err_v) = rss_orbit_vec_errors(&prop_rslt.orbit.to_cartesian_pos_vel(), &rslt_gmat);
 
     assert!(dbg!(err_r) < 0.2, "70x70 failed in position: {err_r:.5e}");
-    assert!(
-        dbg!(err_v) < 1e-3,
-        "70x70 failed in velocity: {err_v:.5e}"
-    );
+    assert!(dbg!(err_v) < 1e-3, "70x70 failed in velocity: {err_v:.5e}");
 }
 
 #[allow(clippy::identity_op)]
@@ -1132,10 +1120,7 @@ fn val_earth_sph_harmonics_70x70_partials(almanac_gmat: Arc<Almanac>) {
     let (err_r, err_v) = rss_orbit_vec_errors(&prop_rslt.orbit.to_cartesian_pos_vel(), &rslt_gmat);
 
     assert!(dbg!(err_r) < 0.2, "12x12 failed in position: {err_r:.5e}");
-    assert!(
-        dbg!(err_v) < 1e-3,
-        "12x12 failed in velocity: {err_v:.5e}"
-    );
+    assert!(dbg!(err_v) < 1e-3, "12x12 failed in velocity: {err_v:.5e}");
 }
 
 #[rstest]

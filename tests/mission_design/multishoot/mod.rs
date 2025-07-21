@@ -141,9 +141,7 @@ fn alt_orbit_raising_cov_test(almanac: Arc<Almanac>) {
     for sol in &multishoot_sol.solutions {
         dv_ms += sol.correction.norm() * 1e3;
     }
-    println!(
-        "Multiple shooting solution requires a total of {dv_ms:.3} m/s"
-    );
+    println!("Multiple shooting solution requires a total of {dv_ms:.3} m/s");
 
     // Propagate the initial orbit too
     prop.with(sc, almanac.clone())
@@ -333,9 +331,7 @@ fn vmag_orbit_raising(almanac: Arc<Almanac>) {
     for sol in &multishoot_sol.solutions {
         dv_ms += sol.correction.norm() * 1e3;
     }
-    println!(
-        "Multiple shooting solution requires a total of {dv_ms:.3} m/s"
-    );
+    println!("Multiple shooting solution requires a total of {dv_ms:.3} m/s");
 
     assert!((dv_ms - 735.9).abs() < 0.1, "Wrong total DV");
 

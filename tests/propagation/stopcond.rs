@@ -151,9 +151,7 @@ fn stop_cond_nrho_apo(almanac: Arc<Almanac>) {
     );
 
     let state_luna = almanac.transform_to(state, MOON_J2000, None).unwrap();
-    println!(
-        "Start state (dynamics: Earth, Moon, Sun gravity):\n{state_luna}"
-    );
+    println!("Start state (dynamics: Earth, Moon, Sun gravity):\n{state_luna}");
 
     let bodies = vec![EARTH, SUN];
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));

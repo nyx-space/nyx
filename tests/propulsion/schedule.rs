@@ -100,9 +100,7 @@ fn val_transfer_schedule_no_depl(almanac: Arc<Almanac>) {
     }
     println!();
 
-    println!(
-        "RSS errors:\tpos = {err_r:.5e} km\tvel = {err_v:.5e} km/s",
-    );
+    println!("RSS errors:\tpos = {err_r:.5e} km\tvel = {err_v:.5e} km/s",);
 
     assert!(err_r < 5e-10, "finite burn position wrong: {err_r:.5e}");
     assert!(err_v < 6e-13, "finite burn velocity wrong: {err_v:.5e}");
@@ -193,9 +191,7 @@ fn val_transfer_schedule_depl_cov_test(almanac: Arc<Almanac>) {
     }
     println!();
 
-    println!(
-        "RSS errors:\tpos = {err_r:.5e} km\tvel = {err_v:.5e} km/s",
-    );
+    println!("RSS errors:\tpos = {err_r:.5e} km\tvel = {err_v:.5e} km/s",);
 
     assert!(err_r < 5e-10, "finite burn position wrong: {err_r:.5e}");
     assert!(err_v < 5e-13, "finite burn velocity wrong: {err_v:.5e}");
@@ -222,9 +218,7 @@ fn val_transfer_schedule_depl_cov_test(almanac: Arc<Almanac>) {
     }
     println!();
 
-    println!(
-        "RSS errors:\tpos = {err_r:.5e} km\tvel = {err_v:.5e} km/s",
-    );
+    println!("RSS errors:\tpos = {err_r:.5e} km\tvel = {err_v:.5e} km/s",);
 
     assert!(
         err_r < 1.0,
@@ -320,9 +314,7 @@ fn val_transfer_single_maneuver_depl_cov_test(almanac: Arc<Almanac>) {
     }
     println!();
 
-    println!(
-        "RSS errors:\tpos = {err_r:.5e} km\tvel = {err_v:.5e} km/s",
-    );
+    println!("RSS errors:\tpos = {err_r:.5e} km\tvel = {err_v:.5e} km/s",);
 
     assert!(err_r < 5e-10, "finite burn position wrong: {err_r:.5e}");
     assert!(err_v < 5e-13, "finite burn velocity wrong: {err_v:.5e}");
@@ -349,9 +341,7 @@ fn val_transfer_single_maneuver_depl_cov_test(almanac: Arc<Almanac>) {
     }
     println!();
 
-    println!(
-        "RSS errors:\tpos = {err_r:.5e} km\tvel = {err_v:.5e} km/s",
-    );
+    println!("RSS errors:\tpos = {err_r:.5e} km\tvel = {err_v:.5e} km/s",);
 
     assert!(
         err_r < 1.0,
