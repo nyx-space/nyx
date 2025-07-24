@@ -142,15 +142,15 @@ impl LambertSolution {
         self.input.final_state.velocity_km_s - self.v_final_km_s
     }
 
-    /// Return the transfer orbit computed from adding the departure velocity to the initial state.
+    /// Return the transfer orbit computed from setting the departure velocity to the initial state.
     pub fn transfer_orbit(mut self) -> Orbit {
-        self.input.initial_state.velocity_km_s += self.v_init_km_s;
+        self.input.initial_state.velocity_km_s = self.v_init_km_s;
         self.input.initial_state
     }
 
-    /// Return the arrival orbit computed from subtracting the arrival velocity to the final state.
+    /// Return the arrival orbit computed from setting the arrival velocity to the final state.
     pub fn arrival_orbit(mut self) -> Orbit {
-        self.input.final_state.velocity_km_s -= self.v_final_km_s;
+        self.input.final_state.velocity_km_s = self.v_final_km_s;
         self.input.final_state
     }
 
