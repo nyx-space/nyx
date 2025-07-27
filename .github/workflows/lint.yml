@@ -2,8 +2,6 @@ name: Ruff Lint
 
 on:
   pull_request:
-  push:
-    branches: [main, develop]
 
 jobs:
   lint:
