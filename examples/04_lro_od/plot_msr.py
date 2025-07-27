@@ -19,7 +19,7 @@ def main(path: str):
     title = f"Measurements from {station_names} spanning {start} to {end} ({arc_duration})"
 
     # Plot the overall tracking
-    px.strip(df, x="Epoch (UTC)", y="Tracking device", color="Tracking device").show()
+    px.strip(df, x="Epoch (UTC)", y="Tracking device", color="Tracking device", title=title).show()
 
     # Plot each measurement kind
     for msr_col_name in ["Range (km)", "Doppler (km/s)"]:

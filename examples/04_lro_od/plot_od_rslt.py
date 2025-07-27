@@ -1,6 +1,5 @@
 import polars as pl
 from scipy import stats
-from scipy.stats import chi2
 import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
@@ -83,7 +82,7 @@ def main(path: str, full: bool):
     # Plot the residual ratios and whether they were accepted.
     px.scatter(df, x="Epoch (UTC)", y="Residual ratio", color="Tracker").show()
 
-    df_resid_ok = df.filter(df["Residual Rejected"] == False)
+    df_resid_ok = df.filter(~df["Residual Rejected"])
 
     # Plot the measurement residuals and their noises.
     for msr in msr_types:
