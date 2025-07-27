@@ -116,7 +116,7 @@ if __name__ == "__main__":
         ]
     )
     fig.update_layout(
-        title=f"JWST RIC 3-Σ position prediction",
+        title="JWST RIC 3-Σ position prediction",
         xaxis_title="Epoch",
         legend_title="Legend",
     )
@@ -134,7 +134,7 @@ if __name__ == "__main__":
         ]
     )
     fig.update_layout(
-        title=f"JWST RIC 3-Σ position prediction",
+        title="JWST RIC 3-Σ position prediction",
         xaxis_title="Epoch",
         legend_title="Legend",
     )
