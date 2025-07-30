@@ -40,7 +40,8 @@ pub enum MultipleShootingError {
     #[snafu(display("segment #{segment} encountered {source}"))]
     TargetingError {
         segment: usize,
-        source: TargetingError,
+        #[snafu(source(from(TargetingError, Box::new)))]
+        source: Box<TargetingError>,
     },
     #[snafu(display("during a multiple shooting, encountered {source}"))]
     MultiShootTrajError { source: TrajError },

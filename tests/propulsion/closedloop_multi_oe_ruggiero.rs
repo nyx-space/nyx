@@ -81,7 +81,7 @@ fn qlaw_as_ruggiero_case_a(almanac: Arc<Almanac>) {
     for e in &events {
         println!(
             "[qlaw_as_ruggiero_case_a] Found {} events of kind {}",
-            traj.find(e, almanac.clone()).unwrap().len(),
+            traj.find(e, None, almanac.clone()).unwrap().len(),
             e
         );
     }

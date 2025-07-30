@@ -27,7 +27,7 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
 
-    let prop_time = state.period().unwrap();
+    let prop_time = 200 * state.period().unwrap();
 
     // Track how many times we've passed by that TA again
     let peri_event = Event::periapsis(); // Special event shortcut!
@@ -47,8 +47,10 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
     println!("{traj}");
 
     // Find all of the events
-    for e in &events {
-        let found_events = traj.find(e, almanac.clone()).unwrap();
+    for (e_num, e) in events.iter().enumerate() {
+        let found_events = traj
+            .find(e, Some(Unit::Minute * 10), almanac.clone())
+            .unwrap();
         let pretty = found_events
             .iter()
             .fold(String::new(), |mut output, orbit_event| {
@@ -59,6 +61,13 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
                 );
                 output
             });
+
+        // We expect one more apsis because we start at periapasis and prop for a fixed number of orbits.
+        assert_eq!(
+            found_events.len(),
+            if e_num <= 1 { 201 } else { 200 },
+            "wrong number of true anomaly events for #{e_num}"
+        );
         println!("[ta_tracker] {e} =>\n{pretty}");
     }
 
@@ -113,7 +122,7 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
     println!("Max elevation {max_el} degrees @ {max_dt}");
 
     let umbra_event_loc = e_loc.to_umbra_event();
-    let umbra_events = traj.find(&umbra_event_loc, almanac.clone()).unwrap();
+    let umbra_events = traj.find(&umbra_event_loc, None, almanac.clone()).unwrap();
 
     let pretty = umbra_events
         .iter()
@@ -143,7 +152,9 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
     println!("[eclipses] {umbra_event_loc} =>\n{pretty}");
 
     let penumbra_event_loc = e_loc.to_penumbra_event();
-    let penumbra_events = traj.find(&penumbra_event_loc, almanac.clone()).unwrap();
+    let penumbra_events = traj
+        .find(&penumbra_event_loc, None, almanac.clone())
+        .unwrap();
 
     let pretty = penumbra_events
         .iter()

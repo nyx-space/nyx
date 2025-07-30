@@ -110,7 +110,7 @@ where
                 } else if prev_value < value && value < next_value {
                     EventEdge::Rising
                 } else {
-                    warn!("could not determine edge of {} at {}", event, state.epoch(),);
+                    debug!("could not determine edge of {} at {}", event, state.epoch(),);
                     EventEdge::Unclear
                 }
             } else if prev_value > value {

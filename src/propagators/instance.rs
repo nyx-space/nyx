@@ -352,7 +352,7 @@ where
         let (_, traj) = self.for_duration_with_traj(max_duration)?;
         // Now, find the requested event
         let events = traj
-            .find(event, self.almanac.clone())
+            .find(event, None, self.almanac.clone())
             .context(TrajectoryEventSnafu)?;
         match events.get(trigger) {
             Some(event_state) => Ok((event_state.state, traj)),

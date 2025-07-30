@@ -119,6 +119,7 @@ where
             (
                 "Frame".to_string(),
                 serde_dhall::serialize(&frame)
+                    .static_type_annotation()
                     .to_string()
                     .map_err(|e| ODError::ODIOError {
                         source: InputOutputError::SerializeDhall {

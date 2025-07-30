@@ -47,7 +47,7 @@ fn stop_cond_3rd_apo_cov_test(almanac: Arc<Almanac>) {
     // NOTE: We start counting at ZERO, so finding the 3rd means grabbing the second found.
     let (third_apo, traj) = prop.until_nth_event(5 * period, &apo_event, 2).unwrap();
 
-    let events = traj.find(&apo_event, almanac).unwrap();
+    let events = traj.find(&apo_event, None, almanac).unwrap();
     let mut prev_event_match = events[0].state.epoch();
     for event_match in events.iter().skip(1) {
         let delta_period = event_match.state.epoch() - prev_event_match - period;
@@ -99,7 +99,7 @@ fn stop_cond_3rd_peri(almanac: Arc<Almanac>) {
     // which the event finder will find.
     let (third_peri, traj) = prop.until_nth_event(5 * period, &peri_event, 2).unwrap();
 
-    let events = traj.find(&peri_event, almanac).unwrap();
+    let events = traj.find(&peri_event, None, almanac).unwrap();
     let mut prev_event_match = events[0].state.epoch();
     for event_match in events.iter().skip(1) {
         let delta_period = event_match.state.epoch() - prev_event_match - period;
@@ -202,7 +202,7 @@ fn stop_cond_nrho_apo(almanac: Arc<Almanac>) {
     );
 
     // Now, find all of the requested events
-    let events = traj_luna.find(&near_apo_event, almanac).unwrap();
+    let events = traj_luna.find(&near_apo_event, None, almanac).unwrap();
     println!(
         "Found all {} events in {} ms",
         near_apo_event,
@@ -363,7 +363,7 @@ fn event_and_combination(almanac: Arc<Almanac>) {
     // NOTE: We're unwrapping here, so if the event isn't found, this will cause the test to fail.
     let event = Event::specific(StateParameter::Declination, 6.0, 3.0, Unit::Minute);
     let mut decl_deg = 0.0;
-    if let Ok(matching_states) = traj_moon.find(&event, almanac.clone()) {
+    if let Ok(matching_states) = traj_moon.find(&event, None, almanac.clone()) {
         for sc_decl_zero in matching_states {
             decl_deg = sc_decl_zero
                 .state
@@ -376,6 +376,7 @@ fn event_and_combination(almanac: Arc<Almanac>) {
         // We should be able to find a similar event with a tighter bound too.
         if let Ok(tighter_states) = traj_moon.find(
             &Event::specific(StateParameter::Declination, decl_deg, 1.0, Unit::Minute),
+            None,
             almanac,
         ) {
             for sc_decl_zero in tighter_states {

@@ -48,7 +48,7 @@ impl<'a> MultipleShooting<'a, Node, 3, 3> {
             error!("At least three nodes are needed for a multiple shooting optimization");
             return Err(MultipleShootingError::TargetingError {
                 segment: 0_usize,
-                source: TargetingError::UnderdeterminedProblem,
+                source: Box::new(TargetingError::UnderdeterminedProblem),
             });
         }
 
