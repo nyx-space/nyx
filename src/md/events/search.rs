@@ -188,7 +188,7 @@ where
     /// This method uses a Brent solver. If the function that defines the event is not unimodal, the event finder may not converge correctly.
     ///
     /// # Heuristic detail
-    /// The initial search step is 1% of the duration of the trajectory duration.
+    /// The initial search step is 1% of the duration of the trajectory duration, if the heuristic is set to None.
     /// For example, if the trajectory is 100 days long, then we split the trajectory into 100 chunks of 1 day and see whether
     /// the event is in there. If the event happens twice or more times within 1% of the trajectory duration, only the _one_ of
     /// such events will be found.
@@ -199,6 +199,7 @@ where
     pub fn find<E>(
         &self,
         event: &E,
+        heuristic: Option<Duration>,
         almanac: Arc<Almanac>,
     ) -> Result<Vec<EventDetails<S>>, EventError>
     where
@@ -213,7 +214,7 @@ where
                 event: format!("{event}"),
             });
         }
-        let heuristic = (end_epoch - start_epoch) / 100;
+        let heuristic = heuristic.unwrap_or((end_epoch - start_epoch) / 100);
         info!("Searching for {event} with initial heuristic of {heuristic}");
 
         let (sender, receiver) = channel();
@@ -393,12 +394,13 @@ where
     pub fn find_arcs<E>(
         &self,
         event: &E,
+        heuristic: Option<Duration>,
         almanac: Arc<Almanac>,
     ) -> Result<Vec<EventArc<S>>, EventError>
     where
         E: EventEvaluator<S>,
     {
-        let mut events = match self.find(event, almanac.clone()) {
+        let mut events = match self.find(event, heuristic, almanac.clone()) {
             Ok(events) => events,
             Err(_) => {
                 // We haven't found the start or end of an arc, i.e. no zero crossing on the event.

@@ -331,7 +331,7 @@ fn multi_body_ckf_covar_map_cov_test(
     // Test that we can generate a navigation trajectory and search it
     let nav_traj = od_sol.to_traj().unwrap();
     let aop_event = Event::apoapsis();
-    for found_event in nav_traj.find(&aop_event, almanac).unwrap() {
+    for found_event in nav_traj.find(&aop_event, None, almanac).unwrap() {
         println!("{:x}", found_event.state);
         assert!((found_event.state.orbit.ta_deg().unwrap() - 180.0).abs() < 1e-2)
     }

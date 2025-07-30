@@ -273,7 +273,7 @@ impl<T: MultishootNode<OT>, const VT: usize, const OT: usize> MultipleShooting<'
         }
         Err(MultipleShootingError::TargetingError {
             segment: 0_usize,
-            source: TargetingError::TooManyIterations,
+            source: Box::new(TargetingError::TooManyIterations),
         })
     }
 }

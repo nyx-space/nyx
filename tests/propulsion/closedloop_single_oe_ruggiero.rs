@@ -698,7 +698,11 @@ fn rugg_raan(almanac: Arc<Almanac>) {
     let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[rugg_raan] {:x}", final_state.orbit);
     let event = Event::new(StateParameter::RAAN, 5.0);
-    println!("[rugg_raan] {} => {:?}", event, traj.find(&event, almanac));
+    println!(
+        "[rugg_raan] {} => {:?}",
+        event,
+        traj.find(&event, None, almanac)
+    );
     println!("[rugg_raan] prop usage: {prop_usage:.3} kg");
 
     assert!(
