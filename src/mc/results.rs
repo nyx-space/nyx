@@ -317,12 +317,15 @@ where
 
         let more_meta = Some(vec![(
             "Frame".to_string(),
-            serde_dhall::serialize(&frame).to_string().map_err(|e| {
-                Box::new(InputOutputError::SerializeDhall {
-                    what: format!("frame `{frame}`"),
-                    err: e.to_string(),
-                })
-            })?,
+            serde_dhall::serialize(&frame)
+                .static_type_annotation()
+                .to_string()
+                .map_err(|e| {
+                    Box::new(InputOutputError::SerializeDhall {
+                        what: format!("frame `{frame}`"),
+                        err: e.to_string(),
+                    })
+                })?,
         )]);
 
         for field in &fields {
