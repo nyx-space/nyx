@@ -32,7 +32,7 @@ maintenance = { status = "actively-developed" }
 github = { repository = "nyx-space/nyx", branch = "master" }
 
 [dependencies]
-nalgebra = "0.33"
+nalgebra = "0.34"
 log = "0.4"
 hifitime = "4.0.0"
 anise = "0.6.0"
