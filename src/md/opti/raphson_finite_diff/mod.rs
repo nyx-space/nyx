@@ -325,7 +325,7 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                 delta
             );
 
-            correction::apply_correction(
+            let applied_delta = correction::apply_correction(
                 self,
                 &delta,
                 &mut xi,
@@ -334,6 +334,7 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                 achievement_epoch,
                 false,
             )?;
+            total_correction += applied_delta;
             total_correction += delta;
             debug!("Total correction: {total_correction:e}");
 
