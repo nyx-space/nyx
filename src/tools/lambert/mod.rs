@@ -157,7 +157,7 @@ impl LambertSolution {
     /// Return the declination of the departure v infinity (i.e. the outgoing asymptote velocity vector), in degrees
     pub fn v_inf_outgoing_declination_deg(&self) -> f64 {
         // Must negate compared to the departure location
-        let v_inf_km_s = self.v_inf_outgoing_km_s();
+        let v_inf_km_s = -self.v_inf_outgoing_km_s();
         (v_inf_km_s.z / v_inf_km_s.norm()).asin().to_degrees()
     }
 
