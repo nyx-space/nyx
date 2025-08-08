@@ -154,10 +154,18 @@ impl LambertSolution {
         self.input.final_state
     }
 
-    /// Return the declination of the departure v infinity, in degrees
-    pub fn v_inf_depart_declination_deg(&self) -> f64 {
+    /// Return the declination of the departure v infinity (i.e. the outgoing asymptote velocity vector), in degrees
+    pub fn v_inf_outgoing_declination_deg(&self) -> f64 {
+        // Must negate compared to the departure location
         let v_inf_km_s = self.v_inf_depart_km_s();
         (v_inf_km_s.z / v_inf_km_s.norm()).asin().to_degrees()
+    }
+
+    /// Return the right ascention of the departure v infinity (i.e. the outgoing asymptote velocity vector), in degrees
+    pub fn v_inf_outgoing_right_ascension_deg(&self) -> f64 {
+        // Must negate compared to the departure location
+        let v_inf_km_s = -self.v_inf_depart_km_s();
+        (v_inf_km_s.y.atan2(v_inf_km_s.x)).to_degrees()
     }
 
     /// Returns the c3 computed as the departure v infinity norm squared
