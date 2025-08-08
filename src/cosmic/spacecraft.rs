@@ -486,11 +486,11 @@ impl State for Spacecraft {
                 .context(StateAstroSnafu { param }),
             StateParameter::BdotR => Ok(BPlane::new(self.orbit)
                 .context(StateAstroSnafu { param })?
-                .b_r
+                .b_r_km
                 .real()),
             StateParameter::BdotT => Ok(BPlane::new(self.orbit)
                 .context(StateAstroSnafu { param })?
-                .b_t
+                .b_t_km
                 .real()),
             StateParameter::BLTOF => Ok(BPlane::new(self.orbit)
                 .context(StateAstroSnafu { param })?

@@ -133,12 +133,12 @@ pub struct LambertSolution {
 
 impl LambertSolution {
     /// Return the v infinity vector at departure, in km/s
-    pub fn v_inf_depart_km_s(&self) -> Vector3<f64> {
+    pub fn v_inf_outgoing_km_s(&self) -> Vector3<f64> {
         self.input.initial_state.velocity_km_s - self.v_init_km_s
     }
 
     /// Return v infinity vector at arrival, in km/s
-    pub fn v_inf_arrive_km_s(&self) -> Vector3<f64> {
+    pub fn v_inf_incoming_km_s(&self) -> Vector3<f64> {
         self.input.final_state.velocity_km_s - self.v_final_km_s
     }
 
@@ -154,14 +154,22 @@ impl LambertSolution {
         self.input.final_state
     }
 
-    /// Return the declination of the departure v infinity, in degrees
-    pub fn v_inf_depart_declination_deg(&self) -> f64 {
-        let v_inf_km_s = self.v_inf_depart_km_s();
+    /// Return the declination of the departure v infinity (i.e. the outgoing asymptote velocity vector), in degrees
+    pub fn v_inf_outgoing_declination_deg(&self) -> f64 {
+        // Must negate compared to the departure location
+        let v_inf_km_s = -self.v_inf_outgoing_km_s();
         (v_inf_km_s.z / v_inf_km_s.norm()).asin().to_degrees()
+    }
+
+    /// Return the right ascention of the departure v infinity (i.e. the outgoing asymptote velocity vector), in degrees
+    pub fn v_inf_outgoing_right_ascension_deg(&self) -> f64 {
+        // Must negate compared to the departure location
+        let v_inf_km_s = -self.v_inf_outgoing_km_s();
+        (v_inf_km_s.y.atan2(v_inf_km_s.x)).to_degrees()
     }
 
     /// Returns the c3 computed as the departure v infinity norm squared
     pub fn c3_km2_s2(&self) -> f64 {
-        self.v_inf_depart_km_s().norm_squared()
+        self.v_inf_outgoing_km_s().norm_squared()
     }
 }

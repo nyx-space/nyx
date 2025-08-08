@@ -175,10 +175,10 @@ mod ut_lambert_gooding {
         println!("{}\n{}", sol.transfer_orbit(), sol.arrival_orbit());
         println!(
             "v_inf+ = {} km/s -- c3 = {} km^2/s^2",
-            sol.v_inf_depart_km_s().norm(),
+            sol.v_inf_outgoing_km_s().norm(),
             sol.c3_km2_s2()
         );
-        println!("v_inf- = {} km/s", sol.v_inf_arrive_km_s().norm());
+        println!("v_inf- = {} km/s", sol.v_inf_incoming_km_s().norm());
     }
 
     #[test]

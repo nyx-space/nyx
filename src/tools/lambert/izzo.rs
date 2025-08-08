@@ -462,6 +462,15 @@ mod ut_lambert_izzo {
 
         assert!((sol.v_init_km_s - exp_vi).norm() < 1e-5);
         assert!((sol.v_final_km_s - exp_vf).norm() < 1e-5);
+
+        assert!(
+            sol.v_inf_outgoing_declination_deg().abs() < 1e-8,
+            "outgoing decl should be zero"
+        );
+        assert!(
+            (sol.v_inf_outgoing_right_ascension_deg() - 54.7747288).abs() < 1e-6,
+            "wrong outgoing RA"
+        );
     }
 
     #[test]
@@ -495,5 +504,14 @@ mod ut_lambert_izzo {
 
         assert!((sol.v_init_km_s - exp_vi).norm() < 1e-5);
         assert!((sol.v_final_km_s - exp_vf).norm() < 1e-5);
+
+        assert!(
+            sol.v_inf_outgoing_declination_deg().abs() < 1e-8,
+            "outgoing decl should be zero"
+        );
+        assert!(
+            (sol.v_inf_outgoing_right_ascension_deg() + 152.2652291).abs() < 1e-6,
+            "wrong outgoing RA"
+        );
     }
 }

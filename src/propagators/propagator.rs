@@ -85,7 +85,7 @@ where
         Self::new(dynamics, IntegratorMethod::DormandPrince78, opts)
     }
 
-    pub fn with(&self, state: D::StateType, almanac: Arc<Almanac>) -> PropInstance<D> {
+    pub fn with(&self, state: D::StateType, almanac: Arc<Almanac>) -> PropInstance<'_, D> {
         // Pre-allocate the k used in the propagator
         let mut k = Vec::with_capacity(self.method.stages() + 1);
         for _ in 0..self.method.stages() {
