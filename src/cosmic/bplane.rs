@@ -37,9 +37,9 @@ use std::fmt;
 
 pub struct BPlane {
     /// The $B_T$ component, in kilometers
-    pub b_t: OrbitPartial,
+    pub b_t_km: OrbitPartial,
     /// The $B_R$ component, in kilometers
-    pub b_r: OrbitPartial,
+    pub b_r_km: OrbitPartial,
     /// The Linearized Time of Flight
     pub ltof_s: OrbitPartial,
     /// The B-Plane rotation matrix
@@ -115,11 +115,11 @@ impl BPlane {
         );
 
         Ok(BPlane {
-            b_r: OrbitPartial {
+            b_r_km: OrbitPartial {
                 dual: b_vec.dot(&r_hat),
                 param: StateParameter::BdotR,
             },
-            b_t: OrbitPartial {
+            b_t_km: OrbitPartial {
                 dual: b_vec.dot(&t_hat),
                 param: StateParameter::BdotT,
             },
@@ -147,12 +147,12 @@ impl BPlane {
     /// Returns the Jacobian of the B plane (BR, BT, LTOF) with respect to the velocity
     pub fn jacobian(&self) -> Matrix3<f64> {
         Matrix3::new(
-            self.b_r.wtr_vx(),
-            self.b_r.wtr_vy(),
-            self.b_r.wtr_vz(),
-            self.b_t.wtr_vx(),
-            self.b_t.wtr_vy(),
-            self.b_t.wtr_vz(),
+            self.b_r_km.wtr_vx(),
+            self.b_r_km.wtr_vy(),
+            self.b_r_km.wtr_vz(),
+            self.b_t_km.wtr_vx(),
+            self.b_t_km.wtr_vy(),
+            self.b_t_km.wtr_vz(),
             self.ltof_s.wtr_vx(),
             self.ltof_s.wtr_vy(),
             self.ltof_s.wtr_vz(),
@@ -163,22 +163,22 @@ impl BPlane {
     pub fn jacobian2(&self, invariant: StateParameter) -> Result<Matrix2<f64>, AstroError> {
         match invariant {
             StateParameter::VX => Ok(Matrix2::new(
-                self.b_r.wtr_vy(),
-                self.b_r.wtr_vz(),
-                self.b_t.wtr_vy(),
-                self.b_t.wtr_vz(),
+                self.b_r_km.wtr_vy(),
+                self.b_r_km.wtr_vz(),
+                self.b_t_km.wtr_vy(),
+                self.b_t_km.wtr_vz(),
             )),
             StateParameter::VY => Ok(Matrix2::new(
-                self.b_r.wtr_vx(),
-                self.b_r.wtr_vz(),
-                self.b_t.wtr_vx(),
-                self.b_t.wtr_vz(),
+                self.b_r_km.wtr_vx(),
+                self.b_r_km.wtr_vz(),
+                self.b_t_km.wtr_vx(),
+                self.b_t_km.wtr_vz(),
             )),
             StateParameter::VZ => Ok(Matrix2::new(
-                self.b_r.wtr_vx(),
-                self.b_r.wtr_vy(),
-                self.b_t.wtr_vx(),
-                self.b_t.wtr_vy(),
+                self.b_r_km.wtr_vx(),
+                self.b_r_km.wtr_vy(),
+                self.b_t_km.wtr_vx(),
+                self.b_t_km.wtr_vy(),
             )),
             _ => Err(AstroError::BPlaneInvariant),
         }
@@ -186,26 +186,34 @@ impl BPlane {
 }
 
 impl BPlane {
-    pub fn b_dot_t(&self) -> f64 {
-        self.b_t.real()
+    /// Returns the B dot T, in km
+    pub fn b_dot_t_km(&self) -> f64 {
+        self.b_t_km.real()
     }
 
-    pub fn b_dot_r(&self) -> f64 {
-        self.b_r.real()
+    /// Returns the B dot R, in km
+    pub fn b_dot_r_km(&self) -> f64 {
+        self.b_r_km.real()
     }
 
+    /// Returns the linearized time of flight, in seconds
+    ///
+    /// NOTE:
+    /// Although the LTOF should allow to build a 3x3 Jacobian for a differential corrector
+    /// it's historically super finicky and one will typically have better results by cascading
+    /// DCs which target different parameters instead of trying to use the LTOF.
     pub fn ltof(&self) -> Duration {
         self.ltof_s.real() * Unit::Second
     }
 
     /// Returns the B plane angle in degrees between -180 and 180
-    pub fn angle(&self) -> f64 {
-        between_pm_180(self.b_dot_r().atan2(self.b_dot_t()).to_degrees())
+    pub fn angle_deg(&self) -> f64 {
+        between_pm_180(self.b_dot_r_km().atan2(self.b_dot_t_km()).to_degrees())
     }
 
     /// Returns the B plane vector magnitude, in kilometers
-    pub fn mag(&self) -> f64 {
-        (self.b_dot_t().powi(2) + self.b_dot_r().powi(2)).sqrt()
+    pub fn magnitude_km(&self) -> f64 {
+        (self.b_dot_t_km().powi(2) + self.b_dot_r_km().powi(2)).sqrt()
     }
 }
 
@@ -216,9 +224,9 @@ impl fmt::Display for BPlane {
             "[{}] {} B-Plane: B∙R = {:.3} km\tB∙T = {:.3} km\tAngle = {:.3} deg",
             self.frame,
             self.epoch,
-            self.b_dot_r(),
-            self.b_dot_t(),
-            self.angle()
+            self.b_dot_r_km(),
+            self.b_dot_t_km(),
+            self.angle_deg()
         )
     }
 }
@@ -333,8 +341,8 @@ pub fn try_achieve_b_plane(
             let b_plane = BPlane::new(real_orbit).context(AstroSnafu)?;
 
             // Check convergence
-            let br_err = target.b_r_km - b_plane.b_dot_r();
-            let bt_err = target.b_t_km - b_plane.b_dot_t();
+            let br_err = target.b_r_km - b_plane.b_dot_r_km();
+            let bt_err = target.b_t_km - b_plane.b_dot_t_km();
 
             if br_err.abs() < target.tol_b_r_km && bt_err.abs() < target.tol_b_t_km {
                 return Ok((total_dv, b_plane));
@@ -381,8 +389,8 @@ pub fn try_achieve_b_plane(
             let b_plane = BPlane::new(real_orbit).context(AstroSnafu)?;
 
             // Check convergence
-            let br_err = target.b_r_km - b_plane.b_dot_r();
-            let bt_err = target.b_t_km - b_plane.b_dot_t();
+            let br_err = target.b_r_km - b_plane.b_dot_r_km();
+            let bt_err = target.b_t_km - b_plane.b_dot_t_km();
             let ltof_err = target.ltof_s - b_plane.ltof_s.real();
 
             if br_err.abs() < target.tol_b_r_km

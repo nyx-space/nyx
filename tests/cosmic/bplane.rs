@@ -157,22 +157,22 @@ fn val_b_plane_gmat(almanac: Arc<Almanac>) {
 
         let b_plane = BPlane::new(state).unwrap();
         assert!(
-            dbg!(b_plane.b_dot_r() - data.b_r).abs() < 1.0,
+            dbg!(b_plane.b_dot_r_km() - data.b_r).abs() < 1.0,
             "invalid b dot R at {}",
             data.epoch
         );
         assert!(
-            dbg!(b_plane.b_dot_t() - data.b_t).abs() < 1.0,
+            dbg!(b_plane.b_dot_t_km() - data.b_t).abs() < 1.0,
             "invalid b dot T at {}",
             data.epoch
         );
         assert!(
-            dbg!(b_plane.angle() - data.b_angle).abs() < 5e-4,
+            dbg!(b_plane.angle_deg() - data.b_angle).abs() < 5e-4,
             "invalid b vector angle at {}",
             data.epoch
         );
         assert!(
-            dbg!(b_plane.mag() - data.b_mag).abs() < 1.0,
+            dbg!(b_plane.magnitude_km() - data.b_mag).abs() < 1.0,
             "invalid b vector angle at {}",
             data.epoch
         );
@@ -183,8 +183,8 @@ fn val_b_plane_gmat(almanac: Arc<Almanac>) {
     let state = almanac.transform_to(eme2k_state, MOON_J2000, None).unwrap();
     let b_plane = BPlane::new(state).unwrap();
     println!("{}\n{}", b_plane, b_plane.jacobian());
-    println!("bt\n{}", b_plane.b_t);
-    println!("br\n{}", b_plane.b_r);
+    println!("bt\n{}", b_plane.b_t_km);
+    println!("br\n{}", b_plane.b_r_km);
     println!("ltof\n{}", b_plane.ltof_s);
 }
 
@@ -205,8 +205,14 @@ fn b_plane_davis(almanac: Arc<Almanac>) {
     );
 
     let bp = BPlane::new(orbit).unwrap();
-    assert!((bp.b_dot_t() - 45892.323790).abs() < 1e-5, "incorrect B_T");
-    assert!((bp.b_dot_r() - 10606.210428).abs() < 1e-5, "incorrect B_R");
+    assert!(
+        (bp.b_dot_t_km() - 45892.323790).abs() < 1e-5,
+        "incorrect B_T"
+    );
+    assert!(
+        (bp.b_dot_r_km() - 10606.210428).abs() < 1e-5,
+        "incorrect B_R"
+    );
     println!("{} km/s\n{}", orbit.vmag_km_s(), bp);
 
     // Check reciprocity between the gravity assist functions.

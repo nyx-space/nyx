@@ -84,8 +84,8 @@ impl MvnSpacecraft {
                 if disp.param.is_orbital() {
                     let partial = if disp.param.is_b_plane() {
                         match disp.param {
-                            StateParameter::BdotR => b_plane.unwrap().b_r,
-                            StateParameter::BdotT => b_plane.unwrap().b_t,
+                            StateParameter::BdotR => b_plane.unwrap().b_r_km,
+                            StateParameter::BdotT => b_plane.unwrap().b_t_km,
                             StateParameter::BLTOF => b_plane.unwrap().ltof_s,
                             _ => unreachable!(),
                         }
