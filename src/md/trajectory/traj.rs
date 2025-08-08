@@ -132,12 +132,12 @@ where
     }
 
     /// Creates an iterator through the trajectory by the provided step size
-    pub fn every(&self, step: Duration) -> TrajIterator<S> {
+    pub fn every(&self, step: Duration) -> TrajIterator<'_, S> {
         self.every_between(step, self.first().epoch(), self.last().epoch())
     }
 
     /// Creates an iterator through the trajectory by the provided step size between the provided bounds
-    pub fn every_between(&self, step: Duration, start: Epoch, end: Epoch) -> TrajIterator<S> {
+    pub fn every_between(&self, step: Duration, start: Epoch, end: Epoch) -> TrajIterator<'_, S> {
         TrajIterator {
             time_series: TimeSeries::inclusive(
                 start.max(self.first().epoch()),
