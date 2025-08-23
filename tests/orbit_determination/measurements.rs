@@ -7,11 +7,15 @@ use indexmap::{IndexMap, IndexSet};
 use nalgebra::{Const, U2};
 use nyx::cosmic::Orbit;
 use nyx::dynamics::SpacecraftDynamics;
+use nyx::md::prelude::*;
 use nyx::od::prelude::*;
 use nyx::time::Epoch;
 use nyx::{dynamics::OrbitalDynamics, propagators::Propagator};
 use nyx_space::propagators::IntegratorMethod;
 use rand::SeedableRng;
+use std::collections::BTreeMap;
+use std::str::FromStr;
+
 use rand_pcg::Pcg64Mcg;
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
@@ -83,11 +87,6 @@ fn nil_measurement(almanac: Arc<Almanac>) {
 #[allow(clippy::identity_op)]
 #[rstest]
 fn val_measurements_topo(almanac: Arc<Almanac>) {
-    use self::nyx::cosmic::Orbit;
-    use self::nyx::md::prelude::*;
-    use self::nyx::od::prelude::*;
-    use std::str::FromStr;
-
     let mut msr_types = IndexSet::new();
     msr_types.insert(MeasurementType::Range);
     msr_types.insert(MeasurementType::Doppler);
@@ -313,11 +312,6 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
 #[allow(clippy::identity_op)]
 #[rstest]
 fn verif_sensitivity_mat(almanac: Arc<Almanac>) {
-    use self::nyx::cosmic::Orbit;
-    use self::nyx::md::prelude::*;
-    use self::nyx::od::prelude::*;
-    use std::str::FromStr;
-
     let cislunar1 = Orbit::cartesian(
         58643.769540,
         -61696.435624,
@@ -388,5 +382,142 @@ fn verif_sensitivity_mat(almanac: Arc<Almanac>) {
         );
 
         assert!(sensitivity_error.abs() < 1e-3);
+    }
+}
+
+/// Validate the white noise modeling on an arbitrary trajectory for all measurement types
+/// is within the covariance and the sigma bounds as configured by the stochastic process.
+#[allow(clippy::identity_op)]
+#[rstest]
+fn val_measurement_noise(almanac: Arc<Almanac>) {
+    // Build an example trajectory.
+    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let epoch = Epoch::from_gregorian_tai_at_midnight(2025, 8, 22);
+
+    let orbit =
+        Orbit::keplerian_apsis_radii(99_000.0, 180.0, 32.0, 128.0, 256.0, 0.0, epoch, eme2k);
+
+    let sc: Spacecraft = orbit.into();
+
+    println!("{sc}");
+
+    let (_, traj) = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
+        vec![MOON, SUN],
+    )))
+    .with(sc, almanac.clone())
+    .for_duration_with_traj(orbit.period().unwrap() * 2)
+    .unwrap();
+
+    println!("{traj}");
+
+    // Set up the noise modeling.
+
+    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
+
+    let range_wn = WhiteNoise::constant_white_noise(2.0e-3);
+    let doppler_wn = WhiteNoise::constant_white_noise(3e-6);
+    let angle_wn = WhiteNoise::constant_white_noise(2e-2);
+
+    let noisy_ground_station = GroundStation::dss13_goldstone(
+        10.0,
+        StochasticNoise {
+            white_noise: Some(range_wn),
+            bias: None,
+        },
+        StochasticNoise {
+            white_noise: Some(doppler_wn),
+            bias: None,
+        },
+        iau_earth,
+    )
+    .with_msr_type(
+        MeasurementType::Azimuth,
+        StochasticNoise {
+            white_noise: Some(angle_wn),
+            bias: None,
+        },
+    )
+    .with_msr_type(
+        MeasurementType::Elevation,
+        StochasticNoise {
+            white_noise: Some(angle_wn),
+            bias: None,
+        },
+    );
+
+    let mut noisy_devices = BTreeMap::new();
+    noisy_devices.insert("Station".to_string(), noisy_ground_station);
+
+    let mut configs = BTreeMap::new();
+    configs.insert(
+        "Station".to_string(),
+        TrkConfig::from_sample_rate(Unit::Minute * 1),
+    );
+
+    let mut noisy_trk_sim =
+        TrackingArcSim::new(noisy_devices, traj.clone(), configs.clone()).unwrap();
+    noisy_trk_sim.build_schedule(almanac.clone()).unwrap();
+    let noisy_trk_data = noisy_trk_sim
+        .generate_measurements(almanac.clone())
+        .unwrap();
+
+    let perfect_ground_station = GroundStation::dss13_goldstone(
+        10.0,
+        StochasticNoise::ZERO,
+        StochasticNoise::ZERO,
+        iau_earth,
+    )
+    .with_msr_type(MeasurementType::Azimuth, StochasticNoise::ZERO)
+    .with_msr_type(MeasurementType::Elevation, StochasticNoise::ZERO);
+
+    let mut noisy_devices = BTreeMap::new();
+    noisy_devices.insert("Station".to_string(), perfect_ground_station);
+
+    let mut perfect_trk_sim =
+        TrackingArcSim::new(noisy_devices, traj.clone(), configs.clone()).unwrap();
+    perfect_trk_sim.build_schedule(almanac.clone()).unwrap();
+    let perfect_trk_data = perfect_trk_sim
+        .generate_measurements(almanac.clone())
+        .unwrap();
+
+    assert_eq!(perfect_trk_data.len(), noisy_trk_data.len());
+
+    // Compute the diff between both tracking data.
+    for (msr_type, std_dev) in [
+        (MeasurementType::Range, range_wn.sigma),
+        (MeasurementType::Doppler, doppler_wn.sigma),
+        (MeasurementType::Azimuth, angle_wn.sigma),
+        (MeasurementType::Elevation, angle_wn.sigma),
+    ] {
+        let noisy_subset = noisy_trk_data.clone().filter_by_measurement_type(msr_type);
+        let perfect_subset = perfect_trk_data
+            .clone()
+            .filter_by_measurement_type(msr_type);
+
+        let mut out_of_family = 0;
+
+        for (noisy_msr, perfect_msr) in noisy_subset
+            .measurements
+            .values()
+            .zip(perfect_subset.measurements.values())
+        {
+            // First, test that the filter by measurement type works
+            assert_eq!(noisy_msr.data.len(), 1);
+            assert_eq!(perfect_msr.data.len(), 1);
+            let noisy_val = noisy_msr.data[&msr_type];
+            let perfect_val = perfect_msr.data[&msr_type];
+
+            if (noisy_val - perfect_val).abs() > 3.0 * std_dev {
+                out_of_family += 1;
+            }
+        }
+
+        let prct_in_family = 100.0 - (out_of_family as f64) / (noisy_subset.len() as f64) * 100.0;
+
+        // We expect 99.7% to be in-family for 3-sigma
+
+        println!("percentage IN FAMILY for {msr_type:?} = {prct_in_family:.4} %");
+
+        assert!((prct_in_family - 99.7).abs() < 0.2);
     }
 }
