@@ -73,6 +73,7 @@ polars = { version = "0.49.0", features = ["parquet"] }
 rstest = "0.26.1"
 pretty_env_logger = "0.5"
 toml = "0.9.0"
+serde_arrow = {version = "0.13", features = ["arrow-55"]}
 
 [build-dependencies]
 shadow-rs = "1.0.1"

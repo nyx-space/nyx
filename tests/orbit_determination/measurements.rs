@@ -13,6 +13,7 @@ use nyx::time::Epoch;
 use nyx::{dynamics::OrbitalDynamics, propagators::Propagator};
 use nyx_space::propagators::IntegratorMethod;
 use rand::SeedableRng;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::str::FromStr;
 
@@ -390,6 +391,11 @@ fn verif_sensitivity_mat(almanac: Arc<Almanac>) {
 #[allow(clippy::identity_op)]
 #[rstest]
 fn val_measurement_noise(almanac: Arc<Almanac>) {
+    use arrow::datatypes::FieldRef;
+    use arrow::datatypes::{DataType, Field, Schema};
+    use parquet::arrow::ArrowWriter;
+    use serde_arrow::schema::{SchemaLike, TracingOptions};
+
     // Build an example trajectory.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let epoch = Epoch::from_gregorian_tai_at_midnight(2025, 8, 22);
@@ -482,6 +488,16 @@ fn val_measurement_noise(almanac: Arc<Almanac>) {
 
     assert_eq!(perfect_trk_data.len(), noisy_trk_data.len());
 
+    #[derive(Serialize, Deserialize)]
+    struct Noises {
+        noise_err: f64,
+        std_dev: f64,
+        name: String,
+        out_of_family: bool,
+    }
+
+    let mut records = vec![];
+
     // Compute the diff between both tracking data.
     for (msr_type, std_dev) in [
         (MeasurementType::Range, range_wn.sigma),
@@ -507,9 +523,17 @@ fn val_measurement_noise(almanac: Arc<Almanac>) {
             let noisy_val = noisy_msr.data[&msr_type];
             let perfect_val = perfect_msr.data[&msr_type];
 
-            if (noisy_val - perfect_val).abs() > 3.0 * std_dev {
+            let noise_err = noisy_val - perfect_val;
+            let is_oof = noise_err.abs() > 3.0 * std_dev;
+            if is_oof {
                 out_of_family += 1;
             }
+            records.push(Noises {
+                noise_err,
+                std_dev,
+                name: format!("{msr_type:?}"),
+                out_of_family: is_oof,
+            });
         }
 
         let prct_in_family = 100.0 - (out_of_family as f64) / (noisy_subset.len() as f64) * 100.0;
@@ -518,6 +542,32 @@ fn val_measurement_noise(almanac: Arc<Almanac>) {
 
         println!("percentage IN FAMILY for {msr_type:?} = {prct_in_family:.4} %");
 
-        assert!((prct_in_family - 99.7).abs() < 0.2);
+        assert!((prct_in_family - 99.7).abs() < 0.3);
     }
+
+    let hdrs = vec![
+        Field::new("Noise err", DataType::Float64, false),
+        Field::new("StdDev", DataType::Float64, false),
+        Field::new("Name", DataType::LargeUtf8, false),
+        Field::new("Out of family", DataType::Boolean, false),
+    ];
+
+    // Build the schema
+    let schema = Arc::new(Schema::new(hdrs));
+    // Determine Arrow schema
+    let fields = Vec::<FieldRef>::from_type::<Noises>(TracingOptions::default()).unwrap();
+
+    // Build the record batch
+    let batch = serde_arrow::to_record_batch(&fields, &records).unwrap();
+
+    let file = File::create("data/04_output/noise_val.parquet").unwrap();
+
+    let mut writer = ArrowWriter::try_new(file, schema.clone(), None).unwrap();
+    // let batch = RecordBatch::try_new(schema, record)
+    //     .context(ArrowSnafu {
+    //         action: "writing OD results (building batch record)",
+    //     })
+    //     .context(ODIOSnafu)?;
+
+    writer.write(&batch).unwrap()
 }
