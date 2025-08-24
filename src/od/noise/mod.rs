@@ -79,7 +79,9 @@ impl StochasticNoise {
                 sigma: 2.0e-3, // 2 m
                 ..Default::default()
             }),
-            bias: Some(GaussMarkov::default_range_km()),
+            // Until Nyx can support bias estimation the default bias is None, cf. https://github.com/nyx-space/nyx/issues/326
+            // bias: Some(GaussMarkov::default_range_km()),
+            bias: None,
         }
     }
 
@@ -90,7 +92,9 @@ impl StochasticNoise {
                 sigma: 3e-6, // 3 mm/s
                 ..Default::default()
             }),
-            bias: Some(GaussMarkov::default_doppler_km_s()),
+            // Until Nyx can support bias estimation the default bias is None, cf. https://github.com/nyx-space/nyx/issues/326
+            // bias: Some(GaussMarkov::default_doppler_km_s()),
+            bias: None,
         }
     }
 
@@ -102,7 +106,9 @@ impl StochasticNoise {
                 sigma: 1.0e-2, // 0.01 deg
                 ..Default::default()
             }),
-            bias: Some(GaussMarkov::default_range_km()),
+            // Until Nyx can support bias estimation the default bias is None, cf. https://github.com/nyx-space/nyx/issues/326
+            // bias: Some(GaussMarkov::default_range_km()),
+            bias: None,
         }
     }
 
