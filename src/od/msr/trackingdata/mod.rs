@@ -221,17 +221,13 @@ impl TrackingDataArc {
 
     /// Returns a new tracking arc that only contains measurements of the provided type.
     pub fn filter_by_measurement_type(mut self, included_type: MeasurementType) -> Self {
-        self.measurements = self
-            .measurements
-            .iter_mut()
-            .map(|(epoch, msr)| {
-                msr.data.retain(|msr_type, _| *msr_type == included_type);
-
-                (*epoch, msr.clone())
-            })
-            .collect::<BTreeMap<Epoch, Measurement>>();
+        self.measurements.retain(|_epoch, msr| {
+            msr.data.retain(|msr_type, _| *msr_type == included_type);
+            !msr.data.is_empty()
+        });
         self
     }
+
     /// Returns a new tracking arc that contains measurements from all trackers except the one provided
     pub fn exclude_tracker(mut self, excluded_tracker: String) -> Self {
         self.measurements = self

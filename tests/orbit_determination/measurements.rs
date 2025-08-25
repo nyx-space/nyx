@@ -395,6 +395,7 @@ fn val_measurement_noise(almanac: Arc<Almanac>) {
     use arrow::datatypes::{DataType, Field, Schema};
     use parquet::arrow::ArrowWriter;
     use serde_arrow::schema::{SchemaLike, TracingOptions};
+    use std::path::PathBuf;
 
     // Build an example trajectory.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
@@ -560,7 +561,9 @@ fn val_measurement_noise(almanac: Arc<Almanac>) {
     // Build the record batch
     let batch = serde_arrow::to_record_batch(&fields, &records).unwrap();
 
-    let file = File::create("data/04_output/noise_val.parquet").unwrap();
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data/04_output/noise_val.parquet");
+
+    let file = File::create(&path).unwrap();
 
     let mut writer = ArrowWriter::try_new(file, schema.clone(), None).unwrap();
 
