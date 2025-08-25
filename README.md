@@ -4,7 +4,7 @@
 
 Nyx is revolutionizing the field of flight dynamics engineering as a powerful, open-source tool for mission design and orbit determination. From trajectory optimization to orbit estimation, Nyx is built for speed, automation, and scalability.
 
-**Nyx has proven mission-critical reliability, already contributing to the success of three lunar missions.**
+**Nyx has proven mission-critical reliability, already contributing to the success of several lunar missions including Firefly Blue Ghost 1 and NASA/Adanced Space CAPSTONE.**
 
 [![Nyx Space Badget][nyxspace-image]][website]
 [![Contact Form][contact-form-image]][contact]
@@ -15,13 +15,9 @@ Nyx is revolutionizing the field of flight dynamics engineering as a powerful, o
 
 # License
 
-The core of Nyx is provided under the [AGPLv3 License](./LICENSE). We are committed to keeping the foundational components of Nyx open-source and accessible to everyone.
+The core of Nyx is provided under the [AGPLv3 License](./LICENSE). The foundational components of Nyx are open-source and accessible to everyone.
 
-By using this software, you assume responsibility for adhering to the license.
-
-Refer to [the pricing page](https://nyxspace.com/pricing/?utm_source=readme-price) for an FAQ on the AGPLv3 license.
-Notably, any software that incorporates, links to, or depends on Nyx must also be released under the AGPLv3 license, even if you distribute an unmodified version of Nyx.
-
+By using this software, you assume responsibility for adhering to the license. Refer to [the pricing page](https://nyxspace.com/pricing/?utm_source=readme-price) for an FAQ on the AGPLv3 license. Notably, any software that incorporates, links to, or depends on Nyx must also be released under the AGPLv3 license, even if you distribute an unmodified version of Nyx.
 
 Starting with version `2.2.0-alpha`, Nyx now offers a set of advanced functionalities available under a `premium` crate feature. This feature operates under a **dual-license** model.
 
@@ -34,16 +30,10 @@ The `premium` feature is available for use free of charge under the standard AGP
 * Commercial entities with annual gross revenue of **$1,000,000 USD** (one million) or less.
 
 Use of any code enabled by the `premium` feature is **prohibited** for any for-profit entity (including, but not limited to, companies, corporations, and organizations) whose annual gross revenue exceeds **$1,000,000 USD**.
-
-The revenue threshold of $1,000,000 USD is indexed to the official U.S. inflation rate, with the year 2025 serving as the baseline. The threshold will be adjusted annually to account for inflation.
+Entities exceeding this revenue threshold **must purchase a commercial license** to enable and use the `premium` feature. This license grants you the right to use these advanced features in your commercial products and services.
+To inquire about a commercial license, please contact me at **christopher.rabotin@gmail.com** or via the [contact form][contact].
 
 _Note:_ under the assumption that most users are below this threshold, the `premium` feature is enabled _by default_. As a user **you are responsible** for ensuring compliance with the license by your entity and customers. It is enforced.
-
-### Commercial Use
-
-Entities exceeding this revenue threshold **must purchase a commercial license** to enable and use the `premium` feature. This license grants you the right to use these advanced features in your commercial products and services.
-
-To inquire about a commercial license, please contact me at **[christopher.rabotin@gmail.com]** or via the [contact form][contact].
 
 # Showcase
 
@@ -111,7 +101,7 @@ Major releases are for dramatic changes.
 
 > Chris Rabotin is a GNC and flight dynamics engineer with a heavy background in software.
 
-I currently work for Rocket Lab USA as the lead flight dynamics engineer on both Blue Ghost lunar lander missions. -- Find me on [LinkedIn](https://www.linkedin.com/in/chrisrabotin/).
+I currently work for Rocket Lab USA as the lead flight dynamics engineer on the Blue Ghost lunar lander missions. -- Find me on [LinkedIn](https://www.linkedin.com/in/chrisrabotin/).
 
 # External contributions
 
