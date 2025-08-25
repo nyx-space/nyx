@@ -563,11 +563,7 @@ fn val_measurement_noise(almanac: Arc<Almanac>) {
     let file = File::create("data/04_output/noise_val.parquet").unwrap();
 
     let mut writer = ArrowWriter::try_new(file, schema.clone(), None).unwrap();
-    // let batch = RecordBatch::try_new(schema, record)
-    //     .context(ArrowSnafu {
-    //         action: "writing OD results (building batch record)",
-    //     })
-    //     .context(ODIOSnafu)?;
 
-    writer.write(&batch).unwrap()
+    writer.write(&batch).unwrap();
+    writer.finish().unwrap();
 }
