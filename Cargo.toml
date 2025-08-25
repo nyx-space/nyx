@@ -67,6 +67,10 @@ serde_dhall = "0.12"
 indexmap = { version = "2.6.0", features = ["serde"] }
 statrs = "0.18.0"
 
+[features]
+default = ["premium"]
+# Premium feature is NOT available to most commercial entities. Refer to the README.
+premium = []
 
 [dev-dependencies]
 polars = { version = "0.49.0", features = ["parquet"] }

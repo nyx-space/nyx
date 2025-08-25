@@ -13,6 +13,38 @@ Nyx is revolutionizing the field of flight dynamics engineering as a powerful, o
 [![nyx-space on docs.rs][docsrs-image]][docsrs]
 [![codecov](https://codecov.io/gh/nyx-space/nyx/graph/badge.svg?token=gEiAvwzwh5)](https://codecov.io/gh/nyx-space/nyx)
 
+# License
+
+The core of Nyx is provided under the [AGPLv3 License](./LICENSE). We are committed to keeping the foundational components of Nyx open-source and accessible to everyone.
+
+By using this software, you assume responsibility for adhering to the license.
+
+Refer to [the pricing page](https://nyxspace.com/pricing/?utm_source=readme-price) for an FAQ on the AGPLv3 license.
+Notably, any software that incorporates, links to, or depends on Nyx must also be released under the AGPLv3 license, even if you distribute an unmodified version of Nyx.
+
+
+Starting with version `2.2.0-alpha`, Nyx now offers a set of advanced functionalities available under a `premium` crate feature. This feature operates under a **dual-license** model.
+
+## The `premium` Feature License
+
+The `premium` feature is available for use free of charge under the standard AGPLv3 license for the following users:
+* Individuals
+* Non-profit organizations
+* Academic institutions
+* Commercial entities with annual gross revenue of **$1,000,000 USD** (one million) or less.
+
+Use of any code enabled by the `premium` feature is **prohibited** for any for-profit entity (including, but not limited to, companies, corporations, and organizations) whose annual gross revenue exceeds **$1,000,000 USD**.
+
+The revenue threshold of $1,000,000 USD is indexed to the official U.S. inflation rate, with the year 2025 serving as the baseline. The threshold will be adjusted annually to account for inflation.
+
+_Note:_ under the assumption that most users are below this threshold, the `premium` feature is enabled _by default_. As a user **you are responsible** for ensuring compliance with the license by your entity and customers. It is enforced.
+
+### Commercial Use
+
+Entities exceeding this revenue threshold **must purchase a commercial license** to enable and use the `premium` feature. This license grants you the right to use these advanced features in your commercial products and services.
+
+To inquire about a commercial license, please contact me at **[christopher.rabotin@gmail.com]** or via the [contact form][contact].
+
 # Showcase
 
 [The website has the latest use cases][showcase]
@@ -57,10 +89,6 @@ Nyx uses `lld`, the LLVM linker, for faster compilation times. You may need to m
 For Python projects, get started by installing the library via `pip`: `pip install nyx_space`.
 
 **Important:** The Python package has been temporarily disabled. Refer to <https://github.com/nyx-space/nyx/issues/311> for details.
-
-# License
-
-Nyx is provided under the [AGPLv3 License](./LICENSE). By using this software, you assume responsibility for adhering to the license. Refer to [the pricing page](https://nyxspace.com/pricing/?utm_source=readme-price) for an FAQ on the AGPLv3 license. Notably, any software that incorporates, links to, or depends on Nyx must also be released under the AGPLv3 license, even if you distribute an unmodified version of Nyx.
 
 # Versioning
 

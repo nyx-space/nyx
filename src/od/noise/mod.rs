@@ -32,6 +32,8 @@ use std::path::Path;
 use std::sync::Arc;
 
 pub mod gauss_markov;
+#[cfg(feature = "premium")]
+pub mod link_specific;
 pub mod white;
 
 pub use gauss_markov::GaussMarkov;
