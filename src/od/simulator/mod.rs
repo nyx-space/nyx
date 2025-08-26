@@ -26,3 +26,6 @@ mod trackdata;
 pub use trackdata::TrackingDevice;
 mod trkconfig;
 pub use trkconfig::{Strand, TrkConfig};
+
+#[cfg(feature = "premium")]
+mod interlink;
