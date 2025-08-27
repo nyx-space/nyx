@@ -141,7 +141,8 @@ fn interlink_nrho_llo_cov_test(almanac: Arc<Almanac>) {
             .build(),
     );
 
-    let mut trk_sim = TrackingArcSim::with_seed(devices.clone(), llo_traj, configs, 0).unwrap();
+    let mut trk_sim =
+        TrackingArcSim::with_seed(devices.clone(), llo_traj.clone(), configs, 0).unwrap();
     println!("{trk_sim}");
 
     let trk_data = trk_sim.generate_measurements(almanac.clone()).unwrap();
@@ -156,7 +157,6 @@ fn interlink_nrho_llo_cov_test(almanac: Arc<Almanac>) {
     // Run a truth OD where we estimate the LLO position
     let llo_uncertainty = SpacecraftUncertainty::builder()
         .nominal(llo_sc)
-        .frame(nyx_space::dynamics::guidance::LocalFrame::RIC)
         .x_km(1.0)
         .y_km(1.0)
         .z_km(1.0)
@@ -165,8 +165,14 @@ fn interlink_nrho_llo_cov_test(almanac: Arc<Almanac>) {
         .vz_km_s(1e-3)
         .build();
 
+    // DISABLE DISPERSIONS, cf. the bug in the estimate randomized docs.
     // Define the initial estimate, randomized, seed for reproducibility
-    let initial_estimate = llo_uncertainty.to_estimate_randomized(Some(0)).unwrap();
+    // let mut initial_estimate = llo_uncertainty.to_estimate_randomized(Some(0)).unwrap();
+    // Inflate the covariance
+    // initial_estimate.covar *= 3.0;
+
+    let initial_estimate = llo_uncertainty.to_estimate().unwrap();
+
     println!("initial estimate:\n{initial_estimate}");
     println!(
         "RIC errors = {}",
@@ -179,7 +185,6 @@ fn interlink_nrho_llo_cov_test(almanac: Arc<Almanac>) {
     let odp = KalmanODProcess::<_, Const<2>, Const<3>, InterlinkTxSpacecraft>::new(
         setup,
         KalmanVariant::DeviationTracking,
-        // KalmanVariant::ReferenceUpdate,
         None,
         devices,
         almanac,
@@ -195,4 +200,12 @@ fn interlink_nrho_llo_cov_test(almanac: Arc<Almanac>) {
     od_sol
         .to_parquet(out.join("nrho_interlink_od_sol.pq"), ExportCfg::default())
         .unwrap();
+
+    let final_est = od_sol.estimates.last().unwrap().orbital_state();
+    println!("ESTIMATE: {final_est:x}");
+    let truth = llo_traj.at(final_est.epoch).unwrap();
+    println!("TRUTH: {truth:x}");
+
+    let diff = truth.orbit.ric_difference(&final_est).unwrap();
+    println!("ERROR {diff}");
 }
