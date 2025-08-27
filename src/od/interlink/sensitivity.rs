@@ -19,7 +19,9 @@
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 use crate::md::prelude::Interpolatable;
-use crate::od::{GroundStation, ODAlmanacSnafu, ODError, TrackingDevice};
+use crate::od::interlink::InterlinkTxSpacecraft;
+use crate::od::msr::{Measurement, MeasurementType};
+use crate::od::{ODAlmanacSnafu, ODError, TrackingDevice};
 use crate::{Spacecraft, State};
 use anise::prelude::Almanac;
 use indexmap::IndexSet;
@@ -27,9 +29,6 @@ use nalgebra::{DimName, OMatrix, U1};
 use snafu::ResultExt;
 use std::marker::PhantomData;
 use std::sync::Arc;
-
-use super::measurement::Measurement;
-use super::MeasurementType;
 
 trait ScalarSensitivityT<SolveState: State, Rx, Tx>
 where

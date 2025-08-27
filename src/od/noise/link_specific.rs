@@ -139,7 +139,7 @@ impl StochasticNoise {
     /// is one second, the Allan Deviation should be the deviation over one second.
     ///
     /// IMPORTANT: These do NOT include atmospheric noises, which add up to ~10 cm one-sigma.
-    pub fn high_prec_range_km(
+    pub fn from_hardware_range_km(
         allan_deviation: f64,
         integration_time: Duration,
         chip_rate: ChipRate,
@@ -161,7 +161,7 @@ impl StochasticNoise {
         }
     }
 
-    pub fn high_prec_doppler_km_s(
+    pub fn from_hardware_doppler_km_s(
         allan_deviation: f64,
         integration_time: Duration,
         carrier: CarrierFreq,
@@ -198,7 +198,7 @@ mod link_noise {
         for (case_num, allan_dev) in [1e-14, 3.8e-13].iter().copied().enumerate() {
             println!("AD = {allan_dev:e}");
 
-            let range_dsac_no_flicker = StochasticNoise::high_prec_range_km(
+            let range_dsac_no_flicker = StochasticNoise::from_hardware_range_km(
                 allan_dev,
                 Unit::Minute * 1,
                 ChipRate::StandardT4B,
@@ -211,7 +211,7 @@ mod link_noise {
 
             assert!(range_sigma_m.abs() < 1.1e-1);
 
-            let doppler_dsac_no_flicker = StochasticNoise::high_prec_doppler_km_s(
+            let doppler_dsac_no_flicker = StochasticNoise::from_hardware_doppler_km_s(
                 allan_dev,
                 Unit::Minute * 1,
                 CarrierFreq::XBand,

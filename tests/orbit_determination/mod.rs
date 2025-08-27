@@ -16,6 +16,9 @@ mod spacecraft;
 mod trackingarc;
 mod two_body;
 
+#[cfg(feature = "premium")]
+mod interlink;
+
 macro_rules! f64_nil {
     ($x:expr, $msg:expr) => {
         assert!($x.abs() < f64::EPSILON, $msg)

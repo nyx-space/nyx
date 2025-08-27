@@ -16,14 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub mod measurement;
 pub mod sensitivity;
-mod trackingdata;
-mod types;
+pub mod simulator;
+pub mod trk_device;
 
-pub use measurement::Measurement;
-pub use trackingdata::TrackingDataArc;
-pub use types::MeasurementType;
-
-#[cfg(feature = "premium")]
-pub mod interlink_sensitivity;
+pub use simulator::InterlinkArcSim;
+pub use trk_device::InterlinkTxSpacecraft;

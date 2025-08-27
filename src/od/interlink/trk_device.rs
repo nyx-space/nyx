@@ -19,7 +19,7 @@ use anise::almanac::Almanac;
 use anise::astro::Aberration;
 use anise::errors::AlmanacResult;
 use anise::prelude::{Frame, Orbit};
-use hifitime::{Duration, Epoch, TimeSeries, TimeUnits};
+use hifitime::{Duration, Epoch, TimeUnits};
 use indexmap::{IndexMap, IndexSet};
 use rand_pcg::Pcg64Mcg;
 use serde::{Deserialize, Serialize};
@@ -36,29 +36,13 @@ use crate::od::{ODAlmanacSnafu, ODTrajSnafu};
 use crate::Spacecraft;
 use crate::State;
 
-use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use super::TrkConfig;
-
-#[derive(Clone)]
-pub struct InterlinkArcSim {
-    /// Receiver spacecraft in this link
-    pub rx_spacecraft: Vec<Trajectory>,
-    /// Transmitter spacercaft
-    pub trajectory: InterlinkSpacecraft,
-    /// Configuration of each device
-    pub configs: BTreeMap<String, TrkConfig>,
-    /// Random number generator used for this tracking arc, ensures repeatability
-    rng: Pcg64Mcg,
-    /// Greatest common denominator time series that allows this arc to meet all of the conditions.
-    time_series: TimeSeries,
-}
-
-// Defines a (transmitter) spacecraft capable of inter-satellite links
+// Defines a (transmitter) spacecraft capable of inter-satellite links.
+// NOTE: There is _no_ `InterlinkRxSpacecraft`, instead you must independently build their trajectories and provide them to the InterlinkArcSim.
 #[derive(Clone, Debug)]
-pub struct InterlinkSpacecraft {
-    /// Trajectory of the spacercaft orbit
+pub struct InterlinkTxSpacecraft {
+    /// Trajectory of the transmitter spacercaft
     pub traj: Trajectory,
     /// Measurement types supported by the link
     pub measurement_types: IndexSet<MeasurementType>,
@@ -70,7 +54,7 @@ pub struct InterlinkSpacecraft {
     pub ab_corr: Option<Aberration>,
 }
 
-impl InterlinkSpacecraft {
+impl InterlinkTxSpacecraft {
     /// Returns the noises for all measurement types configured for this ground station at the provided epoch, timestamp noise is the first entry.
     fn noises(&mut self, epoch: Epoch, rng: Option<&mut Pcg64Mcg>) -> Result<Vec<f64>, ODError> {
         let mut noises = vec![0.0; self.measurement_types.len() + 1];
@@ -104,7 +88,7 @@ impl InterlinkSpacecraft {
     }
 }
 
-impl TrackingDevice<Spacecraft> for InterlinkSpacecraft {
+impl TrackingDevice<Spacecraft> for InterlinkTxSpacecraft {
     fn name(&self) -> String {
         self.traj.name.clone().unwrap_or("unnamed".to_string())
     }
@@ -268,7 +252,7 @@ impl TrackingDevice<Spacecraft> for InterlinkSpacecraft {
     }
 }
 
-impl Serialize for InterlinkSpacecraft {
+impl Serialize for InterlinkTxSpacecraft {
     fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -277,7 +261,7 @@ impl Serialize for InterlinkSpacecraft {
     }
 }
 
-impl<'de> Deserialize<'de> for InterlinkSpacecraft {
+impl<'de> Deserialize<'de> for InterlinkTxSpacecraft {
     fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -286,4 +270,4 @@ impl<'de> Deserialize<'de> for InterlinkSpacecraft {
     }
 }
 
-impl ConfigRepr for InterlinkSpacecraft {}
+impl ConfigRepr for InterlinkTxSpacecraft {}
