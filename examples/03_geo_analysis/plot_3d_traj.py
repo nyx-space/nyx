@@ -62,7 +62,7 @@ def plot_traj(
 
     earth_radius = 6378.136300
 
-    traces = [build_sphere(earth_radius, color, opacity=0.8)]
+    traces = [build_sphere(radius, color, opacity=0.8)]
 
     if isinstance(df, list):
         all_traj = df
@@ -77,7 +77,7 @@ def plot_traj(
                 z=traj_df["z (km)"],
                 mode="lines",
                 line=dict(
-                    color=df[colored_by] * scale,
+                    color=traj_df[colored_by] * scale,
                     colorscale="Viridis",
                     colorbar=dict(title=color_descr),
                 ),

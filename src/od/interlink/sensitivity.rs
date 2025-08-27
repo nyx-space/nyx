@@ -105,8 +105,16 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, InterlinkTxSpacecraft>
         match msr_type {
             MeasurementType::Doppler => {
                 // If we have a simultaneous measurement of the range, use that, otherwise we compute the expected range.
-                let ρ_km = msr.data.get(&MeasurementType::Range).unwrap();
-                let ρ_dot_km_s = msr.data.get(&MeasurementType::Doppler).unwrap();
+                let ρ_km = msr.data.get(&MeasurementType::Range).ok_or_else(|| {
+                    ODError::MeasurementSimError {
+                        details: "Range measurement data is missing".to_string(),
+                    }
+                })?;
+                let ρ_dot_km_s = msr.data.get(&MeasurementType::Doppler).ok_or_else(|| {
+                    ODError::MeasurementSimError {
+                        details: "Doppler measurement data is missing".to_string(),
+                    }
+                })?;
                 let m11 = delta_r.x / ρ_km;
                 let m12 = delta_r.y / ρ_km;
                 let m13 = delta_r.z / ρ_km;
@@ -126,7 +134,11 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, InterlinkTxSpacecraft>
                 })
             }
             MeasurementType::Range => {
-                let ρ_km = msr.data.get(&MeasurementType::Range).unwrap();
+                let ρ_km = msr.data.get(&MeasurementType::Range).ok_or_else(|| {
+                    ODError::MeasurementSimError {
+                        details: "Range measurement data is missing".to_string(),
+                    }
+                })?;
                 let m11 = delta_r.x / ρ_km;
                 let m12 = delta_r.y / ρ_km;
                 let m13 = delta_r.z / ρ_km;

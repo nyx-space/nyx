@@ -149,7 +149,7 @@ impl TrackingDevice<Spacecraft> for InterlinkTxSpacecraft {
                         let msr_value_1 = msr_t1.as_ref().unwrap().data[msr_type];
 
                         let msr_value =
-                            (msr_value_1 - msr_value_0) * 0.5 + noises[ii + 1] / 2.0_f64.sqrt();
+                            (msr_value_1 + msr_value_0) * 0.5 + noises[ii + 1] / 2.0_f64.sqrt();
                         msr.push(*msr_type, msr_value);
                     }
 
@@ -205,10 +205,11 @@ impl TrackingDevice<Spacecraft> for InterlinkTxSpacecraft {
             let mut msr = Measurement::new(self.name(), rx.orbit.epoch + noises[0].seconds());
 
             for (ii, msr_type) in self.measurement_types.iter().enumerate() {
-                let msr_value = match ii {
-                    0 => rho_tx_frame.norm(),
-                    1 => range_rate_km_s,
-                    _ => unreachable!(),
+                let msr_value = match *msr_type {
+                    MeasurementType::Range => rho_tx_frame.norm(),
+                    MeasurementType::Doppler => range_rate_km_s,
+                    // Or return an error for unsupported types
+                    _ => unreachable!("unsupported measurement type for interlink: {:?}", msr_type),
                 } + noises[ii + 1];
                 msr.push(*msr_type, msr_value);
             }

@@ -143,7 +143,7 @@ impl SpacecraftUncertainty {
         let mut estimate = self.to_estimate()?;
         let mvn =
             MvnSpacecraft::from_spacecraft_cov(self.nominal, estimate.covar, SVector::zeros())
-                .unwrap();
+                .expect("covar should be PSD!");
 
         // Setup the RNG
         let mut rng = match seed {
