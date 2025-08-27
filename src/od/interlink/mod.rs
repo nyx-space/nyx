@@ -17,8 +17,6 @@
 */
 
 pub mod sensitivity;
-pub mod simulator;
 pub mod trk_device;
 
-pub use simulator::InterlinkArcSim;
 pub use trk_device::InterlinkTxSpacecraft;

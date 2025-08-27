@@ -174,6 +174,8 @@ where
         let mut current_rms = f64::MAX;
         let mut iter: usize = 0;
 
+        let mut unknown_trackers = IndexSet::new();
+
         // --- Iteration Loop ---
         while iter < self.max_iterations {
             iter += 1;
@@ -221,10 +223,13 @@ where
                         let device = match devices.get_mut(&msr.tracker) {
                             Some(d) => d,
                             None => {
-                                error!(
-                                    "Tracker {} is not in the list of configured devices",
-                                    msr.tracker
-                                );
+                                if !unknown_trackers.contains(&msr.tracker) {
+                                    error!(
+                                        "Tracker {} is not in the list of configured devices",
+                                        msr.tracker
+                                    );
+                                }
+                                unknown_trackers.insert(msr.tracker.clone());
                                 continue;
                             }
                         };

@@ -204,6 +204,7 @@ where
 
         let mut msr_accepted_cnt: usize = 0;
         let mut msr_rejected_cnt: usize = 0;
+        let mut unknown_trackers = IndexSet::new();
         let tick = Epoch::now().unwrap();
 
         for (msr_cnt, (epoch_ref, msr)) in measurements.iter().enumerate() {
@@ -365,10 +366,13 @@ where
                             }
                         }
                         None => {
-                            error!(
-                                "Tracker {} is not in the list of configured devices",
-                                msr.tracker
-                            )
+                            if !unknown_trackers.contains(&msr.tracker) {
+                                error!(
+                                    "Tracker {} is not in the list of configured devices",
+                                    msr.tracker
+                                );
+                            }
+                            unknown_trackers.insert(msr.tracker.clone());
                         }
                     }
 

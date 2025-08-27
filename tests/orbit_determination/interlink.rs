@@ -9,6 +9,7 @@ use indexmap::{IndexMap, IndexSet};
 use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::SpacecraftDynamics;
+use nyx::linalg::Const;
 use nyx::md::prelude::*;
 use nyx::od::interlink::InterlinkTxSpacecraft;
 use nyx::od::prelude::*;
@@ -66,10 +67,12 @@ fn interlink_nrho_llo(almanac: Arc<Almanac>) {
     /* == Propagate the NRHO vehicle == */
     let prop_time = 1.1 * state_luna.period().unwrap();
 
-    let (nrho_final, tx_traj) = setup
+    let (nrho_final, mut tx_traj) = setup
         .with(tx_nrho_sc, almanac.clone())
         .for_duration_with_traj(prop_time)
         .unwrap();
+
+    tx_traj.name = Some("NRHO Tx SC".to_string());
 
     println!("{tx_traj}");
 
@@ -77,11 +80,10 @@ fn interlink_nrho_llo(almanac: Arc<Almanac>) {
     let llo_orbit =
         Orbit::try_keplerian_altitude(110.0, 1e-4, 90.0, 0.0, 0.0, 0.0, epoch, moon_iau).unwrap();
 
+    let llo_sc = Spacecraft::builder().orbit(llo_orbit).build();
+
     let (_, llo_traj) = setup
-        .with(
-            Spacecraft::builder().orbit(llo_orbit).build(),
-            almanac.clone(),
-        )
+        .with(llo_sc, almanac.clone())
         .until_epoch_with_traj(nrho_final.epoch())
         .unwrap();
 
@@ -139,15 +141,50 @@ fn interlink_nrho_llo(almanac: Arc<Almanac>) {
             .build(),
     );
 
-    let mut trk_sim = TrackingArcSim::with_seed(devices, llo_traj, configs, 0).unwrap();
+    let mut trk_sim = TrackingArcSim::with_seed(devices.clone(), llo_traj, configs, 0).unwrap();
     println!("{trk_sim}");
 
     let trk_data = trk_sim.generate_measurements(almanac.clone()).unwrap();
     println!("{trk_data}");
 
+    let out = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data/04_output/");
+
     trk_data
-        .to_parquet_simple(
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data/04_output/nrho_interlink_msr.pq"),
-        )
+        .to_parquet_simple(out.clone().join("nrho_interlink_msr.pq"))
+        .unwrap();
+
+    // Run a truth OD where we estimate the LLO position
+    let llo_uncertainty = SpacecraftUncertainty::builder()
+        .nominal(llo_sc)
+        .frame(nyx_space::dynamics::guidance::LocalFrame::RIC)
+        .x_km(1.0)
+        .y_km(1.0)
+        .z_km(1.0)
+        .vx_km_s(1e-3)
+        .vy_km_s(1e-3)
+        .vz_km_s(1e-3)
+        .build();
+
+    // Define the initial estimate
+    let initial_estimate = llo_uncertainty.to_estimate().unwrap();
+    println!("initial estimate:\n{initial_estimate}");
+
+    let odp = KalmanODProcess::<_, Const<2>, Const<3>, InterlinkTxSpacecraft>::new(
+        setup,
+        KalmanVariant::ReferenceUpdate,
+        None,
+        devices,
+        almanac,
+    );
+
+    // Shrink the data to process.
+    let arc = trk_data.filter_by_offset(..2.hours());
+
+    let od_sol = odp.process_arc(initial_estimate, &arc).unwrap();
+
+    println!("{od_sol}");
+
+    od_sol
+        .to_parquet(out.join("nrho_interlink_od_sol.pq"), ExportCfg::default())
         .unwrap();
 }
