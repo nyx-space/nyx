@@ -15,32 +15,18 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use anise::almanac::Almanac;
-use anise::astro::Aberration;
-use anise::errors::AlmanacResult;
-use anise::prelude::{Frame, Orbit};
-use hifitime::{Duration, Epoch, TimeSeries, TimeUnits};
-use indexmap::{IndexMap, IndexSet};
+use hifitime::TimeSeries;
 use rand_pcg::Pcg64Mcg;
-use serde::{Deserialize, Serialize};
-use snafu::{ensure, ResultExt};
 
-use crate::io::ConfigRepr;
-use crate::md::prelude::Traj;
 use crate::md::Trajectory;
-use crate::od::msr::MeasurementType;
-use crate::od::noise::StochasticNoise;
-use crate::od::prelude::{Measurement, NoiseNotConfiguredSnafu, ODError, TrkConfig};
-use crate::od::TrackingDevice;
-use crate::od::{ODAlmanacSnafu, ODTrajSnafu};
-use crate::Spacecraft;
-use crate::State;
+use crate::od::prelude::TrkConfig;
 
 use std::collections::BTreeMap;
-use std::sync::Arc;
 
 use super::InterlinkTxSpacecraft;
 
+/// Simulates tracking data between the transmitter spacecraft and any number of receiver spacecraft.
+/// This can be used to estimate the position of the receiver spacecraft ... I think.
 #[derive(Clone)]
 pub struct InterlinkArcSim {
     /// Receiver spacecraft in this link

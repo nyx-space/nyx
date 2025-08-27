@@ -4,20 +4,22 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
 use anise::constants::celestial_objects::{EARTH, SUN};
-use anise::constants::frames::MOON_J2000;
+use anise::constants::frames::{IAU_MOON_FRAME, MOON_J2000};
 use indexmap::{IndexMap, IndexSet};
 use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::SpacecraftDynamics;
 use nyx::md::prelude::*;
+use nyx::od::interlink::InterlinkTxSpacecraft;
 use nyx::od::prelude::*;
-use nyx::od::simulator::interlink::{InterlinkArcSim, InterlinkTxSpacecraft};
 use nyx::propagators::Propagator;
 use nyx::time::{Epoch, TimeUnits};
 use nyx::Spacecraft;
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use rstest::*;
+use std::collections::BTreeMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 #[fixture]
@@ -34,6 +36,7 @@ fn interlink_nrho_llo(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let moon_iau = almanac.frame_from_uid(IAU_MOON_FRAME).unwrap();
 
     let epoch = Epoch::from_gregorian_tai(2021, 5, 29, 19, 51, 16, 852_000);
     let nrho = Orbit::cartesian(
@@ -63,12 +66,24 @@ fn interlink_nrho_llo(almanac: Arc<Almanac>) {
     /* == Propagate the NRHO vehicle == */
     let prop_time = 1.1 * state_luna.period().unwrap();
 
-    let (_orbit, tx_traj) = setup
+    let (nrho_final, tx_traj) = setup
         .with(tx_nrho_sc, almanac.clone())
         .for_duration_with_traj(prop_time)
         .unwrap();
 
     println!("{tx_traj}");
+
+    /* == Propagate an LLO vehicle == */
+    let llo_orbit =
+        Orbit::try_keplerian_altitude(110.0, 1e-4, 90.0, 0.0, 0.0, 0.0, epoch, moon_iau).unwrap();
+
+    let (_, llo_traj) = setup
+        .with(
+            Spacecraft::builder().orbit(llo_orbit).build(),
+            almanac.clone(),
+        )
+        .until_epoch_with_traj(nrho_final.epoch())
+        .unwrap();
 
     /* == Setup the interlink == */
 
@@ -108,4 +123,31 @@ fn interlink_nrho_llo(almanac: Arc<Almanac>) {
         ab_corr: Aberration::LT,
         stochastic_noises: Some(stochastics),
     };
+
+    // Devices are the transmitter, which is our NRHO vehicle.
+    let mut devices = BTreeMap::new();
+    devices.insert("NRHO Tx SC".to_string(), interlink);
+
+    let mut configs = BTreeMap::new();
+    configs.insert(
+        "NRHO Tx SC".to_string(),
+        TrkConfig::builder()
+            .strands(vec![Strand {
+                start: epoch,
+                end: nrho_final.epoch(),
+            }])
+            .build(),
+    );
+
+    let mut trk_sim = TrackingArcSim::with_seed(devices, llo_traj, configs, 0).unwrap();
+    println!("{trk_sim}");
+
+    let trk_data = trk_sim.generate_measurements(almanac.clone()).unwrap();
+    println!("{trk_data}");
+
+    trk_data
+        .to_parquet_simple(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data/04_output/nrho_interlink_msr.pq"),
+        )
+        .unwrap();
 }

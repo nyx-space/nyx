@@ -24,6 +24,3 @@ mod types;
 pub use measurement::Measurement;
 pub use trackingdata::TrackingDataArc;
 pub use types::MeasurementType;
-
-#[cfg(feature = "premium")]
-pub mod interlink_sensitivity;
