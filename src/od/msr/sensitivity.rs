@@ -31,7 +31,7 @@ use std::sync::Arc;
 use super::measurement::Measurement;
 use super::MeasurementType;
 
-trait ScalarSensitivityT<SolveState: State, Rx, Tx>
+pub trait ScalarSensitivityT<SolveState: State, Rx, Tx>
 where
     Self: Sized,
     DefaultAllocator: Allocator<SolveState::Size>
