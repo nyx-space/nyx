@@ -33,7 +33,7 @@ fn almanac() -> Arc<Almanac> {
 /// Assume that the NRHO orbiter is the transmitter in a two-way communication with a low lunar orbiter.
 /// This is a Spacecraft to Spacecraft Orbit Determination Process (S2SODP).
 #[rstest]
-fn interlink_nrho_llo(almanac: Arc<Almanac>) {
+fn interlink_nrho_llo_cov_test(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
@@ -165,13 +165,21 @@ fn interlink_nrho_llo(almanac: Arc<Almanac>) {
         .vz_km_s(1e-3)
         .build();
 
-    // Define the initial estimate
-    let initial_estimate = llo_uncertainty.to_estimate().unwrap();
+    // Define the initial estimate, randomized, seed for reproducibility
+    let initial_estimate = llo_uncertainty.to_estimate_randomized(Some(0)).unwrap();
     println!("initial estimate:\n{initial_estimate}");
+    println!(
+        "RIC errors = {}",
+        initial_estimate
+            .orbital_state()
+            .ric_difference(&llo_orbit)
+            .unwrap()
+    );
 
     let odp = KalmanODProcess::<_, Const<2>, Const<3>, InterlinkTxSpacecraft>::new(
         setup,
-        KalmanVariant::ReferenceUpdate,
+        KalmanVariant::DeviationTracking,
+        // KalmanVariant::ReferenceUpdate,
         None,
         devices,
         almanac,

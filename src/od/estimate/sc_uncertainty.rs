@@ -21,8 +21,12 @@ use core::fmt;
 use anise::errors::MathError;
 use anise::{astro::PhysicsResult, errors::PhysicsError};
 use nalgebra::{SMatrix, SVector};
+use rand::SeedableRng;
+use rand_distr::Distribution;
+use rand_pcg::Pcg64Mcg;
 use typed_builder::TypedBuilder;
 
+use crate::mc::MvnSpacecraft;
 use crate::{dynamics::guidance::LocalFrame, Spacecraft};
 
 use super::KfEstimate;
@@ -128,6 +132,31 @@ impl SpacecraftUncertainty {
         }
 
         Ok(KfEstimate::from_covar(self.nominal, init_covar))
+    }
+
+    /// Returns an estimation whose nominal state is dispersed.
+    /// Known bug in MultiVariate dispersion: https://github.com/nyx-space/nyx/issues/339
+    pub fn to_estimate_randomized(
+        &self,
+        seed: Option<u128>,
+    ) -> PhysicsResult<KfEstimate<Spacecraft>> {
+        let mut estimate = self.to_estimate()?;
+        let mvn =
+            MvnSpacecraft::from_spacecraft_cov(self.nominal, estimate.covar, SVector::zeros())
+                .unwrap();
+
+        // Setup the RNG
+        let mut rng = match seed {
+            Some(seed) => Pcg64Mcg::new(seed),
+            None => Pcg64Mcg::from_os_rng(),
+        };
+
+        // Generate the states, forcing the borrow as specified in the `sample_iter` docs.
+        let disp_state = mvn.sample(&mut rng);
+
+        estimate.nominal_state = disp_state.state;
+
+        Ok(estimate)
     }
 }
 

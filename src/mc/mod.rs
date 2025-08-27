@@ -16,8 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use rand::prelude::*;
-use rand_distr::{Distribution, Normal, Uniform};
+pub use rand::prelude::*;
+pub use rand_distr::{Distribution, Normal, Uniform};
 pub use rand_pcg::Pcg64Mcg;
 
 pub mod helpers;
