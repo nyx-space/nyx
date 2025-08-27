@@ -478,8 +478,8 @@ where
                             * (self.prop.opts.tolerance / self.details.error)
                                 .powf(1.0 / f64::from(self.prop.method.order()));
 
-                        step_size_s = if proposed_step > self.prop.opts.max_step.to_seconds() {
-                            self.prop.opts.max_step.to_seconds()
+                        step_size_s = if proposed_step.abs() > self.prop.opts.max_step.to_seconds().abs() {
+                            self.prop.opts.max_step.to_seconds() * proposed_step.signum()
                         } else {
                             proposed_step
                         };
