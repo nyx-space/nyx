@@ -131,29 +131,33 @@ impl TrackingDevice<Spacecraft> for InterlinkTxSpacecraft {
                 };
 
                 // Start of integration time
-                let msr_t0 = self.measure_instantaneous(rx_0, None, almanac.clone())?;
+                let msr_t0_opt = self.measure_instantaneous(rx_0, None, almanac.clone())?;
 
                 // End of integration time
-                let msr_t1 = self.measure_instantaneous(rx_1, None, almanac.clone())?;
+                let msr_t1_opt = self.measure_instantaneous(rx_1, None, almanac.clone())?;
 
-                if msr_t0.is_some() && msr_t1.is_some() {
-                    // Line of sight in both cases
+                if let Some(msr_t0) = msr_t0_opt {
+                    if let Some(msr_t1) = msr_t1_opt {
+                        // Line of sight in both cases
 
-                    // Noises are computed at the midpoint of the integration time.
-                    let noises = self.noises(epoch - integration_time * 0.5, rng)?;
+                        // Noises are computed at the midpoint of the integration time.
+                        let noises = self.noises(epoch - integration_time * 0.5, rng)?;
 
-                    let mut msr = Measurement::new(self.name(), epoch + noises[0].seconds());
+                        let mut msr = Measurement::new(self.name(), epoch + noises[0].seconds());
 
-                    for (ii, msr_type) in self.measurement_types.iter().enumerate() {
-                        let msr_value_0 = msr_t0.as_ref().unwrap().data[msr_type];
-                        let msr_value_1 = msr_t1.as_ref().unwrap().data[msr_type];
+                        for (ii, msr_type) in self.measurement_types.iter().enumerate() {
+                            let msr_value_0 = msr_t0.data[msr_type];
+                            let msr_value_1 = msr_t1.data[msr_type];
 
-                        let msr_value =
-                            (msr_value_1 + msr_value_0) * 0.5 + noises[ii + 1] / 2.0_f64.sqrt();
-                        msr.push(*msr_type, msr_value);
+                            let msr_value =
+                                (msr_value_1 + msr_value_0) * 0.5 + noises[ii + 1] / 2.0_f64.sqrt();
+                            msr.push(*msr_type, msr_value);
+                        }
+
+                        Ok(Some(msr))
+                    } else {
+                        Ok(None)
                     }
-
-                    Ok(Some(msr))
                 } else {
                     Ok(None)
                 }

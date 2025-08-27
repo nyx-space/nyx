@@ -60,8 +60,6 @@ def plot_traj(
 
     fig = go.Figure()
 
-    earth_radius = 6378.136300
-
     traces = [build_sphere(radius, color, opacity=0.8)]
 
     if isinstance(df, list):
