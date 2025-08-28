@@ -61,6 +61,9 @@ pub mod snc;
 /// Provides the Batch least squares initial state solver.
 pub mod blse;
 
+#[cfg(feature = "premium")]
+pub mod interlink;
+
 /// A helper type for spacecraft orbit determination.
 pub type SpacecraftKalmanOD = self::process::KalmanODProcess<
     SpacecraftDynamics,

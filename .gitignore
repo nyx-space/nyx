@@ -12,6 +12,7 @@ node_modules/
 *.venv*
 dist/
 *.parquet
+*.pq
 *.oem
 *.profraw
 lcov.txt
