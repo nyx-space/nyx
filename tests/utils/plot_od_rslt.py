@@ -67,7 +67,8 @@ def main(path: str, wstats: bool):
         fig.show()
 
     # Plot the residual ratios
-    px.scatter(df, x="Epoch (UTC)", y="Residual ratio", color="Tracker").show()
+    ratio_color = "Residual Rejected" if len(df.unique("Tracker")) == 1 else "Tracker"
+    px.scatter(df, x="Epoch (UTC)", y="Residual ratio", color=ratio_color).show()
 
     if wstats:
         for msr in msr_types:

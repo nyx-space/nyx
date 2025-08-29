@@ -27,9 +27,10 @@ use rand_pcg::Pcg64Mcg;
 use typed_builder::TypedBuilder;
 
 use crate::mc::MvnSpacecraft;
+use crate::md::StateParameter;
 use crate::{dynamics::guidance::LocalFrame, Spacecraft};
 
-use super::KfEstimate;
+use super::{Estimate, KfEstimate};
 
 #[derive(Clone, Copy, Debug, TypedBuilder)]
 /// Builds a spacecraft uncertainty in different local frames, dispersing any of the parameters of the spacecraft state.
@@ -184,6 +185,48 @@ impl fmt::Display for SpacecraftUncertainty {
             f,
             "σ_cr = {}  σ_cd = {}  σ_mass = {} kg",
             self.coeff_reflectivity, self.coeff_drag, self.mass_kg
+        )
+    }
+}
+
+impl fmt::LowerHex for KfEstimate<Spacecraft> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let word = if self.predicted {
+            "Prediction"
+        } else {
+            "Estimate"
+        };
+
+        let params = [
+            StateParameter::SMA,
+            StateParameter::Eccentricity,
+            StateParameter::Inclination,
+            StateParameter::RAAN,
+            StateParameter::AoP,
+            StateParameter::TrueAnomaly,
+        ];
+
+        let mut fmt_cov = Vec::with_capacity(params.len());
+        for (i, param) in params.iter().copied().enumerate() {
+            // The sigma_for call will always work because we define which parameters to compute.
+            let this_val = self
+                .sigma_for(param)
+                .unwrap_or_else(|_| panic!("could not compute sigma for {param}"));
+            if i == 1 {
+                // Eccentricity is shown differently
+                fmt_cov.push(format!("{param}: {this_val:.6e}"));
+            } else {
+                fmt_cov.push(format!("{param}: {this_val:.6}"));
+            }
+        }
+        write!(
+            f,
+            "=== {} @ {} -- within 3 sigma: {} ===\nstate {:x}\nsigmas [{}]\n",
+            word,
+            &self.epoch(),
+            self.within_3sigma(),
+            &self.state(),
+            fmt_cov.join(", ")
         )
     }
 }

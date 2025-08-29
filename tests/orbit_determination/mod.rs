@@ -10,6 +10,7 @@ use nyx::State;
 mod blse;
 mod measurements;
 mod multi_body;
+mod predict_validation;
 mod robust;
 mod simulator;
 mod spacecraft;
