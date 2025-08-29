@@ -4,7 +4,7 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
 use anise::constants::celestial_objects::{EARTH, SUN};
-use anise::constants::frames::{IAU_EARTH_FRAME, IAU_MOON_FRAME, MOON_J2000};
+use anise::constants::frames::{IAU_EARTH_FRAME, IAU_MOON_FRAME};
 use indexmap::IndexSet;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::OrbitalDynamics;
@@ -38,19 +38,6 @@ fn val_pure_predictor(almanac: Arc<Almanac>) {
     let prop_time = 1.hours();
 
     let epoch = Epoch::from_gregorian_tai_at_midnight(2025, 1, 1);
-    let nrho = Orbit::cartesian(
-        166_473.631_302_239_7,
-        -274_715.487_253_382_7,
-        -211_233.210_176_686_7,
-        0.933_451_604_520_018_4,
-        0.436_775_046_841_900_9,
-        -0.082_211_021_250_348_95,
-        epoch,
-        eme2k,
-    );
-
-    let state_luna = almanac.transform_to(nrho, MOON_J2000, None).unwrap();
-    println!("Start state (dynamics: Earth, Moon, Sun gravity):\n{state_luna}");
 
     let bodies = vec![EARTH, SUN];
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));

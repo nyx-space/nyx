@@ -211,7 +211,7 @@ impl fmt::LowerHex for KfEstimate<Spacecraft> {
             // The sigma_for call will always work because we define which parameters to compute.
             let this_val = self
                 .sigma_for(param)
-                .expect(&format!("could not compute sigma for {param}"));
+                .unwrap_or_else(|_| panic!("could not compute sigma for {param}"));
             if i == 1 {
                 // Eccentricity is shown differently
                 fmt_cov.push(format!("{param}: {this_val:.6e}"));
