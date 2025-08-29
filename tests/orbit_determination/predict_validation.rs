@@ -109,12 +109,6 @@ fn val_pure_predictor(almanac: Arc<Almanac>) {
         .vz_km_s(1e-3)
         .build();
 
-    // DISABLE DISPERSIONS, cf. the bug in the estimate randomized docs.
-    // Define the initial estimate, randomized, seed for reproducibility
-    // let mut initial_estimate = llo_uncertainty.to_estimate_randomized(Some(0)).unwrap();
-    // Inflate the covariance
-    // initial_estimate.covar *= 3.0;
-
     let initial_estimate = llo_uncertainty.to_estimate().unwrap();
 
     let odp = SpacecraftKalmanOD::new(

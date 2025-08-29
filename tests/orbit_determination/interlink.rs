@@ -61,7 +61,7 @@ fn interlink_nrho_llo_cov_test(almanac: Arc<Almanac>) {
 
     let setup = Propagator::rk89(
         dynamics,
-        IntegratorOptions::builder().max_step(1.minutes()).build(),
+        IntegratorOptions::builder().max_step(0.5.minutes()).build(),
     );
 
     /* == Propagate the NRHO vehicle == */
@@ -168,7 +168,7 @@ fn interlink_nrho_llo_cov_test(almanac: Arc<Almanac>) {
     // DISABLE DISPERSIONS, cf. the bug in the estimate randomized docs.
     // Define the initial estimate, randomized, seed for reproducibility
     // let mut initial_estimate = llo_uncertainty.to_estimate_randomized(Some(0)).unwrap();
-    // Inflate the covariance
+    // Inflate the covariance -- https://github.com/nyx-space/nyx/issues/339
     // initial_estimate.covar *= 3.0;
 
     let initial_estimate = llo_uncertainty.to_estimate().unwrap();
@@ -201,11 +201,20 @@ fn interlink_nrho_llo_cov_test(almanac: Arc<Almanac>) {
         .to_parquet(out.join("nrho_interlink_od_sol.pq"), ExportCfg::default())
         .unwrap();
 
-    let final_est = od_sol.estimates.last().unwrap().orbital_state();
-    println!("ESTIMATE: {final_est:x}");
-    let truth = llo_traj.at(final_est.epoch).unwrap();
-    println!("TRUTH: {truth:x}");
+    let final_est = od_sol.estimates.last().unwrap();
+    assert!(final_est.within_3sigma(), "should be within 3 sigma");
 
-    let diff = truth.orbit.ric_difference(&final_est).unwrap();
+    println!("ESTIMATE\n{final_est:x}\n");
+    let truth = llo_traj.at(final_est.epoch()).unwrap();
+    println!("TRUTH\n{truth:x}");
+
+    let diff = truth
+        .orbit
+        .ric_difference(&final_est.orbital_state())
+        .unwrap();
     println!("ERROR {diff}");
+
+    // When we don't deviate the state, we expect excellent estimation.
+    assert!(diff.rmag_km() < 1e-2);
+    assert!(diff.vmag_km_s() < 1e-6);
 }

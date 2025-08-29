@@ -324,10 +324,31 @@ where
     <DefaultAllocator as Allocator<<T as State>::Size, <T as State>::Size>>::Buffer<f64>: Copy,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let dim = <T as State>::Size::dim();
+        let word = if self.predicted {
+            "Prediction"
+        } else {
+            "Estimate"
+        };
+        let mut fmt_cov = Vec::with_capacity(dim);
+        for i in 0..dim {
+            let unit = if i < 3 {
+                "km"
+            } else if i < 6 {
+                "km/s"
+            } else {
+                ""
+            };
+            fmt_cov.push(format!("{:e} {unit}", &self.covar[(i, i)]));
+        }
         write!(
             f,
-            "=== PREDICTED: {} ===\nEstState {:e} Covariance {:e}\n=====================",
-            &self.predicted, &self.state_deviation, &self.covar
+            "=== {} @ {} -- within 3 sigma: {} ===\nstate {}\nsigmas [{}]\n",
+            word,
+            &self.epoch(),
+            self.within_3sigma(),
+            &self.state(),
+            fmt_cov.join(", ")
         )
     }
 }
