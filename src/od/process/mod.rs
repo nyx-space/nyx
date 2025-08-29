@@ -426,9 +426,12 @@ where
         // Initialize the solution with no measurement types.
         let mut od_sol = ODSolution::new(self.devices.clone(), IndexSet::new());
 
+        od_sol.push_time_update(initial_estimate);
+
         // Set up the propagator instance.
         let prop = self.prop.clone();
         let mut prop_instance = prop.with(initial_estimate.nominal_state().with_stm(), self.almanac.clone()).quiet();
+
 
         // Set up the Kalman filter.
         let mut kf = KalmanFilter::<D::StateType, Accel> {

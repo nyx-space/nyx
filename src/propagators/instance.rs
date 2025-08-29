@@ -372,7 +372,6 @@ where
             .dynamics
             .finally(self.state, self.almanac.clone())
             .context(DynamicsSnafu)?;
-
         Ok(())
     }
 

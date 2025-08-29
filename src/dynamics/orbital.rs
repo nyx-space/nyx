@@ -250,17 +250,17 @@ impl AccelModel for PointMasses {
         let mut grad = Matrix3::zeros();
 
         // Get all of the position vectors between the center body and the third bodies
-        for third_body in &self.celestial_objects {
-            let third_body_frame = almanac
-                .frame_from_uid(Frame::from_ephem_j2000(*third_body))
-                .context(DynamicsPlanetarySnafu {
-                    action: "planetary data from third body not loaded",
-                })?;
-
-            if osc.frame.ephem_origin_match(third_body_frame) {
+        for third_body in self.celestial_objects.iter().copied() {
+            if osc.frame.ephem_origin_id_match(third_body) {
                 // Ignore the contribution of the integration frame, that's handled by OrbitalDynamics
                 continue;
             }
+
+            let third_body_frame = almanac
+                .frame_from_uid(osc.frame.with_ephem(third_body))
+                .context(DynamicsPlanetarySnafu {
+                    action: "planetary data from third body not loaded",
+                })?;
 
             let gm_d = OHyperdual::<f64, Const<7>>::from_real(
                 -third_body_frame
