@@ -9,13 +9,23 @@ import click
 @click.command
 @click.option("-p", "--path", type=str)
 @click.option("-s", "--wstats", type=bool, default=False)
-def main(path: str, wstats: bool):
+@click.option("-e", "--error_ric", type=str, default=None)
+def main(path: str, wstats: bool, error_ric: str):
     df = pl.read_parquet(path)
 
     df = (
         df.with_columns(pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f"))
         .sort("Epoch (UTC)", descending=False)
     )
+
+    if error_ric:
+        ricdf = pl.read_parquet(error_ric)
+        ricdf = (
+            ricdf.with_columns(pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f"))
+            .sort("Epoch (UTC)", descending=False)
+        )
+
+        px.line(ricdf, x="Epoch (UTC)", y=["Delta X (RIC) (km)", "Delta Y (RIC) (km)", "Delta Z (RIC) (km)"])
 
     all_msr_types = ["Range (km)", "Doppler (km/s)", "Azimuth (deg)", "Elevation (deg)"]
     msr_type_count = 0
@@ -69,6 +79,11 @@ def main(path: str, wstats: bool):
     # Plot the residual ratios
     ratio_color = "Residual Rejected" if len(df.unique("Tracker")) == 1 else "Tracker"
     px.scatter(df, x="Epoch (UTC)", y="Residual ratio", color=ratio_color).show()
+    
+    # Plot the RIC uncertainty
+    px.line(
+        df, x="Epoch (UTC)", y=["Sigma X (RIC) (km)", "Sigma Y (RIC) (km)", "Sigma Z (RIC) (km)"]
+    ).show()
 
     if wstats:
         for msr in msr_types:
@@ -124,11 +139,6 @@ def main(path: str, wstats: bool):
             px.scatter(df, x="Epoch (UTC)", y=gain_columns).show()
         else:
             px.scatter(df, x="Epoch (UTC)", y=fs_ratio_columns).show()
-        
-        # Plot the RIC uncertainty
-        px.line(
-            df, x="Epoch (UTC)", y=["Sigma X (RIC) (km)", "Sigma Y (RIC) (km)", "Sigma Z (RIC) (km)"]
-        ).show()
 
 
 if __name__ == "__main__":
