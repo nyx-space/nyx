@@ -32,8 +32,14 @@ fn almanac() -> Arc<Almanac> {
 /// Test the Cislunar Autonomous Positioning System (CAPS) similar to how it's flown on CAPSTONE.
 /// Assume that the NRHO orbiter is the transmitter in a two-way communication with a low lunar orbiter.
 /// This is a Spacecraft to Spacecraft Orbit Determination Process (S2SODP).
+///
+/// We test that with dispersions we can still converge on a better than the original dispersion.
+/// NOTE: In this short tracking arc, we do not converge well because we don't have good enough visibility
+/// of the crosstrack. This is reflected in the covariance.
 #[rstest]
-fn interlink_nrho_llo_cov_test(almanac: Arc<Almanac>) {
+#[case(false)]
+#[case(true)]
+fn interlink_nrho_llo_cov_test(#[case] disperse: bool, almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
@@ -165,28 +171,45 @@ fn interlink_nrho_llo_cov_test(almanac: Arc<Almanac>) {
         .vz_km_s(1e-3)
         .build();
 
-    // DISABLE DISPERSIONS, cf. the bug in the estimate randomized docs.
-    // Define the initial estimate, randomized, seed for reproducibility
-    // let mut initial_estimate = llo_uncertainty.to_estimate_randomized(Some(0)).unwrap();
-    // Inflate the covariance -- https://github.com/nyx-space/nyx/issues/339
-    // initial_estimate.covar *= 3.0;
+    let mut proc_devices = devices.clone();
 
-    let initial_estimate = llo_uncertainty.to_estimate().unwrap();
+    let initial_estimate = if disperse {
+        // Define the initial estimate, randomized, seed for reproducibility
+        let mut initial_estimate = llo_uncertainty.to_estimate_randomized(Some(0)).unwrap();
+        // Inflate the covariance -- https://github.com/nyx-space/nyx/issues/339
+        initial_estimate.covar *= 2.5;
+
+        // Increase the noise in the devices to accept more measurements.
+
+        for link in proc_devices.values_mut() {
+            for noise in &mut link.stochastic_noises.as_mut().unwrap().values_mut() {
+                *noise.white_noise.as_mut().unwrap() *= 15.0;
+            }
+        }
+
+        initial_estimate
+    } else {
+        llo_uncertainty.to_estimate().unwrap()
+    };
+
+    let init_err = initial_estimate
+        .orbital_state()
+        .ric_difference(&llo_orbit)
+        .unwrap();
 
     println!("initial estimate:\n{initial_estimate}");
-    println!(
-        "RIC errors = {}",
-        initial_estimate
-            .orbital_state()
-            .ric_difference(&llo_orbit)
-            .unwrap()
-    );
+    println!("RIC errors = {init_err}",);
 
     let odp = KalmanODProcess::<_, Const<2>, Const<3>, InterlinkTxSpacecraft>::new(
         setup,
-        KalmanVariant::DeviationTracking,
-        None,
-        devices,
+        if disperse {
+            KalmanVariant::ReferenceUpdate
+        } else {
+            KalmanVariant::DeviationTracking
+        },
+        // KalmanVariant::ReferenceUpdate,
+        Some(ResidRejectCrit::default()),
+        proc_devices,
         almanac,
     );
 
@@ -198,7 +221,20 @@ fn interlink_nrho_llo_cov_test(almanac: Arc<Almanac>) {
     println!("{od_sol}");
 
     od_sol
-        .to_parquet(out.join("nrho_interlink_od_sol.pq"), ExportCfg::default())
+        .to_parquet(
+            out.join(format!("interlink_od_sol_disp_{disperse}.pq")),
+            ExportCfg::default(),
+        )
+        .unwrap();
+
+    let od_traj = od_sol.to_traj().unwrap();
+
+    od_traj
+        .ric_diff_to_parquet(
+            &llo_traj,
+            out.join(format!("interlink_llo_est_error_disp_{disperse}.pq")),
+            ExportCfg::default(),
+        )
         .unwrap();
 
     let final_est = od_sol.estimates.last().unwrap();
@@ -208,13 +244,23 @@ fn interlink_nrho_llo_cov_test(almanac: Arc<Almanac>) {
     let truth = llo_traj.at(final_est.epoch()).unwrap();
     println!("TRUTH\n{truth:x}");
 
-    let diff = truth
+    let final_err = truth
         .orbit
         .ric_difference(&final_est.orbital_state())
         .unwrap();
-    println!("ERROR {diff}");
+    println!("ERROR {final_err}");
 
-    // When we don't deviate the state, we expect excellent estimation.
-    assert!(diff.rmag_km() < 1e-2);
-    assert!(diff.vmag_km_s() < 1e-6);
+    println!("RMAG error {:.3} m", final_err.rmag_km() * 1e3);
+    println!("Original error {:.3} m", init_err.rmag_km() * 1e3);
+
+    if disperse {
+        assert!(
+            final_err.rmag_km() < init_err.rmag_km(),
+            "expected smaller error than at start"
+        );
+    } else {
+        // When we don't deviate the state, we expect excellent estimation.
+        assert!(final_err.rmag_km() < 1e-2);
+        assert!(final_err.vmag_km_s() < 1e-6);
+    }
 }
