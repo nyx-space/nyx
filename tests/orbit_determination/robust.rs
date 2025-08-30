@@ -85,7 +85,6 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
         (dss34_canberra.name.clone(), TrkConfig::default()),
     ]);
 
-    // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     let mut devices = BTreeMap::new();
     devices.insert("Madrid".to_string(), dss65_madrid);
     devices.insert("Canberra".to_string(), dss34_canberra);
@@ -153,8 +152,9 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
     assert_eq!(arc.unique_types().len(), 1);
     assert_eq!(arc.unique_types()[0], MeasurementType::Range);
 
-    // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
-    // We expect the estimated orbit to be _nearly_ perfect because we've removed SATURN_BARYCENTER from the estimated trajectory
+    // Now that we have the truth data, let's start an OD and compute the estimates. We expect the
+    // estimated orbit to be _nearly_ perfect because we've removed SATURN_BARYCENTER from the
+    // estimated trajectory
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let estimator = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
     let setup = Propagator::default(estimator);
