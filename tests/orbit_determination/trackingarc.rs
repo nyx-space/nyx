@@ -193,7 +193,7 @@ fn trkconfig_zero_inclusion(
 /// Test invalid tracking configurations
 #[rstest]
 fn trkconfig_invalid(traj: Traj<Spacecraft>, devices: BTreeMap<String, GroundStation>) {
-    // Build a tracking config where the exclusion range is less than the sampling rate
+    // Build a tracking config with a zero-duration strand, which is invalid.
     let trkcfg = TrkConfig::builder()
         .strands(vec![Strand {
             start: traj.first().epoch(),
@@ -255,7 +255,7 @@ fn trkconfig_cadence(
     devices: BTreeMap<String, GroundStation>,
     almanac: Arc<Almanac>,
 ) {
-    // Build the configs map with a single ground station
+    // Build the configs map for two ground stations with different cadences.
     let mut configs = BTreeMap::new();
 
     configs.insert(
@@ -286,7 +286,7 @@ fn trkconfig_cadence(
 
     let arc = trk.generate_measurements(almanac).unwrap();
 
-    // Check the sampling of the arc is one minute: we don't have any overlap of availability and the default sampling is one minute.
+    // The minimum separation should be driven by the Canberra station's sampling rate.
     assert_eq!(
         arc.min_duration_sep().unwrap(),
         26.1.seconds(),

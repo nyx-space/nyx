@@ -129,9 +129,9 @@ fn od_val_multi_body_ckf_perfect_stations(
     let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
     arc.to_parquet_simple("multi_body.parquet").unwrap();
 
-    // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
-    // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
-    // the measurements, and the same time step.
+    // Now that we have the truth data, let's start an OD and compute the estimates. We expect the
+    // estimated orbit to be perfect since we're using strictly the same dynamics, no noise on the
+    // measurements, and the same time step.
     let covar_radius_km = 1.0e-3_f64.powi(2);
     let covar_velocity_km_s = 1.0e-6_f64.powi(2);
     let init_covar = SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([
@@ -245,7 +245,7 @@ fn multi_body_ckf_covar_map_cov_test(
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
-    // Generate the truth data on one thread.
+    // Generate the truth data.
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
     let setup = Propagator::new(
@@ -254,7 +254,6 @@ fn multi_body_ckf_covar_map_cov_test(
         opts,
     );
     let mut prop = setup.with(initial_state.into(), almanac.clone());
-
     let (_, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
     // Simulate tracking data
@@ -263,9 +262,9 @@ fn multi_body_ckf_covar_map_cov_test(
 
     let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
-    // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
-    // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
-    // the measurements, and the same time step.
+    // Now that we have the truth data, let's start an OD. We expect the estimated orbit to be
+    // perfect on measurement updates since we're using strictly the same dynamics and have no
+    // noise on the measurements.
     let covar_radius_km = 1.0e-3_f64.powi(2);
     let covar_velocity_km_s = 1.0e-6_f64.powi(2);
     let init_covar = SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([

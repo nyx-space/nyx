@@ -81,7 +81,6 @@ fn blse_robust_large_disp_cov_test(
         ),
     ]);
 
-    // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     let mut devices = BTreeMap::new();
     // devices.insert("Madrid".to_string(), dss65_madrid);
     devices.insert("Canberra".to_string(), dss34_canberra);

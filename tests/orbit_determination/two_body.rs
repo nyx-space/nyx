@@ -238,8 +238,6 @@ fn od_tb_val_with_arc(
     // Define the propagator information.
     let duration = 1 * Unit::Day;
 
-    // Define the storages (channels for the states and a map for the measurements).
-
     // Define state information.
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -428,7 +426,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
-    // Generate the truth data on one thread.
+    // Generate the truth data.
     let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
     let setup = Propagator::new(orbital_dyn, IntegratorMethod::RungeKutta4, opts);
@@ -689,7 +687,7 @@ fn od_tb_val_az_el_ckf_fixed_step_perfect_stations(
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
-    // Generate the truth data on one thread.
+    // Generate the truth data.
     let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::two_body());
 
     let setup = Propagator::new(orbital_dyn, IntegratorMethod::RungeKutta4, opts);
@@ -1080,7 +1078,7 @@ fn od_tb_fixed_step_perfect_stations_snc_covar_map(
     // Define the initial estimate
     let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
 
-    // Define the process noise to assume an unmodeled acceleration of 1e-3 km^2/s^2 on X, Y and Z in the ECI frame
+    // Define the process noise to assume an unmodeled acceleration on X, Y and Z in the ECI frame.
     let sigma_q = 1e-8_f64.powi(2);
     let process_noise =
         ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
@@ -1154,10 +1152,7 @@ fn od_tb_ckf_map_covar(almanac: Arc<Almanac>) {
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
-    // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
-    // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
-    // the measurements, and the same time step.
-
+    // Test that the covariance inflates correctly during a prediction-only propagation.
     let setup = Propagator::new(
         SpacecraftDynamics::new(OrbitalDynamics::two_body()),
         IntegratorMethod::RungeKutta4,
@@ -1390,7 +1385,7 @@ fn od_tb_fixed_step_perfect_stations_several_snc_covar_map(
     // Define the initial estimate
     let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
 
-    // Define the process noise to assume an unmodeled acceleration of 1e-3 km^2/s^2 on X, Y and Z in the ECI frame
+    // Define the process noise to assume an unmodeled acceleration on X, Y and Z in the ECI frame.
     let sigma_q1 = 1e-7_f64.powi(2);
     let process_noise1 =
         ProcessNoise3D::from_diagonal(2 * Unit::Day, &[sigma_q1, sigma_q1, sigma_q1]);
