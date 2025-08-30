@@ -1,19 +1,22 @@
-import argparse
 import polars as pl
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
+import click
 
-
+@click.command
+@click.option("-p", "--path", type=str)
 def plot_orbit_elements(
-    df: pl.DataFrame,
+    path:str
 ):
     """
     Plots the orbital elements: SMA, ECC, INC, RAAN, AOP, TA, True Longitude, AOL
     """
 
-    df = df.with_columns(pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f")).sort(
-        "Epoch (UTC)", descending=False
-    )
+    df = pl.read_parquet(path)
+
+    df = df.with_columns(
+        pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f")
+    ).sort("Epoch (UTC)", descending=False)
 
     columns = [
         "sma (km)",
@@ -53,10 +56,4 @@ def plot_orbit_elements(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Plot orbital element")
-    parser.add_argument("pq", type=str, help="Path to the parquet file")
-    args = parser.parse_args()
-    
-    df = pl.read_parquet(args.pq)
-
-    plot_orbit_elements(df)
+    plot_orbit_elements()

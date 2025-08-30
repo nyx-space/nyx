@@ -1,25 +1,22 @@
-import argparse
 import polars as pl
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
 import click
 
+
 @click.command
 @click.option("-p", "--path", type=str)
 @click.option("-m", "--multiplier", type=float, default=1.0)
-def plot_orbit_elements(
-    path: str,
-    multiplier: int
-):
+def plot_orbit_elements(path: str, multiplier: int):
     """
     Plots the orbital elements: SMA, ECC, INC, RAAN, AOP, TA, True Longitude, AOL
     """
 
     df = pl.read_parquet(path)
 
-    df = df.with_columns(pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f")).sort(
-        "Epoch (UTC)", descending=False
-    )
+    df = df.with_columns(
+        pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f")
+    ).sort("Epoch (UTC)", descending=False)
 
     columns = [
         "Sigma sma (km)",

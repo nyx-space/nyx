@@ -13,19 +13,21 @@ import click
 def main(path: str, wstats: bool, error_ric: str):
     df = pl.read_parquet(path)
 
-    df = (
-        df.with_columns(pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f"))
-        .sort("Epoch (UTC)", descending=False)
-    )
+    df = df.with_columns(
+        pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f")
+    ).sort("Epoch (UTC)", descending=False)
 
     if error_ric:
         ricdf = pl.read_parquet(error_ric)
-        ricdf = (
-            ricdf.with_columns(pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f"))
-            .sort("Epoch (UTC)", descending=False)
-        )
+        ricdf = ricdf.with_columns(
+            pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f")
+        ).sort("Epoch (UTC)", descending=False)
 
-        px.line(ricdf, x="Epoch (UTC)", y=["Delta X (RIC) (km)", "Delta Y (RIC) (km)", "Delta Z (RIC) (km)"])
+        px.line(
+            ricdf,
+            x="Epoch (UTC)",
+            y=["Delta X (RIC) (km)", "Delta Y (RIC) (km)", "Delta Z (RIC) (km)"],
+        )
 
     all_msr_types = ["Range (km)", "Doppler (km/s)", "Azimuth (deg)", "Elevation (deg)"]
     msr_type_count = 0
@@ -79,15 +81,21 @@ def main(path: str, wstats: bool, error_ric: str):
     # Plot the residual ratios
     ratio_color = "Residual Rejected" if len(df.unique("Tracker")) == 1 else "Tracker"
     px.scatter(df, x="Epoch (UTC)", y="Residual ratio", color=ratio_color).show()
-    
+
     # Plot the RIC uncertainty
     px.line(
-        df, x="Epoch (UTC)", y=["Sigma X (RIC) (km)", "Sigma Y (RIC) (km)", "Sigma Z (RIC) (km)"]
+        df,
+        x="Epoch (UTC)",
+        y=["Sigma X (RIC) (km)", "Sigma Y (RIC) (km)", "Sigma Z (RIC) (km)"],
     ).show()
 
     if wstats:
         for msr in msr_types:
-            px.scatter(df, x="Epoch (UTC)", y=[f"Real observation: {msr}", f"Computed observation: {msr}"]).show()
+            px.scatter(
+                df,
+                x="Epoch (UTC)",
+                y=[f"Real observation: {msr}", f"Computed observation: {msr}"],
+            ).show()
 
         # Convert the Polars column to a NumPy array for compatibility with scipy and Plotly
         residual_ratio = df["Residual ratio"].drop_nulls().to_numpy()
@@ -107,13 +115,23 @@ def main(path: str, wstats: bool, error_ric: str):
         # Add scatter points
         fig_qq.add_trace(
             go.Scatter(
-                x=qq[0][0], y=qq[0][1], mode="markers", name="Residuals ratios (QQ)", marker=dict(color="blue")
+                x=qq[0][0],
+                y=qq[0][1],
+                mode="markers",
+                name="Residuals ratios (QQ)",
+                marker=dict(color="blue"),
             )
         )
 
         # Add the theoretical line
         fig_qq.add_trace(
-            go.Scatter(x=x_qq, y=y_qq, mode="lines", name="Theoretical Normal", line=dict(color="red"))
+            go.Scatter(
+                x=x_qq,
+                y=y_qq,
+                mode="lines",
+                name="Theoretical Normal",
+                line=dict(color="red"),
+            )
         )
 
         # Update layout
