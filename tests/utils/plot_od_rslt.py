@@ -28,6 +28,11 @@ def main(path: str, wstats: bool, error_ric: str):
             x="Epoch (UTC)",
             y=["Delta X (RIC) (km)", "Delta Y (RIC) (km)", "Delta Z (RIC) (km)"],
         ).show()
+        px.line(
+            ricdf,
+            x="Epoch (UTC)",
+            y=["Delta Vx (RIC) (km/s)", "Delta Vy (RIC) (km/s)", "Delta Vz (RIC) (km/s)"],
+        ).show()
 
     all_msr_types = ["Range (km)", "Doppler (km/s)", "Azimuth (deg)", "Elevation (deg)"]
     msr_type_count = 0

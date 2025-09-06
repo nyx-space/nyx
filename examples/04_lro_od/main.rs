@@ -19,6 +19,7 @@ use nyx::{
     io::{ConfigRepr, ExportCfg},
     md::prelude::{HarmonicsMem, Traj},
     od::{
+        msr::MeasurementType,
         prelude::{KalmanVariant, TrackingArcSim, TrkConfig},
         process::{Estimate, NavSolution, ResidRejectCrit, SpacecraftUncertainty},
         snc::ProcessNoise3D,
@@ -200,8 +201,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut proc_devices = devices.clone();
 
     // Increase the noise in the devices to accept more measurements.
-    for link in proc_devices.values_mut() {
-        for noise in &mut link.stochastic_noises.as_mut().unwrap().values_mut() {
+    for gs in proc_devices.values_mut() {
+        if let Some(noise) = &mut gs
+            .stochastic_noises
+            .as_mut()
+            .unwrap()
+            .get_mut(&MeasurementType::Range)
+        {
             *noise.white_noise.as_mut().unwrap() *= 3.0;
         }
     }
@@ -220,10 +226,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let configs: BTreeMap<String, TrkConfig> = TrkConfig::load_named(trkconfg_yaml)?;
 
     // Build the tracking arc simulation to generate a "standard measurement".
-    let mut trk = TrackingArcSim::<Spacecraft, GroundStation>::new(
+    let mut trk = TrackingArcSim::<Spacecraft, GroundStation>::with_seed(
         devices.clone(),
         traj_as_flown.clone(),
         configs,
+        123, // Set a seed for reproducibility
     )?;
 
     trk.build_schedule(almanac.clone())?;
@@ -253,13 +260,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Build the filter initial estimate, which we will reuse in the filter.
     let mut initial_estimate = sc.to_estimate()?;
-    initial_estimate.covar *= 2.5;
+    initial_estimate.covar *= 3.0;
 
     println!("== FILTER STATE ==\n{sc_seed:x}\n{initial_estimate}");
 
     // Build the SNC in the Moon J2000 frame, specified as a velocity noise over time.
     let process_noise = ProcessNoise3D::from_velocity_km_s(
-        &[1e-9, 1e-9, 1e-9],
+        &[1e-10, 1e-10, 1e-10],
         1 * Unit::Hour,
         10 * Unit::Minute,
         None,
@@ -272,15 +279,19 @@ fn main() -> Result<(), Box<dyn Error>> {
         setup,
         KalmanVariant::ReferenceUpdate,
         Some(ResidRejectCrit::default()),
-        devices,
+        proc_devices,
         almanac.clone(),
     )
     .with_process_noise(process_noise);
 
     let od_sol = odp.process_arc(initial_estimate, &arc)?;
 
+    let final_est = od_sol.estimates.last().unwrap();
+
+    println!("{final_est}");
+
     let ric_err = traj_as_flown
-        .at(od_sol.estimates.last().unwrap().epoch())?
+        .at(final_est.epoch())?
         .orbit
         .ric_difference(&od_sol.estimates.last().unwrap().orbital_state())?;
     println!("== RIC at end ==");
