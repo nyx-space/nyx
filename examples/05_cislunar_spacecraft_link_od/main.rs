@@ -211,11 +211,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("RIC errors = {init_err}",);
 
     let odp = InterlinkKalmanOD::new(
-        setup,
+        setup.clone(),
         KalmanVariant::ReferenceUpdate,
         Some(ResidRejectCrit::default()),
         proc_devices,
-        almanac,
+        almanac.clone(),
     );
 
     // Shrink the data to process.
@@ -255,8 +255,21 @@ fn main() -> Result<(), Box<dyn Error>> {
         .unwrap();
     println!("ERROR {final_err}");
 
+    // Compute what the error would be without running a filter
+    let pure_prop = setup
+        .with(initial_estimate.state(), almanac.clone())
+        .until_epoch(final_est.epoch())?;
+
     println!("RMAG error {:.3} m", final_err.rmag_km() * 1e3);
-    println!("Original error {:.3} m", init_err.rmag_km() * 1e3);
+    println!(
+        "Pure prop error {:.3} m",
+        pure_prop
+            .orbit
+            .ric_difference(&final_est.orbital_state())
+            .unwrap()
+            .rmag_km()
+            * 1e3
+    );
 
     Ok(())
 }
