@@ -80,6 +80,15 @@ pub type SpacecraftKalmanScalarOD = self::process::KalmanODProcess<
     GroundStation,
 >;
 
+/// A helper type for spacecraft to spacecraft orbit determination.
+#[cfg(feature = "premium")]
+pub type InterlinkKalmanOD = self::process::KalmanODProcess<
+    SpacecraftDynamics,
+    nalgebra::Const<2>,
+    nalgebra::Const<3>,
+    interlink::InterlinkTxSpacecraft,
+>;
+
 #[allow(unused_imports)]
 pub mod prelude {
     pub use super::estimate::*;

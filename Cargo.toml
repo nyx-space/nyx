@@ -124,3 +124,8 @@ doc-scrape-examples = true
 name = "04_lro_od"
 path = "examples/04_lro_od/main.rs"
 doc-scrape-examples = true
+
+[[example]]
+name = "05_caps"
+path = "examples/05_cislunar_spacecraft_link_od/main.rs"
+doc-scrape-examples = true
