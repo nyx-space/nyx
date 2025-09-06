@@ -27,7 +27,7 @@ def main(path: str, wstats: bool, error_ric: str):
             ricdf,
             x="Epoch (UTC)",
             y=["Delta X (RIC) (km)", "Delta Y (RIC) (km)", "Delta Z (RIC) (km)"],
-        )
+        ).show()
 
     all_msr_types = ["Range (km)", "Doppler (km/s)", "Azimuth (deg)", "Elevation (deg)"]
     msr_type_count = 0
@@ -79,8 +79,8 @@ def main(path: str, wstats: bool, error_ric: str):
         fig.show()
 
     # Plot the residual ratios
-    ratio_color = "Residual Rejected" if len(df.unique("Tracker")) == 1 else "Tracker"
-    px.scatter(df, x="Epoch (UTC)", y="Residual ratio", color=ratio_color).show()
+    px.scatter(df, x="Epoch (UTC)", y="Residual ratio", color="Residual Rejected").show()
+    px.scatter(df, x="Epoch (UTC)", y="Residual ratio", color="Tracker").show()
 
     # Plot the RIC uncertainty
     px.line(

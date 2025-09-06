@@ -207,7 +207,6 @@ fn interlink_nrho_llo_cov_test(#[case] disperse: bool, almanac: Arc<Almanac>) {
         } else {
             KalmanVariant::DeviationTracking
         },
-        // KalmanVariant::ReferenceUpdate,
         Some(ResidRejectCrit::default()),
         proc_devices,
         almanac,

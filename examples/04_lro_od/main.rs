@@ -197,6 +197,15 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let devices = GroundStation::load_named(ground_station_file)?;
 
+    let mut proc_devices = devices.clone();
+
+    // Increase the noise in the devices to accept more measurements.
+    for link in proc_devices.values_mut() {
+        for noise in &mut link.stochastic_noises.as_mut().unwrap().values_mut() {
+            *noise.white_noise.as_mut().unwrap() *= 3.0;
+        }
+    }
+
     // Typical OD software requires that you specify your own tracking schedule or you'll have overlapping measurements.
     // Nyx can build a tracking schedule for you based on the first station with access.
     let trkconfg_yaml: PathBuf = [
@@ -243,13 +252,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         .build();
 
     // Build the filter initial estimate, which we will reuse in the filter.
-    let initial_estimate = sc.to_estimate()?;
+    let mut initial_estimate = sc.to_estimate()?;
+    initial_estimate.covar *= 2.5;
 
     println!("== FILTER STATE ==\n{sc_seed:x}\n{initial_estimate}");
 
     // Build the SNC in the Moon J2000 frame, specified as a velocity noise over time.
     let process_noise = ProcessNoise3D::from_velocity_km_s(
-        &[1.8e-9, 1.8e-9, 1.8e-9],
+        &[1e-9, 1e-9, 1e-9],
         1 * Unit::Hour,
         10 * Unit::Minute,
         None,
@@ -274,8 +284,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         .orbit
         .ric_difference(&od_sol.estimates.last().unwrap().orbital_state())?;
     println!("== RIC at end ==");
-    println!("RIC Position (m): {}", ric_err.radius_km * 1e3);
-    println!("RIC Velocity (m/s): {}", ric_err.velocity_km_s * 1e3);
+    println!("RIC Position (m): {:.3}", ric_err.radius_km * 1e3);
+    println!("RIC Velocity (m/s): {:.3}", ric_err.velocity_km_s * 1e3);
 
     println!(
         "Num residuals rejected: #{}",
