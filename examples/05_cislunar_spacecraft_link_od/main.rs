@@ -255,16 +255,25 @@ fn main() -> Result<(), Box<dyn Error>> {
         .unwrap();
     println!("ERROR {final_err}");
 
-    // Compute what the error would be without running a filter
-    let pure_prop = setup
-        .with(initial_estimate.state(), almanac.clone())
-        .until_epoch(final_est.epoch())?;
+    // Build the residuals versus reference plot.
+    let rvr_sol = odp
+        .process_arc(initial_estimate, &arc.resid_vs_ref_check())
+        .unwrap();
+
+    rvr_sol
+        .to_parquet(
+            out.join(format!("05_caps_interlink_resid_v_ref.pq")),
+            ExportCfg::default(),
+        )
+        .unwrap();
+
+    let final_rvr = rvr_sol.estimates.last().unwrap();
 
     println!("RMAG error {:.3} m", final_err.rmag_km() * 1e3);
     println!(
         "Pure prop error {:.3} m",
-        pure_prop
-            .orbit
+        final_rvr
+            .orbital_state()
             .ric_difference(&final_est.orbital_state())
             .unwrap()
             .rmag_km()

@@ -367,6 +367,11 @@ impl TrackingDataArc {
         }
         result
     }
+
+    pub fn resid_vs_ref_check(mut self) -> Self {
+        self.force_reject = true;
+        self
+    }
 }
 
 impl fmt::Display for TrackingDataArc {
