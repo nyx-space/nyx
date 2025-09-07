@@ -111,6 +111,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         .until_epoch_with_traj(nrho_final.epoch())
         .unwrap();
 
+    // Export the subset of the first two hours.
+    llo_traj
+        .clone()
+        .filter_by_offset(..2.hours())
+        .to_parquet_simple(out.join("05_caps_llo_truth.pq"), almanac.clone())?;
+
     /* == Setup the interlink == */
 
     let mut measurement_types = IndexSet::new();
