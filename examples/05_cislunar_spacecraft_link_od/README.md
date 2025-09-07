@@ -17,6 +17,9 @@ Nyx allows building Range, Doppler, Azimuth, Elevation measurements, with approp
 This example demonstrates solving the OD problem from a vehicle in a Near Rectangular Halo Orbit to a Low Lunar Orbit vehicle.
 The noise models are initialized using the Signal to Noise ratio, the Carrier Power, and the communication frequency for the Range and Doppler between both vehicles.
 
+
+[![asciicast](https://asciinema.org/a/738451.svg)](https://asciinema.org/a/738451)
+
 ## Set up
 
 The initial state used to generate the tracking data is dispersed within the provided covariance, with a given seed to ensure reproducibility.
