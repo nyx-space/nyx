@@ -173,7 +173,7 @@ where
         };
 
         let end = match bound.end_bound() {
-            Unbounded => self.states.first().unwrap().epoch(),
+            Unbounded => self.states.last().unwrap().epoch(),
             Included(offset) | Excluded(offset) => self.states.first().unwrap().epoch() + *offset,
         };
 
