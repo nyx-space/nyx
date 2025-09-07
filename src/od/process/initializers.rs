@@ -106,7 +106,7 @@ where
         self
     }
 
-    /// Pushes the provided process noise to the list the existing process noise configurations.
+    /// Appends the provided process noise to the list the existing process noise configurations.
     pub fn and_with_process_noise(mut self, process_noise: ProcessNoise<Accel>) -> Self {
         self.process_noise.push(process_noise);
         self

@@ -4,6 +4,8 @@
 
 In this example, you'll learn how to use an "as-flown" (_definitive_) SPICE BSP ephemeris file to simulate orbit determination measurements from ground stations. Then, you'll learn how to set up an orbit determination process in Nyx with high fidelity Moon dynamics and estimate the state of LRO. Finally, you'll learn how to compare two ephemerides in the Radial, In-track, Cross-track (RIC) frame.
 
+[![asciicast](https://asciinema.org/a/738443.svg)](https://asciinema.org/a/738443)
+
 **Jump to the [results](#results)**
 
 To run this example, just execute:
@@ -115,27 +117,30 @@ To prepare for a mission, flight dynamics engineers must simulate a tracking sch
 The tracking scheduler will start by finding the exact times when the vehicle comes in view, using the embedded event finder on an elevation event.
 
 ```log
+ INFO  nyx_space::od::simulator::arc      > Tracking Arc Simulator on Trajectory of LRO in Moon J2000 (μ = 4902.74987 km^3/s^2, radius = 1737.4 km) from 2024-01-01T00:00:00 UTC to 2024-01-02T00:00:00 UTC (1 day, or 86400.000 s) [17281 states] with devices ["DSS-13 Goldstone", "DSS-34 Canberra", "DSS-65 Madrid"] over TimeSeries [2024-01-01T00:00:00 UTC : 2024-01-02T00:00:00 UTC : 1 min]
+ INFO  nyx_space::od::simulator::arc      > Building schedule for DSS-13 Goldstone
+ INFO  nyx_space::md::trajectory::sc_traj > Converted trajectory from Moon J2000 (μ = 4902.74987 km^3/s^2, radius = 1737.4 km) to Earth IAU_EARTH (μ = 398600.435436096 km^3/s^2) in 238 ms: Trajectory in Earth IAU_EARTH (μ = 398600.436 km^3/s^2, eq. radius = 6378.1366 km, polar radius = 6356.7519 km, f = 0.0033528131084554717) from 2024-01-01T00:00:00 UTC to 2024-01-02T00:00:00 UTC (1 day, or 86400.000 s) [17281 states]
  INFO  nyx_space::md::events::search      > Searching for DSS-13 Goldstone (lat.: 35.2472 deg    long.: 243.2050 deg    alt.: 1071.149 m) [Earth IAU_EARTH (μ = 398600.435436096 km^3/s^2)] with initial heuristic of 14 min 24 s
- INFO  nyx_space::md::events::search      > Event DSS-13 Goldstone (lat.: 35.2472 deg    long.: 243.2050 deg    alt.: 1071.149 m) [Earth IAU_EARTH (μ = 398600.435436096 km^3/s^2)] found 2 times from 2024-01-01T05:49:54.697010810 UTC until 2024-01-01T18:08:53.555326604 UTC
+ INFO  nyx_space::md::events::search      > Event DSS-13 Goldstone (lat.: 35.2472 deg    long.: 243.2050 deg    alt.: 1071.149 m) [Earth IAU_EARTH (μ = 398600.435436096 km^3/s^2)] found 2 times from 2024-01-01T05:49:54.697010833 UTC until 2024-01-01T18:08:53.555326582 UTC
  INFO  nyx_space::od::simulator::arc      > Built 1 tracking strands for DSS-13 Goldstone
  INFO  nyx_space::od::simulator::arc      > Building schedule for DSS-34 Canberra
- INFO  nyx_space::md::trajectory::sc_traj > Converted trajectory from Moon J2000 (μ = 4902.74987 km^3/s^2, radius = 1737.4 km) to Earth IAU_EARTH (μ = 398600.435436096 km^3/s^2) in 220 ms: Trajectory in Earth IAU_EARTH (μ = 398600.436 km^3/s^2, eq. radius = 6378.1366 km, polar radius = 6356.7519 km, f = 0.0033528131084554717) from 2024-01-01T00:00:00 UTC to 2024-01-02T00:00:00 UTC (1 day, or 86400.000 s) [17281 states]
+ INFO  nyx_space::md::trajectory::sc_traj > Converted trajectory from Moon J2000 (μ = 4902.74987 km^3/s^2, radius = 1737.4 km) to Earth IAU_EARTH (μ = 398600.435436096 km^3/s^2) in 232 ms: Trajectory in Earth IAU_EARTH (μ = 398600.436 km^3/s^2, eq. radius = 6378.1366 km, polar radius = 6356.7519 km, f = 0.0033528131084554717) from 2024-01-01T00:00:00 UTC to 2024-01-02T00:00:00 UTC (1 day, or 86400.000 s) [17281 states]
  INFO  nyx_space::md::events::search      > Searching for DSS-34 Canberra (lat.: -35.3983 deg    long.: 148.9819 deg    alt.: 691.750 m) [Earth IAU_EARTH (μ = 398600.435436096 km^3/s^2)] with initial heuristic of 14 min 24 s
- INFO  nyx_space::md::events::search      > Event DSS-34 Canberra (lat.: -35.3983 deg    long.: 148.9819 deg    alt.: 691.750 m) [Earth IAU_EARTH (μ = 398600.435436096 km^3/s^2)] found 2 times from 2024-01-01T13:19:29.424409217 UTC until 2024-01-01T23:47:35.676704956 UTC
+ INFO  nyx_space::md::events::search      > Event DSS-34 Canberra (lat.: -35.3983 deg    long.: 148.9819 deg    alt.: 691.750 m) [Earth IAU_EARTH (μ = 398600.435436096 km^3/s^2)] found 2 times from 2024-01-01T13:19:29.424409229 UTC until 2024-01-01T23:47:35.676704951 UTC
  INFO  nyx_space::od::simulator::arc      > Built 1 tracking strands for DSS-34 Canberra
  INFO  nyx_space::od::simulator::arc      > Building schedule for DSS-65 Madrid
- INFO  nyx_space::md::trajectory::sc_traj > Converted trajectory from Moon J2000 (μ = 4902.74987 km^3/s^2, radius = 1737.4 km) to Earth IAU_EARTH (μ = 398600.435436096 km^3/s^2) in 220 ms: Trajectory in Earth IAU_EARTH (μ = 398600.436 km^3/s^2, eq. radius = 6378.1366 km, polar radius = 6356.7519 km, f = 0.0033528131084554717) from 2024-01-01T00:00:00 UTC to 2024-01-02T00:00:00 UTC (1 day, or 86400.000 s) [17281 states]
+ INFO  nyx_space::md::trajectory::sc_traj > Converted trajectory from Moon J2000 (μ = 4902.74987 km^3/s^2, radius = 1737.4 km) to Earth IAU_EARTH (μ = 398600.435436096 km^3/s^2) in 231 ms: Trajectory in Earth IAU_EARTH (μ = 398600.436 km^3/s^2, eq. radius = 6378.1366 km, polar radius = 6356.7519 km, f = 0.0033528131084554717) from 2024-01-01T00:00:00 UTC to 2024-01-02T00:00:00 UTC (1 day, or 86400.000 s) [17281 states]
  INFO  nyx_space::md::events::search      > Searching for DSS-65 Madrid (lat.: 40.4272 deg    long.: 4.2506 deg    alt.: 834.939 m) [Earth IAU_EARTH (μ = 398600.435436096 km^3/s^2)] with initial heuristic of 14 min 24 s
- INFO  nyx_space::md::events::search      > Event DSS-65 Madrid (lat.: 40.4272 deg    long.: 4.2506 deg    alt.: 834.939 m) [Earth IAU_EARTH (μ = 398600.435436096 km^3/s^2)] found 2 times from 2024-01-01T09:59:19.297494580 UTC until 2024-01-01T22:19:56.653993644 UTC
+ INFO  nyx_space::md::events::search      > Event DSS-65 Madrid (lat.: 40.4272 deg    long.: 4.2506 deg    alt.: 834.939 m) [Earth IAU_EARTH (μ = 398600.435436096 km^3/s^2)] found 2 times from 2024-01-01T09:59:19.297494595 UTC until 2024-01-01T22:19:56.653993634 UTC
  INFO  nyx_space::od::simulator::arc      > Built 2 tracking strands for DSS-65 Madrid
  INFO  nyx_space::od::simulator::arc      > DSS-65 Madrid configured as Greedy, so DSS-13 Goldstone now starts on 2024-01-01T10:00:20 UTC
  INFO  nyx_space::od::simulator::arc      > DSS-13 Goldstone configured as Greedy, so DSS-34 Canberra now starts on 2024-01-01T18:09:50 UTC
  INFO  nyx_space::od::simulator::arc      > DSS-34 Canberra now hands off to DSS-65 Madrid on 2024-01-01T22:19:00 UTC because it's configured as Eager
- INFO  nyx_space::od::simulator::arc      > Simulated 319 measurements for DSS-13 Goldstone for 1 tracking strands in 13 ms
- INFO  nyx_space::od::simulator::arc      > Simulated 185 measurements for DSS-34 Canberra for 1 tracking strands in 7 ms
- INFO  nyx_space::od::simulator::arc      > Simulated 490 measurements for DSS-65 Madrid for 2 tracking strands in 18 ms
- INFO  nyx_space::od::msr::arc            > Serialized 994 measurements from {"DSS-34 Canberra", "DSS-13 Goldstone", "DSS-65 Madrid"} to ./04_lro_simulated_tracking.parquet
-994 measurements from {"DSS-13 Goldstone", "DSS-65 Madrid", "DSS-34 Canberra"}
+ INFO  nyx_space::od::simulator::arc      > Simulated 286 measurements for DSS-13 Goldstone for 1 tracking strands in 46 ms
+ INFO  nyx_space::od::simulator::arc      > Simulated 147 measurements for DSS-34 Canberra for 1 tracking strands in 25 ms
+ INFO  nyx_space::od::simulator::arc      > Simulated 428 measurements for DSS-65 Madrid for 2 tracking strands in 65 ms
+ INFO  nyx_space::od::msr::trackingdata::io_parquet > Serialized Tracking arc with 861 measurements of type {Range, Doppler} over 23 h 28 min (from 2024-01-01T00:00:00 UTC to 2024-01-01T23:28:00 UTC) with trackers {"DSS-65 Madrid", "DSS-13 Goldstone", "DSS-34 Canberra"} to ./04_lro_simulated_tracking.parquet
+Tracking arc with 861 measurements of type {Range, Doppler} over 23 h 28 min (from 2024-01-01T00:00:00 UTC to 2024-01-01T23:28:00 UTC) with trackers {"DSS-65 Madrid", "DSS-13 Goldstone", "DSS-34 Canberra"}
 ```
 
 ## Tracking arc
@@ -159,18 +164,49 @@ However, as seen in the model matching section, there remains a difference in th
 The filter is configured with the default automatic residual rejection of Nyx whereby any residual ratio greater than 4 sigmas causes the measurement to be rejected. If the residual ratio exceeds this threshold, the measurement is considered an outlier and is rejected by the filter. This process helps to prevent measurements with large errors from negatively impacting the orbit determination solution.
 
 ```log
- INFO  nyx_space::od::process             > Navigation propagating for a total of 1 day with step size 1 min
- INFO  nyx_space::od::process             > Processing 994 measurements with covariance mapping
- INFO  nyx_space::od::process             >  10% done - 101 measurements accepted, 0 rejected
- INFO  nyx_space::od::process             >  20% done - 200 measurements accepted, 0 rejected
- INFO  nyx_space::od::process             >  30% done - 300 measurements accepted, 0 rejected
- INFO  nyx_space::od::process             >  40% done - 394 measurements accepted, 5 rejected
- INFO  nyx_space::od::process             >  50% done - 489 measurements accepted, 9 rejected
- INFO  nyx_space::od::process             >  60% done - 586 measurements accepted, 12 rejected
- INFO  nyx_space::od::process             >  70% done - 677 measurements accepted, 20 rejected
- INFO  nyx_space::od::process             >  80% done - 767 measurements accepted, 30 rejected
- INFO  nyx_space::od::process             >  90% done - 863 measurements accepted, 33 rejected
- INFO  nyx_space::od::process             > 100% done - 955 measurements accepted, 39 rejected (done in 17 s 267 ms 50 μs 496 ns)
+== FILTER STATE ==
+total mass = 1918.000 kg @  [Moon J2000] 2024-01-01T00:00:00 UTC	sma = 1827.726462 km	ecc = 0.012282	inc = 70.207675 deg	raan = 128.185499 deg	aop = 192.826230 deg	ta = 109.656658 deg  Coast
+=== Prediction @ 2024-01-01T00:00:00 UTC -- within 3 sigma: true ===
+state total mass = 1918.000 kg @  [Moon J2000] 2024-01-01T00:00:00 UTC	position = [-197.254435, 1098.652054, -1456.501725] km	velocity = [-1.085832, 0.909499, 0.809229] km/s  Coast
+sigmas [0.750000 km, 0.750000 km, 0.750000 km, 0.000075 km/s, 0.000075 km/s, 0.000075 km/s, 0.000000 , 0.000000 , 0.000000 ]
+
+SNC: diag(2.8e-8, 2.8e-8, 2.8e-8) mm/s^2
+ INFO  nyx_space::od::process                       > Navigation propagating for a total of 23 h 28 min with step size 1 min
+ INFO  nyx_space::od::process                       > Processing 861 measurements from {"DSS-65 Madrid", "DSS-13 Goldstone", "DSS-34 Canberra"}
+ INFO  nyx_space::od::process                       >  10% done - 87 measurements accepted, 1 rejected
+ INFO  nyx_space::od::process                       >  20% done - 173 measurements accepted, 1 rejected
+ INFO  nyx_space::od::process                       >  30% done - 259 measurements accepted, 1 rejected
+ INFO  nyx_space::od::process                       >  40% done - 345 measurements accepted, 1 rejected
+ INFO  nyx_space::od::process                       >  50% done - 431 measurements accepted, 1 rejected
+ INFO  nyx_space::od::process                       >  60% done - 517 measurements accepted, 1 rejected
+ INFO  nyx_space::od::process                       >  70% done - 603 measurements accepted, 1 rejected
+ INFO  nyx_space::od::process                       >  80% done - 689 measurements accepted, 1 rejected
+ INFO  nyx_space::od::process                       >  90% done - 775 measurements accepted, 1 rejected
+ INFO  nyx_space::od::process                       > 100% done - 860 measurements accepted, 1 rejected (done in 16 s 162 ms 790 μs 300 ns)
+=== Estimate @ 2024-01-01T23:28:00 UTC -- within 3 sigma: true ===
+state total mass = 1918.000 kg @  [Moon J2000] 2024-01-01T23:28:00 UTC	position = [-487.403846, 1319.178697, -1187.411633] km	velocity = [-1.010798, 0.639878, 1.101983] km/s  Coast
+sigmas [0.000189 km, 0.004287 km, 0.007292 km, 0.000000 km/s, 0.000000 km/s, 0.000000 km/s, 0.000000 , 0.000000 , 0.000000 ]
+
+== RIC at end ==
+RIC Position (m):
+  ┌          ┐
+  │ -186.575 │
+  │ -110.398 │
+  │   61.301 │
+  └          ┘
+
+
+RIC Velocity (m/s):
+  ┌        ┐
+  │ -0.191 │
+  │ -0.140 │
+  │  0.178 │
+  └        ┘
+
+
+Num residuals rejected: #1
+Percentage within +/-3: 0.9988385598141696
+Ratios normal? true
 ```
 
 # Results

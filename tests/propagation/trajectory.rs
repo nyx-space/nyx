@@ -47,6 +47,20 @@ fn traj_ephem_forward_cov_test(almanac: Arc<Almanac>) {
     let exec_time = Epoch::now().unwrap() - now;
     println!("[TIMING] {exec_time}");
 
+    let ephem_start = ephem.states.first().unwrap().epoch();
+    let trimmed = ephem.clone().filter_by_offset(1.hours()..=3.hours());
+    let trim_start_err =
+        (trimmed.states.first().unwrap().epoch() - (ephem_start + 1.hours())).abs();
+    let trim_end_err = (trimmed.states.last().unwrap().epoch() - (ephem_start + 3.hours())).abs();
+    assert!(
+        trim_start_err < 1.minutes(),
+        "traj filter failed -- large step?: {trim_start_err}"
+    );
+    assert!(
+        trim_end_err < 1.minutes(),
+        "traj filter failed -- large step?: {trim_end_err}"
+    );
+
     // Example of iterating through the trajectory.
     // Note how we receive a fully blown Orbit, so we can manipulate it exactly like a normal state.
     let mut sum_sma = 0.0;

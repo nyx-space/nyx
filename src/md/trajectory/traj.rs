@@ -41,6 +41,7 @@ use std::fmt;
 use std::fs::File;
 use std::iter::Iterator;
 use std::ops;
+use std::ops::Bound::{Excluded, Included, Unbounded};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -148,6 +149,36 @@ where
         }
     }
 
+    /// Returns a new trajectory that only contains states that fall within the given epoch range.
+    pub fn filter_by_epoch<R: ops::RangeBounds<Epoch>>(mut self, bound: R) -> Self {
+        self.states = self
+            .states
+            .iter()
+            .copied()
+            .filter(|s| bound.contains(&s.epoch()))
+            .collect::<Vec<_>>();
+        self
+    }
+
+    /// Returns a new trajectory that only contains states that fall within the given offset from the first epoch.
+    /// For example, a bound of 30.minutes()..90.minutes() will only return states from the start of the trajectory + 30 minutes until start + 90 minutes.
+    pub fn filter_by_offset<R: ops::RangeBounds<Duration>>(self, bound: R) -> Self {
+        if self.states.is_empty() {
+            return self;
+        }
+        // Rebuild an epoch bound.
+        let start = match bound.start_bound() {
+            Unbounded => self.states.first().unwrap().epoch(),
+            Included(offset) | Excluded(offset) => self.states.first().unwrap().epoch() + *offset,
+        };
+
+        let end = match bound.end_bound() {
+            Unbounded => self.states.last().unwrap().epoch(),
+            Included(offset) | Excluded(offset) => self.states.first().unwrap().epoch() + *offset,
+        };
+
+        self.filter_by_epoch(start..=end)
+    }
     /// Store this trajectory arc to a parquet file with the default configuration (depends on the state type, search for `export_params` in the documentation for details).
     pub fn to_parquet_simple<P: AsRef<Path>>(
         &self,

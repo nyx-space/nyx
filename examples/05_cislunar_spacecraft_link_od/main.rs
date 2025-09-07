@@ -1,46 +1,62 @@
-// Test for interlink
-
+extern crate log;
 extern crate nyx_space as nyx;
-extern crate pretty_env_logger;
+extern crate pretty_env_logger as pel;
 
-use anise::constants::celestial_objects::{EARTH, SUN};
-use anise::constants::frames::{IAU_MOON_FRAME, MOON_J2000};
+use anise::{
+    almanac::Almanac,
+    constants::{
+        celestial_objects::{EARTH, SUN},
+        frames::{EARTH_J2000, IAU_MOON_FRAME, MOON_J2000},
+    },
+};
+use hifitime::{Epoch, TimeUnits};
+use nyx::{
+    cosmic::Aberration,
+    dynamics::{OrbitalDynamics, SpacecraftDynamics},
+    io::ExportCfg,
+    md::prelude::{IntegratorOptions, Propagator},
+    od::interlink::InterlinkTxSpacecraft,
+    od::noise::link_specific,
+    od::prelude::*,
+    Orbit, Spacecraft, State,
+};
+
 use indexmap::{IndexMap, IndexSet};
-use nyx::cosmic::Orbit;
-use nyx::dynamics::orbital::OrbitalDynamics;
-use nyx::dynamics::SpacecraftDynamics;
-use nyx::linalg::Const;
-use nyx::md::prelude::*;
-use nyx::od::interlink::InterlinkTxSpacecraft;
-use nyx::od::prelude::*;
-use nyx::propagators::Propagator;
-use nyx::time::{Epoch, TimeUnits};
-use nyx::Spacecraft;
+use std::{collections::BTreeMap, error::Error, path::PathBuf, sync::Arc};
 
-use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
-use rstest::*;
-use std::collections::BTreeMap;
-use std::path::PathBuf;
-use std::sync::Arc;
-
-#[fixture]
-fn almanac() -> Arc<Almanac> {
-    use crate::test_almanac_arcd;
-    test_almanac_arcd()
-}
-
-/// Test the Cislunar Autonomous Positioning System (CAPS) similar to how it's flown on CAPSTONE.
+// Test the Cislunar Autonomous Positioning System (CAPS) similar to how it's flown on CAPSTONE.
 /// Assume that the NRHO orbiter is the transmitter in a two-way communication with a low lunar orbiter.
 /// This is a Spacecraft to Spacecraft Orbit Determination Process (S2SODP).
 ///
 /// We test that with dispersions we can still converge on a better than the original dispersion.
 /// NOTE: In this short tracking arc, we do not converge well because we don't have good enough visibility
 /// of the crosstrack. This is reflected in the covariance.
-#[rstest]
-#[case(false)]
-#[case(true)]
-fn interlink_nrho_llo_cov_test(#[case] disperse: bool, almanac: Arc<Almanac>) {
-    let _ = pretty_env_logger::try_init();
+fn main() -> Result<(), Box<dyn Error>> {
+    pel::init();
+
+    // ====================== //
+    // === ALMANAC SET UP === //
+    // ====================== //
+
+    let manifest_dir =
+        PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string()));
+
+    let out = manifest_dir.join("data/04_output/");
+
+    let almanac = Arc::new(
+        Almanac::new(
+            &manifest_dir
+                .join("data/01_planetary/pck08.pca")
+                .to_string_lossy(),
+        )
+        .unwrap()
+        .load(
+            &manifest_dir
+                .join("data/01_planetary/de440s.bsp")
+                .to_string_lossy(),
+        )
+        .unwrap(),
+    );
 
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let moon_iau = almanac.frame_from_uid(IAU_MOON_FRAME).unwrap();
@@ -93,6 +109,12 @@ fn interlink_nrho_llo_cov_test(#[case] disperse: bool, almanac: Arc<Almanac>) {
         .until_epoch_with_traj(nrho_final.epoch())
         .unwrap();
 
+    // Export the subset of the first two hours.
+    llo_traj
+        .clone()
+        .filter_by_offset(..2.hours())
+        .to_parquet_simple(out.join("05_caps_llo_truth.pq"), almanac.clone())?;
+
     /* == Setup the interlink == */
 
     let mut measurement_types = IndexSet::new();
@@ -108,8 +130,8 @@ fn interlink_nrho_llo_cov_test(#[case] disperse: bool, almanac: Arc<Almanac>) {
         StochasticNoise::from_hardware_range_km(
             sa45_csac_allan_dev,
             10.0.seconds(),
-            noise::link_specific::ChipRate::StandardT4B,
-            noise::link_specific::SN0::Average,
+            link_specific::ChipRate::StandardT4B,
+            link_specific::SN0::Average,
         ),
     );
 
@@ -118,8 +140,8 @@ fn interlink_nrho_llo_cov_test(#[case] disperse: bool, almanac: Arc<Almanac>) {
         StochasticNoise::from_hardware_doppler_km_s(
             sa45_csac_allan_dev,
             10.0.seconds(),
-            noise::link_specific::CarrierFreq::SBand,
-            noise::link_specific::CN0::Average,
+            link_specific::CarrierFreq::SBand,
+            link_specific::CN0::Average,
         ),
     );
 
@@ -154,8 +176,6 @@ fn interlink_nrho_llo_cov_test(#[case] disperse: bool, almanac: Arc<Almanac>) {
     let trk_data = trk_sim.generate_measurements(almanac.clone()).unwrap();
     println!("{trk_data}");
 
-    let out = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data/04_output/");
-
     trk_data
         .to_parquet_simple(out.clone().join("nrho_interlink_msr.pq"))
         .unwrap();
@@ -173,24 +193,18 @@ fn interlink_nrho_llo_cov_test(#[case] disperse: bool, almanac: Arc<Almanac>) {
 
     let mut proc_devices = devices.clone();
 
-    let initial_estimate = if disperse {
-        // Define the initial estimate, randomized, seed for reproducibility
-        let mut initial_estimate = llo_uncertainty.to_estimate_randomized(Some(0)).unwrap();
-        // Inflate the covariance -- https://github.com/nyx-space/nyx/issues/339
-        initial_estimate.covar *= 2.5;
+    // Define the initial estimate, randomized, seed for reproducibility
+    let mut initial_estimate = llo_uncertainty.to_estimate_randomized(Some(0)).unwrap();
+    // Inflate the covariance -- https://github.com/nyx-space/nyx/issues/339
+    initial_estimate.covar *= 2.5;
 
-        // Increase the noise in the devices to accept more measurements.
+    // Increase the noise in the devices to accept more measurements.
 
-        for link in proc_devices.values_mut() {
-            for noise in &mut link.stochastic_noises.as_mut().unwrap().values_mut() {
-                *noise.white_noise.as_mut().unwrap() *= 15.0;
-            }
+    for link in proc_devices.values_mut() {
+        for noise in &mut link.stochastic_noises.as_mut().unwrap().values_mut() {
+            *noise.white_noise.as_mut().unwrap() *= 3.0;
         }
-
-        initial_estimate
-    } else {
-        llo_uncertainty.to_estimate().unwrap()
-    };
+    }
 
     let init_err = initial_estimate
         .orbital_state()
@@ -200,16 +214,12 @@ fn interlink_nrho_llo_cov_test(#[case] disperse: bool, almanac: Arc<Almanac>) {
     println!("initial estimate:\n{initial_estimate}");
     println!("RIC errors = {init_err}",);
 
-    let odp = KalmanODProcess::<_, Const<2>, Const<3>, InterlinkTxSpacecraft>::new(
-        setup,
-        if disperse {
-            KalmanVariant::ReferenceUpdate
-        } else {
-            KalmanVariant::DeviationTracking
-        },
+    let odp = InterlinkKalmanOD::new(
+        setup.clone(),
+        KalmanVariant::ReferenceUpdate,
         Some(ResidRejectCrit::default()),
         proc_devices,
-        almanac,
+        almanac.clone(),
     );
 
     // Shrink the data to process.
@@ -221,7 +231,7 @@ fn interlink_nrho_llo_cov_test(#[case] disperse: bool, almanac: Arc<Almanac>) {
 
     od_sol
         .to_parquet(
-            out.join(format!("interlink_od_sol_disp_{disperse}.pq")),
+            out.join(format!("05_caps_interlink_od_sol.pq")),
             ExportCfg::default(),
         )
         .unwrap();
@@ -231,7 +241,7 @@ fn interlink_nrho_llo_cov_test(#[case] disperse: bool, almanac: Arc<Almanac>) {
     od_traj
         .ric_diff_to_parquet(
             &llo_traj,
-            out.join(format!("interlink_llo_est_error_disp_{disperse}.pq")),
+            out.join(format!("05_caps_interlink_llo_est_error.pq")),
             ExportCfg::default(),
         )
         .unwrap();
@@ -249,17 +259,30 @@ fn interlink_nrho_llo_cov_test(#[case] disperse: bool, almanac: Arc<Almanac>) {
         .unwrap();
     println!("ERROR {final_err}");
 
-    println!("RMAG error {:.3} m", final_err.rmag_km() * 1e3);
-    println!("Original error {:.3} m", init_err.rmag_km() * 1e3);
+    // Build the residuals versus reference plot.
+    let rvr_sol = odp
+        .process_arc(initial_estimate, &arc.resid_vs_ref_check())
+        .unwrap();
 
-    if disperse {
-        assert!(
-            final_err.rmag_km() < init_err.rmag_km(),
-            "expected smaller error than at start"
-        );
-    } else {
-        // When we don't deviate the state, we expect excellent estimation.
-        assert!(final_err.rmag_km() < 1e-2);
-        assert!(final_err.vmag_km_s() < 1e-6);
-    }
+    rvr_sol
+        .to_parquet(
+            out.join(format!("05_caps_interlink_resid_v_ref.pq")),
+            ExportCfg::default(),
+        )
+        .unwrap();
+
+    let final_rvr = rvr_sol.estimates.last().unwrap();
+
+    println!("RMAG error {:.3} m", final_err.rmag_km() * 1e3);
+    println!(
+        "Pure prop error {:.3} m",
+        final_rvr
+            .orbital_state()
+            .ric_difference(&final_est.orbital_state())
+            .unwrap()
+            .rmag_km()
+            * 1e3
+    );
+
+    Ok(())
 }
