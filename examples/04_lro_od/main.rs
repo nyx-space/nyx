@@ -293,7 +293,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let ric_err = traj_as_flown
         .at(final_est.epoch())?
         .orbit
-        .ric_difference(&od_sol.estimates.last().unwrap().orbital_state())?;
+        .ric_difference(&final_est.orbital_state())?;
     println!("== RIC at end ==");
     println!("RIC Position (m): {:.3}", ric_err.radius_km * 1e3);
     println!("RIC Velocity (m/s): {:.3}", ric_err.velocity_km_s * 1e3);

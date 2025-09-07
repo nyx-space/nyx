@@ -58,8 +58,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         .unwrap(),
     );
 
-    let _ = pretty_env_logger::try_init();
-
     let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
     let moon_iau = almanac.frame_from_uid(IAU_MOON_FRAME).unwrap();
 
