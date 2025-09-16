@@ -73,7 +73,7 @@ default = ["premium"]
 premium = []
 
 [dev-dependencies]
-polars = { version = "0.50.0", features = ["parquet"] }
+polars = { version = "0.51.0", features = ["parquet"] }
 planus = "=1.1.1" # cf. https://github.com/pola-rs/polars/issues/24208
 rstest = "0.26.1"
 pretty_env_logger = "0.5"
