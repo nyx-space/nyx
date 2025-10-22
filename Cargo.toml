@@ -41,7 +41,7 @@ flate2 = { version = "1.0", features = [
 ], default-features = false }
 serde = "1.0"
 serde_derive = "1.0"
-hyperdual = "1.3.0"
+hyperdual = "1.4.0"
 rand = "0.9"
 rand_distr = "0.5"
 regex = "1.5"
@@ -63,7 +63,7 @@ num = "0.4.0"
 enum-iterator = "2.0.0"
 typed-builder = "0.22.0"
 snafu = { version = "0.8.3", features = ["backtrace"] }
-serde_dhall = "0.12"
+serde_dhall = "0.13"
 indexmap = { version = "2.6.0", features = ["serde"] }
 statrs = "0.18.0"
 
@@ -74,7 +74,6 @@ premium = []
 
 [dev-dependencies]
 polars = { version = "0.51.0", features = ["parquet"] }
-planus = "=1.1.1" # cf. https://github.com/pola-rs/polars/issues/24208
 rstest = "0.26.1"
 pretty_env_logger = "0.5"
 toml = "0.9.0"
