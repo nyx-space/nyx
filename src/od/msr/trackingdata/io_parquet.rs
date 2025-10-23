@@ -30,6 +30,7 @@ use arrow::{
 use hifitime::prelude::Epoch;
 use hifitime::TimeScale;
 use indexmap::IndexMap;
+use log::{info, warn};
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::arrow::ArrowWriter;
 use snafu::{ensure, ResultExt};

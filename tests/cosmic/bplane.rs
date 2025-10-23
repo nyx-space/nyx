@@ -27,7 +27,7 @@ fn val_b_plane_gmat(almanac: Arc<Almanac>) {
     // This is a reproduction of the B-plane computation from the `Ex_LunarTransfer.script` file from GMAT
     // Grab the frame
     let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
+        .frame_info(EARTH_J2000)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
     // Define the epoch
@@ -201,7 +201,7 @@ fn b_plane_davis(almanac: Arc<Almanac>) {
         5.36316523097915,
         -5.22166308425181,
         Epoch::from_gregorian_utc_at_midnight(2016, 1, 1),
-        almanac.frame_from_uid(EARTH_J2000).unwrap(),
+        almanac.frame_info(EARTH_J2000).unwrap(),
     );
 
     let bp = BPlane::new(orbit).unwrap();

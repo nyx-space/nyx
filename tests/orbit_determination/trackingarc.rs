@@ -29,7 +29,7 @@ fn traj(almanac: Arc<Almanac>) -> Traj<Spacecraft> {
         75.0,
         23.4,
         Epoch::from_str("2023-02-22T19:18:17.16 UTC").unwrap(),
-        almanac.frame_from_uid(EARTH_J2000).unwrap(),
+        almanac.frame_info(EARTH_J2000).unwrap(),
     )
     .unwrap();
 
@@ -86,7 +86,7 @@ fn trk_simple(
 
     traj.to_groundtrack_parquet(
         path.with_file_name("tracking_truth_ephem_groundtrack.parquet"),
-        almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap(),
+        almanac.frame_info(IAU_EARTH_FRAME).unwrap(),
         None,
         None,
         almanac.clone(),

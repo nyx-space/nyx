@@ -28,6 +28,7 @@ pub use crate::md::{Variable, Vary};
 use crate::polyfit::CommonPolynomial;
 use crate::pseudo_inverse;
 use hifitime::TimeUnits;
+use log::{debug, error, info};
 use rayon::prelude::*;
 use snafu::{ensure, ResultExt};
 #[cfg(not(target_arch = "wasm32"))]

@@ -18,6 +18,7 @@
 
 use crate::cosmic::Frame;
 use crate::errors::TargetingError;
+use log::error;
 use std::default::Default;
 use std::f64::consts::{FRAC_PI_2, FRAC_PI_8, PI};
 use std::fmt;

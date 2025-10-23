@@ -20,7 +20,7 @@ use crate::dynamics::guidance::LocalFrame;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector, U3, U6};
 use crate::time::{Duration, Epoch};
-
+use log::debug;
 use std::fmt;
 
 #[allow(clippy::upper_case_acronyms)]

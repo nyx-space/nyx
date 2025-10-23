@@ -26,7 +26,6 @@ Refer to [nyxspace.com](https://nyxspace.com) for a user guide, a show case, the
 // Allow confusable identifiers, as the code tries to use the literature's notation where possible.
 #![allow(confusable_idents)]
 
-#[macro_use]
 extern crate log;
 
 /// Provides all the propagators / integrators available in `nyx`.

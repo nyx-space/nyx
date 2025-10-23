@@ -27,7 +27,7 @@ fn almanac() -> Arc<Almanac> {
 #[rstest]
 fn stm_fixed_step(almanac: Arc<Almanac>) {
     let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
+        .frame_info(EARTH_J2000)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -112,7 +112,7 @@ fn stm_fixed_step(almanac: Arc<Almanac>) {
 #[rstest]
 fn stm_variable_step(almanac: Arc<Almanac>) {
     let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
+        .frame_info(EARTH_J2000)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -195,7 +195,7 @@ fn stm_between_steps(almanac: Arc<Almanac>) {
     // Check that \Phi(t_2, t_1) = \Phi(t_2, t_0) * \Phi^{-1}(t_1, t_0)
 
     let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
+        .frame_info(EARTH_J2000)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -253,7 +253,7 @@ fn stm_hifi_variable_step(almanac: Arc<Almanac>) {
     // Using higher fidelity dynamics for STM testing
 
     let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
+        .frame_info(EARTH_J2000)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -336,7 +336,7 @@ fn stm_hifi_variable_step(almanac: Arc<Almanac>) {
 #[rstest]
 fn orbit_set_unset_static(almanac: Arc<Almanac>) {
     let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
+        .frame_info(EARTH_J2000)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -361,7 +361,7 @@ fn orbit_set_unset_static(almanac: Arc<Almanac>) {
 #[rstest]
 fn orbit_set_unset(almanac: Arc<Almanac>) {
     let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
+        .frame_info(EARTH_J2000)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -391,7 +391,7 @@ fn orbit_set_unset(almanac: Arc<Almanac>) {
 #[rstest]
 fn sc_set_unset_static(almanac: Arc<Almanac>) {
     let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
+        .frame_info(EARTH_J2000)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);

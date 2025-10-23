@@ -28,6 +28,7 @@ use crate::od::process::ResidRejectCrit;
 pub use crate::od::snc::ProcessNoise;
 use crate::od::{ODDynamicsSnafu, ODError, ODStateSnafu, State};
 pub use crate::time::{Epoch, Unit};
+use log::info;
 use snafu::prelude::*;
 
 use super::KalmanFilter;
@@ -78,12 +79,12 @@ where
                         })?;
 
                     // Note: the SNC must be a diagonal matrix, so we only update the diagonals!
-                    match A::USIZE {
+                    match A::DIM {
                         3 => {
                             let new_snc = dcm.rot_mat
                                 * snc_matrix.fixed_view::<3, 3>(0, 0)
                                 * dcm.rot_mat.transpose();
-                            for i in 0..A::USIZE {
+                            for i in 0..A::DIM {
                                 snc_matrix[(i, i)] = new_snc[(i, i)];
                             }
                         }
@@ -91,7 +92,7 @@ where
                             let new_snc = dcm.state_dcm()
                                 * snc_matrix.fixed_view::<6, 6>(0, 0)
                                 * dcm.transpose().state_dcm();
-                            for i in 0..A::USIZE {
+                            for i in 0..A::DIM {
                                 snc_matrix[(i, i)] = new_snc[(i, i)];
                             }
                         }
@@ -213,12 +214,12 @@ where
                         })?;
 
                     // Note: the SNC must be a diagonal matrix, so we only update the diagonals!
-                    match A::USIZE {
+                    match A::DIM {
                         3 => {
                             let new_snc = dcm.rot_mat
                                 * snc_matrix.fixed_view::<3, 3>(0, 0)
                                 * dcm.rot_mat.transpose();
-                            for i in 0..A::USIZE {
+                            for i in 0..A::DIM {
                                 snc_matrix[(i, i)] = new_snc[(i, i)];
                             }
                         }
@@ -226,7 +227,7 @@ where
                             let new_snc = dcm.state_dcm()
                                 * snc_matrix.fixed_view::<6, 6>(0, 0)
                                 * dcm.transpose().state_dcm();
-                            for i in 0..A::USIZE {
+                            for i in 0..A::DIM {
                                 snc_matrix[(i, i)] = new_snc[(i, i)];
                             }
                         }
@@ -307,7 +308,7 @@ where
             .enumerate()
             .map(|(idx, r)| prefit[idx] / r.sqrt())
             .sum::<f64>()
-            / (M::USIZE as f64);
+            / (M::DIM as f64);
 
         if let Some(resid_reject) = resid_rejection {
             if ratio.abs() > resid_reject.num_sigmas {

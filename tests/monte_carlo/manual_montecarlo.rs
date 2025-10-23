@@ -36,8 +36,8 @@ fn multi_thread_monte_carlo_demo(almanac: Arc<Almanac>) {
     extern crate pretty_env_logger;
     let _ = pretty_env_logger::try_init();
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
 
     let earth_sph_harm =
         HarmonicsMem::from_cof("data/01_planetary/JGM3.cof.gz", 70, 70, true).unwrap();

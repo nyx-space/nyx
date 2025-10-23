@@ -213,7 +213,7 @@ impl AccelModel for PointMasses {
             }
 
             let third_body_frame = almanac
-                .frame_from_uid(osc.frame.with_ephem(third_body))
+                .frame_info(osc.frame.with_ephem(third_body))
                 .context(DynamicsPlanetarySnafu {
                     action: "planetary data from third body not loaded",
                 })?;
@@ -257,7 +257,7 @@ impl AccelModel for PointMasses {
             }
 
             let third_body_frame = almanac
-                .frame_from_uid(osc.frame.with_ephem(third_body))
+                .frame_info(osc.frame.with_ephem(third_body))
                 .context(DynamicsPlanetarySnafu {
                     action: "planetary data from third body not loaded",
                 })?;

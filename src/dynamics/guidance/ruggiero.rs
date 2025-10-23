@@ -17,6 +17,7 @@
 */
 
 use anise::prelude::Almanac;
+use log::debug;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 

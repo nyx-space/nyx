@@ -20,7 +20,7 @@ fn almanac() -> Arc<Almanac> {
 
 #[rstest]
 fn rugg_sma(almanac: Arc<Almanac>) {
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -76,7 +76,7 @@ fn rugg_sma(almanac: Arc<Almanac>) {
 
 #[rstest]
 fn rugg_sma_regress_threshold(almanac: Arc<Almanac>) {
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -130,7 +130,7 @@ fn rugg_sma_regress_threshold(almanac: Arc<Almanac>) {
 
 #[rstest]
 fn rugg_sma_decr(almanac: Arc<Almanac>) {
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -186,7 +186,7 @@ fn rugg_sma_decr(almanac: Arc<Almanac>) {
 
 #[rstest]
 fn rugg_inc(almanac: Arc<Almanac>) {
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -246,7 +246,7 @@ fn rugg_inc(almanac: Arc<Almanac>) {
 fn rugg_inc_threshold(almanac: Arc<Almanac>) {
     // Same inclination test as above, but with an efficiency threshold. Data comes from Figure 7 of IEPC-2011-102.
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -303,7 +303,7 @@ fn rugg_inc_threshold(almanac: Arc<Almanac>) {
 
 #[rstest]
 fn rugg_inc_decr(almanac: Arc<Almanac>) {
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -361,7 +361,7 @@ fn rugg_inc_decr(almanac: Arc<Almanac>) {
 
 #[rstest]
 fn rugg_ecc(almanac: Arc<Almanac>) {
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -419,7 +419,7 @@ fn rugg_ecc(almanac: Arc<Almanac>) {
 
 #[rstest]
 fn rugg_ecc_regress_threshold(almanac: Arc<Almanac>) {
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -477,7 +477,7 @@ fn rugg_ecc_regress_threshold(almanac: Arc<Almanac>) {
 
 #[rstest]
 fn rugg_ecc_decr(almanac: Arc<Almanac>) {
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -535,7 +535,7 @@ fn rugg_ecc_decr(almanac: Arc<Almanac>) {
 
 #[rstest]
 fn rugg_aop(almanac: Arc<Almanac>) {
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -595,7 +595,7 @@ fn rugg_aop(almanac: Arc<Almanac>) {
 
 #[rstest]
 fn rugg_aop_decr(almanac: Arc<Almanac>) {
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -656,7 +656,7 @@ fn rugg_aop_decr(almanac: Arc<Almanac>) {
 fn rugg_raan(almanac: Arc<Almanac>) {
     use self::nyx::md::{Event, StateParameter};
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2017, 1, 1);
 
@@ -714,7 +714,7 @@ fn rugg_raan(almanac: Arc<Almanac>) {
 
 #[rstest]
 fn rugg_raan_regress_threshold(almanac: Arc<Almanac>) {
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 

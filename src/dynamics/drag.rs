@@ -119,7 +119,7 @@ impl Drag {
                 r0: 700_000.0,
                 ref_alt_m: 88_667.0,
             },
-            drag_frame: almanac.frame_from_uid(IAU_EARTH_FRAME).context({
+            drag_frame: almanac.frame_info(IAU_EARTH_FRAME).context({
                 DynamicsPlanetarySnafu {
                     action: "planetary data from third body not loaded",
                 }
@@ -134,7 +134,7 @@ impl Drag {
             density: AtmDensity::StdAtm {
                 max_alt_m: 1_000_000.0,
             },
-            drag_frame: almanac.frame_from_uid(IAU_EARTH_FRAME).context({
+            drag_frame: almanac.frame_info(IAU_EARTH_FRAME).context({
                 DynamicsPlanetarySnafu {
                     action: "planetary data from third body not loaded",
                 }

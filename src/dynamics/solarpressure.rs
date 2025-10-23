@@ -49,14 +49,14 @@ impl SolarPressure {
         almanac: Arc<Almanac>,
     ) -> Result<Self, DynamicsError> {
         let e_loc = EclipseLocator {
-            light_source: almanac.frame_from_uid(SUN_J2000).context({
+            light_source: almanac.frame_info(SUN_J2000).context({
                 DynamicsPlanetarySnafu {
                     action: "planetary data from third body not loaded",
                 }
             })?,
             shadow_bodies: shadow_bodies
                 .iter()
-                .filter_map(|object| match almanac.frame_from_uid(object) {
+                .filter_map(|object| match almanac.frame_info(object) {
                     Ok(loaded_obj) => Some(loaded_obj),
                     Err(e) => {
                         warn!("when initializing SRP model for {object}, {e}");

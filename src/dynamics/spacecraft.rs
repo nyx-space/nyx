@@ -17,6 +17,7 @@
 */
 
 use anise::prelude::Almanac;
+use log::{error, warn};
 use snafu::ResultExt;
 
 use super::guidance::{ra_dec_from_unit_vector, GuidanceError, GuidanceLaw};

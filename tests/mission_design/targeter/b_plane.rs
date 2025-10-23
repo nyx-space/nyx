@@ -34,7 +34,7 @@ fn tgt_b_plane_earth_gravity_assist_no_propagation(almanac: Arc<Almanac>) {
         5.36316523097915,
         -5.22166308425181,
         epoch,
-        almanac.frame_from_uid(EARTH_J2000).unwrap(),
+        almanac.frame_info(EARTH_J2000).unwrap(),
     );
 
     let prop = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
@@ -79,8 +79,8 @@ fn tgt_b_plane_lunar_transfer(almanac: Arc<Almanac>) {
     // This is a reproduction of the B-plane computation from the `Ex_LunarTransfer.script` file from GMAT
 
     // Grab the frame
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
-    let luna = almanac.frame_from_uid(MOON_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let luna = almanac.frame_info(MOON_J2000).unwrap();
     // Define the epoch
     let epoch = Epoch::from_gregorian_utc(2014, 7, 22, 11, 29, 10, 811_000);
     // Define the initial orbit in EME2k but convert it to Moon J2000
@@ -190,7 +190,7 @@ fn tgt_b_plane_earth_gravity_assist_with_propagation(almanac: Arc<Almanac>) {
         5.36316523097915,
         -5.22166308425181,
         epoch,
-        almanac.frame_from_uid(EARTH_J2000).unwrap(),
+        almanac.frame_info(EARTH_J2000).unwrap(),
     );
 
     let prop = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::point_masses(

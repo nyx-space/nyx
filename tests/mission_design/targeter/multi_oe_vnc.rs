@@ -16,7 +16,7 @@ fn almanac() -> Arc<Almanac> {
 fn tgt_vnc_c3_decl_cov_test(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
@@ -64,7 +64,7 @@ fn tgt_vnc_c3_decl_cov_test(almanac: Arc<Almanac>) {
 fn tgt_vnc_sma_ecc_cov_test(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 

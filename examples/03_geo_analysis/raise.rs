@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // references to many functions.
     let almanac = Arc::new(MetaAlmanac::latest().map_err(Box::new)?);
     // Fetch the EME2000 frame from the Almabac
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
     // Define the orbit epoch
     let epoch = Epoch::from_gregorian_utc_hms(2024, 2, 29, 12, 13, 14);
 
@@ -95,7 +95,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // The harmonics must be computed in the body fixed frame.
     // We're using the long term prediction of the Earth centered Earth fixed frame, IAU Earth.
     let harmonics = Harmonics::from_stor(
-        almanac.frame_from_uid(IAU_EARTH_FRAME)?,
+        almanac.frame_info(IAU_EARTH_FRAME)?,
         HarmonicsMem::from_cof(&jgm3_meta.uri, 8, 8, true).unwrap(),
     );
 

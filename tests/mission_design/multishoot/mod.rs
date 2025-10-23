@@ -26,8 +26,8 @@ fn almanac() -> Arc<Almanac> {
 #[rstest]
 fn alt_orbit_raising_cov_test(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
 
     /* Define the parking orbit */
     let epoch = Epoch::from_gregorian_utc_at_noon(2022, 3, 4);
@@ -212,8 +212,8 @@ fn alt_orbit_raising_cov_test(almanac: Arc<Almanac>) {
 fn vmag_orbit_raising(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
 
     /* Define the parking orbit */
     let epoch = Epoch::from_gregorian_utc_at_noon(2022, 3, 4);

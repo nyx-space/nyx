@@ -20,7 +20,7 @@ use super::{Interpolatable, Traj};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 use crate::time::TimeSeries;
-
+use log::{error, log_enabled};
 pub struct TrajIterator<'a, S: Interpolatable>
 where
     DefaultAllocator: Allocator<S::VecLength> + Allocator<S::Size> + Allocator<S::Size, S::Size>,

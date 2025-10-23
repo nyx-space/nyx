@@ -34,6 +34,7 @@ use arrow::array::RecordBatchReader;
 use arrow::array::{Array, BooleanArray, Float64Array, StringArray};
 use hifitime::Epoch;
 use indexmap::IndexSet;
+use log::{info, warn};
 use msr::sensitivity::TrackerSensitivity;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use snafu::prelude::*;
@@ -156,7 +157,7 @@ where
             Vec::new();
         let mut measurement_types_found = IndexSet::new();
 
-        let state_size = <Spacecraft as State>::Size::USIZE;
+        let state_size = <Spacecraft as State>::Size::DIM;
 
         // State item names used in column naming
         let state_items = ["X", "Y", "Z", "Vx", "Vy", "Vz", "Cr", "Cd", "Mass"];
@@ -426,11 +427,11 @@ where
                      let mut noise_vec = OVector::<f64, MsrSize>::zeros();
                      let mut real_obs_vec = OVector::<f64, MsrSize>::zeros();
                      let mut comp_obs_vec = OVector::<f64, MsrSize>::zeros();
-                     let mut current_msr_types = IndexSet::with_capacity(MsrSize::USIZE);
+                     let mut current_msr_types = IndexSet::with_capacity(MsrSize::DIM);
 
                      let mut msr_idx = 0;
                      for (msr_type, type_cols) in &residual_data_cols {
-                           if msr_idx >= MsrSize::USIZE { break; } // Should not happen if MsrSize matches data
+                           if msr_idx >= MsrSize::DIM { break; } // Should not happen if MsrSize matches data
 
                            // Check if data exists for this type *at this row*
                            let prefit_val = type_cols.get("Prefit residual").and_then(|col| if col.is_valid(i) { Some(col.value(i)) } else { None });
@@ -482,7 +483,7 @@ where
                      let mut all_valid = true;
                      let mut col_idx = 0;
                      'gain_outer: for row in 0..state_size {
-                          for col in 0..MsrSize::USIZE {
+                          for col in 0..MsrSize::DIM {
                                if let Some(gain_col) = &gain_cols[col_idx] {
                                     if gain_col.is_valid(i) {
                                          gain_mat[(row, col)] = gain_col.value(i);

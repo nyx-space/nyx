@@ -55,10 +55,10 @@ impl EclipseLocator {
     /// Creates a new typical eclipse locator.
     /// The light source is the Sun, and the shadow bodies are the Earth and the Moon.
     pub fn cislunar(almanac: Arc<Almanac>) -> Self {
-        let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
-        let moon_j2k = almanac.frame_from_uid(MOON_J2000).unwrap();
+        let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+        let moon_j2k = almanac.frame_info(MOON_J2000).unwrap();
         Self {
-            light_source: almanac.frame_from_uid(SUN_J2000).unwrap(),
+            light_source: almanac.frame_info(SUN_J2000).unwrap(),
             shadow_bodies: vec![eme2k, moon_j2k],
         }
     }

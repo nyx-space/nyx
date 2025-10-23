@@ -42,12 +42,12 @@ fn blse_robust_large_disp_cov_test(
 ) {
     let _ = pretty_env_logger::try_init();
 
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
+    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
     // Define the ground stations.
     let elevation_mask = 0.0;
 
     // Define state information.
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_utc_hms(2020, 1, 1, 4, 0, 0);
     let initial_state = Spacecraft::from(Orbit::keplerian(
         22000.0, 0.01, 30.0, 80.0, 40.0, 170.0, dt, eme2k,

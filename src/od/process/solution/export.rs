@@ -29,6 +29,7 @@ use arrow::array::{Array, BooleanBuilder, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 use hifitime::TimeScale;
+use log::{info, warn};
 use msr::sensitivity::TrackerSensitivity;
 use nalgebra::Const;
 use parquet::arrow::ArrowWriter;
@@ -301,7 +302,7 @@ where
         hdrs.append(&mut msr_fields);
 
         // Add the filter gain columns
-        if self.measurement_types.len() == MsrSize::USIZE {
+        if self.measurement_types.len() == MsrSize::DIM {
             for i in 0..state_items.len() {
                 for f in &self.measurement_types {
                     hdrs.push(Field::new(
@@ -318,7 +319,7 @@ where
             }
         } else {
             for state_item in &state_items {
-                for j in 0..MsrSize::USIZE {
+                for j in 0..MsrSize::DIM {
                     hdrs.push(Field::new(
                         format!("Gain {state_item}*[{j}]"),
                         DataType::Float64,
@@ -567,7 +568,7 @@ where
 
         // Add the filter gains
         for i in 0..est_size {
-            for j in 0..MsrSize::USIZE {
+            for j in 0..MsrSize::DIM {
                 let mut data = Float64Builder::new();
                 for opt_k in &self.gains {
                     if let Some(k) = opt_k {

@@ -34,7 +34,7 @@ fn almanac_gmat() -> Arc<Almanac> {
 fn energy_conservation(almanac: Arc<Almanac>) {
     let prop_time = 1 * Unit::Day;
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let dt = Epoch::from_gregorian_utc_hms(2022, 2, 15, 17, 30, 37);
     let start_state = Orbit::cartesian(
@@ -100,7 +100,7 @@ fn energy_conservation(almanac: Arc<Almanac>) {
 fn val_two_body_dynamics(almanac: Arc<Almanac>) {
     let prop_time = 1 * Unit::Day;
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let dt = Epoch::from_mjd_tai(MJD_J2000);
     let state = Orbit::cartesian(
@@ -178,7 +178,7 @@ fn val_halo_earth_moon_dynamics(almanac_gmat: Arc<Almanac>) {
     */
     let prop_time = 1 * Unit::Day;
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -248,7 +248,7 @@ fn val_halo_earth_moon_dynamics_adaptive(almanac_gmat: Arc<Almanac>) {
     */
     let prop_time = 1 * Unit::Day;
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
@@ -309,7 +309,7 @@ fn val_llo_earth_moon_dynamics_adaptive(almanac_gmat: Arc<Almanac>) {
     */
     let prop_time = 1 * Unit::Day;
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
@@ -371,7 +371,7 @@ fn val_halo_multi_body_dynamics(almanac_gmat: Arc<Almanac>) {
     */
     let prop_time = 1 * Unit::Day;
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -437,7 +437,7 @@ fn val_halo_multi_body_dynamics_adaptive(almanac_gmat: Arc<Almanac>) {
 
     let prop_time = 1 * Unit::Day;
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
@@ -500,7 +500,7 @@ fn val_llo_multi_body_dynamics_adaptive(almanac_gmat: Arc<Almanac>) {
 
     let prop_time = 1 * Unit::Day;
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
@@ -563,7 +563,7 @@ fn val_leo_multi_body_dynamics_adaptive_wo_moon(almanac_gmat: Arc<Almanac>) {
 
     let prop_time = 1 * Unit::Day;
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -619,7 +619,7 @@ fn val_leo_multi_body_dynamics_adaptive(almanac_gmat: Arc<Almanac>) {
 
     let prop_time = 1 * Unit::Day;
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -669,7 +669,7 @@ fn val_leo_multi_body_dynamics_adaptive(almanac_gmat: Arc<Almanac>) {
 fn two_body_dual(almanac: Arc<Almanac>) {
     // This is a duplicate of the differentials test in hyperdual.
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let init = Orbit::cartesian(
         -9_042.862_233_600_335,
@@ -779,7 +779,7 @@ fn multi_body_dynamics_dual(almanac: Arc<Almanac>) {
     let prop_time = 45 * Unit::Minute;
     let step_size = 10 * Unit::Second;
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -864,12 +864,12 @@ fn val_earth_sph_harmonics_j2(almanac: Arc<Almanac>) {
     let monte_earth_j2 = -0.000_484_169_325_971;
 
     let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
+        .frame_info(EARTH_J2000)
         .unwrap()
         .with_mu_km3_s2(monte_earth_gm);
 
     let iau_earth = almanac
-        .frame_from_uid(IAU_EARTH_FRAME)
+        .frame_info(IAU_EARTH_FRAME)
         .unwrap()
         .with_mu_km3_s2(monte_earth_gm);
 
@@ -938,8 +938,8 @@ fn val_earth_sph_harmonics_12x12(almanac_gmat: Arc<Almanac>) {
     use nyx::dynamics::sph_harmonics::Harmonics;
     use nyx::io::gravity::*;
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
 
     let earth_sph_harm =
         HarmonicsMem::from_cof("data/01_planetary/JGM3.cof.gz", 12, 12, true).unwrap();
@@ -1026,8 +1026,8 @@ fn val_earth_sph_harmonics_70x70(almanac_gmat: Arc<Almanac>) {
     use nyx::dynamics::Harmonics;
     use nyx::io::gravity::*;
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
 
     let earth_sph_harm =
         HarmonicsMem::from_cof("data/01_planetary/JGM3.cof.gz", 70, 70, true).unwrap();
@@ -1079,8 +1079,8 @@ fn val_earth_sph_harmonics_70x70_partials(almanac_gmat: Arc<Almanac>) {
     use nyx::dynamics::Harmonics;
     use nyx::io::gravity::*;
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
 
     let earth_sph_harm =
         HarmonicsMem::from_cof("data/01_planetary/JGM3.cof.gz", 70, 70, true).unwrap();
@@ -1132,8 +1132,8 @@ fn hf_prop(almanac: Arc<Almanac>) {
     use nyx::dynamics::sph_harmonics::Harmonics;
     use nyx::io::gravity::*;
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
 
     let earth_sph_harm =
         HarmonicsMem::from_cof("data/01_planetary/JGM3.cof.gz", 21, 21, true).unwrap();
@@ -1164,7 +1164,7 @@ fn val_cislunar_dynamics(almanac_gmat: Arc<Almanac>) {
     let almanac = almanac_gmat;
     let prop_time = 36 * Unit::Hour;
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     // "2022 NOV 27 05:55:49"
     let dt = Epoch::from_gregorian_utc_hms(2022, 11, 27, 5, 55, 49);

@@ -40,7 +40,7 @@ fn nil_measurement(almanac: Arc<Almanac>) {
     let height = 0.0;
     let epoch = Epoch::from_mjd_tai(JD_J2000);
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let mut stochastics = IndexMap::new();
     stochastics.insert(MeasurementType::Range, StochasticNoise::MIN);
@@ -100,7 +100,7 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
         -8.85806596,
         -5.08576325,
         Epoch::from_str("2023-11-16T06:36:30.232000 UTC").unwrap(),
-        almanac.frame_from_uid(EARTH_J2000).unwrap(),
+        almanac.frame_info(EARTH_J2000).unwrap(),
     );
 
     // In GMAT's uncommon MJD notation, this epoch corresponds to 29912.78296296296.
@@ -112,10 +112,10 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
         -1.78800739052,
         -1.69330836191,
         Epoch::from_str("2022-11-29T06:47:28.0 TAI").unwrap(),
-        almanac.frame_from_uid(EARTH_J2000).unwrap(),
+        almanac.frame_info(EARTH_J2000).unwrap(),
     );
 
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
+    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
 
     let elevation_mask = 7.0; // in degrees
     let mut dss65_madrid = GroundStation::dss65_madrid(
@@ -321,12 +321,12 @@ fn verif_sensitivity_mat(almanac: Arc<Almanac>) {
         -1.202489,
         -0.714016,
         Epoch::from_str("2022-11-16T13:35:31.0 UTC").unwrap(),
-        almanac.frame_from_uid(EARTH_J2000).unwrap(),
+        almanac.frame_info(EARTH_J2000).unwrap(),
     );
 
     let cislunar_sc: Spacecraft = cislunar1.into();
 
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
+    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
 
     let mut dss65_madrid =
         GroundStation::dss65_madrid(0.0, StochasticNoise::ZERO, StochasticNoise::ZERO, iau_earth)
@@ -398,7 +398,7 @@ fn val_measurement_noise(almanac: Arc<Almanac>) {
     use std::path::PathBuf;
 
     // Build an example trajectory.
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
     let epoch = Epoch::from_gregorian_tai_at_midnight(2025, 8, 22);
 
     let orbit =
@@ -419,7 +419,7 @@ fn val_measurement_noise(almanac: Arc<Almanac>) {
 
     // Set up the noise modeling.
 
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
+    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
 
     let range_wn = WhiteNoise::constant_white_noise(2.0e-3);
     let doppler_wn = WhiteNoise::constant_white_noise(3e-6);

@@ -53,7 +53,7 @@ fn spacecraft(almanac: Arc<Almanac>) -> Spacecraft {
         75.0,
         23.4,
         Epoch::from_str("2023-02-22T19:18:17.16 UTC").unwrap(),
-        almanac.frame_from_uid(EARTH_J2000).unwrap(),
+        almanac.frame_info(EARTH_J2000).unwrap(),
     )
     .unwrap();
 

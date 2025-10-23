@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // This allows the frame to include the gravitational parameters and the shape of the Earth,
     // defined as a tri-axial ellipoid. Note that this shape can be changed manually or in the Almanac
     // by loading a different set of planetary constants.
-    let earth_j2000 = almanac.frame_from_uid(EARTH_J2000)?;
+    let earth_j2000 = almanac.frame_info(EARTH_J2000)?;
 
     // Placing this GEO bird just above Colorado.
     // In theory, the eccentricity is zero, but in practice, it's about 1e-5 to 1e-6 at best.
@@ -88,7 +88,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // The harmonics must be computed in the body fixed frame.
     // We're using the long term prediction of the Earth centered Earth fixed frame, IAU Earth.
     let harmonics_21x21 = Harmonics::from_stor(
-        almanac.frame_from_uid(IAU_EARTH_FRAME)?,
+        almanac.frame_info(IAU_EARTH_FRAME)?,
         HarmonicsMem::from_cof(&jgm3_meta.uri, 21, 21, true).unwrap(),
     );
 

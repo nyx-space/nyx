@@ -177,7 +177,7 @@ impl GroundStation {
             self.height_km,
             MEAN_EARTH_ANGULAR_VELOCITY_DEG_S,
             epoch,
-            almanac.frame_from_uid(self.frame).unwrap(),
+            almanac.frame_info(self.frame).unwrap(),
         )
     }
 
