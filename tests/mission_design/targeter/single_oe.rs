@@ -19,7 +19,7 @@ fn almanac() -> Arc<Almanac> {
 fn tgt_sma_from_apo(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
@@ -75,7 +75,7 @@ fn tgt_sma_from_apo(almanac: Arc<Almanac>) {
 fn tgt_sma_from_peri_fd(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
@@ -133,7 +133,7 @@ fn tgt_sma_from_peri_fd(almanac: Arc<Almanac>) {
 fn tgt_hd_sma_from_peri(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
@@ -192,7 +192,7 @@ fn tgt_hd_sma_from_peri(almanac: Arc<Almanac>) {
 fn orbit_stm_chk(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
@@ -248,7 +248,7 @@ fn orbit_stm_chk(almanac: Arc<Almanac>) {
 fn tgt_ecc_from_apo(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
@@ -318,7 +318,7 @@ fn tgt_ecc_from_apo(almanac: Arc<Almanac>) {
 fn tgt_ecc_from_peri(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
@@ -393,7 +393,7 @@ fn tgt_ecc_from_peri(almanac: Arc<Almanac>) {
 fn tgt_raan_from_apo(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
@@ -446,7 +446,7 @@ fn tgt_raan_from_apo(almanac: Arc<Almanac>) {
 fn tgt_raan_from_peri(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
@@ -520,7 +520,7 @@ fn tgt_raan_from_peri(almanac: Arc<Almanac>) {
 fn tgt_aop_from_apo(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
@@ -573,7 +573,7 @@ fn tgt_aop_from_apo(almanac: Arc<Almanac>) {
 fn tgt_aop_from_peri_cov_test(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 

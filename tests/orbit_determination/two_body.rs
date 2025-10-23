@@ -29,7 +29,7 @@ fn almanac() -> Arc<Almanac> {
 
 #[fixture]
 fn sim_devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
+    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
@@ -61,7 +61,7 @@ fn sim_devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
 /// Devices for processing the measurement, noise may not be zero.
 #[fixture]
 fn proc_devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
+    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
@@ -125,7 +125,7 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(
     let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
@@ -239,7 +239,7 @@ fn od_tb_val_with_arc(
     let duration = 1 * Unit::Day;
 
     // Define state information.
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
@@ -422,7 +422,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
     let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
@@ -683,7 +683,7 @@ fn od_tb_val_az_el_ckf_fixed_step_perfect_stations(
     let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
@@ -907,7 +907,7 @@ fn od_tb_fixed_step_smooth_test(
     let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
@@ -1040,7 +1040,7 @@ fn od_tb_fixed_step_perfect_stations_snc_covar_map(
     let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
@@ -1148,7 +1148,7 @@ fn od_tb_ckf_map_covar(almanac: Arc<Almanac>) {
     let step_size = 10.0 * Unit::Second;
 
     // Define state information.
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
@@ -1233,8 +1233,8 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect_cov_test(
     let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
@@ -1348,7 +1348,7 @@ fn od_tb_fixed_step_perfect_stations_several_snc_covar_map(
     let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 

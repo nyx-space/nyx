@@ -29,7 +29,7 @@ fn almanac() -> Arc<Almanac> {
 
 #[rstest]
 fn stop_cond_3rd_apo_cov_test(almanac: Arc<Almanac>) {
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_dt = Epoch::from_mjd_tai(JD_J2000);
     let state = Orbit::cartesian(
@@ -80,7 +80,7 @@ fn stop_cond_3rd_apo_cov_test(almanac: Arc<Almanac>) {
 
 #[rstest]
 fn stop_cond_3rd_peri(almanac: Arc<Almanac>) {
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_dt = Epoch::from_mjd_tai(JD_J2000);
     let state = Orbit::cartesian(
@@ -136,7 +136,7 @@ fn stop_cond_nrho_apo(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
     use std::time::Instant;
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let dt = Epoch::from_gregorian_tai(2021, 5, 29, 19, 51, 16, 852_000);
     let state = Orbit::cartesian(
@@ -220,7 +220,7 @@ fn stop_cond_nrho_apo(almanac: Arc<Almanac>) {
 
 #[rstest]
 fn line_of_nodes(almanac: Arc<Almanac>) {
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_dt = Epoch::from_mjd_tai(JD_J2000);
     let state = Orbit::cartesian(
@@ -248,7 +248,7 @@ fn line_of_nodes(almanac: Arc<Almanac>) {
 
 #[rstest]
 fn latitude(almanac: Arc<Almanac>) {
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_dt = Epoch::from_mjd_tai(JD_J2000);
     let state = Orbit::cartesian(
@@ -284,7 +284,7 @@ fn event_and_combination(almanac: Arc<Almanac>) {
 
     // Setup a scenario
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let epoch = Epoch::now().unwrap();
     // We're at periapse of a GTO

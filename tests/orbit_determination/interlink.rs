@@ -42,8 +42,8 @@ fn almanac() -> Arc<Almanac> {
 fn interlink_nrho_llo_cov_test(#[case] disperse: bool, almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
-    let moon_iau = almanac.frame_from_uid(IAU_MOON_FRAME).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let moon_iau = almanac.frame_info(IAU_MOON_FRAME).unwrap();
 
     let epoch = Epoch::from_gregorian_tai(2021, 5, 29, 19, 51, 16, 852_000);
     let nrho = Orbit::cartesian(

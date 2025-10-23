@@ -24,7 +24,7 @@ fn almanac() -> Arc<Almanac> {
 #[rstest]
 fn srp_earth_full_vis(almanac: Arc<Almanac>) {
     let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
+        .frame_info(EARTH_J2000)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
 
@@ -76,7 +76,7 @@ fn srp_earth_full_vis(almanac: Arc<Almanac>) {
 #[rstest]
 fn srp_earth_leo(almanac: Arc<Almanac>) {
     let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
+        .frame_info(EARTH_J2000)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
 
@@ -130,7 +130,7 @@ fn srp_earth_meo_ecc_inc(almanac: Arc<Almanac>) {
     use std::env::var as envvar;
 
     let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
+        .frame_info(EARTH_J2000)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
 
@@ -256,7 +256,7 @@ fn srp_earth_meo_ecc_inc(almanac: Arc<Almanac>) {
 #[rstest]
 fn exp_drag_earth(almanac: Arc<Almanac>) {
     let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
+        .frame_info(EARTH_J2000)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
 
@@ -291,7 +291,7 @@ fn exp_drag_earth(almanac: Arc<Almanac>) {
 #[rstest]
 fn std_atm_drag_earth(almanac: Arc<Almanac>) {
     let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
+        .frame_info(EARTH_J2000)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
 
@@ -339,7 +339,7 @@ fn std_atm_drag_earth(almanac: Arc<Almanac>) {
 #[rstest]
 fn std_atm_drag_earth_low(almanac: Arc<Almanac>) {
     let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
+        .frame_info(EARTH_J2000)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
 

@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use log::info;
 use snafu::ResultExt;
 
 pub use super::CostFunction;

@@ -20,7 +20,7 @@ fn orbit_dual_test(almanac: Almanac) {
     use nyx::md::StateParameter;
 
     let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
+        .frame_info(EARTH_J2000)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
 

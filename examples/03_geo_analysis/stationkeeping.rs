@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let epoch = Epoch::from_gregorian_utc_hms(2024, 2, 29, 12, 13, 14);
 
     // Define the GEO orbit, and we're just going to maintain it very tightly.
-    let earth_j2000 = almanac.frame_from_uid(EARTH_J2000)?;
+    let earth_j2000 = almanac.frame_info(EARTH_J2000)?;
     let orbit = Orbit::try_keplerian(42164.0, 1e-5, 0., 163.0, 75.0, 0.0, epoch, earth_j2000)?;
     println!("{orbit:x}");
 
@@ -71,7 +71,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     jgm3_meta.process(true)?;
 
     let harmonics = Harmonics::from_stor(
-        almanac.frame_from_uid(IAU_EARTH_FRAME)?,
+        almanac.frame_info(IAU_EARTH_FRAME)?,
         HarmonicsMem::from_cof(&jgm3_meta.uri, 8, 8, true)?,
     );
     orbital_dyn.accel_models.push(harmonics);

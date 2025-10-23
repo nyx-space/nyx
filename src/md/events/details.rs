@@ -17,6 +17,7 @@
 */
 
 use anise::almanac::Almanac;
+use log::{debug, warn};
 
 use crate::errors::EventError;
 use crate::linalg::allocator::Allocator;

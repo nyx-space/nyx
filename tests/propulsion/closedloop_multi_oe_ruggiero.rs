@@ -26,7 +26,7 @@ fn almanac() -> Arc<Almanac> {
 fn qlaw_as_ruggiero_case_a(almanac: Arc<Almanac>) {
     // Source: AAS-2004-5089
     let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
+        .frame_info(EARTH_J2000)
         .unwrap()
         .with_mu_km3_s2(398_600.433);
 
@@ -98,7 +98,7 @@ fn qlaw_as_ruggiero_case_a(almanac: Arc<Almanac>) {
 fn qlaw_as_ruggiero_case_b(almanac: Arc<Almanac>) {
     // Source: AAS-2004-5089
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -157,7 +157,7 @@ fn qlaw_as_ruggiero_case_b(almanac: Arc<Almanac>) {
 fn qlaw_as_ruggiero_case_c_cov_test(almanac: Arc<Almanac>) {
     // Source: AAS-2004-5089
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -216,7 +216,7 @@ fn qlaw_as_ruggiero_case_d(almanac: Arc<Almanac>) {
     // Broken: https://gitlab.com/chrisrabotin/nyx/issues/103
     // Source: AAS-2004-5089
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -278,7 +278,7 @@ fn qlaw_as_ruggiero_case_e(almanac: Arc<Almanac>) {
     // Broken: https://gitlab.com/chrisrabotin/nyx/issues/103
     // Source: AAS-2004-5089
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -343,7 +343,7 @@ fn qlaw_as_ruggiero_case_f(almanac: Arc<Almanac>) {
         components of a spacecraft before defining the spacecraft itself.
     */
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -402,7 +402,7 @@ fn qlaw_as_ruggiero_case_f(almanac: Arc<Almanac>) {
 #[rstest]
 fn ruggiero_iepc_2011_102(almanac: Arc<Almanac>) {
     // Source: IEPC 2011 102
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 

@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let meta = data_folder.join("lro-dynamics.dhall");
 
     // Load this ephem in the general Almanac we're using for this analysis.
-    let mut almanac = MetaAlmanac::new(meta.to_string_lossy().to_string())
+    let mut almanac = MetaAlmanac::new(meta.to_string_lossy().as_ref())
         .map_err(Box::new)?
         .process(true)
         .map_err(Box::new)?;
@@ -126,7 +126,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // We're using the long term prediction of the Moon principal axes frame.
     let moon_pa_frame = MOON_PA_FRAME.with_orient(31008);
     let sph_harmonics = Harmonics::from_stor(
-        almanac.frame_from_uid(moon_pa_frame)?,
+        almanac.frame_info(moon_pa_frame)?,
         HarmonicsMem::from_shadr(&jggrx_meta.uri, 80, 80, true)?,
     );
 

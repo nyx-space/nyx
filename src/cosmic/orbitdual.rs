@@ -19,6 +19,7 @@
 use anise::astro::orbit::ECC_EPSILON;
 use anise::astro::PhysicsResult;
 use anise::prelude::{Frame, Orbit};
+use log::{debug, error, warn};
 use snafu::ResultExt;
 
 use super::AstroError;

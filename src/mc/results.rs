@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use log::{info, warn};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
@@ -105,7 +106,7 @@ where
                             Err(e) => match value_if_run_failed {
                                 Some(val) => report.push(val),
                                 None => {
-                                    warn!("run #{}: {}, skipping {} in report", run.index, e, param)
+                                    info!("run #{}: {}, skipping {} in report", run.index, e, param)
                                 }
                             },
                         }

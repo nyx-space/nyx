@@ -28,7 +28,7 @@ fn val_transfer_schedule_no_depl(almanac: Arc<Almanac>) {
     */
 
     let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
+        .frame_info(EARTH_J2000)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
 
@@ -115,7 +115,7 @@ fn val_transfer_schedule_no_depl(almanac: Arc<Almanac>) {
 #[rstest]
 fn val_transfer_schedule_depl_cov_test(almanac: Arc<Almanac>) {
     let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
+        .frame_info(EARTH_J2000)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
 
@@ -235,7 +235,7 @@ fn val_transfer_single_maneuver_depl_cov_test(almanac: Arc<Almanac>) {
     /* This is the same test as val_transfer_schedule_depl but uses the maneuver directly as the guidance law. It should work in the same way. */
 
     let eme2k = almanac
-        .frame_from_uid(EARTH_J2000)
+        .frame_info(EARTH_J2000)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
 

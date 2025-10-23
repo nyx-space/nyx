@@ -61,7 +61,7 @@ where
     /// Returns strictly the state vector without any STM, if set.
     fn to_state_vector(&self) -> OVector<f64, Self::Size> {
         OVector::<f64, Self::Size>::from_iterator(
-            self.to_vector().iter().copied().take(Self::Size::USIZE),
+            self.to_vector().iter().copied().take(Self::Size::DIM),
         )
     }
 

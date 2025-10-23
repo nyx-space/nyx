@@ -19,8 +19,8 @@
 use crate::errors::NyxError;
 use crate::md::StateParameter;
 use crate::time::Epoch;
-
 use arrow::error::ArrowError;
+use log::debug;
 use parquet::errors::ParquetError;
 use snafu::prelude::*;
 pub(crate) mod watermark;

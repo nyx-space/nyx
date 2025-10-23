@@ -25,7 +25,7 @@ fn almanac() -> Arc<Almanac> {
 fn leo_sun_earth_eclipses(almanac: Arc<Almanac>) {
     let prop_time = 2.0 * Unit::Day;
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -48,7 +48,7 @@ fn leo_sun_earth_eclipses(almanac: Arc<Almanac>) {
 
     // Initialize the EclipseLocator
     let e_loc = EclipseLocator {
-        light_source: almanac.frame_from_uid(SUN_J2000).unwrap(),
+        light_source: almanac.frame_info(SUN_J2000).unwrap(),
         shadow_bodies: vec![eme2k],
     };
 
@@ -75,7 +75,7 @@ fn leo_sun_earth_eclipses(almanac: Arc<Almanac>) {
 fn geo_sun_earth_eclipses(almanac: Arc<Almanac>) {
     let prop_time = 2 * Unit::Day;
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     // GEO are in shadow or near shadow during the equinoxes.
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 3, 19);
@@ -100,7 +100,7 @@ fn geo_sun_earth_eclipses(almanac: Arc<Almanac>) {
 
     // Initialize the EclipseLocator
     let e_loc = EclipseLocator {
-        light_source: almanac.frame_from_uid(SUN_J2000).unwrap(),
+        light_source: almanac.frame_info(SUN_J2000).unwrap(),
         shadow_bodies: vec![eme2k],
     };
 

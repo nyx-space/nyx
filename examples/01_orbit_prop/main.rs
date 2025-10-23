@@ -47,7 +47,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // This allows the frame to include the gravitational parameters and the shape of the Earth,
     // defined as a tri-axial ellipoid. Note that this shape can be changed manually or in the Almanac
     // by loading a different set of planetary constants.
-    let earth_j2000 = almanac.frame_from_uid(EARTH_J2000)?;
+    let earth_j2000 = almanac.frame_info(EARTH_J2000)?;
 
     let orbit =
         Orbit::try_keplerian_altitude(300.0, 0.015, 68.5, 65.2, 75.0, 0.0, epoch, earth_j2000)?;
@@ -121,7 +121,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // The harmonics must be computed in the body fixed frame.
     // We're using the long term prediction of the Earth centered Earth fixed frame, IAU Earth.
     let harmonics_21x21 = Harmonics::from_stor(
-        almanac.frame_from_uid(IAU_EARTH_FRAME)?,
+        almanac.frame_info(IAU_EARTH_FRAME)?,
         HarmonicsMem::from_cof(&jgm3_meta.uri, 21, 21, true).unwrap(),
     );
 
@@ -199,7 +199,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         40.014984,   // latitude in degrees
         -105.270546, // longitude in degrees
         1.6550,      // altitude in kilometers
-        almanac.frame_from_uid(IAU_EARTH_FRAME)?,
+        almanac.frame_info(IAU_EARTH_FRAME)?,
     );
 
     // We iterate over the trajectory, grabbing a state every two minutes.

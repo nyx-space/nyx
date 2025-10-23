@@ -30,7 +30,7 @@ fn almanac() -> Arc<Almanac> {
 
 #[fixture]
 fn sim_devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
+    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
@@ -61,7 +61,7 @@ fn sim_devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
 /// Devices for processing the measurement, noise may not be zero.
 #[fixture]
 fn proc_devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
+    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
@@ -133,7 +133,7 @@ fn od_val_sc_mb_srp_reals_duals_models(
     let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, epoch, eme2k);
 
     let dry_mass_kg = 100.0; // in kg
@@ -303,7 +303,7 @@ fn od_val_sc_srp_estimation_cov_test(
     let epoch = Epoch::from_gregorian_utc_at_noon(2024, 2, 29);
 
     // Define state information.
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
     // Using a GTO because Cr estimation will be more obvious.
     let initial_orbit = Orbit::keplerian(24505.9, 0.725, 7.05, 0.0, 0.0, 0.0, epoch, eme2k);
 

@@ -20,7 +20,7 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
     use nyx::md::prelude::*;
     use nyx::od::GroundStation;
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
     let dt = Epoch::from_gregorian_tai_at_noon(2020, 1, 1);
     let state = Orbit::cartesian(

@@ -27,6 +27,7 @@ use anise::frames::Frame;
 use anise::prelude::{Almanac, Orbit};
 use hifitime::TimeUnits;
 use indexmap::IndexSet;
+use log::debug;
 use rand_pcg::Pcg64Mcg;
 use snafu::ResultExt;
 use std::sync::Arc;

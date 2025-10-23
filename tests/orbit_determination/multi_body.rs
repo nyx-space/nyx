@@ -25,7 +25,7 @@ fn almanac() -> Arc<Almanac> {
 
 #[fixture]
 fn sim_devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
+    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
@@ -57,7 +57,7 @@ fn sim_devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
 /// Devices for processing the measurement, noise may not be zero.
 #[fixture]
 fn proc_devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
-    let iau_earth = almanac.frame_from_uid(IAU_EARTH_FRAME).unwrap();
+    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
     let elevation_mask = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
@@ -107,7 +107,7 @@ fn od_val_multi_body_ckf_perfect_stations(
     let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
@@ -241,7 +241,7 @@ fn multi_body_ckf_covar_map_cov_test(
     let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 

@@ -24,6 +24,7 @@ use crate::md::prelude::{Interpolatable, Traj};
 use crate::md::EventEvaluator;
 use crate::time::{Duration, Epoch, TimeSeries, Unit};
 use anise::almanac::Almanac;
+use log::{debug, error, info, warn};
 use rayon::prelude::*;
 use snafu::ResultExt;
 use std::iter::Iterator;

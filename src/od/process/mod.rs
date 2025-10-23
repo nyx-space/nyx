@@ -27,6 +27,7 @@ use crate::propagators::Propagator;
 pub use crate::time::{Duration, Unit};
 use anise::prelude::Almanac;
 use indexmap::IndexSet;
+use log::{debug, error, info, warn};
 use msr::sensitivity::TrackerSensitivity;
 use snafu::prelude::*;
 use solution::kalman::KalmanVariant;
@@ -145,12 +146,12 @@ where
         );
 
         // Check proper configuration.
-        if MsrSize::USIZE > arc.unique_types().len() {
+        if MsrSize::DIM > arc.unique_types().len() {
             error!("Filter misconfigured: expect high rejection count!");
             error!(
                 "Arc only contains {} measurement types, but filter configured for {}.",
                 arc.unique_types().len(),
-                MsrSize::USIZE
+                MsrSize::DIM
             );
             error!("Filter should be configured for these numbers to match.");
             error!("Consider running subsequent arcs if ground stations provide different measurements.")
@@ -257,15 +258,15 @@ where
                                 let msr_types = device.measurement_types();
 
                                 // Perform several measurement updates to ensure the desired dimensionality.
-                                let windows = msr_types.len() / MsrSize::USIZE;
+                                let windows = msr_types.len() / MsrSize::DIM;
                                 let mut msr_rejected = false;
                                 for wno in 0..=windows {
                                     let mut cur_msr_types = IndexSet::new();
                                     for msr_type in msr_types
                                         .iter()
                                         .copied()
-                                        .skip(wno * MsrSize::USIZE)
-                                        .take(MsrSize::USIZE)
+                                        .skip(wno * MsrSize::DIM)
+                                        .take(MsrSize::DIM)
                                     {
                                         cur_msr_types.insert(msr_type);
                                     }

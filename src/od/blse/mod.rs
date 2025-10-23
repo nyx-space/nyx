@@ -18,7 +18,6 @@
 
 #![allow(clippy::type_complexity)] // Allow complex types for generics
 #![allow(unused_imports)] // Keep imports for context even if slightly unused in snippet
-
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{Const, DefaultAllocator, DimName, OMatrix, OVector, U1}; // Use U1 for MsrSize
 use crate::md::trajectory::{Interpolatable, Traj}; // May not need Traj if we propagate point-to-point
@@ -30,6 +29,7 @@ use crate::propagators::Propagator;
 pub use crate::time::{Duration, Epoch, Unit};
 use anise::prelude::Almanac;
 use indexmap::IndexSet;
+use log::error;
 use log::{debug, info, trace, warn};
 use msr::sensitivity::TrackerSensitivity; // Assuming this is the correct path
 use nalgebra::{Cholesky, Dyn, Matrix, VecStorage};

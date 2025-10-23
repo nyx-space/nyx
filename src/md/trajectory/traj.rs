@@ -33,6 +33,7 @@ use arrow::array::{Array, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 use hifitime::TimeScale;
+use log::{info, warn};
 use parquet::arrow::ArrowWriter;
 use snafu::ResultExt;
 use std::collections::HashMap;

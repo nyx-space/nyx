@@ -25,7 +25,7 @@ fn test_monte_carlo_epoch_cov_test(almanac: Arc<Almanac>) {
 
     // Build the initial state
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
     let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);
     let state = Orbit::keplerian(8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k);
 

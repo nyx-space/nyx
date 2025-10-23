@@ -23,6 +23,7 @@ use anise::prelude::{Almanac, Frame, Orbit};
 use arrow::array::RecordBatchReader;
 use arrow::array::{Float64Array, StringArray};
 use hifitime::TimeSeries;
+use log::{debug, info, warn};
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use snafu::{ensure, ResultExt};
 
@@ -785,7 +786,7 @@ mod ut_ccsds_oem {
             85.0,
             0.0,
             epoch,
-            almanac.frame_from_uid(MOON_J2000).unwrap(),
+            almanac.frame_info(MOON_J2000).unwrap(),
         )
         .unwrap();
 

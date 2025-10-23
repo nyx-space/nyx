@@ -58,8 +58,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         .unwrap(),
     );
 
-    let eme2k = almanac.frame_from_uid(EARTH_J2000).unwrap();
-    let moon_iau = almanac.frame_from_uid(IAU_MOON_FRAME).unwrap();
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let moon_iau = almanac.frame_info(IAU_MOON_FRAME).unwrap();
 
     let epoch = Epoch::from_gregorian_tai(2021, 5, 29, 19, 51, 16, 852_000);
     let nrho = Orbit::cartesian(
@@ -231,7 +231,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     od_sol
         .to_parquet(
-            out.join(format!("05_caps_interlink_od_sol.pq")),
+            out.join("05_caps_interlink_od_sol.pq"),
             ExportCfg::default(),
         )
         .unwrap();
@@ -241,7 +241,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     od_traj
         .ric_diff_to_parquet(
             &llo_traj,
-            out.join(format!("05_caps_interlink_llo_est_error.pq")),
+            out.join("05_caps_interlink_llo_est_error.pq"),
             ExportCfg::default(),
         )
         .unwrap();
@@ -266,7 +266,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     rvr_sol
         .to_parquet(
-            out.join(format!("05_caps_interlink_resid_v_ref.pq")),
+            out.join("05_caps_interlink_resid_v_ref.pq"),
             ExportCfg::default(),
         )
         .unwrap();

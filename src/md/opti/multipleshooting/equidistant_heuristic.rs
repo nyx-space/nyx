@@ -22,6 +22,7 @@ pub use super::CostFunction;
 use crate::errors::TargetingError;
 use crate::md::prelude::*;
 use crate::{Orbit, Spacecraft};
+use log::error;
 
 impl<'a> MultipleShooting<'a, Node, 3, 3> {
     /// Builds a multiple shooting structure assuming that the optimal trajectory is a straight line

@@ -16,8 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use snafu::{ensure, ResultExt};
-
 use super::solution::TargeterSolution;
 use crate::cosmic::AstroAlmanacSnafu;
 use crate::errors::TargetingError;
@@ -27,6 +25,8 @@ use crate::md::{AstroSnafu, StateParameter};
 pub use crate::md::{Variable, Vary};
 use crate::pseudo_inverse;
 use crate::utils::are_eigenvalues_stable;
+use log::{debug, info, warn};
+use snafu::{ensure, ResultExt};
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
