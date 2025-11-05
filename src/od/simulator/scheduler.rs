@@ -43,7 +43,7 @@ impl Default for Handoff {
     }
 }
 
-/// A scheduler allows building a scheduling of spaceraft tracking for a set of ground stations.
+/// A scheduler allows building a scheduling of spacecraft tracking for a set of ground stations.
 #[derive(Copy, Clone, Debug, Default, Deserialize, PartialEq, Serialize, TypedBuilder)]
 #[builder(doc)]
 pub struct Scheduler {

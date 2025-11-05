@@ -32,18 +32,18 @@ use std::sync::Arc;
 #[allow(non_upper_case_globals)]
 pub const SOLAR_FLUX_W_m2: f64 = 1367.0;
 
-/// Computation of solar radiation pressure is based on STK: http://help.agi.com/stk/index.htm#gator/eq-solar.htm .
+/// A solar radiation pressure model, based on the STK model.
 #[derive(Clone)]
 pub struct SolarPressure {
-    /// solar flux at 1 AU, in W/m^2
+    /// Solar flux at 1 AU, in W/m^2.
     pub phi: f64,
     pub e_loc: EclipseLocator,
-    /// Set to true to estimate the coefficient of reflectivity
+    /// Set to true to estimate the coefficient of reflectivity.
     pub estimate: bool,
 }
 
 impl SolarPressure {
-    /// Will set the solar flux at 1 AU to: Phi = 1367.0
+    /// Initializes the model with the default solar flux (1367.0 W/m^2).
     pub fn default_raw(
         shadow_bodies: Vec<Frame>,
         almanac: Arc<Almanac>,
@@ -72,12 +72,12 @@ impl SolarPressure {
         })
     }
 
-    /// Accounts for the shadowing of only one body and will set the solar flux at 1 AU to: Phi = 1367.0
+    /// Initializes the model with default settings, accounting for shadowing from a single celestial body.
     pub fn default(shadow_body: Frame, almanac: Arc<Almanac>) -> Result<Arc<Self>, DynamicsError> {
         Ok(Arc::new(Self::default_raw(vec![shadow_body], almanac)?))
     }
 
-    /// Accounts for the shadowing of only one body and will set the solar flux at 1 AU to: Phi = 1367.0
+    /// Initializes the model with default settings, with reflectivity estimation disabled.
     pub fn default_no_estimation(
         shadow_bodies: Vec<Frame>,
         almanac: Arc<Almanac>,
@@ -87,7 +87,7 @@ impl SolarPressure {
         Ok(Arc::new(srp))
     }
 
-    /// Must provide the flux in W/m^2
+    /// Initializes the model with a custom solar flux.
     pub fn with_flux(
         flux_w_m2: f64,
         shadow_bodies: Vec<Frame>,
@@ -98,7 +98,7 @@ impl SolarPressure {
         Ok(Arc::new(me))
     }
 
-    /// Solar radiation pressure force model accounting for the provided shadow bodies.
+    /// Initializes the model, accounting for shadowing from a list of celestial bodies.
     pub fn new(
         shadow_bodies: Vec<Frame>,
         almanac: Arc<Almanac>,

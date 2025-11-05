@@ -266,7 +266,7 @@ fn traj_ephem_forward_cov_test(almanac: Arc<Almanac>) {
 #[rstest]
 fn traj_spacecraft(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
-    // Test the interpolation of a spaceraft trajectory and of its prop. Includes a demo of checking what the guidance mode _should_ be provided the state.
+    // Test the interpolation of a spacecraft trajectory and of its prop. Includes a demo of checking what the guidance mode _should_ be provided the state.
     // Note that we _do not_ attempt to interpolate the Guidance Mode.
     // This is based on the Ruggiero AOP correction
 
@@ -305,7 +305,7 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
     let mut prop = setup.with(start_state, almanac.clone());
     let (end_state, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
-    // Example of iterating through the spaceraft trajectory and checking what the guidance mode is at each time.
+    // Example of iterating through the spacecraft trajectory and checking what the guidance mode is at each time.
     let mut prev_mode = GuidanceMode::Coast;
 
     // But let's now iterate over the trajectory every day instead of every minute

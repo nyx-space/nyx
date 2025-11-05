@@ -25,56 +25,27 @@ use crate::linalg::{DefaultAllocator, DimName, OVector, U3};
 // prevents dividing by too small of a number.
 const REL_ERR_THRESH: f64 = 0.1;
 
-/// The Error Control manages how a propagator computes the error in the current step.
+/// Manages how a propagator computes the error in the current step.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ErrorControl {
-    /// An RSS state error control which effectively for the provided vector composed of two vectors of the same unit, both of size 3 (e.g. position + velocity).
+    /// An RSS state error control for Cartesian states (e.g., position and velocity).
     RSSCartesianState,
-    /// An RSS step error control which effectively for the provided vector composed of two vectors of the same unit, both of size 3 (e.g. position + velocity).
+    /// An RSS step error control for Cartesian states (e.g., position and velocity).
     RSSCartesianStep,
-    /// An RSS state error control: when in doubt, use this error controller, especially for high accurracy.
-    ///
-    /// Here is the warning from GMAT R2016a on this error controller:
-    /// > This is a more stringent error control method than [`rss_step`] that is often used as the default in other software such as STK.
-    /// > If you set [the] accuracy to a very small number, 1e-13 for example, and set the error control to [`rss_step`], integrator
-    /// > performance will be poor, for little if any improvement in the accuracy of the orbit integration.
-    /// > For more best practices of these integrators (which clone those in GMAT), please refer to the
-    /// > [GMAT reference](https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/doc/help/src/Resource_NumericalIntegrators.xml#L1292).
-    /// > (Source)[https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/ODEModel.cpp#L3004]
+    /// An RSS state error control. Recommended for high-accuracy simulations.
     RSSState,
-    /// An RSS step error control which effectively computes the L2 norm of the provided Vector of size 3
-    ///
-    /// Note that this error controller should be preferably be used only with slices of a state with the same units.
-    /// For example, one should probably use this for position independently of using it for the velocity.
-    /// (Source)[https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/ODEModel.cpp#L3045]
+    /// An RSS step error control. Should only be used with state slices that have the same units.
     RSSStep,
-    /// A largest error control which effectively computes the largest error at each component
-    ///
-    /// This is a standard error computation algorithm, but it's arguably bad if the state's components have different units.
-    /// It calculates the largest local estimate of the error from the integration (`error_est`)
-    /// given the difference in the candidate state and the previous state (`state_delta`).
-    /// This error estimator is from the physical model estimator of GMAT
-    /// (Source)[https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/PhysicalModel.cpp#L987]
+    /// Computes the largest error at each component. Not recommended for states with mixed units.
     LargestError,
-    /// A largest state error control
-    ///
-    /// (Source)[https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/ODEModel.cpp#L3018]
+    /// A largest state error control.
     LargestState,
-
-    /// A largest step error control which effectively computes the L1 norm of the provided Vector of size 3
-    ///
-    /// Note that this error controller should be preferably be used only with slices of a state with the same units.
-    /// For example, one should probably use this for position independently of using it for the velocity.
-    /// (Source)[https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/ODEModel.cpp#L3033]
+    /// A largest step error control. Should only be used with state slices that have the same units.
     LargestStep,
 }
 
 impl ErrorControl {
-    /// Computes the actual error of the current step.
-    ///
-    /// The `error_est` is the estimated error computed from the difference in the two stages of
-    /// of the RK propagator. The `candidate` variable is the candidate state, and `cur_state` is
-    /// the current state. This function must return the error.
+    /// Computes the error of the current step.
     pub fn estimate<N: DimName>(
         self,
         error_est: &OVector<f64, N>,
@@ -192,11 +163,6 @@ impl Default for ErrorControl {
     }
 }
 
-/// An RSS step error control which effectively computes the L2 norm of the provided Vector of size 3
-///
-/// Note that this error controller should be preferably be used only with slices of a state with the same units.
-/// For example, one should probably use this for position independently of using it for the velocity.
-/// (Source)[https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/ODEModel.cpp#L3045]
 #[derive(Clone, Copy)]
 #[allow(clippy::upper_case_acronyms)]
 struct RSSStep;
@@ -219,15 +185,6 @@ impl RSSStep {
     }
 }
 
-/// An RSS state error control: when in doubt, use this error controller, especially for high accurracy.
-///
-/// Here is the warning from GMAT R2016a on this error controller:
-/// > This is a more stringent error control method than [`rss_step`] that is often used as the default in other software such as STK.
-/// > If you set [the] accuracy to a very small number, 1e-13 for example, and set the error control to [`rss_step`], integrator
-/// > performance will be poor, for little if any improvement in the accuracy of the orbit integration.
-/// > For more best practices of these integrators (which clone those in GMAT), please refer to the
-/// > [GMAT reference](https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/doc/help/src/Resource_NumericalIntegrators.xml#L1292).
-/// > (Source)[https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/ODEModel.cpp#L3004]
 #[derive(Clone, Copy)]
 #[allow(clippy::upper_case_acronyms)]
 struct RSSState;

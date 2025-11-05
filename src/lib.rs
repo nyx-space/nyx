@@ -18,9 +18,9 @@
 
 /*! # nyx-space
 
-[Nyx](https://en.wikipedia.org/wiki/Nyx): Blazing fast high-fidelity astrodynamics for Monte Carlo analyzes of constellations, interplanetary missions, and deep space flight navigation.
+[Nyx](https://en.wikipedia.org/wiki/Nyx): High-fidelity, fast astrodynamics toolkit for spacecraft navigation, mission design, and Monte Carlo analyses.
 
-Refer to [nyxspace.com](https://nyxspace.com) for a user guide, a show case, the MathSpec, and the validation data.
+Refer to the [user guide](https://nyxspace.com) for more information.
 */
 
 // Allow confusable identifiers, as the code tries to use the literature's notation where possible.
@@ -28,38 +28,38 @@ Refer to [nyxspace.com](https://nyxspace.com) for a user guide, a show case, the
 
 extern crate log;
 
-/// Provides all the propagators / integrators available in `nyx`.
+/// Numerical propagators and integrators.
 pub mod propagators;
 
-/// Provides several dynamics used for orbital mechanics and attitude dynamics, which can be elegantly combined.
+/// Orbital and attitude dynamics which can be elegantly combined.
 pub mod dynamics;
 
-/// Provides the solar system planets, and state and ephemerides management.
+/// Solar system bodies, state, and ephemerides management.
 pub mod cosmic;
 
-/// Utility functions shared by different modules, and which may be useful to engineers.
+/// Shared utilities.
 pub mod utils;
 
 pub mod errors;
-/// Nyx will (almost) never panic and functions which may fail will return an error.
+/// Nyx's error handling.
 pub use self::errors::NyxError;
 
-/// All the input/output needs for this library, including loading of SPICE kernels, and gravity potential files.
+/// I/O for SPICE kernels, gravity models, and more.
 pub mod io;
 
-/// All the orbital determination and spacecraft navigation tools and functions.
+/// Orbit determination and spacecraft navigation.
 pub mod od;
 
-/// All of the mission design and mission analysis tools and functions
+/// Mission design and analysis.
 pub mod md;
 
-/// Simple tools (e.g. Lambert solver)
+/// Standalone astrodynamics tools.
 pub mod tools;
 
-/// Monte Carlo module
+/// Monte Carlo simulations.
 pub mod mc;
 
-/// Polynomial and fitting module
+/// Polynomial fitting and interpolation.
 pub mod polyfit;
 
 /// Re-export of hifitime

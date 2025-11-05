@@ -32,6 +32,7 @@ use std::sync::Arc;
 
 use super::{DynamicsAlmanacSnafu, DynamicsAstroSnafu, DynamicsError};
 
+/// A spherical harmonics gravity model.
 #[derive(Clone)]
 pub struct Harmonics {
     compute_frame: Frame,
@@ -49,7 +50,7 @@ pub struct Harmonics {
 }
 
 impl Harmonics {
-    /// Create a new Harmonics dynamical model from the provided gravity potential storage instance.
+    /// Creates a new harmonics model from a gravity potential storage instance.
     pub fn from_stor(compute_frame: Frame, stor: HarmonicsMem) -> Arc<Self> {
         let degree_np2 = stor.max_degree_n() + 2;
         let mut a_nm = DMatrix::from_element(degree_np2 + 1, degree_np2 + 1, 0.0);

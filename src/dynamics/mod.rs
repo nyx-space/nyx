@@ -31,43 +31,42 @@ use std::sync::Arc;
 
 pub use crate::errors::NyxError;
 
-/// The orbital module handles all Cartesian based orbital dynamics.
+/// Cartesian-based orbital dynamics.
 ///
-/// It is up to the engineer to ensure that the coordinate frames of the different dynamics borrowed
-/// from this module match, or perform the appropriate coordinate transformations.
+/// Ensure coordinate frames match or perform transformations when combining dynamics.
 pub mod orbital;
 use self::guidance::GuidanceError;
 pub use self::orbital::*;
 
-/// The spacecraft module allows for simulation of spacecraft dynamics in general, including propulsion/maneuvers.
+/// Spacecraft dynamics, including propulsion and maneuvers.
 pub mod spacecraft;
 pub use self::spacecraft::*;
 
-/// Defines a few examples of guidance laws.
+/// Guidance laws.
 pub mod guidance;
 
-/// Defines some velocity change controllers.
+/// Velocity change controllers.
 pub mod deltavctrl;
 
-/// Defines solar radiation pressure models
+/// Solar radiation pressure models.
 pub mod solarpressure;
 pub use self::solarpressure::*;
 
-/// The drag module handles drag in a very basic fashion. Do not use for high fidelity dynamics.
+/// Atmospheric drag models.
 pub mod drag;
 pub use self::drag::*;
 
-/// Define the spherical harmonic models.
-/// This module allows loading gravity models from [PDS](http://pds-geosciences.wustl.edu/), [EGM2008](http://earth-info.nga.mil/GandG/wgs84/gravitymod/egm2008/) and GMAT's own COF files.
+/// Spherical harmonic gravity models.
+///
+/// Supports loading models from PDS, EGM2008, and GMAT's COF files.
 pub mod sph_harmonics;
 pub use self::sph_harmonics::*;
 
-/// The `Dynamics` trait handles and stores any equation of motion *and* the state is integrated.
+/// A trait for models with equations of motion that can be integrated.
 ///
-/// Its design is such that several of the provided dynamics can be combined fairly easily. However,
-/// when combining the dynamics (e.g. integrating both the attitude of a spaceraft and its orbital
-///  parameters), it is up to the implementor to handle time and state organization correctly.
-/// For time management, I highly recommend using `hifitime` which is thoroughly validated.
+/// This trait is designed for composition, allowing different dynamics to be combined.
+/// When combining dynamics, ensure that time and state are handled consistently.
+/// `hifitime` is recommended for time management.
 #[allow(clippy::type_complexity)]
 pub trait Dynamics: Clone + Sync + Send
 where
@@ -79,11 +78,11 @@ where
     type HyperdualSize: DimName;
     type StateType: State;
 
-    /// Defines the equations of motion for these dynamics, or a combination of provided dynamics.
-    /// The time delta_t is in **seconds** PAST the context epoch. The state vector is the state which
-    /// changes for every intermediate step of the integration. The state context is the state of
-    /// what is being propagated, it should allow rebuilding a new state context from the
-    /// provided state vector.
+    /// Defines the equations of motion.
+    ///
+    /// - `delta_t`: Time in seconds past the context epoch.
+    /// - `state_vec`: The state vector, which changes at each integration step.
+    /// - `state_ctx`: The state context, used to rebuild the state from the state vector.
     fn eom(
         &self,
         delta_t: f64,
@@ -94,9 +93,9 @@ where
     where
         DefaultAllocator: Allocator<<Self::StateType as State>::VecLength>;
 
-    /// Defines the equations of motion for Dual numbers for these dynamics.
-    /// _All_ dynamics need to allow for automatic differentiation. However, if differentiation is not supported,
-    /// then the dynamics should prevent initialization with a context which has an STM defined.
+    /// Defines the equations of motion for dual numbers, enabling automatic differentiation.
+    ///
+    /// If differentiation is not supported, this function should prevent initialization with a context that has an STM defined.
     fn dual_eom(
         &self,
         _delta_t: f64,
@@ -118,9 +117,9 @@ where
         Err(DynamicsError::StateTransitionMatrixUnset)
     }
 
-    /// Optionally performs some final changes after each successful integration of the equations of motion.
-    /// For example, this can be used to update the Guidance mode.
-    /// NOTE: This function is also called just prior to very first integration step in order to update the initial state if needed.
+    /// Performs final changes after each successful integration step.
+    ///
+    /// Also called before the first integration step to update the initial state if needed.
     fn finally(
         &self,
         next_state: Self::StateType,
@@ -130,19 +129,19 @@ where
     }
 }
 
-/// The `ForceModel` trait handles immutable dynamics which return a force. Those will be divided by the mass of the spacecraft to compute the acceleration (F = ma).
+/// A trait for immutable dynamics that return a force (e.g., solar radiation pressure, drag).
 ///
-/// Examples include Solar Radiation Pressure, drag, etc., i.e. forces which do not need to save the current state, only act on it.
+/// The force is divided by the spacecraft's mass to compute acceleration (F=ma).
 pub trait ForceModel: Send + Sync + fmt::Display {
-    /// If a parameter of this force model is stored in the spacecraft state, then this function should return the index where this parameter is being affected
+    /// Returns the estimation index if a parameter of this force model is stored in the spacecraft state.
     fn estimation_index(&self) -> Option<usize>;
 
-    /// Defines the equations of motion for this force model from the provided osculating state.
+    /// Defines the equations of motion for this force model.
     fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError>;
 
-    /// Force models must implement their partials, although those will only be called if the propagation requires the
-    /// computation of the STM. The `osc_ctx` is the osculating context, i.e. it changes for each sub-step of the integrator.
-    /// The last row corresponds to the partials of the parameter of this force model wrt the position, i.e. this only applies to conservative forces.
+    /// Defines the partial derivatives of the equations of motion.
+    ///
+    /// The last row corresponds to the partials of the parameter of this force model with respect to position, which only applies to conservative forces.
     fn dual_eom(
         &self,
         osc_ctx: &Spacecraft,
@@ -150,15 +149,12 @@ pub trait ForceModel: Send + Sync + fmt::Display {
     ) -> Result<(Vector3<f64>, Matrix4x3<f64>), DynamicsError>;
 }
 
-/// The `AccelModel` trait handles immutable dynamics which return an acceleration. Those can be added directly to Orbital Dynamics for example.
-///
-/// Examples include spherical harmonics, i.e. accelerations which do not need to save the current state, only act on it.
+/// A trait for immutable dynamics that return an acceleration (e.g., spherical harmonics).
 pub trait AccelModel: Send + Sync + fmt::Display {
-    /// Defines the equations of motion for this force model from the provided osculating state in the integration frame.
+    /// Defines the equations of motion for this acceleration model.
     fn eom(&self, osc: &Orbit, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError>;
 
-    /// Acceleration models must implement their partials, although those will only be called if the propagation requires the
-    /// computation of the STM.
+    /// Defines the partial derivatives of the equations of motion.
     fn dual_eom(
         &self,
         osc_ctx: &Orbit,
@@ -166,25 +162,30 @@ pub trait AccelModel: Send + Sync + fmt::Display {
     ) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError>;
 }
 
-/// Stores dynamical model errors
+/// Dynamical model errors.
 #[derive(Debug, PartialEq, Snafu)]
 #[snafu(visibility(pub(crate)))]
 pub enum DynamicsError {
-    /// Fuel exhausted at the provided spacecraft state
+    /// Fuel exhausted.
     #[snafu(display("fuel exhausted at {sc}"))]
     FuelExhausted { sc: Box<Spacecraft> },
+    /// State Transition Matrix (STM) was expected but not set.
     #[snafu(display("expected STM to be set"))]
     StateTransitionMatrixUnset,
+    /// Astrodynamics error.
     #[snafu(display("dynamical model encountered an astro error: {source}"))]
     DynamicsAstro { source: AstroError },
+    /// Guidance error.
     #[snafu(display("dynamical model encountered an issue with the guidance: {source}"))]
     DynamicsGuidance { source: GuidanceError },
+    /// Almanac error.
     #[snafu(display("dynamical model issue due to Almanac: {action} {source}"))]
     DynamicsAlmanacError {
         action: &'static str,
         #[snafu(source(from(AlmanacError, Box::new)))]
         source: Box<AlmanacError>,
     },
+    /// Planetary data error.
     #[snafu(display("dynamical model issue due to planetary data: {action} {source}"))]
     DynamicsPlanetaryError {
         action: &'static str,
