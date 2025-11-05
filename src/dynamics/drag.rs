@@ -36,18 +36,18 @@ pub enum AtmDensity {
     StdAtm { max_alt_m: f64 },
 }
 
-/// `ConstantDrag` implements a constant drag model as defined in Vallado, 4th ed., page 551, with an important caveat.
+/// Implements a constant drag model as defined in Vallado, 4th ed., page 551.
 ///
-/// **WARNING:** This basic model assumes that the velocity of the spacecraft is identical to the velocity of the upper atmosphere,
-/// This is a **bad** assumption and **should not** be used for high fidelity simulations.
-/// This will be resolved after https://gitlab.com/chrisrabotin/nyx/issues/93 is implemented.
+/// **WARNING:** This model assumes the spacecraft velocity is identical to the upper atmosphere velocity,
+/// which is a significant simplification. Not for high-fidelity simulations.
+/// This will be resolved after https://github.com/nyx-space/nyx/issues/93 is implemented.
 #[derive(Clone)]
 pub struct ConstantDrag {
-    /// atmospheric density in kg/m^3
+    /// Atmospheric density in kg/m^3.
     pub rho: f64,
-    /// Geoid causing the drag
+    /// Geoid causing the drag.
     pub drag_frame: Frame,
-    /// Set to true to estimate the coefficient of drag
+    /// Set to true to estimate the coefficient of drag.
     pub estimate: bool,
 }
 
@@ -78,7 +78,7 @@ impl ForceModel for ConstantDrag {
             })?;
 
         let velocity = osc.velocity_km_s;
-        // Note the 1e3 factor to convert drag units from ((kg * km^2 * s^-2) / m^1) to (kg * km * s^-2)
+        // A factor of 1e3 is needed to convert the acceleration to km/s^2.
         Ok(-0.5
             * 1e3
             * self.rho
@@ -99,14 +99,14 @@ impl ForceModel for ConstantDrag {
     }
 }
 
-/// `Drag` implements all three drag models.
+/// Implements three drag models.
 #[derive(Clone)]
 pub struct Drag {
-    /// Density computation method
+    /// The density computation method.
     pub density: AtmDensity,
-    /// Frame to compute the drag in
+    /// The frame to compute the drag in.
     pub drag_frame: Frame,
-    /// Set to true to estimate the coefficient of drag
+    /// Set to true to estimate the coefficient of drag.
     pub estimate: bool,
 }
 
@@ -175,7 +175,7 @@ impl ForceModel for Drag {
         match self.density {
             AtmDensity::Constant(rho) => {
                 let velocity = osc_drag_frame.velocity_km_s;
-                // Note the 1e3 factor to convert drag units from ((kg * km^2 * s^-2) / m^1) to (kg * km * s^-2)
+                // A factor of 1e3 is needed to convert the acceleration to km/s^2.
                 Ok(-0.5
                     * 1e3
                     * rho
@@ -202,8 +202,8 @@ impl ForceModel for Drag {
                         / ref_alt_m)
                         .exp();
 
-                // TODO: Drag modeling will be improved in https://github.com/nyx-space/nyx/issues/317
-                // The frame will be double checked in this PR as well.
+                // TODO: Drag modeling will be improved in https://github.com/nyx-space/nyx/issues/317.
+                // The frame will be double-checked in this PR as well.
                 let velocity_integr_frame = almanac
                     .transform_to(osc_drag_frame, integration_frame, None)
                     .context(DynamicsAlmanacSnafu {
@@ -212,7 +212,7 @@ impl ForceModel for Drag {
                     .velocity_km_s;
 
                 let velocity = velocity_integr_frame - osc_drag_frame.velocity_km_s;
-                // Note the 1e3 factor to convert drag units from ((kg * km^2 * s^-2) / m^1) to (kg * km * s^-2)
+                // A factor of 1e3 is needed to convert the acceleration to km/s^2.
                 Ok(-0.5
                     * 1e3
                     * rho
@@ -230,11 +230,11 @@ impl ForceModel for Drag {
                         .context(AstroPhysicsSnafu)
                         .context(DynamicsAstroSnafu)?;
                 let rho = if altitude_km > max_alt_m / 1_000.0 {
-                    // Use a constant density
+                    // Use a constant density.
                     10.0_f64.powf((-7e-5) * altitude_km - 14.464)
                 } else {
-                    // Code from AVS/Schaub's Basilisk
-                    // Calculating the density based on a scaled 6th order polynomial fit to the log of density
+                    // Code from AVS/Schaub's Basilisk.
+                    // Calculating the density based on a scaled 6th order polynomial fit to the log of density.
                     let scale = (altitude_km - 526.8000) / 292.8563;
                     let logdensity =
                         0.34047 * scale.powi(6) - 0.5889 * scale.powi(5) - 0.5269 * scale.powi(4)
@@ -243,7 +243,7 @@ impl ForceModel for Drag {
                             - 2.3024 * scale
                             - 12.575;
 
-                    /* Calculating density by raising 10 to the log of density */
+                    // Calculating density by raising 10 to the log of density.
                     10.0_f64.powf(logdensity)
                 };
 
@@ -255,7 +255,7 @@ impl ForceModel for Drag {
                     .velocity_km_s;
 
                 let velocity = velocity_integr_frame - osc_drag_frame.velocity_km_s;
-                // Note the 1e3 factor to convert drag units from ((kg * km^2 * s^-2) / m^1) to (kg * km * s^-2)
+                // A factor of 1e3 is needed to convert the acceleration to km/s^2.
                 Ok(-0.5
                     * 1e3
                     * rho

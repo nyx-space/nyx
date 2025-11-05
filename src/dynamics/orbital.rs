@@ -33,31 +33,31 @@ use std::sync::Arc;
 
 pub use super::sph_harmonics::Harmonics;
 
-/// `OrbitalDynamics` provides the equations of motion for any celestial dynamic, without state transition matrix computation.
+/// Equations of motion for celestial dynamics.
 #[derive(Clone)]
 pub struct OrbitalDynamics {
     pub accel_models: Vec<Arc<dyn AccelModel + Sync>>,
 }
 
 impl OrbitalDynamics {
-    /// Initializes the point masses gravities with the provided list of bodies
+    /// Initializes the dynamics with point mass gravity from a list of celestial bodies.
     pub fn point_masses(celestial_objects: Vec<i32>) -> Self {
-        // Create the point masses
         Self::new(vec![PointMasses::new(celestial_objects)])
     }
 
-    /// Initializes a OrbitalDynamics which does not simulate the gravity pull of other celestial objects but the primary one.
+    /// Initializes two-body dynamics, which only simulate the gravity of the primary body.
     pub fn two_body() -> Self {
         Self::new(vec![])
     }
 
-    /// Initialize orbital dynamics with a list of acceleration models
+    /// Initializes orbital dynamics with a list of acceleration models.
     pub fn new(accel_models: Vec<Arc<dyn AccelModel + Sync>>) -> Self {
         Self { accel_models }
     }
 
-    /// Initialize new orbital mechanics with the provided model.
-    /// **Note:** Orbital dynamics _always_ include two body dynamics, these cannot be turned off.
+    /// Initializes orbital dynamics with a single acceleration model.
+    ///
+    /// **Note:** Two-body dynamics are always included and cannot be disabled.
     pub fn from_model(accel_model: Arc<dyn AccelModel + Sync>) -> Self {
         Self::new(vec![accel_model])
     }
@@ -166,15 +166,15 @@ impl OrbitalDynamics {
     }
 }
 
-/// PointMasses model
+/// A point mass gravity model.
 pub struct PointMasses {
     pub celestial_objects: Vec<i32>,
-    /// Light-time correction computation if extra point masses are needed
+    /// Light-time correction.
     pub correction: Option<Aberration>,
 }
 
 impl PointMasses {
-    /// Initializes the point masses gravities with the provided list of bodies
+    /// Initializes the point mass gravity model with a list of celestial bodies.
     pub fn new(celestial_objects: Vec<i32>) -> Arc<Self> {
         Arc::new(Self {
             celestial_objects,
@@ -182,7 +182,7 @@ impl PointMasses {
         })
     }
 
-    /// Initializes the point masses gravities with the provided list of bodies, and accounting for some light time correction
+    /// Initializes the point mass gravity model with a list of celestial bodies and a light-time correction.
     pub fn with_correction(celestial_objects: Vec<i32>, correction: Aberration) -> Self {
         Self {
             celestial_objects,

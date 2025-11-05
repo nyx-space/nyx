@@ -105,7 +105,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Set up the spacecraft dynamics.
 
     // Specify that the orbital dynamics must account for the graviational pull of the Moon and the Sun.
-    // The gravity of the Earth will also be accounted for since the spaceraft in an Earth orbit.
+    // The gravity of the Earth will also be accounted for since the spacecraft in an Earth orbit.
     let mut orbital_dyn = OrbitalDynamics::point_masses(vec![MOON, SUN]);
 
     // We want to include the spherical harmonics, so let's download the gravitational data from the Nyx Cloud.

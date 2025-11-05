@@ -37,9 +37,9 @@ use crate::cosmic::AstroError;
 
 const NORM_ERR: f64 = 1e-4;
 
-/// A generic spacecraft dynamics with associated force models, guidance law, and flag specifying whether to decrement the prop mass or not.
-/// Note: when developing new guidance laws, it is recommended to _not_ enable prop decrement until the guidance law seems to work without proper physics.
-/// Note: if the spacecraft runs out of prop, the propagation segment will return an error.
+/// A generic spacecraft dynamics model.
+///
+/// **Note:** If the spacecraft runs out of propellant, the propagation will return an error.
 #[derive(Clone)]
 pub struct SpacecraftDynamics {
     pub orbital_dyn: OrbitalDynamics,
@@ -50,8 +50,9 @@ pub struct SpacecraftDynamics {
 }
 
 impl SpacecraftDynamics {
-    /// Initialize a Spacecraft with a set of orbital dynamics and a propulsion subsystem.
-    /// By default, the mass of the vehicle will be decremented as propellant is consumed.
+    /// Initializes the dynamics with a guidance law.
+    ///
+    /// By default, the spacecraft's mass will be decremented as propellant is consumed.
     pub fn from_guidance_law(orbital_dyn: OrbitalDynamics, guid_law: Arc<dyn GuidanceLaw>) -> Self {
         Self {
             orbital_dyn,
@@ -61,8 +62,7 @@ impl SpacecraftDynamics {
         }
     }
 
-    /// Initialize a Spacecraft with a set of orbital dynamics and a propulsion subsystem.
-    /// Will _not_ decrement the prop mass as propellant is consumed.
+    /// Initializes the dynamics with a guidance law, but without mass decrement.
     pub fn from_guidance_law_no_decr(
         orbital_dyn: OrbitalDynamics,
         guid_law: Arc<dyn GuidanceLaw>,
@@ -75,7 +75,7 @@ impl SpacecraftDynamics {
         }
     }
 
-    /// Initialize a Spacecraft with a set of orbital dynamics and with SRP enabled.
+    /// Initializes the dynamics with orbital dynamics.
     pub fn new(orbital_dyn: OrbitalDynamics) -> Self {
         Self {
             orbital_dyn,
@@ -85,7 +85,7 @@ impl SpacecraftDynamics {
         }
     }
 
-    /// Initialize new spacecraft dynamics with the provided orbital mechanics and with the provided force model.
+    /// Initializes the dynamics with a single force model.
     pub fn from_model(orbital_dyn: OrbitalDynamics, force_model: Arc<dyn ForceModel>) -> Self {
         Self {
             orbital_dyn,
@@ -95,7 +95,7 @@ impl SpacecraftDynamics {
         }
     }
 
-    /// Initialize new spacecraft dynamics with a vector of force models.
+    /// Initializes the dynamics with a list of force models.
     pub fn from_models(
         orbital_dyn: OrbitalDynamics,
         force_models: Vec<Arc<dyn ForceModel>>,
@@ -105,7 +105,7 @@ impl SpacecraftDynamics {
         me
     }
 
-    /// A shortcut to spacecraft.guid_law if a guidance law is defined for these dynamics
+    /// Returns whether the guidance objective has been achieved.
     pub fn guidance_achieved(&self, state: &Spacecraft) -> Result<bool, GuidanceError> {
         match &self.guid_law {
             Some(guid_law) => guid_law.achieved(state),
@@ -113,7 +113,7 @@ impl SpacecraftDynamics {
         }
     }
 
-    /// Clone these spacecraft dynamics and update the control to the one provided.
+    /// Clones these dynamics and sets the guidance law.
     pub fn with_guidance_law(&self, guid_law: Arc<dyn GuidanceLaw>) -> Self {
         Self {
             orbital_dyn: self.orbital_dyn.clone(),

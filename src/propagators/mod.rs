@@ -20,7 +20,7 @@ use anise::errors::MathError;
 use snafu::prelude::*;
 use std::fmt;
 
-/// Provides different methods for controlling the error computation of the integrator.
+/// Integrator error control methods.
 pub mod error_ctrl;
 pub use self::error_ctrl::*;
 
@@ -36,14 +36,14 @@ use crate::{dynamics::DynamicsError, errors::EventError, io::ConfigError, time::
 pub use options::*;
 use serde::{Deserialize, Serialize};
 
-/// Stores the details of the previous integration step of a given propagator. Access as `my_prop.clone().latest_details()`.
+/// Stores the details of the previous integration step.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct IntegrationDetails {
-    /// step size used
+    /// The step size used.
     pub step: Duration,
-    /// error in the previous integration step
+    /// The error in the previous integration step.
     pub error: f64,
-    /// number of attempts needed by an adaptive step size to be within the tolerance
+    /// The number of attempts needed by an adaptive step size controller to meet the tolerance.
     pub attempts: u8,
 }
 
@@ -57,16 +57,22 @@ impl fmt::Display for IntegrationDetails {
     }
 }
 
+/// Propagation errors.
 #[derive(Debug, PartialEq, Snafu)]
 pub enum PropagationError {
+    /// A dynamics error was encountered.
     #[snafu(display("encountered a dynamics error {source}"))]
     Dynamics { source: DynamicsError },
+    /// An error was encountered when propagating until an event.
     #[snafu(display("when propagating until an event: {source}"))]
     TrajectoryEventError { source: EventError },
+    /// The requested event could not be found.
     #[snafu(display("requested propagation until event #{nth} but only {found} found"))]
     NthEventError { nth: usize, found: usize },
+    /// A configuration error was encountered.
     #[snafu(display("propagation failed because {source}"))]
     PropConfigError { source: ConfigError },
+    /// A math error was encountered.
     #[snafu(display("propagation encountered a math error {source}"))]
     PropMathError { source: MathError },
 }
