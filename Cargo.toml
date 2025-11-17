@@ -35,7 +35,7 @@ github = { repository = "nyx-space/nyx", branch = "master" }
 nalgebra = "0.34"
 log = "0.4"
 hifitime = "4.0.0"
-anise = "0.7.0"
+anise = "0.8.0"
 flate2 = { version = "1.0", features = [
     "rust_backend",
 ], default-features = false }
