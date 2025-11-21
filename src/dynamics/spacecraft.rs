@@ -299,43 +299,64 @@ impl Dynamics for SpacecraftDynamics {
         let mut d_x = OVector::<f64, Const<9>>::zeros();
         let mut grad = OMatrix::<f64, Const<9>, Const<9>>::zeros();
 
-        let (orb_state, orb_grad) =
-            self.orbital_dyn
-                .dual_eom(delta_t_s, &ctx.orbit, almanac.clone())?;
-
-        // Copy the d orbit dt data
-        for (i, val) in orb_state.iter().enumerate() {
-            d_x[i] = *val;
-        }
-
-        for i in 0..6 {
-            for j in 0..6 {
-                grad[(i, j)] = orb_grad[(i, j)];
-            }
-        }
-
         if self.guid_law.is_some() {
-            return Err(DynamicsError::DynamicsAstro {
-                source: AstroError::PartialsUndefined,
-            });
-        }
+            // Finite differencing needed
+            let mut ctx_no_stm = ctx.clone();
+            ctx_no_stm.unset_stm();
+            let state_vector = ctx_no_stm.to_vector();
 
-        // Call the EOMs
-        let total_mass = ctx.mass_kg();
-        for model in &self.force_models {
-            let (model_frc, model_grad) = model.dual_eom(ctx, almanac.clone())?;
-            for i in 0..3 {
-                // Add the velocity changes
-                d_x[i + 3] += model_frc[i] / total_mass;
-                // Add the velocity partials
-                for j in 0..3 {
-                    grad[(i + 3, j)] += model_grad[(i, j)] / total_mass;
+            let nominal_d_x = self.eom(delta_t_s, &state_vector, &ctx_no_stm, almanac.clone())?;
+
+            // Copy the nominal change in state
+            for i in 0..9 {
+                d_x[i] = nominal_d_x[i];
+            }
+
+            // Compute the finite differences
+            let epsilon = 1e-7;
+            let state_size = <Spacecraft as State>::Size::dim();
+            for i in 0..state_size {
+                let mut perturbed_state = state_vector;
+                perturbed_state[i] += epsilon;
+                let perturbed_d_x =
+                    self.eom(delta_t_s, &perturbed_state, &ctx_no_stm, almanac.clone())?;
+                for j in 0..state_size {
+                    grad[(j, i)] = (perturbed_d_x[j] - nominal_d_x[j]) / epsilon;
                 }
             }
-            // Add this force model's estimation if applicable.
-            if let Some(idx) = model.estimation_index() {
-                for j in 0..3 {
-                    grad[(j + 3, idx)] += model_grad[(3, j)] / total_mass;
+        } else {
+            let (orb_state, orb_grad) =
+                self.orbital_dyn
+                    .dual_eom(delta_t_s, &ctx.orbit, almanac.clone())?;
+
+            // Copy the d orbit dt data
+            for (i, val) in orb_state.iter().enumerate() {
+                d_x[i] = *val;
+            }
+
+            for i in 0..6 {
+                for j in 0..6 {
+                    grad[(i, j)] = orb_grad[(i, j)];
+                }
+            }
+
+            // Call the EOMs
+            let total_mass = ctx.mass_kg();
+            for model in &self.force_models {
+                let (model_frc, model_grad) = model.dual_eom(ctx, almanac.clone())?;
+                for i in 0..3 {
+                    // Add the velocity changes
+                    d_x[i + 3] += model_frc[i] / total_mass;
+                    // Add the velocity partials
+                    for j in 0..3 {
+                        grad[(i + 3, j)] += model_grad[(i, j)] / total_mass;
+                    }
+                }
+                // Add this force model's estimation if applicable.
+                if let Some(idx) = model.estimation_index() {
+                    for j in 0..3 {
+                        grad[(j + 3, idx)] += model_grad[(3, j)] / total_mass;
+                    }
                 }
             }
         }
