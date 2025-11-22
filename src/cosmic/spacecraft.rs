@@ -41,20 +41,15 @@ use std::fmt;
 use std::ops::Add;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-
+#[derive(Default)]
 pub enum GuidanceMode {
     /// Guidance is turned off and Guidance Law may switch mode to Thrust for next call
+    #[default]
     Coast,
     /// Guidance is turned on and Guidance Law may switch mode to Coast for next call
     Thrust,
     /// Guidance is turned off and Guidance Law may not change its mode (will need to be done externally to the guidance law).
     Inhibit,
-}
-
-impl Default for GuidanceMode {
-    fn default() -> Self {
-        Self::Coast
-    }
 }
 
 impl From<f64> for GuidanceMode {

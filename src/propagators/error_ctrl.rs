@@ -26,11 +26,12 @@ use crate::linalg::{DefaultAllocator, DimName, OVector, U3};
 const REL_ERR_THRESH: f64 = 0.1;
 
 /// The Error Control manages how a propagator computes the error in the current step.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum ErrorControl {
     /// An RSS state error control which effectively for the provided vector composed of two vectors of the same unit, both of size 3 (e.g. position + velocity).
     RSSCartesianState,
     /// An RSS step error control which effectively for the provided vector composed of two vectors of the same unit, both of size 3 (e.g. position + velocity).
+    #[default]
     RSSCartesianStep,
     /// An RSS state error control: when in doubt, use this error controller, especially for high accurracy.
     ///
@@ -183,12 +184,6 @@ impl ErrorControl {
                 }
             }
         }
-    }
-}
-
-impl Default for ErrorControl {
-    fn default() -> Self {
-        Self::RSSCartesianStep
     }
 }
 
