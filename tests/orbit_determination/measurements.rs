@@ -2,7 +2,6 @@ extern crate nyx_space as nyx;
 
 use anise::constants::celestial_objects::{EARTH, MOON, SUN};
 use anise::constants::frames::IAU_EARTH_FRAME;
-use anise::constants::usual_planetary_constants::MEAN_EARTH_ANGULAR_VELOCITY_DEG_S;
 use indexmap::{IndexMap, IndexSet};
 use nalgebra::{Const, U2};
 use nyx::cosmic::Orbit;
@@ -60,15 +59,7 @@ fn nil_measurement(almanac: Arc<Almanac>) {
         ..Default::default()
     };
 
-    let at_station = Orbit::try_latlongalt(
-        lat,
-        long,
-        height,
-        MEAN_EARTH_ANGULAR_VELOCITY_DEG_S,
-        epoch,
-        eme2k,
-    )
-    .unwrap();
+    let at_station = Orbit::try_latlongalt(lat, long, height, epoch, eme2k).unwrap();
 
     let (_, traj) = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()))
         .with(at_station.into(), almanac.clone())

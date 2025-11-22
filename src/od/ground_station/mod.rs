@@ -170,12 +170,10 @@ impl GroundStation {
 
     /// Return this ground station as an orbit in its current frame
     pub fn to_orbit(&self, epoch: Epoch, almanac: &Almanac) -> PhysicsResult<Orbit> {
-        use anise::constants::usual_planetary_constants::MEAN_EARTH_ANGULAR_VELOCITY_DEG_S;
         Orbit::try_latlongalt(
             self.latitude_deg,
             self.longitude_deg,
             self.height_km,
-            MEAN_EARTH_ANGULAR_VELOCITY_DEG_S,
             epoch,
             almanac.frame_info(self.frame).unwrap(),
         )
