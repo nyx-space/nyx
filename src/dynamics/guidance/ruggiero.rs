@@ -40,7 +40,7 @@ pub struct Ruggiero {
     pub objectives: [Option<Objective>; 5],
     /// Stores the minimum efficiency to correct a given orbital element, defaults to zero (i.e. always correct)
     pub ηthresholds: [f64; 5],
-    /// If define, coast until vehicle is out of the provided eclipse state.
+    /// If defined, coast until vehicle is out of the provided eclipse state.
     pub max_eclipse_prct: Option<f64>,
     init_state: Spacecraft,
 }
@@ -163,33 +163,33 @@ impl Ruggiero {
     }
 
     /// Returns the efficiency η ∈ [0; 1] of correcting a specific orbital element at the provided osculating orbit
-    pub fn efficency(parameter: &StateParameter, osc_orbit: &Orbit) -> Result<f64, GuidanceError> {
+    pub fn efficiency(parameter: &StateParameter, osc_orbit: &Orbit) -> Result<f64, GuidanceError> {
         let e = osc_orbit.ecc().context(GuidancePhysicsSnafu {
-            action: "computing Ruggiero efficency",
+            action: "computing Ruggiero efficiency",
         })?;
 
         let ν_ta = osc_orbit
             .ta_deg()
             .context(GuidancePhysicsSnafu {
-                action: "computing Ruggiero efficency",
+                action: "computing Ruggiero efficiency",
             })?
             .to_radians();
 
         let ω = osc_orbit
             .aop_deg()
             .context(GuidancePhysicsSnafu {
-                action: "computing Ruggiero efficency",
+                action: "computing Ruggiero efficiency",
             })?
             .to_radians();
 
         match parameter {
             StateParameter::SMA => {
                 let a = osc_orbit.sma_km().context(GuidancePhysicsSnafu {
-                    action: "computing Ruggiero efficency",
+                    action: "computing Ruggiero efficiency",
                 })?;
 
                 let μ = osc_orbit.frame.mu_km3_s2().context(GuidancePhysicsSnafu {
-                    action: "computing Ruggiero efficency",
+                    action: "computing Ruggiero efficiency",
                 })?;
                 Ok(osc_orbit.vmag_km_s() * ((a * (1.0 - e)) / (μ * (1.0 + e))).sqrt())
             }
@@ -226,7 +226,7 @@ impl Ruggiero {
         let tol = obj.tolerance;
 
         // Calculate the efficiency of correcting this specific orbital element
-        let η = Self::efficency(&obj.parameter, &osc_sc.orbit).unwrap();
+        let η = Self::efficiency(&obj.parameter, &osc_sc.orbit).unwrap();
 
         if (osc - target).abs() < tol || η < η_threshold {
             0.0

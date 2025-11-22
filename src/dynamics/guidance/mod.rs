@@ -56,7 +56,7 @@ impl Thruster {
 }
 
 /// The `GuidanceLaw` trait handles guidance laws, optimizations, and other such methods for
-/// controlling the overall thrust direction when tied to a `BaseSpacecraft`. For delta V control,
+/// controlling the overall thrust direction when tied to a `Spacecraft`. For delta V control,
 /// tie the DeltaVctrl to a MissionArc.
 pub trait GuidanceLaw: fmt::Display + Send + Sync {
     /// Returns a unit vector corresponding to the thrust direction in the inertial frame.
