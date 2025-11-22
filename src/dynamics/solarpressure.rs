@@ -32,7 +32,7 @@ use std::sync::Arc;
 #[allow(non_upper_case_globals)]
 pub const SOLAR_FLUX_W_m2: f64 = 1367.0;
 
-/// Computation of solar radiation pressure is based on STK: http://help.agi.com/stk/index.htm#gator/eq-solar.htm .
+/// Computation of solar radiation pressure is based on STK: <http://help.agi.com/stk/index.htm#gator/eq-solar.htm> .
 #[derive(Clone)]
 pub struct SolarPressure {
     /// solar flux at 1 AU, in W/m^2

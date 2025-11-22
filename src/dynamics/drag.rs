@@ -38,14 +38,14 @@ pub enum AtmDensity {
 
 /// `ConstantDrag` implements a constant drag model as defined in Vallado, 4th ed., page 551, with an important caveat.
 ///
-/// **WARNING:** This basic model assumes that the velocity of the spacecraft is identical to the velocity of the upper atmosphere,
+/// **WARNING:** This basic model assumes that the velocity of the spacecraft is identical to the velocity of the upper atmosphere.
 /// This is a **bad** assumption and **should not** be used for high fidelity simulations.
-/// This will be resolved after https://gitlab.com/chrisrabotin/nyx/issues/93 is implemented.
+/// This will be resolved after https://github.com/nyx-space/nyx/issues/317 is implemented.
 #[derive(Clone)]
 pub struct ConstantDrag {
     /// atmospheric density in kg/m^3
     pub rho: f64,
-    /// Geoid causing the drag
+    /// Frame causing the drag
     pub drag_frame: Frame,
     /// Set to true to estimate the coefficient of drag
     pub estimate: bool,

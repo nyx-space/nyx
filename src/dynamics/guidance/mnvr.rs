@@ -32,7 +32,7 @@ use snafu::ResultExt;
 use std::fmt;
 use std::sync::Arc;
 
-/// Mnvr defined a single maneuver. Direction MUST be in the VNC frame (Velocity / Normal / Cross).
+/// Maneuver defines a single maneuver. Direction MUST be in the VNC frame (Velocity / Normal / Cross).
 /// It may be used with a maneuver scheduler.
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Maneuver {
@@ -86,7 +86,7 @@ impl fmt::Display for Maneuver {
 pub enum MnvrRepr {
     /// Represents the maneuver as a fixed vector in the local frame.
     Vector(Vector3<f64>),
-    /// Represents the maneuver as a polynominal of azimuth (right ascension / in-plane) and elevation (declination / out of plane)
+    /// Represents the maneuver as a polynomial of azimuth (right ascension / in-plane) and elevation (declination / out of plane)
     Angles {
         azimuth: CommonPolynomial,
         elevation: CommonPolynomial,
