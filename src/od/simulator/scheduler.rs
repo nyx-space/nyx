@@ -27,20 +27,15 @@ use std::fmt::Debug;
 use typed_builder::TypedBuilder;
 
 /// Defines the handoff from a current ground station to the next one that is visible to prevent overlapping of measurements
-#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize, Default)]
 pub enum Handoff {
     /// If a new station is in visibility of the spacecraft, the "Eager" station will immediately stop tracking and switch over (default)
+    #[default]
     Eager,
     /// If a new station is in visibility of the spacecraft, the "Greedy" station will continue to tracking until the vehicle is below its elevation mask
     Greedy,
     /// If a new station is in visibility of the spacecraft, the "Overlap" station will continue tracking, and so will the other one
     Overlap,
-}
-
-impl Default for Handoff {
-    fn default() -> Self {
-        Self::Eager
-    }
 }
 
 /// A scheduler allows building a scheduling of spaceraft tracking for a set of ground stations.
@@ -67,8 +62,9 @@ pub struct Scheduler {
 }
 
 /// Determines whether tracking is continuous or intermittent.
-#[derive(Copy, Clone, Deserialize, PartialEq, Serialize)]
+#[derive(Copy, Clone, Deserialize, PartialEq, Serialize, Default)]
 pub enum Cadence {
+    #[default]
     Continuous,
     /// An intermittent schedule has On and Off durations.
     Intermittent {
@@ -83,12 +79,6 @@ pub enum Cadence {
         )]
         off: Duration,
     },
-}
-
-impl Default for Cadence {
-    fn default() -> Self {
-        Self::Continuous
-    }
 }
 
 impl Debug for Cadence {

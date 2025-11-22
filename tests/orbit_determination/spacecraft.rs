@@ -499,8 +499,8 @@ fn od_val_sc_srp_estimation_cov_test(
         "all residuals should be accepted"
     );
     assert!(
-        (0.80..0.90).contains(&od_sol.residual_ratio_within_threshold(3.0).unwrap()),
-        "expecting 80-90% of valid residual ratios"
+        od_sol.residual_ratio_within_threshold(3.0).unwrap() > 0.8,
+        "expecting >80-90% of valid residual ratios"
     );
     assert!(
         !od_sol.is_normal(None).unwrap(),

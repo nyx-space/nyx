@@ -39,7 +39,6 @@ impl<'a> MultipleShooting<'a, Node, 3, 3> {
         x0: Spacecraft,
         xf: Orbit,
         node_count: usize,
-        angular_velocity_deg_s: f64,
         body_frame: Frame,
         prop: &'a Propagator<SpacecraftDynamics>,
         almanac: Arc<Almanac>,
@@ -95,7 +94,6 @@ impl<'a> MultipleShooting<'a, Node, 3, 3> {
                     .context(MultiShootPhysicsSnafu)?,
                 orbit_point_bf.longitude_deg(),
                 orbit_point_bf.height_km().context(MultiShootPhysicsSnafu)? + desired_alt_i,
-                angular_velocity_deg_s,
                 this_epoch,
                 body_frame,
             )

@@ -57,9 +57,10 @@ where
 
 /// Enum of supported integration methods, all of which are part of the Runge Kutta family of ordinary differential equation (ODE) solvers.
 /// Nomenclature: X-Y means that this is an X order solver with a Y order error correction step.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum IntegratorMethod {
     /// Runge Kutta 8-9 is the recommended integrator for most application.
+    #[default]
     RungeKutta89,
     /// `Dormand78` is a [Dormand-Prince integrator](https://en.wikipedia.org/wiki/Dormand%E2%80%93Prince_method). Coefficients taken from GMAT `src/base/propagator/PrinceDormand78.cpp`.
     DormandPrince78,
@@ -124,12 +125,6 @@ impl IntegratorMethod {
             Self::CashKarp45 => CashKarp45::B_COEFFS,
             Self::Verner56 => Verner56::B_COEFFS,
         }
-    }
-}
-
-impl Default for IntegratorMethod {
-    fn default() -> Self {
-        Self::RungeKutta89
     }
 }
 

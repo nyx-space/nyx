@@ -7,10 +7,7 @@ use nyx::md::opti::multishoot::*;
 use nyx::md::prelude::*;
 
 use anise::{
-    constants::{
-        frames::{EARTH_J2000, IAU_EARTH_FRAME},
-        usual_planetary_constants::MEAN_EARTH_ANGULAR_VELOCITY_DEG_S,
-    },
+    constants::frames::{EARTH_J2000, IAU_EARTH_FRAME},
     prelude::Almanac,
 };
 use nyx_space::cosmic::Mass;
@@ -68,7 +65,6 @@ fn alt_orbit_raising_cov_test(almanac: Arc<Almanac>) {
         sc,
         target,
         node_count,
-        MEAN_EARTH_ANGULAR_VELOCITY_DEG_S,
         iau_earth,
         &prop,
         almanac.clone(),
