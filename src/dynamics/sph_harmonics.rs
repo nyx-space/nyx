@@ -214,18 +214,19 @@ impl AccelModel for Harmonics {
             let mut sum: Vector4<f64> = Vector4::zeros();
             rho_np1 *= rho;
 
+            let sqrt2 = 2.0_f64.sqrt();
             for m in 0..=min(n, max_order) {
                 let (c_val, s_val) = self.stor.cs_nm(n, m);
-                let d_ = (c_val * r_m[m] + s_val * i_m[m]) * 2.0.sqrt();
+                let d_ = (c_val * r_m[m] + s_val * i_m[m]) * sqrt2;
                 let e_ = if m == 0 {
                     0.0
                 } else {
-                    (c_val * r_m[m - 1] + s_val * i_m[m - 1]) * 2.0.sqrt()
+                    (c_val * r_m[m - 1] + s_val * i_m[m - 1]) * sqrt2
                 };
                 let f_ = if m == 0 {
                     0.0
                 } else {
-                    (s_val * r_m[m - 1] - c_val * i_m[m - 1]) * 2.0.sqrt()
+                    (s_val * r_m[m - 1] - c_val * i_m[m - 1]) * sqrt2
                 };
 
                 sum.x += (m as f64) * a_nm[(n, m)] * e_;
