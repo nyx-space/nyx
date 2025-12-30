@@ -23,13 +23,13 @@ use crate::linalg::DefaultAllocator;
 use crate::mc::results::{PropResult, Results, Run};
 use crate::mc::DispersedState;
 use crate::md::trajectory::Interpolatable;
-use crate::md::EventEvaluator;
 use crate::propagators::Propagator;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::time::Unit;
 use crate::time::{Duration, Epoch};
 use crate::State;
 use anise::almanac::Almanac;
+use anise::analysis::event::Event;
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use log::info;
 use rand::SeedableRng;
@@ -94,14 +94,12 @@ where
         prop: Propagator<D>,
         almanac: Arc<Almanac>,
         max_duration: Duration,
-        event: &F,
+        event: &Event,
         trigger: usize,
         num_runs: usize,
     ) -> Results<S, PropResult<S>>
     where
         D: Dynamics<StateType = S>,
-
-        F: EventEvaluator<S>,
         DefaultAllocator: Allocator<<D::StateType as State>::Size>
             + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
             + Allocator<<D::StateType as State>::VecLength>,
@@ -113,20 +111,18 @@ where
     /// Generate states and propagate each independently until a specific event is found `trigger` times.
     #[must_use = "Monte Carlo result must be used"]
     #[allow(clippy::needless_lifetimes)]
-    pub fn resume_run_until_nth_event<D, F>(
+    pub fn resume_run_until_nth_event<D>(
         &self,
         prop: Propagator<D>,
         almanac: Arc<Almanac>,
         skip: usize,
         max_duration: Duration,
-        event: &F,
+        event: &Event,
         trigger: usize,
         num_runs: usize,
     ) -> Results<S, PropResult<S>>
     where
         D: Dynamics<StateType = S>,
-
-        F: EventEvaluator<S>,
         DefaultAllocator: Allocator<<D::StateType as State>::Size>
             + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
             + Allocator<<D::StateType as State>::VecLength>,

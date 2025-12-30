@@ -21,8 +21,6 @@ use crate::dynamics::{Dynamics, DynamicsAlmanacSnafu};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, OVector};
 use crate::md::trajectory::{Interpolatable, Traj};
-use crate::md::EventEvaluator;
-use crate::propagators::TrajectoryEventSnafu;
 use crate::time::{Duration, Epoch, Unit};
 use crate::State;
 use anise::almanac::Almanac;
@@ -86,11 +84,15 @@ where
     }
 
     #[allow(clippy::erasing_op)]
-    fn for_duration_channel_option(
+    pub(crate) fn propagate<F>(
         &mut self,
         duration: Duration,
         maybe_tx_chan: Option<Sender<D::StateType>>,
-    ) -> Result<D::StateType, PropagationError> {
+        mut stop_condition: Option<F>,
+    ) -> Result<D::StateType, PropagationError>
+    where
+        F: FnMut(D::StateType) -> Result<bool, PropagationError>,
+    {
         if duration == 0 * Unit::Second {
             return Ok(self.state);
         }
@@ -149,6 +151,8 @@ where
             if (!backprop && epoch + self.step_size > stop_time)
                 || (backprop && epoch + self.step_size <= stop_time)
             {
+                // We don't check for the interrupt condition on the last step.
+                // If we're reached this far without hitting it, we most certainly won't trigger it.
                 if stop_time == epoch {
                     // No propagation necessary
                     #[cfg(not(target_arch = "wasm32"))]
@@ -173,6 +177,7 @@ where
 
                     return Ok(self.state);
                 }
+
                 // Take one final step of exactly the needed duration until the stop time
                 let prev_step_size = self.step_size;
                 let prev_step_kind = self.fixed_step;
@@ -232,7 +237,20 @@ where
                         }
                     }
                 }
+
                 self.single_step()?;
+
+                if let Some(ref mut condition) = stop_condition {
+                    if condition(self.state)? {
+                        // Stopping condition triggered. We don't send
+                        // the new state on the channel for the caller to know that the exact
+                        // condition they are seeking is between the last state on the channel
+                        // and the state we're returning
+
+                        return Ok(self.state);
+                    }
+                }
+
                 // Publish to channel if provided
                 if let Some(ref chan) = maybe_tx_chan {
                     if let Err(e) = chan.send(self.state) {
@@ -245,7 +263,7 @@ where
 
     /// This method propagates the provided Dynamics for the provided duration.
     pub fn for_duration(&mut self, duration: Duration) -> Result<D::StateType, PropagationError> {
-        self.for_duration_channel_option(duration, None)
+        self.propagate(duration, None, Some(|_| Ok(false)))
     }
 
     /// This method propagates the provided Dynamics for the provided duration and publishes each state on the channel.
@@ -254,7 +272,7 @@ where
         duration: Duration,
         tx_chan: Sender<D::StateType>,
     ) -> Result<D::StateType, PropagationError> {
-        self.for_duration_channel_option(duration, Some(tx_chan))
+        self.propagate(duration, Some(tx_chan), Some(|_| Ok(false)))
     }
 
     /// Propagates the provided Dynamics until the provided epoch. Returns the end state.
@@ -320,48 +338,6 @@ where
     {
         let duration: Duration = end_time - self.state.epoch();
         self.for_duration_with_traj(duration)
-    }
-
-    /// Propagate until a specific event is found once.
-    /// Returns the state found and the trajectory until `max_duration`
-    pub fn until_event<F: EventEvaluator<D::StateType>>(
-        &mut self,
-        max_duration: Duration,
-        event: &F,
-    ) -> Result<(D::StateType, Traj<D::StateType>), PropagationError>
-    where
-        <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
-        D::StateType: Interpolatable,
-    {
-        self.until_nth_event(max_duration, event, 0)
-    }
-
-    /// Propagate until a specific event is found `trigger` times.
-    /// Returns the state found and the trajectory until `max_duration`
-    pub fn until_nth_event<F: EventEvaluator<D::StateType>>(
-        &mut self,
-        max_duration: Duration,
-        event: &F,
-        trigger: usize,
-    ) -> Result<(D::StateType, Traj<D::StateType>), PropagationError>
-    where
-        <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
-        D::StateType: Interpolatable,
-    {
-        info!("Searching for {event}");
-
-        let (_, traj) = self.for_duration_with_traj(max_duration)?;
-        // Now, find the requested event
-        let events = traj
-            .find(event, None, self.almanac.clone())
-            .context(TrajectoryEventSnafu)?;
-        match events.get(trigger) {
-            Some(event_state) => Ok((event_state.state, traj)),
-            None => Err(PropagationError::NthEventError {
-                nth: trigger,
-                found: events.len(),
-            }),
-        }
     }
 
     /// Take a single propagator step and emit the result on the TX channel (if enabled)

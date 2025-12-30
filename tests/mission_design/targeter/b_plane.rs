@@ -1,5 +1,6 @@
 extern crate nyx_space as nyx;
 
+use anise::analysis::prelude::Event;
 use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SUN};
 use anise::constants::frames::MOON_J2000;
 use nyx::md::prelude::*;

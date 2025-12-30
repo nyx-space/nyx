@@ -53,18 +53,21 @@ fn main() -> Result<(), Box<dyn Error>> {
         .process(true)
         .map_err(Box::new)?;
 
-    let mut moon_pc = almanac.planetary_data.get_by_id(MOON)?;
+    let mut moon_pc = almanac.get_planetary_data_from_id(MOON).unwrap();
     moon_pc.mu_km3_s2 = 4902.74987;
-    almanac.planetary_data.set_by_id(MOON, moon_pc)?;
+    almanac.set_planetary_data_from_id(MOON, moon_pc).unwrap();
 
-    let mut earth_pc = almanac.planetary_data.get_by_id(EARTH)?;
-    earth_pc.mu_km3_s2 = 398600.436;
-    almanac.planetary_data.set_by_id(EARTH, earth_pc)?;
+    let mut earth = almanac.get_planetary_data_from_id(EARTH).unwrap();
+    earth.mu_km3_s2 = 398600.436;
+    almanac.set_planetary_data_from_id(EARTH, earth).unwrap();
 
     // Save this new kernel for reuse.
     // In an operational context, this would be part of the "Lock" process, and should not change throughout the mission.
     almanac
         .planetary_data
+        .values()
+        .next()
+        .unwrap()
         .save_as(&data_folder.join("lro-specific.pca"), true)?;
 
     // Lock the almanac (an Arc is a read only structure).
