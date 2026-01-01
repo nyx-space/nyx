@@ -21,11 +21,12 @@ use crate::dynamics::Dynamics;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 use crate::md::trajectory::{Interpolatable, Traj};
-use crate::propagators::{PropAnalysisSnafu, TrajectoryEventSnafu};
+use crate::propagators::{PropAlmanacSnafu, PropAnalysisSnafu, TrajectoryEventSnafu};
 use crate::time::{Duration, Epoch};
 use crate::State;
 use anise::analysis::event::Event;
 use anise::analysis::{brent_solver, AnalysisError};
+use anise::frames::Frame;
 use log::info;
 use rayon::iter::ParallelBridge;
 use rayon::prelude::ParallelIterator;
@@ -46,12 +47,13 @@ where
         &mut self,
         max_duration: Duration,
         event: &Event,
+        event_frame: Option<Frame>,
     ) -> Result<(D::StateType, Traj<D::StateType>), PropagationError>
     where
         <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
         D::StateType: Interpolatable,
     {
-        self.until_nth_event(max_duration, event, 1)
+        self.until_nth_event(max_duration, event, event_frame, 1)
     }
 
     /// Propagates the dynamics until the specified event has occurred `trigger` times, or until `max_duration` is reached.
@@ -84,7 +86,8 @@ where
     pub fn until_nth_event(
         &mut self,
         max_duration: Duration,
-        event: &Event, // TODO: Support a frame for the event
+        event: &Event,
+        event_frame: Option<Frame>,
         trigger: usize,
     ) -> Result<(D::StateType, Traj<D::StateType>), PropagationError>
     where
@@ -95,13 +98,29 @@ where
 
         let mut crossing_counts = 0;
         let closure_almanac = self.almanac.clone();
+        let orbit = if let Some(observer_frame) = event_frame {
+            self.almanac
+                .transform_to(self.state.orbit(), observer_frame, None)
+                .context(PropAlmanacSnafu)?
+        } else {
+            self.state.orbit()
+        };
+
         let mut y_prev = event
-            .eval(self.state.orbit(), &self.almanac)
+            .eval(orbit, &self.almanac)
             .context(PropAnalysisSnafu)?;
 
         let enough_crossings = |next_state: D::StateType| -> Result<bool, PropagationError> {
+            let orbit = if let Some(observer_frame) = event_frame {
+                closure_almanac
+                    .transform_to(next_state.orbit(), observer_frame, None)
+                    .context(PropAlmanacSnafu)?
+            } else {
+                next_state.orbit()
+            };
+
             let y_next = event
-                .eval(next_state.orbit(), &closure_almanac)
+                .eval(orbit, &closure_almanac)
                 .context(PropAnalysisSnafu)?;
 
             let delta = (y_next - y_prev).abs();

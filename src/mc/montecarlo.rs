@@ -144,7 +144,7 @@ where
             |(prop, tx), (index, dispersed_state)| {
                 let result = prop
                     .with(dispersed_state.state, almanac.clone())
-                    .until_nth_event(max_duration, event, trigger);
+                    .until_nth_event(max_duration, event, None, trigger);
 
                 // Build a single run result
                 let run = Run {

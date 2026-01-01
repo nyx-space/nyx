@@ -27,7 +27,7 @@ pub mod prelude {
     pub use super::{
         targeter::*,
         trajectory::{ExportCfg, Interpolatable, Traj},
-        Event, StateParameter, Trajectory,
+        StateParameter, Trajectory,
     };
     pub use crate::cosmic::{try_achieve_b_plane, BPlane, BPlaneTarget, GuidanceMode, OrbitDual};
     pub use crate::dynamics::{
@@ -41,6 +41,7 @@ pub mod prelude {
     pub use crate::Spacecraft;
     pub use crate::{State, TimeTagged};
 
+    pub use anise::analysis::event::Event;
     pub use anise::prelude::*;
     pub use std::sync::Arc;
 }

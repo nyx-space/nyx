@@ -2,7 +2,6 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
 use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SATURN_BARYCENTER, SUN};
-use anise::constants::frames::IAU_EARTH_FRAME;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::SpacecraftDynamics;
@@ -49,7 +48,6 @@ fn almanac() -> Arc<Almanac> {
 fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
     // Define the ground stations.
     let elevation_mask = 0.0;
 
@@ -67,7 +65,6 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
         elevation_mask,
         StochasticNoise::default_range_km(),
         StochasticNoise::default_doppler_km_s(),
-        iau_earth,
     );
     // Set the integration time so as to generate two way measurements
     dss65_madrid.integration_time = Some(60.seconds());
@@ -75,7 +72,6 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
         elevation_mask,
         StochasticNoise::default_range_km(),
         StochasticNoise::default_doppler_km_s(),
-        iau_earth,
     );
     dss34_canberra.integration_time = Some(60.seconds());
 

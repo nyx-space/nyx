@@ -106,7 +106,7 @@ fn tgt_b_plane_lunar_transfer(almanac: Arc<Almanac>) {
     // Propagate to periapsis
     let periapse_spacecraft = prop
         .with(spacecraft, almanac.clone())
-        .until_nth_event(1 * orbit.period().unwrap(), &Event::periapsis(), 1)
+        .until_nth_event(1 * orbit.period().unwrap(), &Event::periapsis(), None, 1)
         .unwrap()
         .0;
 

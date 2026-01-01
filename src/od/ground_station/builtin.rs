@@ -16,14 +16,16 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anise::astro::TerrainMask;
+use anise::constants::frames::IAU_EARTH_FRAME;
+
 use super::*;
 
 impl GroundStation {
     pub fn dss65_madrid(
-        elevation_mask: f64,
+        elevation_mask_deg: f64,
         range_noise_km: StochasticNoise,
         doppler_noise_km_s: StochasticNoise,
-        iau_earth: Frame,
     ) -> Self {
         let mut measurement_types = IndexSet::new();
         measurement_types.insert(MeasurementType::Range);
@@ -35,11 +37,14 @@ impl GroundStation {
 
         Self {
             name: "Madrid".to_string(),
-            elevation_mask_deg: elevation_mask,
-            latitude_deg: 40.427_222,
-            longitude_deg: 4.250_556,
-            height_km: 0.834_939,
-            frame: iau_earth,
+            location: Location {
+                terrain_mask: vec![TerrainMask::from_flat_terrain(elevation_mask_deg)],
+                terrain_mask_ignored: false,
+                latitude_deg: 40.427_222,
+                longitude_deg: 4.250_556,
+                height_km: 0.834_939,
+                frame: IAU_EARTH_FRAME.into(),
+            },
             measurement_types,
             integration_time: None,
             light_time_correction: false,
@@ -49,10 +54,9 @@ impl GroundStation {
     }
 
     pub fn dss34_canberra(
-        elevation_mask: f64,
+        elevation_mask_deg: f64,
         range_noise_km: StochasticNoise,
         doppler_noise_km_s: StochasticNoise,
-        iau_earth: Frame,
     ) -> Self {
         let mut measurement_types = IndexSet::new();
         measurement_types.insert(MeasurementType::Range);
@@ -64,11 +68,14 @@ impl GroundStation {
 
         Self {
             name: "Canberra".to_string(),
-            elevation_mask_deg: elevation_mask,
-            latitude_deg: -35.398_333,
-            longitude_deg: 148.981_944,
-            height_km: 0.691_750,
-            frame: iau_earth,
+            location: Location {
+                terrain_mask: vec![TerrainMask::from_flat_terrain(elevation_mask_deg)],
+                terrain_mask_ignored: false,
+                latitude_deg: -35.398_333,
+                longitude_deg: 148.981_944,
+                height_km: 0.691_750,
+                frame: IAU_EARTH_FRAME.into(),
+            },
             measurement_types,
             integration_time: None,
             light_time_correction: false,
@@ -78,10 +85,9 @@ impl GroundStation {
     }
 
     pub fn dss13_goldstone(
-        elevation_mask: f64,
+        elevation_mask_deg: f64,
         range_noise_km: StochasticNoise,
         doppler_noise_km_s: StochasticNoise,
-        iau_earth: Frame,
     ) -> Self {
         let mut measurement_types = IndexSet::new();
         measurement_types.insert(MeasurementType::Range);
@@ -93,11 +99,14 @@ impl GroundStation {
 
         Self {
             name: "Goldstone".to_string(),
-            elevation_mask_deg: elevation_mask,
-            latitude_deg: 35.247_164,
-            longitude_deg: 243.205,
-            height_km: 1.071_149_04,
-            frame: iau_earth,
+            location: Location {
+                terrain_mask: vec![TerrainMask::from_flat_terrain(elevation_mask_deg)],
+                terrain_mask_ignored: false,
+                latitude_deg: 35.247_164,
+                longitude_deg: 243.205,
+                height_km: 1.071_149_04,
+                frame: IAU_EARTH_FRAME.into(),
+            },
             measurement_types,
             integration_time: None,
             light_time_correction: false,

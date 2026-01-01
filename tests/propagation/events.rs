@@ -2,6 +2,10 @@ extern crate nyx_space as nyx;
 use std::{fmt::Write, sync::Arc};
 
 use anise::{
+    analysis::{
+        expr::ScalarExpr,
+        prelude::{Condition, OrbitalElement},
+    },
     astro::Occultation,
     constants::frames::{EARTH_J2000, IAU_EARTH_FRAME, SUN_J2000},
     prelude::Almanac,
@@ -32,8 +36,14 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
     // Track how many times we've passed by that TA again
     let peri_event = Event::periapsis(); // Special event shortcut!
     let apo_event = Event::apoapsis(); // Special event shortcut!
-    let ta_event0 = Event::new(StateParameter::TrueAnomaly, 35.1);
-    let ta_event1 = Event::new(StateParameter::TrueAnomaly, 235.1);
+    let ta_event0 = Event::new(
+        ScalarExpr::Element(OrbitalElement::TrueAnomaly),
+        Condition::Equals(35.1),
+    );
+    let ta_event1 = Event::new(
+        ScalarExpr::Element(OrbitalElement::TrueAnomaly),
+        Condition::Equals(235.1),
+    );
 
     let events = vec![peri_event, apo_event, ta_event0, ta_event1];
 
@@ -48,8 +58,8 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
 
     // Find all of the events
     for (e_num, e) in events.iter().enumerate() {
-        let found_events = traj
-            .find(e, Some(Unit::Minute * 10), almanac.clone())
+        let found_events = almanac
+            .report_events(&traj, e, traj.first().epoch(), traj.last().epoch())
             .unwrap();
         let pretty = found_events
             .iter()
@@ -57,7 +67,7 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
                 let _ = writeln!(
                     output,
                     "{:x}\tevent value: {}",
-                    orbit_event.state, orbit_event.value
+                    orbit_event.orbit, orbit_event.value
                 );
                 output
             });

@@ -17,6 +17,8 @@
 */
 
 use anise::almanac::Almanac;
+use anise::analysis::AnalysisError;
+use anise::structure::LocationDataSet;
 use hifitime::{Duration, Epoch, TimeSeries, TimeUnits};
 use log::{info, warn};
 use num::integer::gcd;
@@ -283,11 +285,28 @@ impl TrackingArcSim<Spacecraft, GroundStation> {
     pub fn generate_schedule(
         &self,
         almanac: Arc<Almanac>,
-    ) -> Result<BTreeMap<String, TrkConfig>, NyxError> {
+    ) -> Result<BTreeMap<String, TrkConfig>, AnalysisError> {
+        // Build a Location Dataset so we can use ANISE's visibility finder.
+        let mut loc_dataset = LocationDataSet::default();
+        let mut loc_ids = Vec::with_capacity(self.devices.len());
+        for (dno, device) in self.devices.values().enumerate() {
+            let loc_id = dno as i32 + 1_000;
+            loc_dataset
+                .push(device.location.clone(), Some(loc_id), Some(&device.name))
+                .unwrap();
+            loc_ids.push((device.name.clone(), loc_id));
+        }
+
+        // Deep clone of the Almanac so we can insert the locations of these ground stations.
+        let almanac = (*almanac).clone();
+        let almanac = almanac.with_location_data(loc_dataset);
+
         // Consider using find_all via the heuristic
         let mut built_cfg = self.configs.clone();
 
-        for (name, device) in self.devices.iter() {
+        let traj = &self.trajectory;
+
+        for (name, loc_id) in &loc_ids {
             if let Some(cfg) = self.configs.get(name) {
                 if let Some(scheduler) = cfg.scheduler {
                     info!("Building schedule for {name}");
@@ -297,74 +316,74 @@ impl TrackingArcSim<Spacecraft, GroundStation> {
                     built_cfg.get_mut(name).unwrap().scheduler = None;
                     built_cfg.get_mut(name).unwrap().strands = Some(Vec::new());
 
-                    // Convert the trajectory into the ground station frame.
-                    let traj = self.trajectory.to_frame(device.frame, almanac.clone())?;
+                    let visibilty_arcs = almanac.report_visibility_arcs(
+                        traj,
+                        *loc_id,
+                        traj.first().epoch(),
+                        traj.last().epoch(),
+                        cfg.sampling,
+                        None,
+                    )?;
+                    for arc in visibilty_arcs {
+                        let strand_start = arc.rise.orbit.epoch;
+                        let strand_end = arc.fall.orbit.epoch;
 
-                    match traj.find_arcs(&device, None, almanac.clone()) {
-                        Err(_) => info!("No measurements from {name}"),
-                        Ok(elevation_arcs) => {
-                            for arc in elevation_arcs {
-                                let strand_start = arc.rise.state.epoch();
-                                let strand_end = arc.fall.state.epoch();
-
-                                if strand_end - strand_start
-                                    < cfg.sampling * i64::from(scheduler.min_samples)
-                                {
-                                    info!(
+                        if strand_end - strand_start
+                            < cfg.sampling * i64::from(scheduler.min_samples)
+                        {
+                            info!(
                                     "Too few samples from {name} opportunity from {strand_start} to {strand_end}, discarding strand",
                                 );
-                                    continue;
-                                }
-
-                                let mut strand_range = Strand {
-                                    start: strand_start,
-                                    end: strand_end,
-                                };
-
-                                // If there is an alignment, apply it
-                                if let Some(alignment) = scheduler.sample_alignment {
-                                    strand_range.start = strand_range.start.round(alignment);
-                                    strand_range.end = strand_range.end.round(alignment);
-                                }
-
-                                if let Cadence::Intermittent { on, off } = scheduler.cadence {
-                                    // Check that the next start time is within the allocated time
-                                    if let Some(prev_strand) =
-                                        built_cfg[name].strands.as_ref().unwrap().last()
-                                    {
-                                        if prev_strand.end + off > strand_range.start {
-                                            // We're turning on the tracking sooner than the schedule allows, so let's fix that.
-                                            strand_range.start = prev_strand.end + off;
-                                            // Check that we didn't eat into the whole tracking opportunity
-                                            if strand_range.start > strand_end {
-                                                // Lost this whole opportunity.
-                                                info!("Discarding {name} opportunity from {strand_start} to {strand_end} due to cadence {:?}", scheduler.cadence);
-                                                continue;
-                                            }
-                                        }
-                                    }
-                                    // Check that we aren't tracking for longer than configured
-                                    if strand_range.end - strand_range.start > on {
-                                        strand_range.end = strand_range.start + on;
-                                    }
-                                }
-
-                                // We've found when the spacecraft is below the horizon, so this is a new strand.
-                                built_cfg
-                                    .get_mut(name)
-                                    .unwrap()
-                                    .strands
-                                    .as_mut()
-                                    .unwrap()
-                                    .push(strand_range);
-                            }
-
-                            info!(
-                                "Built {} tracking strands for {name}",
-                                built_cfg[name].strands.as_ref().unwrap().len()
-                            );
+                            continue;
                         }
+
+                        let mut strand_range = Strand {
+                            start: strand_start,
+                            end: strand_end,
+                        };
+
+                        // If there is an alignment, apply it
+                        if let Some(alignment) = scheduler.sample_alignment {
+                            strand_range.start = strand_range.start.round(alignment);
+                            strand_range.end = strand_range.end.round(alignment);
+                        }
+
+                        if let Cadence::Intermittent { on, off } = scheduler.cadence {
+                            // Check that the next start time is within the allocated time
+                            if let Some(prev_strand) =
+                                built_cfg[name].strands.as_ref().unwrap().last()
+                            {
+                                if prev_strand.end + off > strand_range.start {
+                                    // We're turning on the tracking sooner than the schedule allows, so let's fix that.
+                                    strand_range.start = prev_strand.end + off;
+                                    // Check that we didn't eat into the whole tracking opportunity
+                                    if strand_range.start > strand_end {
+                                        // Lost this whole opportunity.
+                                        info!("Discarding {name} opportunity from {strand_start} to {strand_end} due to cadence {:?}", scheduler.cadence);
+                                        continue;
+                                    }
+                                }
+                            }
+                            // Check that we aren't tracking for longer than configured
+                            if strand_range.end - strand_range.start > on {
+                                strand_range.end = strand_range.start + on;
+                            }
+                        }
+
+                        // We've found when the spacecraft is below the horizon, so this is a new strand.
+                        built_cfg
+                            .get_mut(name)
+                            .unwrap()
+                            .strands
+                            .as_mut()
+                            .unwrap()
+                            .push(strand_range);
                     }
+
+                    info!(
+                        "Built {} tracking strands for {name}",
+                        built_cfg[name].strands.as_ref().unwrap().len()
+                    );
                 }
             }
         }
@@ -417,7 +436,7 @@ impl TrackingArcSim<Spacecraft, GroundStation> {
     }
 
     /// Sets the schedule to that built in `build_schedule`
-    pub fn build_schedule(&mut self, almanac: Arc<Almanac>) -> Result<(), NyxError> {
+    pub fn build_schedule(&mut self, almanac: Arc<Almanac>) -> Result<(), AnalysisError> {
         self.configs = self.generate_schedule(almanac)?;
 
         Ok(())

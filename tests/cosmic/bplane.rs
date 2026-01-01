@@ -50,7 +50,7 @@ fn val_b_plane_gmat(almanac: Arc<Almanac>) {
 
     let (out, traj) = prop
         .with(orbit.into(), almanac.clone())
-        .until_event(1.1 * orbit.period().unwrap(), &Event::periapsis())
+        .until_event(1.1 * orbit.period().unwrap(), &Event::periapsis(), None)
         .unwrap();
 
     println!("{out}\n{out:x}");

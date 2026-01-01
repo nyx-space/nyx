@@ -59,14 +59,12 @@ fn blse_robust_large_disp_cov_test(
         elevation_mask,
         StochasticNoise::default_range_km(),
         StochasticNoise::default_doppler_km_s(),
-        iau_earth,
     );
 
     let dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
         StochasticNoise::default_range_km(),
         StochasticNoise::default_doppler_km_s(),
-        iau_earth,
     );
 
     // Define the tracking configurations

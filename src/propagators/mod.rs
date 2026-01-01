@@ -16,7 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use anise::{analysis::AnalysisError, errors::MathError};
+use anise::{
+    analysis::AnalysisError,
+    errors::{AlmanacError, MathError},
+};
 use snafu::prelude::*;
 use std::fmt;
 
@@ -75,5 +78,9 @@ pub enum PropagationError {
     PropAnalysisError {
         #[snafu(source(from(AnalysisError, Box::new)))]
         source: Box<AnalysisError>,
+    },
+    PropAlmanacError {
+        #[snafu(source(from(AlmanacError, Box::new)))]
+        source: Box<AlmanacError>,
     },
 }
