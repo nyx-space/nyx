@@ -57,7 +57,7 @@ parquet = { version = "56.0.0", default-features = false, features = [
 arrow = "56.0.0"
 shadow-rs = { version = "1.0.1", default-features = false }
 serde_yml = "0.0.12"
-whoami = "1.3.0"
+whoami = "2.0.0"
 either = { version = "1.8.1", features = ["serde"] }
 num = "0.4.0"
 enum-iterator = "2.0.0"
