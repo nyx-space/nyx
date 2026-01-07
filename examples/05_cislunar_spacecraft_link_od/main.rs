@@ -113,7 +113,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     llo_traj
         .clone()
         .filter_by_offset(..2.hours())
-        .to_parquet_simple(out.join("05_caps_llo_truth.pq"), almanac.clone())?;
+        .to_parquet_simple(out.join("05_caps_llo_truth.pq"))?;
 
     /* == Setup the interlink == */
 

@@ -48,9 +48,6 @@ pub mod prelude {
 
 pub mod trajectory;
 
-pub(crate) mod events;
-pub use events::{Event, EventEvaluator};
-
 pub mod objective;
 pub mod opti;
 pub use opti::targeter;

@@ -16,7 +16,7 @@ use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::SpacecraftDynamics;
 use nyx::md::StateParameter;
 use nyx::propagators::{IntegratorOptions, Propagator};
-use nyx::time::{Epoch, TimeUnits, Unit};
+use nyx::time::{Epoch, TimeUnits};
 use nyx::{Spacecraft, State};
 
 use nyx_space::propagators::ErrorControl;
@@ -398,7 +398,7 @@ fn event_and_combination(almanac: Arc<Almanac>) {
         ScalarExpr::Element(OrbitalElement::Declination),
         Condition::Between(3.0, 6.0),
     );
-    let mut decl_deg = 0.0;
+
     if let Ok(matching_states) = almanac.report_events(
         &traj_moon,
         &event,
@@ -406,7 +406,7 @@ fn event_and_combination(almanac: Arc<Almanac>) {
         traj.last().epoch(),
     ) {
         for sc_decl_zero in matching_states {
-            decl_deg = sc_decl_zero.orbit.declination_deg();
+            let decl_deg = sc_decl_zero.orbit.declination_deg();
             println!("{sc_decl_zero} => decl = {decl_deg} deg",);
             assert!((decl_deg - 6.0).abs() < 3.0);
         }

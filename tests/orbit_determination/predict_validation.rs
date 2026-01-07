@@ -4,7 +4,7 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
 use anise::constants::celestial_objects::{EARTH, SUN};
-use anise::constants::frames::{IAU_EARTH_FRAME, IAU_MOON_FRAME};
+use anise::constants::frames::IAU_MOON_FRAME;
 use indexmap::IndexSet;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::OrbitalDynamics;

@@ -3,10 +3,12 @@ extern crate nyx_space as nyx;
 
 use std::sync::Arc;
 
+use anise::analysis::prelude::{Condition, Event, OrbitalElement, ScalarExpr};
+
 use self::nyx::cosmic::{GuidanceMode, Orbit, Spacecraft};
 use self::nyx::dynamics::guidance::{Objective, Ruggiero, Thruster};
 use self::nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
-use self::nyx::md::{Event, StateParameter};
+use self::nyx::md::StateParameter;
 use self::nyx::propagators::{IntegratorOptions, Propagator};
 use self::nyx::time::{Epoch, Unit};
 
@@ -52,8 +54,14 @@ fn qlaw_as_ruggiero_case_a(almanac: Arc<Almanac>) {
 
     // Events we will search later
     let events = vec![
-        Event::within_tolerance(StateParameter::SMA, 42_000.0, 1.0),
-        Event::within_tolerance(StateParameter::Eccentricity, 0.01, 5e-5),
+        Event::new(
+            ScalarExpr::Element(OrbitalElement::SemiMajorAxis),
+            Condition::Between(41_999.0, 42_001.0),
+        ),
+        Event::new(
+            ScalarExpr::Element(OrbitalElement::Eccentricity),
+            Condition::Equals(0.01),
+        ),
     ];
 
     let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
@@ -79,10 +87,12 @@ fn qlaw_as_ruggiero_case_a(almanac: Arc<Almanac>) {
     println!("[qlaw_as_ruggiero_case_a] prop usage: {prop_usage:.3} kg");
     // Find all of the events
     for e in &events {
+        let jackpot = almanac
+            .report_events(&traj, e, traj.start_epoch(), traj.end_epoch())
+            .unwrap();
         println!(
-            "[qlaw_as_ruggiero_case_a] Found {} events of kind {}",
-            traj.find(e, None, almanac.clone()).unwrap().len(),
-            e
+            "[qlaw_as_ruggiero_case_a] Found {} events of kind {e}",
+            jackpot.len(),
         );
     }
 
@@ -384,7 +394,7 @@ fn qlaw_as_ruggiero_case_f(almanac: Arc<Almanac>) {
         .unwrap();
 
     // Save as parquet
-    traj.to_parquet_simple("data/04_output/rugg_case_f.parquet", almanac)
+    traj.to_parquet_simple("data/04_output/rugg_case_f.parquet")
         .unwrap();
 
     let prop_usage = prop_mass - final_state.mass.prop_mass_kg;

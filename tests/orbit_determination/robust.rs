@@ -131,11 +131,8 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
         .iter()
         .collect();
 
-    traj.to_parquet_simple(
-        path.join("ekf_robust_two_way_traj.parquet"),
-        almanac.clone(),
-    )
-    .unwrap();
+    traj.to_parquet_simple(path.join("ekf_robust_two_way_traj.parquet"))
+        .unwrap();
     arc.to_parquet_simple(path.join("ekf_robust_two_way_msr.parquet"))
         .unwrap();
 

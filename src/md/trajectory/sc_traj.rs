@@ -34,7 +34,6 @@ use crate::errors::{FromAlmanacSnafu, NyxError};
 use crate::io::watermark::prj_name_ver;
 use crate::io::{InputOutputError, MissingDataSnafu, ParquetSnafu, StdIOSnafu};
 use crate::md::prelude::{Interpolatable, StateParameter};
-use crate::md::EventEvaluator;
 use crate::time::{Duration, Epoch, Format, Formatter, TimeUnits};
 use crate::State;
 use std::collections::{HashMap, HashSet};
@@ -133,11 +132,10 @@ impl Traj<Spacecraft> {
         &self,
         path: P,
         body_fixed_frame: Frame,
-        events: Option<Vec<&dyn EventEvaluator<Spacecraft>>>,
         metadata: Option<HashMap<String, String>>,
         almanac: Arc<Almanac>,
     ) -> Result<PathBuf, Box<dyn Error>> {
-        let traj = self.to_frame(body_fixed_frame, almanac.clone())?;
+        let traj = self.to_frame(body_fixed_frame, almanac)?;
 
         let mut cfg = ExportCfg::builder()
             .step(1.minutes())
@@ -150,7 +148,7 @@ impl Traj<Spacecraft> {
             .build();
         cfg.metadata = metadata;
 
-        traj.to_parquet(path, events, cfg, almanac)
+        traj.to_parquet(path, cfg)
     }
 
     /// Initialize a new spacecraft trajectory from the path to a CCSDS OEM file.

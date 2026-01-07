@@ -17,15 +17,12 @@
 */
 
 use anise::almanac::Almanac;
+use anise::analysis::prelude::Event;
 use anise::astro::Occultation;
 use anise::constants::frames::{EARTH_J2000, MOON_J2000, SUN_J2000};
 use anise::errors::AlmanacResult;
-use snafu::ResultExt;
 
 pub use super::{Frame, Orbit, Spacecraft};
-use crate::errors::{EventAlmanacSnafu, EventError};
-use crate::md::EventEvaluator;
-use crate::time::{Duration, Unit};
 use std::fmt;
 use std::sync::Arc;
 
@@ -82,108 +79,21 @@ impl EclipseLocator {
 
     /// Creates an umbra event from this eclipse locator.
     /// Evaluation of the event, returns 0.0 for umbra, 1.0 for visibility (no shadow) and some value in between for penumbra
-    pub fn to_umbra_event(&self) -> UmbraEvent {
-        UmbraEvent {
-            e_loc: self.clone(),
-        }
+    pub fn to_umbra_events(&self) -> Vec<Event> {
+        self.shadow_bodies
+            .iter()
+            .copied()
+            .map(|eclipsing_frame| Event::total_eclipse(eclipsing_frame))
+            .collect()
     }
 
     /// Creates a penumbra event from this eclipse locator
     // Evaluation of the event, returns 0.0 for umbra, 1.0 for visibility (no shadow) and some value in between for penumbra
-    pub fn to_penumbra_event(&self) -> PenumbraEvent {
-        PenumbraEvent {
-            e_loc: self.clone(),
-        }
-    }
-}
-
-/// An event to find the darkest eclipse state (more than 98% shadow)
-pub struct UmbraEvent {
-    e_loc: EclipseLocator,
-}
-
-impl fmt::Display for UmbraEvent {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "umbra event {}", self.e_loc)
-    }
-}
-
-impl EventEvaluator<Spacecraft> for UmbraEvent {
-    // Evaluation of the event
-    fn eval(&self, sc: &Spacecraft, almanac: Arc<Almanac>) -> Result<f64, EventError> {
-        let occult = self
-            .e_loc
-            .compute(sc.orbit, almanac)
-            .context(EventAlmanacSnafu)?
-            .factor();
-
-        Ok((occult - 1.0).abs())
-        // match self
-        //     .e_loc
-        //     .compute(sc.orbit, almanac)
-        //     .context(EventAlmanacSnafu)?
-        // {
-        //     EclipseState::Umbra => Ok(0.0),
-        //     EclipseState::Visibilis => Ok(1.0),
-        //     EclipseState::Penumbra(val) => Ok(val),
-        // }
-    }
-
-    /// Stop searching when the time has converged to less than 0.1 seconds
-    fn epoch_precision(&self) -> Duration {
-        0.1 * Unit::Second
-    }
-    /// Finds the darkest part of an eclipse within 2% of penumbra (i.e. 98% in shadow)
-    fn value_precision(&self) -> f64 {
-        0.02
-    }
-    fn eval_string(&self, state: &Spacecraft, almanac: Arc<Almanac>) -> Result<String, EventError> {
-        Ok(format!(
-            "{}",
-            self.e_loc
-                .compute(state.orbit, almanac)
-                .context(EventAlmanacSnafu)?
-        ))
-    }
-}
-
-/// An event to find the start of a penumbra
-pub struct PenumbraEvent {
-    e_loc: EclipseLocator,
-}
-
-impl fmt::Display for PenumbraEvent {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "penumbra event {}", self.e_loc)
-    }
-}
-
-impl EventEvaluator<Spacecraft> for PenumbraEvent {
-    fn eval(&self, sc: &Spacecraft, almanac: Arc<Almanac>) -> Result<f64, EventError> {
-        let occult = self
-            .e_loc
-            .compute(sc.orbit, almanac)
-            .context(EventAlmanacSnafu)?
-            .factor();
-
-        Ok((occult - 1.0).abs())
-    }
-
-    /// Stop searching when the time has converged to less than 0.1 seconds
-    fn epoch_precision(&self) -> Duration {
-        0.1 * Unit::Second
-    }
-    /// Finds the slightest penumbra within 2% (i.e. 98% in visibility)
-    fn value_precision(&self) -> f64 {
-        0.02
-    }
-
-    fn eval_string(&self, state: &Spacecraft, almanac: Arc<Almanac>) -> Result<String, EventError> {
-        Ok(format!(
-            "{}",
-            self.e_loc
-                .compute(state.orbit, almanac)
-                .context(EventAlmanacSnafu)?
-        ))
+    pub fn to_penumbra_events(&self) -> Vec<Event> {
+        self.shadow_bodies
+            .iter()
+            .copied()
+            .map(|eclipsing_frame| Event::eclipse(eclipsing_frame))
+            .collect()
     }
 }

@@ -186,7 +186,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     trajectory.to_parquet_with_cfg(
         "./01_cubesat_hf_prop.parquet",
         ExportCfg::builder().step(Unit::Minute * 2).build(),
-        almanac.clone(),
     )?;
 
     // 2. Compare the difference in the radial-intrack-crosstrack frame between the high fidelity

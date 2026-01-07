@@ -654,7 +654,7 @@ fn rugg_aop_decr(almanac: Arc<Almanac>) {
 
 #[rstest]
 fn rugg_raan(almanac: Arc<Almanac>) {
-    use self::nyx::md::{Event, StateParameter};
+    use anise::analysis::prelude::{Condition, Event, OrbitalElement, ScalarExpr};
 
     let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
@@ -697,11 +697,16 @@ fn rugg_raan(almanac: Arc<Almanac>) {
     let (final_state, traj) = prop.for_duration_with_traj(prop_time).unwrap();
     let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
     println!("[rugg_raan] {:x}", final_state.orbit);
-    let event = Event::new(StateParameter::RAAN, 5.0);
+    let event = Event::new(
+        ScalarExpr::Element(OrbitalElement::RAAN),
+        Condition::Equals(5.0),
+    );
     println!(
         "[rugg_raan] {} => {:?}",
         event,
-        traj.find(&event, None, almanac)
+        almanac
+            .report_events(&traj, &event, traj.start_epoch(), traj.end_epoch())
+            .unwrap()
     );
     println!("[rugg_raan] prop usage: {prop_usage:.3} kg");
 

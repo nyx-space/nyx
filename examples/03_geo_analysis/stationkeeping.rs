@@ -12,7 +12,7 @@ use anise::{
 };
 use hifitime::{Epoch, TimeUnits, Unit};
 use nyx::{
-    cosmic::{eclipse::EclipseLocator, GuidanceMode, Mass, MetaAlmanac, Orbit, SRPData},
+    cosmic::{GuidanceMode, Mass, MetaAlmanac, Orbit, SRPData},
     dynamics::{
         guidance::{Ruggiero, Thruster},
         Harmonics, OrbitalDynamics, SolarPressure, SpacecraftDynamics,
@@ -113,16 +113,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     assert_eq!(rslts.runs.len(), num_runs);
 
-    // For all of the resulting trajectories, we'll want to compute the percentage of penumbra and umbra.
-
-    rslts.to_parquet(
-        "03_geo_sk.parquet",
-        Some(vec![
-            &EclipseLocator::cislunar(almanac.clone()).to_penumbra_event()
-        ]),
-        ExportCfg::default(),
-        almanac,
-    )?;
+    rslts.to_parquet("03_geo_sk.parquet", ExportCfg::default())?;
 
     Ok(())
 }

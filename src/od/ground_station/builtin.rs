@@ -38,7 +38,7 @@ impl GroundStation {
         Self {
             name: "Madrid".to_string(),
             location: Location {
-                terrain_mask: vec![TerrainMask::from_flat_terrain(elevation_mask_deg)],
+                terrain_mask: TerrainMask::from_flat_terrain(elevation_mask_deg),
                 terrain_mask_ignored: false,
                 latitude_deg: 40.427_222,
                 longitude_deg: 4.250_556,
@@ -69,7 +69,7 @@ impl GroundStation {
         Self {
             name: "Canberra".to_string(),
             location: Location {
-                terrain_mask: vec![TerrainMask::from_flat_terrain(elevation_mask_deg)],
+                terrain_mask: TerrainMask::from_flat_terrain(elevation_mask_deg),
                 terrain_mask_ignored: false,
                 latitude_deg: -35.398_333,
                 longitude_deg: 148.981_944,
@@ -100,7 +100,7 @@ impl GroundStation {
         Self {
             name: "Goldstone".to_string(),
             location: Location {
-                terrain_mask: vec![TerrainMask::from_flat_terrain(elevation_mask_deg)],
+                terrain_mask: TerrainMask::from_flat_terrain(elevation_mask_deg),
                 terrain_mask_ignored: false,
                 latitude_deg: 35.247_164,
                 longitude_deg: 243.205,

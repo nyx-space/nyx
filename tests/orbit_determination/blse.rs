@@ -2,7 +2,6 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
 use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SUN};
-use anise::constants::frames::IAU_EARTH_FRAME;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::SpacecraftDynamics;
@@ -42,7 +41,6 @@ fn blse_robust_large_disp_cov_test(
 ) {
     let _ = pretty_env_logger::try_init();
 
-    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
     // Define the ground stations.
     let elevation_mask = 0.0;
 

@@ -99,7 +99,6 @@ fn tracking_data(
                 timestamp: true,
                 ..Default::default()
             },
-            almanac.clone(),
         )
         .unwrap();
 
