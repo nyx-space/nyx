@@ -391,13 +391,26 @@ where
                 );
 
                 // Update the covariance
-                current_covariance = match info_matrix.try_inverse() {
-                    Some(cov) => cov,
+                current_covariance = match info_matrix.udu() {
+                    Some(info_udu) => {
+                        match info_udu.u.try_inverse() {
+                            None =>{
+                                warn!("Information matrix H^TWH is singular.");
+                                StateMatrix::<D>::identity()
+                            },
+                            Some(u_inv) => {
+                                let d_inv_v = OVector::<f64,<D::StateType as State>::Size>::from_iterator(info_udu.d.iter().map(|d_ii| 1.0 / d_ii));
+                                let d_inv = OMatrix::from_diagonal(&d_inv_v);
+                                let y = d_inv * u_inv;
+                                u_inv.transpose() * y
+                                }
+                            }
+                    }
                     None => {
                         warn!("Information matrix H^TWH is singular.");
                         StateMatrix::<D>::identity()
                     }
-               };
+                };
 
                 // --- Check Convergence ---
                 if corr_pos_km < self.tolerance_pos_km {

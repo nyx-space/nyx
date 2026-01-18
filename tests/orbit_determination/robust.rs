@@ -182,6 +182,19 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
         )
         .unwrap();
 
+    // Export ephemeris
+    let ephem = od_sol.to_ephemeris("My Spacecraft".to_string());
+    // Check that the final covariance is PSD by rotating it into another frame
+    let covar_ric = ephem
+        .covar_at(
+            ephem.end_epoch().unwrap(),
+            anise::ephemerides::ephemeris::LocalFrame::RIC,
+            &almanac,
+        )
+        .expect("non PSD covariance?")
+        .unwrap();
+    println!("{covar_ric}");
+
     // Test the results
     // Check that the covariance deflated
     let est = &od_sol.estimates[od_sol.estimates.len() - 1];

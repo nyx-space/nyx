@@ -329,9 +329,21 @@ where
             }
         }
 
-        // Invert the innovation covariance.
-        let s_k_inv = match s_k.try_inverse() {
-            Some(s_k_inv) => s_k_inv,
+        // Invert the innovation covariance via UDU decomposition
+        let s_k_inv = match s_k.udu() {
+            Some(s_k_udu) => {
+                // Invert both parts
+                match s_k_udu.u.try_inverse() {
+                    None => return Err(ODError::SingularKalmanGain),
+                    Some(u_inv) => {
+                        let d_inv = OMatrix::from_diagonal(&OVector::<f64, M>::from_iterator(
+                            s_k_udu.d.iter().map(|d_ii| 1.0 / d_ii), // .into_iter(),
+                        ));
+                        let y = d_inv * &u_inv;
+                        u_inv.transpose() * y
+                    }
+                }
+            }
             None => return Err(ODError::SingularKalmanGain),
         };
 

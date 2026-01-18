@@ -83,7 +83,7 @@ impl EclipseLocator {
         self.shadow_bodies
             .iter()
             .copied()
-            .map(|eclipsing_frame| Event::total_eclipse(eclipsing_frame))
+            .map(Event::total_eclipse)
             .collect()
     }
 
@@ -93,7 +93,7 @@ impl EclipseLocator {
         self.shadow_bodies
             .iter()
             .copied()
-            .map(|eclipsing_frame| Event::eclipse(eclipsing_frame))
+            .map(Event::eclipse)
             .collect()
     }
 }

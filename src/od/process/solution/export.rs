@@ -25,6 +25,7 @@ use crate::md::StateParameter;
 use crate::od::estimate::*;
 use crate::State;
 use crate::{od::*, Spacecraft};
+use anise::ephemerides::ephemeris::{Covariance, Ephemeris, EphemerisRecord};
 use arrow::array::{Array, BooleanBuilder, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
@@ -649,5 +650,24 @@ where
             path_buf.display()
         );
         Ok(path_buf)
+    }
+
+    /// Export this spacecraft trajectory estimate to an ANISE Ephemeris
+    pub fn to_ephemeris(&self, object_id: String) -> Ephemeris {
+        let mut ephem = Ephemeris::new(object_id);
+
+        for estimate in &self.estimates {
+            let covar = Covariance {
+                matrix: estimate.covar.fixed_view::<6, 6>(0, 0).into(),
+                local_frame: anise::ephemerides::ephemeris::LocalFrame::Inertial,
+            };
+            let rcrd = EphemerisRecord {
+                orbit: estimate.orbital_state(),
+                covar: Some(covar),
+            };
+            ephem.insert(rcrd);
+        }
+
+        ephem
     }
 }

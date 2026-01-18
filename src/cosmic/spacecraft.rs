@@ -40,8 +40,7 @@ use std::default::Default;
 use std::fmt;
 use std::ops::Add;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum GuidanceMode {
     /// Guidance is turned off and Guidance Law may switch mode to Thrust for next call
     #[default]
