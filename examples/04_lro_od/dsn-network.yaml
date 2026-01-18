@@ -1,10 +1,16 @@
 DSS-65 Madrid:
   name: DSS-65 Madrid
-  frame:
-    ephemeris_id: 399
-    orientation_id: 399
-    mu_km3_s2: 398600.435436096
-    shape: null
+  location:
+    latitude_deg: 40.427222
+    longitude_deg: 4.250556
+    height_km: 0.834939
+    terrain_mask:
+      - azimuth_deg: 0.0
+        elevation_mask_deg: 5.0
+    terrain_mask_ignored: false
+    frame:
+      ephemeris_id: 399
+      orientation_id: 399
   elevation_mask_deg: 5.0
   stochastic_noises:
     range_km:
@@ -16,24 +22,23 @@ DSS-65 Madrid:
         mean: 0.0
         sigma: 50.0e-6 # 5 cm/s
   light_time_correction: true
-  latitude_deg: 40.427222
-  longitude_deg: 4.250556
-  height_km: 0.834939
   measurement_types:
     - range_km
     - doppler_km_s
 
 DSS-34 Canberra:
   name: DSS-34 Canberra
-  frame:
-    ephemeris_id: 399
-    orientation_id: 399
-    mu_km3_s2: 398600.435436096
-    shape: null
-  latitude_deg: -35.398333
-  longitude_deg: 148.981944
-  height_km: 0.691750
-  elevation_mask_deg: 5.0
+  location:
+    frame:
+      ephemeris_id: 399
+      orientation_id: 399
+    latitude_deg: -35.398333
+    longitude_deg: 148.981944
+    height_km: 0.691750
+    terrain_mask:
+      - azimuth_deg: 0.0
+        elevation_mask_deg: 5.0
+    terrain_mask_ignored: false
   stochastic_noises:
     range_km:
       white_noise:
@@ -50,15 +55,17 @@ DSS-34 Canberra:
 
 DSS-13 Goldstone:
   name: DSS-13 Goldstone
-  frame:
-    ephemeris_id: 399
-    orientation_id: 399
-    mu_km3_s2: 398600.435436096
-    shape: null
-  latitude_deg: 35.247164
-  longitude_deg: 243.205
-  height_km: 1.071149
-  elevation_mask_deg: 5.0
+  location:
+    frame:
+      ephemeris_id: 399
+      orientation_id: 399
+    latitude_deg: 35.247164
+    longitude_deg: 243.205
+    height_km: 1.071149
+    terrain_mask:
+      - azimuth_deg: 0.0
+        elevation_mask_deg: 5.0
+    terrain_mask_ignored: false
   stochastic_noises:
     range_km:
       white_noise:

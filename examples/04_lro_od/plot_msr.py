@@ -3,7 +3,7 @@ import polars as pl
 import plotly.express as px
 
 @click.command
-@click.option("-p", "--path", type=str, default="./04_lro_simulated_tracking.parquet")
+@click.option("-p", "--path", type=str, default="./data/04_output/04_lro_simulated_tracking.parquet")
 def main(path: str):
     df = pl.read_parquet(path)
 
