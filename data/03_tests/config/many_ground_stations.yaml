@@ -1,10 +1,15 @@
 - name: Demo ground station
-  frame:
-    ephemeris_id: 399
-    orientation_id: 399
-    mu_km3_s2: 398600.435436096
-    shape: null
-  elevation_mask_deg: 5.0
+  location:
+    latitude_deg: 2.3522
+    longitude_deg: 48.8566
+    height_km: 0.4
+    frame:
+      ephemeris_id: 399
+      orientation_id: 399
+    terrain_mask:
+      - azimuth_deg: 0.0
+        elevation_mask_deg: 5.0
+    terrain_mask_ignored: false
   stochastic_noises:
     range_km:
       bias:
@@ -15,23 +20,22 @@
         tau: 24 h
         process_noise: 50.0e-6 # 5 cm/s
   light_time_correction: false
-  latitude_deg: 2.3522
-  longitude_deg: 48.8566
-  height_km: 0.4
   measurement_types:
     - range_km
     - doppler_km_s
 
 - name: Canberra
-  frame:
-    ephemeris_id: 399
-    orientation_id: 399
-    mu_km3_s2: 398600.435436096
-    shape: null
-  latitude_deg: -35.398333
-  longitude_deg: 148.981944
-  height_km: 0.691750
-  elevation_mask_deg: 5.0
+  location:
+    frame:
+      ephemeris_id: 399
+      orientation_id: 399
+    latitude_deg: -35.398333
+    longitude_deg: 148.981944
+    height_km: 0.691750
+    terrain_mask:
+      - azimuth_deg: 0.0
+        elevation_mask_deg: 5.0
+    terrain_mask_ignored: false
   stochastic_noises:
     range_km:
       bias:
