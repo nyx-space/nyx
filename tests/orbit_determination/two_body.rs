@@ -1270,7 +1270,8 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect_cov_test(
         for i in 0..6 {
             assert!(
                 est.covar[(i, i)] >= 0.0,
-                "covar diagonal element negative @ [{i}, {i}]"
+                "covar diagonal element negative @ [{i}, {i}] = {:e}",
+                est.covar[(i, i)]
             );
         }
         assert!(

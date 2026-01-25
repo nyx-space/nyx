@@ -329,25 +329,42 @@ where
             }
         }
 
-        // Invert the innovation covariance via UDU decomposition
-        let s_k_inv = match s_k.udu() {
-            Some(s_k_udu) => {
-                // Invert both parts
-                match s_k_udu.u.try_inverse() {
-                    None => return Err(ODError::SingularKalmanGain),
-                    Some(u_inv) => {
-                        let d_inv = OMatrix::from_diagonal(&OVector::<f64, M>::from_iterator(
-                            s_k_udu.d.iter().map(|d_ii| 1.0 / d_ii), // .into_iter(),
-                        ));
-                        let y = d_inv * &u_inv;
-                        u_inv.transpose() * y
+        // Prepare the RHS of the linear system: (P * H^T)^T = H * P
+        // We want to solve: S_k * K^T = H * P
+        // So K = (S_k \ (H * P))^T
+        let p_ht = covar_bar * h_tilde.transpose();
+        let rhs = p_ht.transpose();
+
+        // Solve for Gain using Cholesky
+        // We try standard Cholesky first.
+        let gain = match s_k.clone().cholesky() {
+            Some(chol) => {
+                // SOLVE, don't invert.
+                // chol.solve(B) computes S_k^{-1} * B more stably than inv(S_k) * B
+                let k_t = chol.solve(&rhs);
+                k_t.transpose()
+            }
+            None => {
+                // Handle Singularity (The "Perfect" Case)
+                // If S_k is not positive definite, it means our measurements are
+                // effectively perfect (R=0) or perfectly redundant relative to precision.
+                // We apply Tikhonov Regularization (Ridge Regression): S_k' = S_k + epsilon * I
+                let epsilon = 1e-12; // Adjust based on your precision requirements
+                let s_k_reg = s_k.clone() + OMatrix::<f64, M, M>::identity() * epsilon;
+
+                match s_k_reg.cholesky() {
+                    Some(chol) => {
+                        let k_t = chol.solve(&rhs);
+                        k_t.transpose()
+                    }
+                    None => {
+                        // If it's STILL singular after regularization, the math is broken.
+                        // This usually implies NaN or Inf in the inputs.
+                        return Err(ODError::SingularKalmanGain);
                     }
                 }
             }
-            None => return Err(ODError::SingularKalmanGain),
         };
-
-        let gain = covar_bar * &h_tilde.transpose() * &s_k_inv;
 
         // Compute the state estimate, depends on the variant.
         let (state_hat, res) = match self.variant {
@@ -393,6 +410,9 @@ where
             OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity() - &gain * &h_tilde;
         let covar =
             first_term * covar_bar * first_term.transpose() + &gain * &r_k * &gain.transpose();
+
+        // Force symmetry on the covariance
+        let covar = 0.5 * (covar + covar.transpose());
 
         // And wrap up
         let estimate = KfEstimate {
