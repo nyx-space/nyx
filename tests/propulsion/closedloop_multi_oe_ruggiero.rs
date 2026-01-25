@@ -3,7 +3,10 @@ extern crate nyx_space as nyx;
 
 use std::sync::Arc;
 
-use anise::analysis::prelude::{Condition, Event, OrbitalElement, ScalarExpr};
+use anise::analysis::prelude::{
+    find_arc_intersections, Condition, Event, OrbitalElement, ScalarExpr,
+};
+use nyx_space::State;
 
 use self::nyx::cosmic::{GuidanceMode, Orbit, Spacecraft};
 use self::nyx::dynamics::guidance::{Objective, Ruggiero, Thruster};
@@ -52,18 +55,6 @@ fn qlaw_as_ruggiero_case_a(almanac: Arc<Almanac>) {
         Objective::within_tolerance(StateParameter::Eccentricity, 0.01, 5e-5),
     ];
 
-    // Events we will search later
-    let events = vec![
-        Event::new(
-            ScalarExpr::Element(OrbitalElement::SemiMajorAxis),
-            Condition::Between(41_999.0, 42_001.0),
-        ),
-        Event::new(
-            ScalarExpr::Element(OrbitalElement::Eccentricity),
-            Condition::Equals(0.01),
-        ),
-    ];
-
     let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
     let dry_mass = 1.0;
@@ -72,11 +63,11 @@ fn qlaw_as_ruggiero_case_a(almanac: Arc<Almanac>) {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
+    let sc_dynamics = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_a] {orbit:x}");
 
     let setup = Propagator::new(
-        sc.clone(),
+        sc_dynamics.clone(),
         IntegratorMethod::RungeKutta4,
         IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
     );
@@ -86,18 +77,38 @@ fn qlaw_as_ruggiero_case_a(almanac: Arc<Almanac>) {
     println!("[qlaw_as_ruggiero_case_a] {:x}", final_state.orbit);
     println!("[qlaw_as_ruggiero_case_a] prop usage: {prop_usage:.3} kg");
     // Find all of the events
-    for e in &events {
-        let jackpot = almanac
-            .report_events(&traj, e, traj.start_epoch(), traj.end_epoch())
-            .unwrap();
-        println!(
-            "[qlaw_as_ruggiero_case_a] Found {} events of kind {e}",
-            jackpot.len(),
-        );
+    let sma_event = Event::new(
+        ScalarExpr::Element(OrbitalElement::SemiMajorAxis),
+        Condition::Between(41_999.0, 42_001.0),
+    );
+
+    let sma_arcs = almanac
+        .report_event_arcs(&traj, &sma_event, traj.start_epoch(), traj.end_epoch())
+        .unwrap();
+
+    let ecc_event = Event::new(
+        ScalarExpr::Element(OrbitalElement::Eccentricity),
+        Condition::Between(0.01 - 5e-5, 0.01 + 5e55),
+    );
+
+    let ecc_arcs = almanac
+        .report_event_arcs(&traj, &ecc_event, traj.start_epoch(), traj.end_epoch())
+        .unwrap();
+
+    let both_true = find_arc_intersections(vec![sma_arcs, ecc_arcs]);
+
+    assert!(!both_true.is_empty());
+
+    for (start, end) in both_true {
+        let dur = end - start;
+        let delta_to_end = end - final_state.epoch();
+        println!("[qlaw_as_ruggiero_case_a] Conditions met from {start} for {dur}");
+        // Ensure that the condition is valid until the end of this propagation.
+        assert!(delta_to_end.abs().to_seconds() < 1e-15);
     }
 
     assert!(
-        sc.guidance_achieved(&final_state).unwrap(),
+        sc_dynamics.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
 
