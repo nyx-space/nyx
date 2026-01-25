@@ -289,19 +289,18 @@ impl TrackingArcSim<Spacecraft, GroundStation> {
         // Build a Location Dataset so we can use ANISE's visibility finder.
         let mut loc_dataset = LocationDataSet::default();
         let mut loc_ids = Vec::with_capacity(self.devices.len());
-        for (dno, device) in self.devices.values().enumerate() {
+        for (dno, (name, device)) in self.devices.iter().enumerate() {
             let loc_id = dno as i32 + 1_000;
             loc_dataset
-                .push(device.location.clone(), Some(loc_id), Some(&device.name))
+                .push(device.location.clone(), Some(loc_id), Some(name))
                 .unwrap();
-            loc_ids.push((device.name.clone(), loc_id));
+            loc_ids.push((name.clone(), loc_id));
         }
 
         // Deep clone of the Almanac so we can insert the locations of these ground stations.
         let almanac = (*almanac).clone();
         let almanac = almanac.with_location_data(loc_dataset);
 
-        // Consider using find_all via the heuristic
         let mut built_cfg = self.configs.clone();
 
         let traj = &self.trajectory;
@@ -324,6 +323,7 @@ impl TrackingArcSim<Spacecraft, GroundStation> {
                         cfg.sampling,
                         None,
                     )?;
+
                     for arc in visibilty_arcs {
                         let strand_start = arc.rise.orbit.epoch;
                         let strand_end = arc.fall.orbit.epoch;
