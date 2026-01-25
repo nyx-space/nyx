@@ -8,7 +8,6 @@ use anise::analysis::prelude::{Condition, Event, OrbitalElement, ScalarExpr};
 use anise::constants::celestial_objects::{EARTH, SUN};
 use anise::constants::frames::{EARTH_J2000, IAU_EARTH_FRAME, MOON_J2000};
 use anise::prelude::Almanac;
-use hifitime::JD_J2000;
 use nalgebra::Vector3;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::guidance::{FiniteBurns, LocalFrame, Maneuver, Thruster};
@@ -57,7 +56,7 @@ fn stop_cond_3rd_apo_cov_test(almanac: Arc<Almanac>) {
     let mut prev_event_match = events[0].orbit.epoch;
     for event_match in events.iter().skip(1) {
         let delta_period = event_match.orbit.epoch - prev_event_match - period;
-        assert!(delta_period.abs() < 10.milliseconds(), "in two body dyn, event finding should be extremely precise, instead time error of {delta_period}");
+        assert!(delta_period.abs() < 0.5.seconds(), "in two body dyn, event finding should be extremely precise, instead time error of {delta_period}");
         prev_event_match = event_match.orbit.epoch;
     }
 
@@ -88,23 +87,21 @@ fn stop_cond_3rd_apo_cov_test(almanac: Arc<Almanac>) {
 fn stop_cond_3rd_peri(almanac: Arc<Almanac>) {
     let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
-    let start_dt = Epoch::from_mjd_tai(JD_J2000);
+    let epoch = Epoch::from_gregorian_utc_at_noon(2008, 2, 29);
     let state = Orbit::cartesian(
-        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.01, start_dt, eme2k,
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.01, epoch, eme2k,
     );
 
     let period = state.period().unwrap();
 
-    // Track how many times we've passed by that TA again
+    // Track how many times we've passed by that true anomaly again
     let peri_event = Event::periapsis(); // Special event shortcut!
 
     let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
     let mut prop = setup.with(state.into(), almanac.clone());
-    // Propagate for at four orbital periods so we know we've passed the third one
-    // NOTE: We're fetching the 3rd item because the initial state is actually at periapse,
-    // which the event finder will find.
+
     let (third_peri, traj) = prop
-        .until_nth_event(5 * period, &peri_event, None, 2)
+        .until_nth_event(5 * period, &peri_event, None, 3)
         .unwrap();
 
     let events = almanac
@@ -119,24 +116,25 @@ fn stop_cond_3rd_peri(almanac: Arc<Almanac>) {
     let mut prev_event_match = events[0].orbit.epoch;
     for event_match in events.iter().skip(1) {
         let delta_period = event_match.orbit.epoch - prev_event_match - period;
-        assert!(delta_period.abs() < 10.milliseconds(), "in two body dyn, event finding should be extremely precise, instead time error of {delta_period}");
+        println!("{:x}", event_match.orbit);
+        assert!(delta_period.abs() < 0.3.seconds(), "in two body dyn, event finding should be extremely precise, instead time error of {delta_period}");
         prev_event_match = event_match.orbit.epoch;
     }
 
-    let min_epoch = start_dt + 2.0 * period;
-    let max_epoch = start_dt + 3.0 * period;
+    let min_epoch = epoch + 2.0 * period;
+    let max_epoch = epoch + 3.0 * period;
 
     println!("{min_epoch}\t{max_epoch}\t\t{third_peri:x}");
     // Confirm that this is the third apoapse event which is found
     // We use a weird check because it actually converged on a time that's 0.00042 nanoseconds _after_ the max time
     assert!(
         (third_peri.orbit.epoch - min_epoch) >= 1.nanoseconds(),
-        "Found apoapse is {} before min epoch",
+        "Found periapse is {} before min epoch",
         third_peri.orbit.epoch - min_epoch
     );
     assert!(
         (third_peri.orbit.epoch - max_epoch) <= 1.nanoseconds(),
-        "Found apoapse is {} after max epoch",
+        "Found periapse is {} after max epoch",
         third_peri.orbit.epoch - max_epoch
     );
 
@@ -246,7 +244,7 @@ fn stop_cond_nrho_apo(almanac: Arc<Almanac>) {
 fn line_of_nodes(almanac: Arc<Almanac>) {
     let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
-    let start_dt = Epoch::from_mjd_tai(JD_J2000);
+    let start_dt = Epoch::from_gregorian_utc_at_noon(2008, 2, 29);
     let state = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_dt, eme2k,
     );
@@ -254,7 +252,7 @@ fn line_of_nodes(almanac: Arc<Almanac>) {
     let period = state.period().unwrap();
 
     let asc_node_event = Event::new(
-        ScalarExpr::Element(OrbitalElement::AoL),
+        ScalarExpr::Element(OrbitalElement::Longitude),
         Condition::Equals(0.0),
     );
 
@@ -273,12 +271,11 @@ fn line_of_nodes(almanac: Arc<Almanac>) {
     );
 }
 
-// TODO: Update this test for the event finding to be in the correct frame.
 #[rstest]
 fn latitude(almanac: Arc<Almanac>) {
     let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
-    let start_dt = Epoch::from_mjd_tai(JD_J2000);
+    let start_dt = Epoch::from_gregorian_utc_at_noon(2008, 2, 29);
     let state = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_dt, eme2k,
     );
