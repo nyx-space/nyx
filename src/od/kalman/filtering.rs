@@ -301,14 +301,14 @@ where
 
         // Compute the ratio as the average of each component of the prefit over the square root of the measurement
         // matrix r_k. Refer to ODTK MathSpec equation 4.10.
-        let ratio = s_k
+        let ratio = (s_k
             .diagonal()
             .iter()
-            .copied()
-            .enumerate()
-            .map(|(idx, r)| prefit[idx] / r.sqrt())
+            .zip(prefit.iter())
+            .map(|(r, prefit)| (prefit / r.sqrt()).powi(2))
             .sum::<f64>()
-            / (M::DIM as f64);
+            / (M::DIM as f64))
+            .sqrt();
 
         if let Some(resid_reject) = resid_rejection {
             if ratio.abs() > resid_reject.num_sigmas {
@@ -329,6 +329,24 @@ where
             }
         }
 
+        // Instead of inverting the innovation matrix S_k, we will use the (super short) arXiv paper 1111.4144
+        // which shows how to use the Cholesky decomposition to invert a matrix, core tenets repeated here for my reference.
+        // \forall A \ in \mathbb{R}^{n\times n}, X=A^{-1} <=> A*X=I
+        // Cholesky: A = L*L^T
+        // Therefore, L*L^T*X = I
+        // 1. Solve L * Y = I  => Y = L^{-1} (via forward sub)
+        // 2. Solve L^T * X = Y => X = (L^T)^{-1} * L^{-1} = A^{-1}
+        //
+        // _However_, we can be more clever still!
+        // Instead of explicitly inverting the innovation matrix S_k, we solve the linear system
+        // S_k * K^T = H * P using Cholesky decomposition.
+        // This avoids the numerical instability of computing S_k^-1 directly.
+        // Math context:
+        // We want to solve A * X = B for X.
+        // 1. Decompose A into L * L^T (Cholesky).
+        // 2. Solve L * Y = B for Y (Forward substitution).
+        // 3. Solve L^T * X = Y for X (Backward substitution).
+
         // Prepare the RHS of the linear system: (P * H^T)^T = H * P
         // We want to solve: S_k * K^T = H * P
         // So K = (S_k \ (H * P))^T
@@ -345,21 +363,14 @@ where
                 k_t.transpose()
             }
             None => {
-                // Handle Singularity (The "Perfect" Case)
-                // If S_k is not positive definite, it means our measurements are
-                // effectively perfect (R=0) or perfectly redundant relative to precision.
-                // We apply Tikhonov Regularization (Ridge Regression): S_k' = S_k + epsilon * I
-                let epsilon = 1e-12; // Adjust based on your precision requirements
-                let s_k_reg = s_k.clone() + OMatrix::<f64, M, M>::identity() * epsilon;
-
-                match s_k_reg.cholesky() {
-                    Some(chol) => {
-                        let k_t = chol.solve(&rhs);
-                        k_t.transpose()
-                    }
+                // If this fails, revert the LU decomposition of nalgebra
+                // Invert the innovation covariance.
+                match s_k.try_inverse() {
+                    Some(s_k_inv) => covar_bar * &h_tilde.transpose() * &s_k_inv,
                     None => {
-                        // If it's STILL singular after regularization, the math is broken.
-                        // This usually implies NaN or Inf in the inputs.
+                        eprintln!(
+                            "SINGULAR GAIN\nr = {r_k}\nh = {h_tilde:.3e}\ncovar = {covar_bar:.3e}"
+                        );
                         return Err(ODError::SingularKalmanGain);
                     }
                 }

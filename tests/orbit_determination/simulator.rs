@@ -237,7 +237,7 @@ fn od_with_modulus_cov_test(
 
     // Increase the noise on the OD process
     for device in devices.values_mut() {
-        for (_, stochastics) in device.stochastic_noises.as_mut().unwrap().iter_mut() {
+        for (_msr_type, stochastics) in device.stochastic_noises.as_mut().unwrap().iter_mut() {
             *stochastics *= 2.0;
         }
     }
