@@ -293,7 +293,9 @@ impl TrackingArcSim<Spacecraft, GroundStation> {
             let loc_id = dno as i32 + 1_000;
             loc_dataset
                 .push(device.location.clone(), Some(loc_id), Some(name))
-                .unwrap();
+                .map_err(|e| AnalysisError::GenericAnalysisError {
+                    err: format!("{e}"),
+                })?;
             loc_ids.push((name.clone(), loc_id));
         }
 
