@@ -234,7 +234,7 @@ impl TrackingDataArc {
             }
 
             let avail = measurement.availability(&freq_types);
-            let use_prev_transmit_freq;
+            let use_prev_transmit_freq: bool;
             let num_freq_msr = avail
                 .iter()
                 .copied()
@@ -248,15 +248,18 @@ impl TrackingDataArc {
                 // avail[1] means that Transmit Freq is available
                 // We can only compute Doppler data from one data point if that data point
                 // if the receive frequency and the transmit frequency was previously set.
-                if latest_transmit_freq.is_some() && avail[0] {
-                    use_prev_transmit_freq = true;
-                    if malformed_warning == 0 {
-                        warn!(
-                            "no transmit frequency at {epoch}, using previous value of {} Hz",
-                            latest_transmit_freq.unwrap()
-                        );
+                if let Some(latest_transmit_freq) = latest_transmit_freq {
+                    if avail[0] {
+                        use_prev_transmit_freq = true;
+                        if malformed_warning == 0 {
+                            warn!(
+                                "no transmit frequency at {epoch}, using {latest_transmit_freq} Hz",
+                            );
+                        }
+                        malformed_warning += 1;
+                    } else {
+                        use_prev_transmit_freq = false;
                     }
-                    malformed_warning += 1;
                 } else {
                     warn!("only one of receive or transmit frequencies found at {epoch}, ignoring");
                     for freq in &freq_types {
@@ -353,12 +356,14 @@ impl TrackingDataArc {
         }
 
         // Filter epochs if needed.
-        if cfg.start_epoch.is_some() && cfg.end_epoch.is_some() {
-            self = self.filter_by_epoch(cfg.start_epoch.unwrap()..cfg.end_epoch.unwrap());
-        } else if cfg.start_epoch.is_some() {
-            self = self.filter_by_epoch(cfg.start_epoch.unwrap()..);
-        } else if cfg.end_epoch.is_some() {
-            self = self.filter_by_epoch(..cfg.end_epoch.unwrap());
+        if let Some(start_epoch) = cfg.start_epoch {
+            if let Some(end_epoch) = cfg.end_epoch {
+                self = self.filter_by_epoch(start_epoch..end_epoch);
+            } else {
+                self = self.filter_by_epoch(start_epoch..);
+            }
+        } else if let Some(end_epoch) = cfg.end_epoch {
+            self = self.filter_by_epoch(..end_epoch);
         }
 
         let tick = Epoch::now().unwrap();
