@@ -18,7 +18,6 @@
 
 use crate::cosmic::AstroError;
 use crate::dynamics::guidance::GuidanceError;
-use crate::errors::NyxError;
 use crate::propagators::PropagationError;
 use crate::Spacecraft;
 use snafu::prelude::*;
@@ -29,7 +28,7 @@ pub mod prelude {
         trajectory::{ExportCfg, Interpolatable, Traj},
         StateParameter, Trajectory,
     };
-    pub use crate::cosmic::{try_achieve_b_plane, BPlane, BPlaneTarget, GuidanceMode, OrbitDual};
+    pub use crate::cosmic::{try_achieve_b_plane, BPlane, BPlaneTarget, GuidanceMode};
     pub use crate::dynamics::{
         Drag, Harmonics, OrbitalDynamics, PointMasses, SolarPressure, SpacecraftDynamics,
     };
@@ -42,6 +41,7 @@ pub mod prelude {
     pub use crate::{State, TimeTagged};
 
     pub use anise::analysis::event::Event;
+    pub use anise::analysis::prelude::OrbitalElement;
     pub use anise::prelude::*;
     pub use std::sync::Arc;
 }

@@ -172,15 +172,11 @@ where
         let mut sigma_fields = fields.clone();
         // Check that we can retrieve this information
         sigma_fields.retain(|param| {
-            !matches!(
-                param,
-                &StateParameter::X
-                    | &StateParameter::Y
-                    | &StateParameter::Z
-                    | &StateParameter::VX
-                    | &StateParameter::VY
-                    | &StateParameter::VZ
-            ) && self.estimates[0].sigma_for(*param).is_ok()
+            if let StateParameter::Element(_oe) = param {
+                true
+            } else {
+                false
+            }
         });
 
         for field in &sigma_fields {
@@ -399,7 +395,9 @@ where
         for field in sigma_fields {
             let mut data = Float64Builder::new();
             for s in &estimates {
-                data.append_value(s.sigma_for(field).unwrap());
+                if let StateParameter::Element(oe) = field {
+                    data.append_value(s.sigma_for(oe).unwrap());
+                }
             }
             record.push(Arc::new(data.finish()));
         }

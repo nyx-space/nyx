@@ -27,6 +27,7 @@ use crate::md::{PropSnafu, StateParameter};
 pub use crate::md::{Variable, Vary};
 use crate::polyfit::CommonPolynomial;
 use crate::pseudo_inverse;
+use anise::astro::orbit_gradient::OrbitGrad;
 use hifitime::TimeUnits;
 use log::{debug, error, info};
 use rayon::prelude::*;
@@ -253,9 +254,9 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                         .context(AstroAlmanacSnafu)
                         .context(AstroSnafu)?;
 
-                    OrbitDual::from(orbit_obj_frame)
+                    OrbitGrad::from(orbit_obj_frame)
                 }
-                None => OrbitDual::from(xf),
+                None => OrbitGrad::from(xf),
             };
 
             // Build the error vector
@@ -284,10 +285,13 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                         StateParameter::BLTOF => b_plane.unwrap().ltof_s,
                         _ => unreachable!(),
                     }
-                } else {
+                } else if let StateParameter::Element(oe) = obj.parameter {
                     xf_dual_obj_frame
-                        .partial_for(obj.parameter)
+                        .partial_for(oe)
+                        .context(AstroPhysicsSnafu)
                         .context(AstroSnafu)?
+                } else {
+                    unreachable!()
                 };
 
                 let achieved = partial.real();
@@ -472,9 +476,9 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                                 .context(AstroSnafu)
                                 .unwrap();
 
-                            OrbitDual::from(orbit_obj_frame)
+                            OrbitGrad::from(orbit_obj_frame)
                         }
-                        None => OrbitDual::from(this_xf),
+                        None => OrbitGrad::from(this_xf),
                     };
 
                     let b_plane = if is_bplane_tgt {
@@ -490,8 +494,10 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                             StateParameter::BLTOF => b_plane.unwrap().ltof_s,
                             _ => unreachable!(),
                         }
+                    } else if let StateParameter::Element(oe) = obj.parameter {
+                        xf_dual_obj_frame.partial_for(oe).unwrap()
                     } else {
-                        xf_dual_obj_frame.partial_for(obj.parameter).unwrap()
+                        unreachable!()
                     };
 
                     let this_achieved = partial.real();

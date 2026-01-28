@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anise::analysis::prelude::OrbitalElement;
 use anise::prelude::Almanac;
 use log::debug;
 use serde::{Deserialize, Serialize};
@@ -84,11 +85,11 @@ impl Ruggiero {
 
         for (i, obj) in objectives.iter().enumerate() {
             if [
-                StateParameter::SMA,
-                StateParameter::Eccentricity,
-                StateParameter::Inclination,
-                StateParameter::RAAN,
-                StateParameter::AoP,
+                StateParameter::Element(OrbitalElement::SemiMajorAxis),
+                StateParameter::Element(OrbitalElement::Eccentricity),
+                StateParameter::Element(OrbitalElement::Inclination),
+                StateParameter::Element(OrbitalElement::RAAN),
+                StateParameter::Element(OrbitalElement::AoP),
             ]
             .contains(&obj.parameter)
             {
@@ -131,11 +132,11 @@ impl Ruggiero {
 
         for (i, obj) in objectives.iter().enumerate() {
             if [
-                StateParameter::SMA,
-                StateParameter::Eccentricity,
-                StateParameter::Inclination,
-                StateParameter::RAAN,
-                StateParameter::AoP,
+                StateParameter::Element(OrbitalElement::SemiMajorAxis),
+                StateParameter::Element(OrbitalElement::Eccentricity),
+                StateParameter::Element(OrbitalElement::Inclination),
+                StateParameter::Element(OrbitalElement::RAAN),
+                StateParameter::Element(OrbitalElement::AoP),
             ]
             .contains(&obj.parameter)
             {
@@ -183,7 +184,7 @@ impl Ruggiero {
             .to_radians();
 
         match parameter {
-            StateParameter::SMA => {
+            StateParameter::Element(OrbitalElement::SemiMajorAxis) => {
                 let a = osc_orbit.sma_km().context(GuidancePhysicsSnafu {
                     action: "computing Ruggiero efficiency",
                 })?;
@@ -193,7 +194,7 @@ impl Ruggiero {
                 })?;
                 Ok(osc_orbit.vmag_km_s() * ((a * (1.0 - e)) / (μ * (1.0 + e))).sqrt())
             }
-            StateParameter::Eccentricity => {
+            StateParameter::Element(OrbitalElement::Eccentricity) => {
                 let num = 1.0 + 2.0 * e * ν_ta.cos() + ν_ta.cos().powi(2);
                 let denom = 1.0 + e * ν_ta.cos();
                 // NOTE: There is a typo in IEPC 2011 102: the max of this efficiency function is at ν=0
@@ -201,19 +202,19 @@ impl Ruggiero {
                 // _divided_ by two, not multiplied by two.
                 Ok(num / (2.0 * denom))
             }
-            StateParameter::Inclination => {
+            StateParameter::Element(OrbitalElement::Inclination) => {
                 let num = (ω + ν_ta).cos().abs()
                     * ((1.0 - e.powi(2) * ω.sin().powi(2)).sqrt() - e * ω.cos().abs());
                 let denom = 1.0 + e * ν_ta.cos();
                 Ok(num / denom)
             }
-            StateParameter::RAAN => {
+            StateParameter::Element(OrbitalElement::RAAN) => {
                 let num = (ω + ν_ta).sin().abs()
                     * ((1.0 - e.powi(2) * ω.cos().powi(2)).sqrt() - e * ω.sin().abs());
                 let denom = 1.0 + e * ν_ta.cos();
                 Ok(num / denom)
             }
-            StateParameter::AoP => Ok(1.0),
+            StateParameter::Element(OrbitalElement::AoP) => Ok(1.0),
             _ => Err(GuidanceError::InvalidControl { param: *parameter }),
         }
     }
@@ -340,27 +341,27 @@ impl GuidanceLaw for Ruggiero {
                     .to_radians();
 
                 match obj.parameter {
-                    StateParameter::SMA => {
+                    StateParameter::Element(OrbitalElement::SemiMajorAxis) => {
                         let num = ecc * ta_rad.sin();
                         let denom = 1.0 + ecc * ta_rad.cos();
                         let alpha = num.atan2(denom);
                         steering += unit_vector_from_plane_angles(alpha, 0.0) * weight;
                     }
-                    StateParameter::Eccentricity => {
+                    StateParameter::Element(OrbitalElement::Eccentricity) => {
                         let num = ta_rad.sin();
                         let denom = ta_rad.cos() + ea_rad.cos();
                         let alpha = num.atan2(denom);
                         steering += unit_vector_from_plane_angles(alpha, 0.0) * weight;
                     }
-                    StateParameter::Inclination => {
+                    StateParameter::Element(OrbitalElement::Inclination) => {
                         let beta = half_pi.copysign((ta_rad + aop_rad).cos());
                         steering += unit_vector_from_plane_angles(0.0, beta) * weight;
                     }
-                    StateParameter::RAAN => {
+                    StateParameter::Element(OrbitalElement::RAAN) => {
                         let beta = half_pi.copysign((ta_rad + aop_rad).sin());
                         steering += unit_vector_from_plane_angles(0.0, beta) * weight;
                     }
-                    StateParameter::AoP => {
+                    StateParameter::Element(OrbitalElement::AoP) => {
                         let oe2 = 1.0 - ecc.powi(2);
                         let e3 = ecc.powi(3);
                         // Compute the optimal true anomaly for in-plane thrusting
@@ -457,6 +458,7 @@ impl GuidanceLaw for Ruggiero {
 #[test]
 fn ruggiero_weight() {
     use crate::time::Epoch;
+    use anise::analysis::prelude::OrbitalElement;
     use anise::constants::frames::EARTH_J2000;
 
     let eme2k = EARTH_J2000.with_mu_km3_s2(398_600.433);
@@ -466,8 +468,16 @@ fn ruggiero_weight() {
 
     // Define the objectives
     let objectives = &[
-        Objective::within_tolerance(StateParameter::SMA, 42164.0, 1.0),
-        Objective::within_tolerance(StateParameter::Eccentricity, 0.01, 5e-5),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::SemiMajorAxis),
+            42164.0,
+            1.0,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Eccentricity),
+            0.01,
+            5e-5,
+        ),
     ];
 
     let ruggiero = Ruggiero::simple(objectives, sc).unwrap();

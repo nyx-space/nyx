@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anise::analysis::prelude::OrbitalElement;
 use anise::astro::Aberration;
 use anise::constants::orientations::J2000;
 use anise::errors::AlmanacError;
@@ -140,10 +141,10 @@ impl Traj<Spacecraft> {
         let mut cfg = ExportCfg::builder()
             .step(1.minutes())
             .fields(vec![
-                StateParameter::Latitude,
-                StateParameter::Longitude,
-                StateParameter::Height,
-                StateParameter::Rmag,
+                StateParameter::Element(OrbitalElement::Latitude),
+                StateParameter::Element(OrbitalElement::Longitude),
+                StateParameter::Element(OrbitalElement::Height),
+                StateParameter::Element(OrbitalElement::Rmag),
             ])
             .build();
         cfg.metadata = metadata;
@@ -458,12 +459,12 @@ impl Traj<Spacecraft> {
         let mut frame = None;
 
         let mut found_fields = vec![
-            (StateParameter::X, false),
-            (StateParameter::Y, false),
-            (StateParameter::Z, false),
-            (StateParameter::VX, false),
-            (StateParameter::VY, false),
-            (StateParameter::VZ, false),
+            (StateParameter::Element(OrbitalElement::X), false),
+            (StateParameter::Element(OrbitalElement::Y), false),
+            (StateParameter::Element(OrbitalElement::Z), false),
+            (StateParameter::Element(OrbitalElement::VX), false),
+            (StateParameter::Element(OrbitalElement::VY), false),
+            (StateParameter::Element(OrbitalElement::VZ), false),
             (StateParameter::PropMass, false),
         ];
 

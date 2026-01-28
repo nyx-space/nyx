@@ -16,16 +16,18 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::error::Error;
-
 use super::{DispersedState, StateDispersion};
+use crate::cosmic::AstroPhysicsSnafu;
 use crate::errors::StateError;
-use crate::md::prelude::{BPlane, OrbitDual};
+use crate::md::prelude::BPlane;
 use crate::md::{AstroSnafu, StateParameter};
 use crate::{pseudo_inverse, NyxError, Spacecraft, State};
+use anise::analysis::prelude::OrbitalElement;
+use anise::astro::orbit_gradient::OrbitGrad;
 use nalgebra::{DMatrix, DVector, SMatrix, SVector};
 use rand_distr::{Distribution, Normal};
 use snafu::ResultExt;
+use std::error::Error;
 
 /// A multivariate spacecraft state generator for Monte Carlo analyses. Ensures that the covariance is properly applied on all provided state variables.
 #[derive(Clone, Debug)]
@@ -55,7 +57,7 @@ impl MvnSpacecraft {
         let mut cov = SMatrix::<f64, 9, 9>::zeros();
         let mut mean = SVector::<f64, 9>::zeros();
 
-        let orbit_dual = OrbitDual::from(template.orbit);
+        let orbit_dual = OrbitGrad::from(template.orbit);
         let mut b_plane = None;
         for obj in &dispersions {
             if obj.param.is_b_plane() {
@@ -78,39 +80,39 @@ impl MvnSpacecraft {
             let mut jac = DMatrix::from_element(num_orbital, 6, 0.0);
             let mut covar = DMatrix::from_element(num_orbital, num_orbital, 0.0);
             let mut means = DVector::from_element(num_orbital, 0.0);
-            let orbit_dual = OrbitDual::from(template.orbit);
+            let orbit_dual = OrbitGrad::from(template.orbit);
             let mut rno = 0;
             for disp in &dispersions {
-                if disp.param.is_orbital() {
-                    let partial = if disp.param.is_b_plane() {
-                        match disp.param {
-                            StateParameter::BdotR => b_plane.unwrap().b_r_km,
-                            StateParameter::BdotT => b_plane.unwrap().b_t_km,
-                            StateParameter::BLTOF => b_plane.unwrap().ltof_s,
-                            _ => unreachable!(),
-                        }
-                    } else {
-                        orbit_dual.partial_for(disp.param).context(AstroSnafu)?
-                    };
-
-                    for (cno, val) in [
-                        partial.wtr_x(),
-                        partial.wtr_y(),
-                        partial.wtr_z(),
-                        partial.wtr_vx(),
-                        partial.wtr_vy(),
-                        partial.wtr_vz(),
-                    ]
-                    .iter()
-                    .copied()
-                    .enumerate()
-                    {
-                        jac[(rno, cno)] = val;
+                let partial = if let StateParameter::Element(oe) = disp.param {
+                    orbit_dual.partial_for(oe).context(AstroPhysicsSnafu)?
+                } else if disp.param.is_b_plane() {
+                    match disp.param {
+                        StateParameter::BdotR => b_plane.unwrap().b_r_km,
+                        StateParameter::BdotT => b_plane.unwrap().b_t_km,
+                        StateParameter::BLTOF => b_plane.unwrap().ltof_s,
+                        _ => unreachable!(),
                     }
-                    covar[(rno, rno)] = disp.std_dev.unwrap_or(0.0).powi(2);
-                    means[rno] = disp.mean.unwrap_or(0.0);
-                    rno += 1;
+                } else {
+                    unreachable!()
+                };
+
+                for (cno, val) in [
+                    partial.wrt_x(),
+                    partial.wrt_y(),
+                    partial.wrt_z(),
+                    partial.wrt_vx(),
+                    partial.wrt_vy(),
+                    partial.wrt_vz(),
+                ]
+                .iter()
+                .copied()
+                .enumerate()
+                {
+                    jac[(rno, cno)] = val;
                 }
+                covar[(rno, rno)] = disp.std_dev.unwrap_or(0.0).powi(2);
+                means[rno] = disp.mean.unwrap_or(0.0);
+                rno += 1;
             }
 
             // Now that we have the Jacobian that rotates from the Cartesian elements to the dispersions parameters,
@@ -216,27 +218,27 @@ impl MvnSpacecraft {
 
         let dispersions = vec![
             StateDispersion::builder()
-                .param(StateParameter::X)
+                .param(StateParameter::Element(OrbitalElement::X))
                 .std_dev(cov[(0, 0)])
                 .build(),
             StateDispersion::builder()
-                .param(StateParameter::Y)
+                .param(StateParameter::Element(OrbitalElement::Y))
                 .std_dev(cov[(1, 1)])
                 .build(),
             StateDispersion::builder()
-                .param(StateParameter::Z)
+                .param(StateParameter::Element(OrbitalElement::Z))
                 .std_dev(cov[(2, 2)])
                 .build(),
             StateDispersion::builder()
-                .param(StateParameter::VX)
+                .param(StateParameter::Element(OrbitalElement::VX))
                 .std_dev(cov[(3, 3)])
                 .build(),
             StateDispersion::builder()
-                .param(StateParameter::VY)
+                .param(StateParameter::Element(OrbitalElement::VY))
                 .std_dev(cov[(4, 4)])
                 .build(),
             StateDispersion::builder()
-                .param(StateParameter::VZ)
+                .param(StateParameter::Element(OrbitalElement::VZ))
                 .std_dev(cov[(5, 5)])
                 .build(),
             StateDispersion::builder()
@@ -331,7 +333,7 @@ mod multivariate_ut {
         let generator = MvnSpacecraft::new(
             state,
             vec![StateDispersion::builder()
-                .param(StateParameter::Rmag)
+                .param(StateParameter::Element(OrbitalElement::Rmag))
                 .std_dev(std_dev)
                 .build()],
         )
@@ -384,27 +386,27 @@ mod multivariate_ut {
             },
             vec![
                 StateDispersion::builder()
-                    .param(StateParameter::X)
+                    .param(StateParameter::Element(OrbitalElement::X))
                     .std_dev(10.0)
                     .build(),
                 StateDispersion::builder()
-                    .param(StateParameter::Y)
+                    .param(StateParameter::Element(OrbitalElement::Y))
                     .std_dev(10.0)
                     .build(),
                 StateDispersion::builder()
-                    .param(StateParameter::Z)
+                    .param(StateParameter::Element(OrbitalElement::Z))
                     .std_dev(10.0)
                     .build(),
                 StateDispersion::builder()
-                    .param(StateParameter::VX)
+                    .param(StateParameter::Element(OrbitalElement::VX))
                     .std_dev(0.2)
                     .build(),
                 StateDispersion::builder()
-                    .param(StateParameter::VY)
+                    .param(StateParameter::Element(OrbitalElement::VY))
                     .std_dev(0.2)
                     .build(),
                 StateDispersion::builder()
-                    .param(StateParameter::VZ)
+                    .param(StateParameter::Element(OrbitalElement::VZ))
                     .std_dev(0.2)
                     .build(),
             ],
@@ -462,7 +464,7 @@ mod multivariate_ut {
         let generator = MvnSpacecraft::new(
             state,
             vec![StateDispersion::zero_mean(
-                StateParameter::RAAN,
+                StateParameter::Element(OrbitalElement::RAAN),
                 angle_sigma_deg,
             )],
         )
@@ -478,7 +480,10 @@ mod multivariate_ut {
             .take(1000)
             .map(|dispersed_state| {
                 // For all other orbital parameters, make sure that we have not changed things dramatically.
-                for param in [StateParameter::SMA, StateParameter::Inclination] {
+                for param in [
+                    StateParameter::Element(OrbitalElement::SemiMajorAxis),
+                    StateParameter::Element(OrbitalElement::Inclination),
+                ] {
                     let orig = state.value(param).unwrap();
                     let new = dispersed_state.state.value(param).unwrap();
                     let prct_change = 100.0 * (orig - new).abs() / orig;
@@ -530,10 +535,22 @@ mod multivariate_ut {
         let generator = MvnSpacecraft::new(
             state,
             vec![
-                StateDispersion::zero_mean(StateParameter::SMA, sma_sigma_km),
-                StateDispersion::zero_mean(StateParameter::Inclination, inc_sigma_deg),
-                StateDispersion::zero_mean(StateParameter::RAAN, angle_sigma_deg),
-                StateDispersion::zero_mean(StateParameter::AoP, angle_sigma_deg),
+                StateDispersion::zero_mean(
+                    StateParameter::Element(OrbitalElement::SemiMajorAxis),
+                    sma_sigma_km,
+                ),
+                StateDispersion::zero_mean(
+                    StateParameter::Element(OrbitalElement::Inclination),
+                    inc_sigma_deg,
+                ),
+                StateDispersion::zero_mean(
+                    StateParameter::Element(OrbitalElement::RAAN),
+                    angle_sigma_deg,
+                ),
+                StateDispersion::zero_mean(
+                    StateParameter::Element(OrbitalElement::AoP),
+                    angle_sigma_deg,
+                ),
             ],
         )
         .unwrap();

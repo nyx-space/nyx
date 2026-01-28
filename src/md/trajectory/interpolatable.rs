@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anise::analysis::prelude::OrbitalElement;
 use anise::math::interpolation::{hermite_eval, InterpolationError};
 
 pub(crate) const INTERPOLATION_SAMPLES: usize = 13;
@@ -26,8 +27,6 @@ use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 use crate::time::Epoch;
 use crate::{Orbit, Spacecraft, State};
-
-use enum_iterator::all;
 
 /// States that can be interpolated should implement this trait.
 pub trait Interpolatable: State
@@ -114,43 +113,28 @@ impl Interpolatable for Spacecraft {
     }
 
     fn export_params() -> Vec<StateParameter> {
-        // Build all of the orbital parameters but keep the Cartesian state first
-        let orbit_params = all::<StateParameter>()
-            .filter(|p| {
-                p.is_orbital()
-                    && !p.is_b_plane()
-                    && !matches!(
-                        p,
-                        StateParameter::X
-                            | StateParameter::Y
-                            | StateParameter::Z
-                            | StateParameter::VX
-                            | StateParameter::VY
-                            | StateParameter::VZ
-                            | StateParameter::HyperbolicAnomaly
-                            | StateParameter::Height
-                            | StateParameter::Latitude
-                            | StateParameter::Longitude
-                    )
-            })
-            .collect::<Vec<StateParameter>>();
-
-        let sc_params = all::<StateParameter>()
-            .filter(|p| p.is_for_spacecraft())
-            .collect::<Vec<StateParameter>>();
-
-        [
-            vec![
-                StateParameter::X,
-                StateParameter::Y,
-                StateParameter::Z,
-                StateParameter::VX,
-                StateParameter::VY,
-                StateParameter::VZ,
-            ],
-            orbit_params,
-            sc_params,
+        vec![
+            StateParameter::Element(OrbitalElement::X),
+            StateParameter::Element(OrbitalElement::Y),
+            StateParameter::Element(OrbitalElement::Z),
+            StateParameter::Element(OrbitalElement::VX),
+            StateParameter::Element(OrbitalElement::VY),
+            StateParameter::Element(OrbitalElement::VZ),
+            StateParameter::Element(OrbitalElement::SemiMajorAxis),
+            StateParameter::Element(OrbitalElement::Eccentricity),
+            StateParameter::Element(OrbitalElement::Inclination),
+            StateParameter::Element(OrbitalElement::RAAN),
+            StateParameter::Element(OrbitalElement::AoP),
+            StateParameter::Element(OrbitalElement::TrueAnomaly),
+            StateParameter::Element(OrbitalElement::AoL),
+            StateParameter::Element(OrbitalElement::TrueLongitude),
+            StateParameter::DryMass,
+            StateParameter::PropMass,
+            StateParameter::Cr,
+            StateParameter::Cd,
+            StateParameter::Isp,
+            StateParameter::GuidanceMode,
+            StateParameter::Thrust,
         ]
-        .concat()
     }
 }

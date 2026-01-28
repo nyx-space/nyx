@@ -17,7 +17,7 @@
 */
 
 use super::solution::TargeterSolution;
-use crate::cosmic::AstroAlmanacSnafu;
+use crate::cosmic::{AstroAlmanacSnafu, AstroPhysicsSnafu};
 use crate::errors::TargetingError;
 use crate::linalg::{DMatrix, SVector};
 use crate::md::{prelude::*, PropSnafu, UnderdeterminedProblemSnafu};
@@ -25,6 +25,7 @@ use crate::md::{AstroSnafu, StateParameter};
 pub use crate::md::{Variable, Vary};
 use crate::pseudo_inverse;
 use crate::utils::are_eigenvalues_stable;
+use anise::astro::orbit_gradient::OrbitGrad;
 use log::{debug, info, warn};
 use snafu::{ensure, ResultExt};
 #[cfg(not(target_arch = "wasm32"))]
@@ -148,9 +149,9 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                         .context(AstroAlmanacSnafu)
                         .context(AstroSnafu)?;
 
-                    OrbitDual::from(orbit_obj_frame)
+                    OrbitGrad::from(orbit_obj_frame)
                 }
-                None => OrbitDual::from(xf.orbit),
+                None => OrbitGrad::from(xf.orbit),
             };
 
             // Build the error vector
@@ -179,10 +180,13 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                         StateParameter::BLTOF => b_plane.unwrap().ltof_s,
                         _ => unreachable!(),
                     }
-                } else {
+                } else if let StateParameter::Element(oe) = obj.parameter {
                     xf_dual_obj_frame
-                        .partial_for(obj.parameter)
+                        .partial_for(oe)
+                        .context(AstroPhysicsSnafu)
                         .context(AstroSnafu)?
+                } else {
+                    unreachable!()
                 };
 
                 let achieved = xf_partial.real();
@@ -206,12 +210,12 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                 // TODO: VNC (how?!)
                 let mut partial_vec = DMatrix::from_element(1, 6, 0.0);
                 for (i, val) in [
-                    xf_partial.wtr_x(),
-                    xf_partial.wtr_y(),
-                    xf_partial.wtr_z(),
-                    xf_partial.wtr_vx(),
-                    xf_partial.wtr_vy(),
-                    xf_partial.wtr_vz(),
+                    xf_partial.wrt_x(),
+                    xf_partial.wrt_y(),
+                    xf_partial.wrt_z(),
+                    xf_partial.wrt_vx(),
+                    xf_partial.wrt_vy(),
+                    xf_partial.wrt_vz(),
                 ]
                 .iter()
                 .enumerate()

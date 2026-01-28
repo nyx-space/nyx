@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anise::analysis::AnalysisError;
 use anise::errors::{AlmanacError, PhysicsError};
 pub use anise::prelude::*;
 
@@ -151,16 +152,14 @@ pub enum AstroError {
     NotHyperbolic,
     #[snafu(display("physics error occured during astro computation: {source}"))]
     AstroPhysics { source: PhysicsError },
+    #[snafu(display("analysis error occured during astro computation: {source}"))]
+    AstroAnalysis { source: AnalysisError },
     #[snafu(display("ANISE Almanac error occured during astro computation: {source}"))]
     AstroAlmanac {
         #[snafu(source(from(AlmanacError, Box::new)))]
         source: Box<AlmanacError>,
     },
 }
-
-// Re-Export OrbitDual
-mod orbitdual;
-pub use self::orbitdual::*;
 
 // Re-Export B Plane
 mod bplane;

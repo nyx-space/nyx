@@ -18,7 +18,7 @@ use nyx::{
         Harmonics, OrbitalDynamics, SolarPressure, SpacecraftDynamics,
     },
     io::{gravity::HarmonicsMem, ExportCfg},
-    md::{prelude::Objective, StateParameter},
+    md::prelude::{Objective, OrbitalElement, StateParameter},
     propagators::{ErrorControl, IntegratorOptions, Propagator},
     Spacecraft,
 };
@@ -65,9 +65,21 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Define the guidance law -- we're just using a Ruggiero controller as demonstrated in AAS-2004-5089.
     let objectives = &[
-        Objective::within_tolerance(StateParameter::SMA, 42_165.0, 20.0),
-        Objective::within_tolerance(StateParameter::Eccentricity, 0.001, 5e-5),
-        Objective::within_tolerance(StateParameter::Inclination, 0.05, 1e-2),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::SemiMajorAxis),
+            42_165.0,
+            20.0,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Eccentricity),
+            0.001,
+            5e-5,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Inclination),
+            0.05,
+            1e-2,
+        ),
     ];
 
     // Ensure that we only thrust if we have more than 20% illumination.

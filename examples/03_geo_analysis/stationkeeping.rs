@@ -19,7 +19,7 @@ use nyx::{
     },
     io::{gravity::HarmonicsMem, ExportCfg},
     mc::{MonteCarlo, MvnSpacecraft, StateDispersion},
-    md::{prelude::Objective, StateParameter},
+    md::prelude::{Objective, OrbitalElement, StateParameter},
     propagators::{ErrorControl, IntegratorOptions, Propagator},
     Spacecraft, State,
 };
@@ -54,9 +54,21 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Define the guidance law -- we're just using a Ruggiero controller as demonstrated in AAS-2004-5089.
     let objectives = &[
-        Objective::within_tolerance(StateParameter::SMA, 42_164.0, 5.0), // 5 km
-        Objective::within_tolerance(StateParameter::Eccentricity, 0.001, 5e-5),
-        Objective::within_tolerance(StateParameter::Inclination, 0.05, 1e-2),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::SemiMajorAxis),
+            42_165.0,
+            20.0,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Eccentricity),
+            0.001,
+            5e-5,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Inclination),
+            0.05,
+            1e-2,
+        ),
     ];
 
     let ruggiero_ctrl = Ruggiero::from_max_eclipse(objectives, sc, 0.2)?;
@@ -89,7 +101,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Note that additional validation on the MVN is in progress -- https://github.com/nyx-space/nyx/issues/339.
     let mc_rv = MvnSpacecraft::new(
         sc,
-        vec![StateDispersion::zero_mean(StateParameter::SMA, 3.0)],
+        vec![StateDispersion::zero_mean(
+            StateParameter::Element(OrbitalElement::SemiMajorAxis),
+            3.0,
+        )],
     )?;
 
     let my_mc = MonteCarlo::new(

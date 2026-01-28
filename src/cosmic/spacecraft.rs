@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anise::analysis::prelude::OrbitalElement;
 use anise::astro::PhysicsResult;
 use anise::constants::frames::EARTH_J2000;
 pub use anise::prelude::Orbit;
@@ -27,6 +28,7 @@ use snafu::ResultExt;
 use typed_builder::TypedBuilder;
 
 use super::{AstroPhysicsSnafu, BPlane, State};
+use crate::cosmic::AstroAnalysisSnafu;
 use crate::dynamics::guidance::Thruster;
 use crate::dynamics::DynamicsError;
 use crate::errors::{StateAstroSnafu, StateError};
@@ -463,20 +465,9 @@ impl State for Spacecraft {
                 None => Err(StateError::NoThrusterAvail),
             },
             StateParameter::GuidanceMode => Ok(self.mode.into()),
-            StateParameter::ApoapsisRadius => self
-                .orbit
-                .apoapsis_km()
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param }),
-            StateParameter::AoL => self
-                .orbit
-                .aol_deg()
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param }),
-            StateParameter::AoP => self
-                .orbit
-                .aop_deg()
-                .context(AstroPhysicsSnafu)
+            StateParameter::Element(e) => e
+                .evaluate(self.orbit)
+                .context(AstroAnalysisSnafu)
                 .context(StateAstroSnafu { param }),
             StateParameter::BdotR => Ok(BPlane::new(self.orbit)
                 .context(StateAstroSnafu { param })?
@@ -490,129 +481,6 @@ impl State for Spacecraft {
                 .context(StateAstroSnafu { param })?
                 .ltof_s
                 .real()),
-            StateParameter::C3 => self
-                .orbit
-                .c3_km2_s2()
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param }),
-            StateParameter::Declination => Ok(self.orbit.declination_deg()),
-            StateParameter::EccentricAnomaly => self
-                .orbit
-                .ea_deg()
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param }),
-            StateParameter::Eccentricity => self
-                .orbit
-                .ecc()
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param }),
-            StateParameter::Energy => self
-                .orbit
-                .energy_km2_s2()
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param }),
-            StateParameter::FlightPathAngle => self
-                .orbit
-                .fpa_deg()
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param }),
-            StateParameter::Height => self
-                .orbit
-                .height_km()
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param }),
-            StateParameter::Latitude => self
-                .orbit
-                .latitude_deg()
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param }),
-            StateParameter::Longitude => Ok(self.orbit.longitude_deg()),
-            StateParameter::Hmag => self
-                .orbit
-                .hmag()
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param }),
-            StateParameter::HX => self
-                .orbit
-                .hx()
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param }),
-            StateParameter::HY => self
-                .orbit
-                .hy()
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param }),
-            StateParameter::HZ => self
-                .orbit
-                .hz()
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param }),
-            StateParameter::HyperbolicAnomaly => self
-                .orbit
-                .hyperbolic_anomaly_deg()
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param }),
-            StateParameter::Inclination => self
-                .orbit
-                .inc_deg()
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param }),
-            StateParameter::MeanAnomaly => self
-                .orbit
-                .ma_deg()
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param }),
-            StateParameter::PeriapsisRadius => self
-                .orbit
-                .periapsis_km()
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param }),
-            StateParameter::Period => Ok(self
-                .orbit
-                .period()
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param })?
-                .to_seconds()),
-            StateParameter::RightAscension => Ok(self.orbit.right_ascension_deg()),
-            StateParameter::RAAN => self
-                .orbit
-                .raan_deg()
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param }),
-            StateParameter::Rmag => Ok(self.orbit.rmag_km()),
-            StateParameter::SemiMinorAxis => self
-                .orbit
-                .semi_minor_axis_km()
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param }),
-            StateParameter::SemiParameter => self
-                .orbit
-                .semi_parameter_km()
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param }),
-            StateParameter::SMA => self
-                .orbit
-                .sma_km()
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param }),
-            StateParameter::TrueAnomaly => self
-                .orbit
-                .ta_deg()
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param }),
-            StateParameter::TrueLongitude => self
-                .orbit
-                .tlong_deg()
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param }),
-            StateParameter::VelocityDeclination => Ok(self.orbit.velocity_declination_deg()),
-            StateParameter::Vmag => Ok(self.orbit.vmag_km_s()),
-            StateParameter::X => Ok(self.orbit.radius_km.x),
-            StateParameter::Y => Ok(self.orbit.radius_km.y),
-            StateParameter::Z => Ok(self.orbit.radius_km.z),
-            StateParameter::VX => Ok(self.orbit.velocity_km_s.x),
-            StateParameter::VY => Ok(self.orbit.velocity_km_s.y),
-            StateParameter::VZ => Ok(self.orbit.velocity_km_s.z),
             _ => Err(StateError::Unavailable { param }),
         }
     }
@@ -631,53 +499,58 @@ impl State for Spacecraft {
                 Some(ref mut thruster) => thruster.thrust_N = val,
                 None => return Err(StateError::NoThrusterAvail),
             },
-            StateParameter::AoP => self
-                .orbit
-                .set_aop_deg(val)
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param })?,
-            StateParameter::Eccentricity => self
-                .orbit
-                .set_ecc(val)
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param })?,
-            StateParameter::Inclination => self
-                .orbit
-                .set_inc_deg(val)
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param })?,
-            StateParameter::RAAN => self
-                .orbit
-                .set_raan_deg(val)
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param })?,
-            StateParameter::SMA => self
-                .orbit
-                .set_sma_km(val)
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param })?,
-            StateParameter::TrueAnomaly => self
-                .orbit
-                .set_ta_deg(val)
-                .context(AstroPhysicsSnafu)
-                .context(StateAstroSnafu { param })?,
-            StateParameter::X => self.orbit.radius_km.x = val,
-            StateParameter::Y => self.orbit.radius_km.y = val,
-            StateParameter::Z => self.orbit.radius_km.z = val,
-            StateParameter::Rmag => {
-                // Convert the position to spherical coordinates
-                let (_, θ, φ) = cartesian_to_spherical(&self.orbit.radius_km);
-                // Convert back to cartesian after setting the new range value
-                self.orbit.radius_km = spherical_to_cartesian(val, θ, φ);
-            }
-            StateParameter::VX => self.orbit.velocity_km_s.x = val,
-            StateParameter::VY => self.orbit.velocity_km_s.y = val,
-            StateParameter::VZ => self.orbit.velocity_km_s.z = val,
-            StateParameter::Vmag => {
-                // Convert the velocity to spherical coordinates
-                let (_, θ, φ) = cartesian_to_spherical(&self.orbit.velocity_km_s);
-                // Convert back to cartesian after setting the new range value
-                self.orbit.velocity_km_s = spherical_to_cartesian(val, θ, φ);
+            StateParameter::Element(el) => {
+                match el {
+                    OrbitalElement::AoP => self
+                        .orbit
+                        .set_aop_deg(val)
+                        .context(AstroPhysicsSnafu)
+                        .context(StateAstroSnafu { param })?,
+                    OrbitalElement::Eccentricity => self
+                        .orbit
+                        .set_ecc(val)
+                        .context(AstroPhysicsSnafu)
+                        .context(StateAstroSnafu { param })?,
+                    OrbitalElement::Inclination => self
+                        .orbit
+                        .set_inc_deg(val)
+                        .context(AstroPhysicsSnafu)
+                        .context(StateAstroSnafu { param })?,
+                    OrbitalElement::RAAN => self
+                        .orbit
+                        .set_raan_deg(val)
+                        .context(AstroPhysicsSnafu)
+                        .context(StateAstroSnafu { param })?,
+                    OrbitalElement::SemiMajorAxis => self
+                        .orbit
+                        .set_sma_km(val)
+                        .context(AstroPhysicsSnafu)
+                        .context(StateAstroSnafu { param })?,
+                    OrbitalElement::TrueAnomaly => self
+                        .orbit
+                        .set_ta_deg(val)
+                        .context(AstroPhysicsSnafu)
+                        .context(StateAstroSnafu { param })?,
+                    OrbitalElement::X => self.orbit.radius_km.x = val,
+                    OrbitalElement::Y => self.orbit.radius_km.y = val,
+                    OrbitalElement::Z => self.orbit.radius_km.z = val,
+                    OrbitalElement::Rmag => {
+                        // Convert the position to spherical coordinates
+                        let (_, θ, φ) = cartesian_to_spherical(&self.orbit.radius_km);
+                        // Convert back to cartesian after setting the new range value
+                        self.orbit.radius_km = spherical_to_cartesian(val, θ, φ);
+                    }
+                    OrbitalElement::VX => self.orbit.velocity_km_s.x = val,
+                    OrbitalElement::VY => self.orbit.velocity_km_s.y = val,
+                    OrbitalElement::VZ => self.orbit.velocity_km_s.z = val,
+                    OrbitalElement::Vmag => {
+                        // Convert the velocity to spherical coordinates
+                        let (_, θ, φ) = cartesian_to_spherical(&self.orbit.velocity_km_s);
+                        // Convert back to cartesian after setting the new range value
+                        self.orbit.velocity_km_s = spherical_to_cartesian(val, θ, φ);
+                    }
+                    _ => return Err(StateError::ReadOnly { param }),
+                }
             }
             _ => return Err(StateError::ReadOnly { param }),
         }
