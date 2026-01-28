@@ -38,7 +38,10 @@ fn tgt_sma_from_apo(almanac: Arc<Almanac>) {
     let xf_desired_sma = 8_100.0;
 
     // Define the objective
-    let objectives = [Objective::new(StateParameter::SMA, xf_desired_sma)];
+    let objectives = [Objective::new(
+        StateParameter::Element(OrbitalElement::SemiMajorAxis),
+        xf_desired_sma,
+    )];
 
     let tgt = Targeter::delta_v(&setup, objectives);
 
@@ -98,7 +101,10 @@ fn tgt_sma_from_peri_fd(almanac: Arc<Almanac>) {
     let xf_desired_sma = 8_100.0;
 
     // Define the objective
-    let objectives = [Objective::new(StateParameter::SMA, xf_desired_sma)];
+    let objectives = [Objective::new(
+        StateParameter::Element(OrbitalElement::SemiMajorAxis),
+        xf_desired_sma,
+    )];
 
     let tgt = Targeter::delta_v(&setup, objectives);
 
@@ -156,7 +162,10 @@ fn tgt_hd_sma_from_peri(almanac: Arc<Almanac>) {
     let xf_desired_sma = 8_100.0;
 
     // Define the objective
-    let objectives = [Objective::new(StateParameter::SMA, xf_desired_sma)];
+    let objectives = [Objective::new(
+        StateParameter::Element(OrbitalElement::SemiMajorAxis),
+        xf_desired_sma,
+    )];
 
     let mut tgt = Targeter::delta_v(&setup, objectives);
     tgt.iterations = 5;
@@ -284,7 +293,10 @@ fn tgt_ecc_from_apo(almanac: Arc<Almanac>) {
                 ..Default::default()
             },
         ],
-        [Objective::new(StateParameter::Eccentricity, xf_desired_ecc)],
+        [Objective::new(
+            StateParameter::Element(OrbitalElement::Eccentricity),
+            xf_desired_ecc,
+        )],
     );
 
     println!("{tgt}");
@@ -358,7 +370,10 @@ fn tgt_ecc_from_peri(almanac: Arc<Almanac>) {
                 ..Default::default()
             },
         ],
-        [Objective::new(StateParameter::Eccentricity, xf_desired_ecc)],
+        [Objective::new(
+            StateParameter::Element(OrbitalElement::Eccentricity),
+            xf_desired_ecc,
+        )],
     );
 
     println!("{tgt}");
@@ -411,7 +426,10 @@ fn tgt_raan_from_apo(almanac: Arc<Almanac>) {
     let xf_desired_raan = 65.0;
 
     // Define the objective
-    let objectives = [Objective::new(StateParameter::RAAN, xf_desired_raan)];
+    let objectives = [Objective::new(
+        StateParameter::Element(OrbitalElement::RAAN),
+        xf_desired_raan,
+    )];
 
     let tgt = Targeter::delta_v(&setup, objectives);
 
@@ -464,7 +482,10 @@ fn tgt_raan_from_peri(almanac: Arc<Almanac>) {
     let xf_desired_raan = 65.0;
 
     // Define the objective
-    let objectives = [Objective::new(StateParameter::RAAN, xf_desired_raan)];
+    let objectives = [Objective::new(
+        StateParameter::Element(OrbitalElement::RAAN),
+        xf_desired_raan,
+    )];
 
     let tgt = Targeter::new(
         &setup,
@@ -538,7 +559,10 @@ fn tgt_aop_from_apo(almanac: Arc<Almanac>) {
     let xf_desired_aop = 65.0;
 
     // Define the objective
-    let objectives = [Objective::new(StateParameter::AoP, xf_desired_aop)];
+    let objectives = [Objective::new(
+        StateParameter::Element(OrbitalElement::AoP),
+        xf_desired_aop,
+    )];
 
     let tgt = Targeter::delta_v(&setup, objectives);
 
@@ -591,7 +615,10 @@ fn tgt_aop_from_peri_cov_test(almanac: Arc<Almanac>) {
     let xf_desired_aop = 65.0;
 
     // Define the objective
-    let objectives = [Objective::new(StateParameter::AoP, xf_desired_aop)];
+    let objectives = [Objective::new(
+        StateParameter::Element(OrbitalElement::AoP),
+        xf_desired_aop,
+    )];
 
     let tgt = Targeter::delta_v(&setup, objectives);
 

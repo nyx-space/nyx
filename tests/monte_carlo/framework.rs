@@ -36,8 +36,11 @@ fn test_monte_carlo_epoch_cov_test(almanac: Arc<Almanac>) {
     let random_state = MvnSpacecraft::new(
         nominal_state,
         vec![
-            StateDispersion::zero_mean(StateParameter::SMA, 0.05),
-            StateDispersion::zero_mean(StateParameter::Eccentricity, 0.05),
+            StateDispersion::zero_mean(
+                StateParameter::Element(OrbitalElement::SemiMajorAxis),
+                0.05,
+            ),
+            StateDispersion::zero_mean(StateParameter::Element(OrbitalElement::Eccentricity), 0.05),
         ],
     )
     .unwrap();
@@ -63,23 +66,27 @@ fn test_monte_carlo_epoch_cov_test(almanac: Arc<Almanac>) {
     let rslts = my_mc.run_until_epoch(prop, almanac.clone(), dt + 1.0_f64 * Unit::Day, 10);
 
     let average_sma_dispersion = rslts
-        .dispersion_values_of(StateParameter::SMA)
+        .dispersion_values_of(StateParameter::Element(OrbitalElement::SemiMajorAxis))
         .unwrap()
         .amean()
         .unwrap();
 
     let average_sma = rslts
-        .every_value_of(StateParameter::SMA, 5.minutes(), None)
+        .every_value_of(
+            StateParameter::Element(OrbitalElement::SemiMajorAxis),
+            5.minutes(),
+            None,
+        )
         .amean()
         .unwrap();
 
     let average_initial_sma = rslts
-        .first_values_of(StateParameter::SMA, None)
+        .first_values_of(StateParameter::Element(OrbitalElement::SemiMajorAxis), None)
         .amean()
         .unwrap();
 
     let average_final_sma = rslts
-        .last_values_of(StateParameter::SMA, None)
+        .last_values_of(StateParameter::Element(OrbitalElement::SemiMajorAxis), None)
         .amean()
         .unwrap();
 

@@ -51,8 +51,16 @@ fn qlaw_as_ruggiero_case_a(almanac: Arc<Almanac>) {
     };
 
     let objectives = &[
-        Objective::within_tolerance(StateParameter::SMA, 42_000.0, 1.0),
-        Objective::within_tolerance(StateParameter::Eccentricity, 0.01, 5e-5),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::SemiMajorAxis),
+            42_000.0,
+            1.0,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Eccentricity),
+            0.01,
+            5e-5,
+        ),
     ];
 
     let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
@@ -137,9 +145,21 @@ fn qlaw_as_ruggiero_case_b(almanac: Arc<Almanac>) {
     };
 
     let objectives = &[
-        Objective::within_tolerance(StateParameter::SMA, 42_165.0, 20.0),
-        Objective::within_tolerance(StateParameter::Eccentricity, 0.001, 5e-5),
-        Objective::within_tolerance(StateParameter::Inclination, 0.05, 5e-3),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::SemiMajorAxis),
+            42_165.0,
+            20.0,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Eccentricity),
+            0.001,
+            5e-5,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Inclination),
+            0.05,
+            5e-3,
+        ),
     ];
 
     let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
@@ -196,8 +216,16 @@ fn qlaw_as_ruggiero_case_c_cov_test(almanac: Arc<Almanac>) {
     };
 
     let objectives = &[
-        Objective::within_tolerance(StateParameter::SMA, 30_000.0, 1.0),
-        Objective::within_tolerance(StateParameter::Eccentricity, 0.7, 5e-5),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::SemiMajorAxis),
+            30_000.0,
+            1.0,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Eccentricity),
+            0.7,
+            5e-5,
+        ),
     ];
 
     let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
@@ -255,10 +283,26 @@ fn qlaw_as_ruggiero_case_d(almanac: Arc<Almanac>) {
     };
 
     let objectives = &[
-        Objective::within_tolerance(StateParameter::SMA, 26_500.0, 1.0),
-        Objective::within_tolerance(StateParameter::Inclination, 116.0, 5e-3),
-        Objective::within_tolerance(StateParameter::Eccentricity, 0.7, 5e-5),
-        Objective::within_tolerance(StateParameter::RAAN, 360.0 - 90.0, 5e-3),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::SemiMajorAxis),
+            26_500.0,
+            1.0,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Inclination),
+            116.0,
+            5e-3,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Eccentricity),
+            0.7,
+            5e-5,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::RAAN),
+            360.0 - 90.0,
+            5e-3,
+        ),
     ];
 
     let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
@@ -317,11 +361,23 @@ fn qlaw_as_ruggiero_case_e(almanac: Arc<Almanac>) {
     };
 
     let objectives = &[
-        Objective::within_tolerance(StateParameter::SMA, 26_500.0, 1.0),
-        Objective::within_tolerance(StateParameter::Eccentricity, 0.7, 5e-5),
-        Objective::within_tolerance(StateParameter::Inclination, 116.0, 5e-3),
-        Objective::within_tolerance(StateParameter::RAAN, 270.0, 5e-3),
-        Objective::within_tolerance(StateParameter::AoP, 180.0, 5e-3),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::SemiMajorAxis),
+            26_500.0,
+            1.0,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Eccentricity),
+            0.7,
+            5e-5,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Inclination),
+            116.0,
+            5e-3,
+        ),
+        Objective::within_tolerance(StateParameter::Element(OrbitalElement::RAAN), 270.0, 5e-3),
+        Objective::within_tolerance(StateParameter::Element(OrbitalElement::AoP), 180.0, 5e-3),
     ];
 
     let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
@@ -381,7 +437,10 @@ fn qlaw_as_ruggiero_case_f(almanac: Arc<Almanac>) {
         isp_s: 1650.0,
     };
 
-    let objectives = &[Objective::new(StateParameter::Eccentricity, 0.15)];
+    let objectives = &[Objective::new(
+        StateParameter::Element(OrbitalElement::Eccentricity),
+        0.15,
+    )];
 
     let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
@@ -441,9 +500,21 @@ fn ruggiero_iepc_2011_102(almanac: Arc<Almanac>) {
     };
 
     let objectives = &[
-        Objective::within_tolerance(StateParameter::SMA, 42_164.0, 20.0),
-        Objective::within_tolerance(StateParameter::Inclination, 0.001, 5e-3),
-        Objective::within_tolerance(StateParameter::Eccentricity, 0.011, 5e-5),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::SemiMajorAxis),
+            42_164.0,
+            20.0,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Inclination),
+            0.001,
+            5e-3,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Eccentricity),
+            0.011,
+            5e-5,
+        ),
     ];
 
     let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();

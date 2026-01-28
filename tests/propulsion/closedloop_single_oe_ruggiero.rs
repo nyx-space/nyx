@@ -7,6 +7,7 @@ use self::nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
 use self::nyx::propagators::{IntegratorOptions, Propagator};
 use self::nyx::time::{Epoch, Unit};
 
+use anise::analysis::prelude::OrbitalElement;
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use nyx_space::propagators::IntegratorMethod;
 use rstest::*;
@@ -39,7 +40,7 @@ fn rugg_sma(almanac: Arc<Almanac>) {
 
     // Define the objectives
     let objectives = &[Objective::within_tolerance(
-        StateParameter::SMA,
+        StateParameter::Element(OrbitalElement::SemiMajorAxis),
         42_164.0,
         1.0,
     )];
@@ -92,7 +93,7 @@ fn rugg_sma_regress_threshold(almanac: Arc<Almanac>) {
 
     // Define the objectives
     let objectives = &[Objective::within_tolerance(
-        StateParameter::SMA,
+        StateParameter::Element(OrbitalElement::SemiMajorAxis),
         42_164.0,
         1.0,
     )];
@@ -149,7 +150,7 @@ fn rugg_sma_decr(almanac: Arc<Almanac>) {
 
     // Define the objectives
     let objectives = &[Objective::within_tolerance(
-        StateParameter::SMA,
+        StateParameter::Element(OrbitalElement::SemiMajorAxis),
         24_396.0,
         1.0,
     )];
@@ -207,7 +208,7 @@ fn rugg_inc(almanac: Arc<Almanac>) {
 
     // Define the objectives
     let objectives = &[Objective::within_tolerance(
-        StateParameter::Inclination,
+        StateParameter::Element(OrbitalElement::Inclination),
         51.6,
         5e-3,
     )];
@@ -266,7 +267,7 @@ fn rugg_inc_threshold(almanac: Arc<Almanac>) {
 
     // Define the objectives
     let objectives = &[Objective::within_tolerance(
-        StateParameter::Inclination,
+        StateParameter::Element(OrbitalElement::Inclination),
         51.6,
         5e-3,
     )];
@@ -324,7 +325,7 @@ fn rugg_inc_decr(almanac: Arc<Almanac>) {
 
     // Define the objectives
     let objectives = &[Objective::within_tolerance(
-        StateParameter::Inclination,
+        StateParameter::Element(OrbitalElement::Inclination),
         46.0,
         5e-3,
     )];
@@ -382,7 +383,7 @@ fn rugg_ecc(almanac: Arc<Almanac>) {
 
     // Define the objectives
     let objectives = &[Objective::within_tolerance(
-        StateParameter::Eccentricity,
+        StateParameter::Element(OrbitalElement::Eccentricity),
         0.15,
         5e-5,
     )];
@@ -440,7 +441,7 @@ fn rugg_ecc_regress_threshold(almanac: Arc<Almanac>) {
 
     // Define the objectives
     let objectives = &[Objective::within_tolerance(
-        StateParameter::Eccentricity,
+        StateParameter::Element(OrbitalElement::Eccentricity),
         0.15,
         5e-5,
     )];
@@ -498,7 +499,7 @@ fn rugg_ecc_decr(almanac: Arc<Almanac>) {
 
     // Define the objectives
     let objectives = &[Objective::within_tolerance(
-        StateParameter::Eccentricity,
+        StateParameter::Element(OrbitalElement::Eccentricity),
         0.01,
         5e-5,
     )];
@@ -558,7 +559,7 @@ fn rugg_aop(almanac: Arc<Almanac>) {
 
     // Define the objectives
     let objectives = &[Objective::within_tolerance(
-        StateParameter::AoP,
+        StateParameter::Element(OrbitalElement::AoP),
         183.0,
         5e-3,
     )];
@@ -617,7 +618,7 @@ fn rugg_aop_decr(almanac: Arc<Almanac>) {
 
     // Define the objectives
     let objectives = &[Objective::within_tolerance(
-        StateParameter::AoP,
+        StateParameter::Element(OrbitalElement::AoP),
         178.0,
         5e-3,
     )];
@@ -676,7 +677,11 @@ fn rugg_raan(almanac: Arc<Almanac>) {
     };
 
     // Define the objectives
-    let objectives = &[Objective::within_tolerance(StateParameter::RAAN, 5.0, 5e-5)];
+    let objectives = &[Objective::within_tolerance(
+        StateParameter::Element(OrbitalElement::RAAN),
+        5.0,
+        5e-5,
+    )];
 
     let guid_law = Ruggiero::simple(objectives, orbit.into()).unwrap();
 
@@ -739,7 +744,11 @@ fn rugg_raan_regress_threshold(almanac: Arc<Almanac>) {
     };
 
     // Define the objectives
-    let objectives = &[Objective::within_tolerance(StateParameter::RAAN, 5.0, 5e-5)];
+    let objectives = &[Objective::within_tolerance(
+        StateParameter::Element(OrbitalElement::RAAN),
+        5.0,
+        5e-5,
+    )];
 
     for (threshold, expected_prop_usage) in &[(0.9, 14.787), (0.0, 22.189)] {
         let guid_law = Ruggiero::from_ηthresholds(objectives, &[*threshold], orbit.into()).unwrap();

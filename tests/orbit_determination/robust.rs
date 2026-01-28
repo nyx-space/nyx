@@ -1,6 +1,7 @@
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
+use anise::analysis::prelude::OrbitalElement;
 use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SATURN_BARYCENTER, SUN};
 use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::OrbitalDynamics;
@@ -88,10 +89,16 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
     let initial_estimate = KfEstimate::disperse_from_diag(
         initial_state,
         vec![
-            StateDispersion::zero_mean(StateParameter::SMA, 0.002),
-            StateDispersion::zero_mean(StateParameter::RAAN, 0.002),
-            StateDispersion::zero_mean(StateParameter::Inclination, 0.002),
-            StateDispersion::zero_mean(StateParameter::Eccentricity, 0.0002),
+            StateDispersion::zero_mean(
+                StateParameter::Element(OrbitalElement::SemiMajorAxis),
+                0.002,
+            ),
+            StateDispersion::zero_mean(StateParameter::Element(OrbitalElement::RAAN), 0.002),
+            StateDispersion::zero_mean(StateParameter::Element(OrbitalElement::Inclination), 0.002),
+            StateDispersion::zero_mean(
+                StateParameter::Element(OrbitalElement::Eccentricity),
+                0.0002,
+            ),
         ],
         Some(0),
     )

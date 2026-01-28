@@ -2,10 +2,7 @@ extern crate nyx_space as nyx;
 use std::{fmt::Write, sync::Arc};
 
 use anise::{
-    analysis::{
-        expr::ScalarExpr,
-        prelude::{Condition, OrbitalElement},
-    },
+    analysis::{expr::ScalarExpr, prelude::Condition},
     astro::Occultation,
     constants::frames::{EARTH_J2000, IAU_EARTH_FRAME, SUN_J2000},
     prelude::Almanac,

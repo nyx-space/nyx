@@ -334,7 +334,8 @@ fn event_and_combination(almanac: Arc<Almanac>) {
 
     println!(
         "{sc}\tinitial c3 = {}",
-        sc.value(StateParameter::C3).unwrap()
+        sc.value(StateParameter::Element(OrbitalElement::C3))
+            .unwrap()
     );
 
     // Thrust in the +X direction continuously
@@ -375,17 +376,26 @@ fn event_and_combination(almanac: Arc<Almanac>) {
     println!(
         "Earth Apoapse\n{:x}\tc3 = {} km^2/s^2\n{:x}\tdecl = {} deg",
         sc_apo,
-        sc_apo.value(StateParameter::C3).unwrap(),
+        sc_apo
+            .value(StateParameter::Element(OrbitalElement::C3))
+            .unwrap(),
         sc_moon_apo,
-        sc_moon_apo.value(StateParameter::Declination).unwrap()
+        sc_moon_apo
+            .value(StateParameter::Element(OrbitalElement::Declination))
+            .unwrap()
     );
 
     println!(
         "End of prop\n{:x}\tc3 = {} km^2/s^2\n{:x}\tdecl = {} deg",
         traj.last(),
-        traj.last().value(StateParameter::C3).unwrap(),
+        traj.last()
+            .value(StateParameter::Element(OrbitalElement::C3))
+            .unwrap(),
         traj_moon.last(),
-        traj_moon.last().value(StateParameter::Declination).unwrap()
+        traj_moon
+            .last()
+            .value(StateParameter::Element(OrbitalElement::Declination))
+            .unwrap()
     );
 
     // Now let's find when the declination with the Moon is zero.

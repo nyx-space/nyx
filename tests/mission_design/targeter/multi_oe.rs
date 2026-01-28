@@ -3,6 +3,7 @@ extern crate nyx_space as nyx;
 use nyx::dynamics::guidance::Thruster;
 use nyx::md::prelude::*;
 
+use anise::analysis::prelude::OrbitalElement;
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use nyx_space::cosmic::Mass;
 use rstest::*;
@@ -35,8 +36,12 @@ fn tgt_c3_decl(almanac: Arc<Almanac>) {
 
     // Define the objective
     let objectives = [
-        Objective::within_tolerance(StateParameter::Declination, 5.0, 0.1),
-        Objective::within_tolerance(StateParameter::C3, -5.0, 0.5),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Declination),
+            5.0,
+            0.1,
+        ),
+        Objective::within_tolerance(StateParameter::Element(OrbitalElement::C3), -5.0, 0.5),
     ];
 
     let tgt = Targeter::delta_v(&setup, objectives);
@@ -104,8 +109,16 @@ fn conv_tgt_sma_ecc(almanac: Arc<Almanac>) {
 
     // Define the objective
     let objectives = [
-        Objective::within_tolerance(StateParameter::Eccentricity, 0.4, 1e-5),
-        Objective::within_tolerance(StateParameter::SMA, 8100.0, 0.1),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Eccentricity),
+            0.4,
+            1e-5,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::SemiMajorAxis),
+            8100.0,
+            0.1,
+        ),
     ];
 
     let tgt = Targeter::new(
@@ -207,8 +220,16 @@ fn tgt_hd_sma_ecc_cov_test(almanac: Arc<Almanac>) {
 
     // Define the objective
     let objectives = [
-        Objective::within_tolerance(StateParameter::Eccentricity, 0.4, 1e-5),
-        Objective::within_tolerance(StateParameter::SMA, 8100.0, 0.1),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Eccentricity),
+            0.4,
+            1e-5,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::SemiMajorAxis),
+            8100.0,
+            0.1,
+        ),
     ];
 
     let tgt = Targeter::new(

@@ -1,6 +1,7 @@
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
+use anise::analysis::prelude::OrbitalElement;
 use anise::constants::frames::{EARTH_J2000, MOON_J2000};
 use hifitime::TimeUnits;
 use nyx::cosmic::{GuidanceMode, Orbit, Spacecraft};
@@ -269,7 +270,7 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
 
     // Define the objectives and the control law
     let objectives = &[Objective::within_tolerance(
-        StateParameter::AoP,
+        StateParameter::Element(OrbitalElement::AoP),
         183.0,
         5e-3,
     )];
