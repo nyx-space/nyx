@@ -302,11 +302,11 @@ impl Distribution<DispersedState<Spacecraft>> for MvnSpacecraft {
 #[cfg(test)]
 mod multivariate_ut {
     use super::*;
+    use crate::time::Epoch;
     use crate::Spacecraft;
     use crate::GMAT_EARTH_GM;
     use anise::constants::frames::EARTH_J2000;
     use anise::prelude::Orbit;
-    use crate::time::Epoch;
     use rand::Rng;
     use statrs;
     use statrs::distribution::ContinuousCDF;
@@ -338,8 +338,8 @@ mod multivariate_ut {
     #[test]
     fn test_mvn_generator() {
         // Generate a random covariance matrix.
-        let mut rng = rand::thread_rng();
-        let cov = SMatrix::<f64, 6, 6>::from_fn(|_, _| rng.gen());
+        let mut rng = rand::rng();
+        let cov = SMatrix::<f64, 6, 6>::from_fn(|_, _| rng.random());
         let cov = cov * cov.transpose();
         let mut cov_resized = SMatrix::<f64, 9, 9>::zeros();
         cov_resized.fixed_view_mut::<6, 6>(0, 0).copy_from(&cov);
@@ -365,7 +365,8 @@ mod multivariate_ut {
             .map(|sample| {
                 let mut v = SVector::<f64, 9>::zeros();
                 for i in 0..6 {
-                    v[i] = sample.state.orbit.to_cartesian_pos_vel()[i] - state.orbit.to_cartesian_pos_vel()[i];
+                    v[i] = sample.state.orbit.to_cartesian_pos_vel()[i]
+                        - state.orbit.to_cartesian_pos_vel()[i];
                 }
                 mahalanobis_distance(&v, &SVector::zeros(), &cov_inv)
             })
@@ -554,7 +555,9 @@ mod multivariate_ut {
         let n = 1000;
         let samples = generator.sample_iter(rng).take(n);
 
-        let cov = SMatrix::<f64, 1, 1>::from_diagonal(&SVector::<f64, 1>::from_vec(vec![angle_sigma_deg.powi(2)]));
+        let cov = SMatrix::<f64, 1, 1>::from_diagonal(&SVector::<f64, 1>::from_vec(vec![
+            angle_sigma_deg.powi(2),
+        ]));
         let cov_inv = cov.pseudo_inverse(1e-12).unwrap();
 
         let md: Vec<f64> = samples
@@ -570,7 +573,8 @@ mod multivariate_ut {
                     );
                 }
 
-                let delta = SVector::<f64, 1>::from_vec(vec![dispersed_state.actual_dispersions[0].1]);
+                let delta =
+                    SVector::<f64, 1>::from_vec(vec![dispersed_state.actual_dispersions[0].1]);
                 mahalanobis_distance(&delta, &SVector::zeros(), &cov_inv)
             })
             .collect();
