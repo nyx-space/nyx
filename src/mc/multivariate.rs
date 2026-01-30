@@ -75,14 +75,16 @@ impl MvnSpacecraft {
             .filter(|disp| disp.param.is_orbital())
             .count();
 
+        dbg!(num_orbital);
+
         if num_orbital > 0 {
             // Build the rotation matrix from the orbital dispersions to the Cartesian state.
             let mut jac = DMatrix::from_element(num_orbital, 6, 0.0);
             let mut covar = DMatrix::from_element(num_orbital, num_orbital, 0.0);
             let mut means = DVector::from_element(num_orbital, 0.0);
             let orbit_dual = OrbitGrad::from(template.orbit);
-            let mut rno = 0;
-            for disp in &dispersions {
+
+            for (rno, disp) in dispersions.iter().enumerate() {
                 let partial = if let StateParameter::Element(oe) = disp.param {
                     orbit_dual.partial_for(oe).context(AstroPhysicsSnafu)?
                 } else if disp.param.is_b_plane() {
@@ -95,6 +97,8 @@ impl MvnSpacecraft {
                 } else {
                     unreachable!()
                 };
+
+                println!("{partial}");
 
                 for (cno, val) in [
                     partial.wrt_x(),
@@ -112,7 +116,6 @@ impl MvnSpacecraft {
                 }
                 covar[(rno, rno)] = disp.std_dev.unwrap_or(0.0).powi(2);
                 means[rno] = disp.mean.unwrap_or(0.0);
-                rno += 1;
             }
 
             // Now that we have the Jacobian that rotates from the Cartesian elements to the dispersions parameters,
@@ -460,6 +463,8 @@ mod multivariate_ut {
             .build();
 
         let angle_sigma_deg = 0.2;
+
+        assert!(StateParameter::Element(OrbitalElement::RAAN).is_orbital());
 
         let generator = MvnSpacecraft::new(
             state,

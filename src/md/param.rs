@@ -80,7 +80,7 @@ impl StateParameter {
 
     /// Returns whether this is an orbital parameter
     pub const fn is_orbital(&self) -> bool {
-        !self.is_for_spacecraft() && !matches!(self, Self::Element(..))
+        matches!(self, Self::Element(..))
     }
 
     /// Returns whether this parameter is only applicable to a spacecraft state
