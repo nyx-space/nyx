@@ -311,8 +311,90 @@ impl Distribution<DispersedState<Spacecraft>> for MvnSpacecraft {
 #[cfg(test)]
 mod multivariate_ut {
     use super::*;
+    use crate::time::Epoch;
     use crate::Spacecraft;
     use crate::GMAT_EARTH_GM;
+    use anise::constants::frames::EARTH_J2000;
+    use anise::prelude::Orbit;
+    use rand::Rng;
+    use statrs;
+    use statrs::distribution::ContinuousCDF;
+
+    /// Returns the Mahalanobis distance of a random variable x from a multivariate normal distribution
+    /// with mean mu and covariance matrix S.
+    fn mahalanobis_distance<const T: usize>(
+        x: &SVector<f64, T>,
+        mu: &SVector<f64, T>,
+        cov_inv: &SMatrix<f64, T, T>,
+    ) -> f64 {
+        let delta = x - mu;
+        (delta.transpose() * cov_inv * delta)[(0, 0)]
+    }
+
+    #[test]
+    fn mahalanobis_distance_test() {
+        // Simple 2D case with diagonal covariance
+        let x = SVector::<f64, 2>::new(1.0, 2.0);
+        let mu = SVector::<f64, 2>::new(0.0, 0.0);
+        let cov = SMatrix::<f64, 2, 2>::from_diagonal(&SVector::<f64, 2>::new(2.0, 3.0));
+        let cov_inv = cov.pseudo_inverse(1e-12).unwrap();
+
+        // Expected distance: (1-0)^2/2 + (2-0)^2/3 = 1/2 + 4/3 = 0.5 + 1.333... = 1.8333...
+        let md = mahalanobis_distance(&x, &mu, &cov_inv);
+        assert!((md - 1.8333333333333333).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_mvn_generator() {
+        // Generate a random covariance matrix.
+        let mut rng = rand::rng();
+        let cov = SMatrix::<f64, 6, 6>::from_fn(|_, _| rng.random());
+        let cov = cov * cov.transpose();
+        let mut cov_resized = SMatrix::<f64, 9, 9>::zeros();
+        cov_resized.fixed_view_mut::<6, 6>(0, 0).copy_from(&cov);
+
+        let eme2k = EARTH_J2000.with_mu_km3_s2(GMAT_EARTH_GM);
+
+        let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);
+        let state = Spacecraft::builder()
+            .orbit(Orbit::keplerian(
+                8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k,
+            ))
+            .build();
+
+        let mvn = MvnSpacecraft::from_spacecraft_cov(state, cov_resized, SVector::zeros()).unwrap();
+
+        // Generate N samples from this distribution
+        let n = 1000;
+        let samples = mvn.sample_iter(&mut rng).take(n);
+
+        // Compute the Mahalanobis distance for each sample
+        let cov_inv = cov_resized.pseudo_inverse(1e-12).unwrap();
+        let md: Vec<f64> = samples
+            .map(|sample| {
+                let mut v = SVector::<f64, 9>::zeros();
+                for i in 0..6 {
+                    v[i] = sample.state.orbit.to_cartesian_pos_vel()[i]
+                        - state.orbit.to_cartesian_pos_vel()[i];
+                }
+                mahalanobis_distance(&v, &SVector::zeros(), &cov_inv)
+            })
+            .collect();
+
+        // Perform a chi-squared test on the Mahalanobis distances.
+        // The squared Mahalanobis distance of a sample from the mean of a multivariate normal distribution
+        // with k degrees of freedom follows a chi-squared distribution with k degrees of freedom.
+        // We will test if the 95th percentile of the Mahalanobis distances is within the 95th percentile
+        // of the chi-squared distribution.
+        let mut md = md;
+        md.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let p95_md = md[(0.95 * n as f64) as usize];
+
+        let chi_squared = statrs::distribution::ChiSquared::new(6.0).unwrap();
+        let p95_chi_squared = chi_squared.inverse_cdf(0.95);
+
+        assert!((p95_md - p95_chi_squared).abs() / p95_chi_squared < 0.2);
+    }
 
     #[test]
     fn disperse_r_mag() {
@@ -483,10 +565,15 @@ mod multivariate_ut {
         // Create a reproducible fast seed
         let seed = 0;
         let rng = Pcg64Mcg::new(seed);
+        let n = 1000;
+        let samples = generator.sample_iter(rng).take(n);
 
-        let cnt_too_far: u16 = generator
-            .sample_iter(rng)
-            .take(1000)
+        let cov = SMatrix::<f64, 1, 1>::from_diagonal(&SVector::<f64, 1>::from_vec(vec![
+            angle_sigma_deg.powi(2),
+        ]));
+        let cov_inv = cov.pseudo_inverse(1e-12).unwrap();
+
+        let md: Vec<f64> = samples
             .map(|dispersed_state| {
                 // For all other orbital parameters, make sure that we have not changed things dramatically.
                 for param in [
@@ -502,24 +589,22 @@ mod multivariate_ut {
                     );
                 }
 
-                if (dispersed_state.actual_dispersions[0].1).abs() > 3.0 * angle_sigma_deg {
-                    1
-                } else {
-                    0
-                }
+                let delta =
+                    SVector::<f64, 1>::from_vec(vec![dispersed_state.actual_dispersions[0].1]);
+                mahalanobis_distance(&delta, &SVector::zeros(), &cov_inv)
             })
-            .sum::<u16>();
+            .collect();
 
-        // We specified a seed so we know exactly what to expect
-        // Consider: https://github.com/nyx-space/nyx/issues/339
-        assert_eq!(
-            cnt_too_far,
-            7, // This is about twice too high
-            "Should have about 3% of samples being more than 3 sigma away, got {cnt_too_far}"
-        );
+        let mut md = md;
+        md.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let p95_md = md[(0.95 * n as f64) as usize];
+
+        let chi_squared = statrs::distribution::ChiSquared::new(1.0).unwrap();
+        let p95_chi_squared = chi_squared.inverse_cdf(0.95);
+
+        assert!((p95_md - p95_chi_squared).abs() / p95_chi_squared < 0.2);
     }
 
-    #[ignore = "https://github.com/nyx-space/nyx/issues/339"]
     #[test]
     fn disperse_keplerian() {
         use anise::constants::frames::EARTH_J2000;
@@ -564,32 +649,43 @@ mod multivariate_ut {
         )
         .unwrap();
 
-        // Ensure that this worked: a 3 sigma deviation around 1 km means we shouldn't have 99.7% of samples within those bounds.
-        // Create a reproducible fast seed
+        // The generator computes the equivalent Cartesian covariance. Let's retrieve it.
+        let expected_cart_cov = &generator.sqrt_s_v * generator.sqrt_s_v.transpose();
+
+        // Create a reproducible fast seed, and generate the samples in the Cartesian space
         let seed = 0;
         let rng = Pcg64Mcg::new(seed);
-
-        let cnt_too_far: u16 = generator
+        let n = 2000; // Increase samples for better stats
+        let samples: Vec<SVector<f64, 6>> = generator
             .sample_iter(rng)
-            .take(1000)
-            .map(|dispersed_state| {
-                if (dispersed_state.actual_dispersions[0].1).abs() > 3.0 * sma_sigma_km
-                    || (dispersed_state.actual_dispersions[1].1).abs() > 3.0 * inc_sigma_deg
-                    || (dispersed_state.actual_dispersions[2].1).abs() > 3.0 * angle_sigma_deg
-                    || (dispersed_state.actual_dispersions[3].1).abs() > 3.0 * angle_sigma_deg
-                {
-                    1
-                } else {
-                    0
-                }
-            })
-            .sum::<u16>();
+            .take(n)
+            .map(|s| s.state.orbit.to_cartesian_pos_vel())
+            .collect();
 
-        // We specified a seed so we know exactly what to expect
-        assert_eq!(
-            dbg!(cnt_too_far) / 3,
-            3,
-            "Should have about 3% of samples being more than 3 sigma away, got {cnt_too_far}"
-        );
+        let nominal_cart = state.orbit.to_cartesian_pos_vel();
+
+        // Check that the mean of the Cartesian states is close to the nominal
+        let mut mean_cart = SVector::<f64, 6>::zeros();
+        for sample in &samples {
+            mean_cart += sample;
+        }
+        mean_cart /= n as f64;
+
+        let mean_diff = mean_cart - nominal_cart;
+        // We expect some deviation because of the non-linearities.
+        assert!(mean_diff.norm() < 1.0);
+
+        // Check that the covariance of the Cartesian states is close to the expected one
+        let mut sample_cov = SMatrix::<f64, 6, 6>::zeros();
+        for sample in &samples {
+            let disp_vec = sample - &mean_cart;
+            sample_cov += &disp_vec * disp_vec.transpose();
+        }
+        sample_cov /= (n - 1) as f64;
+
+        let expected_cov_6x6 = expected_cart_cov.fixed_view::<6, 6>(0, 0);
+
+        let diff = sample_cov - expected_cov_6x6;
+        assert!(diff.norm() / expected_cov_6x6.norm() < 0.2);
     }
 }
