@@ -280,12 +280,12 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
     assert!(df
         .columns([
             "Epoch (UTC)",
-            "x (km)",
-            "y (km)",
-            "z (km)",
-            "vx (km/s)",
-            "vy (km/s)",
-            "vz (km/s)",
+            "X (km)",
+            "Y (km)",
+            "Z (km)",
+            "VX (km/s)",
+            "VY (km/s)",
+            "VZ (km/s)",
         ])
         .is_ok());
 

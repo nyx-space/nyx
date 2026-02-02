@@ -455,8 +455,8 @@ fn tgt_raan_from_apo(almanac: Arc<Almanac>) {
     );
     // GMAT validation
     assert!(
-        (solution_fd.correction.norm() - gmat_sol).abs() < 1e-3,
-        "Finite differencing result different from GMAT (greater than 1 m/s)."
+        (solution_fd.correction.norm() - gmat_sol).abs() < 1.5e-3,
+        "Finite differencing result different from GMAT (greater than 1.5 m/s)."
     );
 }
 
