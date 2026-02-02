@@ -171,13 +171,7 @@ where
 
         let mut sigma_fields = fields.clone();
         // Check that we can retrieve this information
-        sigma_fields.retain(|param| {
-            if let StateParameter::Element(_oe) = param {
-                true
-            } else {
-                false
-            }
-        });
+        sigma_fields.retain(|param| matches!(param, StateParameter::Element(_oe)));
 
         for field in &sigma_fields {
             hdrs.push(field.to_cov_field(more_meta.clone()));

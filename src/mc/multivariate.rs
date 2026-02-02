@@ -84,7 +84,11 @@ impl MvnSpacecraft {
             let mut means = DVector::from_element(num_orbital, 0.0);
             let orbit_dual = OrbitGrad::from(template.orbit);
 
-            for (rno, disp) in dispersions.iter().enumerate() {
+            for (rno, disp) in dispersions
+                .iter()
+                .filter(|d| d.param.is_orbital())
+                .enumerate()
+            {
                 let partial = if let StateParameter::Element(oe) = disp.param {
                     orbit_dual.partial_for(oe).context(AstroPhysicsSnafu)?
                 } else if disp.param.is_b_plane() {
