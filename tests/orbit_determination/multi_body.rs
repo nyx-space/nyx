@@ -1,7 +1,6 @@
 extern crate nyx_space as nyx;
 
 use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SUN};
-use anise::constants::frames::IAU_EARTH_FRAME;
 use nyx::od::simulator::TrackingArcSim;
 use nyx::od::simulator::TrkConfig;
 use nyx_space::propagators::IntegratorMethod;
@@ -24,26 +23,16 @@ fn almanac() -> Arc<Almanac> {
 }
 
 #[fixture]
-fn sim_devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
-    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
+fn sim_devices() -> BTreeMap<String, GroundStation> {
     let elevation_mask = 0.0;
-    let dss65_madrid = GroundStation::dss65_madrid(
-        elevation_mask,
-        StochasticNoise::ZERO,
-        StochasticNoise::ZERO,
-        iau_earth,
-    );
-    let dss34_canberra = GroundStation::dss34_canberra(
-        elevation_mask,
-        StochasticNoise::ZERO,
-        StochasticNoise::ZERO,
-        iau_earth,
-    );
+    let dss65_madrid =
+        GroundStation::dss65_madrid(elevation_mask, StochasticNoise::ZERO, StochasticNoise::ZERO);
+    let dss34_canberra =
+        GroundStation::dss34_canberra(elevation_mask, StochasticNoise::ZERO, StochasticNoise::ZERO);
     let dss13_goldstone = GroundStation::dss13_goldstone(
         elevation_mask,
         StochasticNoise::ZERO,
         StochasticNoise::ZERO,
-        iau_earth,
     );
 
     let mut devices = BTreeMap::new();
@@ -56,27 +45,14 @@ fn sim_devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
 
 /// Devices for processing the measurement, noise may not be zero.
 #[fixture]
-fn proc_devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
-    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
+fn proc_devices() -> BTreeMap<String, GroundStation> {
     let elevation_mask = 0.0;
-    let dss65_madrid = GroundStation::dss65_madrid(
-        elevation_mask,
-        StochasticNoise::MIN,
-        StochasticNoise::MIN,
-        iau_earth,
-    );
-    let dss34_canberra = GroundStation::dss34_canberra(
-        elevation_mask,
-        StochasticNoise::MIN,
-        StochasticNoise::MIN,
-        iau_earth,
-    );
-    let dss13_goldstone = GroundStation::dss13_goldstone(
-        elevation_mask,
-        StochasticNoise::MIN,
-        StochasticNoise::MIN,
-        iau_earth,
-    );
+    let dss65_madrid =
+        GroundStation::dss65_madrid(elevation_mask, StochasticNoise::MIN, StochasticNoise::MIN);
+    let dss34_canberra =
+        GroundStation::dss34_canberra(elevation_mask, StochasticNoise::MIN, StochasticNoise::MIN);
+    let dss13_goldstone =
+        GroundStation::dss13_goldstone(elevation_mask, StochasticNoise::MIN, StochasticNoise::MIN);
 
     let mut devices = BTreeMap::new();
     devices.insert(dss65_madrid.name(), dss65_madrid);
@@ -330,8 +306,16 @@ fn multi_body_ckf_covar_map_cov_test(
     // Test that we can generate a navigation trajectory and search it
     let nav_traj = od_sol.to_traj().unwrap();
     let aop_event = Event::apoapsis();
-    for found_event in nav_traj.find(&aop_event, None, almanac).unwrap() {
-        println!("{:x}", found_event.state);
-        assert!((found_event.state.orbit.ta_deg().unwrap() - 180.0).abs() < 1e-2)
+    for found_event in almanac
+        .report_events(
+            &nav_traj,
+            &aop_event,
+            nav_traj.first().epoch(),
+            nav_traj.last().epoch(),
+        )
+        .unwrap()
+    {
+        println!("{:x}", found_event.orbit);
+        assert!((found_event.orbit.ta_deg().unwrap() - 180.0).abs() < 1e-2)
     }
 }

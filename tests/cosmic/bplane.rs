@@ -1,10 +1,10 @@
 extern crate nyx_space as nyx;
 
+use anise::analysis::prelude::Event;
 use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SUN};
 use anise::constants::frames::MOON_J2000;
 use nyx::cosmic::{try_achieve_b_plane, BPlane, BPlaneTarget, Orbit};
 use nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
-use nyx::md::Event;
 use nyx::propagators::Propagator;
 use nyx::time::Epoch;
 
@@ -50,7 +50,7 @@ fn val_b_plane_gmat(almanac: Arc<Almanac>) {
 
     let (out, traj) = prop
         .with(orbit.into(), almanac.clone())
-        .until_event(1.1 * orbit.period().unwrap(), &Event::periapsis())
+        .until_event(1.1 * orbit.period().unwrap(), &Event::periapsis(), None)
         .unwrap();
 
     println!("{out}\n{out:x}");

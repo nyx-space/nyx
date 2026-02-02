@@ -16,8 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use anise::astro::{Aberration, AzElRange, PhysicsResult};
-use anise::constants::frames::EARTH_J2000;
+use anise::astro::{Aberration, AzElRange, Location, PhysicsResult};
 use anise::errors::AlmanacResult;
 use anise::prelude::{Almanac, Frame, Orbit};
 use indexmap::{IndexMap, IndexSet};
@@ -35,22 +34,13 @@ use serde_derive::{Deserialize, Serialize};
 use std::fmt;
 
 pub mod builtin;
-pub mod event;
 pub mod trk_device;
 
 /// GroundStation defines a two-way ranging and doppler station.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct GroundStation {
     pub name: String,
-    /// in degrees
-    pub elevation_mask_deg: f64,
-    /// in degrees
-    pub latitude_deg: f64,
-    /// in degrees
-    pub longitude_deg: f64,
-    /// in km
-    pub height_km: f64,
-    pub frame: Frame,
+    pub location: Location,
     pub measurement_types: IndexSet<MeasurementType>,
     /// Duration needed to generate a measurement (if unset, it is assumed to be instantaneous)
     pub integration_time: Option<Duration>,
@@ -73,11 +63,14 @@ impl GroundStation {
     ) -> Self {
         Self {
             name,
-            elevation_mask_deg: 0.0,
-            latitude_deg,
-            longitude_deg,
-            height_km,
-            frame,
+            location: Location {
+                latitude_deg,
+                longitude_deg,
+                height_km,
+                frame: frame.into(),
+                terrain_mask: vec![],
+                terrain_mask_ignored: true,
+            },
             measurement_types: IndexSet::new(),
             integration_time: None,
             light_time_correction: false,
@@ -171,11 +164,11 @@ impl GroundStation {
     /// Return this ground station as an orbit in its current frame
     pub fn to_orbit(&self, epoch: Epoch, almanac: &Almanac) -> PhysicsResult<Orbit> {
         Orbit::try_latlongalt(
-            self.latitude_deg,
-            self.longitude_deg,
-            self.height_km,
+            self.location.latitude_deg,
+            self.location.longitude_deg,
+            self.location.height_km,
             epoch,
-            almanac.frame_info(self.frame).unwrap(),
+            almanac.frame_info(self.location.frame).unwrap(),
         )
     }
 
@@ -220,11 +213,7 @@ impl Default for GroundStation {
         Self {
             name: "UNDEFINED".to_string(),
             measurement_types,
-            elevation_mask_deg: 0.0,
-            latitude_deg: 0.0,
-            longitude_deg: 0.0,
-            height_km: 0.0,
-            frame: EARTH_J2000,
+            location: Location::default(),
             integration_time: None,
             light_time_correction: false,
             timestamp_noise_s: None,
@@ -238,21 +227,14 @@ impl ConfigRepr for GroundStation {}
 impl fmt::Display for GroundStation {
     // Prints the Keplerian orbital elements with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{} (lat.: {:.4} deg    long.: {:.4} deg    alt.: {:.3} m) [{}]",
-            self.name,
-            self.latitude_deg,
-            self.longitude_deg,
-            self.height_km * 1e3,
-            self.frame,
-        )
+        write!(f, "{} ({})", self.name, self.location,)
     }
 }
 
 #[cfg(test)]
 mod gs_ut {
 
+    use anise::astro::{Location, TerrainMask};
     use anise::constants::frames::IAU_EARTH_FRAME;
     use indexmap::{IndexMap, IndexSet};
 
@@ -304,13 +286,17 @@ mod gs_ut {
 
         let expected_gs = GroundStation {
             name: "Demo ground station".to_string(),
-            frame: IAU_EARTH_FRAME,
+            location: Location {
+                latitude_deg: 2.3522,
+                longitude_deg: 48.8566,
+                height_km: 0.4,
+                frame: IAU_EARTH_FRAME.into(),
+                terrain_mask: TerrainMask::from_flat_terrain(5.0),
+                terrain_mask_ignored: false,
+            },
             measurement_types,
-            elevation_mask_deg: 5.0,
             stochastic_noises: Some(stochastics),
-            latitude_deg: 2.3522,
-            longitude_deg: 48.8566,
-            height_km: 0.4,
+
             light_time_correction: false,
             timestamp_noise_s: None,
             integration_time: Some(60 * Unit::Second),
@@ -364,26 +350,32 @@ mod gs_ut {
         let expected = vec![
             GroundStation {
                 name: "Demo ground station".to_string(),
-                frame: IAU_EARTH_FRAME.with_mu_km3_s2(398600.435436096),
+                location: Location {
+                    latitude_deg: 2.3522,
+                    longitude_deg: 48.8566,
+                    height_km: 0.4,
+                    frame: IAU_EARTH_FRAME.into(),
+                    terrain_mask: TerrainMask::from_flat_terrain(5.0),
+                    terrain_mask_ignored: false,
+                },
                 measurement_types: measurement_types.clone(),
-                elevation_mask_deg: 5.0,
                 stochastic_noises: Some(stochastics.clone()),
-                latitude_deg: 2.3522,
-                longitude_deg: 48.8566,
-                height_km: 0.4,
                 light_time_correction: false,
                 timestamp_noise_s: None,
                 integration_time: None,
             },
             GroundStation {
                 name: "Canberra".to_string(),
-                frame: IAU_EARTH_FRAME.with_mu_km3_s2(398600.435436096),
+                location: Location {
+                    latitude_deg: -35.398333,
+                    longitude_deg: 148.981944,
+                    height_km: 0.691750,
+                    frame: IAU_EARTH_FRAME.into(),
+                    terrain_mask: TerrainMask::from_flat_terrain(5.0),
+                    terrain_mask_ignored: false,
+                },
                 measurement_types,
-                elevation_mask_deg: 5.0,
                 stochastic_noises: Some(stochastics),
-                latitude_deg: -35.398333,
-                longitude_deg: 148.981944,
-                height_km: 0.691750,
                 light_time_correction: false,
                 timestamp_noise_s: None,
                 integration_time: None,

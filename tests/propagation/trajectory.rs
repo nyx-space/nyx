@@ -1,9 +1,9 @@
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
+use anise::analysis::prelude::OrbitalElement;
 use anise::constants::frames::{EARTH_J2000, MOON_J2000};
 use hifitime::TimeUnits;
-use nyx::cosmic::eclipse::EclipseLocator;
 use nyx::cosmic::{GuidanceMode, Orbit, Spacecraft};
 use nyx::dynamics::guidance::{GuidanceLaw, Ruggiero, Thruster};
 use nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
@@ -145,16 +145,7 @@ fn traj_ephem_forward_cov_test(almanac: Arc<Almanac>) {
     .iter()
     .collect();
 
-    let exported_path = ephem
-        .to_parquet(
-            path,
-            Some(vec![
-                &EclipseLocator::cislunar(almanac.clone()).to_penumbra_event()
-            ]),
-            ExportCfg::timestamped(),
-            almanac.clone(),
-        )
-        .unwrap();
+    let exported_path = ephem.to_parquet(path, ExportCfg::timestamped()).unwrap();
 
     // Reload this trajectory and make sure that it matches
 
@@ -279,7 +270,7 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
 
     // Define the objectives and the control law
     let objectives = &[Objective::within_tolerance(
-        StateParameter::AoP,
+        StateParameter::Element(OrbitalElement::AoP),
         183.0,
         5e-3,
     )];

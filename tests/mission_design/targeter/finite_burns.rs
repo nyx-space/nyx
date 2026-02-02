@@ -46,9 +46,17 @@ fn thrust_dir_tgt_sma_aop_raan(almanac: Arc<Almanac>) {
 
     // Define the objective
     let objectives = [
-        Objective::within_tolerance(StateParameter::SMA, 8012.176, 0.1),
-        Objective::within_tolerance(StateParameter::AoP, 53.939, 1e-3),
-        Objective::within_tolerance(StateParameter::RAAN, 60.000182, 1e-3),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::SemiMajorAxis),
+            8012.176,
+            0.1,
+        ),
+        Objective::within_tolerance(StateParameter::Element(OrbitalElement::AoP), 53.939, 1e-3),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::RAAN),
+            60.000182,
+            1e-3,
+        ),
     ];
 
     let tgt = Targeter::thrust_dir(&setup, objectives);
@@ -92,9 +100,17 @@ fn thrust_dir_rate_tgt_sma_aop_raan(almanac: Arc<Almanac>) {
 
     // Define the objective
     let objectives = [
-        Objective::within_tolerance(StateParameter::SMA, 8012.176, 0.1),
-        Objective::within_tolerance(StateParameter::AoP, 53.939, 1e-2),
-        Objective::within_tolerance(StateParameter::RAAN, 60.000182, 1e-3),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::SemiMajorAxis),
+            8012.176,
+            0.1,
+        ),
+        Objective::within_tolerance(StateParameter::Element(OrbitalElement::AoP), 53.939, 1e-2),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::RAAN),
+            60.000182,
+            1e-3,
+        ),
     ];
 
     let tgt = Targeter::thrust_dir_rate(&setup, objectives);
@@ -140,9 +156,17 @@ fn thrust_profile_tgt_sma_aop_raan_cov_test(almanac: Arc<Almanac>) {
 
     // Define the objective
     let objectives = [
-        Objective::within_tolerance(StateParameter::SMA, 8012.176, 0.1),
-        Objective::within_tolerance(StateParameter::AoP, 53.939, 1e-3),
-        Objective::within_tolerance(StateParameter::RAAN, 60.000182, 1e-3),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::SemiMajorAxis),
+            8012.176,
+            0.1,
+        ),
+        Objective::within_tolerance(StateParameter::Element(OrbitalElement::AoP), 53.939, 1e-3),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::RAAN),
+            60.000182,
+            1e-3,
+        ),
     ];
 
     let tgt = Targeter::thrust_profile(&setup, objectives);
@@ -222,9 +246,21 @@ fn val_tgt_finite_burn(almanac: Arc<Almanac>) {
     let impulsive_tgt = Targeter::delta_v(
         &prop_no_thrust,
         [
-            Objective::within_tolerance(StateParameter::X, sc_xf_desired.orbit.radius_km.x, 1e-5),
-            Objective::within_tolerance(StateParameter::Y, sc_xf_desired.orbit.radius_km.y, 1e-5),
-            Objective::within_tolerance(StateParameter::Z, sc_xf_desired.orbit.radius_km.z, 1e-5),
+            Objective::within_tolerance(
+                StateParameter::Element(OrbitalElement::X),
+                sc_xf_desired.orbit.radius_km.x,
+                1e-5,
+            ),
+            Objective::within_tolerance(
+                StateParameter::Element(OrbitalElement::Y),
+                sc_xf_desired.orbit.radius_km.y,
+                1e-5,
+            ),
+            Objective::within_tolerance(
+                StateParameter::Element(OrbitalElement::Z),
+                sc_xf_desired.orbit.radius_km.z,
+                1e-5,
+            ),
         ],
     )
     .try_achieve_from(

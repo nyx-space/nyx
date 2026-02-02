@@ -12,7 +12,7 @@ use anise::{
 };
 use hifitime::{TimeUnits, Unit};
 use nyx::{
-    cosmic::{eclipse::EclipseLocator, Frame, Mass, MetaAlmanac, SRPData},
+    cosmic::{Frame, Mass, MetaAlmanac, SRPData},
     dynamics::{guidance::LocalFrame, OrbitalDynamics, SolarPressure, SpacecraftDynamics},
     io::ExportCfg,
     mc::MonteCarlo,
@@ -148,17 +148,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     assert_eq!(rslts.runs.len(), num_runs);
     // Finally, export these results, computing the eclipse percentage for all of these results.
 
-    // For all of the resulting trajectories, we'll want to compute the percentage of penumbra and umbra.
-    let eclipse_loc = EclipseLocator::cislunar(almanac.clone());
-    let umbra_event = eclipse_loc.to_umbra_event();
-    let penumbra_event = eclipse_loc.to_penumbra_event();
-
-    rslts.to_parquet(
-        "02_jwst_monte_carlo.parquet",
-        Some(vec![&umbra_event, &penumbra_event]),
-        ExportCfg::default(),
-        almanac,
-    )?;
+    rslts.to_parquet("02_jwst_monte_carlo.parquet", ExportCfg::default())?;
 
     Ok(())
 }

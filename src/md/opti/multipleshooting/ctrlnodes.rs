@@ -16,11 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use anise::prelude::Frame;
-
 use crate::md::prelude::{Objective, StateParameter};
 use crate::time::Epoch;
 use crate::NyxError;
+use anise::analysis::prelude::OrbitalElement;
+use anise::prelude::Frame;
 use serde_derive::{Deserialize, Serialize};
 use std::convert::Into;
 use std::str::FromStr;
@@ -103,9 +103,9 @@ impl MultishootNode<3> for Node {
 impl Into<[Objective; 3]> for Node {
     fn into(self) -> [Objective; 3] {
         [
-            Objective::new(StateParameter::X, self.x),
-            Objective::new(StateParameter::Y, self.y),
-            Objective::new(StateParameter::Z, self.z),
+            Objective::new(StateParameter::Element(OrbitalElement::X), self.x),
+            Objective::new(StateParameter::Element(OrbitalElement::Y), self.y),
+            Objective::new(StateParameter::Element(OrbitalElement::Z), self.z),
         ]
     }
 }
@@ -130,10 +130,10 @@ impl MultishootNode<4> for Node {
 impl Into<[Objective; 4]> for Node {
     fn into(self) -> [Objective; 4] {
         [
-            Objective::new(StateParameter::X, self.x),
-            Objective::new(StateParameter::Y, self.y),
-            Objective::new(StateParameter::Z, self.z),
-            Objective::new(StateParameter::Vmag, self.vmag),
+            Objective::new(StateParameter::Element(OrbitalElement::X), self.x),
+            Objective::new(StateParameter::Element(OrbitalElement::Y), self.y),
+            Objective::new(StateParameter::Element(OrbitalElement::Z), self.z),
+            Objective::new(StateParameter::Element(OrbitalElement::Vmag), self.vmag),
         ]
     }
 }

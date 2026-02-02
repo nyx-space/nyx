@@ -2,13 +2,11 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
 use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SUN};
-use anise::constants::frames::IAU_EARTH_FRAME;
 use nyx::cosmic::{Orbit, Spacecraft};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::spacecraft::{SolarPressure, SpacecraftDynamics};
 use nyx::linalg::{SMatrix, SVector};
 use nyx::md::trajectory::ExportCfg;
-use nyx::md::{Event, StateParameter};
 use nyx::od::prelude::*;
 use nyx::propagators::{IntegratorOptions, Propagator};
 use nyx::time::{Epoch, TimeUnits, Unit};
@@ -29,26 +27,16 @@ fn almanac() -> Arc<Almanac> {
 }
 
 #[fixture]
-fn sim_devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
-    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
+fn sim_devices() -> BTreeMap<String, GroundStation> {
     let elevation_mask = 0.0;
-    let dss65_madrid = GroundStation::dss65_madrid(
-        elevation_mask,
-        StochasticNoise::ZERO,
-        StochasticNoise::ZERO,
-        iau_earth,
-    );
-    let dss34_canberra = GroundStation::dss34_canberra(
-        elevation_mask,
-        StochasticNoise::ZERO,
-        StochasticNoise::ZERO,
-        iau_earth,
-    );
+    let dss65_madrid =
+        GroundStation::dss65_madrid(elevation_mask, StochasticNoise::ZERO, StochasticNoise::ZERO);
+    let dss34_canberra =
+        GroundStation::dss34_canberra(elevation_mask, StochasticNoise::ZERO, StochasticNoise::ZERO);
     let dss13_goldstone = GroundStation::dss13_goldstone(
         elevation_mask,
         StochasticNoise::ZERO,
         StochasticNoise::ZERO,
-        iau_earth,
     );
 
     let mut devices = BTreeMap::new();
@@ -60,27 +48,14 @@ fn sim_devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
 
 /// Devices for processing the measurement, noise may not be zero.
 #[fixture]
-fn proc_devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
-    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
+fn proc_devices() -> BTreeMap<String, GroundStation> {
     let elevation_mask = 0.0;
-    let dss65_madrid = GroundStation::dss65_madrid(
-        elevation_mask,
-        StochasticNoise::MIN,
-        StochasticNoise::MIN,
-        iau_earth,
-    );
-    let dss34_canberra = GroundStation::dss34_canberra(
-        elevation_mask,
-        StochasticNoise::MIN,
-        StochasticNoise::MIN,
-        iau_earth,
-    );
-    let dss13_goldstone = GroundStation::dss13_goldstone(
-        elevation_mask,
-        StochasticNoise::MIN,
-        StochasticNoise::MIN,
-        iau_earth,
-    );
+    let dss65_madrid =
+        GroundStation::dss65_madrid(elevation_mask, StochasticNoise::MIN, StochasticNoise::MIN);
+    let dss34_canberra =
+        GroundStation::dss34_canberra(elevation_mask, StochasticNoise::MIN, StochasticNoise::MIN);
+    let dss13_goldstone =
+        GroundStation::dss13_goldstone(elevation_mask, StochasticNoise::MIN, StochasticNoise::MIN);
 
     let mut devices = BTreeMap::new();
     devices.insert("Madrid".to_string(), dss65_madrid);
@@ -162,9 +137,6 @@ fn od_val_sc_mb_srp_reals_duals_models(
     .iter()
     .collect();
 
-    // Adding some events to the exported trajectory
-    let event = Event::specific(StateParameter::Declination, 6.0, 3.0, Unit::Minute);
-
     let cfg = ExportCfg::from_metadata(vec![
         (
             "Dynamics".to_string(),
@@ -181,8 +153,7 @@ fn od_val_sc_mb_srp_reals_duals_models(
         ),
     ]);
 
-    traj.to_parquet(path.clone(), Some(vec![&event]), cfg, almanac.clone())
-        .unwrap();
+    traj.to_parquet(path.clone(), cfg).unwrap();
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(sim_devices, traj, configs.clone(), 0).unwrap();
@@ -351,8 +322,7 @@ fn od_val_sc_srp_estimation_cov_test(
     .iter()
     .collect();
 
-    traj.to_parquet_simple(path.clone(), almanac.clone())
-        .unwrap();
+    traj.to_parquet_simple(path.clone()).unwrap();
 
     // Define the tracking configurations
     let mut configs = BTreeMap::new();

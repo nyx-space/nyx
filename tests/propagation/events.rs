@@ -2,6 +2,7 @@ extern crate nyx_space as nyx;
 use std::{fmt::Write, sync::Arc};
 
 use anise::{
+    analysis::{expr::ScalarExpr, prelude::Condition},
     astro::Occultation,
     constants::frames::{EARTH_J2000, IAU_EARTH_FRAME, SUN_J2000},
     prelude::Almanac,
@@ -32,8 +33,14 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
     // Track how many times we've passed by that TA again
     let peri_event = Event::periapsis(); // Special event shortcut!
     let apo_event = Event::apoapsis(); // Special event shortcut!
-    let ta_event0 = Event::new(StateParameter::TrueAnomaly, 35.1);
-    let ta_event1 = Event::new(StateParameter::TrueAnomaly, 235.1);
+    let ta_event0 = Event::new(
+        ScalarExpr::Element(OrbitalElement::TrueAnomaly),
+        Condition::Equals(35.1),
+    );
+    let ta_event1 = Event::new(
+        ScalarExpr::Element(OrbitalElement::TrueAnomaly),
+        Condition::Equals(235.1),
+    );
 
     let events = vec![peri_event, apo_event, ta_event0, ta_event1];
 
@@ -48,16 +55,16 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
 
     // Find all of the events
     for (e_num, e) in events.iter().enumerate() {
-        let found_events = traj
-            .find(e, Some(Unit::Minute * 10), almanac.clone())
+        let found_events = almanac
+            .report_events(&traj, e, traj.first().epoch(), traj.last().epoch())
             .unwrap();
         let pretty = found_events
             .iter()
             .fold(String::new(), |mut output, orbit_event| {
                 let _ = writeln!(
                     output,
-                    "{:x}\tevent value: {}",
-                    orbit_event.state, orbit_event.value
+                    "{:x}\tevent value: {:.6}",
+                    orbit_event.orbit, orbit_event.value
                 );
                 output
             });
@@ -65,7 +72,7 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
         // We expect one more apsis because we start at periapasis and prop for a fixed number of orbits.
         assert_eq!(
             found_events.len(),
-            if e_num <= 1 { 201 } else { 200 },
+            if e_num == 0 { 199 } else { 200 },
             "wrong number of true anomaly events for #{e_num}"
         );
         println!("[ta_tracker] {e} =>\n{pretty}");
@@ -121,64 +128,38 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
     println!("Min elevation {min_el} degrees @ {min_dt}");
     println!("Max elevation {max_el} degrees @ {max_dt}");
 
-    let umbra_event_loc = e_loc.to_umbra_event();
-    let umbra_events = traj.find(&umbra_event_loc, None, almanac.clone()).unwrap();
+    let umbra_event_loc = &e_loc.to_umbra_events()[0];
+    let umbra_events = almanac
+        .report_event_arcs(&traj, umbra_event_loc, traj.start_epoch(), traj.end_epoch())
+        .unwrap();
 
     let pretty = umbra_events
         .iter()
         .skip(1)
         .fold(String::new(), |mut output, orbit_event| {
-            let orbit = orbit_event.state.orbit;
-            let _ = writeln!(
-                output,
-                "{:x}\tevent value: {}\t(-10s: {}\t+10s: {})",
-                orbit,
-                &e_loc.compute(orbit, almanac.clone()).unwrap(),
-                &e_loc
-                    .compute(
-                        traj.at(orbit.epoch - 10 * Unit::Second).unwrap().orbit,
-                        almanac.clone()
-                    )
-                    .unwrap(),
-                &e_loc
-                    .compute(
-                        traj.at(orbit.epoch + 10 * Unit::Second).unwrap().orbit,
-                        almanac.clone()
-                    )
-                    .unwrap()
-            );
+            let orbit = orbit_event.rise.orbit;
+            let _ = writeln!(output, "{orbit:x}\t{orbit_event}",);
             output
         });
     println!("[eclipses] {umbra_event_loc} =>\n{pretty}");
 
-    let penumbra_event_loc = e_loc.to_penumbra_event();
-    let penumbra_events = traj
-        .find(&penumbra_event_loc, None, almanac.clone())
+    let penumbra_event_loc = &e_loc.to_penumbra_events()[0];
+    let penumbra_events = almanac
+        .report_event_arcs(
+            &traj,
+            penumbra_event_loc,
+            traj.start_epoch(),
+            traj.end_epoch(),
+        )
         .unwrap();
 
     let pretty = penumbra_events
         .iter()
         .fold(String::new(), |mut output, orbit_event| {
-            let orbit = orbit_event.state.orbit;
-            let _ = writeln!(
-                output,
-                "{:x}\tevent value: {}\t(-10s: {}\t+10s: {})",
-                orbit,
-                &e_loc.compute(orbit, almanac.clone()).unwrap(),
-                &e_loc
-                    .compute(
-                        traj.at(orbit.epoch - 10 * Unit::Second).unwrap().orbit,
-                        almanac.clone()
-                    )
-                    .unwrap(),
-                &e_loc
-                    .compute(
-                        traj.at(orbit.epoch + 10 * Unit::Second).unwrap().orbit,
-                        almanac.clone()
-                    )
-                    .unwrap()
-            );
+            let orbit = orbit_event.rise.orbit;
+            let _ = writeln!(output, "{orbit:x}\t{orbit_event}",);
             output
         });
+
     println!("[eclipses] {penumbra_event_loc} =>\n{pretty}");
 }

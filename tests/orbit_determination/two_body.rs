@@ -28,26 +28,16 @@ fn almanac() -> Arc<Almanac> {
 }
 
 #[fixture]
-fn sim_devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
-    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
+fn sim_devices() -> BTreeMap<String, GroundStation> {
     let elevation_mask = 0.0;
-    let dss65_madrid = GroundStation::dss65_madrid(
-        elevation_mask,
-        StochasticNoise::ZERO,
-        StochasticNoise::ZERO,
-        iau_earth,
-    );
-    let dss34_canberra = GroundStation::dss34_canberra(
-        elevation_mask,
-        StochasticNoise::ZERO,
-        StochasticNoise::ZERO,
-        iau_earth,
-    );
+    let dss65_madrid =
+        GroundStation::dss65_madrid(elevation_mask, StochasticNoise::ZERO, StochasticNoise::ZERO);
+    let dss34_canberra =
+        GroundStation::dss34_canberra(elevation_mask, StochasticNoise::ZERO, StochasticNoise::ZERO);
     let dss13_goldstone = GroundStation::dss13_goldstone(
         elevation_mask,
         StochasticNoise::ZERO,
         StochasticNoise::ZERO,
-        iau_earth,
     );
 
     let mut devices = BTreeMap::new();
@@ -60,27 +50,14 @@ fn sim_devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
 
 /// Devices for processing the measurement, noise may not be zero.
 #[fixture]
-fn proc_devices(almanac: Arc<Almanac>) -> BTreeMap<String, GroundStation> {
-    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
+fn proc_devices() -> BTreeMap<String, GroundStation> {
     let elevation_mask = 0.0;
-    let dss65_madrid = GroundStation::dss65_madrid(
-        elevation_mask,
-        StochasticNoise::MIN,
-        StochasticNoise::MIN,
-        iau_earth,
-    );
-    let dss34_canberra = GroundStation::dss34_canberra(
-        elevation_mask,
-        StochasticNoise::MIN,
-        StochasticNoise::MIN,
-        iau_earth,
-    );
-    let dss13_goldstone = GroundStation::dss13_goldstone(
-        elevation_mask,
-        StochasticNoise::MIN,
-        StochasticNoise::MIN,
-        iau_earth,
-    );
+    let dss65_madrid =
+        GroundStation::dss65_madrid(elevation_mask, StochasticNoise::MIN, StochasticNoise::MIN);
+    let dss34_canberra =
+        GroundStation::dss34_canberra(elevation_mask, StochasticNoise::MIN, StochasticNoise::MIN);
+    let dss13_goldstone =
+        GroundStation::dss13_goldstone(elevation_mask, StochasticNoise::MIN, StochasticNoise::MIN);
 
     let mut devices = BTreeMap::new();
     devices.insert("Madrid".to_string(), dss65_madrid);
@@ -264,7 +241,7 @@ fn od_tb_val_with_arc(
     ]
     .iter()
     .collect();
-    traj.to_parquet_simple(path, almanac.clone()).unwrap();
+    traj.to_parquet_simple(path).unwrap();
 
     // Load the tracking configs
     let trkconfig_yaml: PathBuf = [
@@ -1293,7 +1270,8 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect_cov_test(
         for i in 0..6 {
             assert!(
                 est.covar[(i, i)] >= 0.0,
-                "covar diagonal element negative @ [{i}, {i}]"
+                "covar diagonal element negative @ [{i}, {i}] = {:e}",
+                est.covar[(i, i)]
             );
         }
         assert!(

@@ -1,8 +1,8 @@
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
+use anise::analysis::prelude::OrbitalElement;
 use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SUN};
-use anise::constants::frames::IAU_EARTH_FRAME;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::SpacecraftDynamics;
@@ -42,7 +42,6 @@ fn blse_robust_large_disp_cov_test(
 ) {
     let _ = pretty_env_logger::try_init();
 
-    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
     // Define the ground stations.
     let elevation_mask = 0.0;
 
@@ -59,14 +58,12 @@ fn blse_robust_large_disp_cov_test(
         elevation_mask,
         StochasticNoise::default_range_km(),
         StochasticNoise::default_doppler_km_s(),
-        iau_earth,
     );
 
     let dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
         StochasticNoise::default_range_km(),
         StochasticNoise::default_doppler_km_s(),
-        iau_earth,
     );
 
     // Define the tracking configurations
@@ -88,10 +85,16 @@ fn blse_robust_large_disp_cov_test(
     let initial_estimate = KfEstimate::disperse_from_diag(
         initial_state,
         vec![
-            StateDispersion::zero_mean(StateParameter::SMA, 0.02),
-            StateDispersion::zero_mean(StateParameter::RAAN, 0.02),
-            StateDispersion::zero_mean(StateParameter::Inclination, 0.02),
-            StateDispersion::zero_mean(StateParameter::Eccentricity, 0.0002),
+            StateDispersion::zero_mean(
+                StateParameter::Element(OrbitalElement::SemiMajorAxis),
+                0.02,
+            ),
+            StateDispersion::zero_mean(StateParameter::Element(OrbitalElement::RAAN), 0.02),
+            StateDispersion::zero_mean(StateParameter::Element(OrbitalElement::Inclination), 0.02),
+            StateDispersion::zero_mean(
+                StateParameter::Element(OrbitalElement::Eccentricity),
+                0.0002,
+            ),
         ],
         Some(0),
     )

@@ -7,7 +7,7 @@ import click
 
 
 @click.command
-@click.option("-p", "--path", type=str, default="./04_lro_od_results.parquet")
+@click.option("-p", "--path", type=str, default="./data/04_output/04_lro_od_results.parquet")
 @click.option("-f", "--full", type=bool, default=True)
 def main(path: str, full: bool):
     df = pl.read_parquet(path)
@@ -131,7 +131,7 @@ def main(path: str, full: bool):
         ("04_lro_od_truth_error", "OD vs Flown"),
         ("04_lro_sim_truth_error", "Sim vs Flown (model matching)"),
     ]:
-        df_ric = pl.read_parquet(f"./{fname}.parquet")
+        df_ric = pl.read_parquet(f"./data/04_output/{fname}.parquet")
         df_ric = df_ric.with_columns(
             pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f")
         ).sort("Epoch (UTC)", descending=False)

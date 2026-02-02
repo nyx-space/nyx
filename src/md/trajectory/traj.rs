@@ -26,9 +26,11 @@ use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 use crate::md::prelude::{GuidanceMode, StateParameter};
 use crate::md::trajectory::smooth_state_diff_in_place;
-use crate::md::EventEvaluator;
 use crate::time::{Duration, Epoch, TimeSeries, TimeUnits};
-use anise::almanac::Almanac;
+use anise::analysis::specs::StateSpecTrait;
+use anise::analysis::AnalysisError;
+use anise::astro::orbit::Orbit;
+use anise::prelude::{Aberration, Almanac};
 use arrow::array::{Array, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
@@ -133,6 +135,14 @@ where
         self.states.last().unwrap()
     }
 
+    pub fn start_epoch(&self) -> Epoch {
+        self.first().epoch()
+    }
+
+    pub fn end_epoch(&self) -> Epoch {
+        self.last().epoch()
+    }
+
     /// Creates an iterator through the trajectory by the provided step size
     pub fn every(&self, step: Duration) -> TrajIterator<'_, S> {
         self.every_between(step, self.first().epoch(), self.last().epoch())
@@ -181,12 +191,8 @@ where
         self.filter_by_epoch(start..=end)
     }
     /// Store this trajectory arc to a parquet file with the default configuration (depends on the state type, search for `export_params` in the documentation for details).
-    pub fn to_parquet_simple<P: AsRef<Path>>(
-        &self,
-        path: P,
-        almanac: Arc<Almanac>,
-    ) -> Result<PathBuf, Box<dyn Error>> {
-        self.to_parquet(path, None, ExportCfg::default(), almanac)
+    pub fn to_parquet_simple<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf, Box<dyn Error>> {
+        self.to_parquet(path, ExportCfg::default())
     }
 
     /// Store this trajectory arc to a parquet file with the provided configuration
@@ -194,9 +200,8 @@ where
         &self,
         path: P,
         cfg: ExportCfg,
-        almanac: Arc<Almanac>,
     ) -> Result<PathBuf, Box<dyn Error>> {
-        self.to_parquet(path, None, cfg, almanac)
+        self.to_parquet(path, cfg)
     }
 
     /// A shortcut to `to_parquet_with_cfg`
@@ -204,7 +209,6 @@ where
         &self,
         path: P,
         step: Duration,
-        almanac: Arc<Almanac>,
     ) -> Result<(), Box<dyn Error>> {
         self.to_parquet_with_cfg(
             path,
@@ -212,19 +216,16 @@ where
                 step: Some(step),
                 ..Default::default()
             },
-            almanac,
         )?;
 
         Ok(())
     }
 
-    /// Store this trajectory arc to a parquet file with the provided configuration and event evaluators
+    /// Store this trajectory arc to a parquet file with the provided configuration
     pub fn to_parquet<P: AsRef<Path>>(
         &self,
         path: P,
-        events: Option<Vec<&dyn EventEvaluator<S>>>,
         cfg: ExportCfg,
-        almanac: Arc<Almanac>,
     ) -> Result<PathBuf, Box<dyn Error>> {
         let tick = Epoch::now().unwrap();
         info!("Exporting trajectory to parquet file...");
@@ -259,13 +260,6 @@ where
 
         for field in &fields {
             hdrs.push(field.to_field(more_meta.clone()));
-        }
-
-        if let Some(events) = events.as_ref() {
-            for event in events {
-                let field = Field::new(format!("{event}"), DataType::Float64, false);
-                hdrs.push(field);
-            }
         }
 
         // Build the schema
@@ -316,18 +310,6 @@ where
             states.first().unwrap().epoch(),
             states.last().unwrap().epoch()
         );
-
-        // Add all of the evaluated events
-        if let Some(events) = events {
-            info!("Evaluating {} event(s)", events.len());
-            for event in events {
-                let mut data = Float64Builder::new();
-                for s in &states {
-                    data.append_value(event.eval(s, almanac.clone()).map_err(Box::new)?);
-                }
-                record.push(Arc::new(data.finish()));
-            }
-        }
 
         // Serialize all of the devices and add that to the parquet file too.
         let mut metadata = HashMap::new();
@@ -689,5 +671,22 @@ where
 {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl<S: Interpolatable> StateSpecTrait for Traj<S>
+where
+    DefaultAllocator: Allocator<S::VecLength> + Allocator<S::Size> + Allocator<S::Size, S::Size>,
+{
+    fn ab_corr(&self) -> Option<Aberration> {
+        None
+    }
+
+    fn evaluate(&self, epoch: Epoch, _almanac: &Almanac) -> Result<Orbit, AnalysisError> {
+        self.at(epoch)
+            .map(|state| state.orbit())
+            .map_err(|e| AnalysisError::GenericAnalysisError {
+                err: format!("{e}"),
+            })
     }
 }

@@ -9,8 +9,9 @@ use anise::{
         celestial_objects::{EARTH, JUPITER_BARYCENTER, MOON, SUN},
         frames::{EARTH_J2000, MOON_J2000, MOON_PA_FRAME},
     },
+    prelude::Almanac,
 };
-use hifitime::{Epoch, TimeUnits, Unit};
+use hifitime::{Epoch, TimeSeries, TimeUnits, Unit};
 use nyx::{
     cosmic::{Aberration, Frame, Mass, MetaAlmanac, SRPData},
     dynamics::{
@@ -53,18 +54,21 @@ fn main() -> Result<(), Box<dyn Error>> {
         .process(true)
         .map_err(Box::new)?;
 
-    let mut moon_pc = almanac.planetary_data.get_by_id(MOON)?;
+    let mut moon_pc = almanac.get_planetary_data_from_id(MOON).unwrap();
     moon_pc.mu_km3_s2 = 4902.74987;
-    almanac.planetary_data.set_by_id(MOON, moon_pc)?;
+    almanac.set_planetary_data_from_id(MOON, moon_pc).unwrap();
 
-    let mut earth_pc = almanac.planetary_data.get_by_id(EARTH)?;
-    earth_pc.mu_km3_s2 = 398600.436;
-    almanac.planetary_data.set_by_id(EARTH, earth_pc)?;
+    let mut earth = almanac.get_planetary_data_from_id(EARTH).unwrap();
+    earth.mu_km3_s2 = 398600.436;
+    almanac.set_planetary_data_from_id(EARTH, earth).unwrap();
 
     // Save this new kernel for reuse.
     // In an operational context, this would be part of the "Lock" process, and should not change throughout the mission.
     almanac
         .planetary_data
+        .values()
+        .next()
+        .unwrap()
         .save_as(&data_folder.join("lro-specific.pca"), true)?;
 
     // Lock the almanac (an Arc is a read only structure).
@@ -170,7 +174,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     traj_as_sim.ric_diff_to_parquet(
         &traj_as_flown,
-        "./04_lro_sim_truth_error.parquet",
+        "./data/04_output/04_lro_sim_truth_error.parquet",
         ExportCfg::default(),
     )?;
 
@@ -236,7 +240,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     trk.build_schedule(almanac.clone())?;
     let arc = trk.generate_measurements(almanac.clone())?;
     // Save the simulated tracking data
-    arc.to_parquet_simple("./04_lro_simulated_tracking.parquet")?;
+    arc.to_parquet_simple("./data/04_output/04_lro_simulated_tracking.parquet")?;
 
     // We'll note that in our case, we have continuous coverage of LRO when the vehicle is not behind the Moon.
     println!("{arc}");
@@ -308,7 +312,37 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     println!("Ratios normal? {}", od_sol.is_normal(None).unwrap());
 
-    od_sol.to_parquet("./04_lro_od_results.parquet", ExportCfg::default())?;
+    od_sol.to_parquet(
+        "./data/04_output/04_lro_od_results.parquet",
+        ExportCfg::default(),
+    )?;
+
+    // Create the ephemeris
+    let ephem = od_sol.to_ephemeris("LRO rebuilt".to_string());
+    let ephem_start = ephem.start_epoch().unwrap();
+    let ephem_end = ephem.end_epoch().unwrap();
+    // Check that the covariance is PSD throughout the ephemeris by interpolating it.
+    for epoch in TimeSeries::inclusive(ephem_start, ephem_end, Unit::Minute * 5) {
+        ephem
+            .covar_at(
+                epoch,
+                anise::ephemerides::ephemeris::LocalFrame::RIC,
+                &almanac,
+            )
+            .unwrap_or_else(|e| panic!("covar not PSD at {epoch}: {e}"));
+    }
+    // Export as BSP!
+    ephem
+        .write_spice_bsp(-85, "./data/04_output/04_lro_rebuilt.bsp", None)
+        .expect("could not built BSP");
+    let new_almanac = Almanac::default()
+        .load("./data/04_output/04_lro_rebuilt.bsp")
+        .unwrap();
+    new_almanac.describe(None, None, None, None, None, None, None, None);
+    let (spk_start, spk_end) = new_almanac.spk_domain(-85).unwrap();
+
+    assert!((ephem_start - spk_start).abs() < Unit::Microsecond * 1);
+    assert!((ephem_end - spk_end).abs() < Unit::Microsecond * 1);
 
     // In our case, we have the truth trajectory from NASA.
     // So we can compute the RIC state difference between the real LRO ephem and what we've just estimated.
@@ -317,7 +351,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Build the RIC difference.
     od_trajectory.ric_diff_to_parquet(
         &traj_as_flown,
-        "./04_lro_od_truth_error.parquet",
+        "./data/04_output/04_lro_od_truth_error.parquet",
         ExportCfg::default(),
     )?;
 

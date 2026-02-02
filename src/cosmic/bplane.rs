@@ -16,9 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anise::analysis::prelude::OrbitalElement;
+use anise::astro::orbit_gradient::{OrbitGrad, OrbitalElementPartials};
 use anise::prelude::{Frame, Orbit};
 
-use super::{AstroError, AstroPhysicsSnafu, OrbitDual, OrbitPartial};
+use super::{AstroError, AstroPhysicsSnafu};
 use crate::cosmic::NotHyperbolicSnafu;
 use crate::linalg::{Matrix2, Matrix3, Vector2, Vector3};
 use crate::md::objective::Objective;
@@ -37,11 +39,11 @@ use std::fmt;
 
 pub struct BPlane {
     /// The $B_T$ component, in kilometers
-    pub b_t_km: OrbitPartial,
+    pub b_t_km: OrbitalElementPartials,
     /// The $B_R$ component, in kilometers
-    pub b_r_km: OrbitPartial,
+    pub b_r_km: OrbitalElementPartials,
     /// The Linearized Time of Flight
-    pub ltof_s: OrbitPartial,
+    pub ltof_s: OrbitalElementPartials,
     /// The B-Plane rotation matrix
     pub str_dcm: Matrix3<f64>,
     /// The frame in which this B Plane was computed
@@ -52,7 +54,7 @@ pub struct BPlane {
 
 impl BPlane {
     /// Returns a newly define B-Plane if the orbit is hyperbolic and already in Dual form
-    pub fn from_dual(orbit: OrbitDual) -> Result<Self, AstroError> {
+    pub fn from_dual(orbit: OrbitGrad) -> Result<Self, AstroError> {
         ensure!(
             orbit.ecc().context(AstroPhysicsSnafu)?.real() > 1.0,
             NotHyperbolicSnafu
@@ -115,28 +117,28 @@ impl BPlane {
         );
 
         Ok(BPlane {
-            b_r_km: OrbitPartial {
+            b_r_km: OrbitalElementPartials {
                 dual: b_vec.dot(&r_hat),
-                param: StateParameter::BdotR,
+                oe: OrbitalElement::Custom,
             },
-            b_t_km: OrbitPartial {
+            b_t_km: OrbitalElementPartials {
                 dual: b_vec.dot(&t_hat),
-                param: StateParameter::BdotT,
+                oe: OrbitalElement::Custom,
             },
-            ltof_s: OrbitPartial {
+            ltof_s: OrbitalElementPartials {
                 dual: b_vec.dot(&s_hat) / orbit.vmag_km_s().dual,
-                param: StateParameter::BLTOF,
+                oe: OrbitalElement::Custom,
             },
             str_dcm: str_rot,
             frame: orbit.frame,
-            epoch: orbit.dt,
+            epoch: orbit.epoch,
         })
     }
 
     /// Returns a newly defined B-Plane if the orbit is hyperbolic.
     pub fn new(orbit: Orbit) -> Result<Self, AstroError> {
-        // Convert to OrbitDual so we can target it
-        Self::from_dual(OrbitDual::from(orbit))
+        // Convert to OrbitGrad so we can target it
+        Self::from_dual(OrbitGrad::from(orbit))
     }
 
     /// Returns the DCM to convert to the B Plane from the inertial frame
@@ -147,38 +149,38 @@ impl BPlane {
     /// Returns the Jacobian of the B plane (BR, BT, LTOF) with respect to the velocity
     pub fn jacobian(&self) -> Matrix3<f64> {
         Matrix3::new(
-            self.b_r_km.wtr_vx(),
-            self.b_r_km.wtr_vy(),
-            self.b_r_km.wtr_vz(),
-            self.b_t_km.wtr_vx(),
-            self.b_t_km.wtr_vy(),
-            self.b_t_km.wtr_vz(),
-            self.ltof_s.wtr_vx(),
-            self.ltof_s.wtr_vy(),
-            self.ltof_s.wtr_vz(),
+            self.b_r_km.wrt_vx(),
+            self.b_r_km.wrt_vy(),
+            self.b_r_km.wrt_vz(),
+            self.b_t_km.wrt_vx(),
+            self.b_t_km.wrt_vy(),
+            self.b_t_km.wrt_vz(),
+            self.ltof_s.wrt_vx(),
+            self.ltof_s.wrt_vy(),
+            self.ltof_s.wrt_vz(),
         )
     }
 
     /// Returns the Jacobian of the B plane (BR, BT) with respect to two of the velocity components
     pub fn jacobian2(&self, invariant: StateParameter) -> Result<Matrix2<f64>, AstroError> {
         match invariant {
-            StateParameter::VX => Ok(Matrix2::new(
-                self.b_r_km.wtr_vy(),
-                self.b_r_km.wtr_vz(),
-                self.b_t_km.wtr_vy(),
-                self.b_t_km.wtr_vz(),
+            StateParameter::Element(OrbitalElement::VX) => Ok(Matrix2::new(
+                self.b_r_km.wrt_vy(),
+                self.b_r_km.wrt_vz(),
+                self.b_t_km.wrt_vy(),
+                self.b_t_km.wrt_vz(),
             )),
-            StateParameter::VY => Ok(Matrix2::new(
-                self.b_r_km.wtr_vx(),
-                self.b_r_km.wtr_vz(),
-                self.b_t_km.wtr_vx(),
-                self.b_t_km.wtr_vz(),
+            StateParameter::Element(OrbitalElement::VY) => Ok(Matrix2::new(
+                self.b_r_km.wrt_vx(),
+                self.b_r_km.wrt_vz(),
+                self.b_t_km.wrt_vx(),
+                self.b_t_km.wrt_vz(),
             )),
-            StateParameter::VZ => Ok(Matrix2::new(
-                self.b_r_km.wtr_vx(),
-                self.b_r_km.wtr_vy(),
-                self.b_t_km.wtr_vx(),
-                self.b_t_km.wtr_vy(),
+            StateParameter::Element(OrbitalElement::VZ) => Ok(Matrix2::new(
+                self.b_r_km.wrt_vx(),
+                self.b_r_km.wrt_vy(),
+                self.b_t_km.wrt_vx(),
+                self.b_t_km.wrt_vy(),
             )),
             _ => Err(AstroError::BPlaneInvariant),
         }

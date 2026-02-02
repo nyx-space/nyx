@@ -244,12 +244,12 @@ where
                  })?.clone(); // Clone the concrete array
 
             // State component columns
-            let x_col = get_col("x (km)")?.as_any().downcast_ref::<Float64Array>().ok_or_else(|| InputOutputError::ArrowError{action: "downcasting X", source: arrow::error::ArrowError::CastError("".to_string())})?.clone();
-            let y_col = get_col("y (km)")?.as_any().downcast_ref::<Float64Array>().ok_or_else(|| InputOutputError::ArrowError{action: "downcasting Y", source: arrow::error::ArrowError::CastError("".to_string())})?.clone();
-            let z_col = get_col("z (km)")?.as_any().downcast_ref::<Float64Array>().ok_or_else(|| InputOutputError::ArrowError{action: "downcasting Z", source: arrow::error::ArrowError::CastError("".to_string())})?.clone();
-            let vx_col = get_col("vx (km/s)")?.as_any().downcast_ref::<Float64Array>().ok_or_else(|| InputOutputError::ArrowError{action: "downcasting VX", source: arrow::error::ArrowError::CastError("".to_string())})?.clone();
-            let vy_col = get_col("vy (km/s)")?.as_any().downcast_ref::<Float64Array>().ok_or_else(|| InputOutputError::ArrowError{action: "downcasting VY", source: arrow::error::ArrowError::CastError("".to_string())})?.clone();
-            let vz_col = get_col("vz (km/s)")?.as_any().downcast_ref::<Float64Array>().ok_or_else(|| InputOutputError::ArrowError{action: "downcasting VZ", source: arrow::error::ArrowError::CastError("".to_string())})?.clone();
+            let x_col = get_col("X (km)")?.as_any().downcast_ref::<Float64Array>().ok_or_else(|| InputOutputError::ArrowError{action: "downcasting X", source: arrow::error::ArrowError::CastError("".to_string())})?.clone();
+            let y_col = get_col("Y (km)")?.as_any().downcast_ref::<Float64Array>().ok_or_else(|| InputOutputError::ArrowError{action: "downcasting Y", source: arrow::error::ArrowError::CastError("".to_string())})?.clone();
+            let z_col = get_col("Z (km)")?.as_any().downcast_ref::<Float64Array>().ok_or_else(|| InputOutputError::ArrowError{action: "downcasting Z", source: arrow::error::ArrowError::CastError("".to_string())})?.clone();
+            let vx_col = get_col("VX (km/s)")?.as_any().downcast_ref::<Float64Array>().ok_or_else(|| InputOutputError::ArrowError{action: "downcasting VX", source: arrow::error::ArrowError::CastError("".to_string())})?.clone();
+            let vy_col = get_col("VY (km/s)")?.as_any().downcast_ref::<Float64Array>().ok_or_else(|| InputOutputError::ArrowError{action: "downcasting VY", source: arrow::error::ArrowError::CastError("".to_string())})?.clone();
+            let vz_col = get_col("VZ (km/s)")?.as_any().downcast_ref::<Float64Array>().ok_or_else(|| InputOutputError::ArrowError{action: "downcasting VZ", source: arrow::error::ArrowError::CastError("".to_string())})?.clone();
 
             let cr_col = get_col("cr")?.as_any().downcast_ref::<Float64Array>().ok_or_else(|| InputOutputError::ArrowError{action: "downcasting Cr (unitless)", source: arrow::error::ArrowError::CastError("".to_string())})?.clone();
             let cd_col = get_col("cd")?.as_any().downcast_ref::<Float64Array>().ok_or_else(|| InputOutputError::ArrowError{action: "downcasting Cd (unitless)", source: arrow::error::ArrowError::CastError("".to_string())})?.clone();

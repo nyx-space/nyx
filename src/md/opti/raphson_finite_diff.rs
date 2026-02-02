@@ -27,6 +27,7 @@ use crate::md::{PropSnafu, StateParameter};
 pub use crate::md::{Variable, Vary};
 use crate::polyfit::CommonPolynomial;
 use crate::pseudo_inverse;
+use anise::astro::orbit_gradient::OrbitGrad;
 use hifitime::TimeUnits;
 use log::{debug, error, info};
 use rayon::prelude::*;
@@ -90,15 +91,16 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
             // Check the validity (this function will report to log and raise an error)
             var.valid()?;
             // Check that there is no attempt to target a position in a local frame
-            if self.correction_frame.is_some() && var.component.vec_index() < 3 {
-                // Then this is a position correction, which is not allowed if a frame is provided!
-                let msg = format!(
-                    "Variable is in frame {:?} but that frame cannot be used for a {:?} correction",
-                    self.correction_frame.unwrap(),
+            if let Some(correction_frame) = self.correction_frame {
+                if var.component.vec_index() < 3 {
+                    // Then this is a position correction, which is not allowed if a frame is provided!
+                    let msg = format!(
+                    "Variable is in frame {correction_frame:?} but that frame cannot be used for a {:?} correction",
                     var.component
                 );
-                error!("{msg}");
-                return Err(TargetingError::FrameError { msg });
+                    error!("{msg}");
+                    return Err(TargetingError::FrameError { msg });
+                }
             }
 
             // Check that a thruster is provided since we'll be changing that and the burn duration
@@ -252,9 +254,9 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                         .context(AstroAlmanacSnafu)
                         .context(AstroSnafu)?;
 
-                    OrbitDual::from(orbit_obj_frame)
+                    OrbitGrad::from(orbit_obj_frame)
                 }
-                None => OrbitDual::from(xf),
+                None => OrbitGrad::from(xf),
             };
 
             // Build the error vector
@@ -283,10 +285,13 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                         StateParameter::BLTOF => b_plane.unwrap().ltof_s,
                         _ => unreachable!(),
                     }
-                } else {
+                } else if let StateParameter::Element(oe) = obj.parameter {
                     xf_dual_obj_frame
-                        .partial_for(obj.parameter)
+                        .partial_for(oe)
+                        .context(AstroPhysicsSnafu)
                         .context(AstroSnafu)?
+                } else {
+                    unreachable!()
                 };
 
                 let achieved = partial.real();
@@ -471,9 +476,9 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                                 .context(AstroSnafu)
                                 .unwrap();
 
-                            OrbitDual::from(orbit_obj_frame)
+                            OrbitGrad::from(orbit_obj_frame)
                         }
-                        None => OrbitDual::from(this_xf),
+                        None => OrbitGrad::from(this_xf),
                     };
 
                     let b_plane = if is_bplane_tgt {
@@ -489,8 +494,10 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                             StateParameter::BLTOF => b_plane.unwrap().ltof_s,
                             _ => unreachable!(),
                         }
+                    } else if let StateParameter::Element(oe) = obj.parameter {
+                        xf_dual_obj_frame.partial_for(oe).unwrap()
                     } else {
-                        xf_dual_obj_frame.partial_for(obj.parameter).unwrap()
+                        unreachable!()
                     };
 
                     let this_achieved = partial.real();

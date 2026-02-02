@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anise::analysis::prelude::OrbitalElement;
 use anise::astro::Aberration;
 use anise::constants::orientations::J2000;
 use anise::errors::AlmanacError;
@@ -34,7 +35,6 @@ use crate::errors::{FromAlmanacSnafu, NyxError};
 use crate::io::watermark::prj_name_ver;
 use crate::io::{InputOutputError, MissingDataSnafu, ParquetSnafu, StdIOSnafu};
 use crate::md::prelude::{Interpolatable, StateParameter};
-use crate::md::EventEvaluator;
 use crate::time::{Duration, Epoch, Format, Formatter, TimeUnits};
 use crate::State;
 use std::collections::{HashMap, HashSet};
@@ -133,24 +133,23 @@ impl Traj<Spacecraft> {
         &self,
         path: P,
         body_fixed_frame: Frame,
-        events: Option<Vec<&dyn EventEvaluator<Spacecraft>>>,
         metadata: Option<HashMap<String, String>>,
         almanac: Arc<Almanac>,
     ) -> Result<PathBuf, Box<dyn Error>> {
-        let traj = self.to_frame(body_fixed_frame, almanac.clone())?;
+        let traj = self.to_frame(body_fixed_frame, almanac)?;
 
         let mut cfg = ExportCfg::builder()
             .step(1.minutes())
             .fields(vec![
-                StateParameter::Latitude,
-                StateParameter::Longitude,
-                StateParameter::Height,
-                StateParameter::Rmag,
+                StateParameter::Element(OrbitalElement::Latitude),
+                StateParameter::Element(OrbitalElement::Longitude),
+                StateParameter::Element(OrbitalElement::Height),
+                StateParameter::Element(OrbitalElement::Rmag),
             ])
             .build();
         cfg.metadata = metadata;
 
-        traj.to_parquet(path, events, cfg, almanac)
+        traj.to_parquet(path, cfg)
     }
 
     /// Initialize a new spacecraft trajectory from the path to a CCSDS OEM file.
@@ -460,12 +459,12 @@ impl Traj<Spacecraft> {
         let mut frame = None;
 
         let mut found_fields = vec![
-            (StateParameter::X, false),
-            (StateParameter::Y, false),
-            (StateParameter::Z, false),
-            (StateParameter::VX, false),
-            (StateParameter::VY, false),
-            (StateParameter::VZ, false),
+            (StateParameter::Element(OrbitalElement::X), false),
+            (StateParameter::Element(OrbitalElement::Y), false),
+            (StateParameter::Element(OrbitalElement::Z), false),
+            (StateParameter::Element(OrbitalElement::VX), false),
+            (StateParameter::Element(OrbitalElement::VY), false),
+            (StateParameter::Element(OrbitalElement::VZ), false),
             (StateParameter::PropMass, false),
         ];
 

@@ -24,7 +24,7 @@ use crate::time::Epoch;
 use crate::Spacecraft;
 use anise::errors::AlmanacResult;
 use anise::frames::Frame;
-use anise::prelude::{Almanac, Orbit};
+use anise::prelude::{Aberration, Almanac, Orbit};
 use hifitime::TimeUnits;
 use indexmap::IndexSet;
 use log::debug;
@@ -69,35 +69,57 @@ impl TrackingDevice<Spacecraft> for GroundStation {
                     Err(_) => return Ok(None),
                 };
 
-                let obstructing_body = if !self.frame.ephem_origin_match(rx_0.frame()) {
-                    Some(rx_0.frame())
+                let obstructing_body =
+                    if self.location.frame.ephemeris_id != rx_0.frame().ephemeris_id {
+                        Some(rx_0.frame())
+                    } else {
+                        None
+                    };
+
+                let ab_corr = if self.light_time_correction {
+                    Aberration::LT
                 } else {
-                    None
+                    Aberration::NONE
                 };
 
-                let aer_t0 = self
-                    .azimuth_elevation_of(rx_0.orbit, obstructing_body, &almanac)
-                    .context(ODAlmanacSnafu {
-                        action: "computing AER",
-                    })?;
-                let aer_t1 = self
-                    .azimuth_elevation_of(rx_1.orbit, obstructing_body, &almanac)
+                let aer_t0 = almanac
+                    .azimuth_elevation_range_sez_from_location(
+                        rx_0.orbit,
+                        self.location.clone(),
+                        obstructing_body,
+                        ab_corr,
+                    )
                     .context(ODAlmanacSnafu {
                         action: "computing AER",
                     })?;
 
-                if aer_t0.elevation_deg < self.elevation_mask_deg
-                    || aer_t1.elevation_deg < self.elevation_mask_deg
+                let aer_t1 = almanac
+                    .azimuth_elevation_range_sez_from_location(
+                        rx_1.orbit,
+                        self.location.clone(),
+                        obstructing_body,
+                        ab_corr,
+                    )
+                    .context(ODAlmanacSnafu {
+                        action: "computing AER",
+                    })?;
+
+                if aer_t0.elevation_above_mask_deg() < 0.0
+                    || aer_t1.elevation_above_mask_deg() < 0.0
                 {
                     debug!(
-                        "{} (el. mask {:.3} deg) but object moves from {:.3} to {:.3} deg -- no measurement",
-                        self.name, self.elevation_mask_deg, aer_t0.elevation_deg, aer_t1.elevation_deg
+                        "{} {} obstructed by terrain ({:.3} - {:.3} deg) -- no measurement",
+                        self.name,
+                        aer_t0.epoch,
+                        aer_t0.elevation_above_mask_deg(),
+                        aer_t1.elevation_above_mask_deg()
                     );
                     return Ok(None);
                 } else if aer_t0.is_obstructed() || aer_t1.is_obstructed() {
                     debug!(
-                        "{} obstruction at t0={}, t1={} -- no measurement",
+                        "{} {} obstruction at t0={}, t1={} -- no measurement",
                         self.name,
+                        aer_t0.epoch,
                         aer_t0.is_obstructed(),
                         aer_t1.is_obstructed()
                     );
@@ -140,19 +162,30 @@ impl TrackingDevice<Spacecraft> for GroundStation {
         rng: Option<&mut Pcg64Mcg>,
         almanac: Arc<Almanac>,
     ) -> Result<Option<Measurement>, ODError> {
-        let obstructing_body = if !self.frame.ephem_origin_match(rx.frame()) {
+        let obstructing_body = if self.location.frame.ephemeris_id != rx.frame().ephemeris_id {
             Some(rx.frame())
         } else {
             None
         };
 
-        let aer = self
-            .azimuth_elevation_of(rx.orbit, obstructing_body, &almanac)
+        let ab_corr = if self.light_time_correction {
+            Aberration::LT
+        } else {
+            Aberration::NONE
+        };
+
+        let aer = almanac
+            .azimuth_elevation_range_sez_from_location(
+                rx.orbit,
+                self.location.clone(),
+                obstructing_body,
+                ab_corr,
+            )
             .context(ODAlmanacSnafu {
                 action: "computing AER",
             })?;
 
-        if aer.elevation_deg >= self.elevation_mask_deg && !aer.is_obstructed() {
+        if aer.elevation_above_mask_deg() >= 0.0 && !aer.is_obstructed() {
             // Only update the noises if the measurement is valid.
             let noises = self.noises(rx.orbit.epoch, rng)?;
 
@@ -166,8 +199,10 @@ impl TrackingDevice<Spacecraft> for GroundStation {
             Ok(Some(msr))
         } else {
             debug!(
-                "{} {} (el. mask {:.3} deg), object at {:.3} deg -- no measurement",
-                self.name, rx.orbit.epoch, self.elevation_mask_deg, aer.elevation_deg
+                "{} {} object at {:.3} deg -- no measurement",
+                self.name,
+                rx.orbit.epoch,
+                aer.elevation_above_mask_deg(),
             );
             Ok(None)
         }

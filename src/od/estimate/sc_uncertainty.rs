@@ -18,6 +18,7 @@
 
 use core::fmt;
 
+use anise::analysis::prelude::OrbitalElement;
 use anise::errors::MathError;
 use anise::{astro::PhysicsResult, errors::PhysicsError};
 use nalgebra::{SMatrix, SVector};
@@ -27,7 +28,6 @@ use rand_pcg::Pcg64Mcg;
 use typed_builder::TypedBuilder;
 
 use crate::mc::MvnSpacecraft;
-use crate::md::StateParameter;
 use crate::{dynamics::guidance::LocalFrame, Spacecraft};
 
 use super::{Estimate, KfEstimate};
@@ -198,12 +198,12 @@ impl fmt::LowerHex for KfEstimate<Spacecraft> {
         };
 
         let params = [
-            StateParameter::SMA,
-            StateParameter::Eccentricity,
-            StateParameter::Inclination,
-            StateParameter::RAAN,
-            StateParameter::AoP,
-            StateParameter::TrueAnomaly,
+            OrbitalElement::SemiMajorAxis,
+            OrbitalElement::Eccentricity,
+            OrbitalElement::Inclination,
+            OrbitalElement::RAAN,
+            OrbitalElement::AoP,
+            OrbitalElement::TrueAnomaly,
         ];
 
         let mut fmt_cov = Vec::with_capacity(params.len());
@@ -236,8 +236,8 @@ mod ut_sc_uncertainty {
 
     use super::{Spacecraft, SpacecraftUncertainty};
     use crate::dynamics::guidance::LocalFrame;
-    use crate::md::StateParameter;
     use crate::GMAT_EARTH_GM;
+    use anise::analysis::prelude::OrbitalElement;
     use anise::constants::frames::EME2000;
     use anise::prelude::{Epoch, Orbit};
 
@@ -325,8 +325,8 @@ mod ut_sc_uncertainty {
 
         println!("{estimate}");
 
-        let sma_sigma_km = estimate.sigma_for(StateParameter::SMA).unwrap();
-        assert!((sma_sigma_km - 1.3528088887049263).abs() < f64::EPSILON);
+        let sma_sigma_km = estimate.sigma_for(OrbitalElement::SemiMajorAxis).unwrap();
+        assert!((sma_sigma_km - 1.3528088887049263).abs() < 1e-8);
 
         let covar_keplerian = estimate.keplerian_covar();
         for i in 1..=3 {

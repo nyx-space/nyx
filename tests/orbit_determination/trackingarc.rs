@@ -81,13 +81,11 @@ fn trk_simple(
     .iter()
     .collect();
 
-    traj.to_parquet_simple(path.clone(), almanac.clone())
-        .unwrap();
+    traj.to_parquet_simple(path.clone()).unwrap();
 
     traj.to_groundtrack_parquet(
         path.with_file_name("tracking_truth_ephem_groundtrack.parquet"),
         almanac.frame_info(IAU_EARTH_FRAME).unwrap(),
-        None,
         None,
         almanac.clone(),
     )
@@ -130,7 +128,7 @@ fn trk_simple(
     let arc = trk.generate_measurements(almanac).unwrap();
 
     // Regression
-    assert_eq!(arc.measurements.len(), 12803);
+    assert_eq!(arc.measurements.len(), 14909);
 
     // And serialize to disk
     let path: PathBuf = [
@@ -294,5 +292,5 @@ fn trkconfig_cadence(
     );
 
     // Regression
-    assert_eq!(arc.measurements.len(), 215);
+    assert_eq!(arc.measurements.len(), 259);
 }

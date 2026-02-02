@@ -12,13 +12,13 @@ use anise::{
 };
 use hifitime::{Epoch, TimeUnits, Unit};
 use nyx::{
-    cosmic::{eclipse::EclipseLocator, GuidanceMode, Mass, MetaAlmanac, Orbit, SRPData},
+    cosmic::{GuidanceMode, Mass, MetaAlmanac, Orbit, SRPData},
     dynamics::{
         guidance::{GuidanceLaw, Ruggiero, Thruster},
         Harmonics, OrbitalDynamics, SolarPressure, SpacecraftDynamics,
     },
     io::{gravity::HarmonicsMem, ExportCfg},
-    md::{prelude::Objective, StateParameter},
+    md::prelude::{Objective, OrbitalElement, StateParameter},
     propagators::{ErrorControl, IntegratorOptions, Propagator},
     Spacecraft,
 };
@@ -65,9 +65,21 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Define the guidance law -- we're just using a Ruggiero controller as demonstrated in AAS-2004-5089.
     let objectives = &[
-        Objective::within_tolerance(StateParameter::SMA, 42_165.0, 20.0),
-        Objective::within_tolerance(StateParameter::Eccentricity, 0.001, 5e-5),
-        Objective::within_tolerance(StateParameter::Inclination, 0.05, 1e-2),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::SemiMajorAxis),
+            42_165.0,
+            20.0,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Eccentricity),
+            0.001,
+            5e-5,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Inclination),
+            0.05,
+            1e-2,
+        ),
     ];
 
     // Ensure that we only thrust if we have more than 20% illumination.
@@ -129,14 +141,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("prop usage: {prop_usage:.3} kg");
 
     // Finally, export the results for analysis, including the penumbra percentage throughout the orbit raise.
-    traj.to_parquet(
-        "./03_geo_raise.parquet",
-        Some(vec![
-            &EclipseLocator::cislunar(almanac.clone()).to_penumbra_event()
-        ]),
-        ExportCfg::default(),
-        almanac,
-    )?;
+    traj.to_parquet("./03_geo_raise.parquet", ExportCfg::default())?;
 
     for status_line in ruggiero_ctrl.status(&final_state) {
         println!("{status_line}");

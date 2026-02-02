@@ -1,7 +1,7 @@
 extern crate nyx_space as nyx;
 
+use anise::astro::Location;
 use anise::constants::celestial_objects::{EARTH, MOON, SUN};
-use anise::constants::frames::IAU_EARTH_FRAME;
 use indexmap::{IndexMap, IndexSet};
 use nalgebra::{Const, U2};
 use nyx::cosmic::Orbit;
@@ -47,11 +47,13 @@ fn nil_measurement(almanac: Arc<Almanac>) {
 
     let mut station = GroundStation {
         name: "nil".to_string(),
-        latitude_deg: lat,
-        longitude_deg: long,
-        height_km: height,
-        frame: eme2k,
-        elevation_mask_deg: 0.0,
+        location: Location {
+            latitude_deg: lat,
+            longitude_deg: long,
+            height_km: height,
+            frame: eme2k.into(),
+            ..Default::default()
+        },
         timestamp_noise_s: None,
         stochastic_noises: Some(stochastics),
         integration_time: None,
@@ -106,15 +108,9 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
         almanac.frame_info(EARTH_J2000).unwrap(),
     );
 
-    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
-
     let elevation_mask = 7.0; // in degrees
-    let mut dss65_madrid = GroundStation::dss65_madrid(
-        elevation_mask,
-        StochasticNoise::MIN,
-        StochasticNoise::MIN,
-        iau_earth,
-    );
+    let mut dss65_madrid =
+        GroundStation::dss65_madrid(elevation_mask, StochasticNoise::MIN, StochasticNoise::MIN);
 
     // Generate the measurements
 
@@ -317,10 +313,8 @@ fn verif_sensitivity_mat(almanac: Arc<Almanac>) {
 
     let cislunar_sc: Spacecraft = cislunar1.into();
 
-    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
-
     let mut dss65_madrid =
-        GroundStation::dss65_madrid(0.0, StochasticNoise::ZERO, StochasticNoise::ZERO, iau_earth)
+        GroundStation::dss65_madrid(0.0, StochasticNoise::ZERO, StochasticNoise::ZERO)
             .with_msr_type(MeasurementType::Azimuth, StochasticNoise::ZERO)
             .with_msr_type(MeasurementType::Elevation, StochasticNoise::ZERO);
 
@@ -409,9 +403,6 @@ fn val_measurement_noise(almanac: Arc<Almanac>) {
     println!("{traj}");
 
     // Set up the noise modeling.
-
-    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
-
     let range_wn = WhiteNoise::constant_white_noise(2.0e-3);
     let doppler_wn = WhiteNoise::constant_white_noise(3e-6);
     let angle_wn = WhiteNoise::constant_white_noise(2e-2);
@@ -426,7 +417,6 @@ fn val_measurement_noise(almanac: Arc<Almanac>) {
             white_noise: Some(doppler_wn),
             bias: None,
         },
-        iau_earth,
     )
     .with_msr_type(
         MeasurementType::Azimuth,
@@ -459,14 +449,10 @@ fn val_measurement_noise(almanac: Arc<Almanac>) {
         .generate_measurements(almanac.clone())
         .unwrap();
 
-    let perfect_ground_station = GroundStation::dss13_goldstone(
-        10.0,
-        StochasticNoise::ZERO,
-        StochasticNoise::ZERO,
-        iau_earth,
-    )
-    .with_msr_type(MeasurementType::Azimuth, StochasticNoise::ZERO)
-    .with_msr_type(MeasurementType::Elevation, StochasticNoise::ZERO);
+    let perfect_ground_station =
+        GroundStation::dss13_goldstone(10.0, StochasticNoise::ZERO, StochasticNoise::ZERO)
+            .with_msr_type(MeasurementType::Azimuth, StochasticNoise::ZERO)
+            .with_msr_type(MeasurementType::Elevation, StochasticNoise::ZERO);
 
     let mut noisy_devices = BTreeMap::new();
     noisy_devices.insert("Station".to_string(), perfect_ground_station);

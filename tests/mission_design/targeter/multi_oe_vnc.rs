@@ -33,8 +33,12 @@ fn tgt_vnc_c3_decl_cov_test(almanac: Arc<Almanac>) {
 
     // Define the objective
     let objectives = [
-        Objective::within_tolerance(StateParameter::Declination, 5.0, 0.1),
-        Objective::within_tolerance(StateParameter::C3, -5.0, 0.5),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Declination),
+            5.0,
+            0.1,
+        ),
+        Objective::within_tolerance(StateParameter::Element(OrbitalElement::C3), -5.0, 0.5),
     ];
 
     let tgt = Targeter::vnc(&setup, objectives);
@@ -81,8 +85,16 @@ fn tgt_vnc_sma_ecc_cov_test(almanac: Arc<Almanac>) {
 
     // Define the objective
     let objectives = [
-        Objective::within_tolerance(StateParameter::Eccentricity, 0.4, 1e-5),
-        Objective::within_tolerance(StateParameter::SMA, 8100.0, 0.1),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Eccentricity),
+            0.4,
+            1e-5,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::SemiMajorAxis),
+            8100.0,
+            0.1,
+        ),
     ];
 
     let tgt = Targeter::vnc_with_components(

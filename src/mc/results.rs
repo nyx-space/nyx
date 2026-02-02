@@ -30,10 +30,9 @@ use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 use crate::md::prelude::GuidanceMode;
 use crate::md::trajectory::{Interpolatable, Traj};
-use crate::md::{EventEvaluator, StateParameter};
+use crate::md::StateParameter;
 use crate::propagators::PropagationError;
 use crate::time::{Duration, Epoch, TimeUnits};
-use anise::almanac::Almanac;
 use anise::constants::frames::EARTH_J2000;
 use arrow::array::{Array, Float64Builder, Int32Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
@@ -243,9 +242,7 @@ where
     pub fn to_parquet<P: AsRef<Path>>(
         &self,
         path: P,
-        events: Option<Vec<&dyn EventEvaluator<S>>>,
         cfg: ExportCfg,
-        almanac: Arc<Almanac>,
     ) -> Result<PathBuf, Box<dyn Error>> {
         let tick = Epoch::now().unwrap();
         info!("Exporting Monte Carlo results to parquet file...");
@@ -333,13 +330,6 @@ where
             hdrs.push(field.to_field(more_meta.clone()));
         }
 
-        if let Some(events) = events.as_ref() {
-            for event in events {
-                let field = Field::new(format!("{event}"), DataType::Float64, false);
-                hdrs.push(field);
-            }
-        }
-
         // Build the schema
         let schema = Arc::new(Schema::new(hdrs));
         let mut record: Vec<Arc<dyn Array>> = Vec::new();
@@ -382,18 +372,6 @@ where
             start.unwrap(),
             end.unwrap()
         );
-
-        // Add all of the evaluated events
-        if let Some(events) = events {
-            info!("Evaluating {} event(s)", events.len());
-            for event in events {
-                let mut data = Float64Builder::new();
-                for s in &all_states {
-                    data.append_value(event.eval(s, almanac.clone()).map_err(Box::new)?);
-                }
-                record.push(Arc::new(data.finish()));
-            }
-        }
 
         // Serialize all of the devices and add that to the parquet file too.
         let mut metadata = HashMap::new();

@@ -17,18 +17,19 @@
 */
 
 use super::{Estimate, State};
-use crate::cosmic::AstroError;
+use crate::cosmic::{AstroError, AstroPhysicsSnafu};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, Matrix, OMatrix, OVector};
 use crate::mc::{MvnSpacecraft, StateDispersion};
-use crate::md::prelude::OrbitDual;
-use crate::md::StateParameter;
 use crate::Spacecraft;
+use anise::analysis::prelude::OrbitalElement;
+use anise::astro::orbit_gradient::OrbitGrad;
 use nalgebra::Const;
 use nalgebra::SMatrix;
 use rand::SeedableRng;
 use rand_distr::Distribution;
 use rand_pcg::Pcg64Mcg;
+use snafu::ResultExt;
 use std::cmp::PartialEq;
 use std::error::Error;
 use std::fmt;
@@ -163,19 +164,19 @@ impl KfEstimate<Spacecraft> {
     ///
     /// This method uses the [OrbitDual] structure to compute the estimate in the hyperdual space
     /// and rotate the nominal covariance into that space.
-    pub fn sigma_for(&self, param: StateParameter) -> Result<f64, AstroError> {
+    pub fn sigma_for(&self, param: OrbitalElement) -> Result<f64, AstroError> {
         // Build the rotation matrix using Orbit Dual.
         let mut rotmat = SMatrix::<f64, 1, 6>::zeros();
-        let orbit_dual = OrbitDual::from(self.nominal_state.orbit);
+        let orbit_dual = OrbitGrad::from(self.nominal_state.orbit);
 
-        let xf_partial = orbit_dual.partial_for(param)?;
+        let xf_partial = orbit_dual.partial_for(param).context(AstroPhysicsSnafu)?;
         for (cno, val) in [
-            xf_partial.wtr_x(),
-            xf_partial.wtr_y(),
-            xf_partial.wtr_z(),
-            xf_partial.wtr_vx(),
-            xf_partial.wtr_vy(),
-            xf_partial.wtr_vz(),
+            xf_partial.wrt_x(),
+            xf_partial.wrt_y(),
+            xf_partial.wrt_z(),
+            xf_partial.wrt_vx(),
+            xf_partial.wrt_vy(),
+            xf_partial.wrt_vz(),
         ]
         .iter()
         .copied()
@@ -191,14 +192,14 @@ impl KfEstimate<Spacecraft> {
     pub fn keplerian_covar(&self) -> SMatrix<f64, 6, 6> {
         // Build the rotation matrix using Orbit Dual.
         let mut rotmat = SMatrix::<f64, 6, 6>::zeros();
-        let orbit_dual = OrbitDual::from(self.nominal_state.orbit);
+        let orbit_dual = OrbitGrad::from(self.nominal_state.orbit);
         for (pno, param) in [
-            StateParameter::SMA,
-            StateParameter::Eccentricity,
-            StateParameter::Inclination,
-            StateParameter::RAAN,
-            StateParameter::AoP,
-            StateParameter::TrueAnomaly,
+            OrbitalElement::SemiMajorAxis,
+            OrbitalElement::Eccentricity,
+            OrbitalElement::Inclination,
+            OrbitalElement::RAAN,
+            OrbitalElement::AoP,
+            OrbitalElement::TrueAnomaly,
         ]
         .iter()
         .copied()
@@ -206,12 +207,12 @@ impl KfEstimate<Spacecraft> {
         {
             let xf_partial = orbit_dual.partial_for(param).unwrap();
             for (cno, val) in [
-                xf_partial.wtr_x(),
-                xf_partial.wtr_y(),
-                xf_partial.wtr_z(),
-                xf_partial.wtr_vx(),
-                xf_partial.wtr_vy(),
-                xf_partial.wtr_vz(),
+                xf_partial.wrt_x(),
+                xf_partial.wrt_y(),
+                xf_partial.wrt_z(),
+                xf_partial.wrt_vx(),
+                xf_partial.wrt_vy(),
+                xf_partial.wrt_vz(),
             ]
             .iter()
             .copied()
@@ -376,6 +377,7 @@ mod ut_kfest {
         mc::StateDispersion, md::StateParameter, od::estimate::KfEstimate, Spacecraft,
         GMAT_EARTH_GM,
     };
+    use anise::analysis::prelude::OrbitalElement;
     use anise::{constants::frames::EARTH_J2000, prelude::Orbit};
     use hifitime::Epoch;
 
@@ -393,12 +395,15 @@ mod ut_kfest {
             initial_state,
             vec![
                 StateDispersion::builder()
-                    .param(StateParameter::SMA)
+                    .param(StateParameter::Element(OrbitalElement::SemiMajorAxis))
                     .std_dev(1.1)
                     .build(),
-                StateDispersion::zero_mean(StateParameter::Inclination, 0.2),
-                StateDispersion::zero_mean(StateParameter::RAAN, 0.2),
-                StateDispersion::zero_mean(StateParameter::AoP, 0.2),
+                StateDispersion::zero_mean(
+                    StateParameter::Element(OrbitalElement::Inclination),
+                    0.2,
+                ),
+                StateDispersion::zero_mean(StateParameter::Element(OrbitalElement::RAAN), 0.2),
+                StateDispersion::zero_mean(StateParameter::Element(OrbitalElement::AoP), 0.2),
             ],
             Some(0),
         )

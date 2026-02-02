@@ -16,13 +16,18 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use anise::errors::MathError;
+use anise::{
+    analysis::AnalysisError,
+    errors::{AlmanacError, MathError},
+};
 use snafu::prelude::*;
 use std::fmt;
 
 /// Provides different methods for controlling the error computation of the integrator.
 pub mod error_ctrl;
 pub use self::error_ctrl::*;
+
+mod event;
 
 // Re-Export
 mod instance;
@@ -32,7 +37,7 @@ pub use propagator::*;
 mod rk_methods;
 pub use rk_methods::*;
 mod options;
-use crate::{dynamics::DynamicsError, errors::EventError, io::ConfigError, time::Duration};
+use crate::{dynamics::DynamicsError, io::ConfigError, md::trajectory::TrajError, time::Duration};
 pub use options::*;
 use serde::{Deserialize, Serialize};
 
@@ -62,11 +67,20 @@ pub enum PropagationError {
     #[snafu(display("encountered a dynamics error {source}"))]
     Dynamics { source: DynamicsError },
     #[snafu(display("when propagating until an event: {source}"))]
-    TrajectoryEventError { source: EventError },
+    TrajectoryEventError { source: TrajError },
     #[snafu(display("requested propagation until event #{nth} but only {found} found"))]
     NthEventError { nth: usize, found: usize },
     #[snafu(display("propagation failed because {source}"))]
     PropConfigError { source: ConfigError },
     #[snafu(display("propagation encountered a math error {source}"))]
     PropMathError { source: MathError },
+    #[snafu(display("propagation encountered an analysis error {source}"))]
+    PropAnalysisError {
+        #[snafu(source(from(AnalysisError, Box::new)))]
+        source: Box<AnalysisError>,
+    },
+    PropAlmanacError {
+        #[snafu(source(from(AlmanacError, Box::new)))]
+        source: Box<AlmanacError>,
+    },
 }

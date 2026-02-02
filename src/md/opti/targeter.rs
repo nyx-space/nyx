@@ -18,6 +18,7 @@
 
 use snafu::ResultExt;
 
+use crate::cosmic::AstroPhysicsSnafu;
 use crate::dynamics::guidance::LocalFrame;
 use crate::errors::TargetingError;
 use crate::md::objective::Objective;
@@ -26,6 +27,7 @@ use crate::md::AstroSnafu;
 use crate::md::PropSnafu;
 use crate::md::StateParameter;
 pub use crate::md::{Variable, Vary};
+use anise::astro::orbit_gradient::OrbitGrad;
 use std::fmt;
 
 use super::solution::TargeterSolution;
@@ -288,7 +290,7 @@ impl<'a, const V: usize, const O: usize> Targeter<'a, V, O> {
         };
 
         // Build the partials
-        let xf_dual = OrbitDual::from(xf.orbit);
+        let xf_dual = OrbitGrad::from(xf.orbit);
 
         let mut is_bplane_tgt = false;
         for obj in &self.objectives {
@@ -314,8 +316,13 @@ impl<'a, const V: usize, const O: usize> Targeter<'a, V, O> {
                     StateParameter::BLTOF => b_plane.unwrap().ltof_s,
                     _ => unreachable!(),
                 }
+            } else if let StateParameter::Element(oe) = obj.parameter {
+                xf_dual
+                    .partial_for(oe)
+                    .context(AstroPhysicsSnafu)
+                    .context(AstroSnafu)?
             } else {
-                xf_dual.partial_for(obj.parameter).context(AstroSnafu)?
+                unreachable!()
             };
 
             let param_err = obj.desired_value - partial.real();

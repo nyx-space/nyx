@@ -17,7 +17,7 @@
 */
 
 use crate::linalg::allocator::Allocator;
-use crate::linalg::{DefaultAllocator, DimName};
+use crate::linalg::{DefaultAllocator, DimName, OMatrix};
 use crate::md::trajectory::Interpolatable;
 pub use crate::od::estimate::*;
 pub use crate::od::*;
@@ -135,17 +135,31 @@ where
             // The filter will reset the STM between each estimate it computes, time update or measurement update.
             // Therefore, the STM is simply the inverse of the one we used previously.
             // est_kp1 is the estimate that used the STM from time k to time k+1. So the STM stored there
-            // is \Phi_{k \to k+1}. Let's invert that.
-            let phi_kp1_k = &est_kp1
-                .stm()
-                .clone()
-                .try_inverse()
-                .ok_or(ODError::SingularStateTransitionMatrix)?;
+            // is \Phi_{k \to k+1}. Let's invert that via a UDU decomposition for stability.
+            let phi_kp1_k = match est_kp1.stm().clone().udu() {
+                Some(stm_udu) => {
+                    // Invert both parts
+                    match stm_udu.u.try_inverse() {
+                        None => return Err(ODError::SingularStateTransitionMatrix),
+                        Some(u_inv) => {
+                            let d_inv = OMatrix::from_diagonal(&OVector::<
+                                f64,
+                                <StateType as State>::Size,
+                            >::from_iterator(
+                                stm_udu.d.iter().map(|d_ii| 1.0 / d_ii),
+                            ));
+                            let y = d_inv * &u_inv;
+                            u_inv.transpose() * y
+                        }
+                    }
+                }
+                None => return Err(ODError::SingularStateTransitionMatrix),
+            };
 
             // Compute smoothed state deviation
-            let x_k_l = phi_kp1_k * x_kp1_l;
+            let x_k_l = &phi_kp1_k * x_kp1_l;
             // Compute smoothed covariance
-            let p_k_l = phi_kp1_k * p_kp1_l * phi_kp1_k.transpose();
+            let p_k_l = &phi_kp1_k * p_kp1_l * &phi_kp1_k.transpose();
             // Store into vector
             let mut smoothed_est_k = est_k.clone();
             // Compute the smoothed state deviation

@@ -308,6 +308,7 @@ where
                                     let measurement_covar =
                                         device.measurement_covar_matrix(&cur_msr_types, epoch)?;
 
+
                                     // Apply any biases on the computed observation
                                     let computed_obs = computed_meas
                                         .observation::<MsrSize>(&cur_msr_types)

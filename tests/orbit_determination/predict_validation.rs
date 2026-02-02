@@ -4,7 +4,7 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
 use anise::constants::celestial_objects::{EARTH, SUN};
-use anise::constants::frames::{IAU_EARTH_FRAME, IAU_MOON_FRAME};
+use anise::constants::frames::IAU_MOON_FRAME;
 use indexmap::IndexSet;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::OrbitalDynamics;
@@ -31,7 +31,6 @@ fn almanac() -> Arc<Almanac> {
 fn val_pure_predictor(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
     let moon_iau = almanac.frame_info(IAU_MOON_FRAME).unwrap();
 
     let prop_time = 1.hours();
@@ -69,7 +68,6 @@ fn val_pure_predictor(almanac: Arc<Almanac>) {
             0.0,
             StochasticNoise::default_range_km(),
             StochasticNoise::default_doppler_km_s(),
-            iau_earth,
         ),
     );
 

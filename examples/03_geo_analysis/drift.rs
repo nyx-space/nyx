@@ -12,7 +12,7 @@ use anise::{
 };
 use hifitime::{Epoch, Unit};
 use nyx::{
-    cosmic::{eclipse::EclipseLocator, Mass, MetaAlmanac, Orbit, SRPData},
+    cosmic::{Mass, MetaAlmanac, Orbit, SRPData},
     dynamics::{Harmonics, OrbitalDynamics, SolarPressure, SpacecraftDynamics},
     io::{gravity::HarmonicsMem, ExportCfg},
     propagators::Propagator,
@@ -151,11 +151,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     trajectory.to_parquet(
         "./03_geo_hf_prop.parquet",
-        Some(vec![
-            &EclipseLocator::cislunar(almanac.clone()).to_penumbra_event()
-        ]),
         ExportCfg::builder().step(analysis_step).build(),
-        almanac.clone(),
     )?;
 
     // 2. Compute the latitude, longitude, and altitude throughout the trajectory by rotating the spacecraft position into the Earth body fixed frame.

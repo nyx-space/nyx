@@ -1,8 +1,8 @@
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
+use anise::analysis::prelude::OrbitalElement;
 use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SATURN_BARYCENTER, SUN};
-use anise::constants::frames::IAU_EARTH_FRAME;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::SpacecraftDynamics;
@@ -49,7 +49,6 @@ fn almanac() -> Arc<Almanac> {
 fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
     // Define the ground stations.
     let elevation_mask = 0.0;
 
@@ -67,7 +66,6 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
         elevation_mask,
         StochasticNoise::default_range_km(),
         StochasticNoise::default_doppler_km_s(),
-        iau_earth,
     );
     // Set the integration time so as to generate two way measurements
     dss65_madrid.integration_time = Some(60.seconds());
@@ -75,7 +73,6 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
         elevation_mask,
         StochasticNoise::default_range_km(),
         StochasticNoise::default_doppler_km_s(),
-        iau_earth,
     );
     dss34_canberra.integration_time = Some(60.seconds());
 
@@ -92,10 +89,16 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
     let initial_estimate = KfEstimate::disperse_from_diag(
         initial_state,
         vec![
-            StateDispersion::zero_mean(StateParameter::SMA, 0.002),
-            StateDispersion::zero_mean(StateParameter::RAAN, 0.002),
-            StateDispersion::zero_mean(StateParameter::Inclination, 0.002),
-            StateDispersion::zero_mean(StateParameter::Eccentricity, 0.0002),
+            StateDispersion::zero_mean(
+                StateParameter::Element(OrbitalElement::SemiMajorAxis),
+                0.002,
+            ),
+            StateDispersion::zero_mean(StateParameter::Element(OrbitalElement::RAAN), 0.002),
+            StateDispersion::zero_mean(StateParameter::Element(OrbitalElement::Inclination), 0.002),
+            StateDispersion::zero_mean(
+                StateParameter::Element(OrbitalElement::Eccentricity),
+                0.0002,
+            ),
         ],
         Some(0),
     )
@@ -135,11 +138,8 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
         .iter()
         .collect();
 
-    traj.to_parquet_simple(
-        path.join("ekf_robust_two_way_traj.parquet"),
-        almanac.clone(),
-    )
-    .unwrap();
+    traj.to_parquet_simple(path.join("ekf_robust_two_way_traj.parquet"))
+        .unwrap();
     arc.to_parquet_simple(path.join("ekf_robust_two_way_msr.parquet"))
         .unwrap();
 
@@ -188,6 +188,19 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
             ExportCfg::default(),
         )
         .unwrap();
+
+    // Export ephemeris
+    let ephem = od_sol.to_ephemeris("My Spacecraft".to_string());
+    // Check that the final covariance is PSD by rotating it into another frame
+    let covar_ric = ephem
+        .covar_at(
+            ephem.end_epoch().unwrap(),
+            anise::ephemerides::ephemeris::LocalFrame::RIC,
+            &almanac,
+        )
+        .expect("non PSD covariance?")
+        .unwrap();
+    println!("{covar_ric}");
 
     // Test the results
     // Check that the covariance deflated
@@ -267,12 +280,12 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
     assert!(df
         .columns([
             "Epoch (UTC)",
-            "x (km)",
-            "y (km)",
-            "z (km)",
-            "vx (km/s)",
-            "vy (km/s)",
-            "vz (km/s)",
+            "X (km)",
+            "Y (km)",
+            "Z (km)",
+            "VX (km/s)",
+            "VY (km/s)",
+            "VZ (km/s)",
         ])
         .is_ok());
 

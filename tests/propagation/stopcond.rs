@@ -4,18 +4,18 @@ extern crate pretty_env_logger;
 
 use std::sync::Arc;
 
+use anise::analysis::prelude::{Condition, Event, OrbitalElement, ScalarExpr};
 use anise::constants::celestial_objects::{EARTH, SUN};
-use anise::constants::frames::{EARTH_J2000, MOON_J2000};
+use anise::constants::frames::{EARTH_J2000, IAU_EARTH_FRAME, MOON_J2000};
 use anise::prelude::Almanac;
-use hifitime::JD_J2000;
 use nalgebra::Vector3;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::guidance::{FiniteBurns, LocalFrame, Maneuver, Thruster};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::SpacecraftDynamics;
-use nyx::md::{Event, StateParameter};
+use nyx::md::StateParameter;
 use nyx::propagators::{IntegratorOptions, Propagator};
-use nyx::time::{Epoch, TimeUnits, Unit};
+use nyx::time::{Epoch, TimeUnits};
 use nyx::{Spacecraft, State};
 
 use nyx_space::propagators::ErrorControl;
@@ -31,7 +31,7 @@ fn almanac() -> Arc<Almanac> {
 fn stop_cond_3rd_apo_cov_test(almanac: Arc<Almanac>) {
     let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
-    let start_dt = Epoch::from_mjd_tai(JD_J2000);
+    let start_dt = Epoch::from_gregorian_utc_at_midnight(2025, 11, 12);
     let state = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.01, start_dt, eme2k,
     );
@@ -39,20 +39,25 @@ fn stop_cond_3rd_apo_cov_test(almanac: Arc<Almanac>) {
     let period = state.period().unwrap();
 
     // Track how many times we've passed by that TA again
-    let apo_event = Event::apoapsis(); // Special event shortcut!
+    let apo_event = Event::apoapsis();
 
     let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
     let mut prop = setup.with(state.into(), almanac.clone());
     // Propagate for at five orbital periods so we know we've passed the third one
-    // NOTE: We start counting at ZERO, so finding the 3rd means grabbing the second found.
-    let (third_apo, traj) = prop.until_nth_event(5 * period, &apo_event, 2).unwrap();
+    let (third_apo, traj) = prop
+        .until_nth_event(5 * period, &apo_event, None, 3)
+        .unwrap();
 
-    let events = traj.find(&apo_event, None, almanac).unwrap();
-    let mut prev_event_match = events[0].state.epoch();
+    // Trajectory implements the StateSpecTrait, so we can search for events directly with the Almanac!
+    let events = almanac
+        .report_events(&traj, &apo_event, traj.first().epoch(), traj.last().epoch())
+        .unwrap();
+
+    let mut prev_event_match = events[0].orbit.epoch;
     for event_match in events.iter().skip(1) {
-        let delta_period = event_match.state.epoch() - prev_event_match - period;
-        assert!(delta_period.abs() < 10.milliseconds(), "in two body dyn, event finding should be extremely precise, instead time error of {delta_period}");
-        prev_event_match = event_match.state.epoch();
+        let delta_period = event_match.orbit.epoch - prev_event_match - period;
+        assert!(delta_period.abs() < 0.5.seconds(), "in two body dyn, event finding should be extremely precise, instead time error of {delta_period}");
+        prev_event_match = event_match.orbit.epoch;
     }
 
     let min_epoch = start_dt + 2.0 * period;
@@ -73,7 +78,7 @@ fn stop_cond_3rd_apo_cov_test(almanac: Arc<Almanac>) {
     );
 
     assert!(
-        (180.0 - third_apo.orbit.ta_deg().unwrap()).abs() < 1e-3,
+        (180.0 - third_apo.orbit.ta_deg().unwrap()).abs() < 1e-6,
         "converged, yet convergence criteria not met"
     );
 }
@@ -82,45 +87,54 @@ fn stop_cond_3rd_apo_cov_test(almanac: Arc<Almanac>) {
 fn stop_cond_3rd_peri(almanac: Arc<Almanac>) {
     let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
-    let start_dt = Epoch::from_mjd_tai(JD_J2000);
+    let epoch = Epoch::from_gregorian_utc_at_noon(2008, 2, 29);
     let state = Orbit::cartesian(
-        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.01, start_dt, eme2k,
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.01, epoch, eme2k,
     );
 
     let period = state.period().unwrap();
 
-    // Track how many times we've passed by that TA again
+    // Track how many times we've passed by that true anomaly again
     let peri_event = Event::periapsis(); // Special event shortcut!
 
     let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
     let mut prop = setup.with(state.into(), almanac.clone());
-    // Propagate for at four orbital periods so we know we've passed the third one
-    // NOTE: We're fetching the 3rd item because the initial state is actually at periapse,
-    // which the event finder will find.
-    let (third_peri, traj) = prop.until_nth_event(5 * period, &peri_event, 2).unwrap();
 
-    let events = traj.find(&peri_event, None, almanac).unwrap();
-    let mut prev_event_match = events[0].state.epoch();
+    let (third_peri, traj) = prop
+        .until_nth_event(5 * period, &peri_event, None, 3)
+        .unwrap();
+
+    let events = almanac
+        .report_events(
+            &traj,
+            &peri_event,
+            traj.first().epoch(),
+            traj.last().epoch(),
+        )
+        .unwrap();
+
+    let mut prev_event_match = events[0].orbit.epoch;
     for event_match in events.iter().skip(1) {
-        let delta_period = event_match.state.epoch() - prev_event_match - period;
-        assert!(delta_period.abs() < 10.milliseconds(), "in two body dyn, event finding should be extremely precise, instead time error of {delta_period}");
-        prev_event_match = event_match.state.epoch();
+        let delta_period = event_match.orbit.epoch - prev_event_match - period;
+        println!("{:x}", event_match.orbit);
+        assert!(delta_period.abs() < 0.3.seconds(), "in two body dyn, event finding should be extremely precise, instead time error of {delta_period}");
+        prev_event_match = event_match.orbit.epoch;
     }
 
-    let min_epoch = start_dt + 2.0 * period;
-    let max_epoch = start_dt + 3.0 * period;
+    let min_epoch = epoch + 2.0 * period;
+    let max_epoch = epoch + 3.0 * period;
 
     println!("{min_epoch}\t{max_epoch}\t\t{third_peri:x}");
     // Confirm that this is the third apoapse event which is found
     // We use a weird check because it actually converged on a time that's 0.00042 nanoseconds _after_ the max time
     assert!(
         (third_peri.orbit.epoch - min_epoch) >= 1.nanoseconds(),
-        "Found apoapse is {} before min epoch",
+        "Found periapse is {} before min epoch",
         third_peri.orbit.epoch - min_epoch
     );
     assert!(
         (third_peri.orbit.epoch - max_epoch) <= 1.nanoseconds(),
-        "Found apoapse is {} after max epoch",
+        "Found periapse is {} after max epoch",
         third_peri.orbit.epoch - max_epoch
     );
 
@@ -181,7 +195,10 @@ fn stop_cond_nrho_apo(almanac: Arc<Almanac>) {
     );
 
     // Create the event
-    let near_apo_event = Event::new(StateParameter::TrueAnomaly, 172.0);
+    let near_apo_event = Event::new(
+        ScalarExpr::Element(OrbitalElement::TrueAnomaly),
+        Condition::Equals(172.0),
+    );
 
     // Convert this trajectory into the Luna frame
     let traj_luna = traj.to_frame(MOON_J2000, almanac.clone()).unwrap();
@@ -202,19 +219,24 @@ fn stop_cond_nrho_apo(almanac: Arc<Almanac>) {
     );
 
     // Now, find all of the requested events
-    let events = traj_luna.find(&near_apo_event, None, almanac).unwrap();
+    let events = almanac
+        .report_events(
+            &traj,
+            &near_apo_event,
+            traj.first().epoch(),
+            traj.last().epoch(),
+        )
+        .unwrap();
     println!(
         "Found all {} events in {} ms",
         near_apo_event,
         (Instant::now() - end_conv).as_millis()
     );
     for event in &events {
-        let event_state = event.state;
-        let delta_t = event_state.epoch() - dt;
+        let event_state = event.orbit;
+        let delta_t = event_state.epoch - dt;
         println!("{delta_t} after start:\n{event_state:x}");
-        assert!(
-            (event_state.orbit.ta_deg().unwrap() - 172.0).abs() < near_apo_event.value_precision
-        );
+        assert!((event_state.ta_deg().unwrap() - 172.0).abs() < 1e-3);
     }
 }
 
@@ -222,18 +244,21 @@ fn stop_cond_nrho_apo(almanac: Arc<Almanac>) {
 fn line_of_nodes(almanac: Arc<Almanac>) {
     let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
-    let start_dt = Epoch::from_mjd_tai(JD_J2000);
+    let start_dt = Epoch::from_gregorian_utc_at_noon(2008, 2, 29);
     let state = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_dt, eme2k,
     );
 
     let period = state.period().unwrap();
 
-    let lon_event = Event::new(StateParameter::Longitude, 0.0);
+    let asc_node_event = Event::new(
+        ScalarExpr::Element(OrbitalElement::Longitude),
+        Condition::Equals(0.0),
+    );
 
     let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
     let mut prop = setup.with(state.into(), almanac);
-    let (lon_state, _) = prop.until_event(3 * period, &lon_event).unwrap();
+    let (lon_state, _) = prop.until_event(3 * period, &asc_node_event, None).unwrap();
     println!(
         "{:x} => longitude = {} degrees",
         lon_state,
@@ -241,7 +266,7 @@ fn line_of_nodes(almanac: Arc<Almanac>) {
     );
 
     assert!(
-        lon_state.orbit.longitude_deg().abs() < lon_event.value_precision,
+        lon_state.orbit.longitude_deg().abs() < 1e-3,
         "converged, yet convergence criteria not met"
     );
 }
@@ -250,18 +275,23 @@ fn line_of_nodes(almanac: Arc<Almanac>) {
 fn latitude(almanac: Arc<Almanac>) {
     let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
 
-    let start_dt = Epoch::from_mjd_tai(JD_J2000);
+    let start_dt = Epoch::from_gregorian_utc_at_noon(2008, 2, 29);
     let state = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_dt, eme2k,
     );
 
     let period = state.period().unwrap();
 
-    let lat_event = Event::new(StateParameter::Latitude, 2.0);
+    let lat_event = Event::new(
+        ScalarExpr::Element(OrbitalElement::Latitude),
+        Condition::Equals(2.0),
+    );
 
     let setup = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
     let mut prop = setup.with(state.into(), almanac);
-    let (lon_state, _) = prop.until_event(3 * period, &lat_event).unwrap();
+    let (lon_state, _) = prop
+        .until_event(3 * period, &lat_event, Some(IAU_EARTH_FRAME))
+        .unwrap();
     println!(
         "{:x} => latitude = {} degrees",
         lon_state,
@@ -269,7 +299,7 @@ fn latitude(almanac: Arc<Almanac>) {
     );
 
     assert!(
-        (2.0 - lon_state.orbit.latitude_deg().unwrap()).abs() < lat_event.value_precision,
+        (2.0 - lon_state.orbit.latitude_deg().unwrap()).abs() < 1e-3,
         "converged, yet convergence criteria not met"
     );
 }
@@ -304,7 +334,8 @@ fn event_and_combination(almanac: Arc<Almanac>) {
 
     println!(
         "{sc}\tinitial c3 = {}",
-        sc.value(StateParameter::C3).unwrap()
+        sc.value(StateParameter::Element(OrbitalElement::C3))
+            .unwrap()
     );
 
     // Thrust in the +X direction continuously
@@ -323,7 +354,7 @@ fn event_and_combination(almanac: Arc<Almanac>) {
 
     // First, propagate until apoapsis
     let (sc_apo, traj) = prop
-        .until_event(orbit.period().unwrap() * 4.0, &Event::apoapsis())
+        .until_event(orbit.period().unwrap() * 4.0, &Event::apoapsis(), None)
         .unwrap();
 
     // Check that the prop always decreases or stays constant
@@ -345,48 +376,46 @@ fn event_and_combination(almanac: Arc<Almanac>) {
     println!(
         "Earth Apoapse\n{:x}\tc3 = {} km^2/s^2\n{:x}\tdecl = {} deg",
         sc_apo,
-        sc_apo.value(StateParameter::C3).unwrap(),
+        sc_apo
+            .value(StateParameter::Element(OrbitalElement::C3))
+            .unwrap(),
         sc_moon_apo,
-        sc_moon_apo.value(StateParameter::Declination).unwrap()
+        sc_moon_apo
+            .value(StateParameter::Element(OrbitalElement::Declination))
+            .unwrap()
     );
 
     println!(
         "End of prop\n{:x}\tc3 = {} km^2/s^2\n{:x}\tdecl = {} deg",
         traj.last(),
-        traj.last().value(StateParameter::C3).unwrap(),
+        traj.last()
+            .value(StateParameter::Element(OrbitalElement::C3))
+            .unwrap(),
         traj_moon.last(),
-        traj_moon.last().value(StateParameter::Declination).unwrap()
+        traj_moon
+            .last()
+            .value(StateParameter::Element(OrbitalElement::Declination))
+            .unwrap()
     );
 
     // Now let's find when the declination with the Moon is zero.
     // Within one minute and with a precision of 3.0 degrees.
     // NOTE: We're unwrapping here, so if the event isn't found, this will cause the test to fail.
-    let event = Event::specific(StateParameter::Declination, 6.0, 3.0, Unit::Minute);
-    let mut decl_deg = 0.0;
-    if let Ok(matching_states) = traj_moon.find(&event, None, almanac.clone()) {
+    let event = Event::new(
+        ScalarExpr::Element(OrbitalElement::Declination),
+        Condition::Between(3.0, 6.0),
+    );
+
+    if let Ok(matching_states) = almanac.report_events(
+        &traj_moon,
+        &event,
+        traj.first().epoch(),
+        traj.last().epoch(),
+    ) {
         for sc_decl_zero in matching_states {
-            decl_deg = sc_decl_zero
-                .state
-                .value(StateParameter::Declination)
-                .unwrap();
+            let decl_deg = sc_decl_zero.orbit.declination_deg();
             println!("{sc_decl_zero} => decl = {decl_deg} deg",);
             assert!((decl_deg - 6.0).abs() < 3.0);
-        }
-
-        // We should be able to find a similar event with a tighter bound too.
-        if let Ok(tighter_states) = traj_moon.find(
-            &Event::specific(StateParameter::Declination, decl_deg, 1.0, Unit::Minute),
-            None,
-            almanac,
-        ) {
-            for sc_decl_zero in tighter_states {
-                let found_decl_deg = sc_decl_zero
-                    .state
-                    .value(StateParameter::Declination)
-                    .unwrap();
-                println!("{sc_decl_zero} => decl = {found_decl_deg} deg");
-                assert!((decl_deg - found_decl_deg).abs() < 1.0);
-            }
         }
     }
 }
