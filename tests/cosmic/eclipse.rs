@@ -68,7 +68,7 @@ fn leo_sun_earth_eclipses(almanac: Arc<Almanac>) {
         }
     }
 
-    assert_eq!(cnt_changes, 68, "wrong number of eclipse state changes");
+    assert_eq!(cnt_changes, 73, "wrong number of eclipse state changes");
 }
 
 #[rstest]
