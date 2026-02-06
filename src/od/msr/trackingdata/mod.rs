@@ -28,6 +28,9 @@ use std::ops::{Add, AddAssign, RangeBounds};
 mod io_ccsds_tdm;
 mod io_parquet;
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
 /// Tracking data storing all of measurements as a B-Tree.
 /// It inherently does NOT support multiple concurrent measurements from several trackers.
 ///
@@ -69,6 +72,7 @@ mod io_parquet;
 /// Reference: JPL DESCANSO, document 214, _Pseudo-Noise and Regenerative Ranging_.
 ///
 #[derive(Clone, Default)]
+#[cfg_attr(feature = "python", pyclass)]
 pub struct TrackingDataArc {
     /// All measurements in this data arc
     pub measurements: BTreeMap<Epoch, Measurement>, // BUG: Consider a map of tracking to epoch!

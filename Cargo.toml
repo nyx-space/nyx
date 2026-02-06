@@ -65,11 +65,14 @@ snafu = { version = "0.8.3", features = ["backtrace"] }
 serde_dhall = "0.13"
 indexmap = { version = "2.6.0", features = ["serde"] }
 statrs = "0.18.0"
+# Optional dependencies
+pyo3 = {version = "0.27.0", optional = true}
 
 [features]
 default = ["premium"]
 # Premium feature is NOT available to most commercial entities. Refer to the README.
 premium = []
+python = ["pyo3"]
 
 [dev-dependencies]
 polars = { version = "0.51.0", features = ["parquet"] }
