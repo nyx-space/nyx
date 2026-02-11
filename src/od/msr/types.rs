@@ -26,7 +26,7 @@ use crate::{io::InputOutputError, od::ODError};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 
-#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyclass, pyo3(module = "nyx_space.od"))]
 #[derive(Copy, Clone, Debug, Hash, Serialize, Deserialize, PartialEq, Eq)]
 pub enum MeasurementType {
     #[serde(rename = "range_km")]

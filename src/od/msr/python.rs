@@ -16,14 +16,31 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub mod measurement;
-pub mod sensitivity;
-mod trackingdata;
-mod types;
+use pyo3::pymethods;
 
-pub use measurement::Measurement;
-pub use trackingdata::TrackingDataArc;
-pub use types::MeasurementType;
+use crate::od::msr::MeasurementType;
 
-#[cfg(feature = "python")]
-mod python;
+use super::Measurement;
+use hifitime::Epoch;
+
+#[pymethods]
+impl Measurement {
+    #[new]
+    fn py_new(tracker: String, epoch: Epoch) -> Self {
+        Self::new(tracker, epoch)
+    }
+
+    /// Returns the floating point value of this observation if this measurement contains the provided measurement type
+    #[pyo3(name = "observation")]
+    fn py_observation(&self, msr_type: MeasurementType) -> Option<f64> {
+        self.data.get(&msr_type).copied()
+    }
+
+    fn __str__(&self) -> String {
+        format!("{self}")
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self} @ {self:p}")
+    }
+}

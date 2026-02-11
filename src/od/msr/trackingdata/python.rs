@@ -16,14 +16,30 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::{MeasurementType, TrackingDataArc};
+use super::{Measurement, MeasurementType, TrackingDataArc};
 use crate::io::{ExportCfg, InputOutputError};
+use hifitime::Epoch;
 use pyo3::prelude::*;
 use pyo3::types::PyType;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 #[pymethods]
 impl TrackingDataArc {
+    #[new]
+    fn py_new(msrs: HashMap<Epoch, Measurement>) -> Self {
+        let mut measurements = BTreeMap::new();
+        for (epoch, msr) in msrs.iter() {
+            measurements.insert(*epoch, msr.clone());
+        }
+
+        Self {
+            measurements,
+            source: None,
+            moduli: None,
+            force_reject: false,
+        }
+    }
+
     /// Initializes a new Almanac from a file path to CCSDS OEM file, after converting to to SPICE SPK/BSP
     ///
     /// :type path: str
@@ -65,5 +81,19 @@ impl TrackingDataArc {
 
     fn __str__(&self) -> String {
         format!("{self}")
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self} @ {self:p}")
+    }
+
+    #[getter]
+    fn get_force_reject(&self) -> bool {
+        self.force_reject
+    }
+
+    #[setter]
+    fn set_force_reject(&mut self, reject: bool) {
+        self.force_reject = reject;
     }
 }
