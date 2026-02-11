@@ -66,13 +66,13 @@ serde_dhall = "0.13"
 indexmap = { version = "2.6.0", features = ["serde"] }
 statrs = "0.18.0"
 # Optional dependencies
-pyo3 = {version = "0.27.0", optional = true}
+pyo3 = { version = "0.27", features = ["multiple-pymethods"], optional = true }
 
 [features]
 default = ["premium"]
 # Premium feature is NOT available to most commercial entities. Refer to the README.
 premium = []
-python = ["pyo3"]
+python = ["pyo3", "hifitime/python", "anise/python"]
 
 [dev-dependencies]
 polars = { version = "0.51.0", features = ["parquet"] }

@@ -72,6 +72,9 @@ pub mod linalg {
     pub use nalgebra::base::*;
 }
 
+#[cfg(feature = "python")]
+mod python;
+
 /// Re-export some useful things
 pub use self::cosmic::{Orbit, Spacecraft, State, TimeTagged};
 

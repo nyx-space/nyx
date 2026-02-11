@@ -19,6 +19,7 @@
 use super::MeasurementType;
 use hifitime::Epoch;
 use indexmap::{IndexMap, IndexSet};
+use log::debug;
 use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, OVector};
 use std::fmt;
 
@@ -80,6 +81,15 @@ impl Measurement {
             }
         }
         rtn
+    }
+
+    /// Correct the provided measurement type with the provided correction, if that measurement type is available
+    pub fn correct(&mut self, msr_type: MeasurementType, correction: f64) {
+        if let Some(cur_value) = self.data.get_mut(&msr_type) {
+            let new_value = *cur_value + correction;
+            debug!("corrected {msr_type:?} from {cur_value} to {new_value}");
+            *cur_value = new_value;
+        }
     }
 }
 

@@ -23,6 +23,10 @@ use std::{collections::HashMap, str::FromStr};
 
 use crate::{io::InputOutputError, od::ODError};
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
+#[cfg_attr(feature = "python", pyclass)]
 #[derive(Copy, Clone, Debug, Hash, Serialize, Deserialize, PartialEq, Eq)]
 pub enum MeasurementType {
     #[serde(rename = "range_km")]
@@ -116,6 +120,18 @@ impl MeasurementType {
             Self::ReceiveFrequency | Self::TransmitFrequency => Err(ODError::MeasurementSimError {
                 details: format!("{self:?} is only supported in CCSDS TDM parsing"),
             }),
+        }
+    }
+
+    /// Returns the CCSDS TDM name for this measurement type.
+    pub fn ccsds_tdm_name(&self) -> &str {
+        match self {
+            MeasurementType::Range => "RANGE",
+            MeasurementType::Doppler => "DOPPLER_INTEGRATED",
+            MeasurementType::Azimuth => "ANGLE_1",
+            MeasurementType::Elevation => "ANGLE_2",
+            MeasurementType::ReceiveFrequency => "RECEIVE_FREQ",
+            MeasurementType::TransmitFrequency => "TRANSMIT_FREQ",
         }
     }
 }

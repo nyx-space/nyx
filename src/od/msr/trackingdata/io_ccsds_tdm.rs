@@ -218,14 +218,53 @@ impl TrackingDataArc {
             drop_freq_data = true;
         }
 
+        let corrections_applied = if let Some(corr_flag) = metadata.get("CORRECTIONS_APPLIED") {
+            match corr_flag.trim().to_lowercase().as_str() {
+                "no" => false,
+                "yes" => true,
+                _ => {
+                    warn!("invalid CORRECTIONS_APPLIED `{corr_flag}`");
+                    true
+                }
+            }
+        } else {
+            true
+        };
+
         // Now, let's convert the receive and transmit frequencies to Doppler measurements in velocity units.
         // We expect the transmit and receive frequencies to have the exact same timestamp.
         let mut freq_types = IndexSet::new();
         freq_types.insert(MeasurementType::ReceiveFrequency);
         freq_types.insert(MeasurementType::TransmitFrequency);
+
         let mut latest_transmit_freq = None;
         let mut malformed_warning = 0;
+
+        let mut all_applied_corrections = IndexSet::new();
+
         for (epoch, measurement) in measurements.iter_mut() {
+            // Apply corrections if any
+            if !corrections_applied {
+                for msr_type in [
+                    MeasurementType::Range,
+                    MeasurementType::Doppler,
+                    MeasurementType::Azimuth,
+                    MeasurementType::Elevation,
+                    MeasurementType::ReceiveFrequency,
+                    MeasurementType::TransmitFrequency,
+                ] {
+                    let kw = format!("CORRECTION_{}", msr_type.ccsds_tdm_name());
+                    if let Some(correction_str) = metadata.get(&kw) {
+                        if let Ok(correction) = correction_str.parse::<f64>() {
+                            measurement.correct(msr_type, correction);
+                            all_applied_corrections.insert(msr_type);
+                        } else {
+                            warn!("invalid correction value for {kw}");
+                        }
+                    }
+                }
+            }
+
             if drop_freq_data {
                 for freq in &freq_types {
                     measurement.data.swap_remove(freq);
@@ -304,6 +343,10 @@ impl TrackingDataArc {
 
         if malformed_warning > 1 {
             warn!("missing transmit frequency warning occured {malformed_warning} times",);
+        }
+
+        if !all_applied_corrections.is_empty() {
+            info!("applied corrections for {all_applied_corrections:?}");
         }
 
         let moduli = if let Some(range_modulus) = metadata.get("RANGE_MODULUS") {
@@ -515,19 +558,11 @@ impl TrackingDataArc {
                         if !types.contains(mtype) {
                             continue;
                         }
-                        let type_str = match mtype {
-                            MeasurementType::Range => "RANGE",
-                            MeasurementType::Doppler => "DOPPLER_INTEGRATED",
-                            MeasurementType::Azimuth => "ANGLE_1",
-                            MeasurementType::Elevation => "ANGLE_2",
-                            MeasurementType::ReceiveFrequency => "RECEIVE_FREQ",
-                            MeasurementType::TransmitFrequency => "TRANSMIT_FREQ",
-                        };
 
                         writeln!(
                             writer,
                             "\t{:<20} = {:<23}\t{:.12}",
-                            type_str,
+                            mtype.ccsds_tdm_name(),
                             Formatter::new(*epoch, iso8601_no_ts),
                             value * multiplier
                         )
