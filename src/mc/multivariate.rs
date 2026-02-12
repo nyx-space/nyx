@@ -29,8 +29,12 @@ use rand_distr::{Distribution, Normal};
 use snafu::ResultExt;
 use std::error::Error;
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
 /// A multivariate spacecraft state generator for Monte Carlo analyses. Ensures that the covariance is properly applied on all provided state variables.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "python", pyclass)]
 pub struct MvnSpacecraft {
     /// The template state
     pub template: Spacecraft,
