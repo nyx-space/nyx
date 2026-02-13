@@ -43,7 +43,7 @@ serde = "1.0"
 serde_derive = "1.0"
 hyperdual = "1.4.0"
 rand = "0.10"
-rand_distr = "0.5"
+rand_distr = "0.6"
 regex = "1.5"
 rayon = "1.6"
 approx = "0.5"
@@ -76,7 +76,7 @@ polars = { version = "0.51.0", features = ["parquet"] }
 rstest = "0.26.1"
 pretty_env_logger = "0.5"
 toml = "0.9.0"
-serde_arrow = {version = "0.13", features = ["arrow-56"]}
+serde_arrow = {version = "0.13", features = ["arrow-57"]}
 
 [build-dependencies]
 shadow-rs = "1.0.1"

@@ -26,6 +26,7 @@ use anise::analysis::prelude::OrbitalElement;
 use anise::astro::orbit_gradient::OrbitGrad;
 use nalgebra::Const;
 use nalgebra::SMatrix;
+use rand::rngs::SysRng;
 use rand::SeedableRng;
 use rand_distr::Distribution;
 use rand_pcg::Pcg64Mcg;
@@ -113,7 +114,7 @@ impl KfEstimate<Spacecraft> {
 
         let mut rng = match seed {
             Some(seed) => Pcg64Mcg::new(seed),
-            None => Pcg64Mcg::from_os_rng(),
+            None => Pcg64Mcg::try_from_rng(&mut SysRng::default()).unwrap(),
         };
         let dispersed_state = generator.sample(&mut rng);
 

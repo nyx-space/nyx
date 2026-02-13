@@ -19,7 +19,7 @@
 use crate::io::{ConfigError, ConfigRepr};
 use hifitime::{Duration, Epoch, TimeUnits};
 
-use rand::Rng;
+use rand::{Rng, RngExt};
 use rand_distr::Normal;
 use serde_derive::{Deserialize, Serialize};
 use std::fmt;

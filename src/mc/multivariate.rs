@@ -316,7 +316,7 @@ mod multivariate_ut {
     use crate::GMAT_EARTH_GM;
     use anise::constants::frames::EARTH_J2000;
     use anise::prelude::Orbit;
-    use rand::Rng;
+    use rand::RngExt;
     use statrs;
     use statrs::distribution::ContinuousCDF;
 
