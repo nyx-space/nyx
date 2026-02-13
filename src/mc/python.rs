@@ -48,17 +48,8 @@ impl MvnSpacecraft {
             return Err(PyValueError::new_err("Mean vector must be length 9"));
         }
 
-        let mut cov_mat = SMatrix::<f64, 9, 9>::zeros();
-        for (i, row) in cov.iter().enumerate() {
-            for (j, val) in row.iter().enumerate() {
-                cov_mat[(i, j)] = *val;
-            }
-        }
-
-        let mut mean_vec = SVector::<f64, 9>::zeros();
-        for (i, val) in mean.iter().enumerate() {
-            mean_vec[i] = *val;
-        }
+        let cov_mat = SMatrix::<f64, 9, 9>::from_fn(|r, c| cov[r][c]);
+        let mean_vec = SVector::<f64, 9>::from_vec(mean);
 
         MvnSpacecraft::from_spacecraft_cov(template, cov_mat, mean_vec)
             .map_err(|e| PyValueError::new_err(e.to_string()))

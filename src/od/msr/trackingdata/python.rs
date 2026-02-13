@@ -100,14 +100,8 @@ impl TrackingDataArc {
 
     #[pyo3(name = "filter_by_epoch")]
     fn py_filter_by_epoch(&self, start: Option<Epoch>, end: Option<Epoch>) -> Self {
-        let start_bound = match start {
-            Some(s) => Included(s),
-            None => Unbounded,
-        };
-        let end_bound = match end {
-            Some(e) => Excluded(e),
-            None => Unbounded,
-        };
+        let start_bound = start.map(Included).unwrap_or(Unbounded);
+        let end_bound = end.map(Excluded).unwrap_or(Unbounded);
         self.clone().filter_by_epoch((start_bound, end_bound))
     }
 
