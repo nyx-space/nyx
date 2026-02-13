@@ -18,10 +18,11 @@
 
 use super::{Measurement, MeasurementType, TrackingDataArc};
 use crate::io::{ExportCfg, InputOutputError};
-use hifitime::Epoch;
+use hifitime::{Duration, Epoch};
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 use std::collections::{BTreeMap, HashMap};
+use std::ops::Bound::{Excluded, Included, Unbounded};
 
 #[pymethods]
 impl TrackingDataArc {
@@ -95,5 +96,68 @@ impl TrackingDataArc {
     #[setter]
     fn set_force_reject(&mut self, reject: bool) {
         self.force_reject = reject;
+    }
+
+    #[pyo3(name = "filter_by_epoch")]
+    fn py_filter_by_epoch(&self, start: Option<Epoch>, end: Option<Epoch>) -> Self {
+        let start_bound = start.map(Included).unwrap_or(Unbounded);
+        let end_bound = end.map(Excluded).unwrap_or(Unbounded);
+        self.clone().filter_by_epoch((start_bound, end_bound))
+    }
+
+    #[pyo3(name = "filter_by_offset")]
+    fn py_filter_by_offset(&self, start: Option<Duration>, end: Option<Duration>) -> Self {
+        let start_bound = match start {
+            Some(s) => Included(s),
+            None => Unbounded,
+        };
+        let end_bound = match end {
+            Some(e) => Excluded(e),
+            None => Unbounded,
+        };
+        self.clone().filter_by_offset((start_bound, end_bound))
+    }
+
+    #[pyo3(name = "filter_by_tracker")]
+    fn py_filter_by_tracker(&self, tracker: String) -> Self {
+        self.clone().filter_by_tracker(tracker)
+    }
+
+    #[pyo3(name = "filter_by_measurement_type")]
+    fn py_filter_by_measurement_type(&self, msr_type: MeasurementType) -> Self {
+        self.clone().filter_by_measurement_type(msr_type)
+    }
+
+    #[pyo3(name = "exclude_tracker")]
+    fn py_exclude_tracker(&self, tracker: String) -> Self {
+        self.clone().exclude_tracker(tracker)
+    }
+
+    #[pyo3(name = "exclude_by_epoch")]
+    fn py_exclude_by_epoch(&self, start: Option<Epoch>, end: Option<Epoch>) -> Self {
+        let start_bound = match start {
+            Some(s) => Included(s),
+            None => Unbounded,
+        };
+        let end_bound = match end {
+            Some(e) => Excluded(e),
+            None => Unbounded,
+        };
+        self.clone().exclude_by_epoch((start_bound, end_bound))
+    }
+
+    #[pyo3(name = "exclude_measurement_type")]
+    fn py_exclude_measurement_type(&self, msr_type: MeasurementType) -> Self {
+        self.clone().exclude_measurement_type(msr_type)
+    }
+
+    #[pyo3(name = "downsample")]
+    fn py_downsample(&self, step: Duration) -> Self {
+        self.clone().downsample(step)
+    }
+
+    #[pyo3(name = "resid_vs_ref_check")]
+    fn py_resid_vs_ref_check(&self) -> Self {
+        self.clone().resid_vs_ref_check()
     }
 }

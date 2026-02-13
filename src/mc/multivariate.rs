@@ -29,8 +29,12 @@ use rand_distr::{Distribution, Normal};
 use snafu::ResultExt;
 use std::error::Error;
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
 /// A multivariate spacecraft state generator for Monte Carlo analyses. Ensures that the covariance is properly applied on all provided state variables.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "python", pyclass)]
 pub struct MvnSpacecraft {
     /// The template state
     pub template: Spacecraft,
@@ -75,8 +79,6 @@ impl MvnSpacecraft {
             .filter(|disp| disp.param.is_orbital())
             .count();
 
-        dbg!(num_orbital);
-
         if num_orbital > 0 {
             // Build the rotation matrix from the orbital dispersions to the Cartesian state.
             let mut jac = DMatrix::from_element(num_orbital, 6, 0.0);
@@ -93,16 +95,14 @@ impl MvnSpacecraft {
                     orbit_dual.partial_for(oe).context(AstroPhysicsSnafu)?
                 } else if disp.param.is_b_plane() {
                     match disp.param {
-                        StateParameter::BdotR => b_plane.unwrap().b_r_km,
-                        StateParameter::BdotT => b_plane.unwrap().b_t_km,
-                        StateParameter::BLTOF => b_plane.unwrap().ltof_s,
+                        StateParameter::BdotR() => b_plane.unwrap().b_r_km,
+                        StateParameter::BdotT() => b_plane.unwrap().b_t_km,
+                        StateParameter::BLTOF() => b_plane.unwrap().ltof_s,
                         _ => unreachable!(),
                     }
                 } else {
                     unreachable!()
                 };
-
-                println!("{partial}");
 
                 for (cno, val) in [
                     partial.wrt_x(),
@@ -144,13 +144,13 @@ impl MvnSpacecraft {
                     continue;
                 } else {
                     match disp.param {
-                        StateParameter::Cr => {
+                        StateParameter::Cr() => {
                             cov[(7, 7)] = disp.mean.unwrap_or(0.0).powi(2);
                         }
-                        StateParameter::Cd => {
+                        StateParameter::Cd() => {
                             cov[(8, 8)] = disp.mean.unwrap_or(0.0).powi(2);
                         }
-                        StateParameter::DryMass | StateParameter::PropMass => {
+                        StateParameter::DryMass() | StateParameter::PropMass() => {
                             cov[(9, 9)] = disp.mean.unwrap_or(0.0).powi(2);
                         }
                         _ => return Err(Box::new(StateError::ReadOnly { param: disp.param })),
@@ -249,15 +249,15 @@ impl MvnSpacecraft {
                 .std_dev(cov[(5, 5)])
                 .build(),
             StateDispersion::builder()
-                .param(StateParameter::Cr)
+                .param(StateParameter::Cr())
                 .std_dev(cov[(6, 6)])
                 .build(),
             StateDispersion::builder()
-                .param(StateParameter::Cd)
+                .param(StateParameter::Cd())
                 .std_dev(cov[(7, 7)])
                 .build(),
             StateDispersion::builder()
-                .param(StateParameter::PropMass)
+                .param(StateParameter::PropMass())
                 .std_dev(cov[(8, 8)])
                 .build(),
         ];

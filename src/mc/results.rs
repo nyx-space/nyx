@@ -350,7 +350,7 @@ where
 
         // Add all of the fields
         for field in fields {
-            if field == StateParameter::GuidanceMode {
+            if field == StateParameter::GuidanceMode() {
                 let mut guid_mode = StringBuilder::new();
                 for s in &all_states {
                     guid_mode
