@@ -16,30 +16,29 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::md::StateParameter;
-use serde::{Deserialize, Serialize};
-use typed_builder::TypedBuilder;
-
-#[cfg(feature = "python")]
+use crate::cosmic::GuidanceMode;
+use crate::Spacecraft;
+use anise::prelude::Orbit;
+// use anise::structure::spacecraft::{DragData, Mass, SRPData};
 use pyo3::prelude::*;
 
-/// A dispersions configuration, allows specifying min/max bounds (by default, they are not set)
-#[derive(Copy, Clone, Debug, TypedBuilder, Serialize, Deserialize)]
-#[cfg_attr(feature = "python", pyclass)]
-pub struct StateDispersion {
-    pub param: StateParameter,
-    #[builder(default, setter(strip_option))]
-    pub mean: Option<f64>,
-    #[builder(default, setter(strip_option))]
-    pub std_dev: Option<f64>,
-}
-
-impl StateDispersion {
-    pub fn zero_mean(param: StateParameter, std_dev: f64) -> Self {
-        Self {
-            param,
-            std_dev: Some(std_dev),
-            mean: Some(0.0),
+#[pymethods]
+impl Spacecraft {
+    #[new]
+    fn py_new(
+        orbit: Orbit,
+        // TODO: Implement Python classes for all following elements
+        // mass: Option<Mass>,
+        // srp: Option<SRPData>,
+        // drag: Option<DragData>,
+        // thruster: Option<Thruster>,
+        mode: Option<GuidanceMode>,
+    ) -> Self {
+        let builder = Spacecraft::builder().orbit(orbit);
+        if let Some(mode) = mode {
+            builder.mode(mode).build()
+        } else {
+            builder.build()
         }
     }
 }

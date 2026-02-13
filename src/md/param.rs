@@ -23,35 +23,38 @@ use core::fmt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Common state parameters
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
+#[cfg_attr(feature = "python", pyclass)]
 #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum StateParameter {
     Element(OrbitalElement),
     /// B-Plane B⋅R
-    BdotR,
+    BdotR(),
     /// B-Plane B⋅T
-    BdotT,
+    BdotT(),
     /// B-Plane LTOF
-    BLTOF,
+    BLTOF(),
     /// Coefficient of drag
-    Cd,
+    Cd(),
     /// Coefficient of reflectivity
-    Cr,
+    Cr(),
     /// Dry mass (kg)
-    DryMass,
+    DryMass(),
     /// The epoch of the state
-    Epoch,
+    Epoch(),
     /// Return the guidance mode of the spacecraft
-    GuidanceMode,
+    GuidanceMode(),
     /// Specific impulse (isp) in seconds
-    Isp,
+    Isp(),
     /// prop mass in kilograms
-    PropMass,
+    PropMass(),
     /// Thrust (Newtons)
-    Thrust,
+    Thrust(),
     /// Total mass
-    TotalMass,
+    TotalMass(),
 }
 
 impl StateParameter {
@@ -65,17 +68,17 @@ impl StateParameter {
                     1e-3
                 }
             }
-            Self::BdotR | Self::BdotT => 1e-3,
+            Self::BdotR() | Self::BdotT() => 1e-3,
 
             // Special
-            Self::DryMass | Self::PropMass => 1e-3,
+            Self::DryMass() | Self::PropMass() => 1e-3,
             _ => unimplemented!("{self} cannot be used for targeting"),
         }
     }
 
     /// Returns whether this parameter is of the B-Plane kind
     pub const fn is_b_plane(&self) -> bool {
-        matches!(&self, Self::BdotR | Self::BdotT | Self::BLTOF)
+        matches!(&self, Self::BdotR() | Self::BdotT() | Self::BLTOF())
     }
 
     /// Returns whether this is an orbital parameter
@@ -87,24 +90,24 @@ impl StateParameter {
     pub const fn is_for_spacecraft(&self) -> bool {
         matches!(
             &self,
-            Self::DryMass
-                | Self::PropMass
-                | Self::Cr
-                | Self::Cd
-                | Self::Isp
-                | Self::GuidanceMode
-                | Self::Thrust
+            Self::DryMass()
+                | Self::PropMass()
+                | Self::Cr()
+                | Self::Cd()
+                | Self::Isp()
+                | Self::GuidanceMode()
+                | Self::Thrust()
         )
     }
 
     pub const fn unit(&self) -> &'static str {
         match self {
             Self::Element(e) => e.unit(),
-            Self::BdotR | Self::BdotT => "km",
+            Self::BdotR() | Self::BdotT() => "km",
 
-            Self::DryMass | Self::PropMass => "kg",
-            Self::Isp => "isp",
-            Self::Thrust => "N",
+            Self::DryMass() | Self::PropMass() => "kg",
+            Self::Isp() => "isp",
+            Self::Thrust() => "N",
             _ => "",
         }
     }
@@ -137,7 +140,7 @@ impl StateParameter {
             } else {
                 format!("{self}")
             },
-            if self == Self::GuidanceMode {
+            if self == Self::GuidanceMode() {
                 DataType::Utf8
             } else {
                 DataType::Float64
@@ -152,18 +155,18 @@ impl fmt::Display for StateParameter {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let repr = match *self {
             Self::Element(e) => return write!(f, "{e}"),
-            Self::BLTOF => "BLToF",
-            Self::BdotR => "BdotR",
-            Self::BdotT => "BdotT",
-            Self::Cd => "cd",
-            Self::Cr => "cr",
-            Self::DryMass => "dry_mass",
-            Self::Epoch => "epoch",
-            Self::GuidanceMode => "guidance_mode",
-            Self::Isp => "isp",
-            Self::PropMass => "prop_mass",
-            Self::Thrust => "thrust",
-            Self::TotalMass => "total_mass",
+            Self::BLTOF() => "BLToF",
+            Self::BdotR() => "BdotR",
+            Self::BdotT() => "BdotT",
+            Self::Cd() => "cd",
+            Self::Cr() => "cr",
+            Self::DryMass() => "dry_mass",
+            Self::Epoch() => "epoch",
+            Self::GuidanceMode() => "guidance_mode",
+            Self::Isp() => "isp",
+            Self::PropMass() => "prop_mass",
+            Self::Thrust() => "thrust",
+            Self::TotalMass() => "total_mass",
         };
         let unit = if self.unit().is_empty() {
             String::new()

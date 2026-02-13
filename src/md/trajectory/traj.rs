@@ -288,7 +288,7 @@ where
 
         // Add all of the fields
         for field in fields {
-            if field == StateParameter::GuidanceMode {
+            if field == StateParameter::GuidanceMode() {
                 let mut guid_mode = StringBuilder::new();
                 for s in &states {
                     guid_mode
@@ -446,7 +446,7 @@ where
 
         // Remove disallowed field and check that we can retrieve this information
         fields.retain(|param| {
-            param != &StateParameter::GuidanceMode && self.first().value(*param).is_ok()
+            param != &StateParameter::GuidanceMode() && self.first().value(*param).is_ok()
         });
 
         for field in &fields {

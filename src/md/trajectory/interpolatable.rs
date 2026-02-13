@@ -128,13 +128,13 @@ impl Interpolatable for Spacecraft {
             StateParameter::Element(OrbitalElement::TrueAnomaly),
             StateParameter::Element(OrbitalElement::AoL),
             StateParameter::Element(OrbitalElement::TrueLongitude),
-            StateParameter::DryMass,
-            StateParameter::PropMass,
-            StateParameter::Cr,
-            StateParameter::Cd,
-            StateParameter::Isp,
-            StateParameter::GuidanceMode,
-            StateParameter::Thrust,
+            StateParameter::DryMass(),
+            StateParameter::PropMass(),
+            StateParameter::Cr(),
+            StateParameter::Cd(),
+            StateParameter::Isp(),
+            StateParameter::GuidanceMode(),
+            StateParameter::Thrust(),
         ]
     }
 }

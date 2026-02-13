@@ -30,6 +30,9 @@ use crate::md::StateParameter;
 use snafu::Snafu;
 use std::fmt;
 
+#[cfg(feature = "python")]
+mod nyx_python;
+
 /// A trait allowing for something to have an epoch
 pub trait TimeTagged {
     /// Retrieve the Epoch
