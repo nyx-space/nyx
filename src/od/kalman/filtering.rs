@@ -72,7 +72,7 @@ where
                         .dcm_to_inertial(nominal_state.orbit())
                         .context(AstroPhysicsSnafu)
                         .context(StateAstroSnafu {
-                            param: StateParameter::Epoch,
+                            param: StateParameter::Epoch(),
                         })
                         .context(ODStateSnafu {
                             action: "rotating SNC from definition frame into state frame",
@@ -207,7 +207,7 @@ where
                         .dcm_to_inertial(nominal_state.orbit())
                         .context(AstroPhysicsSnafu)
                         .context(StateAstroSnafu {
-                            param: StateParameter::Epoch,
+                            param: StateParameter::Epoch(),
                         })
                         .context(ODStateSnafu {
                             action: "rotating SNC from definition frame into state frame",

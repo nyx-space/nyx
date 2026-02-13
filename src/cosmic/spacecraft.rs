@@ -456,33 +456,33 @@ impl State for Spacecraft {
 
     fn value(&self, param: StateParameter) -> Result<f64, StateError> {
         match param {
-            StateParameter::Cd => Ok(self.drag.coeff_drag),
-            StateParameter::Cr => Ok(self.srp.coeff_reflectivity),
-            StateParameter::DryMass => Ok(self.mass.dry_mass_kg),
-            StateParameter::PropMass => Ok(self.mass.prop_mass_kg),
-            StateParameter::TotalMass => Ok(self.mass.total_mass_kg()),
-            StateParameter::Isp => match self.thruster {
+            StateParameter::Cd() => Ok(self.drag.coeff_drag),
+            StateParameter::Cr() => Ok(self.srp.coeff_reflectivity),
+            StateParameter::DryMass() => Ok(self.mass.dry_mass_kg),
+            StateParameter::PropMass() => Ok(self.mass.prop_mass_kg),
+            StateParameter::TotalMass() => Ok(self.mass.total_mass_kg()),
+            StateParameter::Isp() => match self.thruster {
                 Some(thruster) => Ok(thruster.isp_s),
                 None => Err(StateError::NoThrusterAvail),
             },
-            StateParameter::Thrust => match self.thruster {
+            StateParameter::Thrust() => match self.thruster {
                 Some(thruster) => Ok(thruster.thrust_N),
                 None => Err(StateError::NoThrusterAvail),
             },
-            StateParameter::GuidanceMode => Ok(self.mode.into()),
+            StateParameter::GuidanceMode() => Ok(self.mode.into()),
             StateParameter::Element(e) => e
                 .evaluate(self.orbit)
                 .context(AstroAnalysisSnafu)
                 .context(StateAstroSnafu { param }),
-            StateParameter::BdotR => Ok(BPlane::new(self.orbit)
+            StateParameter::BdotR() => Ok(BPlane::new(self.orbit)
                 .context(StateAstroSnafu { param })?
                 .b_r_km
                 .real()),
-            StateParameter::BdotT => Ok(BPlane::new(self.orbit)
+            StateParameter::BdotT() => Ok(BPlane::new(self.orbit)
                 .context(StateAstroSnafu { param })?
                 .b_t_km
                 .real()),
-            StateParameter::BLTOF => Ok(BPlane::new(self.orbit)
+            StateParameter::BLTOF() => Ok(BPlane::new(self.orbit)
                 .context(StateAstroSnafu { param })?
                 .ltof_s
                 .real()),
@@ -492,15 +492,15 @@ impl State for Spacecraft {
 
     fn set_value(&mut self, param: StateParameter, val: f64) -> Result<(), StateError> {
         match param {
-            StateParameter::Cd => self.drag.coeff_drag = val,
-            StateParameter::Cr => self.srp.coeff_reflectivity = val,
-            StateParameter::PropMass => self.mass.prop_mass_kg = val,
-            StateParameter::DryMass => self.mass.dry_mass_kg = val,
-            StateParameter::Isp => match self.thruster {
+            StateParameter::Cd() => self.drag.coeff_drag = val,
+            StateParameter::Cr() => self.srp.coeff_reflectivity = val,
+            StateParameter::PropMass() => self.mass.prop_mass_kg = val,
+            StateParameter::DryMass() => self.mass.dry_mass_kg = val,
+            StateParameter::Isp() => match self.thruster {
                 Some(ref mut thruster) => thruster.isp_s = val,
                 None => return Err(StateError::NoThrusterAvail),
             },
-            StateParameter::Thrust => match self.thruster {
+            StateParameter::Thrust() => match self.thruster {
                 Some(ref mut thruster) => thruster.thrust_N = val,
                 None => return Err(StateError::NoThrusterAvail),
             },

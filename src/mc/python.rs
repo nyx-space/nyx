@@ -19,43 +19,10 @@
 use super::{MvnSpacecraft, StateDispersion};
 use crate::md::StateParameter;
 use crate::Spacecraft;
-use anise::analysis::prelude::OrbitalElement;
 use nalgebra::{SMatrix, SVector};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyType;
-
-fn parse_state_parameter(name: &str) -> PyResult<StateParameter> {
-    match name.to_lowercase().as_str() {
-        "x" => Ok(StateParameter::Element(OrbitalElement::X)),
-        "y" => Ok(StateParameter::Element(OrbitalElement::Y)),
-        "z" => Ok(StateParameter::Element(OrbitalElement::Z)),
-        "vx" => Ok(StateParameter::Element(OrbitalElement::VX)),
-        "vy" => Ok(StateParameter::Element(OrbitalElement::VY)),
-        "vz" => Ok(StateParameter::Element(OrbitalElement::VZ)),
-        "sma" | "semimajoraxis" => Ok(StateParameter::Element(OrbitalElement::SemiMajorAxis)),
-        "ecc" | "eccentricity" => Ok(StateParameter::Element(OrbitalElement::Eccentricity)),
-        "inc" | "inclination" => Ok(StateParameter::Element(OrbitalElement::Inclination)),
-        "raan" => Ok(StateParameter::Element(OrbitalElement::RAAN)),
-        "aop" | "argumentofperiapsis" => Ok(StateParameter::Element(OrbitalElement::AoP)),
-        "ta" | "trueanomaly" => Ok(StateParameter::Element(OrbitalElement::TrueAnomaly)),
-        "rmag" => Ok(StateParameter::Element(OrbitalElement::Rmag)),
-        "vmag" => Ok(StateParameter::Element(OrbitalElement::Vmag)),
-        "cr" => Ok(StateParameter::Cr),
-        "cd" => Ok(StateParameter::Cd),
-        "drymass" => Ok(StateParameter::DryMass),
-        "propmass" => Ok(StateParameter::PropMass),
-        "totalmass" => Ok(StateParameter::TotalMass),
-        "isp" => Ok(StateParameter::Isp),
-        "thrust" => Ok(StateParameter::Thrust),
-        "bdotr" => Ok(StateParameter::BdotR),
-        "bdott" => Ok(StateParameter::BdotT),
-        "bltof" => Ok(StateParameter::BLTOF),
-        "epoch" => Ok(StateParameter::Epoch),
-        "guidancemode" => Ok(StateParameter::GuidanceMode),
-        _ => Err(PyValueError::new_err(format!("Unknown state parameter: {}", name))),
-    }
-}
 
 #[pymethods]
 impl MvnSpacecraft {
@@ -112,9 +79,8 @@ impl MvnSpacecraft {
 #[pymethods]
 impl StateDispersion {
     #[new]
-    fn py_new(param: String, std_dev: Option<f64>, mean: Option<f64>) -> PyResult<Self> {
-        let param_enum = parse_state_parameter(&param)?;
-        let builder = StateDispersion::builder().param(param_enum);
+    fn py_new(param: StateParameter, std_dev: Option<f64>, mean: Option<f64>) -> PyResult<Self> {
+        let builder = StateDispersion::builder().param(param);
         Ok(match (std_dev, mean) {
             (Some(s), Some(m)) => builder.std_dev(s).mean(m).build(),
             (Some(s), None) => builder.std_dev(s).build(),
@@ -125,8 +91,11 @@ impl StateDispersion {
 
     #[classmethod]
     #[pyo3(name = "zero_mean")]
-    fn py_zero_mean(_cls: &Bound<'_, PyType>, param: String, std_dev: f64) -> PyResult<Self> {
-        let param_enum = parse_state_parameter(&param)?;
-        Ok(StateDispersion::zero_mean(param_enum, std_dev))
+    fn py_zero_mean(
+        _cls: &Bound<'_, PyType>,
+        param: StateParameter,
+        std_dev: f64,
+    ) -> PyResult<Self> {
+        Ok(StateDispersion::zero_mean(param, std_dev))
     }
 }

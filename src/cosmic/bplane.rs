@@ -289,17 +289,21 @@ impl BPlaneTarget {
 
     pub fn to_objectives_with_tolerance(self, tol_km: f64) -> [Objective; 2] {
         [
-            Objective::within_tolerance(StateParameter::BdotR, self.b_r_km, tol_km),
-            Objective::within_tolerance(StateParameter::BdotT, self.b_t_km, tol_km),
+            Objective::within_tolerance(StateParameter::BdotR(), self.b_r_km, tol_km),
+            Objective::within_tolerance(StateParameter::BdotT(), self.b_t_km, tol_km),
         ]
     }
 
     /// Includes the linearized time of flight as an objective
     pub fn to_all_objectives_with_tolerance(self, tol_km: f64) -> [Objective; 3] {
         [
-            Objective::within_tolerance(StateParameter::BdotR, self.b_r_km, tol_km),
-            Objective::within_tolerance(StateParameter::BdotT, self.b_t_km, tol_km),
-            Objective::within_tolerance(StateParameter::BLTOF, self.ltof_s, self.tol_ltof_s * 1e5),
+            Objective::within_tolerance(StateParameter::BdotR(), self.b_r_km, tol_km),
+            Objective::within_tolerance(StateParameter::BdotT(), self.b_t_km, tol_km),
+            Objective::within_tolerance(
+                StateParameter::BLTOF(),
+                self.ltof_s,
+                self.tol_ltof_s * 1e5,
+            ),
         ]
     }
 }
