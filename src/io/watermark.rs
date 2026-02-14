@@ -42,7 +42,12 @@ pub(crate) fn pq_writer(metadata: Option<HashMap<String, String>>) -> Option<Wri
         ),
         KeyValue::new(
             "Created by".to_string(),
-            format!("{} ({}) on {}", realname(), username(), platform()),
+            format!(
+                "{} ({}) on {}",
+                realname().unwrap_or("unknown user".to_string()),
+                username().unwrap_or("no-user".to_string()),
+                platform()
+            ),
         ),
         KeyValue::new(
             "Created on".to_string(),
