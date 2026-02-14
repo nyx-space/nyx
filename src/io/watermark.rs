@@ -21,8 +21,8 @@ use std::collections::HashMap;
 use hifitime::Epoch;
 use parquet::{
     basic::{Compression, ZstdLevel},
+    file::metadata::KeyValue,
     file::properties::WriterProperties,
-    format::KeyValue,
 };
 use shadow_rs::shadow;
 use whoami::{platform, realname, username};

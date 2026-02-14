@@ -22,6 +22,7 @@ use anise::analysis::prelude::OrbitalElement;
 use anise::errors::MathError;
 use anise::{astro::PhysicsResult, errors::PhysicsError};
 use nalgebra::{SMatrix, SVector};
+use rand::rngs::SysRng;
 use rand::SeedableRng;
 use rand_distr::Distribution;
 use rand_pcg::Pcg64Mcg;
@@ -149,7 +150,7 @@ impl SpacecraftUncertainty {
         // Setup the RNG
         let mut rng = match seed {
             Some(seed) => Pcg64Mcg::new(seed),
-            None => Pcg64Mcg::from_os_rng(),
+            None => Pcg64Mcg::try_from_rng(&mut SysRng::default()).unwrap(),
         };
 
         // Generate the states, forcing the borrow as specified in the `sample_iter` docs.

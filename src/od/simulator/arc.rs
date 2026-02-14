@@ -22,6 +22,7 @@ use anise::structure::LocationDataSet;
 use hifitime::{Duration, Epoch, TimeSeries, TimeUnits};
 use log::{info, warn};
 use num::integer::gcd;
+use rand::rngs::SysRng;
 use rand::SeedableRng;
 use rand_pcg::Pcg64Mcg;
 
@@ -148,7 +149,7 @@ where
         trajectory: Traj<MsrIn>,
         configs: BTreeMap<String, TrkConfig>,
     ) -> Result<Self, ConfigError> {
-        let rng = Pcg64Mcg::from_os_rng();
+        let rng = Pcg64Mcg::try_from_rng(&mut SysRng::default()).unwrap();
 
         Self::with_rng(devices, trajectory, configs, rng)
     }
