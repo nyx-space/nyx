@@ -210,7 +210,7 @@ impl AccelModel for Harmonics {
         let mut rho_np1 = mu_km3_s2 / r_ * rho;
         let mut accel4: Vector4<f64> = Vector4::zeros();
 
-        for n in 1..max_degree {
+        for n in 1..=max_degree {
             let mut sum: Vector4<f64> = Vector4::zeros();
             rho_np1 *= rho;
 

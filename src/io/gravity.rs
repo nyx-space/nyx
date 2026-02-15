@@ -86,7 +86,7 @@ impl HarmonicsMem {
         gunzipped: bool,
     ) -> Result<HarmonicsMem, NyxError> {
         Self::load(
-            gunzipped, true, //SHADR has a header which we ignore
+            gunzipped, false, //SHADR has a header which we ignore
             degree, order, filepath,
         )
     }
