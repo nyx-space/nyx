@@ -81,7 +81,7 @@ impl MvnSpacecraft {
     fn sample(&self, count: usize, seed: Option<u64>) -> Vec<Spacecraft> {
         let mut rng = match seed {
             Some(s) => Pcg64Mcg::seed_from_u64(s),
-            None => Pcg64Mcg::from_rng(rand::rng()),
+            None => Pcg64Mcg::from_rng(&mut rand::rng()),
         };
 
         let mut samples = Vec::with_capacity(count);
