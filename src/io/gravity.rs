@@ -91,15 +91,6 @@ impl HarmonicsMem {
         )
     }
 
-    pub fn from_egm(
-        filepath: &str,
-        degree: usize,
-        order: usize,
-        gunzipped: bool,
-    ) -> Result<HarmonicsMem, NyxError> {
-        Self::load(gunzipped, false, degree, order, filepath)
-    }
-
     pub fn from_cof(
         filepath: &str,
         degree: usize,
@@ -470,7 +461,7 @@ fn test_load_harmonic_files() {
     HarmonicsMem::from_cof("data/01_planetary/JGM3.cof.gz", 50, 50, true)
         .expect("could not load JGM3");
 
-    HarmonicsMem::from_egm(
+    HarmonicsMem::from_shadr(
         "data/01_planetary/EGM2008_to2190_TideFree.gz",
         120,
         120,
