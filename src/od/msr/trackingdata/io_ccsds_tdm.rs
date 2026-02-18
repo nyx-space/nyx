@@ -180,6 +180,7 @@ impl TrackingDataArc {
                         tracker: current_tracker.clone(),
                         epoch,
                         data: IndexMap::new(),
+                        rejected: false,
                     })
                     .data
                     .insert(mtype, value / msr_divider);

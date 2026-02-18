@@ -34,6 +34,8 @@ pub struct Measurement {
     pub epoch: Epoch,
     /// All measurements made simultaneously
     pub data: IndexMap<MeasurementType, f64>,
+    /// Whether this measurement has been manually rejected
+    pub rejected: bool,
 }
 
 impl Measurement {
@@ -42,6 +44,7 @@ impl Measurement {
             tracker,
             epoch,
             data: IndexMap::new(),
+            rejected: false,
         }
     }
 
