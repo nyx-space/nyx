@@ -331,7 +331,7 @@ impl AccelModel for Harmonics {
         let mut a3 = OHyperdual::<f64, U7>::from(0.0);
         let sqrt2 = OHyperdual::<f64, U7>::from(2.0.sqrt());
 
-        for n in 1..max_degree {
+        for n in 1..=max_degree {
             let mut sum0 = OHyperdual::from(0.0);
             let mut sum1 = OHyperdual::from(0.0);
             let mut sum2 = OHyperdual::from(0.0);

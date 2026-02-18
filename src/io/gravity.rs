@@ -42,7 +42,7 @@ impl HarmonicsMem {
         c_nm[(2, 0)] = j2;
 
         HarmonicsMem {
-            degree: 2 + 1,
+            degree: 2,
             order: 0,
             c_nm,
             s_nm: DMatrix::from_element(3, 3, 0.0),
