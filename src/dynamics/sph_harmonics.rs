@@ -210,7 +210,7 @@ impl AccelModel for Harmonics {
         let mut rho_np1 = mu_km3_s2 / r_ * rho;
         let mut accel4: Vector4<f64> = Vector4::zeros();
 
-        for n in 1..max_degree {
+        for n in 1..=max_degree {
             let mut sum: Vector4<f64> = Vector4::zeros();
             rho_np1 *= rho;
 
@@ -331,7 +331,7 @@ impl AccelModel for Harmonics {
         let mut a3 = OHyperdual::<f64, U7>::from(0.0);
         let sqrt2 = OHyperdual::<f64, U7>::from(2.0.sqrt());
 
-        for n in 1..max_degree {
+        for n in 1..=max_degree {
             let mut sum0 = OHyperdual::from(0.0);
             let mut sum1 = OHyperdual::from(0.0);
             let mut sum2 = OHyperdual::from(0.0);

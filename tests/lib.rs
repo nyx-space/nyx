@@ -27,6 +27,8 @@ fn base_almanac() -> Almanac {
             .to_string_lossy(),
     )
     .unwrap()
+    .load("data/01_planetary/earth_longterm_000101_251211_250915.bpc")
+    .unwrap()
     .load(
         &manifest_dir
             .join("data/01_planetary/earth_latest_high_prec.bpc")

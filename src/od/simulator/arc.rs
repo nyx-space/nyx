@@ -149,7 +149,7 @@ where
         trajectory: Traj<MsrIn>,
         configs: BTreeMap<String, TrkConfig>,
     ) -> Result<Self, ConfigError> {
-        let rng = Pcg64Mcg::try_from_rng(&mut SysRng::default()).unwrap();
+        let rng = Pcg64Mcg::try_from_rng(&mut SysRng).unwrap();
 
         Self::with_rng(devices, trajectory, configs, rng)
     }

@@ -42,7 +42,7 @@ impl HarmonicsMem {
         c_nm[(2, 0)] = j2;
 
         HarmonicsMem {
-            degree: 2 + 1,
+            degree: 2,
             order: 0,
             c_nm,
             s_nm: DMatrix::from_element(3, 3, 0.0),
@@ -89,15 +89,6 @@ impl HarmonicsMem {
             gunzipped, true, //SHADR has a header which we ignore
             degree, order, filepath,
         )
-    }
-
-    pub fn from_egm(
-        filepath: &str,
-        degree: usize,
-        order: usize,
-        gunzipped: bool,
-    ) -> Result<HarmonicsMem, NyxError> {
-        Self::load(gunzipped, false, degree, order, filepath)
     }
 
     pub fn from_cof(
@@ -470,7 +461,7 @@ fn test_load_harmonic_files() {
     HarmonicsMem::from_cof("data/01_planetary/JGM3.cof.gz", 50, 50, true)
         .expect("could not load JGM3");
 
-    HarmonicsMem::from_egm(
+    HarmonicsMem::from_shadr(
         "data/01_planetary/EGM2008_to2190_TideFree.gz",
         120,
         120,
