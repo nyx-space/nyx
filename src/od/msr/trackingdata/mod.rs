@@ -205,7 +205,7 @@ impl TrackingDataArc {
     }
 
     /// Returns a new tracking arc that only contains measurements from the desired tracker.
-    pub fn filter_by_tracker(mut self, tracker: String) -> Self {
+    pub fn filter_by_tracker(mut self, tracker: &str) -> Self {
         self.measurements = self
             .measurements
             .iter()
@@ -296,7 +296,7 @@ impl TrackingDataArc {
     }
 
     /// Marks measurements from the provided tracker as rejected.
-    pub fn reject_by_tracker(mut self, tracker: String) -> Self {
+    pub fn reject_by_tracker(mut self, tracker: &str) -> Self {
         for msr in self.measurements.values_mut() {
             if msr.tracker == tracker {
                 msr.rejected = true;

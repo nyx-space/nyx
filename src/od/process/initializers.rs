@@ -32,15 +32,10 @@ use std::ops::Add;
 
 use super::{KalmanODProcess, ResidRejectCrit};
 
-impl<
-        D: Dynamics,
-        MsrSize: DimName,
-        Accel: DimName,
-        Trk: TrackerSensitivity<D::StateType, D::StateType>,
-    > KalmanODProcess<D, MsrSize, Accel, Trk>
+impl<D: Dynamics, MsrSize: DimName, Accel: DimName, Trk: TrackerSensitivity<D::StateType, D::StateType>>
+    KalmanODProcess<D, MsrSize, Accel, Trk>
 where
-    D::StateType:
-        Interpolatable + Add<OVector<f64, <D::StateType as State>::Size>, Output = D::StateType>,
+    D::StateType: Interpolatable + Add<OVector<f64, <D::StateType as State>::Size>, Output = D::StateType>,
     <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
     <DefaultAllocator as Allocator<<D::StateType as State>::Size>>::Buffer<f64>: Copy,
     <DefaultAllocator as Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>>::Buffer<f64>: Copy,
@@ -88,13 +83,7 @@ where
         process_noise: ProcessNoise<Accel>,
         almanac: Arc<Almanac>,
     ) -> Self {
-        let mut me = Self::new(
-            prop,
-            kf_variant,
-            resid_crit,
-            devices,
-            almanac
-        );
+        let mut me = Self::new(prop, kf_variant, resid_crit, devices, almanac);
         me.process_noise.push(process_noise);
         me
     }

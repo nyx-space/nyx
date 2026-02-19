@@ -83,7 +83,9 @@ pub enum TargetingError {
     Astro { source: AstroError },
     #[snafu(display("targeting aborted, too many iterations"))]
     TooManyIterations,
-    #[snafu(display("correction is ineffective at {action}: value at previous iteration {prev_val}, current value: {cur_val}"))]
+    #[snafu(display(
+        "correction is ineffective at {action}: value at previous iteration {prev_val}, current value: {cur_val}"
+    ))]
     CorrectionIneffective {
         prev_val: f64,
         cur_val: f64,

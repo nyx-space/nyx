@@ -49,7 +49,9 @@ pub enum NyxError {
     InvalidInterpolationData { msg: String },
     #[snafu(display("No state data: {msg}"))]
     NoStateData { msg: String },
-    #[snafu(display("Happens when trying to modify a polynomial's (error)-th error but the polynomial has less orders than that"))]
+    #[snafu(display(
+        "Happens when trying to modify a polynomial's (error)-th error but the polynomial has less orders than that"
+    ))]
     PolynomialOrderError { order: usize },
     #[snafu(display(
         "An objective based analysis or control was attempted, but no objective was defined"

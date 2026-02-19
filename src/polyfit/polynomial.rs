@@ -360,14 +360,14 @@ impl fmt::Display for CommonPolynomial {
                 f,
                 "{}",
                 Polynomial::<2> {
-                    coefficients: [b, a],
+                    coefficients: [b, a]
                 }
             ),
             Self::Quadratic(a, b, c) => write!(
                 f,
                 "{}",
                 Polynomial::<3> {
-                    coefficients: [c, b, a],
+                    coefficients: [c, b, a]
                 }
             ),
         }
