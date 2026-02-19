@@ -259,17 +259,6 @@ impl Spacecraft {
         self
     }
 
-    /// Returns the root sum square error between this spacecraft and the other, in kilometers for the position, kilometers per second in velocity, and kilograms in prop
-    pub fn rss(&self, other: &Self) -> PhysicsResult<(f64, f64, f64)> {
-        let rss_p_km = self.orbit.rss_radius_km(&other.orbit)?;
-        let rss_v_km_s = self.orbit.rss_velocity_km_s(&other.orbit)?;
-        let rss_prop_kg = (self.mass.prop_mass_kg - other.mass.prop_mass_kg)
-            .powi(2)
-            .sqrt();
-
-        Ok((rss_p_km, rss_v_km_s, rss_prop_kg))
-    }
-
     /// Sets the STM of this state of identity, which also enables computation of the STM for spacecraft navigation
     pub fn enable_stm(&mut self) {
         self.stm = Some(OMatrix::<f64, Const<9>, Const<9>>::identity());
@@ -292,6 +281,20 @@ impl Spacecraft {
 
     pub fn mut_mode(&mut self, mode: GuidanceMode) {
         self.mode = mode;
+    }
+}
+
+#[cfg_attr(feature = "python", pymethods)]
+impl Spacecraft {
+    /// Returns the root sum square error between this spacecraft and the other, in kilometers for the position, kilometers per second in velocity, and kilograms in prop
+    pub fn rss(&self, other: &Self) -> PhysicsResult<(f64, f64, f64)> {
+        let rss_p_km = self.orbit.rss_radius_km(&other.orbit)?;
+        let rss_v_km_s = self.orbit.rss_velocity_km_s(&other.orbit)?;
+        let rss_prop_kg = (self.mass.prop_mass_kg - other.mass.prop_mass_kg)
+            .powi(2)
+            .sqrt();
+
+        Ok((rss_p_km, rss_v_km_s, rss_prop_kg))
     }
 }
 

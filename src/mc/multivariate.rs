@@ -104,8 +104,6 @@ impl MvnSpacecraft {
                     unreachable!()
                 };
 
-                println!("{partial}");
-
                 for (cno, val) in [
                     partial.wrt_x(),
                     partial.wrt_y(),

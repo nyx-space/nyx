@@ -23,6 +23,9 @@ use nalgebra::{SMatrix, SVector};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyType;
+use rand::SeedableRng;
+use rand_distr::Distribution;
+use rand_pcg::Pcg64Mcg;
 
 #[pymethods]
 impl MvnSpacecraft {
@@ -64,6 +67,29 @@ impl MvnSpacecraft {
     ) -> PyResult<Self> {
         MvnSpacecraft::zero_mean(template, dispersions)
             .map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
+    /// Samples the multivariate distribution to generate a list of spacecraft states.
+    ///
+    /// The Pseudo-Random Number Generator (PRNG) used is the Permuted Congruential Generator (PCG).
+    /// PCG is an excellent choice for Monte Carlo simulations because:
+    /// 1. **Statistical Quality**: It passes difficult statistical tests (like TestU01), ensuring the generated numbers are random enough for high-fidelity simulations.
+    /// 2. **Performance**: It is very fast and efficient, which is crucial when generating a large number of samples.
+    /// 3. **Small State**: It has a small state size and is easy to seed, making it ideal for reproducible simulations.
+    /// 4. **Reproducibility**: By providing a seed, the exact same sequence of spacecraft states can be generated, allowing for debugging and validation of Monte Carlo runs.
+    #[pyo3(signature = (count, seed=None))]
+    fn sample(&self, count: usize, seed: Option<u64>) -> Vec<Spacecraft> {
+        let mut rng = match seed {
+            Some(s) => Pcg64Mcg::seed_from_u64(s),
+            None => Pcg64Mcg::from_rng(&mut rand::rng()),
+        };
+
+        let mut samples = Vec::with_capacity(count);
+        for _ in 0..count {
+            let dispersed_state = Distribution::sample(self, &mut rng);
+            samples.push(dispersed_state.state);
+        }
+        samples
     }
 }
 
