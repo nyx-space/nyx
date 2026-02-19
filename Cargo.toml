@@ -36,7 +36,8 @@ nalgebra = "0.34"
 log = "0.4"
 hifitime = "4.0.0"
 # anise = {version = "0.9.3", features=[ "analysis" ] }
-anise = {path = "../../anise/anise"}
+# anise = {path = "../../anise/anise"}
+anise = {git = "https://github.com/nyx-space/anise.git", rev = "581ef02", features = ["analysis"]}
 flate2 = { version = "1.0", features = [
     "rust_backend",
 ], default-features = false }
