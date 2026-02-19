@@ -249,6 +249,11 @@ where
 
                 // Perform a measurement update, accounting for possible errors in measurement timestamps
                 if (nominal_state.epoch() - next_msr_epoch).abs() < self.epoch_precision {
+                    // Force the state epoch to match the measurement epoch exactly.
+                    // This prevents infinite loops where the propagator (especially if fixed step)
+                    // fails to step a tiny amount (drift) to reach the exact measurement time.
+                    prop_instance.state.set_epoch(next_msr_epoch);
+
                     if msr.rejected {
                         debug!("Skipping manually rejected measurement at {}", epoch);
                         match kf.time_update(nominal_state) {
