@@ -245,105 +245,103 @@ where
                         od_sol.push_time_update(est);
                         prop_instance.state.reset_stm();
                         msr_rejected_cnt += 1;
-                        // Continue to avoid another identation.
-                        continue;
-                    }
+                    } else {
+                        // Get the computed observations
+                        match devices.get_mut(&msr.tracker) {
+                            Some(device) => {
+                                if let Some(computed_meas) = device.measure(epoch, &traj, None, self.almanac.clone())? {
+                                    let msr_types = device.measurement_types();
 
-                    // Get the computed observations
-                    match devices.get_mut(&msr.tracker) {
-                        Some(device) => {
-                            if let Some(computed_meas) = device.measure(epoch, &traj, None, self.almanac.clone())? {
-                                let msr_types = device.measurement_types();
-
-                                // Perform several measurement updates to ensure the desired dimensionality.
-                                let windows = msr_types.len() / MsrSize::DIM;
-                                let mut msr_rejected = false;
-                                for wno in 0..=windows {
-                                    let mut cur_msr_types = IndexSet::new();
-                                    for msr_type in msr_types.iter().copied().skip(wno * MsrSize::DIM).take(MsrSize::DIM) {
-                                        cur_msr_types.insert(msr_type);
-                                    }
-
-                                    if cur_msr_types.is_empty() {
-                                        // We've processed all measurements.
-                                        break;
-                                    }
-
-                                    // If this measurement type is unavailable, continue to the next one.
-                                    if !msr.availability(&cur_msr_types).iter().any(|avail| *avail) {
-                                        continue;
-                                    }
-
-                                    // Grab the un-modulo'd real observation
-                                    let mut real_obs: OVector<f64, MsrSize> = msr.observation(&cur_msr_types);
-
-                                    // Check that the observation is valid.
-                                    for val in real_obs.iter().copied() {
-                                        ensure!(val.is_finite(), InvalidMeasurementSnafu { epoch: *epoch_ref, val });
-                                    }
-
-                                    // Compute device specific matrices
-                                    let h_tilde =
-                                        device.h_tilde::<MsrSize>(msr, &cur_msr_types, &nominal_state, self.almanac.clone())?;
-
-                                    let measurement_covar = device.measurement_covar_matrix(&cur_msr_types, epoch)?;
-
-                                    // Apply any biases on the computed observation
-                                    let computed_obs = computed_meas.observation::<MsrSize>(&cur_msr_types)
-                                        - device.measurement_bias_vector::<MsrSize>(&cur_msr_types, epoch)?;
-
-                                    // Apply the modulo to the real obs
-                                    if let Some(moduli) = &arc.moduli {
-                                        let mut obs_ambiguity = OVector::<f64, MsrSize>::zeros();
-
-                                        for (i, msr_type) in cur_msr_types.iter().enumerate() {
-                                            if let Some(modulus) = moduli.get(msr_type) {
-                                                let k = computed_obs[i].div_euclid(*modulus);
-                                                // real_obs = measured_obs + k * modulus
-                                                obs_ambiguity[i] = k * *modulus;
-                                            }
+                                    // Perform several measurement updates to ensure the desired dimensionality.
+                                    let windows = msr_types.len() / MsrSize::DIM;
+                                    let mut msr_rejected = false;
+                                    for wno in 0..=windows {
+                                        let mut cur_msr_types = IndexSet::new();
+                                        for msr_type in msr_types.iter().copied().skip(wno * MsrSize::DIM).take(MsrSize::DIM) {
+                                            cur_msr_types.insert(msr_type);
                                         }
-                                        real_obs += obs_ambiguity;
+
+                                        if cur_msr_types.is_empty() {
+                                            // We've processed all measurements.
+                                            break;
+                                        }
+
+                                        // If this measurement type is unavailable, continue to the next one.
+                                        if !msr.availability(&cur_msr_types).iter().any(|avail| *avail) {
+                                            continue;
+                                        }
+
+                                        // Grab the un-modulo'd real observation
+                                        let mut real_obs: OVector<f64, MsrSize> = msr.observation(&cur_msr_types);
+
+                                        // Check that the observation is valid.
+                                        for val in real_obs.iter().copied() {
+                                            ensure!(val.is_finite(), InvalidMeasurementSnafu { epoch: *epoch_ref, val });
+                                        }
+
+                                        // Compute device specific matrices
+                                        let h_tilde =
+                                            device.h_tilde::<MsrSize>(msr, &cur_msr_types, &nominal_state, self.almanac.clone())?;
+
+                                        let measurement_covar = device.measurement_covar_matrix(&cur_msr_types, epoch)?;
+
+                                        // Apply any biases on the computed observation
+                                        let computed_obs = computed_meas.observation::<MsrSize>(&cur_msr_types)
+                                            - device.measurement_bias_vector::<MsrSize>(&cur_msr_types, epoch)?;
+
+                                        // Apply the modulo to the real obs
+                                        if let Some(moduli) = &arc.moduli {
+                                            let mut obs_ambiguity = OVector::<f64, MsrSize>::zeros();
+
+                                            for (i, msr_type) in cur_msr_types.iter().enumerate() {
+                                                if let Some(modulus) = moduli.get(msr_type) {
+                                                    let k = computed_obs[i].div_euclid(*modulus);
+                                                    // real_obs = measured_obs + k * modulus
+                                                    obs_ambiguity[i] = k * *modulus;
+                                                }
+                                            }
+                                            real_obs += obs_ambiguity;
+                                        }
+
+                                        let (estimate, mut residual, gain) = kf.measurement_update(
+                                            nominal_state,
+                                            real_obs,
+                                            computed_obs,
+                                            measurement_covar,
+                                            h_tilde,
+                                            resid_crit,
+                                        )?;
+
+                                        residual.tracker = Some(device.name());
+                                        residual.msr_types = cur_msr_types;
+
+                                        if residual.rejected {
+                                            msr_rejected = true;
+                                        }
+
+                                        if kf.replace_state() {
+                                            prop_instance.state = estimate.state();
+                                        }
+
+                                        prop_instance.state.reset_stm();
+
+                                        od_sol.push_measurement_update(estimate, residual, gain);
                                     }
-
-                                    let (estimate, mut residual, gain) = kf.measurement_update(
-                                        nominal_state,
-                                        real_obs,
-                                        computed_obs,
-                                        measurement_covar,
-                                        h_tilde,
-                                        resid_crit,
-                                    )?;
-
-                                    residual.tracker = Some(device.name());
-                                    residual.msr_types = cur_msr_types;
-
-                                    if residual.rejected {
-                                        msr_rejected = true;
+                                    if msr_rejected {
+                                        msr_rejected_cnt += 1;
+                                    } else {
+                                        msr_accepted_cnt += 1;
                                     }
-
-                                    if kf.replace_state() {
-                                        prop_instance.state = estimate.state();
-                                    }
-
-                                    prop_instance.state.reset_stm();
-
-                                    od_sol.push_measurement_update(estimate, residual, gain);
-                                }
-                                if msr_rejected {
-                                    msr_rejected_cnt += 1;
                                 } else {
-                                    msr_accepted_cnt += 1;
+                                    debug!("Device {} does not expect measurement at {epoch}, skipping", msr.tracker);
                                 }
-                            } else {
-                                debug!("Device {} does not expect measurement at {epoch}, skipping", msr.tracker);
                             }
-                        }
-                        None => {
-                            if !unknown_trackers.contains(&msr.tracker) {
-                                error!("Tracker {} is not in the list of configured devices", msr.tracker);
+                            None => {
+                                if !unknown_trackers.contains(&msr.tracker) {
+                                    error!("Tracker {} is not in the list of configured devices", msr.tracker);
+                                }
+                                unknown_trackers.insert(msr.tracker.clone());
                             }
-                            unknown_trackers.insert(msr.tracker.clone());
                         }
                     }
 
