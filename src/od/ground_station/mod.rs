@@ -19,6 +19,7 @@
 use anise::astro::{Aberration, AzElRange, Location, PhysicsResult};
 use anise::errors::AlmanacResult;
 use anise::prelude::{Almanac, Frame, Orbit};
+use der::Encode;
 use indexmap::{IndexMap, IndexSet};
 use snafu::ensure;
 
@@ -223,6 +224,119 @@ impl Default for GroundStation {
 }
 
 impl ConfigRepr for GroundStation {}
+
+impl<'a> der::DecodeValue<'a> for GroundStation {
+    fn decode_value<R: der::Reader<'a>>(reader: &mut R, _header: der::Header) -> der::Result<Self> {
+        let name: String = reader.decode()?;
+        let location = reader.decode()?;
+        // Measurement types are stored as a sequence of measurement types
+        let msr_types_vec: Vec<MeasurementType> = reader.decode()?;
+        let measurement_types = IndexSet::from_iter(msr_types_vec);
+
+        // Integration time is optional, but stored as f64 seconds if present
+        let integration_time_s: Option<f64> = reader.decode()?;
+        let integration_time = integration_time_s.map(Duration::from_seconds);
+
+        let light_time_correction = reader.decode()?;
+        let timestamp_noise_s = reader.decode()?;
+
+        // Stochastic noises are stored as a sequence of (MeasurementType, StochasticNoise) tuples (SEQUENCE of SEQUENCE)
+        // We define a helper struct for decoding
+        #[derive(der::Sequence)]
+        struct MsrNoisePair {
+            msr_type: MeasurementType,
+            noise: StochasticNoise,
+        }
+
+        let stochastics_vec: Option<Vec<MsrNoisePair>> = reader.decode()?;
+        let stochastic_noises = stochastics_vec.map(|vec| {
+            let mut map = IndexMap::new();
+            for pair in vec {
+                map.insert(pair.msr_type, pair.noise);
+            }
+            map
+        });
+
+        Ok(GroundStation {
+            name,
+            location,
+            measurement_types,
+            integration_time,
+            light_time_correction,
+            timestamp_noise_s,
+            stochastic_noises,
+        })
+    }
+}
+
+impl der::EncodeValue for GroundStation {
+    fn value_len(&self) -> der::Result<der::Length> {
+        let msr_types_vec: Vec<MeasurementType> =
+            self.measurement_types.iter().cloned().collect();
+
+        let integration_time_s = self.integration_time.map(|d| d.to_seconds());
+
+        // Helper for encoding map
+        #[derive(der::Sequence)]
+        struct MsrNoisePair {
+            msr_type: MeasurementType,
+            noise: StochasticNoise,
+        }
+
+        let stochastics_vec = self.stochastic_noises.as_ref().map(|map| {
+            map.iter()
+                .map(|(k, v)| MsrNoisePair {
+                    msr_type: *k,
+                    noise: *v,
+                })
+                .collect::<Vec<MsrNoisePair>>()
+        });
+
+        self.name.encoded_len()?
+            + self.location.encoded_len()?
+            + msr_types_vec.encoded_len()?
+            + integration_time_s.encoded_len()?
+            + self.light_time_correction.encoded_len()?
+            + self.timestamp_noise_s.encoded_len()?
+            + stochastics_vec.encoded_len()?
+    }
+
+    fn encode_value(&self, encoder: &mut impl der::Writer) -> der::Result<()> {
+        self.name.encode(encoder)?;
+        self.location.encode(encoder)?;
+
+        let msr_types_vec: Vec<MeasurementType> =
+            self.measurement_types.iter().cloned().collect();
+        msr_types_vec.encode(encoder)?;
+
+        let integration_time_s = self.integration_time.map(|d| d.to_seconds());
+        integration_time_s.encode(encoder)?;
+
+        self.light_time_correction.encode(encoder)?;
+        self.timestamp_noise_s.encode(encoder)?;
+
+        // Helper for encoding map
+        #[derive(der::Sequence)]
+        struct MsrNoisePair {
+            msr_type: MeasurementType,
+            noise: StochasticNoise,
+        }
+
+        let stochastics_vec = self.stochastic_noises.as_ref().map(|map| {
+            map.iter()
+                .map(|(k, v)| MsrNoisePair {
+                    msr_type: *k,
+                    noise: *v,
+                })
+                .collect::<Vec<MsrNoisePair>>()
+        });
+        stochastics_vec.encode(encoder)?;
+
+        Ok(())
+    }
+}
+
+impl<'a> der::Sequence<'a> for GroundStation {}
 
 impl fmt::Display for GroundStation {
     // Prints the Keplerian orbital elements with units

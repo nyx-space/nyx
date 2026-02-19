@@ -22,6 +22,7 @@ use anise::constants::frames::EARTH_J2000;
 pub use anise::prelude::Orbit;
 
 pub use anise::structure::spacecraft::{DragData, Mass, SRPData};
+use der::{Encode, Enumerated};
 use nalgebra::Vector3;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
@@ -45,16 +46,17 @@ use std::ops::Add;
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default, Enumerated)]
 #[cfg_attr(feature = "python", pyclass)]
+#[repr(u8)]
 pub enum GuidanceMode {
     /// Guidance is turned off and Guidance Law may switch mode to Thrust for next call
     #[default]
-    Coast,
+    Coast = 0,
     /// Guidance is turned on and Guidance Law may switch mode to Coast for next call
-    Thrust,
+    Thrust = 1,
     /// Guidance is turned off and Guidance Law may not change its mode (will need to be done externally to the guidance law).
-    Inhibit,
+    Inhibit = 2,
 }
 
 impl From<f64> for GuidanceMode {
@@ -610,6 +612,50 @@ impl Add<OVector<f64, Const<9>>> for Spacecraft {
         self
     }
 }
+
+impl<'a> der::DecodeValue<'a> for Spacecraft {
+    fn decode_value<R: der::Reader<'a>>(reader: &mut R, _header: der::Header) -> der::Result<Self> {
+        let orbit = reader.decode()?;
+        let mass = reader.decode()?;
+        let srp = reader.decode()?;
+        let drag = reader.decode()?;
+        let thruster = reader.decode()?;
+        let mode = reader.decode()?;
+
+        Ok(Spacecraft {
+            orbit,
+            mass,
+            srp,
+            drag,
+            thruster,
+            mode,
+            stm: None,
+        })
+    }
+}
+
+impl der::EncodeValue for Spacecraft {
+    fn value_len(&self) -> der::Result<der::Length> {
+        self.orbit.encoded_len()?
+            + self.mass.encoded_len()?
+            + self.srp.encoded_len()?
+            + self.drag.encoded_len()?
+            + self.thruster.encoded_len()?
+            + self.mode.encoded_len()?
+    }
+
+    fn encode_value(&self, encoder: &mut impl der::Writer) -> der::Result<()> {
+        self.orbit.encode(encoder)?;
+        self.mass.encode(encoder)?;
+        self.srp.encode(encoder)?;
+        self.drag.encode(encoder)?;
+        self.thruster.encode(encoder)?;
+        self.mode.encode(encoder)?;
+        Ok(())
+    }
+}
+
+impl<'a> der::Sequence<'a> for Spacecraft {}
 
 impl ConfigRepr for Spacecraft {}
 

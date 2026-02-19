@@ -36,6 +36,7 @@ pub mod gauss_markov;
 pub mod link_specific;
 pub mod white;
 
+use der::Sequence;
 pub use gauss_markov::GaussMarkov;
 pub use white::WhiteNoise;
 
@@ -51,9 +52,11 @@ pub trait Stochastics {
 /// Stochastic noise modeling used primarily for synthetic orbit determination measurements.
 ///
 /// This implementation distinguishes between the white noise model and the bias model. It also includes a constant offset.
-#[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize, Sequence)]
 pub struct StochasticNoise {
+    #[asn1(context_specific = "0", optional = "true")]
     pub white_noise: Option<WhiteNoise>,
+    #[asn1(context_specific = "1", optional = "true")]
     pub bias: Option<GaussMarkov>,
 }
 

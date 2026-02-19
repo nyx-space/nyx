@@ -27,7 +27,7 @@ use serde_derive::{Deserialize, Serialize};
 use super::Stochastics;
 
 /// White noise is an uncorrelated random variable.
-#[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize, der::Sequence)]
 pub struct WhiteNoise {
     /// Mean value of this white noise
     pub mean: f64,

@@ -19,6 +19,7 @@
 use crate::io::{ConfigError, ConfigRepr};
 use hifitime::{Duration, Epoch, TimeUnits};
 
+use der::Encode;
 use rand::Rng;
 use rand_distr::Normal;
 use serde_derive::{Deserialize, Serialize};
@@ -167,6 +168,39 @@ impl MulAssign<f64> for GaussMarkov {
         *self = *self * rhs;
     }
 }
+
+impl<'a> der::DecodeValue<'a> for GaussMarkov {
+    fn decode_value<R: der::Reader<'a>>(reader: &mut R, _header: der::Header) -> der::Result<Self> {
+        let tau_s = reader.decode::<f64>()?;
+        let process_noise = reader.decode()?;
+        let constant = reader.decode()?;
+
+        Ok(Self {
+            tau: Duration::from_seconds(tau_s),
+            process_noise,
+            constant,
+            prev_epoch: None,
+            init_sample: None,
+        })
+    }
+}
+
+impl der::EncodeValue for GaussMarkov {
+    fn value_len(&self) -> der::Result<der::Length> {
+        self.tau.to_seconds().encoded_len()?
+            + self.process_noise.encoded_len()?
+            + self.constant.encoded_len()?
+    }
+
+    fn encode_value(&self, encoder: &mut impl der::Writer) -> der::Result<()> {
+        self.tau.to_seconds().encode(encoder)?;
+        self.process_noise.encode(encoder)?;
+        self.constant.encode(encoder)?;
+        Ok(())
+    }
+}
+
+impl<'a> der::Sequence<'a> for GaussMarkov {}
 
 impl ConfigRepr for GaussMarkov {}
 
