@@ -182,6 +182,7 @@ impl TrackingDataArc {
                     epoch,
                     tracker: tracking_device.value(i).to_string(),
                     data: IndexMap::new(),
+                    rejected: false,
                 };
 
                 if range_avail {

@@ -11,6 +11,7 @@ mod blse;
 mod measurements;
 mod multi_body;
 mod predict_validation;
+mod rejection;
 mod robust;
 mod simulator;
 mod spacecraft;
