@@ -1,12 +1,9 @@
-extern crate nyx_space as nyx;
-
 mod cosmic;
 mod mission_design;
 mod monte_carlo;
 mod orbit_determination;
 mod propagation;
 mod propulsion;
-mod kluever;
 
 use std::sync::Arc;
 

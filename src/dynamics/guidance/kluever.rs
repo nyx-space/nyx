@@ -23,13 +23,13 @@ use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 
 use super::{
-    GuidStateSnafu, GuidanceError, GuidanceLaw, GuidanceMode,
-    GuidancePhysicsSnafu, Spacecraft, Vector3,
+    GuidStateSnafu, GuidanceError, GuidanceLaw, GuidanceMode, GuidancePhysicsSnafu, Spacecraft,
+    Vector3,
 };
-use crate::State;
 use crate::cosmic::eclipse::EclipseLocator;
 pub use crate::md::objective::Objective;
 pub use crate::md::StateParameter;
+use crate::State;
 use std::fmt;
 use std::sync::Arc;
 
@@ -47,10 +47,8 @@ pub struct Kluever {
 impl Kluever {
     /// Creates a new Kluever blended control law.
     pub fn new(objectives: &[Objective], weights: &[f64]) -> Arc<Self> {
-        let mut objs = Vec::with_capacity(objectives.len());
-        for obj in objectives {
-            objs.push(Some(*obj));
-        }
+        let objs: Vec<Option<Objective>> = objectives.iter().copied().map(Some).collect();
+
         Arc::new(Self {
             objectives: objs,
             weights: weights.to_vec(),
@@ -249,11 +247,7 @@ impl GuidanceLaw for Kluever {
     /// Either thrust full power or not at all
     fn throttle(&self, sc: &Spacecraft) -> Result<f64, GuidanceError> {
         if sc.mode() == GuidanceMode::Thrust {
-            if self.direction(sc)?.norm() > 0.0 {
-                Ok(1.0)
-            } else {
-                Ok(0.0)
-            }
+            Ok(1.0)
         } else {
             Ok(0.0)
         }
