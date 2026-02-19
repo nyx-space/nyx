@@ -114,7 +114,7 @@ impl KfEstimate<Spacecraft> {
 
         let mut rng = match seed {
             Some(seed) => Pcg64Mcg::new(seed),
-            None => Pcg64Mcg::try_from_rng(&mut SysRng).unwrap(),
+            None => Pcg64Mcg::try_from_rng(&mut SysRng::default()).unwrap(),
         };
         let dispersed_state = generator.sample(&mut rng);
 

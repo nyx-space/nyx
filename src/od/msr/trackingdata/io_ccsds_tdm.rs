@@ -421,7 +421,7 @@ impl TrackingDataArc {
         let trackers = self.unique_aliases();
 
         for tracker in trackers {
-            let tracker_data = self.clone().filter_by_tracker(&tracker);
+            let tracker_data = self.clone().filter_by_tracker(tracker.clone());
 
             let types = tracker_data.unique_types();
 

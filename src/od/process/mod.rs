@@ -48,9 +48,14 @@ mod initializers;
 #[derive(Clone, TypedBuilder)]
 #[builder(doc)]
 #[allow(clippy::upper_case_acronyms)]
-pub struct KalmanODProcess<D: Dynamics, MsrSize: DimName, Accel: DimName, Trk: TrackerSensitivity<D::StateType, D::StateType>>
-where
-    D::StateType: Interpolatable + Add<OVector<f64, <D::StateType as State>::Size>, Output = D::StateType>,
+pub struct KalmanODProcess<
+    D: Dynamics,
+    MsrSize: DimName,
+    Accel: DimName,
+    Trk: TrackerSensitivity<D::StateType, D::StateType>,
+> where
+    D::StateType:
+        Interpolatable + Add<OVector<f64, <D::StateType as State>::Size>, Output = D::StateType>,
     <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
     <DefaultAllocator as Allocator<<D::StateType as State>::Size>>::Buffer<f64>: Copy,
     <DefaultAllocator as Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>>::Buffer<f64>: Copy,
@@ -91,10 +96,15 @@ where
     _msr_size: PhantomData<MsrSize>,
 }
 
-impl<D: Dynamics, MsrSize: DimName, Accel: DimName, Trk: TrackerSensitivity<D::StateType, D::StateType>>
-    KalmanODProcess<D, MsrSize, Accel, Trk>
+impl<
+        D: Dynamics,
+        MsrSize: DimName,
+        Accel: DimName,
+        Trk: TrackerSensitivity<D::StateType, D::StateType>,
+    > KalmanODProcess<D, MsrSize, Accel, Trk>
 where
-    D::StateType: Interpolatable + Add<OVector<f64, <D::StateType as State>::Size>, Output = D::StateType>,
+    D::StateType:
+        Interpolatable + Add<OVector<f64, <D::StateType as State>::Size>, Output = D::StateType>,
     <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
     <DefaultAllocator as Allocator<<D::StateType as State>::Size>>::Buffer<f64>: Copy,
     <DefaultAllocator as Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>>::Buffer<f64>: Copy,
@@ -152,9 +162,7 @@ where
 
         // Set up the propagator instance.
         let prop = self.prop.clone();
-        let mut prop_instance = prop
-            .with(initial_estimate.nominal_state().with_stm(), self.almanac.clone())
-            .quiet();
+        let mut prop_instance = prop.with(initial_estimate.nominal_state().with_stm(), self.almanac.clone()).quiet();
 
         // Update the step size of the navigation propagator if it isn't already fixed step
         if !prop_instance.fixed_step {
@@ -162,10 +170,7 @@ where
         }
 
         let prop_time = arc.end_epoch().unwrap() - initial_estimate.epoch();
-        info!(
-            "Navigation propagating for a total of {prop_time} with step size {}",
-            self.max_step
-        );
+        info!("Navigation propagating for a total of {prop_time} with step size {}", self.max_step);
 
         let resid_crit = if arc.force_reject {
             warn!("Rejecting all measurements from {arc} as requested");
@@ -178,7 +183,10 @@ where
 
         let mut reported = [false; 11];
         reported[0] = true; // Prevent showing "0% done"
-        info!("Processing {num_msrs} measurements from {:?}", arc.unique_aliases());
+        info!(
+            "Processing {num_msrs} measurements from {:?}",
+            arc.unique_aliases()
+        );
 
         // Set up the Kalman filter.
         let mut kf = KalmanFilter::<D::StateType, Accel> {
@@ -222,7 +230,9 @@ where
                 traj.states.truncate(index);
 
                 debug!("propagate for {next_step_size} (Δt to next msr: {delta_t})");
-                let (_, traj_covar) = prop_instance.for_duration_with_traj(next_step_size).context(ODPropSnafu)?;
+                let (_, traj_covar) = prop_instance
+                    .for_duration_with_traj(next_step_size)
+                    .context(ODPropSnafu)?;
 
                 for state in traj_covar.states {
                     // NOTE: At the time being, only spacecraft estimation is possible, and the trajectory will always be the exact state
@@ -240,16 +250,22 @@ where
                 // Perform a measurement update, accounting for possible errors in measurement timestamps
                 if (nominal_state.epoch() - next_msr_epoch).abs() < self.epoch_precision {
                     if msr.rejected {
-                        debug!("Skipping manually rejected measurement at {epoch}");
-                        let est = kf.time_update(nominal_state)?;
-                        od_sol.push_time_update(est);
+                        debug!("Skipping manually rejected measurement at {}", epoch);
+                        match kf.time_update(nominal_state) {
+                            Ok(est) => {
+                                od_sol.push_time_update(est);
+                            }
+                            Err(e) => return Err(e),
+                        }
                         prop_instance.state.reset_stm();
                         msr_rejected_cnt += 1;
                     } else {
                         // Get the computed observations
                         match devices.get_mut(&msr.tracker) {
                             Some(device) => {
-                                if let Some(computed_meas) = device.measure(epoch, &traj, None, self.almanac.clone())? {
+                                if let Some(computed_meas) =
+                                    device.measure(epoch, &traj, None, self.almanac.clone())?
+                                {
                                     let msr_types = device.measurement_types();
 
                                     // Perform several measurement updates to ensure the desired dimensionality.
@@ -257,7 +273,12 @@ where
                                     let mut msr_rejected = false;
                                     for wno in 0..=windows {
                                         let mut cur_msr_types = IndexSet::new();
-                                        for msr_type in msr_types.iter().copied().skip(wno * MsrSize::DIM).take(MsrSize::DIM) {
+                                        for msr_type in msr_types
+                                            .iter()
+                                            .copied()
+                                            .skip(wno * MsrSize::DIM)
+                                            .take(MsrSize::DIM)
+                                        {
                                             cur_msr_types.insert(msr_type);
                                         }
 
@@ -267,31 +288,51 @@ where
                                         }
 
                                         // If this measurement type is unavailable, continue to the next one.
-                                        if !msr.availability(&cur_msr_types).iter().any(|avail| *avail) {
+                                        if !msr.availability(&cur_msr_types)
+                                            .iter()
+                                            .any(|avail| *avail)
+                                        {
                                             continue;
                                         }
 
                                         // Grab the un-modulo'd real observation
-                                        let mut real_obs: OVector<f64, MsrSize> = msr.observation(&cur_msr_types);
+                                        let mut real_obs: OVector<f64, MsrSize> =
+                                            msr.observation(&cur_msr_types);
 
                                         // Check that the observation is valid.
                                         for val in real_obs.iter().copied() {
-                                            ensure!(val.is_finite(), InvalidMeasurementSnafu { epoch: *epoch_ref, val });
+                                            ensure!(
+                                                val.is_finite(),
+                                                InvalidMeasurementSnafu {
+                                                    epoch: *epoch_ref,
+                                                    val
+                                                }
+                                            );
                                         }
 
                                         // Compute device specific matrices
-                                        let h_tilde =
-                                            device.h_tilde::<MsrSize>(msr, &cur_msr_types, &nominal_state, self.almanac.clone())?;
+                                        let h_tilde = device.h_tilde::<MsrSize>(
+                                            msr,
+                                            &cur_msr_types,
+                                            &nominal_state,
+                                            self.almanac.clone(),
+                                        )?;
 
-                                        let measurement_covar = device.measurement_covar_matrix(&cur_msr_types, epoch)?;
+                                        let measurement_covar = device
+                                            .measurement_covar_matrix(&cur_msr_types, epoch)?;
 
                                         // Apply any biases on the computed observation
-                                        let computed_obs = computed_meas.observation::<MsrSize>(&cur_msr_types)
-                                            - device.measurement_bias_vector::<MsrSize>(&cur_msr_types, epoch)?;
+                                        let computed_obs = computed_meas
+                                            .observation::<MsrSize>(&cur_msr_types)
+                                            - device.measurement_bias_vector::<MsrSize>(
+                                                &cur_msr_types,
+                                                epoch,
+                                            )?;
 
                                         // Apply the modulo to the real obs
                                         if let Some(moduli) = &arc.moduli {
-                                            let mut obs_ambiguity = OVector::<f64, MsrSize>::zeros();
+                                            let mut obs_ambiguity =
+                                                OVector::<f64, MsrSize>::zeros();
 
                                             for (i, msr_type) in cur_msr_types.iter().enumerate() {
                                                 if let Some(modulus) = moduli.get(msr_type) {
@@ -311,6 +352,11 @@ where
                                             h_tilde,
                                             resid_crit,
                                         )?;
+
+                                        debug!(
+                                            "processed measurement #{msr_cnt} for {cur_msr_types:?} @ {epoch} from {}",
+                                            device.name()
+                                        );
 
                                         residual.tracker = Some(device.name());
                                         residual.msr_types = cur_msr_types;
@@ -333,12 +379,18 @@ where
                                         msr_accepted_cnt += 1;
                                     }
                                 } else {
-                                    debug!("Device {} does not expect measurement at {epoch}, skipping", msr.tracker);
+                                    debug!(
+                                        "Device {} does not expect measurement at {epoch}, skipping",
+                                        msr.tracker
+                                    );
                                 }
                             }
                             None => {
                                 if !unknown_trackers.contains(&msr.tracker) {
-                                    error!("Tracker {} is not in the list of configured devices", msr.tracker);
+                                    error!(
+                                        "Tracker {} is not in the list of configured devices",
+                                        msr.tracker
+                                    );
                                 }
                                 unknown_trackers.insert(msr.tracker.clone());
                             }
@@ -349,8 +401,7 @@ where
                     if !reported[msr_prct] {
                         let msg = format!(
                             "{:>3}% done - {msr_accepted_cnt:.0} measurements accepted, {:.0} rejected",
-                            10 * msr_prct,
-                            msr_rejected_cnt
+                            10 * msr_prct, msr_rejected_cnt
                         );
                         if msr_accepted_cnt < msr_rejected_cnt {
                             warn!("{msg}");
@@ -379,7 +430,9 @@ where
         // Always report the 100% mark
         if !reported[10] {
             let tock_time = Epoch::now().unwrap() - tick;
-            info!("100% done - {msr_accepted_cnt} measurements accepted, {msr_rejected_cnt} rejected (done in {tock_time})",);
+            info!(
+                "100% done - {msr_accepted_cnt} measurements accepted, {msr_rejected_cnt} rejected (done in {tock_time})",
+            );
         }
 
         Ok(od_sol)
@@ -398,9 +451,8 @@ where
 
         // Set up the propagator instance.
         let prop = self.prop.clone();
-        let mut prop_instance = prop
-            .with(initial_estimate.nominal_state().with_stm(), self.almanac.clone())
-            .quiet();
+        let mut prop_instance = prop.with(initial_estimate.nominal_state().with_stm(), self.almanac.clone()).quiet();
+
 
         // Set up the Kalman filter.
         let mut kf = KalmanFilter::<D::StateType, Accel> {

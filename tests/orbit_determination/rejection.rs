@@ -117,11 +117,7 @@ fn od_rejection_test(
     let initial_count = arc_full.len();
     println!("Full arc has {} measurements", initial_count);
 
-    // Reject Madrid measurements
-    let arc_rejected = arc_full.clone().reject_by_tracker("Madrid");
-    // The number of measurements in the arc structure remains the same, but they are marked as rejected.
-    assert_eq!(arc_rejected.len(), initial_count);
-
+    // Create an initial estimate
     let covar_radius_km = 1.0e-6;
     let covar_velocity_km_s = 1.0e-6;
     let init_covar = SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([
@@ -136,7 +132,6 @@ fn od_rejection_test(
         0.0,
     ]));
 
-    // Define the initial estimate
     let initial_estimate = KfEstimate::from_covar(initial_state.into(), init_covar);
 
     let odp = SpacecraftKalmanOD::new(
@@ -147,28 +142,28 @@ fn od_rejection_test(
         almanac,
     );
 
+    // Process the full arc first
     let od_sol_full = odp.process_arc(initial_estimate, &arc_full).unwrap();
     let accepted_full = od_sol_full.accepted_residuals().len();
     println!("Full arc accepted residuals: {}", accepted_full);
 
+    // Drop the full solution to free memory
+    drop(od_sol_full);
+
+    // Reject Madrid measurements in place to save memory
+    let arc_rejected = arc_full.reject_by_tracker("Madrid".to_string());
+    // The number of measurements in the arc structure remains the same, but they are marked as rejected.
+    assert_eq!(arc_rejected.len(), initial_count);
+
+    // Process the rejected arc
     let od_sol_rejected = odp.process_arc(initial_estimate, &arc_rejected).unwrap();
     let accepted_rejected = od_sol_rejected.accepted_residuals().len();
     println!("Rejected arc accepted residuals: {}", accepted_rejected);
 
-    assert!(
-        accepted_rejected < accepted_full,
-        "Expected fewer accepted residuals after rejection"
-    );
+    assert!(accepted_rejected < accepted_full, "Expected fewer accepted residuals after rejection");
 
     // Check that we indeed rejected all Madrid measurements
     // We can check by iterating over residuals and checking if tracker "Madrid" is present in accepted residuals
-    let madrid_accepted = od_sol_rejected
-        .accepted_residuals()
-        .iter()
-        .filter(|r| r.tracker.as_ref().unwrap() == "Madrid")
-        .count();
-    assert_eq!(
-        madrid_accepted, 0,
-        "Expected 0 Madrid measurements to be accepted"
-    );
+    let madrid_accepted = od_sol_rejected.accepted_residuals().iter().filter(|r| r.tracker.as_ref().unwrap() == "Madrid").count();
+    assert_eq!(madrid_accepted, 0, "Expected 0 Madrid measurements to be accepted");
 }

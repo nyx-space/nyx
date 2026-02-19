@@ -95,9 +95,9 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                 if var.component.vec_index() < 3 {
                     // Then this is a position correction, which is not allowed if a frame is provided!
                     let msg = format!(
-                        "Variable is in frame {correction_frame:?} but that frame cannot be used for a {:?} correction",
-                        var.component
-                    );
+                    "Variable is in frame {correction_frame:?} but that frame cannot be used for a {:?} correction",
+                    var.component
+                );
                     error!("{msg}");
                     return Err(TargetingError::FrameError { msg });
                 }
@@ -307,9 +307,7 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                     obj.parameter,
                     achieved,
                     obj.desired_value,
-                    param_err,
-                    width = width,
-                    prec = max_obj_tol
+                    param_err, width=width, prec=max_obj_tol
                 ));
 
                 let mut pert_calc: Vec<_> = self

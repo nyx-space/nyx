@@ -113,7 +113,9 @@ impl TrackingDevice<Spacecraft> for InterlinkTxSpacecraft {
                 // TODO: This should support measurement alignment
                 // If out of traj bounds, return None, else the whole strand is rejected.
                 let rx_0 = match traj.at(epoch - integration_time).context(ODTrajSnafu {
-                    details: format!("fetching state {epoch} at start of ground station integration time {integration_time}"),
+                    details: format!(
+                        "fetching state {epoch} at start of ground station integration time {integration_time}"
+                    ),
                 }) {
                     Ok(rx) => rx,
                     Err(_) => return Ok(None),

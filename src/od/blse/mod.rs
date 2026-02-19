@@ -63,7 +63,8 @@ pub struct BatchLeastSquares<
     D: Dynamics,
     Trk: TrackerSensitivity<D::StateType, D::StateType>, // Use the same TrackerSensitivity
 > where
-    D::StateType: Interpolatable + Add<OVector<f64, <D::StateType as State>::Size>, Output = D::StateType>,
+    D::StateType:
+        Interpolatable + Add<OVector<f64, <D::StateType as State>::Size>, Output = D::StateType>,
     <D::StateType as State>::Size: DimName, // Add DimName bound for state size
     // Add Allocator constraints similar to KalmanODProcess, but using U1 for MsrSize
     <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
@@ -126,7 +127,9 @@ impl<D, Trk> BatchLeastSquares<D, Trk>
 where
     D: Dynamics,
     Trk: TrackerSensitivity<D::StateType, D::StateType> + Clone, // Add Clone requirement for Trk
-    D::StateType: Interpolatable + Add<OVector<f64, <D::StateType as State>::Size>, Output = D::StateType> + std::fmt::Debug, // Add Debug for logging
+    D::StateType: Interpolatable
+        + Add<OVector<f64, <D::StateType as State>::Size>, Output = D::StateType>
+        + std::fmt::Debug, // Add Debug for logging
     <D::StateType as State>::Size: DimName,
     <DefaultAllocator as Allocator<<D::StateType as State>::VecLength>>::Buffer<f64>: Send,
     <DefaultAllocator as Allocator<<D::StateType as State>::Size>>::Buffer<f64>: Copy,
@@ -140,7 +143,11 @@ where
         + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>,
 {
     /// Processes a tracking data arc to estimate the state using Batch Least Squares.
-    pub fn estimate(&self, initial_guess: D::StateType, arc: &TrackingDataArc) -> Result<BLSSolution<D::StateType>, ODError> {
+    pub fn estimate(
+        &self,
+        initial_guess: D::StateType,
+        arc: &TrackingDataArc,
+    ) -> Result<BLSSolution<D::StateType>, ODError> {
         let measurements = &arc.measurements;
         let num_measurements = measurements.len();
         let mut devices = self.devices.clone();
@@ -172,11 +179,7 @@ where
         // --- Iteration Loop ---
         while iter < self.max_iterations {
             iter += 1;
-            info!(
-                "[{iter}/{}] Current estimate: {}",
-                self.max_iterations,
-                current_estimate.orbit()
-            );
+            info!("[{iter}/{}] Current estimate: {}", self.max_iterations, current_estimate.orbit());
 
             // Re-initialize matrices for this iteration
             // Information Matrix: Lambda = H^T * W * H
@@ -221,7 +224,10 @@ where
                             Some(d) => d,
                             None => {
                                 if !unknown_trackers.contains(&msr.tracker) {
-                                    error!("Tracker {} is not in the list of configured devices", msr.tracker);
+                                    error!(
+                                        "Tracker {} is not in the list of configured devices",
+                                        msr.tracker
+                                    );
                                 }
                                 unknown_trackers.insert(msr.tracker.clone());
                                 continue;
@@ -232,18 +238,17 @@ where
                             let mut msr_types = IndexSet::new();
                             msr_types.insert(msr_type);
 
-                            let h_tilde = device.h_tilde::<U1>(msr, &msr_types, &this_state, self.almanac.clone())?;
+                            let h_tilde = device
+                            .h_tilde::<U1>(msr, &msr_types, &this_state, self.almanac.clone())?;
 
                             // Compute expected measurement H(X(t_i))
-                            let computed_meas_opt = device.measure_instantaneous(this_state, None, self.almanac.clone())?;
+                            let computed_meas_opt = device
+                                .measure_instantaneous(this_state, None, self.almanac.clone())?;
 
                             let computed_meas = match computed_meas_opt {
                                 Some(cm) => cm,
                                 None => {
-                                    debug!(
-                                        "Device {} does not expect measurement at epoch {msr_epoch}, skipping",
-                                        msr.tracker
-                                    );
+                                    debug!("Device {} does not expect measurement at epoch {msr_epoch}, skipping", msr.tracker);
                                     continue;
                                 }
                             };
@@ -267,7 +272,8 @@ where
                             let residual = real_obs - computed_obs;
 
                             // Get measurement variance R (assuming 1x1 matrix) and weight W = 1/R
-                            let r_matrix = device.measurement_covar_matrix::<U1>(&msr_types, msr_epoch)?;
+                            let r_matrix = device
+                                .measurement_covar_matrix::<U1>(&msr_types, msr_epoch)?;
                             let r_variance = r_matrix[(0, 0)];
 
                             ensure!(r_variance > 0.0, SingularNoiseRkSnafu);
@@ -301,8 +307,8 @@ where
                 BLSSolver::NormalEquations => {
                     // Solve Lambda * dx = N => dx = Lambda^-1 * N
                     let info_matrix_chol = match info_matrix.cholesky() {
-                        Some(chol) => chol,
-                        None => return Err(ODError::SingularInformationMatrix),
+                         Some(chol) => chol,
+                         None => return Err(ODError::SingularInformationMatrix)
                     };
                     state_correction = info_matrix_chol.solve(&normal_matrix);
                     // Assume NE always decreases cost locally
@@ -310,9 +316,9 @@ where
                     current_rms = current_iter_rms;
                 }
                 BLSSolver::LevenbergMarquardt => {
-                    // Solve (Lambda + lambda * D^T D) * dx = N
-                    // D^T D is a diagonal scaling matrix.
-                    // Common choices: D^T D = I or D^T D = diag(Lambda)
+                     // Solve (Lambda + lambda * D^T D) * dx = N
+                     // D^T D is a diagonal scaling matrix.
+                     // Common choices: D^T D = I or D^T D = diag(Lambda)
                     let mut d_sq = StateMatrix::<D>::identity();
                     if self.lm_use_diag_scaling {
                         // Use D^T D = diag(Lambda)
@@ -323,10 +329,7 @@ where
                         for i in 0..6 {
                             if d_sq[(i, i)] <= 0.0 {
                                 d_sq[(i, i)] = 1e-6; // Set a small positive floor
-                                warn!(
-                                    "LM Scaling: Found non-positive diagonal element {} in H^TWH, using floor.",
-                                    info_matrix[(i, i)]
-                                );
+                                warn!("LM Scaling: Found non-positive diagonal element {} in H^TWH, using floor.", info_matrix[(i, i)]);
                             }
                         }
                     } // else d_sq remains Identity
@@ -347,20 +350,19 @@ where
                             lambda /= self.lm_lambda_decrease;
                             // Clamp to min
                             lambda = lambda.max(self.lm_lambda_min);
-                            debug!(
-                                "LM: Cost decreased (RMS {current_rms} -> {current_iter_rms}). Decreasing lambda to {lambda}"
-                            );
+                            debug!("LM: Cost decreased (RMS {current_rms} -> {current_iter_rms}). Decreasing lambda to {lambda}");
                             current_rms = current_iter_rms;
                         } else {
-                            // Cost increased or stalled
-                            iteration_cost_decreased = false;
-                            // Increase damping
-                            lambda *= self.lm_lambda_increase;
-                            // Clamp to max
-                            lambda = lambda.min(self.lm_lambda_max);
-                            debug!("LM: Cost increased/stalled (RMS {current_rms} -> {current_iter_rms}). Increasing lambda to {lambda}");
-                            // Don't update current_rms baseline if cost increased
+                             // Cost increased or stalled
+                             iteration_cost_decreased = false;
+                             // Increase damping
+                             lambda *= self.lm_lambda_increase;
+                             // Clamp to max
+                             lambda = lambda.min(self.lm_lambda_max);
+                             debug!("LM: Cost increased/stalled (RMS {current_rms} -> {current_iter_rms}). Increasing lambda to {lambda}");
+                             // Don't update current_rms baseline if cost increased
                         }
+
                     } else {
                         // Augmented matrix is singular, increase lambda significantly and retry
                         warn!("LM: Augmented matrix (H^TWH + lambda*D^2) singular with lambda={lambda}. Increasing lambda.");
@@ -390,20 +392,20 @@ where
 
                 // Update the covariance
                 current_covariance = match info_matrix.udu() {
-                    Some(info_udu) => match info_udu.u.try_inverse() {
-                        None => {
-                            warn!("Information matrix H^TWH is singular.");
-                            StateMatrix::<D>::identity()
-                        }
-                        Some(u_inv) => {
-                            let d_inv_v = OVector::<f64, <D::StateType as State>::Size>::from_iterator(
-                                info_udu.d.iter().map(|d_ii| 1.0 / d_ii),
-                            );
-                            let d_inv = OMatrix::from_diagonal(&d_inv_v);
-                            let y = d_inv * u_inv;
-                            u_inv.transpose() * y
-                        }
-                    },
+                    Some(info_udu) => {
+                        match info_udu.u.try_inverse() {
+                            None =>{
+                                warn!("Information matrix H^TWH is singular.");
+                                StateMatrix::<D>::identity()
+                            },
+                            Some(u_inv) => {
+                                let d_inv_v = OVector::<f64,<D::StateType as State>::Size>::from_iterator(info_udu.d.iter().map(|d_ii| 1.0 / d_ii));
+                                let d_inv = OMatrix::from_diagonal(&d_inv_v);
+                                let y = d_inv * u_inv;
+                                u_inv.transpose() * y
+                                }
+                            }
+                    }
                     None => {
                         warn!("Information matrix H^TWH is singular.");
                         StateMatrix::<D>::identity()
@@ -417,11 +419,11 @@ where
                     break;
                 }
             } else if self.solver == BLSSolver::LevenbergMarquardt {
-                // LM step was rejected (cost increased)
-                info!("[{iter}/{}] LM: Step rejected, increasing lambda.", self.max_iterations);
-                // Reset correction norm as step was bad
-                corr_pos_km = f64::MAX;
-                // The loop will continue with the increased lambda
+                 // LM step was rejected (cost increased)
+                 info!("[{iter}/{}] LM: Step rejected, increasing lambda.", self.max_iterations);
+                 // Reset correction norm as step was bad
+                 corr_pos_km = f64::MAX;
+                 // The loop will continue with the increased lambda
             }
         }
 

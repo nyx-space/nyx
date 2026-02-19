@@ -202,9 +202,7 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                     obj.parameter,
                     achieved,
                     obj.desired_value,
-                    param_err,
-                    width = width,
-                    prec = max_obj_tol
+                    param_err, width=width, prec=max_obj_tol
                 ));
 
                 // Build the Jacobian with the partials of the objectives with respect to all of the final state parameters

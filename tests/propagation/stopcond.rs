@@ -56,10 +56,7 @@ fn stop_cond_3rd_apo_cov_test(almanac: Arc<Almanac>) {
     let mut prev_event_match = events[0].orbit.epoch;
     for event_match in events.iter().skip(1) {
         let delta_period = event_match.orbit.epoch - prev_event_match - period;
-        assert!(
-            delta_period.abs() < 0.5.seconds(),
-            "in two body dyn, event finding should be extremely precise, instead time error of {delta_period}"
-        );
+        assert!(delta_period.abs() < 0.5.seconds(), "in two body dyn, event finding should be extremely precise, instead time error of {delta_period}");
         prev_event_match = event_match.orbit.epoch;
     }
 
@@ -120,10 +117,7 @@ fn stop_cond_3rd_peri(almanac: Arc<Almanac>) {
     for event_match in events.iter().skip(1) {
         let delta_period = event_match.orbit.epoch - prev_event_match - period;
         println!("{:x}", event_match.orbit);
-        assert!(
-            delta_period.abs() < 0.3.seconds(),
-            "in two body dyn, event finding should be extremely precise, instead time error of {delta_period}"
-        );
+        assert!(delta_period.abs() < 0.3.seconds(), "in two body dyn, event finding should be extremely precise, instead time error of {delta_period}");
         prev_event_match = event_match.orbit.epoch;
     }
 

@@ -64,7 +64,9 @@ fn energy_conservation(almanac: Arc<Almanac>) {
     let rk89_energy_bleed =
         rk89_final.orbit.energy_km2_s2().unwrap() - start_state.energy_km2_s2().unwrap();
 
-    println!("[RK89] ==> energy_conservation absolute errors with RK89 val state\tenergy bleed = {rk89_energy_bleed:e}");
+    println!(
+        "[RK89] ==> energy_conservation absolute errors with RK89 val state\tenergy bleed = {rk89_energy_bleed:e}"
+    );
     let delta = rk89_final.orbit.to_cartesian_pos_vel() - rslt.to_cartesian_pos_vel();
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());
@@ -83,7 +85,9 @@ fn energy_conservation(almanac: Arc<Almanac>) {
     let dp78_energy_bleed =
         dp78_final.orbit.energy_km2_s2().unwrap() - start_state.energy_km2_s2().unwrap();
 
-    println!("[DP78] ==> energy_conservation absolute errors with RK89 val state\tenergy bleed = {dp78_energy_bleed:e}");
+    println!(
+        "[DP78] ==> energy_conservation absolute errors with RK89 val state\tenergy bleed = {dp78_energy_bleed:e}"
+    );
     let delta = dp78_final.orbit.to_cartesian_pos_vel() - rslt.to_cartesian_pos_vel();
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());

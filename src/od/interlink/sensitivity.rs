@@ -65,11 +65,12 @@ where
                 // Skip computation, this row is zero anyway.
                 continue;
             }
-            let scalar_h = <ScalarSensitivity<Spacecraft, Spacecraft, InterlinkTxSpacecraft> as ScalarSensitivityT<
-                Spacecraft,
-                Spacecraft,
-                InterlinkTxSpacecraft,
-            >>::new(*msr_type, msr, rx, self, almanac.clone())?;
+            let scalar_h =
+                <ScalarSensitivity<Spacecraft, Spacecraft, InterlinkTxSpacecraft> as ScalarSensitivityT<
+                    Spacecraft,
+                    Spacecraft,
+                    InterlinkTxSpacecraft,
+                >>::new(*msr_type, msr, rx, self, almanac.clone())?;
 
             mat.set_row(ith_row, &scalar_h.sensitivity_row);
         }
