@@ -18,8 +18,9 @@
 
 use std::ops::{Mul, MulAssign};
 
+use crate::io::ConfigError;
 use anise::constants::SPEED_OF_LIGHT_KM_S;
-use der::{Decode, Encode, Reader};
+use der::Sequence;
 use hifitime::{Duration, Epoch};
 use rand::Rng;
 use rand_distr::Normal;
@@ -31,7 +32,7 @@ use pyo3::prelude::*;
 use super::Stochastics;
 
 /// White noise is an uncorrelated random variable.
-#[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize, Sequence)]
 #[cfg_attr(feature = "python", pyclass(get_all, set_all))]
 pub struct WhiteNoise {
     /// Mean value of this white noise
@@ -43,11 +44,16 @@ pub struct WhiteNoise {
 impl WhiteNoise {
     /// Initializes a new random walk stochastic noise model from the process noise and the integration time.
     /// This will compute the process noise per second automatically.
-    pub fn new(process_noise: f64, integration_time: Duration) -> Self {
-        Self {
+    pub fn new(process_noise: f64, integration_time: Duration) -> Result<Self, ConfigError> {
+        if process_noise.is_sign_negative() {
+            return Err(ConfigError::InvalidConfig {
+                msg: format!("process noise must be positive: {process_noise}"),
+            });
+        }
+        Ok(Self {
             sigma: process_noise / integration_time.to_seconds(),
             ..Default::default()
-        }
+        })
     }
 
     /// Initializes a new random walk stochastic noise model from the provided process noise, assuming that the noise level
@@ -97,26 +103,6 @@ impl Mul<f64> for WhiteNoise {
 impl MulAssign<f64> for WhiteNoise {
     fn mul_assign(&mut self, rhs: f64) {
         *self = *self * rhs;
-    }
-}
-
-impl Encode for WhiteNoise {
-    fn encoded_len(&self) -> der::Result<der::Length> {
-        self.mean.encoded_len()? + self.sigma.encoded_len()?
-    }
-
-    fn encode(&self, encoder: &mut impl der::Writer) -> der::Result<()> {
-        self.mean.encode(encoder)?;
-        self.sigma.encode(encoder)
-    }
-}
-
-impl<'a> Decode<'a> for WhiteNoise {
-    fn decode<R: Reader<'a>>(decoder: &mut R) -> der::Result<Self> {
-        Ok(Self {
-            mean: decoder.decode()?,
-            sigma: decoder.decode()?,
-        })
     }
 }
 

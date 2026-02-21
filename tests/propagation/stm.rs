@@ -2,6 +2,7 @@ extern crate nyx_space as nyx;
 use std::sync::Arc;
 
 use anise::constants::celestial_objects::{MOON, SUN};
+use der::{Decode, Encode};
 use nyx::cosmic::{Orbit, Spacecraft};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::linalg::{Const, Matrix6, OVector};
@@ -46,6 +47,12 @@ fn stm_fixed_step(almanac: Arc<Almanac>) {
         let init = Spacecraft::from(Orbit::keplerian(
             8000.0, ecc, 10.0, 5.0, 25.0, 0.0, epoch, eme2k,
         ));
+
+        // ASN1 test
+        let mut buf = vec![];
+        init.encode_to_vec(&mut buf).expect("could not encode");
+        let rebuilt = Spacecraft::from_der(&buf).expect("could not decode");
+        assert_eq!(init, rebuilt);
 
         let ten_steps = prop
             .with(init.with_stm(), almanac.clone())

@@ -16,8 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use anise::astro::{Aberration, AzElRange, Location, PhysicsResult};
-use anise::errors::AlmanacResult;
+use anise::astro::{Aberration, AzElRange, Location};
+use anise::errors::{AlmanacError, AlmanacResult};
 use anise::prelude::{Almanac, Frame, Orbit};
 use der::{Decode, Encode, Reader};
 use indexmap::{IndexMap, IndexSet};
@@ -77,21 +77,29 @@ impl GroundStation {
         };
         almanac.azimuth_elevation_range_sez(
             rx,
-            self.to_orbit(rx.epoch, almanac).unwrap(),
+            self.to_orbit(rx.epoch, almanac)?,
             obstructing_body,
             ab_corr,
         )
     }
 
     /// Return this ground station as an orbit in its current frame
-    pub fn to_orbit(&self, epoch: Epoch, almanac: &Almanac) -> PhysicsResult<Orbit> {
+    pub fn to_orbit(&self, epoch: Epoch, almanac: &Almanac) -> AlmanacResult<Orbit> {
         Orbit::try_latlongalt(
             self.location.latitude_deg,
             self.location.longitude_deg,
             self.location.height_km,
             epoch,
-            almanac.frame_info(self.location.frame).unwrap(),
+            almanac.frame_info(self.location.frame).map_err(|source| {
+                AlmanacError::GenericError {
+                    err: source.to_string(),
+                }
+            })?,
         )
+        .map_err(|source| AlmanacError::AlmanacPhysics {
+            action: "building ground station location",
+            source: Box::new(source),
+        })
     }
 }
 
@@ -278,6 +286,12 @@ impl Default for GroundStation {
 
 impl ConfigRepr for GroundStation {}
 
+#[derive(der::Sequence)]
+struct MsrNoisePair {
+    msr_type: MeasurementType,
+    noise: StochasticNoise,
+}
+
 impl<'a> Decode<'a> for GroundStation {
     fn decode<R: Reader<'a>>(decoder: &mut R) -> der::Result<Self> {
         let name: String = decoder.decode()?;
@@ -306,11 +320,6 @@ impl<'a> Decode<'a> for GroundStation {
         let stochastic_noises = if flags & (1 << 2) != 0 {
             // Stochastic noises are stored as a sequence of (MeasurementType, StochasticNoise) tuples (SEQUENCE of SEQUENCE)
             // We define a helper struct for decoding
-            #[derive(der::Sequence)]
-            struct MsrNoisePair {
-                msr_type: MeasurementType,
-                noise: StochasticNoise,
-            }
 
             let stochastics_vec: Vec<MsrNoisePair> = decoder.decode()?;
             let mut map = IndexMap::new();
@@ -340,13 +349,6 @@ impl Encode for GroundStation {
 
         let integration_time_ns = self.integration_time.map(|d| d.total_nanoseconds());
 
-        // Helper for encoding map
-        #[derive(der::Sequence)]
-        struct MsrNoisePair {
-            msr_type: MeasurementType,
-            noise: StochasticNoise,
-        }
-
         let stochastics_vec = self.stochastic_noises.as_ref().map(|map| {
             map.iter()
                 .map(|(k, v)| MsrNoisePair {
@@ -370,7 +372,7 @@ impl Encode for GroundStation {
         self.name.encode(encoder)?;
         self.location.encode(encoder)?;
 
-        let msr_types_vec: Vec<MeasurementType> = self.measurement_types.iter().cloned().collect();
+        let msr_types_vec: Vec<MeasurementType> = self.measurement_types.iter().copied().collect();
         msr_types_vec.encode(encoder)?;
 
         self.light_time_correction.encode(encoder)?;
@@ -380,13 +382,6 @@ impl Encode for GroundStation {
         integration_time_ns.encode(encoder)?;
 
         self.timestamp_noise_s.encode(encoder)?;
-
-        // Helper for encoding map
-        #[derive(der::Sequence)]
-        struct MsrNoisePair {
-            msr_type: MeasurementType,
-            noise: StochasticNoise,
-        }
 
         let stochastics_vec = self.stochastic_noises.as_ref().map(|map| {
             map.iter()

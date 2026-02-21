@@ -3,17 +3,17 @@ extern crate nyx_space as nyx;
 
 use std::sync::Arc;
 
-use anise::analysis::prelude::{
-    find_arc_intersections, Condition, Event, OrbitalElement, ScalarExpr,
-};
-use nyx_space::State;
-
 use self::nyx::cosmic::{GuidanceMode, Orbit, Spacecraft};
 use self::nyx::dynamics::guidance::{Objective, Ruggiero, Thruster};
 use self::nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
 use self::nyx::md::StateParameter;
 use self::nyx::propagators::{IntegratorOptions, Propagator};
 use self::nyx::time::{Epoch, Unit};
+use anise::analysis::prelude::{
+    find_arc_intersections, Condition, Event, OrbitalElement, ScalarExpr,
+};
+use der::{Decode, Encode};
+use nyx_space::State;
 
 /// NOTE: Herein shows the difference between the QLaw and Ruggiero (and other control laws).
 /// The Ruggiero control law takes quite some longer to converge than the QLaw.
@@ -70,6 +70,11 @@ fn qlaw_as_ruggiero_case_a(almanac: Arc<Almanac>) {
 
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
+
+    let mut buf = vec![];
+    sc_state.encode_to_vec(&mut buf).expect("could not encode");
+    let rebuilt = Spacecraft::from_der(&buf).expect("could not decode");
+    assert_eq!(sc_state, rebuilt);
 
     let sc_dynamics = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_a] {orbit:x}");
