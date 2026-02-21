@@ -25,10 +25,14 @@ use rand::Rng;
 use rand_distr::Normal;
 use serde_derive::{Deserialize, Serialize};
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
 use super::Stochastics;
 
 /// White noise is an uncorrelated random variable.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "python", pyclass(get_all, set_all))]
 pub struct WhiteNoise {
     /// Mean value of this white noise
     pub mean: f64,

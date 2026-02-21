@@ -37,8 +37,16 @@ use std::fmt::{self, Debug};
 pub mod builtin;
 pub mod trk_device;
 
+#[cfg(feature = "python")]
+use pyo3::exceptions::PyValueError;
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+#[cfg(feature = "python")]
+use pyo3::types::{PyBytes, PyType};
+
 /// GroundStation defines a two-way ranging and doppler station.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "python", pyclass)]
 pub struct GroundStation {
     pub name: String,
     pub location: Location,
@@ -50,6 +58,41 @@ pub struct GroundStation {
     /// Noise on the timestamp of the measurement
     pub timestamp_noise_s: Option<StochasticNoise>,
     pub stochastic_noises: Option<IndexMap<MeasurementType, StochasticNoise>>,
+}
+
+#[cfg_attr(feature = "python", pymethods)]
+impl GroundStation {
+    /// Computes the azimuth and elevation of the provided object seen from this ground station, both in degrees.
+    /// This is a shortcut to almanac.azimuth_elevation_range_sez.
+    pub fn azimuth_elevation_of(
+        &self,
+        rx: Orbit,
+        obstructing_body: Option<Frame>,
+        almanac: &Almanac,
+    ) -> AlmanacResult<AzElRange> {
+        let ab_corr = if self.light_time_correction {
+            Aberration::LT
+        } else {
+            Aberration::NONE
+        };
+        almanac.azimuth_elevation_range_sez(
+            rx,
+            self.to_orbit(rx.epoch, almanac).unwrap(),
+            obstructing_body,
+            ab_corr,
+        )
+    }
+
+    /// Return this ground station as an orbit in its current frame
+    pub fn to_orbit(&self, epoch: Epoch, almanac: &Almanac) -> PhysicsResult<Orbit> {
+        Orbit::try_latlongalt(
+            self.location.latitude_deg,
+            self.location.longitude_deg,
+            self.location.height_km,
+            epoch,
+            almanac.frame_info(self.location.frame).unwrap(),
+        )
+    }
 }
 
 impl GroundStation {
@@ -141,38 +184,6 @@ impl GroundStation {
         Ok(self)
     }
 
-    /// Computes the azimuth and elevation of the provided object seen from this ground station, both in degrees.
-    /// This is a shortcut to almanac.azimuth_elevation_range_sez.
-    pub fn azimuth_elevation_of(
-        &self,
-        rx: Orbit,
-        obstructing_body: Option<Frame>,
-        almanac: &Almanac,
-    ) -> AlmanacResult<AzElRange> {
-        let ab_corr = if self.light_time_correction {
-            Aberration::LT
-        } else {
-            Aberration::NONE
-        };
-        almanac.azimuth_elevation_range_sez(
-            rx,
-            self.to_orbit(rx.epoch, almanac).unwrap(),
-            obstructing_body,
-            ab_corr,
-        )
-    }
-
-    /// Return this ground station as an orbit in its current frame
-    pub fn to_orbit(&self, epoch: Epoch, almanac: &Almanac) -> PhysicsResult<Orbit> {
-        Orbit::try_latlongalt(
-            self.location.latitude_deg,
-            self.location.longitude_deg,
-            self.location.height_km,
-            epoch,
-            almanac.frame_info(self.location.frame).unwrap(),
-        )
-    }
-
     /// Returns the noises for all measurement types configured for this ground station at the provided epoch, timestamp noise is the first entry.
     fn noises(&mut self, epoch: Epoch, rng: Option<&mut Pcg64Mcg>) -> Result<Vec<f64>, ODError> {
         let mut noises = vec![0.0; self.measurement_types.len() + 1];
@@ -218,6 +229,33 @@ impl GroundStation {
             bits |= 1 << 2;
         }
         bits
+    }
+}
+
+#[cfg(feature = "python")]
+#[cfg_attr(feature = "python", pymethods)]
+impl GroundStation {
+    /// Decodes an ASN.1 DER encoded byte array into a GroundStation object.
+    ///
+    /// :type data: bytes
+    /// :rtype: GroundStation
+    #[classmethod]
+    pub fn from_asn1(_cls: &Bound<'_, PyType>, data: &[u8]) -> PyResult<Self> {
+        match Self::from_der(data) {
+            Ok(obj) => Ok(obj),
+            Err(e) => Err(PyValueError::new_err(format!("ASN.1 decoding error: {e}"))),
+        }
+    }
+
+    /// Encodes this GroundStation object into an ASN.1 DER encoded byte array.
+    ///
+    /// :rtype: bytes
+    pub fn to_asn1<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
+        let mut buf = Vec::new();
+        match self.encode_to_vec(&mut buf) {
+            Ok(_) => Ok(PyBytes::new(py, &buf)),
+            Err(e) => Err(PyValueError::new_err(format!("ASN.1 encoding error: {e}"))),
+        }
     }
 }
 

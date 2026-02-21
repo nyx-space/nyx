@@ -37,6 +37,9 @@ pub mod gauss_markov;
 pub mod link_specific;
 pub mod white;
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
 pub use gauss_markov::GaussMarkov;
 pub use white::WhiteNoise;
 
@@ -53,6 +56,7 @@ pub trait Stochastics {
 ///
 /// This implementation distinguishes between the white noise model and the bias model. It also includes a constant offset.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "python", pyclass(get_all, set_all))]
 pub struct StochasticNoise {
     pub white_noise: Option<WhiteNoise>,
     pub bias: Option<GaussMarkov>,

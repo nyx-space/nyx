@@ -26,6 +26,9 @@ use serde_derive::{Deserialize, Serialize};
 use std::fmt;
 use std::ops::{Mul, MulAssign};
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
 use super::Stochastics;
 
 /// A first order Gauss-Markov process for modeling biases as described in section 5.2.4 of the NASA Best Practices for Navigation Filters (D'Souza et al.).
@@ -40,6 +43,7 @@ use super::Stochastics;
 ///
 /// s(t - t_0) = ((q * τ) / 2) * (1 - exp((-2 / τ) * (t - t_0)))
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "python", pyclass(get_all, set_all))]
 pub struct GaussMarkov {
     /// The time constant, tau gives the correlation time, or the time over which the intensity of the time correlation will fade to 1/e of its prior value. (This is sometimes incorrectly referred to as the "half-life" of the process.)
     pub tau: Duration,
