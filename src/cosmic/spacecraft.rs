@@ -22,7 +22,7 @@ use anise::constants::frames::EARTH_J2000;
 pub use anise::prelude::Orbit;
 
 pub use anise::structure::spacecraft::{DragData, Mass, SRPData};
-use der::{Encode, Enumerated};
+use der::{Decode, Encode, Enumerated, Reader};
 use nalgebra::Vector3;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
@@ -613,14 +613,19 @@ impl Add<OVector<f64, Const<9>>> for Spacecraft {
     }
 }
 
-impl<'a> der::DecodeValue<'a> for Spacecraft {
-    fn decode_value<R: der::Reader<'a>>(reader: &mut R, _header: der::Header) -> der::Result<Self> {
-        let orbit = reader.decode()?;
-        let mass = reader.decode()?;
-        let srp = reader.decode()?;
-        let drag = reader.decode()?;
-        let thruster = reader.decode()?;
-        let mode = reader.decode()?;
+impl<'a> Decode<'a> for Spacecraft {
+    fn decode<R: Reader<'a>>(decoder: &mut R) -> der::Result<Self> {
+        let orbit = decoder.decode()?;
+        let mass = decoder.decode()?;
+        let srp = decoder.decode()?;
+        let drag = decoder.decode()?;
+        let mode = decoder.decode()?;
+        // Decode the thruster last, checking the presence flag
+        let thruster = if decoder.decode::<bool>()? {
+            Some(decoder.decode()?)
+        } else {
+            None
+        };
 
         Ok(Spacecraft {
             orbit,
@@ -634,28 +639,33 @@ impl<'a> der::DecodeValue<'a> for Spacecraft {
     }
 }
 
-impl der::EncodeValue for Spacecraft {
-    fn value_len(&self) -> der::Result<der::Length> {
+impl Encode for Spacecraft {
+    fn encoded_len(&self) -> der::Result<der::Length> {
         self.orbit.encoded_len()?
             + self.mass.encoded_len()?
             + self.srp.encoded_len()?
             + self.drag.encoded_len()?
-            + self.thruster.encoded_len()?
             + self.mode.encoded_len()?
+            + self.thruster.is_some().encoded_len()?
+            + self.thruster.encoded_len()?
     }
 
-    fn encode_value(&self, encoder: &mut impl der::Writer) -> der::Result<()> {
+    fn encode(&self, encoder: &mut impl der::Writer) -> der::Result<()> {
         self.orbit.encode(encoder)?;
         self.mass.encode(encoder)?;
         self.srp.encode(encoder)?;
         self.drag.encode(encoder)?;
-        self.thruster.encode(encoder)?;
         self.mode.encode(encoder)?;
+        if let Some(thruster) = self.thruster {
+            true.encode(encoder)?;
+            thruster.encode(encoder)?;
+        } else {
+            false.encode(encoder)?
+        };
+
         Ok(())
     }
 }
-
-impl<'a> der::Sequence<'a> for Spacecraft {}
 
 impl ConfigRepr for Spacecraft {}
 

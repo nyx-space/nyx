@@ -19,7 +19,7 @@
 use crate::io::{ConfigError, ConfigRepr};
 use hifitime::{Duration, Epoch, TimeUnits};
 
-use der::Encode;
+use der::{Decode, Encode, Reader};
 use rand::Rng;
 use rand_distr::Normal;
 use serde_derive::{Deserialize, Serialize};
@@ -169,14 +169,41 @@ impl MulAssign<f64> for GaussMarkov {
     }
 }
 
-impl<'a> der::DecodeValue<'a> for GaussMarkov {
-    fn decode_value<R: der::Reader<'a>>(reader: &mut R, _header: der::Header) -> der::Result<Self> {
-        let tau_s = reader.decode::<f64>()?;
-        let process_noise = reader.decode()?;
-        let constant = reader.decode()?;
+impl Encode for GaussMarkov {
+    fn encoded_len(&self) -> der::Result<der::Length> {
+        self.tau.total_nanoseconds().encoded_len()?
+            + self.process_noise.encoded_len()?
+            + if let Some(constant) = self.constant {
+                (true.encoded_len()? + constant.encoded_len()?)?
+            } else {
+                false.encoded_len()?
+            }
+    }
+
+    fn encode(&self, encoder: &mut impl der::Writer) -> der::Result<()> {
+        self.tau.total_nanoseconds().encode(encoder)?;
+        self.process_noise.encode(encoder)?;
+        if let Some(constant) = self.constant {
+            true.encode(encoder)?;
+            constant.encode(encoder)
+        } else {
+            false.encode(encoder)
+        }
+    }
+}
+
+impl<'a> Decode<'a> for GaussMarkov {
+    fn decode<R: Reader<'a>>(decoder: &mut R) -> der::Result<Self> {
+        let tau = Duration::from_total_nanoseconds(decoder.decode::<i128>()?);
+        let process_noise = decoder.decode()?;
+        let constant = if decoder.decode::<bool>()? {
+            Some(decoder.decode()?)
+        } else {
+            None
+        };
 
         Ok(Self {
-            tau: Duration::from_seconds(tau_s),
+            tau,
             process_noise,
             constant,
             prev_epoch: None,
@@ -184,23 +211,6 @@ impl<'a> der::DecodeValue<'a> for GaussMarkov {
         })
     }
 }
-
-impl der::EncodeValue for GaussMarkov {
-    fn value_len(&self) -> der::Result<der::Length> {
-        self.tau.to_seconds().encoded_len()?
-            + self.process_noise.encoded_len()?
-            + self.constant.encoded_len()?
-    }
-
-    fn encode_value(&self, encoder: &mut impl der::Writer) -> der::Result<()> {
-        self.tau.to_seconds().encode(encoder)?;
-        self.process_noise.encode(encoder)?;
-        self.constant.encode(encoder)?;
-        Ok(())
-    }
-}
-
-impl<'a> der::Sequence<'a> for GaussMarkov {}
 
 impl ConfigRepr for GaussMarkov {}
 

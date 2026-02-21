@@ -19,6 +19,7 @@
 use std::ops::{Mul, MulAssign};
 
 use anise::constants::SPEED_OF_LIGHT_KM_S;
+use der::{Decode, Encode, Reader};
 use hifitime::{Duration, Epoch};
 use rand::Rng;
 use rand_distr::Normal;
@@ -27,7 +28,7 @@ use serde_derive::{Deserialize, Serialize};
 use super::Stochastics;
 
 /// White noise is an uncorrelated random variable.
-#[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize, der::Sequence)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct WhiteNoise {
     /// Mean value of this white noise
     pub mean: f64,
@@ -92,6 +93,26 @@ impl Mul<f64> for WhiteNoise {
 impl MulAssign<f64> for WhiteNoise {
     fn mul_assign(&mut self, rhs: f64) {
         *self = *self * rhs;
+    }
+}
+
+impl Encode for WhiteNoise {
+    fn encoded_len(&self) -> der::Result<der::Length> {
+        self.mean.encoded_len()? + self.sigma.encoded_len()?
+    }
+
+    fn encode(&self, encoder: &mut impl der::Writer) -> der::Result<()> {
+        self.mean.encode(encoder)?;
+        self.sigma.encode(encoder)
+    }
+}
+
+impl<'a> Decode<'a> for WhiteNoise {
+    fn decode<R: Reader<'a>>(decoder: &mut R) -> der::Result<Self> {
+        Ok(Self {
+            mean: decoder.decode()?,
+            sigma: decoder.decode()?,
+        })
     }
 }
 

@@ -19,7 +19,7 @@
 use anise::astro::{Aberration, AzElRange, Location, PhysicsResult};
 use anise::errors::AlmanacResult;
 use anise::prelude::{Almanac, Frame, Orbit};
-use der::Encode;
+use der::{Decode, Encode, Reader};
 use indexmap::{IndexMap, IndexSet};
 use snafu::ensure;
 
@@ -32,7 +32,7 @@ use crate::time::Epoch;
 use hifitime::Duration;
 use rand_pcg::Pcg64Mcg;
 use serde_derive::{Deserialize, Serialize};
-use std::fmt;
+use std::fmt::{self, Debug};
 
 pub mod builtin;
 pub mod trk_device;
@@ -204,6 +204,21 @@ impl GroundStation {
 
         Ok(noises)
     }
+
+    fn available_data(&self) -> u8 {
+        let mut bits: u8 = 0;
+
+        if self.integration_time.is_some() {
+            bits |= 1 << 0;
+        }
+        if self.timestamp_noise_s.is_some() {
+            bits |= 1 << 1;
+        }
+        if self.stochastic_noises.is_some() {
+            bits |= 1 << 2;
+        }
+        bits
+    }
 }
 
 impl Default for GroundStation {
@@ -225,37 +240,49 @@ impl Default for GroundStation {
 
 impl ConfigRepr for GroundStation {}
 
-impl<'a> der::DecodeValue<'a> for GroundStation {
-    fn decode_value<R: der::Reader<'a>>(reader: &mut R, _header: der::Header) -> der::Result<Self> {
-        let name: String = reader.decode()?;
-        let location = reader.decode()?;
+impl<'a> Decode<'a> for GroundStation {
+    fn decode<R: Reader<'a>>(decoder: &mut R) -> der::Result<Self> {
+        let name: String = decoder.decode()?;
+        let location = decoder.decode()?;
         // Measurement types are stored as a sequence of measurement types
-        let msr_types_vec: Vec<MeasurementType> = reader.decode()?;
+        let msr_types_vec: Vec<MeasurementType> = decoder.decode()?;
         let measurement_types = IndexSet::from_iter(msr_types_vec);
 
-        // Integration time is optional, but stored as f64 seconds if present
-        let integration_time_s: Option<f64> = reader.decode()?;
-        let integration_time = integration_time_s.map(Duration::from_seconds);
+        let light_time_correction = decoder.decode()?;
 
-        let light_time_correction = reader.decode()?;
-        let timestamp_noise_s = reader.decode()?;
+        // The flags tell us what happens next
+        let flags: u8 = decoder.decode()?;
 
-        // Stochastic noises are stored as a sequence of (MeasurementType, StochasticNoise) tuples (SEQUENCE of SEQUENCE)
-        // We define a helper struct for decoding
-        #[derive(der::Sequence)]
-        struct MsrNoisePair {
-            msr_type: MeasurementType,
-            noise: StochasticNoise,
-        }
+        let integration_time = if flags & (1 << 0) != 0 {
+            Some(Duration::from_total_nanoseconds(decoder.decode()?))
+        } else {
+            None
+        };
 
-        let stochastics_vec: Option<Vec<MsrNoisePair>> = reader.decode()?;
-        let stochastic_noises = stochastics_vec.map(|vec| {
+        let timestamp_noise_s = if flags & (1 << 1) != 0 {
+            Some(decoder.decode()?)
+        } else {
+            None
+        };
+
+        let stochastic_noises = if flags & (1 << 2) != 0 {
+            // Stochastic noises are stored as a sequence of (MeasurementType, StochasticNoise) tuples (SEQUENCE of SEQUENCE)
+            // We define a helper struct for decoding
+            #[derive(der::Sequence)]
+            struct MsrNoisePair {
+                msr_type: MeasurementType,
+                noise: StochasticNoise,
+            }
+
+            let stochastics_vec: Vec<MsrNoisePair> = decoder.decode()?;
             let mut map = IndexMap::new();
-            for pair in vec {
+            for pair in stochastics_vec {
                 map.insert(pair.msr_type, pair.noise);
             }
-            map
-        });
+            Some(map)
+        } else {
+            None
+        };
 
         Ok(GroundStation {
             name,
@@ -269,12 +296,11 @@ impl<'a> der::DecodeValue<'a> for GroundStation {
     }
 }
 
-impl der::EncodeValue for GroundStation {
-    fn value_len(&self) -> der::Result<der::Length> {
-        let msr_types_vec: Vec<MeasurementType> =
-            self.measurement_types.iter().cloned().collect();
+impl Encode for GroundStation {
+    fn encoded_len(&self) -> der::Result<der::Length> {
+        let msr_types_vec: Vec<MeasurementType> = self.measurement_types.iter().copied().collect();
 
-        let integration_time_s = self.integration_time.map(|d| d.to_seconds());
+        let integration_time_ns = self.integration_time.map(|d| d.total_nanoseconds());
 
         // Helper for encoding map
         #[derive(der::Sequence)]
@@ -295,24 +321,26 @@ impl der::EncodeValue for GroundStation {
         self.name.encoded_len()?
             + self.location.encoded_len()?
             + msr_types_vec.encoded_len()?
-            + integration_time_s.encoded_len()?
             + self.light_time_correction.encoded_len()?
+            + self.available_data().encoded_len()?
+            + integration_time_ns.encoded_len()?
             + self.timestamp_noise_s.encoded_len()?
             + stochastics_vec.encoded_len()?
     }
 
-    fn encode_value(&self, encoder: &mut impl der::Writer) -> der::Result<()> {
+    fn encode(&self, encoder: &mut impl der::Writer) -> der::Result<()> {
         self.name.encode(encoder)?;
         self.location.encode(encoder)?;
 
-        let msr_types_vec: Vec<MeasurementType> =
-            self.measurement_types.iter().cloned().collect();
+        let msr_types_vec: Vec<MeasurementType> = self.measurement_types.iter().cloned().collect();
         msr_types_vec.encode(encoder)?;
 
-        let integration_time_s = self.integration_time.map(|d| d.to_seconds());
-        integration_time_s.encode(encoder)?;
-
         self.light_time_correction.encode(encoder)?;
+        self.available_data().encode(encoder)?;
+
+        let integration_time_ns = self.integration_time.map(|d| d.total_nanoseconds());
+        integration_time_ns.encode(encoder)?;
+
         self.timestamp_noise_s.encode(encoder)?;
 
         // Helper for encoding map
@@ -335,8 +363,6 @@ impl der::EncodeValue for GroundStation {
         Ok(())
     }
 }
-
-impl<'a> der::Sequence<'a> for GroundStation {}
 
 impl fmt::Display for GroundStation {
     // Prints the Keplerian orbital elements with units

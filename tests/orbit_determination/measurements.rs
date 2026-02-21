@@ -2,6 +2,7 @@ extern crate nyx_space as nyx;
 
 use anise::astro::Location;
 use anise::constants::celestial_objects::{EARTH, MOON, SUN};
+use der::{Decode, Encode};
 use indexmap::{IndexMap, IndexSet};
 use nalgebra::{Const, U2};
 use nyx::cosmic::Orbit;
@@ -72,6 +73,34 @@ fn nil_measurement(almanac: Arc<Almanac>) {
         .measure(epoch, &traj, None, almanac)
         .unwrap()
         .is_none());
+
+    // ASN.1 round trip test
+    let mut buf = vec![];
+    station.encode_to_vec(&mut buf).unwrap();
+    let station_dec = GroundStation::from_der(&buf).unwrap();
+    assert_eq!(station_dec, station);
+    // Add a timestamp noise
+    station.timestamp_noise_s = Some(StochasticNoise {
+        bias: Some(GaussMarkov::new(Unit::Second * 10, 1e-9).unwrap()),
+        white_noise: None,
+    });
+    buf.clear();
+    station.encode_to_vec(&mut buf).unwrap();
+    let station_dec = GroundStation::from_der(&buf).unwrap();
+    assert_eq!(station_dec, station);
+    // Set the integration time
+    station.integration_time = Some(Unit::Minute * 1);
+    buf.clear();
+    station.encode_to_vec(&mut buf).unwrap();
+    let station_dec = GroundStation::from_der(&buf).unwrap();
+    assert_eq!(station_dec, station);
+    // Unset optional data
+    station.timestamp_noise_s = None;
+    station.stochastic_noises = None;
+    buf.clear();
+    station.encode_to_vec(&mut buf).unwrap();
+    let station_dec = GroundStation::from_der(&buf).unwrap();
+    assert_eq!(station_dec, station);
 }
 
 /// Tests that the measurements generated from a topocentric frame are correct.
