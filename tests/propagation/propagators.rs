@@ -101,7 +101,7 @@ fn gmat_val_leo_day_adaptive(almanac: Arc<Almanac>) {
     ));
     let final_dt = dt + prop_time;
 
-    let all_rslts = vec![
+    let all_rslts = [
         Orbit::cartesian(
             -5_971.194_191_972_314,
             3_945.506_662_039_457,
@@ -316,7 +316,7 @@ fn gmat_val_leo_day_fixed(almanac: Arc<Almanac>) {
     ));
     let final_dt = dt + prop_time;
 
-    let all_rslts = vec![
+    let all_rslts = [
         Orbit::cartesian(
             -5_971.194_191_670_768,
             3_945.506_653_227_154,

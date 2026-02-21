@@ -22,6 +22,7 @@ use anise::constants::frames::EARTH_J2000;
 pub use anise::prelude::Orbit;
 
 pub use anise::structure::spacecraft::{DragData, Mass, SRPData};
+use der::{Decode, Encode, Enumerated, Reader};
 use nalgebra::Vector3;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
@@ -45,16 +46,17 @@ use std::ops::Add;
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default, Enumerated)]
 #[cfg_attr(feature = "python", pyclass)]
+#[repr(u8)]
 pub enum GuidanceMode {
     /// Guidance is turned off and Guidance Law may switch mode to Thrust for next call
     #[default]
-    Coast,
+    Coast = 0,
     /// Guidance is turned on and Guidance Law may switch mode to Coast for next call
-    Thrust,
+    Thrust = 1,
     /// Guidance is turned off and Guidance Law may not change its mode (will need to be done externally to the guidance law).
-    Inhibit,
+    Inhibit = 2,
 }
 
 impl From<f64> for GuidanceMode {
@@ -608,6 +610,60 @@ impl Add<OVector<f64, Const<9>>> for Spacecraft {
         self.mass.prop_mass_kg += other[8];
 
         self
+    }
+}
+
+impl<'a> Decode<'a> for Spacecraft {
+    fn decode<R: Reader<'a>>(decoder: &mut R) -> der::Result<Self> {
+        let orbit = decoder.decode()?;
+        let mass = decoder.decode()?;
+        let srp = decoder.decode()?;
+        let drag = decoder.decode()?;
+        let mode = decoder.decode()?;
+        // Decode the thruster last, checking the presence flag
+        let thruster = if decoder.decode::<bool>()? {
+            Some(decoder.decode()?)
+        } else {
+            None
+        };
+
+        Ok(Spacecraft {
+            orbit,
+            mass,
+            srp,
+            drag,
+            thruster,
+            mode,
+            stm: None,
+        })
+    }
+}
+
+impl Encode for Spacecraft {
+    fn encoded_len(&self) -> der::Result<der::Length> {
+        self.orbit.encoded_len()?
+            + self.mass.encoded_len()?
+            + self.srp.encoded_len()?
+            + self.drag.encoded_len()?
+            + self.mode.encoded_len()?
+            + self.thruster.is_some().encoded_len()?
+            + self.thruster.encoded_len()?
+    }
+
+    fn encode(&self, encoder: &mut impl der::Writer) -> der::Result<()> {
+        self.orbit.encode(encoder)?;
+        self.mass.encode(encoder)?;
+        self.srp.encode(encoder)?;
+        self.drag.encode(encoder)?;
+        self.mode.encode(encoder)?;
+        if let Some(thruster) = self.thruster {
+            true.encode(encoder)?;
+            thruster.encode(encoder)?;
+        } else {
+            false.encode(encoder)?
+        };
+
+        Ok(())
     }
 }
 

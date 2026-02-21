@@ -16,9 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use anise::astro::{Aberration, AzElRange, Location, PhysicsResult};
-use anise::errors::AlmanacResult;
+use anise::astro::{Aberration, AzElRange, Location};
+use anise::errors::{AlmanacError, AlmanacResult};
 use anise::prelude::{Almanac, Frame, Orbit};
+use der::{Decode, Encode, Reader};
 use indexmap::{IndexMap, IndexSet};
 use snafu::ensure;
 
@@ -31,13 +32,21 @@ use crate::time::Epoch;
 use hifitime::Duration;
 use rand_pcg::Pcg64Mcg;
 use serde_derive::{Deserialize, Serialize};
-use std::fmt;
+use std::fmt::{self, Debug};
 
 pub mod builtin;
 pub mod trk_device;
 
+#[cfg(feature = "python")]
+use pyo3::exceptions::PyValueError;
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+#[cfg(feature = "python")]
+use pyo3::types::{PyBytes, PyType};
+
 /// GroundStation defines a two-way ranging and doppler station.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "python", pyclass)]
 pub struct GroundStation {
     pub name: String,
     pub location: Location,
@@ -49,6 +58,49 @@ pub struct GroundStation {
     /// Noise on the timestamp of the measurement
     pub timestamp_noise_s: Option<StochasticNoise>,
     pub stochastic_noises: Option<IndexMap<MeasurementType, StochasticNoise>>,
+}
+
+#[cfg_attr(feature = "python", pymethods)]
+impl GroundStation {
+    /// Computes the azimuth and elevation of the provided object seen from this ground station, both in degrees.
+    /// This is a shortcut to almanac.azimuth_elevation_range_sez.
+    pub fn azimuth_elevation_of(
+        &self,
+        rx: Orbit,
+        obstructing_body: Option<Frame>,
+        almanac: &Almanac,
+    ) -> AlmanacResult<AzElRange> {
+        let ab_corr = if self.light_time_correction {
+            Aberration::LT
+        } else {
+            Aberration::NONE
+        };
+        almanac.azimuth_elevation_range_sez(
+            rx,
+            self.to_orbit(rx.epoch, almanac)?,
+            obstructing_body,
+            ab_corr,
+        )
+    }
+
+    /// Return this ground station as an orbit in its current frame
+    pub fn to_orbit(&self, epoch: Epoch, almanac: &Almanac) -> AlmanacResult<Orbit> {
+        Orbit::try_latlongalt(
+            self.location.latitude_deg,
+            self.location.longitude_deg,
+            self.location.height_km,
+            epoch,
+            almanac.frame_info(self.location.frame).map_err(|source| {
+                AlmanacError::GenericError {
+                    err: source.to_string(),
+                }
+            })?,
+        )
+        .map_err(|source| AlmanacError::AlmanacPhysics {
+            action: "building ground station location",
+            source: Box::new(source),
+        })
+    }
 }
 
 impl GroundStation {
@@ -140,38 +192,6 @@ impl GroundStation {
         Ok(self)
     }
 
-    /// Computes the azimuth and elevation of the provided object seen from this ground station, both in degrees.
-    /// This is a shortcut to almanac.azimuth_elevation_range_sez.
-    pub fn azimuth_elevation_of(
-        &self,
-        rx: Orbit,
-        obstructing_body: Option<Frame>,
-        almanac: &Almanac,
-    ) -> AlmanacResult<AzElRange> {
-        let ab_corr = if self.light_time_correction {
-            Aberration::LT
-        } else {
-            Aberration::NONE
-        };
-        almanac.azimuth_elevation_range_sez(
-            rx,
-            self.to_orbit(rx.epoch, almanac).unwrap(),
-            obstructing_body,
-            ab_corr,
-        )
-    }
-
-    /// Return this ground station as an orbit in its current frame
-    pub fn to_orbit(&self, epoch: Epoch, almanac: &Almanac) -> PhysicsResult<Orbit> {
-        Orbit::try_latlongalt(
-            self.location.latitude_deg,
-            self.location.longitude_deg,
-            self.location.height_km,
-            epoch,
-            almanac.frame_info(self.location.frame).unwrap(),
-        )
-    }
-
     /// Returns the noises for all measurement types configured for this ground station at the provided epoch, timestamp noise is the first entry.
     fn noises(&mut self, epoch: Epoch, rng: Option<&mut Pcg64Mcg>) -> Result<Vec<f64>, ODError> {
         let mut noises = vec![0.0; self.measurement_types.len() + 1];
@@ -203,6 +223,48 @@ impl GroundStation {
 
         Ok(noises)
     }
+
+    fn available_data(&self) -> u8 {
+        let mut bits: u8 = 0;
+
+        if self.integration_time.is_some() {
+            bits |= 1 << 0;
+        }
+        if self.timestamp_noise_s.is_some() {
+            bits |= 1 << 1;
+        }
+        if self.stochastic_noises.is_some() {
+            bits |= 1 << 2;
+        }
+        bits
+    }
+}
+
+#[cfg(feature = "python")]
+#[cfg_attr(feature = "python", pymethods)]
+impl GroundStation {
+    /// Decodes an ASN.1 DER encoded byte array into a GroundStation object.
+    ///
+    /// :type data: bytes
+    /// :rtype: GroundStation
+    #[classmethod]
+    pub fn from_asn1(_cls: &Bound<'_, PyType>, data: &[u8]) -> PyResult<Self> {
+        match Self::from_der(data) {
+            Ok(obj) => Ok(obj),
+            Err(e) => Err(PyValueError::new_err(format!("ASN.1 decoding error: {e}"))),
+        }
+    }
+
+    /// Encodes this GroundStation object into an ASN.1 DER encoded byte array.
+    ///
+    /// :rtype: bytes
+    pub fn to_asn1<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
+        let mut buf = Vec::new();
+        match self.encode_to_vec(&mut buf) {
+            Ok(_) => Ok(PyBytes::new(py, &buf)),
+            Err(e) => Err(PyValueError::new_err(format!("ASN.1 encoding error: {e}"))),
+        }
+    }
 }
 
 impl Default for GroundStation {
@@ -223,6 +285,117 @@ impl Default for GroundStation {
 }
 
 impl ConfigRepr for GroundStation {}
+
+#[derive(der::Sequence)]
+struct MsrNoisePair {
+    msr_type: MeasurementType,
+    noise: StochasticNoise,
+}
+
+impl<'a> Decode<'a> for GroundStation {
+    fn decode<R: Reader<'a>>(decoder: &mut R) -> der::Result<Self> {
+        let name: String = decoder.decode()?;
+        let location = decoder.decode()?;
+        // Measurement types are stored as a sequence of measurement types
+        let msr_types_vec: Vec<MeasurementType> = decoder.decode()?;
+        let measurement_types = IndexSet::from_iter(msr_types_vec);
+
+        let light_time_correction = decoder.decode()?;
+
+        // The flags tell us what happens next
+        let flags: u8 = decoder.decode()?;
+
+        let integration_time = if flags & (1 << 0) != 0 {
+            Some(Duration::from_total_nanoseconds(decoder.decode()?))
+        } else {
+            None
+        };
+
+        let timestamp_noise_s = if flags & (1 << 1) != 0 {
+            Some(decoder.decode()?)
+        } else {
+            None
+        };
+
+        let stochastic_noises = if flags & (1 << 2) != 0 {
+            // Stochastic noises are stored as a sequence of (MeasurementType, StochasticNoise) tuples (SEQUENCE of SEQUENCE)
+            // We define a helper struct for decoding
+
+            let stochastics_vec: Vec<MsrNoisePair> = decoder.decode()?;
+            let mut map = IndexMap::new();
+            for pair in stochastics_vec {
+                map.insert(pair.msr_type, pair.noise);
+            }
+            Some(map)
+        } else {
+            None
+        };
+
+        Ok(GroundStation {
+            name,
+            location,
+            measurement_types,
+            integration_time,
+            light_time_correction,
+            timestamp_noise_s,
+            stochastic_noises,
+        })
+    }
+}
+
+impl Encode for GroundStation {
+    fn encoded_len(&self) -> der::Result<der::Length> {
+        let msr_types_vec: Vec<MeasurementType> = self.measurement_types.iter().copied().collect();
+
+        let integration_time_ns = self.integration_time.map(|d| d.total_nanoseconds());
+
+        let stochastics_vec = self.stochastic_noises.as_ref().map(|map| {
+            map.iter()
+                .map(|(k, v)| MsrNoisePair {
+                    msr_type: *k,
+                    noise: *v,
+                })
+                .collect::<Vec<MsrNoisePair>>()
+        });
+
+        self.name.encoded_len()?
+            + self.location.encoded_len()?
+            + msr_types_vec.encoded_len()?
+            + self.light_time_correction.encoded_len()?
+            + self.available_data().encoded_len()?
+            + integration_time_ns.encoded_len()?
+            + self.timestamp_noise_s.encoded_len()?
+            + stochastics_vec.encoded_len()?
+    }
+
+    fn encode(&self, encoder: &mut impl der::Writer) -> der::Result<()> {
+        self.name.encode(encoder)?;
+        self.location.encode(encoder)?;
+
+        let msr_types_vec: Vec<MeasurementType> = self.measurement_types.iter().copied().collect();
+        msr_types_vec.encode(encoder)?;
+
+        self.light_time_correction.encode(encoder)?;
+        self.available_data().encode(encoder)?;
+
+        let integration_time_ns = self.integration_time.map(|d| d.total_nanoseconds());
+        integration_time_ns.encode(encoder)?;
+
+        self.timestamp_noise_s.encode(encoder)?;
+
+        let stochastics_vec = self.stochastic_noises.as_ref().map(|map| {
+            map.iter()
+                .map(|(k, v)| MsrNoisePair {
+                    msr_type: *k,
+                    noise: *v,
+                })
+                .collect::<Vec<MsrNoisePair>>()
+        });
+        stochastics_vec.encode(encoder)?;
+
+        Ok(())
+    }
+}
 
 impl fmt::Display for GroundStation {
     // Prints the Keplerian orbital elements with units

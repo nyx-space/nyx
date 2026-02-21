@@ -23,6 +23,7 @@ use anise::astro::PhysicsResult;
 use anise::errors::PhysicsError;
 use anise::math::rotation::DCM;
 use anise::prelude::Almanac;
+use der::{Decode, Encode, Reader};
 use serde::{Deserialize, Serialize};
 
 mod finiteburns;
@@ -67,6 +68,26 @@ impl Thruster {
     #[new]
     fn py_new(thrust_N: f64, isp_s: f64) -> Self {
         Self { thrust_N, isp_s }
+    }
+}
+
+impl Encode for Thruster {
+    fn encoded_len(&self) -> der::Result<der::Length> {
+        self.thrust_N.encoded_len()? + self.isp_s.encoded_len()?
+    }
+
+    fn encode(&self, encoder: &mut impl der::Writer) -> der::Result<()> {
+        self.thrust_N.encode(encoder)?;
+        self.isp_s.encode(encoder)
+    }
+}
+
+impl<'a> Decode<'a> for Thruster {
+    fn decode<R: Reader<'a>>(decoder: &mut R) -> der::Result<Self> {
+        Ok(Self {
+            thrust_N: decoder.decode()?,
+            isp_s: decoder.decode()?,
+        })
     }
 }
 

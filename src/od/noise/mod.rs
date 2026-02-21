@@ -20,6 +20,7 @@ use crate::io::watermark::pq_writer;
 use arrow::array::{ArrayRef, Float64Array, UInt32Array};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
+use der::{Decode, Encode, Reader};
 use hifitime::{Epoch, TimeSeries, TimeUnits};
 use parquet::arrow::ArrowWriter;
 use rand::{Rng, SeedableRng};
@@ -35,6 +36,9 @@ pub mod gauss_markov;
 #[cfg(feature = "premium")]
 pub mod link_specific;
 pub mod white;
+
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
 
 pub use gauss_markov::GaussMarkov;
 pub use white::WhiteNoise;
@@ -52,6 +56,7 @@ pub trait Stochastics {
 ///
 /// This implementation distinguishes between the white noise model and the bias model. It also includes a constant offset.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "python", pyclass(get_all, set_all))]
 pub struct StochasticNoise {
     pub white_noise: Option<WhiteNoise>,
     pub bias: Option<GaussMarkov>,
@@ -219,6 +224,20 @@ impl StochasticNoise {
 
         Ok(samples)
     }
+
+    fn available_data(&self) -> u8 {
+        let mut bits: u8 = 0;
+
+        if self.white_noise.is_some() {
+            bits |= 1 << 0;
+        }
+
+        if self.bias.is_some() {
+            bits |= 1 << 1;
+        }
+
+        bits
+    }
 }
 
 impl Mul<f64> for StochasticNoise {
@@ -239,6 +258,41 @@ impl Mul<f64> for StochasticNoise {
 impl MulAssign<f64> for StochasticNoise {
     fn mul_assign(&mut self, rhs: f64) {
         *self = *self * rhs;
+    }
+}
+
+impl Encode for StochasticNoise {
+    fn encoded_len(&self) -> der::Result<der::Length> {
+        let flags = self.available_data();
+        flags.encoded_len()? + self.white_noise.encoded_len()? + self.bias.encoded_len()?
+    }
+
+    fn encode(&self, encoder: &mut impl der::Writer) -> der::Result<()> {
+        let flags = self.available_data();
+
+        flags.encode(encoder)?;
+        self.white_noise.encode(encoder)?;
+        self.bias.encode(encoder)
+    }
+}
+
+impl<'a> Decode<'a> for StochasticNoise {
+    fn decode<R: Reader<'a>>(decoder: &mut R) -> der::Result<Self> {
+        let flags: u8 = decoder.decode()?;
+
+        let white_noise = if flags & (1 << 0) != 0 {
+            Some(decoder.decode()?)
+        } else {
+            None
+        };
+
+        let bias = if flags & (1 << 1) != 0 {
+            Some(decoder.decode()?)
+        } else {
+            None
+        };
+
+        Ok(Self { white_noise, bias })
     }
 }
 

@@ -650,7 +650,7 @@ mod multivariate_ut {
         .unwrap();
 
         // The generator computes the equivalent Cartesian covariance. Let's retrieve it.
-        let expected_cart_cov = &generator.sqrt_s_v * generator.sqrt_s_v.transpose();
+        let expected_cart_cov = generator.sqrt_s_v * generator.sqrt_s_v.transpose();
 
         // Create a reproducible fast seed, and generate the samples in the Cartesian space
         let seed = 0;
@@ -678,8 +678,8 @@ mod multivariate_ut {
         // Check that the covariance of the Cartesian states is close to the expected one
         let mut sample_cov = SMatrix::<f64, 6, 6>::zeros();
         for sample in &samples {
-            let disp_vec = sample - &mean_cart;
-            sample_cov += &disp_vec * disp_vec.transpose();
+            let disp_vec = sample - mean_cart;
+            sample_cov += disp_vec * disp_vec.transpose();
         }
         sample_cov /= (n - 1) as f64;
 
