@@ -292,17 +292,17 @@ impl<'a> Decode<'a> for Strand {
 impl Encode for Strand {
     fn encoded_len(&self) -> der::Result<der::Length> {
         let ts_len = 1u8.encoded_len()?;
-        let start_len = (self.start.to_tai_duration().total_nanoseconds().encoded_len()? + ts_len)?;
-        let end_len = (self.end.to_tai_duration().total_nanoseconds().encoded_len()? + ts_len)?;
+        let start_len = (self.start.to_duration_in_time_scale(self.start.time_scale).total_nanoseconds().encoded_len()? + ts_len)?;
+        let end_len = (self.end.to_duration_in_time_scale(self.end.time_scale).total_nanoseconds().encoded_len()? + ts_len)?;
         Ok((start_len + end_len)?)
     }
 
     fn encode(&self, encoder: &mut impl der::Writer) -> der::Result<()> {
-        self.start.to_tai_duration().total_nanoseconds().encode(encoder)?;
-        (TimeScale::TAI as u8).encode(encoder)?;
+        self.start.to_duration_in_time_scale(self.start.time_scale).total_nanoseconds().encode(encoder)?;
+        (self.start.time_scale as u8).encode(encoder)?;
 
-        self.end.to_tai_duration().total_nanoseconds().encode(encoder)?;
-        (TimeScale::TAI as u8).encode(encoder)
+        self.end.to_duration_in_time_scale(self.end.time_scale).total_nanoseconds().encode(encoder)?;
+        (self.end.time_scale as u8).encode(encoder)
     }
 }
 

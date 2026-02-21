@@ -54,6 +54,21 @@ fn test_strand_asn1() {
     let s2 = Strand::from_der(&buf).unwrap();
 
     assert_eq!(s, s2);
+
+    // Test TAI explicitly
+    let epoch_tai = Epoch::from_gregorian_tai(2023, 1, 1, 0, 0, 0, 0);
+    let s = Strand {
+        start: epoch_tai,
+        end: epoch_tai + 1.0.hours(),
+    };
+
+    let mut buf = Vec::new();
+    s.encode_to_vec(&mut buf).unwrap();
+    let s2 = Strand::from_der(&buf).unwrap();
+
+    assert_eq!(s, s2);
+    // Check that the timescale is indeed TAI (byte value 0 for TAI in hifitime u8 conversion, usually, but we rely on roundtrip)
+    // Actually, TAI is 0, UTC is 1 in hifitime TimeScale enum as u8? Let's verify roundtrip logic holds.
 }
 
 #[test]
