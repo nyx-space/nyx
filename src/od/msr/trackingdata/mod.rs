@@ -296,6 +296,24 @@ impl TrackingDataArc {
         self
     }
 
+    /// Marks measurements within the given epoch range as rejected.
+    pub fn reject_by_epoch<R: RangeBounds<Epoch>>(mut self, bound: R) -> Self {
+        for (_epoch, msr) in self.measurements.range_mut(bound) {
+            msr.rejected = true;
+        }
+        self
+    }
+
+    /// Marks measurements from the provided tracker as rejected.
+    pub fn reject_by_tracker(mut self, tracker: String) -> Self {
+        for msr in self.measurements.values_mut() {
+            if msr.tracker == tracker {
+                msr.rejected = true;
+            }
+        }
+        self
+    }
+
     /// Downsamples the tracking data to a lower frequency using a simple moving average low-pass filter followed by decimation,
     /// returning new `TrackingDataArc` with downsampled measurements.
     ///
@@ -358,6 +376,7 @@ impl TrackingDataArc {
                 tracker: window[0].1.tracker.clone(),
                 epoch: **epoch,
                 data: IndexMap::new(),
+                rejected: false,
             };
 
             // Apply moving average filter for each measurement type

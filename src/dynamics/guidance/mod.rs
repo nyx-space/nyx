@@ -34,6 +34,9 @@ pub use mnvr::{Maneuver, MnvrRepr};
 
 mod ruggiero;
 pub use ruggiero::{Objective, Ruggiero, StateParameter};
+
+mod kluever;
+pub use kluever::Kluever;
 use snafu::Snafu;
 
 use std::fmt;

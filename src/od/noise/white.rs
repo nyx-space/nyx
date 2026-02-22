@@ -22,7 +22,7 @@ use crate::io::ConfigError;
 use anise::constants::SPEED_OF_LIGHT_KM_S;
 use der::Sequence;
 use hifitime::{Duration, Epoch};
-use rand::Rng;
+use rand::{Rng, RngExt};
 use rand_distr::Normal;
 use serde_derive::{Deserialize, Serialize};
 

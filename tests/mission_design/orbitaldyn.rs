@@ -2,11 +2,13 @@ extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
 use anise::constants::celestial_objects::{EARTH, JUPITER_BARYCENTER, MOON, SUN};
-use anise::constants::frames::IAU_EARTH_FRAME;
+use anise::constants::frames::{EARTH_ITRF93, IAU_EARTH_FRAME};
 use hifitime::MJD_J2000;
 use nalgebra::{Const, OMatrix};
 use nyx::cosmic::{assert_orbit_eq_or_abs, Orbit};
+use nyx::dynamics::Harmonics;
 use nyx::dynamics::{Dynamics, OrbitalDynamics, PointMasses, SpacecraftDynamics};
+use nyx::io::gravity::*;
 use nyx::linalg::Vector6;
 use nyx::time::{Epoch, Unit};
 use nyx::utils::{rss_orbit_errors, rss_orbit_vec_errors};
@@ -857,8 +859,6 @@ fn multi_body_dynamics_dual(almanac: Arc<Almanac>) {
 #[rstest]
 fn val_earth_sph_harmonics_j2(almanac: Arc<Almanac>) {
     // NOTE: GMAT and Monte are within about 0.1 meters of difference in position. Hence, we're checking we're in the same bracket.
-    use nyx::dynamics::Harmonics;
-    use nyx::io::gravity::*;
 
     let monte_earth_gm = 3.986_004_328_969_392e5;
     let monte_earth_j2 = -0.000_484_169_325_971;
@@ -925,8 +925,8 @@ fn val_earth_sph_harmonics_j2(almanac: Arc<Almanac>) {
     let (err_r, err_v) =
         rss_orbit_vec_errors(&prop_state.orbit.to_cartesian_pos_vel(), &rslt_monte);
 
-    assert!(err_r < 1e-1, "J2 failed in position: {err_r:.5e}");
-    assert!(err_v < 1e-4, "J2 failed in velocity: {err_v:.5e}");
+    assert!(err_r < 2e-2, "J2 failed in position: {err_r:.5e}");
+    assert!(err_v < 2e-5, "J2 failed in velocity: {err_v:.5e}");
 }
 
 #[allow(clippy::identity_op)]
@@ -935,15 +935,13 @@ fn val_earth_sph_harmonics_12x12(almanac_gmat: Arc<Almanac>) {
     let almanac = almanac_gmat;
     extern crate pretty_env_logger;
     let _ = pretty_env_logger::try_init();
-    use nyx::dynamics::sph_harmonics::Harmonics;
-    use nyx::io::gravity::*;
 
     let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
-    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
+    let itrf93 = almanac.frame_info(EARTH_ITRF93).unwrap();
 
     let earth_sph_harm =
         HarmonicsMem::from_cof("data/01_planetary/JGM3.cof.gz", 12, 12, true).unwrap();
-    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm);
+    let harmonics = Harmonics::from_stor(itrf93, earth_sph_harm);
 
     let dt = Epoch::from_mjd_tai(MJD_J2000);
     let state = Orbit::cartesian(
@@ -981,8 +979,8 @@ fn val_earth_sph_harmonics_12x12(almanac_gmat: Arc<Almanac>) {
     let (err_r, err_v) =
         rss_orbit_vec_errors(&final_state.orbit.to_cartesian_pos_vel(), &rslt_gmat);
 
-    assert!(err_r < 1e-1, "12x12 failed in position: {err_r:.5e}");
-    assert!(err_v < 1e-4, "12x12 failed in velocity: {err_v:.5e}");
+    assert!(err_r < 4e-3, "12x12 failed in position: {err_r:.5e}");
+    assert!(err_v < 3e-6, "12x12 failed in velocity: {err_v:.5e}");
 
     // We set up a new propagator with a fixed step. Without the fixed step, the error control
     // on the STM leads to a difference of 1.04 meters in this one day propagation.
@@ -1023,8 +1021,6 @@ fn val_earth_sph_harmonics_70x70(almanac_gmat: Arc<Almanac>) {
     let almanac = almanac_gmat;
     extern crate pretty_env_logger;
     let _ = pretty_env_logger::try_init();
-    use nyx::dynamics::Harmonics;
-    use nyx::io::gravity::*;
 
     let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
     let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
@@ -1076,8 +1072,6 @@ fn val_earth_sph_harmonics_70x70_partials(almanac_gmat: Arc<Almanac>) {
     let almanac = almanac_gmat;
     extern crate pretty_env_logger;
     let _ = pretty_env_logger::try_init();
-    use nyx::dynamics::Harmonics;
-    use nyx::io::gravity::*;
 
     let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
     let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
@@ -1121,6 +1115,74 @@ fn val_earth_sph_harmonics_70x70_partials(almanac_gmat: Arc<Almanac>) {
 
     assert!(dbg!(err_r) < 0.2, "12x12 failed in position: {err_r:.5e}");
     assert!(dbg!(err_v) < 1e-3, "12x12 failed in velocity: {err_v:.5e}");
+}
+
+#[rstest]
+fn val_ioastro_earth_egm2008_10x10(almanac: Arc<Almanac>) {
+    let epoch = Epoch::from_gregorian_utc_hms(2025, 8, 25, 11, 55, 44);
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let orbit = Orbit::new(
+        5442.1625926801835,
+        -4068.9498468206248,
+        -13.456851447751518,
+        2.8581975428173836,
+        3.8097859312745794,
+        6.0021266931226886,
+        epoch,
+        eme2k,
+    );
+
+    // Configure the EGM2008 model
+    let hh = HarmonicsMem::from_shadr("data/01_planetary/EGM2008_to2190_TideFree.gz", 10, 10, true)
+        .unwrap();
+
+    let mut orbital_dyn = OrbitalDynamics::point_masses(vec![SUN, MOON]);
+    orbital_dyn.accel_models.push(Harmonics::from_stor(
+        almanac.frame_info(EARTH_ITRF93).unwrap(),
+        hh,
+    ));
+
+    let sc_dyn = SpacecraftDynamics::new(orbital_dyn);
+
+    let setup = Propagator::new(
+        sc_dyn,
+        IntegratorMethod::DormandPrince78,
+        IntegratorOptions::builder()
+            .init_step(Unit::Second * 1.0)
+            .build(),
+    );
+
+    let final_state = setup
+        .with(orbit.into(), almanac.into())
+        .for_duration(Unit::Day * 1)
+        .unwrap();
+
+    let expected_state = Orbit::new(
+        -5276.159136,
+        4263.301774,
+        -404.522560,
+        -2.724561,
+        -3.933753,
+        -5.983828,
+        Epoch::from_gregorian_utc_hms(2025, 8, 26, 11, 55, 44),
+        eme2k,
+    );
+
+    let ric_error = expected_state.ric_difference(&final_state.orbit).unwrap();
+
+    assert!(dbg!(ric_error.rmag_km()) < 0.05);
+    assert!(dbg!(ric_error.vmag_km_s()) < 5e-5);
+
+    println!(
+        "RIC pos error (km) = {:.6}\n{:.6}",
+        ric_error.rmag_km(),
+        ric_error.radius_km
+    );
+    println!(
+        "RIC vel error (km/s) = {:.6}\n{:.6}",
+        ric_error.vmag_km_s(),
+        ric_error.velocity_km_s
+    );
 }
 
 #[rstest]

@@ -39,6 +39,8 @@ pub struct Measurement {
     pub epoch: Epoch,
     /// All measurements made simultaneously
     pub data: IndexMap<MeasurementType, f64>,
+    /// Whether this measurement has been manually rejected
+    pub rejected: bool,
 }
 
 #[cfg_attr(feature = "python", pymethods)]
@@ -63,6 +65,7 @@ impl Measurement {
             tracker,
             epoch,
             data: IndexMap::new(),
+            rejected: false,
         }
     }
 

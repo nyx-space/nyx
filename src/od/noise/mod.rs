@@ -23,6 +23,7 @@ use arrow::record_batch::RecordBatch;
 use der::{Decode, Encode, Reader};
 use hifitime::{Epoch, TimeSeries, TimeUnits};
 use parquet::arrow::ArrowWriter;
+use rand::rngs::SysRng;
 use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg64Mcg;
 use serde_derive::{Deserialize, Serialize};
@@ -165,7 +166,7 @@ impl StochasticNoise {
         let mut samples = Vec::with_capacity(capacity);
 
         for run in 0..num_runs {
-            let mut rng = Pcg64Mcg::from_os_rng();
+            let mut rng = Pcg64Mcg::try_from_rng(&mut SysRng).unwrap();
 
             let mut mdl = self;
             for epoch in TimeSeries::inclusive(start, end, step) {

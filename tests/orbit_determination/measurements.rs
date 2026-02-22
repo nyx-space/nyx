@@ -12,6 +12,7 @@ use nyx::od::prelude::*;
 use nyx::time::Epoch;
 use nyx::{dynamics::OrbitalDynamics, propagators::Propagator};
 use nyx_space::propagators::IntegratorMethod;
+use rand::rngs::SysRng;
 use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -194,7 +195,7 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
         },
     ];
 
-    let mut rng = Pcg64Mcg::from_os_rng();
+    let mut rng = Pcg64Mcg::try_from_rng(&mut SysRng::default()).unwrap();
     let mut traj1_msr_cnt = 0;
     for state in traj1.every(1 * Unit::Minute) {
         if dss65_madrid

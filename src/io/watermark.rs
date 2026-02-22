@@ -21,8 +21,8 @@ use std::collections::HashMap;
 use hifitime::Epoch;
 use parquet::{
     basic::{Compression, ZstdLevel},
+    file::metadata::KeyValue,
     file::properties::WriterProperties,
-    format::KeyValue,
 };
 use shadow_rs::shadow;
 use whoami::{platform, realname, username};
@@ -42,7 +42,12 @@ pub(crate) fn pq_writer(metadata: Option<HashMap<String, String>>) -> Option<Wri
         ),
         KeyValue::new(
             "Created by".to_string(),
-            format!("{} ({}) on {}", realname(), username(), platform()),
+            format!(
+                "{} ({}) on {}",
+                realname().unwrap_or("unknown user".to_string()),
+                username().unwrap_or("no-user".to_string()),
+                platform()
+            ),
         ),
         KeyValue::new(
             "Created on".to_string(),

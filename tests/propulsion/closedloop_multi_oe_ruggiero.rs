@@ -115,7 +115,11 @@ fn qlaw_as_ruggiero_case_a(almanac: Arc<Almanac>) {
     for (start, end) in both_true {
         let dur = end - start;
         let delta_to_end = end - final_state.epoch();
+        let from_start = start - start_time;
         println!("[qlaw_as_ruggiero_case_a] Conditions met from {start} for {dur}");
+        println!(
+            "[qlaw_as_ruggiero_case_a] Conditions met in {from_start} after guidance law enabled"
+        );
         // Ensure that the condition is valid until the end of this propagation.
         assert!(delta_to_end.abs().to_seconds() < 1e-15);
     }
