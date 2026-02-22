@@ -292,16 +292,16 @@ impl<'a> Decode<'a> for Strand {
 impl Encode for Strand {
     fn encoded_len(&self) -> der::Result<der::Length> {
         let ts_len = 1u8.encoded_len()?;
-        let start_len = (self.start.to_duration_in_time_scale(self.start.time_scale).total_nanoseconds().encoded_len()? + ts_len)?;
-        let end_len = (self.end.to_duration_in_time_scale(self.end.time_scale).total_nanoseconds().encoded_len()? + ts_len)?;
-        Ok((start_len + end_len)?)
+        let start_len = (self.start.duration.total_nanoseconds().encoded_len()? + ts_len)?;
+        let end_len = (self.end.duration.total_nanoseconds().encoded_len()? + ts_len)?;
+        start_len + end_len
     }
 
     fn encode(&self, encoder: &mut impl der::Writer) -> der::Result<()> {
-        self.start.to_duration_in_time_scale(self.start.time_scale).total_nanoseconds().encode(encoder)?;
+        self.start.duration.total_nanoseconds().encode(encoder)?;
         (self.start.time_scale as u8).encode(encoder)?;
 
-        self.end.to_duration_in_time_scale(self.end.time_scale).total_nanoseconds().encode(encoder)?;
+        self.end.duration.total_nanoseconds().encode(encoder)?;
         (self.end.time_scale as u8).encode(encoder)
     }
 }
@@ -385,7 +385,9 @@ impl Strand {
 #[cfg(test)]
 mod trkconfig_ut {
     use crate::io::ConfigRepr;
-    use crate::od::prelude::*;
+    use crate::od::simulator::{Cadence, Handoff, Scheduler, Strand, TrkConfig};
+    use der::{Decode, Encode};
+    use hifitime::{Epoch, TimeUnits};
 
     #[test]
     fn sanity_checks() {
@@ -506,5 +508,99 @@ mod trkconfig_ut {
             .build();
 
         assert_eq!(cfg.sampling, 60.seconds());
+    }
+
+    #[test]
+    fn test_handoff_asn1() {
+        let h = Handoff::Greedy;
+        let mut buf = Vec::new();
+        h.encode_to_vec(&mut buf).unwrap();
+        let h2 = Handoff::from_der(&buf).unwrap();
+        assert_eq!(h, h2);
+    }
+
+    #[test]
+    fn test_cadence_asn1() {
+        let c = Cadence::Intermittent {
+            on: 1.0.hours(),
+            off: 0.5.hours(),
+        };
+        let mut buf = Vec::new();
+        c.encode_to_vec(&mut buf).unwrap();
+        let c2 = Cadence::from_der(&buf).unwrap();
+        assert_eq!(c, c2);
+
+        let c = Cadence::Continuous;
+        let mut buf = Vec::new();
+        c.encode_to_vec(&mut buf).unwrap();
+        let c2 = Cadence::from_der(&buf).unwrap();
+        assert_eq!(c, c2);
+    }
+
+    #[test]
+    fn test_scheduler_asn1() {
+        let s = Scheduler::builder()
+            .handoff(Handoff::Overlap)
+            .cadence(Cadence::Intermittent {
+                on: 10.0.minutes(),
+                off: 5.0.minutes(),
+            })
+            .min_samples(5)
+            .sample_alignment(1.0.seconds())
+            .build();
+
+        let mut buf = Vec::new();
+        s.encode_to_vec(&mut buf).unwrap();
+        let s2 = Scheduler::from_der(&buf).unwrap();
+        assert_eq!(s, s2);
+    }
+
+    #[test]
+    fn test_strand_asn1() {
+        let epoch = Epoch::from_gregorian_utc_at_midnight(2023, 1, 1);
+        let s = Strand {
+            start: epoch,
+            end: epoch + 1.0.hours(),
+        };
+
+        let mut buf = Vec::new();
+        s.encode_to_vec(&mut buf).unwrap();
+        let s2 = Strand::from_der(&buf).unwrap();
+
+        assert_eq!(s, s2);
+
+        // Test TAI explicitly
+        let epoch_tai = Epoch::from_gregorian_utc_at_midnight(2023, 1, 1);
+        let s = Strand {
+            start: epoch_tai,
+            end: epoch_tai + 1.0.hours(),
+        };
+
+        let mut buf = Vec::new();
+        s.encode_to_vec(&mut buf).unwrap();
+        let s2 = Strand::from_der(&buf).unwrap();
+
+        assert_eq!(s, s2);
+    }
+
+    #[test]
+    fn test_trkconfig_asn1() {
+        // Encode one in UTC and the other in TAI
+        let epoch = Epoch::from_gregorian_utc_at_midnight(2023, 1, 1);
+        let strand = Strand {
+            start: epoch,
+            end: (epoch + 1.0.hours()).to_time_scale(hifitime::TimeScale::TAI),
+        };
+
+        let cfg = TrkConfig::builder()
+            .sampling(10.0.seconds())
+            .strands(vec![strand])
+            .build();
+
+        let mut buf = Vec::new();
+        cfg.encode_to_vec(&mut buf).unwrap();
+        let cfg2 = TrkConfig::from_der(&buf).unwrap();
+
+        assert_eq!(cfg, cfg2);
     }
 }

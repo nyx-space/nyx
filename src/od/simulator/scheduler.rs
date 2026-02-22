@@ -133,7 +133,9 @@ impl Encode for Cadence {
         match self {
             Self::Continuous => 0u8.encoded_len(),
             Self::Intermittent { on, off } => {
-                1u8.encoded_len()? + on.total_nanoseconds().encoded_len()? + off.total_nanoseconds().encoded_len()?
+                1u8.encoded_len()?
+                    + on.total_nanoseconds().encoded_len()?
+                    + off.total_nanoseconds().encoded_len()?
             }
         }
     }
