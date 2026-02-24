@@ -75,7 +75,7 @@ premium = []
 polars = { version = "0.51.0", features = ["parquet"] }
 rstest = "0.26.1"
 pretty_env_logger = "0.5"
-serde_arrow = {version = "0.13", features = ["arrow-57"]}
+serde_arrow = {version = "0.14", features = ["arrow-57"]}
 toml = "1.0.0"
 
 [build-dependencies]
