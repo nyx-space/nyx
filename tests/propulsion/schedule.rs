@@ -352,3 +352,115 @@ fn val_transfer_single_maneuver_depl_cov_test(almanac: Arc<Almanac>) {
         "finite burn backprop velocity wrong: {err_v:.5e}"
     );
 }
+
+#[rstest]
+fn finite_burns_respects_gaps_between_maneuvers(almanac: Arc<Almanac>) {
+    let eme2k = almanac
+        .frame_info(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
+
+    let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 1, 1);
+    let orbit = Orbit::cartesian(
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, eme2k,
+    );
+
+    let monoprop = Thruster {
+        thrust_N: 10.0,
+        isp_s: 300.0,
+    };
+    let dry_mass_kg = 1e3;
+    let prop_mass_kg = 756.0;
+    let sc_state = Spacecraft::from_thruster(
+        orbit,
+        dry_mass_kg,
+        prop_mass_kg,
+        monoprop,
+        GuidanceMode::Coast,
+    );
+
+    let mnvr0 = Maneuver::from_time_invariant(
+        start_time,
+        start_time + 60.0 * Unit::Second,
+        1.0,
+        Vector3::new(1.0, 0.0, 0.0),
+        LocalFrame::VNC,
+    );
+
+    // notice the 120 second gap here
+
+    let mnvr1 = Maneuver::from_time_invariant(
+        start_time + 180.0 * Unit::Second,
+        start_time + 240.0 * Unit::Second,
+        1.0,
+        Vector3::new(1.0, 0.0, 0.0),
+        LocalFrame::VNC,
+    );
+
+    let schedule = FiniteBurns::from_mnvrs(vec![mnvr0, mnvr1]);
+
+    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
+    let orbital_dyn = OrbitalDynamics::point_masses(bodies);
+    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, schedule);
+
+    let setup = Propagator::rk89(sc, IntegratorOptions::with_fixed_step(1.0 * Unit::Second));
+
+    let (_, traj) = setup
+        .with(sc_state, almanac)
+        .until_epoch_with_traj(start_time + 300.0 * Unit::Second)
+        .unwrap();
+
+    let m_during_first = traj
+        .at(start_time + 30.0 * Unit::Second)
+        .unwrap()
+        .mass
+        .prop_mass_kg;
+    let m_after_first = traj
+        .at(start_time + 70.0 * Unit::Second)
+        .unwrap()
+        .mass
+        .prop_mass_kg;
+    let m_in_gap = traj
+        .at(start_time + 150.0 * Unit::Second)
+        .unwrap()
+        .mass
+        .prop_mass_kg;
+    let m_during_second = traj
+        .at(start_time + 220.0 * Unit::Second)
+        .unwrap()
+        .mass
+        .prop_mass_kg;
+
+    let m_after_second = traj
+        .at(start_time + 250.0 * Unit::Second)
+        .unwrap()
+        .mass
+        .prop_mass_kg;
+
+    let m_after_second_2 = traj
+        .at(start_time + 280.0 * Unit::Second)
+        .unwrap()
+        .mass
+        .prop_mass_kg;
+
+    assert!(
+        m_after_first < m_during_first,
+        "first burn did not consume propellant"
+    );
+    assert!(
+        (m_in_gap - m_after_first).abs() < 1e-9,
+        "propellant changed in burn gap"
+    );
+    assert!(
+        m_during_second < m_in_gap,
+        "second burn did not consume propellant"
+    );
+    assert!(
+        m_after_second < m_during_second,
+        "second burn did not consume propellant"
+    );
+    assert!(
+        (m_after_second_2 - m_after_second).abs() < 1e-9,
+        "propellant changed in burn gap"
+    );
+}
