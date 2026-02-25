@@ -461,6 +461,6 @@ fn finite_burns_respects_gaps_between_maneuvers(almanac: Arc<Almanac>) {
     );
     assert!(
         (m_after_second_2 - m_after_second).abs() < 1e-9,
-        "propellant changed in burn gap"
+        "propellant changed after burn"
     );
 }
