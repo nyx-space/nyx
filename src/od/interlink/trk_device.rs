@@ -199,10 +199,10 @@ impl TrackingDevice<Spacecraft> for InterlinkTxSpacecraft {
                 })?;
 
             let rho_tx_frame = rx_in_tx_frame.radius_km - observer.orbit.radius_km;
+            let relative_velocity = rx_in_tx_frame.velocity_km_s - observer.orbit.velocity_km_s;
 
-            // Compute the range-rate \dot ρ. Note that rx_in_tx_frame is already the relative velocity of rx wrt tx!
-            let range_rate_km_s =
-                rho_tx_frame.dot(&rx_in_tx_frame.velocity_km_s) / rho_tx_frame.norm();
+            // Compute the range-rate \dot ρ.
+            let range_rate_km_s = rho_tx_frame.dot(&relative_velocity) / rho_tx_frame.norm();
 
             let noises = self.noises(observer.epoch(), rng)?;
 
