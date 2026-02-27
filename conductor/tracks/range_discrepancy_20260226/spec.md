@@ -1,17 +1,27 @@
 # Track Specification: Range Discrepancy Fix
 
 ## Problem
-There is a reported range calculation discrepancy between `InterlinkTxSpacecraft` and `GroundStation` tracking when measuring an asset (e.g., a rover) on the surface of a celestial body. The user suspects that `InterlinkTxSpacecraft` provides an incorrect range when light-time (aberration) correction is enabled.
+There is a reported range and doppler calculation discrepancy between `InterlinkTxSpacecraft` and `GroundStation` tracking. This happens even when aberration (light-time) correction is disabled.
 
-## Root Cause Hypothesis
-`InterlinkTxSpacecraft::measure_instantaneous` computes the relative position vector as:
-`let rho_tx_frame = rx_in_tx_frame.radius_km - observer.orbit.radius_km;` where `rx_in_tx_frame` is obtained via `almanac.transform_to(rx.orbit, observer.orbit.frame, self.ab_corr)`.
+## Root Cause
+`InterlinkTxSpacecraft::measure_instantaneous` computes the relative state using naive vector subtraction and an incorrect assumption:
+```rust
+let rho_tx_frame = rx_in_tx_frame.radius_km - observer.orbit.radius_km;
 
-If `ab_corr` is `Aberration::LT`, `transform_to` corrects the light-time from the receiver to the *origin* of `observer.orbit.frame` (typically a celestial body center), not to the transmitter's position. This leads to an incorrect relative position vector when the transmitter is not at the origin of its own frame.
+// Compute the range-rate \dot ρ. Note that rx_in_tx_frame is already the relative velocity of rx wrt tx!
+let range_rate_km_s = rho_tx_frame.dot(&rx_in_tx_frame.velocity_km_s) / rho_tx_frame.norm();
+```
+
+The comment "Note that rx_in_tx_frame is already the relative velocity of rx wrt tx!" is **incorrect** unless the observer is stationary at the origin of `observer.orbit.frame`. For an orbiter in EME2000 or a body-fixed frame, `rx_in_tx_frame.velocity_km_s` is the receiver's velocity in that frame, not the relative velocity. The correct relative velocity is `rx_in_tx_frame.velocity_km_s - observer.orbit.velocity_km_s`.
+
+Furthermore, relying on manual vector subtraction is less robust than using high-level geometric functions provided by `anise`.
 
 ## Proposed Fix
-The implementation should correctly compute the relative state of the receiver with respect to the transmitter, accounting for light-time between the two specific objects, rather than between the receiver and the frame origin.
+Modify `InterlinkTxSpacecraft::measure_instantaneous` to:
+1.  Correctly compute the relative position and velocity vectors by subtracting the observer's state from the receiver's state (both transformed to the same frame).
+2.  Investigate using `anise`'s `relative_state` or similar high-level functions to ensure consistency with `GroundStation` and other tracking devices.
+3.  Ensure the fix works correctly both with and without aberration corrections.
 
 ## Verification Plan
-1.  **Reproduction Test:** Create a test case mimicking the user's scenario: an orbiter and a rover on a celestial body. Use a body-fixed frame for the rover as described. Compare the range from an `InterlinkTxSpacecraft` (orbiter to rover) and a `GroundStation` (rover to orbiter).
-2.  **Validation:** Ensure that the range and doppler values match between both implementations when configured identically.
+1.  **Reproduction Test:** Create a test case with an orbiter and a "rover" (mimicked by a body-fixed trajectory). Compare range and doppler from `InterlinkTxSpacecraft` and `GroundStation`.
+2.  **Validation:** Verify that range and doppler values match between both implementations within acceptable numerical precision.
