@@ -1,0 +1,8 @@
+{
+  "track_id": "range_discrepancy_20260226",
+  "type": "bug",
+  "status": "new",
+  "created_at": "2026-02-26T12:00:00Z",
+  "updated_at": "2026-02-26T12:00:00Z",
+  "description": "Investigate and Resolve Range Calculation Discrepancy between InterlinkTxSpacecraft and GroundStation Tracking"
+}
