@@ -1,5 +1,6 @@
 pub mod blse;
 pub mod interlink;
+pub mod interlink_location;
 pub mod measurements;
 pub mod multi_body;
 pub mod predict_validation;

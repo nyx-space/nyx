@@ -125,6 +125,7 @@ fn interlink_nrho_llo_cov_test(#[case] disperse: bool, almanac: Arc<Almanac>) {
 
     let interlink = InterlinkTxSpacecraft {
         traj: tx_traj,
+        location: None,
         measurement_types,
         integration_time: None,
         timestamp_noise_s: None,

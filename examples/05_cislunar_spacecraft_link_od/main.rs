@@ -147,6 +147,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let interlink = InterlinkTxSpacecraft {
         traj: tx_traj,
+        location: None,
         measurement_types,
         integration_time: None,
         timestamp_noise_s: None,

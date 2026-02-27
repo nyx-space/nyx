@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 use anise::almanac::Almanac;
-use anise::astro::Aberration;
+use anise::astro::{Aberration, Location};
 use anise::errors::AlmanacResult;
 use anise::prelude::{Frame, Orbit};
 use hifitime::{Duration, Epoch, TimeUnits};
@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ensure, ResultExt};
 
 use crate::io::ConfigRepr;
-use crate::md::prelude::Traj;
+use crate::md::prelude::{Interpolatable, Traj};
 use crate::md::Trajectory;
 use crate::od::msr::MeasurementType;
 use crate::od::noise::StochasticNoise;
@@ -44,6 +44,8 @@ use std::sync::Arc;
 pub struct InterlinkTxSpacecraft {
     /// Trajectory of the transmitter spacercaft
     pub traj: Trajectory,
+    /// Optional location of the transmitter (if on a surface)
+    pub location: Option<Location>,
     /// Measurement types supported by the link
     pub measurement_types: IndexSet<MeasurementType>,
     /// Integration time used to generate the measurement.
@@ -182,40 +184,75 @@ impl TrackingDevice<Spacecraft> for InterlinkTxSpacecraft {
             details: format!("fetching state {} for interlink", rx.epoch()),
         })?;
 
-        let is_obstructed = almanac
-            .line_of_sight_obstructed(observer.orbit, rx.orbit, observer.orbit.frame, self.ab_corr)
-            .context(ODAlmanacSnafu {
-                action: "computing line of sight",
-            })?;
+        let (aer, is_obstructed) = if let Some(loc) = &self.location {
+            let obstructing_body = if loc.frame.ephemeris_id != rx.frame().ephemeris_id {
+                Some(rx.frame())
+            } else {
+                None
+            };
+            let aer = almanac
+                .azimuth_elevation_range_sez_from_location(
+                    rx.orbit,
+                    loc.clone(),
+                    obstructing_body,
+                    self.ab_corr,
+                )
+                .context(ODAlmanacSnafu {
+                    action: "computing AER from location",
+                })?;
+            (
+                Some(aer),
+                aer.elevation_above_mask_deg() < 0.0 || aer.is_obstructed(),
+            )
+        } else {
+            let is_obstructed = almanac
+                .line_of_sight_obstructed(
+                    observer.orbit,
+                    rx.orbit,
+                    observer.orbit.frame,
+                    self.ab_corr,
+                )
+                .context(ODAlmanacSnafu {
+                    action: "computing line of sight",
+                })?;
+            (None, is_obstructed)
+        };
 
         if is_obstructed {
             Ok(None)
         } else {
-            // Convert the receiver into the body fixed transmitter frame.
-            let rx_in_tx_frame = almanac
-                .transform_to(rx.orbit, observer.orbit.frame, self.ab_corr)
-                .context(ODAlmanacSnafu {
-                    action: "transforming receiver to transmitter frame",
-                })?;
-
-            let rho_tx_frame = rx_in_tx_frame.radius_km - observer.orbit.radius_km;
-            let relative_velocity = rx_in_tx_frame.velocity_km_s - observer.orbit.velocity_km_s;
-
-            // Compute the range-rate \dot ρ.
-            let range_rate_km_s = rho_tx_frame.dot(&relative_velocity) / rho_tx_frame.norm();
-
             let noises = self.noises(observer.epoch(), rng)?;
 
             let mut msr = Measurement::new(self.name(), rx.orbit.epoch + noises[0].seconds());
 
-            for (ii, msr_type) in self.measurement_types.iter().enumerate() {
-                let msr_value = match *msr_type {
-                    MeasurementType::Range => rho_tx_frame.norm(),
-                    MeasurementType::Doppler => range_rate_km_s,
-                    // Or return an error for unsupported types
-                    _ => unreachable!("unsupported measurement type for interlink: {:?}", msr_type),
-                } + noises[ii + 1];
-                msr.push(*msr_type, msr_value);
+            if let Some(aer) = aer {
+                for (ii, msr_type) in self.measurement_types.iter().enumerate() {
+                    let msr_value = msr_type.compute_one_way(aer, noises[ii + 1])?;
+                    msr.push(*msr_type, msr_value);
+                }
+            } else {
+                // Convert the receiver into the body fixed transmitter frame.
+                let rx_in_tx_frame = almanac
+                    .transform_to(rx.orbit, observer.orbit.frame, self.ab_corr)
+                    .context(ODAlmanacSnafu {
+                        action: "transforming receiver to transmitter frame",
+                    })?;
+
+                let rho_tx_frame = rx_in_tx_frame.radius_km - observer.orbit.radius_km;
+                let relative_velocity = rx_in_tx_frame.velocity_km_s - observer.orbit.velocity_km_s;
+
+                // Compute the range-rate \dot ρ.
+                let range_rate_km_s = rho_tx_frame.dot(&relative_velocity) / rho_tx_frame.norm();
+
+                for (ii, msr_type) in self.measurement_types.iter().enumerate() {
+                    let msr_value = match *msr_type {
+                        MeasurementType::Range => rho_tx_frame.norm(),
+                        MeasurementType::Doppler => range_rate_km_s,
+                        // Or return an error for unsupported types
+                        _ => unreachable!("unsupported measurement type for interlink: {:?}", msr_type),
+                    } + noises[ii + 1];
+                    msr.push(*msr_type, msr_value);
+                }
             }
 
             Ok(Some(msr))
