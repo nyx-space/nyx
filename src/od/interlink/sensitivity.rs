@@ -93,11 +93,15 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, InterlinkTxSpacecraft>
         // Compute the device location in the receiver frame because we compute the sensitivity in that frame.
         // This frame is required because the scalar measurements are frame independent, but the sensitivity
         // must be in the estimation frame.
-        let transmitter = tx
-            .location(rx.orbit.epoch, rx.orbit.frame, almanac.clone())
-            .context(ODAlmanacSnafu {
-                action: "computing transmitter location when computing sensitivity matrix",
-            })?;
+        let transmitter = <InterlinkTxSpacecraft as TrackingDevice<Spacecraft>>::location(
+            tx,
+            rx.orbit.epoch,
+            rx.orbit.frame,
+            almanac.clone(),
+        )
+        .context(ODAlmanacSnafu {
+            action: "computing transmitter location when computing sensitivity matrix",
+        })?;
 
         let delta_r = receiver.radius_km - transmitter.radius_km;
         let delta_v = receiver.velocity_km_s - transmitter.velocity_km_s;

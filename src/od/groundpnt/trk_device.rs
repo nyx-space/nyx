@@ -16,83 +16,25 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 use anise::almanac::Almanac;
-use anise::astro::Aberration;
 use anise::errors::AlmanacResult;
 use anise::prelude::{Frame, Orbit};
-use hifitime::{Duration, Epoch, TimeUnits};
-use indexmap::{IndexMap, IndexSet};
+use hifitime::{Epoch, TimeUnits};
+use indexmap::IndexSet;
 use rand_pcg::Pcg64Mcg;
-use serde::{Deserialize, Serialize};
-use snafu::{ensure, ResultExt};
+use snafu::ResultExt;
 
-use crate::io::ConfigRepr;
 use crate::md::prelude::Traj;
-use crate::md::Trajectory;
+use crate::od::groundpnt::GroundAsset;
+use crate::od::interlink::InterlinkTxSpacecraft;
 use crate::od::msr::MeasurementType;
-use crate::od::noise::StochasticNoise;
-use crate::od::prelude::{Measurement, NoiseNotConfiguredSnafu, ODError};
+use crate::od::prelude::{Measurement, ODError};
 use crate::od::TrackingDevice;
 use crate::od::{ODAlmanacSnafu, ODTrajSnafu};
-use crate::Spacecraft;
 use crate::State;
 
 use std::sync::Arc;
 
-// Defines a (transmitter) spacecraft capable of inter-satellite links.
-// NOTE: There is _no_ `InterlinkRxSpacecraft`, instead you must independently build their trajectories and provide them to the InterlinkArcSim.
-#[derive(Clone, Debug)]
-pub struct InterlinkTxSpacecraft {
-    /// Trajectory of the transmitter spacercaft
-    pub traj: Trajectory,
-    /// Measurement types supported by the link
-    pub measurement_types: IndexSet<MeasurementType>,
-    /// Integration time used to generate the measurement.
-    pub integration_time: Option<Duration>,
-    pub timestamp_noise_s: Option<StochasticNoise>,
-    pub stochastic_noises: Option<IndexMap<MeasurementType, StochasticNoise>>,
-    /// Aberration correction used in the interlink
-    pub ab_corr: Option<Aberration>,
-}
-
-impl InterlinkTxSpacecraft {
-    /// Returns the noises for all measurement types configured for this ground station at the provided epoch, timestamp noise is the first entry.
-    pub fn noises(
-        &mut self,
-        epoch: Epoch,
-        rng: Option<&mut Pcg64Mcg>,
-    ) -> Result<Vec<f64>, ODError> {
-        let mut noises = vec![0.0; self.measurement_types.len() + 1];
-
-        if let Some(rng) = rng {
-            ensure!(
-                self.stochastic_noises.is_some(),
-                NoiseNotConfiguredSnafu {
-                    kind: "ground station stochastics".to_string(),
-                }
-            );
-            // Add the timestamp noise first
-
-            if let Some(mut timestamp_noise) = self.timestamp_noise_s {
-                noises[0] = timestamp_noise.sample(epoch, rng);
-            }
-
-            let stochastics = self.stochastic_noises.as_mut().unwrap();
-
-            for (ii, msr_type) in self.measurement_types.iter().enumerate() {
-                noises[ii + 1] = stochastics
-                    .get_mut(msr_type)
-                    .ok_or(ODError::NoiseNotConfigured {
-                        kind: format!("{msr_type:?}"),
-                    })?
-                    .sample(epoch, rng);
-            }
-        }
-
-        Ok(noises)
-    }
-}
-
-impl TrackingDevice<Spacecraft> for InterlinkTxSpacecraft {
+impl TrackingDevice<GroundAsset> for InterlinkTxSpacecraft {
     fn name(&self) -> String {
         self.traj.name.clone().unwrap_or("unnamed".to_string())
     }
@@ -108,7 +50,7 @@ impl TrackingDevice<Spacecraft> for InterlinkTxSpacecraft {
     fn measure(
         &mut self,
         epoch: Epoch,
-        traj: &Traj<Spacecraft>,
+        traj: &Traj<GroundAsset>,
         rng: Option<&mut Pcg64Mcg>,
         almanac: Arc<Almanac>,
     ) -> Result<Option<Measurement>, ODError> {
@@ -148,7 +90,7 @@ impl TrackingDevice<Spacecraft> for InterlinkTxSpacecraft {
                         let noises = self.noises(epoch - integration_time * 0.5, rng)?;
 
                         let mut msr = Measurement::new(
-                            <InterlinkTxSpacecraft as TrackingDevice<Spacecraft>>::name(self),
+                            "GroundAsset".to_string(),
                             epoch + noises[0].seconds(),
                         );
 
@@ -179,49 +121,37 @@ impl TrackingDevice<Spacecraft> for InterlinkTxSpacecraft {
         }
     }
 
+    /// Returns the Range and Doppler from pnt vehicle to ground asset (i.e. the opposed AER range and doppler data.)
     fn measure_instantaneous(
         &mut self,
-        rx: Spacecraft,
+        rx: GroundAsset,
         rng: Option<&mut Pcg64Mcg>,
         almanac: Arc<Almanac>,
     ) -> Result<Option<Measurement>, ODError> {
-        let observer = self.traj.at(rx.epoch()).context(ODTrajSnafu {
+        let pnt_veh = self.traj.at(rx.epoch()).context(ODTrajSnafu {
             details: format!("fetching state {} for interlink", rx.epoch()),
         })?;
 
-        let is_obstructed = almanac
-            .line_of_sight_obstructed(observer.orbit, rx.orbit, observer.orbit.frame, self.ab_corr)
+        let asset_loc = rx.to_location();
+
+        let aer = almanac
+            .azimuth_elevation_range_sez_from_location(pnt_veh.orbit, asset_loc, None, None)
             .context(ODAlmanacSnafu {
-                action: "computing line of sight",
+                action: "transforming receiver to transmitter frame",
             })?;
 
-        if is_obstructed {
+        if aer.elevation_above_mask_deg() < 0.0 {
             Ok(None)
         } else {
-            // Convert the receiver into the body fixed transmitter frame.
-            let rx_in_tx_frame = almanac
-                .transform_to(rx.orbit, observer.orbit.frame, self.ab_corr)
-                .context(ODAlmanacSnafu {
-                    action: "transforming receiver to transmitter frame",
-                })?;
+            let noises = self.noises(rx.epoch, rng)?;
 
-            let rho_tx_frame = rx_in_tx_frame.radius_km - observer.orbit.radius_km;
-
-            // Compute the range-rate \dot ρ. Note that rx_in_tx_frame is already the relative velocity of rx wrt tx!
-            let range_rate_km_s =
-                rho_tx_frame.dot(&rx_in_tx_frame.velocity_km_s) / rho_tx_frame.norm();
-
-            let noises = self.noises(observer.epoch(), rng)?;
-
-            let mut msr = Measurement::new(
-                <InterlinkTxSpacecraft as TrackingDevice<Spacecraft>>::name(self),
-                rx.orbit.epoch + noises[0].seconds(),
-            );
+            let mut msr =
+                Measurement::new("GroundAsset".to_string(), rx.epoch + noises[0].seconds());
 
             for (ii, msr_type) in self.measurement_types.iter().enumerate() {
                 let msr_value = match *msr_type {
-                    MeasurementType::Range => rho_tx_frame.norm(),
-                    MeasurementType::Doppler => range_rate_km_s,
+                    MeasurementType::Range => -aer.range_km,
+                    MeasurementType::Doppler => -aer.range_rate_km_s,
                     // Or return an error for unsupported types
                     _ => unreachable!("unsupported measurement type for interlink: {:?}", msr_type),
                 } + noises[ii + 1];
@@ -266,23 +196,3 @@ impl TrackingDevice<Spacecraft> for InterlinkTxSpacecraft {
         }
     }
 }
-
-impl Serialize for InterlinkTxSpacecraft {
-    fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        unimplemented!("interlink spacecraft cannot be serialized")
-    }
-}
-
-impl<'de> Deserialize<'de> for InterlinkTxSpacecraft {
-    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        unimplemented!("interlink spacecraft cannot be deserialized")
-    }
-}
-
-impl ConfigRepr for InterlinkTxSpacecraft {}

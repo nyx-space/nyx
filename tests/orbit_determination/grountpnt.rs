@@ -1,0 +1,268 @@
+// Test for interlink
+
+extern crate nyx_space as nyx;
+extern crate pretty_env_logger;
+
+use anise::constants::celestial_objects::{EARTH, SUN};
+use anise::constants::frames::{IAU_MOON_FRAME, MOON_J2000};
+use indexmap::{IndexMap, IndexSet};
+use nyx::cosmic::Orbit;
+use nyx::dynamics::orbital::OrbitalDynamics;
+use nyx::dynamics::SpacecraftDynamics;
+use nyx::linalg::Const;
+use nyx::md::prelude::*;
+use nyx::od::interlink::InterlinkTxSpacecraft;
+use nyx::od::prelude::*;
+use nyx::propagators::Propagator;
+use nyx::time::{Epoch, TimeUnits};
+use nyx::Spacecraft;
+
+use anise::prelude::Almanac;
+use nyx_space::od::groundpnt::ground_dynamics::GroundDynamics;
+use nyx_space::od::groundpnt::GroundAsset;
+use rstest::*;
+use std::collections::BTreeMap;
+use std::path::PathBuf;
+use std::sync::Arc;
+
+#[fixture]
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
+}
+
+/// Test the Cislunar Autonomous Positioning System (CAPS) similar to how it's flown on CAPSTONE.
+/// Assume that the NRHO orbiter is the transmitter in a two-way communication with a low lunar orbiter.
+/// This is a Spacecraft to Spacecraft Orbit Determination Process (S2SODP).
+///
+/// We test that with dispersions we can still converge on a better than the original dispersion.
+/// NOTE: In this short tracking arc, we do not converge well because we don't have good enough visibility
+/// of the crosstrack. This is reflected in the covariance.
+#[rstest]
+#[case(false)]
+#[case(true)]
+fn ground_pnt_lunar_cov_test(#[case] disperse: bool, almanac: Arc<Almanac>) {
+    let _ = pretty_env_logger::try_init();
+
+    let moon_iau = almanac.frame_info(IAU_MOON_FRAME).unwrap();
+
+    let epoch = Epoch::from_gregorian_utc_at_midnight(2024, 2, 29);
+    /* == Propagate an LLO vehicle == */
+    let llo_orbit =
+        Orbit::try_keplerian_altitude(110.0, 1e-4, 35.0, 0.0, 0.0, 0.0, epoch, moon_iau).unwrap();
+
+    let tx_llo_sc = Spacecraft::from(llo_orbit);
+
+    println!("Start state (dynamics: Earth, Moon, Sun gravity):\n{llo_orbit}");
+
+    let bodies = vec![EARTH, SUN];
+    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(bodies));
+
+    let setup = Propagator::rk89(
+        dynamics,
+        IntegratorOptions::builder().max_step(0.5.minutes()).build(),
+    );
+
+    let prop_time = 1.1 * llo_orbit.period().unwrap();
+
+    let (llo_final, mut llo_traj) = setup
+        .with(tx_llo_sc, almanac.clone())
+        .for_duration_with_traj(prop_time)
+        .unwrap();
+
+    llo_traj.name = Some("PNT SC".to_string());
+
+    println!("{llo_traj}");
+
+    /* == Setup a ground asset visible at the halfway mark of this arbitrary trajectory == */
+    let (lat_deg, long_deg, _) = llo_traj
+        .at(epoch + 0.55 * llo_orbit.period().unwrap())
+        .unwrap()
+        .orbit
+        .latlongalt()
+        .unwrap();
+
+    // Set it up as immobile.
+    let rover = GroundAsset::from_fixed(lat_deg, long_deg, 0.0, epoch, moon_iau);
+
+    // Build a trajectory of the rover. It is immobile, but we demonstrate here that it can be propagated, which is required to run it through an OD.
+    let (rover_final, rover_traj) = Propagator::default(GroundDynamics {})
+        .with(rover, almanac.clone())
+        .for_duration_with_traj(prop_time)
+        .unwrap();
+
+    // Check that the rover didn't move
+    assert!((rover_final.latitude_deg - rover.latitude_deg).abs() < f64::EPSILON);
+    assert!((rover_final.longitude_deg - rover.longitude_deg).abs() < f64::EPSILON);
+    assert!((rover_final.height_km - rover.height_km).abs() < f64::EPSILON);
+
+    /* == Setup the interlink == */
+
+    let mut measurement_types = IndexSet::new();
+    measurement_types.insert(MeasurementType::Range);
+    measurement_types.insert(MeasurementType::Doppler);
+
+    let mut stochastics = IndexMap::new();
+
+    let sa45_csac_allan_dev = 1e-11;
+
+    stochastics.insert(
+        MeasurementType::Range,
+        StochasticNoise::from_hardware_range_km(
+            sa45_csac_allan_dev,
+            10.0.seconds(),
+            noise::link_specific::ChipRate::StandardT4B,
+            noise::link_specific::SN0::Average,
+        ),
+    );
+
+    stochastics.insert(
+        MeasurementType::Doppler,
+        StochasticNoise::from_hardware_doppler_km_s(
+            sa45_csac_allan_dev,
+            10.0.seconds(),
+            noise::link_specific::CarrierFreq::SBand,
+            noise::link_specific::CN0::Average,
+        ),
+    );
+
+    let interlink = InterlinkTxSpacecraft {
+        traj: llo_traj.clone(),
+        measurement_types,
+        integration_time: None,
+        timestamp_noise_s: None,
+        ab_corr: Aberration::LT,
+        stochastic_noises: Some(stochastics),
+    };
+
+    // Devices are the transmitter, which is our NRHO vehicle.
+    let mut devices = BTreeMap::new();
+    devices.insert("PNT SC".to_string(), interlink);
+
+    let mut configs = BTreeMap::new();
+    configs.insert(
+        "PNT SC".to_string(),
+        TrkConfig::builder()
+            .strands(vec![Strand {
+                start: epoch,
+                end: llo_final.epoch(),
+            }])
+            .build(),
+    );
+
+    let mut trk_sim =
+        TrackingArcSim::with_seed(devices.clone(), llo_traj.clone(), configs, 0).unwrap();
+    println!("{trk_sim}");
+
+    let trk_data = trk_sim.generate_measurements(almanac.clone()).unwrap();
+    println!("{trk_data}");
+
+    let out = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data/04_output/");
+
+    trk_data
+        .to_parquet_simple(out.clone().join("nrho_interlink_msr.pq"))
+        .unwrap();
+
+    // Run a truth OD where we estimate the LLO position
+    let llo_uncertainty = SpacecraftUncertainty::builder()
+        .nominal(tx_llo_sc)
+        .x_km(1.0)
+        .y_km(1.0)
+        .z_km(1.0)
+        .vx_km_s(1e-3)
+        .vy_km_s(1e-3)
+        .vz_km_s(1e-3)
+        .build();
+
+    let mut proc_devices = devices.clone();
+
+    let initial_estimate = if disperse {
+        // Define the initial estimate, randomized, seed for reproducibility
+        let mut initial_estimate = llo_uncertainty.to_estimate_randomized(Some(0)).unwrap();
+        // Inflate the covariance -- https://github.com/nyx-space/nyx/issues/339
+        initial_estimate.covar *= 2.5;
+
+        // Increase the noise in the devices to accept more measurements.
+
+        for link in proc_devices.values_mut() {
+            for noise in &mut link.stochastic_noises.as_mut().unwrap().values_mut() {
+                *noise.white_noise.as_mut().unwrap() *= 15.0;
+            }
+        }
+
+        initial_estimate
+    } else {
+        llo_uncertainty.to_estimate().unwrap()
+    };
+
+    let init_err = initial_estimate
+        .orbital_state()
+        .ric_difference(&llo_orbit)
+        .unwrap();
+
+    println!("initial estimate:\n{initial_estimate}");
+    println!("RIC errors = {init_err}",);
+
+    let odp = KalmanODProcess::<_, Const<2>, Const<3>, InterlinkTxSpacecraft>::new(
+        setup,
+        if disperse {
+            KalmanVariant::ReferenceUpdate
+        } else {
+            KalmanVariant::DeviationTracking
+        },
+        Some(ResidRejectCrit::default()),
+        proc_devices,
+        almanac,
+    );
+
+    // Shrink the data to process.
+    let arc = trk_data.filter_by_offset(..2.hours());
+
+    let od_sol = odp.process_arc(initial_estimate, &arc).unwrap();
+
+    println!("{od_sol}");
+
+    od_sol
+        .to_parquet(
+            out.join(format!("interlink_od_sol_disp_{disperse}.pq")),
+            ExportCfg::default(),
+        )
+        .unwrap();
+
+    let od_traj = od_sol.to_traj().unwrap();
+
+    od_traj
+        .ric_diff_to_parquet(
+            &llo_traj,
+            out.join(format!("interlink_llo_est_error_disp_{disperse}.pq")),
+            ExportCfg::default(),
+        )
+        .unwrap();
+
+    let final_est = od_sol.estimates.last().unwrap();
+    assert!(final_est.within_3sigma(), "should be within 3 sigma");
+
+    println!("ESTIMATE\n{final_est:x}\n");
+    let truth = llo_traj.at(final_est.epoch()).unwrap();
+    println!("TRUTH\n{truth:x}");
+
+    let final_err = truth
+        .orbit
+        .ric_difference(&final_est.orbital_state())
+        .unwrap();
+    println!("ERROR {final_err}");
+
+    println!("RMAG error {:.3} m", final_err.rmag_km() * 1e3);
+    println!("Original error {:.3} m", init_err.rmag_km() * 1e3);
+
+    if disperse {
+        assert!(
+            final_err.rmag_km() < init_err.rmag_km(),
+            "expected smaller error than at start"
+        );
+    } else {
+        // When we don't deviate the state, we expect excellent estimation.
+        assert!(final_err.rmag_km() < 1e-2);
+        assert!(final_err.vmag_km_s() < 1e-6);
+    }
+}
