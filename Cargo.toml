@@ -34,8 +34,8 @@ github = { repository = "nyx-space/nyx", branch = "master" }
 [dependencies]
 nalgebra = "0.34"
 log = "0.4"
-hifitime = "4.2.4"
-anise = {version = "0.9.3", features=[ "analysis" ] }
+hifitime = "4.2.5"
+anise = {version = "0.9.5", features=[ "analysis" ] }
 flate2 = { version = "1.0", features = [
     "rust_backend",
 ], default-features = false }
@@ -50,11 +50,11 @@ approx = "0.5"
 rand_pcg = "0.10"
 indicatif = { version = "0.18", features = ["rayon"], default-features = false }
 rstats = "2.0.1"
-parquet = { version = "57.3.0", default-features = false, features = [
+parquet = { version = "58.0.0", default-features = false, features = [
     "arrow",
     "zstd",
 ] }
-arrow = "57.3.0"
+arrow = "58.0.0"
 shadow-rs = { version = "1.0.1", default-features = false }
 serde_yml = "0.0.12"
 whoami = "2.1.1"
@@ -75,7 +75,7 @@ premium = []
 polars = { version = "0.51.0", features = ["parquet"] }
 rstest = "0.26.1"
 pretty_env_logger = "0.5"
-serde_arrow = {version = "0.14", features = ["arrow-57"]}
+serde_arrow = {version = "0.14", features = ["arrow-58"]}
 toml = "1.0.0"
 
 [build-dependencies]
