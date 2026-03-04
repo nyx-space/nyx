@@ -32,17 +32,8 @@ fn almanac() -> Arc<Almanac> {
     test_almanac_arcd()
 }
 
-/// Test the Cislunar Autonomous Positioning System (CAPS) similar to how it's flown on CAPSTONE.
-/// Assume that the NRHO orbiter is the transmitter in a two-way communication with a low lunar orbiter.
-/// This is a Spacecraft to Spacecraft Orbit Determination Process (S2SODP).
-///
-/// We test that with dispersions we can still converge on a better than the original dispersion.
-/// NOTE: In this short tracking arc, we do not converge well because we don't have good enough visibility
-/// of the crosstrack. This is reflected in the covariance.
 #[rstest]
-#[case(false)]
-// #[case(true)]
-fn ground_pnt_lunar_cov_test(#[case] ref_update: bool, almanac: Arc<Almanac>) {
+fn ground_pnt_lunar_cov_test(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
     let moon_iau = almanac.frame_info(IAU_MOON_FRAME).unwrap();
@@ -64,7 +55,7 @@ fn ground_pnt_lunar_cov_test(#[case] ref_update: bool, almanac: Arc<Almanac>) {
         IntegratorOptions::builder().max_step(0.5.minutes()).build(),
     );
 
-    let prop_time = 1.1 * llo_orbit.period().unwrap();
+    let prop_time = 10.5 * llo_orbit.period().unwrap();
 
     let (llo_final, mut llo_traj) = setup
         .with(tx_llo_sc, almanac.clone())
@@ -186,6 +177,7 @@ fn ground_pnt_lunar_cov_test(#[case] ref_update: bool, almanac: Arc<Almanac>) {
                 start: epoch,
                 end: llo_final.epoch(),
             }])
+            .sampling(Unit::Second * 10)
             .build(),
     );
 
@@ -208,12 +200,10 @@ fn ground_pnt_lunar_cov_test(#[case] ref_update: bool, almanac: Arc<Almanac>) {
     // rover_dispersed.longitude_deg += 0.5;
     rover_dispersed.latitude_deg = rover_sb_final.latitude_deg;
     rover_dispersed.longitude_deg = rover_eb_final.longitude_deg;
-    // HACK: Set the initial epoch to the first measurements
-    rover_dispersed.epoch = *trk_data.measurements.iter().next().unwrap().0;
 
     let asset_estimate = KfEstimate::from_diag(
         rover_dispersed,
-        Vector6::from_iterator([1e-4, 1e-4, 1e-4, 0.0, 0.0, 0.0]),
+        Vector6::from_iterator([1e-2, 1e-2, 1e-2, 0.0, 0.0, 0.0]),
     );
 
     let proc_devices = devices.clone();
@@ -221,18 +211,20 @@ fn ground_pnt_lunar_cov_test(#[case] ref_update: bool, almanac: Arc<Almanac>) {
     let odp = KalmanODProcess::<_, Const<2>, Const<3>, InterlinkTxSpacecraft>::new(
         rover_prop,
         // if ref_update {
-        //     KalmanVariant::ReferenceUpdate
+        KalmanVariant::ReferenceUpdate,
         // } else {
-        KalmanVariant::DeviationTracking,
+        // KalmanVariant::DeviationTracking,
         // },
-        // None,
-        Some(ResidRejectCrit::default()),
+        None,
+        // Some(ResidRejectCrit::default()),
         proc_devices,
         almanac,
     );
 
+    let err_m = rover_dispersed.great_circle_distance_km(&rover).unwrap() * 1e3;
+
     println!(
-        "== INIT -- Ref. update: {ref_update} ==\nESTIMATE: {}\tsigmas: [{:.2e} deg, {:.2e} deg, {:.2e} m]\nTRUTH\t: {rover}",
+        "== INIT -- Great circle dist: {err_m:.3} ==\nESTIMATE: {}\tsigmas: [{:.2e} deg, {:.2e} deg, {:.2e} m]\nTRUTH\t: {rover}",
         asset_estimate.nominal_state,
         asset_estimate.covar[(0, 0)].sqrt(),
         asset_estimate.covar[(1, 1)].sqrt(),
@@ -245,27 +237,17 @@ fn ground_pnt_lunar_cov_test(#[case] ref_update: bool, almanac: Arc<Almanac>) {
 
     let final_est = od_sol.estimates.last().unwrap();
     let truth = rover_traj.at(final_est.epoch()).unwrap();
+    println!("Within 3 sigma: {}", final_est.within_3sigma());
     // assert!(final_est.within_3sigma(), "should be within 3 sigma");
 
+    let final_estimate = final_est.nominal_state + final_est.state_deviation;
+
+    let err_m = final_estimate.great_circle_distance_km(&truth).unwrap() * 1e3;
+
     println!(
-        "== Ref. update: {ref_update} ==\nESTIMATE: {}\tsigmas: [{:.2e} deg, {:.2e} deg, {:.2e} m]\nTRUTH\t: {truth}",
-        final_est.nominal_state + final_est.state_deviation,
+        "== FINAL -- Great circle dist: {err_m:.3} ==\nESTIMATE: {final_estimate}\tsigmas: [{:.2e} deg, {:.2e} deg, {:.2e} m]\nTRUTH\t: {truth}",
         final_est.covar[(0, 0)].sqrt(),
         final_est.covar[(1, 1)].sqrt(),
         final_est.covar[(2, 2)].sqrt() * 1e3
     );
-
-    // for (est, resid) in od_sol.results() {
-    //     if est.predicted {
-    //         continue;
-    //     }
-    //     println!(
-    //         "ESTIMATE: {}\tsigmas: [{:.2e} deg, {:.2e} deg, {:.2e} m]",
-    //         est.state_deviation,
-    //         est.covar[(0, 0)].sqrt(),
-    //         est.covar[(1, 1)].sqrt(),
-    //         est.covar[(2, 2)].sqrt() * 1e3
-    //     );
-    //     println!("RESID: {}", resid.as_ref().unwrap());
-    // }
 }

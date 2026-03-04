@@ -18,9 +18,7 @@
 
 use crate::dynamics::{Dynamics, DynamicsError};
 use crate::od::groundpnt::GroundAsset;
-use crate::State;
 use anise::prelude::Almanac;
-use hyperdual::{hyperspace_from_vector, OHyperdual};
 use nalgebra::allocator::Allocator;
 use nalgebra::{Const, DefaultAllocator, Matrix6, OMatrix, OVector, Vector6};
 use std::sync::Arc;
@@ -83,25 +81,24 @@ impl Dynamics for GroundDynamics {
             >,
         nalgebra::Owned<f64, Self::HyperdualSize>: Copy,
     {
-        // Extract data from hyperspace
-        // Build full state vector with partials in the right position (hence building with all six components)
-        let state: Vector6<OHyperdual<f64, Const<7>>> =
-            hyperspace_from_vector(&osc.to_state_vector());
+        // The math is very simple here, so we're skipping the hyperdual represenation.
+        let dx = Vector6::new(
+            osc.latitude_rate_deg_s,
+            osc.longitude_rate_deg_s,
+            osc.height_rate_km_s,
+            0.0,
+            0.0,
+            0.0,
+        );
 
-        let velocity = state.fixed_rows::<3>(3).into_owned();
-
-        // Extract result into Vector6 and Matrix6
-        let mut dx = Vector6::zeros();
+        // A-matrix for kinematic (no acceleration) model:
+        // d/dt[pos] = vel  →  ∂(pos_dot)/∂vel = I₃
+        // d/dt[vel] = 0    →  all velocity partials are zero
         let mut grad = Matrix6::zeros();
-        for i in 0..6 {
-            dx[i] = if i < 3 { velocity[i].real() } else { 0.0 };
-            for j in 1..7 {
-                grad[(i, j - 1)] = if i < 3 { velocity[i][j] } else { 0.0 };
-            }
-        }
+        grad[(0, 3)] = 1.0;
+        grad[(1, 4)] = 1.0;
+        grad[(2, 5)] = 1.0;
 
-        // This function returns the time derivative of each function. The propagator will add this to the state vector (which has the previous STM).
-        // This is why we don't multiply the gradient (A matrix) with the previous STM
         Ok((dx, grad))
     }
 }

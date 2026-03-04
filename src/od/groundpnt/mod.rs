@@ -22,15 +22,15 @@ use crate::{cosmic::State, md::prelude::Interpolatable};
 use anise::analysis::prelude::OrbitalElement;
 use anise::errors::PhysicsError;
 use anise::math::interpolation::{hermite_eval, InterpolationError};
-use anise::{
-    astro::Location,
-    prelude::{Frame, Orbit},
-};
+use anise::prelude::Orbit;
+use anise::{astro::Location, prelude::Frame};
 use core::error::Error;
 use core::fmt;
 use core::ops::Add;
 use hifitime::Epoch;
-use nalgebra::{Const, DimName, OMatrix, OVector, Vector3};
+use hyperdual::{hyperspace_from_vector, OHyperdual};
+use nalgebra::{Const, DimName, Matrix6, OMatrix, OVector, Vector3, Vector6};
+use num_traits::Float;
 pub mod ground_dynamics;
 pub mod sensitivity;
 pub mod trk_device;
@@ -120,6 +120,109 @@ impl GroundAsset {
             self.height_rate_km_s,
         )
         .map(|v| v * 1e3)
+    }
+
+    pub fn geodetic_to_cartesian_jacobian(&self) -> Result<Matrix6<f64>, PhysicsError> {
+        let lat_deg = self.latitude_deg;
+        let lon_deg = self.longitude_deg;
+        let alt_km = self.height_km;
+        let a = self.frame.mean_equatorial_radius_km()?;
+        let b = self.frame.shape.unwrap().polar_radius_km;
+        let e2 = (a * a - b * b) / (a * a);
+
+        // 1. Pack the full geodetic state vector
+        let state_vec = Vector6::new(
+            lat_deg,
+            lon_deg,
+            alt_km,
+            self.latitude_rate_deg_s,
+            self.longitude_rate_deg_s,
+            self.height_rate_km_s,
+        );
+
+        // 2. Initialize hyperspace (1 real + 6 dual components)
+        let hyper_state: Vector6<OHyperdual<f64, Const<7>>> = hyperspace_from_vector(&state_vec);
+
+        // 3. Extract and scale angular variables
+        // Multiplying the hyperdual by π/180 scales the duals perfectly,
+        // yielding partials in per-degree automatically!
+        let deg_to_rad = std::f64::consts::PI / 180.0;
+        let lat = hyper_state[0] * deg_to_rad;
+        let lon = hyper_state[1] * deg_to_rad;
+        let alt = hyper_state[2];
+        let lat_rate = hyper_state[3] * deg_to_rad;
+        let lon_rate = hyper_state[4] * deg_to_rad;
+        let alt_rate = hyper_state[5];
+
+        let sin_lat = lat.sin();
+        let cos_lat = lat.cos();
+        let sin_lon = lon.sin();
+        let cos_lon = lon.cos();
+
+        let one = OHyperdual::<f64, Const<7>>::from_real(1.0);
+        let e2_dual = OHyperdual::<f64, Const<7>>::from_real(e2);
+
+        // Radius of curvature in prime vertical
+        let n = OHyperdual::from_real(a) / (one - e2_dual * sin_lat * sin_lat).sqrt();
+
+        // 4. Cartesian positions
+        let x = (n + alt) * cos_lat * cos_lon;
+        let y = (n + alt) * cos_lat * sin_lon;
+        let z = (n * OHyperdual::from_real(1.0 - e2) + alt) * sin_lat;
+
+        // 5. Cartesian velocities (using your exact J_rp logic mapped to hyperduals)
+        let term1 = n * OHyperdual::from_real(1.0 - e2) / (one - e2_dual * sin_lat * sin_lat);
+
+        let dx_dlat = -(term1 + alt) * sin_lat * cos_lon;
+        let dy_dlat = -(term1 + alt) * sin_lat * sin_lon;
+        let dz_dlat = term1 * cos_lat + alt * cos_lat;
+
+        let dx_dlon = -(n + alt) * cos_lat * sin_lon;
+        let dy_dlon = (n + alt) * cos_lat * cos_lon;
+        let dz_dlon = OHyperdual::from_real(0.0);
+
+        let dx_dalt = cos_lat * cos_lon;
+        let dy_dalt = cos_lat * sin_lon;
+        let dz_dalt = sin_lat;
+
+        let vx = dx_dlat * lat_rate + dx_dlon * lon_rate + dx_dalt * alt_rate;
+        let vy = dy_dlat * lat_rate + dy_dlon * lon_rate + dy_dalt * alt_rate;
+        let vz = dz_dlat * lat_rate + dz_dlon * lon_rate + dz_dalt * alt_rate;
+
+        // 6. Extract the 6x6 Jacobian matrix from the dual parts
+        let mut jacobian = Matrix6::zeros();
+        let cartesian_state = [x, y, z, vx, vy, vz];
+
+        for i in 0..6 {
+            for j in 1..7 {
+                jacobian[(i, j - 1)] = cartesian_state[i][j];
+            }
+        }
+
+        Ok(jacobian)
+    }
+
+    /// Computes the great circle (Haversine) distance between this asset and another in kilometers.
+    ///
+    /// Note: This assumes a perfectly spherical body using the frame's mean equatorial radius.
+    /// It does not account for the ellipsoidal oblateness or the `height_km` of either asset.
+    pub fn great_circle_distance_km(&self, other: &Self) -> Result<f64, PhysicsError> {
+        let lat1 = self.latitude_deg.to_radians();
+        let lon1 = self.longitude_deg.to_radians();
+        let lat2 = other.latitude_deg.to_radians();
+        let lon2 = other.longitude_deg.to_radians();
+
+        let dlat = lat2 - lat1;
+        let dlon = lon2 - lon1;
+
+        let a = (dlat / 2.0).sin().powi(2) + lat1.cos() * lat2.cos() * (dlon / 2.0).sin().powi(2);
+
+        let c = 2.0 * a.sqrt().atan2((1.0 - a).sqrt());
+
+        // Extract the spherical radius from the frame definition
+        let radius_km = self.frame.mean_equatorial_radius_km()?;
+
+        Ok(radius_km * c)
     }
 }
 
@@ -349,9 +452,6 @@ pub fn latlongalt_rate(
     // Get current lat, long, alt
     let (lat_deg, _long_deg, alt_km) = orbit.latlongalt()?;
     let lat_rad = lat_deg.to_radians();
-
-    // // Get the DCM from SEZ to body-fixed frame
-    // let sez2body_dcm = orbit.dcm_from_topocentric_to_body_fixed()?;
 
     // Extract SEZ velocity components
     // SEZ frame: x=South, y=East, z=Zenith (up)

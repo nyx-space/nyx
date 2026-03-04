@@ -24,8 +24,6 @@ use crate::od::msr::{sensitivity::ScalarSensitivity, Measurement, MeasurementTyp
 use crate::od::prelude::sensitivity::{ScalarSensitivityT, TrackerSensitivity};
 use crate::od::{ODAlmanacSnafu, ODError};
 use crate::{Spacecraft, State};
-use anise::ephemerides::EphemerisPhysicsSnafu;
-use anise::errors::EphemerisSnafu;
 use anise::prelude::Almanac;
 use indexmap::IndexSet;
 use nalgebra::{DimName, OMatrix, U1};
@@ -118,7 +116,7 @@ impl ScalarSensitivityT<GroundAsset, GroundAsset, InterlinkTxSpacecraft>
                 let sensitivity_row =
                     OMatrix::<f64, U1, <GroundAsset as State>::Size>::from_row_slice(&[
                         m21, m22, m23, m11, m12, m13,
-                    ]);
+                    ]) * rx.geodetic_to_cartesian_jacobian().unwrap();
 
                 Ok(Self {
                     sensitivity_row,
@@ -135,7 +133,7 @@ impl ScalarSensitivityT<GroundAsset, GroundAsset, InterlinkTxSpacecraft>
                 let sensitivity_row =
                     OMatrix::<f64, U1, <GroundAsset as State>::Size>::from_row_slice(&[
                         m11, m12, m13, 0.0, 0.0, 0.0,
-                    ]);
+                    ]) * rx.geodetic_to_cartesian_jacobian().unwrap();
 
                 Ok(Self {
                     sensitivity_row,

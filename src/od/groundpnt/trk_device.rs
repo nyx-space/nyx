@@ -152,7 +152,7 @@ impl TrackingDevice<GroundAsset> for InterlinkTxSpacecraft {
             for (ii, msr_type) in self.measurement_types.iter().enumerate() {
                 let msr_value = match *msr_type {
                     MeasurementType::Range => aer.range_km,
-                    MeasurementType::Doppler => -aer.range_rate_km_s,
+                    MeasurementType::Doppler => aer.range_rate_km_s,
                     // Or return an error for unsupported types
                     _ => unreachable!("unsupported measurement type for interlink: {:?}", msr_type),
                 } + noises[ii + 1];
