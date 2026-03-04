@@ -81,61 +81,39 @@ impl ScalarSensitivityT<GroundAsset, GroundAsset, InterlinkTxSpacecraft>
         tx: &InterlinkTxSpacecraft,
         almanac: Arc<Almanac>,
     ) -> Result<Self, ODError> {
-        let rx_orbit = rx.orbit();
+        let receiver = rx.orbit();
+        let loc = rx.to_location();
 
-        // Compute the SEZ DCM
-        // SEZ DCM is topo to fixed
-        let sez_dcm = rx_orbit
-            .dcm_from_topocentric_to_body_fixed()
-            .context(EphemerisPhysicsSnafu { action: "" })
-            .context(EphemerisSnafu {
-                action: "computing SEZ DCM for sensitivity",
-            })
-            .context(ODAlmanacSnafu { action: "" })?;
+        // Compute the device location in the receiver frame because we compute the sensitivity in that frame.
+        // This frame is required because the scalar measurements are frame independent, but the sensitivity
+        // must be in the estimation frame.
+        let transmitter = tx.traj.at(receiver.epoch).unwrap().orbit;
 
-        let rx_sez = (sez_dcm.transpose() * rx_orbit)
-            .context(EphemerisPhysicsSnafu { action: "" })
-            .context(EphemerisSnafu {
-                action: "transforming ground asset to SEZ",
-            })
-            .context(ODAlmanacSnafu { action: "" })?;
-
-        // Convert the transmitter/PNT vehicle into the body fixed transmitter frame.
-        let tx_in_rx_frame = almanac
-            .transform_to(tx.traj.at(rx.epoch).unwrap().orbit, rx.frame, None)
-            .context(ODAlmanacSnafu {
-                action: "computing transmitter location when computing sensitivity matrix",
-            })?;
-
-        // Convert into SEZ frame
-        let tx_sez = (sez_dcm.transpose() * tx_in_rx_frame)
-            .context(EphemerisPhysicsSnafu { action: "" })
-            .context(EphemerisSnafu {
-                action: "transforming received to SEZ",
-            })
-            .context(ODAlmanacSnafu { action: "" })?;
-
-        // Compute the range ρ in the SEZ frame
-        let delta_r_km = tx_sez.radius_km - rx_sez.radius_km;
-        let ρ_km_sez = delta_r_km.norm();
-        // Compute the velocity difference - BUT note that rx_in_tx_frame is already the relative velocity of rx wrt tx!
-        let delta_v_km_s = tx_in_rx_frame.velocity_km_s;
+        let delta_r = receiver.radius_km - transmitter.radius_km;
+        let delta_v = receiver.velocity_km_s - transmitter.velocity_km_s;
 
         match msr_type {
             MeasurementType::Doppler => {
                 // If we have a simultaneous measurement of the range, use that, otherwise we compute the expected range.
                 let ρ_km = match msr.data.get(&MeasurementType::Range) {
                     Some(range_km) => *range_km,
-                    None => ρ_km_sez,
+                    None => {
+                        almanac
+                            .azimuth_elevation_range_sez_from_location(transmitter, loc, None, None)
+                            .context(ODAlmanacSnafu {
+                                action: "computing range for Doppler measurement",
+                            })?
+                            .range_km
+                    }
                 };
 
                 let ρ_dot_km_s = msr.data.get(&MeasurementType::Doppler).unwrap();
-                let m11 = delta_r_km.x / ρ_km;
-                let m12 = delta_r_km.y / ρ_km;
-                let m13 = delta_r_km.z / ρ_km;
-                let m21 = delta_v_km_s.x / ρ_km - ρ_dot_km_s * delta_r_km.x / ρ_km.powi(2);
-                let m22 = delta_v_km_s.y / ρ_km - ρ_dot_km_s * delta_r_km.y / ρ_km.powi(2);
-                let m23 = delta_v_km_s.z / ρ_km - ρ_dot_km_s * delta_r_km.z / ρ_km.powi(2);
+                let m11 = delta_r.x / ρ_km;
+                let m12 = delta_r.y / ρ_km;
+                let m13 = delta_r.z / ρ_km;
+                let m21 = delta_v.x / ρ_km - ρ_dot_km_s * delta_r.x / ρ_km.powi(2);
+                let m22 = delta_v.y / ρ_km - ρ_dot_km_s * delta_r.y / ρ_km.powi(2);
+                let m23 = delta_v.z / ρ_km - ρ_dot_km_s * delta_r.z / ρ_km.powi(2);
 
                 let sensitivity_row =
                     OMatrix::<f64, U1, <GroundAsset as State>::Size>::from_row_slice(&[
@@ -150,9 +128,9 @@ impl ScalarSensitivityT<GroundAsset, GroundAsset, InterlinkTxSpacecraft>
             }
             MeasurementType::Range => {
                 let ρ_km = msr.data.get(&MeasurementType::Range).unwrap();
-                let m11 = delta_r_km.x / ρ_km;
-                let m12 = delta_r_km.y / ρ_km;
-                let m13 = delta_r_km.z / ρ_km;
+                let m11 = delta_r.x / ρ_km;
+                let m12 = delta_r.y / ρ_km;
+                let m13 = delta_r.z / ρ_km;
 
                 let sensitivity_row =
                     OMatrix::<f64, U1, <GroundAsset as State>::Size>::from_row_slice(&[
@@ -165,12 +143,100 @@ impl ScalarSensitivityT<GroundAsset, GroundAsset, InterlinkTxSpacecraft>
                     _tx: PhantomData::<_>,
                 })
             }
-            MeasurementType::Azimuth
-            | MeasurementType::Elevation
-            | MeasurementType::ReceiveFrequency
-            | MeasurementType::TransmitFrequency => Err(ODError::MeasurementSimError {
-                details: format!("{msr_type:?} is not supported for interlink"),
+            _ => Err(ODError::MeasurementSimError {
+                details: format!("{msr_type:?} is only supported in CCSDS TDM parsing"),
             }),
         }
+        // let rx_orbit = rx.orbit();
+
+        // // Compute the SEZ DCM
+        // // SEZ DCM is topo to fixed
+        // let sez_dcm = rx_orbit
+        //     .dcm_from_topocentric_to_body_fixed()
+        //     .context(EphemerisPhysicsSnafu { action: "" })
+        //     .context(EphemerisSnafu {
+        //         action: "computing SEZ DCM for sensitivity",
+        //     })
+        //     .context(ODAlmanacSnafu { action: "" })?;
+
+        // let rx_sez = (sez_dcm.transpose() * rx_orbit)
+        //     .context(EphemerisPhysicsSnafu { action: "" })
+        //     .context(EphemerisSnafu {
+        //         action: "transforming ground asset to SEZ",
+        //     })
+        //     .context(ODAlmanacSnafu { action: "" })?;
+
+        // // Convert the transmitter/PNT vehicle into the body fixed transmitter frame.
+        // let tx_in_rx_frame = almanac
+        //     .transform_to(tx.traj.at(rx.epoch).unwrap().orbit, rx.frame, None)
+        //     .context(ODAlmanacSnafu {
+        //         action: "computing transmitter location when computing sensitivity matrix",
+        //     })?;
+
+        // // Convert into SEZ frame
+        // let tx_sez = (sez_dcm.transpose() * tx_in_rx_frame)
+        //     .context(EphemerisPhysicsSnafu { action: "" })
+        //     .context(EphemerisSnafu {
+        //         action: "transforming received to SEZ",
+        //     })
+        //     .context(ODAlmanacSnafu { action: "" })?;
+
+        // // Compute the range ρ in the SEZ frame
+        // let delta_r_km = tx_sez.radius_km - rx_sez.radius_km;
+        // let ρ_km_sez = delta_r_km.norm();
+        // // Compute the velocity difference - BUT note that rx_in_tx_frame is already the relative velocity of rx wrt tx!
+        // let delta_v_km_s = tx_in_rx_frame.velocity_km_s;
+
+        // match msr_type {
+        //     MeasurementType::Doppler => {
+        //         // If we have a simultaneous measurement of the range, use that, otherwise we compute the expected range.
+        //         let ρ_km = match msr.data.get(&MeasurementType::Range) {
+        //             Some(range_km) => *range_km,
+        //             None => ρ_km_sez,
+        //         };
+
+        //         let ρ_dot_km_s = msr.data.get(&MeasurementType::Doppler).unwrap();
+        //         let m11 = delta_r_km.x / ρ_km;
+        //         let m12 = delta_r_km.y / ρ_km;
+        //         let m13 = delta_r_km.z / ρ_km;
+        //         let m21 = delta_v_km_s.x / ρ_km - ρ_dot_km_s * delta_r_km.x / ρ_km.powi(2);
+        //         let m22 = delta_v_km_s.y / ρ_km - ρ_dot_km_s * delta_r_km.y / ρ_km.powi(2);
+        //         let m23 = delta_v_km_s.z / ρ_km - ρ_dot_km_s * delta_r_km.z / ρ_km.powi(2);
+
+        //         let sensitivity_row =
+        //             OMatrix::<f64, U1, <GroundAsset as State>::Size>::from_row_slice(&[
+        //                 m21, m22, m23, m11, m12, m13,
+        //             ]);
+
+        //         Ok(Self {
+        //             sensitivity_row,
+        //             _rx: PhantomData::<_>,
+        //             _tx: PhantomData::<_>,
+        //         })
+        //     }
+        //     MeasurementType::Range => {
+        //         let ρ_km = msr.data.get(&MeasurementType::Range).unwrap();
+        //         let m11 = delta_r_km.x / ρ_km;
+        //         let m12 = delta_r_km.y / ρ_km;
+        //         let m13 = delta_r_km.z / ρ_km;
+
+        //         let sensitivity_row =
+        //             OMatrix::<f64, U1, <GroundAsset as State>::Size>::from_row_slice(&[
+        //                 m11, m12, m13, 0.0, 0.0, 0.0,
+        //             ]);
+
+        //         Ok(Self {
+        //             sensitivity_row,
+        //             _rx: PhantomData::<_>,
+        //             _tx: PhantomData::<_>,
+        //         })
+        //     }
+        //     MeasurementType::Azimuth
+        //     | MeasurementType::Elevation
+        //     | MeasurementType::ReceiveFrequency
+        //     | MeasurementType::TransmitFrequency => Err(ODError::MeasurementSimError {
+        //         details: format!("{msr_type:?} is not supported for interlink"),
+        //     }),
+        // }
     }
 }

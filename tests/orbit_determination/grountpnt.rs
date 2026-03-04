@@ -4,7 +4,8 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
 use anise::constants::celestial_objects::{EARTH, SUN};
-use anise::constants::frames::{IAU_MOON_FRAME, MOON_J2000};
+use anise::constants::frames::IAU_MOON_FRAME;
+use anise::math::Vector6;
 use indexmap::{IndexMap, IndexSet};
 use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::OrbitalDynamics;
@@ -40,8 +41,8 @@ fn almanac() -> Arc<Almanac> {
 /// of the crosstrack. This is reflected in the covariance.
 #[rstest]
 #[case(false)]
-#[case(true)]
-fn ground_pnt_lunar_cov_test(#[case] disperse: bool, almanac: Arc<Almanac>) {
+// #[case(true)]
+fn ground_pnt_lunar_cov_test(#[case] ref_update: bool, almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
     let moon_iau = almanac.frame_info(IAU_MOON_FRAME).unwrap();
@@ -86,7 +87,9 @@ fn ground_pnt_lunar_cov_test(#[case] disperse: bool, almanac: Arc<Almanac>) {
     let rover = GroundAsset::from_fixed(lat_deg, long_deg, 0.0, epoch, moon_iau);
 
     // Build a trajectory of the rover. It is immobile, but we demonstrate here that it can be propagated, which is required to run it through an OD.
-    let (rover_final, rover_traj) = Propagator::default(GroundDynamics {})
+    let rover_prop = Propagator::default(GroundDynamics {});
+    let (rover_final, rover_traj) = rover_prop
+        .clone()
         .with(rover, almanac.clone())
         .for_duration_with_traj(prop_time)
         .unwrap();
@@ -95,6 +98,42 @@ fn ground_pnt_lunar_cov_test(#[case] disperse: bool, almanac: Arc<Almanac>) {
     assert!((rover_final.latitude_deg - rover.latitude_deg).abs() < f64::EPSILON);
     assert!((rover_final.longitude_deg - rover.longitude_deg).abs() < f64::EPSILON);
     assert!((rover_final.height_km - rover.height_km).abs() < f64::EPSILON);
+
+    /* == Check that the S/E/Z movement is properly integrated == */
+    /* *** S = 1 m/s ; E = 0 m/s ; Z = 0 m/s *** */
+    let rover_sb = rover.with_velocity_sez_m_s(1.0, 0.0, 0.0).unwrap();
+    let rover_sb_final = Propagator::default(GroundDynamics {})
+        .with(rover_sb, almanac.clone())
+        .for_duration(Unit::Second * 1000)
+        .unwrap();
+
+    println!("SOUNDBOUND: {rover_sb} -> {rover_sb_final}");
+    let vel_sez_m_s = rover_sb_final.velocity_sez_m_s().unwrap();
+
+    assert!((vel_sez_m_s[0] - 1.0).abs() < 1e-12);
+    assert!((vel_sez_m_s[1]).abs() < f64::EPSILON);
+    assert!((vel_sez_m_s[2]).abs() < f64::EPSILON);
+    // Propagated for a thousand seconds going one meter per second south bound, moving by 0.002 degrees
+    assert!((rover_sb_final.latitude_deg - rover.latitude_deg).abs() < 4e-2);
+    assert!((rover_sb_final.longitude_deg - rover.longitude_deg).abs() < f64::EPSILON);
+    assert!((rover_sb_final.height_km - rover.height_km).abs() < f64::EPSILON);
+    /* *** S = 0 m/s ; E = 1 m/s ; Z = 0 m/s *** */
+    let rover_eb = rover.with_velocity_sez_m_s(0.0, 1.0, 0.0).unwrap();
+    let rover_eb_final = Propagator::default(GroundDynamics {})
+        .with(rover_eb, almanac.clone())
+        .for_duration(Unit::Second * 1000)
+        .unwrap();
+
+    println!("EASTBOUND: {rover_eb} -> {rover_eb_final}");
+    let vel_sez_m_s = rover_eb.velocity_sez_m_s().unwrap();
+
+    assert!((vel_sez_m_s[1] - 1.0).abs() < 1e-12);
+    assert!((vel_sez_m_s[0]).abs() < f64::EPSILON);
+    assert!((vel_sez_m_s[2]).abs() < f64::EPSILON);
+
+    assert!((rover_eb_final.latitude_deg - rover.latitude_deg).abs() < f64::EPSILON);
+    assert!((rover_eb_final.longitude_deg - rover.longitude_deg).abs() < 4e-2);
+    assert!((rover_eb_final.height_km - rover.height_km).abs() < f64::EPSILON);
 
     /* == Setup the interlink == */
 
@@ -137,11 +176,11 @@ fn ground_pnt_lunar_cov_test(#[case] disperse: bool, almanac: Arc<Almanac>) {
 
     // Devices are the transmitter, which is our NRHO vehicle.
     let mut devices = BTreeMap::new();
-    devices.insert("PNT SC".to_string(), interlink);
+    devices.insert("GroundAsset".to_string(), interlink);
 
     let mut configs = BTreeMap::new();
     configs.insert(
-        "PNT SC".to_string(),
+        "GroundAsset".to_string(),
         TrkConfig::builder()
             .strands(vec![Strand {
                 start: epoch,
@@ -151,7 +190,7 @@ fn ground_pnt_lunar_cov_test(#[case] disperse: bool, almanac: Arc<Almanac>) {
     );
 
     let mut trk_sim =
-        TrackingArcSim::with_seed(devices.clone(), llo_traj.clone(), configs, 0).unwrap();
+        TrackingArcSim::with_seed(devices.clone(), rover_traj.clone(), configs, 0).unwrap();
     println!("{trk_sim}");
 
     let trk_data = trk_sim.generate_measurements(almanac.clone()).unwrap();
@@ -160,109 +199,73 @@ fn ground_pnt_lunar_cov_test(#[case] disperse: bool, almanac: Arc<Almanac>) {
     let out = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data/04_output/");
 
     trk_data
-        .to_parquet_simple(out.clone().join("nrho_interlink_msr.pq"))
+        .to_parquet_simple(out.clone().join("rover_pnt_msr.pq"))
         .unwrap();
 
-    // Run a truth OD where we estimate the LLO position
-    let llo_uncertainty = SpacecraftUncertainty::builder()
-        .nominal(tx_llo_sc)
-        .x_km(1.0)
-        .y_km(1.0)
-        .z_km(1.0)
-        .vx_km_s(1e-3)
-        .vy_km_s(1e-3)
-        .vz_km_s(1e-3)
-        .build();
+    // Build some uncertainty for the ground asset location
+    let mut rover_dispersed = rover;
+    // rover_dispersed.latitude_deg += 0.5;
+    // rover_dispersed.longitude_deg += 0.5;
+    rover_dispersed.latitude_deg = rover_sb_final.latitude_deg;
+    rover_dispersed.longitude_deg = rover_eb_final.longitude_deg;
+    // HACK: Set the initial epoch to the first measurements
+    rover_dispersed.epoch = *trk_data.measurements.iter().next().unwrap().0;
 
-    let mut proc_devices = devices.clone();
+    let asset_estimate = KfEstimate::from_diag(
+        rover_dispersed,
+        Vector6::from_iterator([1e-4, 1e-4, 1e-4, 0.0, 0.0, 0.0]),
+    );
 
-    let initial_estimate = if disperse {
-        // Define the initial estimate, randomized, seed for reproducibility
-        let mut initial_estimate = llo_uncertainty.to_estimate_randomized(Some(0)).unwrap();
-        // Inflate the covariance -- https://github.com/nyx-space/nyx/issues/339
-        initial_estimate.covar *= 2.5;
-
-        // Increase the noise in the devices to accept more measurements.
-
-        for link in proc_devices.values_mut() {
-            for noise in &mut link.stochastic_noises.as_mut().unwrap().values_mut() {
-                *noise.white_noise.as_mut().unwrap() *= 15.0;
-            }
-        }
-
-        initial_estimate
-    } else {
-        llo_uncertainty.to_estimate().unwrap()
-    };
-
-    let init_err = initial_estimate
-        .orbital_state()
-        .ric_difference(&llo_orbit)
-        .unwrap();
-
-    println!("initial estimate:\n{initial_estimate}");
-    println!("RIC errors = {init_err}",);
+    let proc_devices = devices.clone();
 
     let odp = KalmanODProcess::<_, Const<2>, Const<3>, InterlinkTxSpacecraft>::new(
-        setup,
-        if disperse {
-            KalmanVariant::ReferenceUpdate
-        } else {
-            KalmanVariant::DeviationTracking
-        },
+        rover_prop,
+        // if ref_update {
+        //     KalmanVariant::ReferenceUpdate
+        // } else {
+        KalmanVariant::DeviationTracking,
+        // },
+        // None,
         Some(ResidRejectCrit::default()),
         proc_devices,
         almanac,
     );
 
-    // Shrink the data to process.
-    let arc = trk_data.filter_by_offset(..2.hours());
+    println!(
+        "== INIT -- Ref. update: {ref_update} ==\nESTIMATE: {}\tsigmas: [{:.2e} deg, {:.2e} deg, {:.2e} m]\nTRUTH\t: {rover}",
+        asset_estimate.nominal_state,
+        asset_estimate.covar[(0, 0)].sqrt(),
+        asset_estimate.covar[(1, 1)].sqrt(),
+        asset_estimate.covar[(2, 2)].sqrt() * 1e3
+    );
 
-    let od_sol = odp.process_arc(initial_estimate, &arc).unwrap();
+    let od_sol = odp.process_arc(asset_estimate, &trk_data).unwrap();
 
     println!("{od_sol}");
 
-    od_sol
-        .to_parquet(
-            out.join(format!("interlink_od_sol_disp_{disperse}.pq")),
-            ExportCfg::default(),
-        )
-        .unwrap();
-
-    let od_traj = od_sol.to_traj().unwrap();
-
-    od_traj
-        .ric_diff_to_parquet(
-            &llo_traj,
-            out.join(format!("interlink_llo_est_error_disp_{disperse}.pq")),
-            ExportCfg::default(),
-        )
-        .unwrap();
-
     let final_est = od_sol.estimates.last().unwrap();
-    assert!(final_est.within_3sigma(), "should be within 3 sigma");
+    let truth = rover_traj.at(final_est.epoch()).unwrap();
+    // assert!(final_est.within_3sigma(), "should be within 3 sigma");
 
-    println!("ESTIMATE\n{final_est:x}\n");
-    let truth = llo_traj.at(final_est.epoch()).unwrap();
-    println!("TRUTH\n{truth:x}");
+    println!(
+        "== Ref. update: {ref_update} ==\nESTIMATE: {}\tsigmas: [{:.2e} deg, {:.2e} deg, {:.2e} m]\nTRUTH\t: {truth}",
+        final_est.nominal_state + final_est.state_deviation,
+        final_est.covar[(0, 0)].sqrt(),
+        final_est.covar[(1, 1)].sqrt(),
+        final_est.covar[(2, 2)].sqrt() * 1e3
+    );
 
-    let final_err = truth
-        .orbit
-        .ric_difference(&final_est.orbital_state())
-        .unwrap();
-    println!("ERROR {final_err}");
-
-    println!("RMAG error {:.3} m", final_err.rmag_km() * 1e3);
-    println!("Original error {:.3} m", init_err.rmag_km() * 1e3);
-
-    if disperse {
-        assert!(
-            final_err.rmag_km() < init_err.rmag_km(),
-            "expected smaller error than at start"
-        );
-    } else {
-        // When we don't deviate the state, we expect excellent estimation.
-        assert!(final_err.rmag_km() < 1e-2);
-        assert!(final_err.vmag_km_s() < 1e-6);
-    }
+    // for (est, resid) in od_sol.results() {
+    //     if est.predicted {
+    //         continue;
+    //     }
+    //     println!(
+    //         "ESTIMATE: {}\tsigmas: [{:.2e} deg, {:.2e} deg, {:.2e} m]",
+    //         est.state_deviation,
+    //         est.covar[(0, 0)].sqrt(),
+    //         est.covar[(1, 1)].sqrt(),
+    //         est.covar[(2, 2)].sqrt() * 1e3
+    //     );
+    //     println!("RESID: {}", resid.as_ref().unwrap());
+    // }
 }

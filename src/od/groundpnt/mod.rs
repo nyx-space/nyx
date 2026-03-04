@@ -20,6 +20,7 @@ use crate::md::StateParameter;
 use crate::od::DynamicsError;
 use crate::{cosmic::State, md::prelude::Interpolatable};
 use anise::analysis::prelude::OrbitalElement;
+use anise::errors::PhysicsError;
 use anise::math::interpolation::{hermite_eval, InterpolationError};
 use anise::{
     astro::Location,
@@ -27,6 +28,7 @@ use anise::{
 };
 use core::error::Error;
 use core::fmt;
+use core::ops::Add;
 use hifitime::Epoch;
 use nalgebra::{Const, DimName, OMatrix, OVector, Vector3};
 pub mod ground_dynamics;
@@ -36,17 +38,17 @@ pub mod trk_device;
 /// Represents a ground position/nav/timing receiver, e.g. a customer
 /// Note that we rebuild the Location structure from ANISE but _without_ a terrain mask because the mask is not copyable
 /// and this PNTRx must be copyable to implement State.
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct GroundAsset {
     pub latitude_deg: f64,
     pub longitude_deg: f64,
     pub height_km: f64,
     // Velocity in the SEZ frame, South component, in METERS per second
-    pub latitude_vel_deg_s: f64,
+    pub latitude_rate_deg_s: f64,
     // Velocity in the SEZ frame, East component, in METERS per second
-    pub longitude_vel_deg_s: f64,
+    pub longitude_rate_deg_s: f64,
     // Velocity in the SEZ frame, Up/+Z component, in METERS per second
-    pub height_vel_km_s: f64,
+    pub height_rate_km_s: f64,
     // Epoch
     pub epoch: Epoch,
     /// Frame on which this location rests
@@ -78,29 +80,14 @@ impl GroundAsset {
         vel_e_m_s: f64,
         vel_z_m_s: f64,
     ) -> Result<Self, Box<dyn Error>> {
-        let orbit = self.orbit();
-        let sez2body_dcm = orbit.dcm_from_topocentric_to_body_fixed()?;
-        let vel_sez_m_s = Vector3::new(vel_s_m_s, vel_e_m_s, vel_z_m_s);
-        let vel_m_s = sez2body_dcm * vel_sez_m_s;
+        let (lat_rate_deg_s, long_rate_deg_s, alt_rate_km_s) = latlongalt_rate(
+            self.orbit(),
+            Vector3::new(vel_s_m_s, vel_e_m_s, vel_z_m_s) * 1e-3,
+        )?;
 
-        // HACK: Assume the transformation is the same for position and velocity. It's a reasonable assumption.
-        let rx_vel_km_s = Orbit::new(
-            vel_m_s.x * 1e-3_f64,
-            vel_m_s.y * 1e-3_f64,
-            vel_m_s.z * 1e-3_f64,
-            0.0,
-            0.0,
-            0.0,
-            self.epoch,
-            self.frame,
-        );
-
-        // Compute the velocity to be compatible with the position units
-        let (lat_deg_s, long_deg_s, alt_km_s) = rx_vel_km_s.latlongalt()?;
-
-        self.latitude_vel_deg_s = lat_deg_s;
-        self.longitude_vel_deg_s = long_deg_s;
-        self.height_vel_km_s = alt_km_s;
+        self.latitude_rate_deg_s = lat_rate_deg_s;
+        self.longitude_rate_deg_s = long_rate_deg_s;
+        self.height_rate_km_s = alt_rate_km_s;
 
         Ok(self)
     }
@@ -116,7 +103,7 @@ impl GroundAsset {
     }
 
     /// Compute the velocity in m/s in the SEZ frame from the state data stored in latitude deg/s, longitude deg/s, and height in km/s for integration of EOMs
-    pub fn velocity_sez_m_s(&self) -> Result<OVector<f64, Const<3>>, Box<dyn std::error::Error>> {
+    pub fn velocity_sez_m_s(&self) -> Result<OVector<f64, Const<3>>, PhysicsError> {
         // First, convert from SEZ to body frame.
         let rx = Orbit::try_latlongalt(
             self.latitude_deg,
@@ -126,20 +113,13 @@ impl GroundAsset {
             self.frame,
         )?;
 
-        let sez_dcm = rx.dcm_from_topocentric_to_body_fixed()?;
-
-        // HACK: Assume the transformation is the same for position and velocity. It's a reasonable assumption.
-        let asset_vel_km_s = Orbit::try_latlongalt(
-            self.latitude_vel_deg_s,
-            self.longitude_vel_deg_s * 1e-3,
-            self.height_vel_km_s * 1e-3,
-            self.epoch,
-            self.frame,
+        velocity_sez_from_latlongalt_rate(
+            rx,
+            self.latitude_rate_deg_s,
+            self.longitude_rate_deg_s,
+            self.height_rate_km_s,
         )
-        .unwrap();
-
-        // Rotate and change units at once
-        Ok(sez_dcm * asset_vel_km_s.velocity_km_s * 1e3)
+        .map(|v| v * 1e3)
     }
 }
 
@@ -150,9 +130,9 @@ impl Default for GroundAsset {
             latitude_deg: 0.,
             longitude_deg: 0.,
             height_km: 0.,
-            latitude_vel_deg_s: 0.,
-            longitude_vel_deg_s: 0.,
-            height_vel_km_s: 0.0,
+            latitude_rate_deg_s: 0.,
+            longitude_rate_deg_s: 0.,
+            height_rate_km_s: 0.0,
             epoch: Epoch::from_tdb_seconds(0.0),
             stm: None,
         }
@@ -196,6 +176,17 @@ impl State for GroundAsset {
         vector[1] = self.longitude_deg;
         vector[2] = self.height_km;
 
+        vector[3] = self.latitude_rate_deg_s;
+        vector[4] = self.longitude_rate_deg_s;
+        vector[5] = self.height_rate_km_s;
+
+        if let Some(stm) = self.stm {
+            let stm_slice = stm.as_slice();
+            for i in 0..36 {
+                vector[6 + i] = stm_slice[i];
+            }
+        }
+
         vector
     }
 
@@ -236,11 +227,15 @@ impl State for GroundAsset {
         self.longitude_deg = asset_state[1];
         self.height_km = asset_state[2];
 
-        self.latitude_vel_deg_s = asset_state[3];
-        self.longitude_vel_deg_s = asset_state[4];
-        self.height_vel_km_s = asset_state[5];
+        self.latitude_rate_deg_s = asset_state[3];
+        self.longitude_rate_deg_s = asset_state[4];
+        self.height_rate_km_s = asset_state[5];
 
         self.epoch = epoch;
+    }
+
+    fn reset_stm(&mut self) {
+        self.stm = Some(OMatrix::<f64, Const<6>, Const<6>>::identity());
     }
 
     fn unset_stm(&mut self) {
@@ -257,6 +252,10 @@ impl State for GroundAsset {
     fn with_stm(mut self) -> Self {
         self.stm = Some(OMatrix::<f64, Const<6>, Const<6>>::identity());
         self
+    }
+
+    fn add(self, other: OVector<f64, Self::Size>) -> Self {
+        self + other
     }
 }
 
@@ -276,9 +275,9 @@ impl Interpolatable for GroundAsset {
             xs[cno] = state.latitude_deg;
             ys[cno] = state.longitude_deg;
             zs[cno] = state.height_km;
-            vxs[cno] = state.latitude_vel_deg_s;
-            vys[cno] = state.longitude_vel_deg_s;
-            vzs[cno] = state.height_vel_km_s;
+            vxs[cno] = state.latitude_rate_deg_s;
+            vys[cno] = state.longitude_rate_deg_s;
+            vzs[cno] = state.height_rate_km_s;
             epochs_tdb[cno] = state.epoch.to_et_seconds();
         }
 
@@ -297,9 +296,9 @@ impl Interpolatable for GroundAsset {
         self.latitude_deg = latitude_deg;
         self.longitude_deg = longitude_deg;
         self.height_km = height_km;
-        self.latitude_vel_deg_s = latitude_vel_deg_s;
-        self.longitude_vel_deg_s = longitude_vel_deg_s;
-        self.height_vel_km_s = height_vel_km_s;
+        self.latitude_rate_deg_s = latitude_vel_deg_s;
+        self.longitude_rate_deg_s = longitude_vel_deg_s;
+        self.height_rate_km_s = height_vel_km_s;
 
         self.epoch = epoch;
 
@@ -324,4 +323,106 @@ impl Interpolatable for GroundAsset {
             StateParameter::Element(OrbitalElement::VZ),
         ]
     }
+}
+
+impl Add<OVector<f64, Const<6>>> for GroundAsset {
+    type Output = Self;
+
+    /// Adds the provided state deviation to this orbit
+    fn add(mut self, asset_state: OVector<f64, Const<6>>) -> Self {
+        self.latitude_deg += asset_state[0];
+        self.longitude_deg += asset_state[1];
+        self.height_km += asset_state[2];
+
+        self.latitude_rate_deg_s += asset_state[3];
+        self.longitude_rate_deg_s += asset_state[4];
+        self.height_rate_km_s += asset_state[5];
+
+        self
+    }
+}
+
+pub fn latlongalt_rate(
+    orbit: Orbit,
+    velocity_sez_km_s: Vector3<f64>,
+) -> Result<(f64, f64, f64), PhysicsError> {
+    // Get current lat, long, alt
+    let (lat_deg, _long_deg, alt_km) = orbit.latlongalt()?;
+    let lat_rad = lat_deg.to_radians();
+
+    // // Get the DCM from SEZ to body-fixed frame
+    // let sez2body_dcm = orbit.dcm_from_topocentric_to_body_fixed()?;
+
+    // Extract SEZ velocity components
+    // SEZ frame: x=South, y=East, z=Zenith (up)
+    let v_south = velocity_sez_km_s.x;
+    let v_east = velocity_sez_km_s.y;
+    let v_zenith = velocity_sez_km_s.z;
+
+    // Get ellipsoid parameters
+    let a_km = orbit.frame.mean_equatorial_radius_km()?;
+    let b_km = orbit.frame.shape.unwrap().polar_radius_km;
+    let e2 = (a_km.powi(2) - b_km.powi(2)) / a_km.powi(2);
+
+    // Compute radius of curvature in the meridian (N)
+    let sin_lat = lat_rad.sin();
+    let n = a_km / (1.0 - e2 * sin_lat.powi(2)).sqrt();
+
+    // Compute radius of curvature in the prime vertical (M)
+    let m = a_km * (1.0 - e2) / (1.0 - e2 * sin_lat.powi(2)).powf(1.5);
+
+    // Convert SEZ velocities to geodetic coordinate rates
+    // Altitude rate (positive = up)
+    let alt_rate_km_s = v_zenith;
+
+    // Latitude rate (positive = north, but SEZ x-axis is south)
+    let lat_rate_rad_s = -v_south / (m + alt_km);
+    let lat_rate_deg_s = lat_rate_rad_s.to_degrees();
+
+    // Longitude rate (positive = east)
+    let cos_lat = lat_rad.cos();
+    let long_rate_rad_s = if cos_lat.abs() > 1e-10 {
+        v_east / ((n + alt_km) * cos_lat)
+    } else {
+        0.0 // At poles, longitude rate is undefined
+    };
+    let long_rate_deg_s = long_rate_rad_s.to_degrees();
+
+    Ok((lat_rate_deg_s, long_rate_deg_s, alt_rate_km_s))
+}
+
+/// Convert geodetic coordinate rates (lat rate, long rate, alt rate) to velocity in SEZ frame
+pub fn velocity_sez_from_latlongalt_rate(
+    orbit: Orbit,
+    lat_rate_deg_s: f64,
+    long_rate_deg_s: f64,
+    alt_rate_km_s: f64,
+) -> Result<Vector3<f64>, PhysicsError> {
+    // Get current lat and alt
+    let (lat_deg, _long_deg, alt_km) = orbit.latlongalt()?;
+    let lat_rad = lat_deg.to_radians();
+
+    // Get ellipsoid parameters
+    let a_km = orbit.frame.mean_equatorial_radius_km()?;
+    let b_km = orbit.frame.shape.unwrap().polar_radius_km;
+    let e2 = (a_km.powi(2) - b_km.powi(2)) / a_km.powi(2);
+
+    // Compute radius of curvature in the meridian (M)
+    let sin_lat = lat_rad.sin();
+    let m = a_km * (1.0 - e2) / (1.0 - e2 * sin_lat.powi(2)).powf(1.5);
+
+    // Compute radius of curvature in the prime vertical (N)
+    let n = a_km / (1.0 - e2 * sin_lat.powi(2)).sqrt();
+
+    // Convert rates to radians per second
+    let lat_rate_rad_s = lat_rate_deg_s.to_radians();
+    let long_rate_rad_s = long_rate_deg_s.to_radians();
+
+    // Convert geodetic coordinate rates to SEZ velocities
+    // SEZ frame: x=South, y=East, z=Zenith (up)
+    let v_south = -lat_rate_rad_s * (m + alt_km); // Negative because x is south
+    let v_east = long_rate_rad_s * (n + alt_km) * lat_rad.cos();
+    let v_zenith = alt_rate_km_s;
+
+    Ok(Vector3::new(v_south, v_east, v_zenith))
 }

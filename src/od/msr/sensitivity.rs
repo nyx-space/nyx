@@ -237,5 +237,3 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
         }
     }
 }
-
-// TODO: Build the tracker sensitivity for the Interlink

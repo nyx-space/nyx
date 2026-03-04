@@ -148,9 +148,10 @@ impl TrackingDevice<GroundAsset> for InterlinkTxSpacecraft {
             let mut msr =
                 Measurement::new("GroundAsset".to_string(), rx.epoch + noises[0].seconds());
 
+            // Range is a norm, so we don't flip the sign. But the rate depends on the direction of travel, so we do indeed flip its sign.
             for (ii, msr_type) in self.measurement_types.iter().enumerate() {
                 let msr_value = match *msr_type {
-                    MeasurementType::Range => -aer.range_km,
+                    MeasurementType::Range => aer.range_km,
                     MeasurementType::Doppler => -aer.range_rate_km_s,
                     // Or return an error for unsupported types
                     _ => unreachable!("unsupported measurement type for interlink: {:?}", msr_type),

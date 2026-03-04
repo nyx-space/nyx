@@ -98,8 +98,6 @@ impl MvnSpacecraft {
             .filter(|disp| disp.param.is_orbital())
             .count();
 
-        dbg!(num_orbital);
-
         if num_orbital > 0 {
             // Build the rotation matrix from the orbital dispersions to the Cartesian state.
             let mut jac = DMatrix::from_element(num_orbital, 6, 0.0);

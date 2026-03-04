@@ -43,9 +43,9 @@ impl Dynamics for GroundDynamics {
         DefaultAllocator: Allocator<<Self::StateType as crate::State>::VecLength>,
     {
         let d_x = Vector6::from_iterator([
-            state_ctx.latitude_vel_deg_s,
-            state_ctx.longitude_vel_deg_s,
-            state_ctx.height_vel_km_s,
+            state_ctx.latitude_rate_deg_s,
+            state_ctx.longitude_rate_deg_s,
+            state_ctx.height_rate_km_s,
             0.0,
             0.0,
             0.0,
