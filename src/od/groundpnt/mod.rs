@@ -33,6 +33,7 @@ use nalgebra::{Const, DimName, Matrix6, OMatrix, OVector, Vector3, Vector6};
 use num_traits::Float;
 pub mod ground_dynamics;
 pub mod sensitivity;
+pub mod solution;
 pub mod trk_device;
 
 /// Represents a ground position/nav/timing receiver, e.g. a customer
@@ -360,6 +361,15 @@ impl State for GroundAsset {
     fn add(self, other: OVector<f64, Self::Size>) -> Self {
         self + other
     }
+
+    fn value(&self, param: StateParameter) -> Result<f64, crate::errors::StateError> {
+        match param {
+            StateParameter::Element(OrbitalElement::Latitude) => Ok(self.latitude_deg),
+            StateParameter::Element(OrbitalElement::Longitude) => Ok(self.longitude_deg),
+            StateParameter::Element(OrbitalElement::Height) => Ok(self.height_km),
+            _ => Err(crate::errors::StateError::Unavailable { param }),
+        }
+    }
 }
 
 impl Interpolatable for GroundAsset {
@@ -418,12 +428,9 @@ impl Interpolatable for GroundAsset {
 
     fn export_params() -> Vec<StateParameter> {
         vec![
-            StateParameter::Element(OrbitalElement::X),
-            StateParameter::Element(OrbitalElement::Y),
-            StateParameter::Element(OrbitalElement::Z),
-            StateParameter::Element(OrbitalElement::VX),
-            StateParameter::Element(OrbitalElement::VY),
-            StateParameter::Element(OrbitalElement::VZ),
+            StateParameter::Element(OrbitalElement::Latitude),
+            StateParameter::Element(OrbitalElement::Longitude),
+            StateParameter::Element(OrbitalElement::Height),
         ]
     }
 }

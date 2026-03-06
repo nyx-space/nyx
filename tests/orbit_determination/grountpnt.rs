@@ -55,7 +55,7 @@ fn ground_pnt_lunar_cov_test(almanac: Arc<Almanac>) {
         IntegratorOptions::builder().max_step(0.5.minutes()).build(),
     );
 
-    let prop_time = 10.5 * llo_orbit.period().unwrap();
+    let prop_time = 11 * llo_orbit.period().unwrap();
 
     let (llo_final, mut llo_traj) = setup
         .with(tx_llo_sc, almanac.clone())
@@ -177,7 +177,7 @@ fn ground_pnt_lunar_cov_test(almanac: Arc<Almanac>) {
                 start: epoch,
                 end: llo_final.epoch(),
             }])
-            .sampling(Unit::Second * 10)
+            // .sampling(Unit::Second * 10)
             .build(),
     );
 
@@ -203,51 +203,51 @@ fn ground_pnt_lunar_cov_test(almanac: Arc<Almanac>) {
 
     let asset_estimate = KfEstimate::from_diag(
         rover_dispersed,
-        Vector6::from_iterator([1e-2, 1e-2, 1e-2, 0.0, 0.0, 0.0]),
+        Vector6::from_iterator([1e-2, 1e-2, 0.0, 0.0, 0.0, 0.0]),
     );
 
     let proc_devices = devices.clone();
 
     let odp = KalmanODProcess::<_, Const<2>, Const<3>, InterlinkTxSpacecraft>::new(
         rover_prop,
-        // if ref_update {
         KalmanVariant::ReferenceUpdate,
-        // } else {
-        // KalmanVariant::DeviationTracking,
-        // },
         None,
-        // Some(ResidRejectCrit::default()),
         proc_devices,
         almanac,
     );
 
-    let err_m = rover_dispersed.great_circle_distance_km(&rover).unwrap() * 1e3;
+    let init_err_m = rover_dispersed.great_circle_distance_km(&rover).unwrap() * 1e3;
 
     println!(
-        "== INIT -- Great circle dist: {err_m:.3} ==\nESTIMATE: {}\tsigmas: [{:.2e} deg, {:.2e} deg, {:.2e} m]\nTRUTH\t: {rover}",
+        "== INIT -- Great circle dist: {init_err_m:.3} ==\nESTIMATE: {}\tsigmas: [{:.2e} deg, {:.2e} deg, {:.2e} m]\nTRUTH\t: {rover}",
         asset_estimate.nominal_state,
         asset_estimate.covar[(0, 0)].sqrt(),
         asset_estimate.covar[(1, 1)].sqrt(),
         asset_estimate.covar[(2, 2)].sqrt() * 1e3
     );
 
-    let od_sol = odp.process_arc(asset_estimate, &trk_data).unwrap();
+    let pnt_sol = odp.process_arc(asset_estimate, &trk_data).unwrap();
 
-    println!("{od_sol}");
+    println!("{pnt_sol}");
 
-    let final_est = od_sol.estimates.last().unwrap();
+    let final_est = pnt_sol.estimates.last().unwrap();
     let truth = rover_traj.at(final_est.epoch()).unwrap();
-    println!("Within 3 sigma: {}", final_est.within_3sigma());
-    // assert!(final_est.within_3sigma(), "should be within 3 sigma");
+    assert!(final_est.within_3sigma(), "should be within 3 sigma");
 
     let final_estimate = final_est.nominal_state + final_est.state_deviation;
 
-    let err_m = final_estimate.great_circle_distance_km(&truth).unwrap() * 1e3;
+    let final_err_m = final_estimate.great_circle_distance_km(&truth).unwrap() * 1e3;
 
     println!(
-        "== FINAL -- Great circle dist: {err_m:.3} ==\nESTIMATE: {final_estimate}\tsigmas: [{:.2e} deg, {:.2e} deg, {:.2e} m]\nTRUTH\t: {truth}",
+        "== FINAL -- Great circle dist: {final_err_m:.3} ==\nESTIMATE: {final_estimate}\tsigmas: [{:.2e} deg, {:.2e} deg, {:.2e} m]\nTRUTH\t: {truth}",
         final_est.covar[(0, 0)].sqrt(),
         final_est.covar[(1, 1)].sqrt(),
         final_est.covar[(2, 2)].sqrt() * 1e3
     );
+
+    assert!(final_err_m < init_err_m);
+
+    pnt_sol
+        .to_parquet("data/04_output/lunar_pnt.pq", ExportCfg::default())
+        .unwrap();
 }
