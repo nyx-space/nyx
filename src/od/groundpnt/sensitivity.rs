@@ -24,6 +24,7 @@ use crate::od::msr::{sensitivity::ScalarSensitivity, Measurement, MeasurementTyp
 use crate::od::prelude::sensitivity::{ScalarSensitivityT, TrackerSensitivity};
 use crate::od::{ODAlmanacSnafu, ODError};
 use crate::{Spacecraft, State};
+use anise::errors::AlmanacError;
 use anise::prelude::Almanac;
 use indexmap::IndexSet;
 use nalgebra::{DimName, OMatrix, U1};
@@ -85,7 +86,25 @@ impl ScalarSensitivityT<GroundAsset, GroundAsset, InterlinkTxSpacecraft>
         // Compute the device location in the receiver frame because we compute the sensitivity in that frame.
         // This frame is required because the scalar measurements are frame independent, but the sensitivity
         // must be in the estimation frame.
-        let transmitter = tx.traj.at(receiver.epoch).unwrap().orbit;
+
+        let transmitter = tx
+            .traj
+            .at(receiver.epoch)
+            .map_err(|source| ODError::ODTrajError {
+                source,
+                details: "computing sensitivity ground asset / interlink".into(),
+            })?
+            .orbit;
+
+        let jac = rx
+            .geodetic_to_cartesian_jacobian()
+            .map_err(|e| ODError::ODAlmanac {
+                source: Box::new(AlmanacError::AlmanacPhysics {
+                    action: "computing Jacobian for geodetics",
+                    source: Box::new(e),
+                }),
+                action: "computing Jacobian for geodetics",
+            })?;
 
         let delta_r = receiver.radius_km - transmitter.radius_km;
         let delta_v = receiver.velocity_km_s - transmitter.velocity_km_s;
@@ -116,7 +135,7 @@ impl ScalarSensitivityT<GroundAsset, GroundAsset, InterlinkTxSpacecraft>
                 let sensitivity_row =
                     OMatrix::<f64, U1, <GroundAsset as State>::Size>::from_row_slice(&[
                         m21, m22, m23, m11, m12, m13,
-                    ]) * rx.geodetic_to_cartesian_jacobian().unwrap();
+                    ]) * jac;
 
                 Ok(Self {
                     sensitivity_row,
@@ -133,7 +152,7 @@ impl ScalarSensitivityT<GroundAsset, GroundAsset, InterlinkTxSpacecraft>
                 let sensitivity_row =
                     OMatrix::<f64, U1, <GroundAsset as State>::Size>::from_row_slice(&[
                         m11, m12, m13, 0.0, 0.0, 0.0,
-                    ]) * rx.geodetic_to_cartesian_jacobian().unwrap();
+                    ]) * jac;
 
                 Ok(Self {
                     sensitivity_row,

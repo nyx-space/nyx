@@ -128,6 +128,8 @@ impl GroundAsset {
         let lon_deg = self.longitude_deg;
         let alt_km = self.height_km;
         let a = self.frame.mean_equatorial_radius_km()?;
+        // If there is no shape data, the previous line returns an error, so we
+        // can safely unwrap here.
         let b = self.frame.shape.unwrap().polar_radius_km;
         let e2 = (a * a - b * b) / (a * a);
 
@@ -251,7 +253,10 @@ impl fmt::Display for GroundAsset {
             self.latitude_deg,
             self.longitude_deg,
             self.height_km,
-            self.velocity_sez_m_s().unwrap().norm()
+            match self.velocity_sez_m_s() {
+                Ok(vel_m_s) => vel_m_s.norm(),
+                Err(_) => f64::NAN,
+            }
         )
     }
 }
@@ -264,7 +269,10 @@ impl fmt::LowerExp for GroundAsset {
             self.latitude_deg,
             self.longitude_deg,
             self.height_km,
-            self.velocity_sez_m_s().unwrap().norm()
+            match self.velocity_sez_m_s() {
+                Ok(vel_m_s) => vel_m_s.norm(),
+                Err(_) => f64::NAN,
+            }
         )
     }
 }
@@ -302,7 +310,7 @@ impl State for GroundAsset {
             self.epoch,
             self.frame,
         )
-        .unwrap()
+        .expect("Ground asset frame does not allow init from lat/long/alt")
     }
 
     fn epoch(&self) -> Epoch {
@@ -468,6 +476,8 @@ pub fn latlongalt_rate(
 
     // Get ellipsoid parameters
     let a_km = orbit.frame.mean_equatorial_radius_km()?;
+    // If there is no shape data, the previous line returns an error, so we
+    // can safely unwrap here.
     let b_km = orbit.frame.shape.unwrap().polar_radius_km;
     let e2 = (a_km.powi(2) - b_km.powi(2)) / a_km.powi(2);
 
@@ -511,6 +521,8 @@ pub fn velocity_sez_from_latlongalt_rate(
 
     // Get ellipsoid parameters
     let a_km = orbit.frame.mean_equatorial_radius_km()?;
+    // If there is no shape data, the previous line returns an error, so we
+    // can safely unwrap here.
     let b_km = orbit.frame.shape.unwrap().polar_radius_km;
     let e2 = (a_km.powi(2) - b_km.powi(2)) / a_km.powi(2);
 

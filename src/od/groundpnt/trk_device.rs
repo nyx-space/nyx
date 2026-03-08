@@ -16,7 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 use anise::almanac::Almanac;
-use anise::errors::AlmanacResult;
+use anise::ephemerides::EphemerisError;
+use anise::errors::{AlmanacError, AlmanacResult};
+use anise::math::interpolation::InterpolationError;
 use anise::prelude::{Frame, Orbit};
 use hifitime::{Epoch, TimeUnits};
 use indexmap::IndexSet;
@@ -44,7 +46,15 @@ impl TrackingDevice<GroundAsset> for InterlinkTxSpacecraft {
     }
 
     fn location(&self, epoch: Epoch, frame: Frame, almanac: Arc<Almanac>) -> AlmanacResult<Orbit> {
-        almanac.transform_to(self.traj.at(epoch).unwrap().orbit, frame, self.ab_corr)
+        match self.traj.at(epoch) {
+            Ok(state) => almanac.transform_to(state.orbit, frame, self.ab_corr),
+            Err(_) => Err(AlmanacError::Ephemeris {
+                action: "computing location from Interlink",
+                source: Box::new(EphemerisError::EphemInterpolation {
+                    source: InterpolationError::MissingInterpolationData { epoch },
+                }),
+            }),
+        }
     }
 
     fn measure(
@@ -171,7 +181,12 @@ impl TrackingDevice<GroundAsset> for InterlinkTxSpacecraft {
     /// a diagonal matrix. The first item in the diagonal is the range noise (in km), set to the square of the steady state sigma. The
     /// second item is the Doppler noise (in km/s), set to the square of the steady state sigma of that Gauss Markov process.
     fn measurement_covar(&self, msr_type: MeasurementType, epoch: Epoch) -> Result<f64, ODError> {
-        let stochastics = self.stochastic_noises.as_ref().unwrap();
+        let stochastics =
+            self.stochastic_noises
+                .as_ref()
+                .ok_or_else(|| ODError::NoiseNotConfigured {
+                    kind: "stochastic noises for interlink transmitter".to_string(),
+                })?;
 
         Ok(stochastics
             .get(&msr_type)
