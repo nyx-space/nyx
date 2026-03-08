@@ -22,7 +22,7 @@ mod two_body;
 mod interlink;
 
 #[cfg(feature = "premium")]
-mod grountpnt;
+mod groundpnt;
 
 macro_rules! f64_nil {
     ($x:expr, $msg:expr) => {
