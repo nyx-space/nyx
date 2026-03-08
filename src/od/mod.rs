@@ -64,6 +64,9 @@ pub mod blse;
 #[cfg(feature = "premium")]
 pub mod interlink;
 
+#[cfg(feature = "premium")]
+pub mod groundpnt;
+
 /// A helper type for spacecraft orbit determination.
 pub type SpacecraftKalmanOD = self::process::KalmanODProcess<
     SpacecraftDynamics,

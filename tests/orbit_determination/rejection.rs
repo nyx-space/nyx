@@ -160,10 +160,20 @@ fn od_rejection_test(
     let accepted_rejected = od_sol_rejected.accepted_residuals().len();
     println!("Rejected arc accepted residuals: {}", accepted_rejected);
 
-    assert!(accepted_rejected < accepted_full, "Expected fewer accepted residuals after rejection");
+    assert!(
+        accepted_rejected < accepted_full,
+        "Expected fewer accepted residuals after rejection"
+    );
 
     // Check that we indeed rejected all Madrid measurements
     // We can check by iterating over residuals and checking if tracker "Madrid" is present in accepted residuals
-    let madrid_accepted = od_sol_rejected.accepted_residuals().iter().filter(|r| r.tracker.as_ref().unwrap() == "Madrid").count();
-    assert_eq!(madrid_accepted, 0, "Expected 0 Madrid measurements to be accepted");
+    let madrid_accepted = od_sol_rejected
+        .accepted_residuals()
+        .iter()
+        .filter(|r| r.tracker.as_ref().unwrap() == "Madrid")
+        .count();
+    assert_eq!(
+        madrid_accepted, 0,
+        "Expected 0 Madrid measurements to be accepted"
+    );
 }
