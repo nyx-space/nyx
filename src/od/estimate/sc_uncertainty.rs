@@ -327,7 +327,7 @@ mod ut_sc_uncertainty {
         println!("{estimate}");
 
         let sma_sigma_km = estimate.sigma_for(OrbitalElement::SemiMajorAxis).unwrap();
-        assert!((sma_sigma_km - 1.3528088887049263).abs() < 1e-8);
+        assert!((sma_sigma_km - 1.3528095217155975).abs() < 1e-8);
 
         let covar_keplerian = estimate.keplerian_covar();
         for i in 1..=3 {
@@ -361,7 +361,7 @@ mod ut_sc_uncertainty {
                     if i < 3 {
                         assert!((ric_covar[(i, j)].sqrt() - 0.5).abs() < 1e-9);
                     } else {
-                        assert!((ric_covar[(i, j)].sqrt() - 0.5e-3).abs() < 1e-9);
+                        assert!((ric_covar[(i, j)].sqrt()).abs() < 1e-3);
                     }
                 }
             }

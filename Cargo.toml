@@ -35,10 +35,8 @@ github = { repository = "nyx-space/nyx", branch = "master" }
 der = { version = "0.7", features = ["derive", "alloc", "real"] }
 nalgebra = "0.34"
 log = "0.4"
-# anise = {version = "0.9.3", features=[ "analysis" ] }
-# anise = {path = "../../anise/anise"}
-anise = {git = "https://github.com/nyx-space/anise.git", rev = "581ef02", features = ["analysis"]}
-hifitime = "4.2.4"
+hifitime = "4.2.5"
+anise = {version = "0.9.6", features=[ "analysis" ] }
 flate2 = { version = "1.0", features = [
     "rust_backend",
 ], default-features = false }
@@ -53,23 +51,28 @@ approx = "0.5"
 rand_pcg = "0.10"
 indicatif = { version = "0.18", features = ["rayon"], default-features = false }
 rstats = "2.0.1"
-parquet = { version = "57.3.0", default-features = false, features = [
+parquet = { version = "58.0.0", default-features = false, features = [
     "arrow",
     "zstd",
 ] }
-arrow = "57.3.0"
+arrow = "58.0.0"
 shadow-rs = { version = "1.0.1", default-features = false }
 serde_yml = "0.0.12"
 whoami = "2.1.1"
 either = { version = "1.8.1", features = ["serde"] }
 num = "0.4.0"
 typed-builder = "0.23.0"
-snafu = { version = "0.8.3", features = ["backtrace"] }
+snafu = { version = "0.9.0", features = ["backtrace"] }
 serde_dhall = "0.13"
 indexmap = { version = "2.6.0", features = ["serde"] }
 statrs = "0.18.0"
+<<<<<<< HEAD
 # Optional dependencies
 pyo3 = { version = "0.27", features = ["multiple-pymethods"], optional = true }
+||||||| ae19ef2c
+=======
+num-traits = "=0.2.19"
+>>>>>>> master
 
 [features]
 default = ["premium"]
@@ -81,7 +84,7 @@ python = ["pyo3", "hifitime/python", "anise/python"]
 polars = { version = "0.51.0", features = ["parquet"] }
 rstest = "0.26.1"
 pretty_env_logger = "0.5"
-serde_arrow = {version = "0.13", features = ["arrow-57"]}
+serde_arrow = {version = "0.14", features = ["arrow-58"]}
 toml = "1.0.0"
 
 [build-dependencies]

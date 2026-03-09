@@ -68,16 +68,16 @@ where
         DefaultAllocator: Allocator<M> + Allocator<M, SolveState::Size>;
 }
 
-struct ScalarSensitivity<SolveState: State, Rx, Tx>
+pub struct ScalarSensitivity<SolveState: State, Rx, Tx>
 where
     DefaultAllocator: Allocator<SolveState::Size>
         + Allocator<SolveState::VecLength>
         + Allocator<SolveState::Size, SolveState::Size>
         + Allocator<U1, SolveState::Size>,
 {
-    sensitivity_row: OMatrix<f64, U1, SolveState::Size>,
-    _rx: PhantomData<Rx>,
-    _tx: PhantomData<Tx>,
+    pub sensitivity_row: OMatrix<f64, U1, SolveState::Size>,
+    pub _rx: PhantomData<Rx>,
+    pub _tx: PhantomData<Tx>,
 }
 
 impl TrackerSensitivity<Spacecraft, Spacecraft> for GroundStation
@@ -237,5 +237,3 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
         }
     }
 }
-
-// TODO: Build the tracker sensitivity for the Interlink
