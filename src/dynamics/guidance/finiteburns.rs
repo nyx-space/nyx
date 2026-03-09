@@ -48,7 +48,7 @@ impl FiniteBurns {
             Err(index) => Some(&self.mnvrs[index - 1]), // Return the maneuver with the closest start epoch
         }?;
 
-        (epoch < mnvr.end).then_some(mnvr)
+        (epoch <= mnvr.end).then_some(mnvr)
     }
 }
 

@@ -301,7 +301,7 @@ impl GuidanceLaw for Maneuver {
     }
 
     fn next(&self, sc: &mut Spacecraft, _almanac: Arc<Almanac>) {
-        let next_mode = if sc.epoch() >= self.start && sc.epoch() < self.end {
+        let next_mode = if sc.epoch() >= self.start && sc.epoch() <= self.end {
             GuidanceMode::Thrust
         } else {
             GuidanceMode::Coast
