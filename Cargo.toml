@@ -1,7 +1,7 @@
 [package]
 name = "nyx-space"
 build = "build.rs"
-version = "2.3.0"
+version = "2.3.1"
 edition = "2021"
 authors = ["Christopher Rabotin <christopher.rabotin@gmail.com>"]
 description = "A high-fidelity space mission toolkit, with orbit propagation, estimation and some systems engineering"
@@ -35,7 +35,7 @@ github = { repository = "nyx-space/nyx", branch = "master" }
 nalgebra = "0.34"
 log = "0.4"
 hifitime = "4.2.5"
-anise = {version = "0.9.6", features=[ "analysis" ] }
+anise = { version = "0.9.6", features = ["analysis"] }
 flate2 = { version = "1.0", features = [
     "rust_backend",
 ], default-features = false }
@@ -76,7 +76,7 @@ premium = []
 polars = { version = "0.51.0", features = ["parquet"] }
 rstest = "0.26.1"
 pretty_env_logger = "0.5"
-serde_arrow = {version = "0.14", features = ["arrow-58"]}
+serde_arrow = { version = "0.14", features = ["arrow-58"] }
 toml = "1.0.0"
 
 [build-dependencies]

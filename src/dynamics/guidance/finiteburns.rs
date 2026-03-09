@@ -28,7 +28,7 @@ use std::sync::Arc;
 /// A guidance law for a set of pre-determined maneuvers.
 #[derive(Clone, Debug)]
 pub struct FiniteBurns {
-    /// Maneuvers should be provided in chronological order, first maneuver first in the list
+    /// Maneuvers should be provided in chronological order and non-overlapping, first maneuver first in the list
     pub mnvrs: Vec<Maneuver>,
 }
 
@@ -39,13 +39,16 @@ impl FiniteBurns {
     }
 
     /// Find the maneuver with the closest start epoch that is less than or equal to the current epoch
+    /// and return it if its end epoch is after the current epoch
     fn maneuver_at(&self, epoch: Epoch) -> Option<&Maneuver> {
         let index = self.mnvrs.binary_search_by_key(&epoch, |mnvr| mnvr.start);
-        match index {
+        let mnvr = match index {
             Err(0) => None, // No maneuvers start before the current epoch
             Ok(index) => Some(&self.mnvrs[index]),
             Err(index) => Some(&self.mnvrs[index - 1]), // Return the maneuver with the closest start epoch
-        }
+        }?;
+
+        (epoch <= mnvr.end).then_some(mnvr)
     }
 }
 
@@ -62,11 +65,7 @@ impl GuidanceLaw for FiniteBurns {
         match osc.mode() {
             GuidanceMode::Thrust => {
                 if let Some(next_mnvr) = self.maneuver_at(osc.epoch()) {
-                    if next_mnvr.start <= osc.epoch() {
-                        <Maneuver as GuidanceLaw>::direction(next_mnvr, osc)
-                    } else {
-                        Ok(Vector3::zeros())
-                    }
+                    <Maneuver as GuidanceLaw>::direction(next_mnvr, osc)
                 } else {
                     Ok(Vector3::zeros())
                 }
@@ -79,11 +78,7 @@ impl GuidanceLaw for FiniteBurns {
         match osc.mode() {
             GuidanceMode::Thrust => {
                 if let Some(next_mnvr) = self.maneuver_at(osc.epoch()) {
-                    if next_mnvr.start <= osc.epoch() {
-                        Ok(next_mnvr.thrust_prct)
-                    } else {
-                        Ok(0.0)
-                    }
+                    Ok(next_mnvr.thrust_prct)
                 } else {
                     Ok(0.0)
                 }
@@ -96,15 +91,9 @@ impl GuidanceLaw for FiniteBurns {
     }
 
     fn next(&self, sc: &mut Spacecraft, _almanac: Arc<Almanac>) {
-        // Grab the last maneuver
-        if let Some(last_mnvr) = self.mnvrs.last() {
-            // If the last maneuver ends before the current epoch, switch back into coast
-            if last_mnvr.end < sc.epoch() {
-                sc.mut_mode(GuidanceMode::Coast)
-            } else {
-                // Get ready for the maneuver
-                sc.mut_mode(GuidanceMode::Thrust)
-            }
+        // check if there is a current maneuver and put into Thrust mode otherwise Coast
+        if self.maneuver_at(sc.epoch()).is_some() {
+            sc.mut_mode(GuidanceMode::Thrust)
         } else {
             // There aren't any maneuvers
             sc.mut_mode(GuidanceMode::Coast)
