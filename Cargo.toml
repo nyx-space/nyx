@@ -66,13 +66,9 @@ snafu = { version = "0.9.0", features = ["backtrace"] }
 serde_dhall = "0.13"
 indexmap = { version = "2.6.0", features = ["serde"] }
 statrs = "0.18.0"
-<<<<<<< HEAD
-# Optional dependencies
-pyo3 = { version = "0.27", features = ["multiple-pymethods"], optional = true }
-||||||| ae19ef2c
-=======
 num-traits = "=0.2.19"
->>>>>>> master
+# Optional dependencies
+pyo3 = { version = "0.28", features = ["multiple-pymethods"], optional = true }
 
 [features]
 default = ["premium"]

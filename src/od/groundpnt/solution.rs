@@ -132,7 +132,7 @@ where
 
         // Check that we can retrieve this information
         fields.retain(|param| match self.estimates[0].state().value(*param) {
-            Ok(_) => param != &StateParameter::GuidanceMode,
+            Ok(_) => param != &StateParameter::GuidanceMode(),
             Err(_) => false,
         });
 
