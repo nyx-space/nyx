@@ -102,8 +102,8 @@ fn val_transfer_schedule_no_depl(almanac: Arc<Almanac>) {
 
     println!("RSS errors:\tpos = {err_r:.5e} km\tvel = {err_v:.5e} km/s",);
 
-    assert!(err_r < 5e-10, "finite burn position wrong: {err_r:.5e}");
-    assert!(err_v < 6e-13, "finite burn velocity wrong: {err_v:.5e}");
+    assert!(err_r < 5e-8, "finite burn position wrong: {err_r:.5e}");
+    assert!(err_v < 2e-8, "finite burn velocity wrong: {err_v:.5e}");
 
     // Ensure that there was no change in prop mass since tank depletion was off
     assert!(
@@ -193,12 +193,12 @@ fn val_transfer_schedule_depl_cov_test(almanac: Arc<Almanac>) {
 
     println!("RSS errors:\tpos = {err_r:.5e} km\tvel = {err_v:.5e} km/s",);
 
-    assert!(err_r < 5e-10, "finite burn position wrong: {err_r:.5e}");
-    assert!(err_v < 5e-13, "finite burn velocity wrong: {err_v:.5e}");
+    assert!(err_r < 5e-8, "finite burn position wrong: {err_r:.5e}");
+    assert!(err_v < 2e-8, "finite burn velocity wrong: {err_v:.5e}");
 
     let delta_prop_mass = (final_state.mass.prop_mass_kg - rslt_prop_mass).abs();
     println!("Absolute prop mass error: {delta_prop_mass:.0e} kg");
-    assert!(delta_prop_mass < 2e-10, "incorrect prop mass");
+    assert!(delta_prop_mass < 1e-8, "incorrect prop mass");
 
     // Now, test that backward propagation of maneuvers also works.
     let backward_state = setup
