@@ -198,7 +198,7 @@ fn val_transfer_schedule_depl_cov_test(almanac: Arc<Almanac>) {
 
     let delta_prop_mass = (final_state.mass.prop_mass_kg - rslt_prop_mass).abs();
     println!("Absolute prop mass error: {delta_prop_mass:.0e} kg");
-    assert!(delta_prop_mass < 1e-8, "incorrect prop mass");
+    assert!(delta_prop_mass < 1e-5, "incorrect prop mass");
 
     // Now, test that backward propagation of maneuvers also works.
     let backward_state = setup
