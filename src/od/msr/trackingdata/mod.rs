@@ -28,6 +28,11 @@ use std::ops::{Add, AddAssign, RangeBounds};
 mod io_ccsds_tdm;
 mod io_parquet;
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+#[cfg(feature = "python")]
+mod python;
+
 /// Tracking data storing all of measurements as a B-Tree.
 /// It inherently does NOT support multiple concurrent measurements from several trackers.
 ///
@@ -69,6 +74,7 @@ mod io_parquet;
 /// Reference: JPL DESCANSO, document 214, _Pseudo-Noise and Regenerative Ranging_.
 ///
 #[derive(Clone, Default)]
+#[cfg_attr(feature = "python", pyclass)]
 pub struct TrackingDataArc {
     /// All measurements in this data arc
     pub measurements: BTreeMap<Epoch, Measurement>, // BUG: Consider a map of tracking to epoch!
@@ -78,6 +84,53 @@ pub struct TrackingDataArc {
     pub moduli: Option<IndexMap<MeasurementType, f64>>,
     /// Reject all of the measurements, useful for debugging passes.
     pub force_reject: bool,
+}
+
+#[cfg_attr(feature = "python", pymethods)]
+impl TrackingDataArc {
+    /// Returns the start epoch of this tracking arc
+    pub fn start_epoch(&self) -> Option<Epoch> {
+        self.measurements.first_key_value().map(|(k, _)| *k)
+    }
+
+    /// Returns the end epoch of this tracking arc
+    pub fn end_epoch(&self) -> Option<Epoch> {
+        self.measurements.last_key_value().map(|(k, _)| *k)
+    }
+
+    /// Returns the duration this tracking arc
+    pub fn duration(&self) -> Option<Duration> {
+        match self.start_epoch() {
+            Some(start) => self.end_epoch().map(|end| end - start),
+            None => None,
+        }
+    }
+
+    /// Returns the number of measurements in this data arc
+    pub fn len(&self) -> usize {
+        self.measurements.len()
+    }
+
+    /// Returns whether this arc has no measurements.
+    pub fn is_empty(&self) -> bool {
+        self.measurements.is_empty()
+    }
+
+    /// Returns the minimum duration between two subsequent measurements.
+    pub fn min_duration_sep(&self) -> Option<Duration> {
+        if self.is_empty() {
+            None
+        } else {
+            let mut min_sep = Duration::MAX;
+            let mut prev_epoch = self.start_epoch().unwrap();
+            for (epoch, _) in self.measurements.iter().skip(1) {
+                let this_sep = *epoch - prev_epoch;
+                min_sep = min_sep.min(this_sep);
+                prev_epoch = *epoch;
+            }
+            Some(min_sep)
+        }
+    }
 }
 
 impl TrackingDataArc {
@@ -128,50 +181,6 @@ impl TrackingDataArc {
             }
         }
         (aliases, types)
-    }
-
-    /// Returns the start epoch of this tracking arc
-    pub fn start_epoch(&self) -> Option<Epoch> {
-        self.measurements.first_key_value().map(|(k, _)| *k)
-    }
-
-    /// Returns the end epoch of this tracking arc
-    pub fn end_epoch(&self) -> Option<Epoch> {
-        self.measurements.last_key_value().map(|(k, _)| *k)
-    }
-
-    /// Returns the duration this tracking arc
-    pub fn duration(&self) -> Option<Duration> {
-        match self.start_epoch() {
-            Some(start) => self.end_epoch().map(|end| end - start),
-            None => None,
-        }
-    }
-
-    /// Returns the number of measurements in this data arc
-    pub fn len(&self) -> usize {
-        self.measurements.len()
-    }
-
-    /// Returns whether this arc has no measurements.
-    pub fn is_empty(&self) -> bool {
-        self.measurements.is_empty()
-    }
-
-    /// Returns the minimum duration between two subsequent measurements.
-    pub fn min_duration_sep(&self) -> Option<Duration> {
-        if self.is_empty() {
-            None
-        } else {
-            let mut min_sep = Duration::MAX;
-            let mut prev_epoch = self.start_epoch().unwrap();
-            for (epoch, _) in self.measurements.iter().skip(1) {
-                let this_sep = *epoch - prev_epoch;
-                min_sep = min_sep.min(this_sep);
-                prev_epoch = *epoch;
-            }
-            Some(min_sep)
-        }
     }
 
     /// Returns a new tracking arc that only contains measurements that fall within the given epoch range.

@@ -16,30 +16,31 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::md::StateParameter;
-use serde::{Deserialize, Serialize};
-use typed_builder::TypedBuilder;
+use pyo3::pymethods;
 
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
+use crate::od::msr::MeasurementType;
 
-/// A dispersions configuration, allows specifying min/max bounds (by default, they are not set)
-#[derive(Copy, Clone, Debug, TypedBuilder, Serialize, Deserialize)]
-#[cfg_attr(feature = "python", pyclass)]
-pub struct StateDispersion {
-    pub param: StateParameter,
-    #[builder(default, setter(strip_option))]
-    pub mean: Option<f64>,
-    #[builder(default, setter(strip_option))]
-    pub std_dev: Option<f64>,
-}
+use super::Measurement;
+use hifitime::Epoch;
 
-impl StateDispersion {
-    pub fn zero_mean(param: StateParameter, std_dev: f64) -> Self {
-        Self {
-            param,
-            std_dev: Some(std_dev),
-            mean: Some(0.0),
-        }
+#[pymethods]
+impl Measurement {
+    #[new]
+    fn py_new(tracker: String, epoch: Epoch) -> Self {
+        Self::new(tracker, epoch)
+    }
+
+    /// Returns the floating point value of this observation if this measurement contains the provided measurement type
+    #[pyo3(name = "observation")]
+    fn py_observation(&self, msr_type: MeasurementType) -> Option<f64> {
+        self.data.get(&msr_type).copied()
+    }
+
+    fn __str__(&self) -> String {
+        format!("{self}")
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self} @ {self:p}")
     }
 }

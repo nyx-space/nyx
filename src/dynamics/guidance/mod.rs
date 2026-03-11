@@ -23,6 +23,7 @@ use anise::astro::PhysicsResult;
 use anise::errors::PhysicsError;
 use anise::math::rotation::DCM;
 use anise::prelude::Almanac;
+use der::{Decode, Encode, Reader};
 use serde::{Deserialize, Serialize};
 
 mod finiteburns;
@@ -41,8 +42,12 @@ use snafu::Snafu;
 use std::fmt;
 use std::sync::Arc;
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
 /// Defines a thruster with a maximum isp and a maximum thrust.
 #[allow(non_snake_case)]
+#[cfg_attr(feature = "python", pyclass(get_all, set_all))]
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Thruster {
     /// The thrust is to be provided in Newtons
@@ -51,10 +56,41 @@ pub struct Thruster {
     pub isp_s: f64,
 }
 
+#[cfg_attr(feature = "python", pymethods)]
 impl Thruster {
     /// Returns the exhaust velocity v_e in meters per second
     pub fn exhaust_velocity_m_s(&self) -> f64 {
         self.isp_s * STD_GRAVITY
+    }
+}
+
+#[cfg(feature = "python")]
+#[cfg_attr(feature = "python", pymethods)]
+impl Thruster {
+    #[allow(non_snake_case)]
+    #[new]
+    fn py_new(thrust_N: f64, isp_s: f64) -> Self {
+        Self { thrust_N, isp_s }
+    }
+}
+
+impl Encode for Thruster {
+    fn encoded_len(&self) -> der::Result<der::Length> {
+        self.thrust_N.encoded_len()? + self.isp_s.encoded_len()?
+    }
+
+    fn encode(&self, encoder: &mut impl der::Writer) -> der::Result<()> {
+        self.thrust_N.encode(encoder)?;
+        self.isp_s.encode(encoder)
+    }
+}
+
+impl<'a> Decode<'a> for Thruster {
+    fn decode<R: Reader<'a>>(decoder: &mut R) -> der::Result<Self> {
+        Ok(Self {
+            thrust_N: decoder.decode()?,
+            isp_s: decoder.decode()?,
+        })
     }
 }
 

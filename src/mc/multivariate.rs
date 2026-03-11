@@ -29,6 +29,9 @@ use rand_distr::{Distribution, Normal};
 use snafu::ResultExt;
 use std::error::Error;
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
 /// A multivariate spacecraft state generator for Monte Carlo analyses. Ensures that the covariance is properly applied on all provided state variables.
 ///
 /// # Algorithm
@@ -54,6 +57,7 @@ use std::error::Error;
 /// 2.  **Geometry**: Uncertainties defined in orbital elements form complex shapes (like "bananas") in Cartesian space. A multivariate normal approximation in Cartesian space captures the principal axes and orientation of this uncertainty volume, which an axis-aligned bounding box (implied by independent sampling) effectively destroys.
 /// 3.  **Consistency**: By using the Jacobian transformation, we ensure that the generated samples, when mapped back to the parameter space (linearized), reproduce the input statistics (mean and standard deviation) provided by the user.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "python", pyclass)]
 pub struct MvnSpacecraft {
     /// The template state
     pub template: Spacecraft,
@@ -114,16 +118,14 @@ impl MvnSpacecraft {
                     orbit_dual.partial_for(oe).context(AstroPhysicsSnafu)?
                 } else if disp.param.is_b_plane() {
                     match disp.param {
-                        StateParameter::BdotR => b_plane.unwrap().b_r_km,
-                        StateParameter::BdotT => b_plane.unwrap().b_t_km,
-                        StateParameter::BLTOF => b_plane.unwrap().ltof_s,
+                        StateParameter::BdotR() => b_plane.unwrap().b_r_km,
+                        StateParameter::BdotT() => b_plane.unwrap().b_t_km,
+                        StateParameter::BLTOF() => b_plane.unwrap().ltof_s,
                         _ => unreachable!(),
                     }
                 } else {
                     unreachable!()
                 };
-
-                println!("{partial}");
 
                 for (cno, val) in [
                     partial.wrt_x(),
@@ -165,13 +167,13 @@ impl MvnSpacecraft {
                     continue;
                 } else {
                     match disp.param {
-                        StateParameter::Cr => {
+                        StateParameter::Cr() => {
                             cov[(7, 7)] = disp.mean.unwrap_or(0.0).powi(2);
                         }
-                        StateParameter::Cd => {
+                        StateParameter::Cd() => {
                             cov[(8, 8)] = disp.mean.unwrap_or(0.0).powi(2);
                         }
-                        StateParameter::DryMass | StateParameter::PropMass => {
+                        StateParameter::DryMass() | StateParameter::PropMass() => {
                             cov[(9, 9)] = disp.mean.unwrap_or(0.0).powi(2);
                         }
                         _ => return Err(Box::new(StateError::ReadOnly { param: disp.param })),
@@ -270,15 +272,15 @@ impl MvnSpacecraft {
                 .std_dev(cov[(5, 5)])
                 .build(),
             StateDispersion::builder()
-                .param(StateParameter::Cr)
+                .param(StateParameter::Cr())
                 .std_dev(cov[(6, 6)])
                 .build(),
             StateDispersion::builder()
-                .param(StateParameter::Cd)
+                .param(StateParameter::Cd())
                 .std_dev(cov[(7, 7)])
                 .build(),
             StateDispersion::builder()
-                .param(StateParameter::PropMass)
+                .param(StateParameter::PropMass())
                 .std_dev(cov[(8, 8)])
                 .build(),
         ];
@@ -671,7 +673,7 @@ mod multivariate_ut {
         .unwrap();
 
         // The generator computes the equivalent Cartesian covariance. Let's retrieve it.
-        let expected_cart_cov = &generator.sqrt_s_v * generator.sqrt_s_v.transpose();
+        let expected_cart_cov = generator.sqrt_s_v * generator.sqrt_s_v.transpose();
 
         // Create a reproducible fast seed, and generate the samples in the Cartesian space
         let seed = 0;
@@ -699,8 +701,8 @@ mod multivariate_ut {
         // Check that the covariance of the Cartesian states is close to the expected one
         let mut sample_cov = SMatrix::<f64, 6, 6>::zeros();
         for sample in &samples {
-            let disp_vec = sample - &mean_cart;
-            sample_cov += &disp_vec * disp_vec.transpose();
+            let disp_vec = sample - mean_cart;
+            sample_cov += disp_vec * disp_vec.transpose();
         }
         sample_cov /= (n - 1) as f64;
 

@@ -42,7 +42,7 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
         Condition::Equals(235.1),
     );
 
-    let events = vec![peri_event, apo_event, ta_event0, ta_event1];
+    let events = &[peri_event, apo_event, ta_event0, ta_event1];
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
     let setup = Propagator::rk89(dynamics, IntegratorOptions::with_tolerance(1e-9));

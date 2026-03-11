@@ -36,3 +36,6 @@ pub use multivariate::MvnSpacecraft;
 
 mod results;
 pub use results::{Results, Stats};
+
+#[cfg(feature = "python")]
+pub mod python;

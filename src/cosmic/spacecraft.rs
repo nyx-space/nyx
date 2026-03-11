@@ -22,6 +22,7 @@ use anise::constants::frames::EARTH_J2000;
 pub use anise::prelude::Orbit;
 
 pub use anise::structure::spacecraft::{DragData, Mass, SRPData};
+use der::{Decode, Encode, Enumerated, Reader};
 use nalgebra::Vector3;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
@@ -42,15 +43,20 @@ use std::default::Default;
 use std::fmt;
 use std::ops::Add;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default, Enumerated)]
+#[cfg_attr(feature = "python", pyclass)]
+#[repr(u8)]
 pub enum GuidanceMode {
     /// Guidance is turned off and Guidance Law may switch mode to Thrust for next call
     #[default]
-    Coast,
+    Coast = 0,
     /// Guidance is turned on and Guidance Law may switch mode to Coast for next call
-    Thrust,
+    Thrust = 1,
     /// Guidance is turned off and Guidance Law may not change its mode (will need to be done externally to the guidance law).
-    Inhibit,
+    Inhibit = 2,
 }
 
 impl From<f64> for GuidanceMode {
@@ -79,6 +85,7 @@ impl From<GuidanceMode> for f64 {
 ///
 /// Optionally, the spacecraft state can also store the state transition matrix from the start of the propagation until the current time (i.e. trajectory STM, not step-size STM).
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, TypedBuilder)]
+#[cfg_attr(feature = "python", pyclass)]
 pub struct Spacecraft {
     /// Initial orbit of the vehicle
     pub orbit: Orbit,
@@ -254,17 +261,6 @@ impl Spacecraft {
         self
     }
 
-    /// Returns the root sum square error between this spacecraft and the other, in kilometers for the position, kilometers per second in velocity, and kilograms in prop
-    pub fn rss(&self, other: &Self) -> PhysicsResult<(f64, f64, f64)> {
-        let rss_p_km = self.orbit.rss_radius_km(&other.orbit)?;
-        let rss_v_km_s = self.orbit.rss_velocity_km_s(&other.orbit)?;
-        let rss_prop_kg = (self.mass.prop_mass_kg - other.mass.prop_mass_kg)
-            .powi(2)
-            .sqrt();
-
-        Ok((rss_p_km, rss_v_km_s, rss_prop_kg))
-    }
-
     /// Sets the STM of this state of identity, which also enables computation of the STM for spacecraft navigation
     pub fn enable_stm(&mut self) {
         self.stm = Some(OMatrix::<f64, Const<9>, Const<9>>::identity());
@@ -287,6 +283,20 @@ impl Spacecraft {
 
     pub fn mut_mode(&mut self, mode: GuidanceMode) {
         self.mode = mode;
+    }
+}
+
+#[cfg_attr(feature = "python", pymethods)]
+impl Spacecraft {
+    /// Returns the root sum square error between this spacecraft and the other, in kilometers for the position, kilometers per second in velocity, and kilograms in prop
+    pub fn rss(&self, other: &Self) -> PhysicsResult<(f64, f64, f64)> {
+        let rss_p_km = self.orbit.rss_radius_km(&other.orbit)?;
+        let rss_v_km_s = self.orbit.rss_velocity_km_s(&other.orbit)?;
+        let rss_prop_kg = (self.mass.prop_mass_kg - other.mass.prop_mass_kg)
+            .powi(2)
+            .sqrt();
+
+        Ok((rss_p_km, rss_v_km_s, rss_prop_kg))
     }
 }
 
@@ -451,33 +461,33 @@ impl State for Spacecraft {
 
     fn value(&self, param: StateParameter) -> Result<f64, StateError> {
         match param {
-            StateParameter::Cd => Ok(self.drag.coeff_drag),
-            StateParameter::Cr => Ok(self.srp.coeff_reflectivity),
-            StateParameter::DryMass => Ok(self.mass.dry_mass_kg),
-            StateParameter::PropMass => Ok(self.mass.prop_mass_kg),
-            StateParameter::TotalMass => Ok(self.mass.total_mass_kg()),
-            StateParameter::Isp => match self.thruster {
+            StateParameter::Cd() => Ok(self.drag.coeff_drag),
+            StateParameter::Cr() => Ok(self.srp.coeff_reflectivity),
+            StateParameter::DryMass() => Ok(self.mass.dry_mass_kg),
+            StateParameter::PropMass() => Ok(self.mass.prop_mass_kg),
+            StateParameter::TotalMass() => Ok(self.mass.total_mass_kg()),
+            StateParameter::Isp() => match self.thruster {
                 Some(thruster) => Ok(thruster.isp_s),
                 None => Err(StateError::NoThrusterAvail),
             },
-            StateParameter::Thrust => match self.thruster {
+            StateParameter::Thrust() => match self.thruster {
                 Some(thruster) => Ok(thruster.thrust_N),
                 None => Err(StateError::NoThrusterAvail),
             },
-            StateParameter::GuidanceMode => Ok(self.mode.into()),
+            StateParameter::GuidanceMode() => Ok(self.mode.into()),
             StateParameter::Element(e) => e
                 .evaluate(self.orbit)
                 .context(AstroAnalysisSnafu)
                 .context(StateAstroSnafu { param }),
-            StateParameter::BdotR => Ok(BPlane::new(self.orbit)
+            StateParameter::BdotR() => Ok(BPlane::new(self.orbit)
                 .context(StateAstroSnafu { param })?
                 .b_r_km
                 .real()),
-            StateParameter::BdotT => Ok(BPlane::new(self.orbit)
+            StateParameter::BdotT() => Ok(BPlane::new(self.orbit)
                 .context(StateAstroSnafu { param })?
                 .b_t_km
                 .real()),
-            StateParameter::BLTOF => Ok(BPlane::new(self.orbit)
+            StateParameter::BLTOF() => Ok(BPlane::new(self.orbit)
                 .context(StateAstroSnafu { param })?
                 .ltof_s
                 .real()),
@@ -487,15 +497,15 @@ impl State for Spacecraft {
 
     fn set_value(&mut self, param: StateParameter, val: f64) -> Result<(), StateError> {
         match param {
-            StateParameter::Cd => self.drag.coeff_drag = val,
-            StateParameter::Cr => self.srp.coeff_reflectivity = val,
-            StateParameter::PropMass => self.mass.prop_mass_kg = val,
-            StateParameter::DryMass => self.mass.dry_mass_kg = val,
-            StateParameter::Isp => match self.thruster {
+            StateParameter::Cd() => self.drag.coeff_drag = val,
+            StateParameter::Cr() => self.srp.coeff_reflectivity = val,
+            StateParameter::PropMass() => self.mass.prop_mass_kg = val,
+            StateParameter::DryMass() => self.mass.dry_mass_kg = val,
+            StateParameter::Isp() => match self.thruster {
                 Some(ref mut thruster) => thruster.isp_s = val,
                 None => return Err(StateError::NoThrusterAvail),
             },
-            StateParameter::Thrust => match self.thruster {
+            StateParameter::Thrust() => match self.thruster {
                 Some(ref mut thruster) => thruster.thrust_N = val,
                 None => return Err(StateError::NoThrusterAvail),
             },
@@ -600,6 +610,60 @@ impl Add<OVector<f64, Const<9>>> for Spacecraft {
         self.mass.prop_mass_kg += other[8];
 
         self
+    }
+}
+
+impl<'a> Decode<'a> for Spacecraft {
+    fn decode<R: Reader<'a>>(decoder: &mut R) -> der::Result<Self> {
+        let orbit = decoder.decode()?;
+        let mass = decoder.decode()?;
+        let srp = decoder.decode()?;
+        let drag = decoder.decode()?;
+        let mode = decoder.decode()?;
+        // Decode the thruster last, checking the presence flag
+        let thruster = if decoder.decode::<bool>()? {
+            Some(decoder.decode()?)
+        } else {
+            None
+        };
+
+        Ok(Spacecraft {
+            orbit,
+            mass,
+            srp,
+            drag,
+            thruster,
+            mode,
+            stm: None,
+        })
+    }
+}
+
+impl Encode for Spacecraft {
+    fn encoded_len(&self) -> der::Result<der::Length> {
+        self.orbit.encoded_len()?
+            + self.mass.encoded_len()?
+            + self.srp.encoded_len()?
+            + self.drag.encoded_len()?
+            + self.mode.encoded_len()?
+            + self.thruster.is_some().encoded_len()?
+            + self.thruster.encoded_len()?
+    }
+
+    fn encode(&self, encoder: &mut impl der::Writer) -> der::Result<()> {
+        self.orbit.encode(encoder)?;
+        self.mass.encode(encoder)?;
+        self.srp.encode(encoder)?;
+        self.drag.encode(encoder)?;
+        self.mode.encode(encoder)?;
+        if let Some(thruster) = self.thruster {
+            true.encode(encoder)?;
+            thruster.encode(encoder)?;
+        } else {
+            false.encode(encoder)?
+        };
+
+        Ok(())
     }
 }
 

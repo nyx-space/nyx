@@ -19,13 +19,18 @@
 use super::MeasurementType;
 use hifitime::Epoch;
 use indexmap::{IndexMap, IndexSet};
+use log::debug;
 use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, OVector};
 use std::fmt;
+
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
 
 /// A type-agnostic simultaneous measurement storage structure. Allows storing any number of simultaneous measurement of a given taker.
 ///
 /// Note that two measurements are considered equal if the tracker and epoch match exactly, and if both have the same measurement types,
 /// and those measurements are equal to within 1e-10 (this allows for some leeway in TDM producers).
+#[cfg_attr(feature = "python", pyclass, pyo3(module = "nyx_space.od"))]
 #[derive(Clone, Debug)]
 pub struct Measurement {
     /// Tracker alias which made this measurement
@@ -38,6 +43,22 @@ pub struct Measurement {
     pub rejected: bool,
 }
 
+#[cfg_attr(feature = "python", pymethods)]
+impl Measurement {
+    /// Correct the provided measurement type with the provided correction, if that measurement type is available
+    pub fn correct(&mut self, msr_type: MeasurementType, correction: f64) {
+        if let Some(cur_value) = self.data.get_mut(&msr_type) {
+            let new_value = *cur_value + correction;
+            debug!("corrected {msr_type:?} from {cur_value} to {new_value}");
+            *cur_value = new_value;
+        }
+    }
+
+    pub fn push(&mut self, msr_type: MeasurementType, msr_value: f64) {
+        self.data.insert(msr_type, msr_value);
+    }
+}
+
 impl Measurement {
     pub fn new(tracker: String, epoch: Epoch) -> Self {
         Self {
@@ -46,10 +67,6 @@ impl Measurement {
             data: IndexMap::new(),
             rejected: false,
         }
-    }
-
-    pub fn push(&mut self, msr_type: MeasurementType, msr_value: f64) {
-        self.data.insert(msr_type, msr_value);
     }
 
     pub fn with(mut self, msr_type: MeasurementType, msr_value: f64) -> Self {

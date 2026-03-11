@@ -23,20 +23,25 @@ use std::{collections::HashMap, str::FromStr};
 
 use crate::{io::InputOutputError, od::ODError};
 
-#[derive(Copy, Clone, Debug, Hash, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
+#[cfg_attr(feature = "python", pyclass, pyo3(module = "nyx_space.od"))]
+#[derive(Copy, Clone, Debug, Hash, Serialize, Deserialize, PartialEq, Eq, der::Enumerated)]
+#[repr(u8)]
 pub enum MeasurementType {
     #[serde(rename = "range_km")]
-    Range,
+    Range = 0,
     #[serde(rename = "doppler_km_s")]
-    Doppler,
+    Doppler = 1,
     #[serde(rename = "azimuth_deg")]
-    Azimuth,
+    Azimuth = 2,
     #[serde(rename = "elevation_deg")]
-    Elevation,
+    Elevation = 3,
     #[serde(rename = "receive_freq")]
-    ReceiveFrequency,
+    ReceiveFrequency = 4,
     #[serde(rename = "transmit_freq")]
-    TransmitFrequency,
+    TransmitFrequency = 5,
 }
 
 impl MeasurementType {
@@ -116,6 +121,18 @@ impl MeasurementType {
             Self::ReceiveFrequency | Self::TransmitFrequency => Err(ODError::MeasurementSimError {
                 details: format!("{self:?} is only supported in CCSDS TDM parsing"),
             }),
+        }
+    }
+
+    /// Returns the CCSDS TDM name for this measurement type.
+    pub fn ccsds_tdm_name(&self) -> &str {
+        match self {
+            MeasurementType::Range => "RANGE",
+            MeasurementType::Doppler => "DOPPLER_INTEGRATED",
+            MeasurementType::Azimuth => "ANGLE_1",
+            MeasurementType::Elevation => "ANGLE_2",
+            MeasurementType::ReceiveFrequency => "RECEIVE_FREQ",
+            MeasurementType::TransmitFrequency => "TRANSMIT_FREQ",
         }
     }
 }

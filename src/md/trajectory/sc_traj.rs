@@ -465,7 +465,7 @@ impl Traj<Spacecraft> {
             (StateParameter::Element(OrbitalElement::VX), false),
             (StateParameter::Element(OrbitalElement::VY), false),
             (StateParameter::Element(OrbitalElement::VZ), false),
-            (StateParameter::PropMass, false),
+            (StateParameter::PropMass(), false),
         ];
 
         let reader = builder.build().context(ParquetSnafu {
@@ -479,7 +479,7 @@ impl Traj<Spacecraft> {
                 for potential_field in &mut found_fields {
                     if field.name() == potential_field.0.to_field(None).name() {
                         potential_field.1 = true;
-                        if potential_field.0 != StateParameter::PropMass {
+                        if potential_field.0 != StateParameter::PropMass() {
                             if let Some(frame_info) = field.metadata().get("Frame") {
                                 // Frame is expected to be serialized as Dhall.
                                 match serde_dhall::from_str(frame_info).parse::<Frame>() {
@@ -542,7 +542,7 @@ impl Traj<Spacecraft> {
         } else if sc_compat {
             // Not a spacecraft, remove the prop mass
             if let Some(last_field) = found_fields.last_mut() {
-                if last_field.0 == StateParameter::PropMass && last_field.1 {
+                if last_field.0 == StateParameter::PropMass() && last_field.1 {
                     last_field.1 = false;
                 }
             }

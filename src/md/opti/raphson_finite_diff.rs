@@ -280,9 +280,9 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
             for (i, obj) in self.objectives.iter().enumerate() {
                 let partial = if obj.parameter.is_b_plane() {
                     match obj.parameter {
-                        StateParameter::BdotR => b_plane.unwrap().b_r_km,
-                        StateParameter::BdotT => b_plane.unwrap().b_t_km,
-                        StateParameter::BLTOF => b_plane.unwrap().ltof_s,
+                        StateParameter::BdotR() => b_plane.unwrap().b_r_km,
+                        StateParameter::BdotT() => b_plane.unwrap().b_t_km,
+                        StateParameter::BLTOF() => b_plane.unwrap().ltof_s,
                         _ => unreachable!(),
                     }
                 } else if let StateParameter::Element(oe) = obj.parameter {
@@ -489,9 +489,9 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
 
                     let partial = if obj.parameter.is_b_plane() {
                         match obj.parameter {
-                            StateParameter::BdotR => b_plane.unwrap().b_r_km,
-                            StateParameter::BdotT => b_plane.unwrap().b_t_km,
-                            StateParameter::BLTOF => b_plane.unwrap().ltof_s,
+                            StateParameter::BdotR() => b_plane.unwrap().b_r_km,
+                            StateParameter::BdotT() => b_plane.unwrap().b_t_km,
+                            StateParameter::BLTOF() => b_plane.unwrap().ltof_s,
                             _ => unreachable!(),
                         }
                     } else if let StateParameter::Element(oe) = obj.parameter {

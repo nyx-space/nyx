@@ -18,16 +18,22 @@
 
 use std::ops::{Mul, MulAssign};
 
+use crate::io::ConfigError;
 use anise::constants::SPEED_OF_LIGHT_KM_S;
+use der::Sequence;
 use hifitime::{Duration, Epoch};
 use rand::{Rng, RngExt};
 use rand_distr::Normal;
 use serde_derive::{Deserialize, Serialize};
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
 use super::Stochastics;
 
 /// White noise is an uncorrelated random variable.
-#[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize, Sequence)]
+#[cfg_attr(feature = "python", pyclass(get_all, set_all))]
 pub struct WhiteNoise {
     /// Mean value of this white noise
     pub mean: f64,
@@ -38,11 +44,21 @@ pub struct WhiteNoise {
 impl WhiteNoise {
     /// Initializes a new random walk stochastic noise model from the process noise and the integration time.
     /// This will compute the process noise per second automatically.
-    pub fn new(process_noise: f64, integration_time: Duration) -> Self {
-        Self {
+    pub fn new(process_noise: f64, integration_time: Duration) -> Result<Self, ConfigError> {
+        if process_noise.is_sign_negative() {
+            return Err(ConfigError::InvalidConfig {
+                msg: format!("process noise must be positive: {process_noise}"),
+            });
+        }
+        if integration_time.to_seconds() <= 0.0 {
+            return Err(ConfigError::InvalidConfig {
+                msg: format!("integration time must be positive: {integration_time}"),
+            });
+        }
+        Ok(Self {
             sigma: process_noise / integration_time.to_seconds(),
             ..Default::default()
-        }
+        })
     }
 
     /// Initializes a new random walk stochastic noise model from the provided process noise, assuming that the noise level
