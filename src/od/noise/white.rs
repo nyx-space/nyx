@@ -50,6 +50,11 @@ impl WhiteNoise {
                 msg: format!("process noise must be positive: {process_noise}"),
             });
         }
+        if integration_time.to_seconds() <= 0.0 {
+            return Err(ConfigError::InvalidConfig {
+                msg: format!("integration time must be positive: {integration_time}"),
+            });
+        }
         Ok(Self {
             sigma: process_noise / integration_time.to_seconds(),
             ..Default::default()

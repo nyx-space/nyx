@@ -38,25 +38,15 @@ impl Spacecraft {
         thruster: Option<Thruster>,
         mode: Option<GuidanceMode>,
     ) -> Self {
-        let mut sc = Spacecraft {
+        Self {
             orbit,
             thruster,
+            mass: mass.unwrap_or_default(),
+            srp: srp.unwrap_or_default(),
+            drag: drag.unwrap_or_default(),
+            mode: mode.unwrap_or_default(),
             ..Default::default()
-        };
-        if let Some(mass) = mass {
-            sc.mass = mass;
         }
-        if let Some(srp) = srp {
-            sc.srp = srp;
-        }
-        if let Some(drag) = drag {
-            sc.drag = drag;
-        }
-        if let Some(mode) = mode {
-            sc.mode = mode;
-        }
-
-        sc
     }
 
     #[getter]

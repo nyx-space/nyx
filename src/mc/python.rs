@@ -69,7 +69,7 @@ impl MvnSpacecraft {
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
-    /// Samples the multivariate distribution to generate a list of spacecraft states.
+    /// Samples the multivariate distribution to generate a list of spacecraft states (up to 100k).
     ///
     /// The Pseudo-Random Number Generator (PRNG) used is the Permuted Congruential Generator (PCG).
     /// PCG is an excellent choice for Monte Carlo simulations because:
@@ -84,7 +84,7 @@ impl MvnSpacecraft {
             None => Pcg64Mcg::from_rng(&mut rand::rng()),
         };
 
-        let mut samples = Vec::with_capacity(count);
+        let mut samples = Vec::with_capacity(count.min(100_000));
         for _ in 0..count {
             let dispersed_state = Distribution::sample(self, &mut rng);
             samples.push(dispersed_state.state);
