@@ -37,7 +37,7 @@ use std::sync::Arc;
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Kluever {
     /// Stores the objectives
-    pub objectives: Vec<Option<Objective>>,
+    pub objectives: Vec<Objective>,
     /// Stores the weights for each objective
     pub weights: Vec<f64>,
     /// If defined, coast until vehicle is out of the provided eclipse state.
@@ -47,10 +47,8 @@ pub struct Kluever {
 impl Kluever {
     /// Creates a new Kluever blended control law.
     pub fn new(objectives: &[Objective], weights: &[f64]) -> Arc<Self> {
-        let objs: Vec<Option<Objective>> = objectives.iter().copied().map(Some).collect();
-
         Arc::new(Self {
-            objectives: objs,
+            objectives: objectives.to_vec(),
             weights: weights.to_vec(),
             max_eclipse_prct: None,
         })
@@ -67,13 +65,12 @@ impl fmt::Display for Kluever {
         let obj_msg = self
             .objectives
             .iter()
-            .flatten()
             .enumerate()
             .map(|(i, obj)| format!("{obj} (weight: {:.3})", self.weights[i]))
             .collect::<Vec<String>>();
         write!(
             f,
-            "Kluever Controller (max eclipse: {}): \n {}",
+            "Kluever Guidance (max eclipse: {}): \n {}",
             match self.max_eclipse_prct {
                 Some(eclp) => format!("{eclp}"),
                 None => "None".to_string(),
@@ -86,7 +83,7 @@ impl fmt::Display for Kluever {
 impl GuidanceLaw for Kluever {
     /// Returns whether the guidance law has achieved all goals
     fn achieved(&self, state: &Spacecraft) -> Result<bool, GuidanceError> {
-        for obj in self.objectives.iter().flatten() {
+        for obj in &self.objectives {
             if !obj
                 .assess_value(state.value(obj.parameter).context(GuidStateSnafu)?)
                 .0
@@ -134,91 +131,89 @@ impl GuidanceLaw for Kluever {
         let l_rad = u_rad + raan_rad;
         let (sin_l, cos_l) = l_rad.sin_cos();
 
-        for (i, obj_opt) in self.objectives.iter().enumerate() {
-            if let Some(obj) = obj_opt {
-                let weight = self.weights[i];
-                if weight == 0.0 {
-                    continue;
+        for (i, obj) in self.objectives.iter().enumerate() {
+            let weight = self.weights[i];
+            if weight == 0.0 {
+                continue;
+            }
+
+            let osc_val = sc.value(obj.parameter).context(GuidStateSnafu)?;
+            let error = obj.desired_value - osc_val;
+            if error.abs() < obj.tolerance {
+                continue;
+            }
+            let weight = weight * error.signum();
+
+            match obj.parameter {
+                StateParameter::Element(OrbitalElement::SemiMajorAxis) => {
+                    // Maximize rate of change of energy
+                    sum_weighted_num_alpha += weight * (ecc * ta_rad.sin());
+                    sum_weighted_den_alpha += weight * (1.0 + ecc * ta_rad.cos());
+                }
+                StateParameter::Element(OrbitalElement::Eccentricity) => {
+                    // Optimal alpha for eccentricity
+                    let (sin_ta, cos_ta) = ta_rad.sin_cos();
+                    sum_weighted_num_alpha += weight * sin_ta;
+                    sum_weighted_den_alpha +=
+                        weight * (cos_ta + (ecc + cos_ta) / (1.0 + ecc * cos_ta));
+                }
+                StateParameter::Element(OrbitalElement::Inclination) => {
+                    // Purely out-of-plane requirement
+                    let beta_opt = if u_rad.cos() >= 0.0 { 1.0 } else { -1.0 };
+                    sum_weighted_num_beta += weight * beta_opt;
+                }
+                StateParameter::Element(OrbitalElement::RAAN) => {
+                    let beta_opt = if u_rad.sin() >= 0.0 { 1.0 } else { -1.0 };
+                    sum_weighted_num_beta += weight * beta_opt;
                 }
 
-                let osc_val = sc.value(obj.parameter).context(GuidStateSnafu)?;
-                let error = obj.desired_value - osc_val;
-                if error.abs() < obj.tolerance {
-                    continue;
+                StateParameter::Element(OrbitalElement::EquinoctialH) => {
+                    // H = e * sin(omega + RAAN)
+                    let h = sc
+                        .value(StateParameter::Element(OrbitalElement::EquinoctialH))
+                        .context(GuidStateSnafu)?;
+                    let k = sc
+                        .value(StateParameter::Element(OrbitalElement::EquinoctialK))
+                        .context(GuidStateSnafu)?;
+                    sum_weighted_num_alpha += weight * cos_l;
+                    sum_weighted_den_alpha +=
+                        weight * (sin_l + (h + sin_l) / (1.0 + h * sin_l + k * cos_l));
                 }
-                let weight = weight * error.signum();
 
-                match obj.parameter {
-                    StateParameter::Element(OrbitalElement::SemiMajorAxis) => {
-                        // Maximize rate of change of energy
-                        sum_weighted_num_alpha += weight * (ecc * ta_rad.sin());
-                        sum_weighted_den_alpha += weight * (1.0 + ecc * ta_rad.cos());
-                    }
-                    StateParameter::Element(OrbitalElement::Eccentricity) => {
-                        // Optimal alpha for eccentricity
-                        let (sin_ta, cos_ta) = ta_rad.sin_cos();
-                        sum_weighted_num_alpha += weight * sin_ta;
-                        sum_weighted_den_alpha +=
-                            weight * (cos_ta + (ecc + cos_ta) / (1.0 + ecc * cos_ta));
-                    }
-                    StateParameter::Element(OrbitalElement::Inclination) => {
-                        // Purely out-of-plane requirement
-                        let beta_opt = if u_rad.cos() >= 0.0 { 1.0 } else { -1.0 };
-                        sum_weighted_num_beta += weight * beta_opt;
-                    }
-                    StateParameter::Element(OrbitalElement::RAAN) => {
-                        let beta_opt = if u_rad.sin() >= 0.0 { 1.0 } else { -1.0 };
-                        sum_weighted_num_beta += weight * beta_opt;
-                    }
+                StateParameter::Element(OrbitalElement::EquinoctialK) => {
+                    // K = e * cos(omega + RAAN)
+                    let h = sc
+                        .value(StateParameter::Element(OrbitalElement::EquinoctialH))
+                        .context(GuidStateSnafu)?;
+                    let k = sc
+                        .value(StateParameter::Element(OrbitalElement::EquinoctialK))
+                        .context(GuidStateSnafu)?;
+                    sum_weighted_num_alpha += weight * (-sin_l);
+                    sum_weighted_den_alpha +=
+                        weight * (cos_l + (k + cos_l) / (1.0 + h * sin_l + k * cos_l));
+                }
 
-                    StateParameter::Element(OrbitalElement::EquinoctialH) => {
-                        // H = e * sin(omega + RAAN)
-                        let h = sc
-                            .value(StateParameter::Element(OrbitalElement::EquinoctialH))
-                            .context(GuidStateSnafu)?;
-                        let k = sc
-                            .value(StateParameter::Element(OrbitalElement::EquinoctialK))
-                            .context(GuidStateSnafu)?;
-                        sum_weighted_num_alpha += weight * cos_l;
-                        sum_weighted_den_alpha +=
-                            weight * (sin_l + (h + sin_l) / (1.0 + h * sin_l + k * cos_l));
-                    }
+                StateParameter::Element(OrbitalElement::EquinoctialP) => {
+                    // P = tan(i/2) * sin(RAAN)
+                    let beta_opt = if sin_l >= 0.0 { 1.0 } else { -1.0 };
+                    sum_weighted_num_beta += weight * beta_opt;
+                }
 
-                    StateParameter::Element(OrbitalElement::EquinoctialK) => {
-                        // K = e * cos(omega + RAAN)
-                        let h = sc
-                            .value(StateParameter::Element(OrbitalElement::EquinoctialH))
-                            .context(GuidStateSnafu)?;
-                        let k = sc
-                            .value(StateParameter::Element(OrbitalElement::EquinoctialK))
-                            .context(GuidStateSnafu)?;
-                        sum_weighted_num_alpha += weight * (-sin_l);
-                        sum_weighted_den_alpha +=
-                            weight * (cos_l + (k + cos_l) / (1.0 + h * sin_l + k * cos_l));
-                    }
+                StateParameter::Element(OrbitalElement::EquinoctialQ) => {
+                    // Q = tan(i/2) * cos(RAAN)
+                    let beta_opt = if cos_l >= 0.0 { 1.0 } else { -1.0 };
+                    sum_weighted_num_beta += weight * beta_opt;
+                }
 
-                    StateParameter::Element(OrbitalElement::EquinoctialP) => {
-                        // P = tan(i/2) * sin(RAAN)
-                        let beta_opt = if sin_l >= 0.0 { 1.0 } else { -1.0 };
-                        sum_weighted_num_beta += weight * beta_opt;
-                    }
+                StateParameter::Element(OrbitalElement::EquinoctialLambda) => {
+                    // Phasing / True Longitude
+                    sum_weighted_den_alpha += weight * 1.0;
+                }
 
-                    StateParameter::Element(OrbitalElement::EquinoctialQ) => {
-                        // Q = tan(i/2) * cos(RAAN)
-                        let beta_opt = if cos_l >= 0.0 { 1.0 } else { -1.0 };
-                        sum_weighted_num_beta += weight * beta_opt;
-                    }
-
-                    StateParameter::Element(OrbitalElement::EquinoctialLambda) => {
-                        // Phasing / True Longitude
-                        sum_weighted_den_alpha += weight * 1.0;
-                    }
-
-                    _ => {
-                        return Err(GuidanceError::InvalidControl {
-                            param: obj.parameter,
-                        })
-                    }
+                _ => {
+                    return Err(GuidanceError::InvalidControl {
+                        param: obj.parameter,
+                    })
                 }
             }
         }
