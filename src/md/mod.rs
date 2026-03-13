@@ -30,10 +30,10 @@ pub mod prelude {
     };
     pub use crate::cosmic::{try_achieve_b_plane, BPlane, BPlaneTarget, GuidanceMode};
     pub use crate::dynamics::{
-        Drag, Harmonics, OrbitalDynamics, PointMasses, SolarPressure, SpacecraftDynamics,
+        Drag, GravityField, OrbitalDynamics, PointMasses, SolarPressure, SpacecraftDynamics,
     };
     pub use crate::dynamics::{Dynamics, NyxError};
-    pub use crate::io::gravity::HarmonicsMem;
+    pub use crate::io::gravity::GravityFieldData;
     pub use crate::md::objective::Objective;
     pub use crate::propagators::{IntegratorOptions, Propagator};
     pub use crate::time::{Duration, Epoch, TimeUnits, Unit};

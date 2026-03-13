@@ -13,8 +13,8 @@ use anise::{
 use hifitime::{Epoch, Unit};
 use nyx::{
     cosmic::{Mass, MetaAlmanac, Orbit, SRPData},
-    dynamics::{Harmonics, OrbitalDynamics, SolarPressure, SpacecraftDynamics},
-    io::{gravity::HarmonicsMem, ExportCfg},
+    dynamics::{GravityField, OrbitalDynamics, SolarPressure, SpacecraftDynamics},
+    io::{gravity::GravityFieldData, ExportCfg},
     propagators::Propagator,
     Spacecraft, State,
 };
@@ -87,9 +87,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Build the spherical harmonics.
     // The harmonics must be computed in the body fixed frame.
     // We're using the long term prediction of the Earth centered Earth fixed frame, IAU Earth.
-    let harmonics_21x21 = Harmonics::from_stor(
+    let harmonics_21x21 = GravityField::from_stor(
         almanac.frame_info(IAU_EARTH_FRAME)?,
-        HarmonicsMem::from_cof(&jgm3_meta.uri, 21, 21, true).unwrap(),
+        GravityFieldData::from_cof(&jgm3_meta.uri, 21, 21, true).unwrap(),
     );
 
     // Include the spherical harmonics into the orbital dynamics.

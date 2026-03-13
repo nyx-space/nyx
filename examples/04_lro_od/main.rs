@@ -15,10 +15,10 @@ use hifitime::{Epoch, TimeSeries, TimeUnits, Unit};
 use nyx::{
     cosmic::{Aberration, Frame, Mass, MetaAlmanac, SRPData},
     dynamics::{
-        guidance::LocalFrame, Harmonics, OrbitalDynamics, SolarPressure, SpacecraftDynamics,
+        guidance::LocalFrame, GravityField, OrbitalDynamics, SolarPressure, SpacecraftDynamics,
     },
     io::{ConfigRepr, ExportCfg},
-    md::prelude::{HarmonicsMem, Traj},
+    md::prelude::{GravityFieldData, Traj},
     od::{
         msr::MeasurementType,
         prelude::{KalmanVariant, TrackingArcSim, TrkConfig},
@@ -129,9 +129,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     // The harmonics must be computed in the body fixed frame.
     // We're using the long term prediction of the Moon principal axes frame.
     let moon_pa_frame = MOON_PA_FRAME.with_orient(31008);
-    let sph_harmonics = Harmonics::from_stor(
+    let sph_harmonics = GravityField::from_stor(
         almanac.frame_info(moon_pa_frame)?,
-        HarmonicsMem::from_shadr(&jggrx_meta.uri, 80, 80, true)?,
+        GravityFieldData::from_shadr(&jggrx_meta.uri, 80, 80, true)?,
     );
 
     // Include the spherical harmonics into the orbital dynamics.

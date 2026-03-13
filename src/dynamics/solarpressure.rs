@@ -17,11 +17,11 @@
 */
 
 use super::{DynamicsAlmanacSnafu, DynamicsError, DynamicsPlanetarySnafu, ForceModel};
-use crate::cosmic::eclipse::EclipseLocator;
+use crate::cosmic::eclipse::ShadowModel;
 use crate::cosmic::{Frame, Spacecraft, AU, SPEED_OF_LIGHT_M_S};
 use crate::linalg::{Const, Matrix4x3, Vector3};
 use anise::almanac::Almanac;
-use anise::constants::frames::SUN_J2000;
+use anise::constants::frames::{EARTH_J2000, SUN_J2000};
 use hyperdual::{hyperspace_from_vector, linalg::norm, Float, OHyperdual};
 use log::warn;
 use snafu::ResultExt;
@@ -33,22 +33,36 @@ use std::sync::Arc;
 pub const SOLAR_FLUX_W_m2: f64 = 1367.0;
 
 /// Computation of solar radiation pressure is based on STK: <http://help.agi.com/stk/index.htm#gator/eq-solar.htm> .
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SolarPressure {
     /// solar flux at 1 AU, in W/m^2
     pub phi: f64,
-    pub e_loc: EclipseLocator,
+    pub shadow_model: ShadowModel,
     /// Set to true to estimate the coefficient of reflectivity
     pub estimate: bool,
 }
 
+impl Default for SolarPressure {
+    /// Important: the default will FAIL at runtime if the shadow model is not manually defined with loaded frames.
+    fn default() -> Self {
+        Self {
+            phi: SOLAR_FLUX_W_m2,
+            estimate: false,
+            shadow_model: ShadowModel {
+                light_source: SUN_J2000,
+                shadow_bodies: vec![EARTH_J2000],
+            },
+        }
+    }
+}
+
 impl SolarPressure {
     /// Will set the solar flux at 1 AU to: Phi = 1367.0
-    pub fn default_raw(
+    fn default_flux_raw(
         shadow_bodies: Vec<Frame>,
         almanac: Arc<Almanac>,
     ) -> Result<Self, DynamicsError> {
-        let e_loc = EclipseLocator {
+        let e_loc = ShadowModel {
             light_source: almanac.frame_info(SUN_J2000).context({
                 DynamicsPlanetarySnafu {
                     action: "planetary data from third body not loaded",
@@ -67,14 +81,20 @@ impl SolarPressure {
         };
         Ok(Self {
             phi: SOLAR_FLUX_W_m2,
-            e_loc,
+            shadow_model: e_loc,
             estimate: true,
         })
     }
 
     /// Accounts for the shadowing of only one body and will set the solar flux at 1 AU to: Phi = 1367.0
-    pub fn default(shadow_body: Frame, almanac: Arc<Almanac>) -> Result<Arc<Self>, DynamicsError> {
-        Ok(Arc::new(Self::default_raw(vec![shadow_body], almanac)?))
+    pub fn default_flux(
+        shadow_body: Frame,
+        almanac: Arc<Almanac>,
+    ) -> Result<Arc<Self>, DynamicsError> {
+        Ok(Arc::new(Self::default_flux_raw(
+            vec![shadow_body],
+            almanac,
+        )?))
     }
 
     /// Accounts for the shadowing of only one body and will set the solar flux at 1 AU to: Phi = 1367.0
@@ -82,7 +102,7 @@ impl SolarPressure {
         shadow_bodies: Vec<Frame>,
         almanac: Arc<Almanac>,
     ) -> Result<Arc<Self>, DynamicsError> {
-        let mut srp = Self::default_raw(shadow_bodies, almanac)?;
+        let mut srp = Self::default_flux_raw(shadow_bodies, almanac)?;
         srp.estimate = false;
         Ok(Arc::new(srp))
     }
@@ -93,7 +113,7 @@ impl SolarPressure {
         shadow_bodies: Vec<Frame>,
         almanac: Arc<Almanac>,
     ) -> Result<Arc<Self>, DynamicsError> {
-        let mut me = Self::default_raw(shadow_bodies, almanac)?;
+        let mut me = Self::default_flux_raw(shadow_bodies, almanac)?;
         me.phi = flux_w_m2;
         Ok(Arc::new(me))
     }
@@ -103,7 +123,7 @@ impl SolarPressure {
         shadow_bodies: Vec<Frame>,
         almanac: Arc<Almanac>,
     ) -> Result<Arc<Self>, DynamicsError> {
-        Ok(Arc::new(Self::default_raw(shadow_bodies, almanac)?))
+        Ok(Arc::new(Self::default_flux_raw(shadow_bodies, almanac)?))
     }
 }
 
@@ -120,7 +140,7 @@ impl ForceModel for SolarPressure {
         let osc = ctx.orbit;
         // Compute the position of the Sun as seen from the spacecraft
         let r_sun = almanac
-            .transform_to(ctx.orbit, self.e_loc.light_source, None)
+            .transform_to(ctx.orbit, self.shadow_model.light_source, None)
             .context(DynamicsAlmanacSnafu {
                 action: "transforming state to vector seen from Sun",
             })?
@@ -130,7 +150,7 @@ impl ForceModel for SolarPressure {
 
         // ANISE returns the occultation percentage (or factor), which is the opposite as the illumination factor.
         let occult = self
-            .e_loc
+            .shadow_model
             .compute(osc, almanac)
             .context(DynamicsAlmanacSnafu {
                 action: "solar radiation pressure computation",
@@ -157,7 +177,7 @@ impl ForceModel for SolarPressure {
 
         // Compute the position of the Sun as seen from the spacecraft
         let r_sun = almanac
-            .transform_to(ctx.orbit, self.e_loc.light_source, None)
+            .transform_to(ctx.orbit, self.shadow_model.light_source, None)
             .context(DynamicsAlmanacSnafu {
                 action: "transforming state to vector seen from Sun",
             })?
@@ -168,7 +188,7 @@ impl ForceModel for SolarPressure {
 
         // ANISE returns the occultation percentage (or factor), which is the opposite as the illumination factor.
         let occult = self
-            .e_loc
+            .shadow_model
             .compute(osc, almanac.clone())
             .context(DynamicsAlmanacSnafu {
                 action: "solar radiation pressure computation",
@@ -221,7 +241,7 @@ impl fmt::Display for SolarPressure {
         write!(
             f,
             "SRP with φ = {} W/m^2 and eclipse {}",
-            self.phi, self.e_loc
+            self.phi, self.shadow_model
         )
     }
 }

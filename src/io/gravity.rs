@@ -20,28 +20,55 @@ use crate::linalg::DMatrix;
 use crate::NyxError;
 use flate2::read::GzDecoder;
 use log::{info, warn};
+use std::fmt::Debug;
 use std::fs::File;
 use std::io::prelude::*;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
+
+/// Configuration holder for gravity field.
+///
+/// Data is first loaded as a SHADR, if that fails, Nyx will try to load it as a COF file.
+#[derive(Clone, Debug)]
+pub struct GravityFieldConfig {
+    /// Path to the file, relative to the current working director
+    pub filepath: PathBuf,
+    /// Set to true if the data is gunzipped
+    pub gunzipped: bool,
+    /// Desired degree
+    pub degree: usize,
+    /// Desired order
+    pub order: usize,
+}
 
 /// `HarmonicsMem` loads the requested gravity potential files and stores them in memory (in a HashMap).
 ///
 /// WARNING: This memory backend may require a lot of RAM (e.g. EMG2008 2190x2190 requires nearly 400 MB of RAM).
 #[derive(Clone)]
-pub struct HarmonicsMem {
+pub struct GravityFieldData {
     degree: usize,
     order: usize,
     c_nm: DMatrix<f64>,
     s_nm: DMatrix<f64>,
 }
 
-impl HarmonicsMem {
+impl GravityFieldData {
+    pub fn from_config(cfg: GravityFieldConfig) -> Result<Self, NyxError> {
+        if !cfg.gunzipped && cfg.filepath.ends_with(".cof")
+            || cfg.gunzipped && cfg.filepath.ends_with(".cof.gz")
+        {
+            Self::from_cof(cfg.filepath, cfg.degree, cfg.order, cfg.gunzipped)
+        } else {
+            Self::from_shadr(cfg.filepath, cfg.degree, cfg.order, cfg.gunzipped)
+        }
+    }
+
     /// Initialize `HarmonicsMem` with a custom J2 value
-    pub fn from_j2(j2: f64) -> HarmonicsMem {
+    pub fn from_j2(j2: f64) -> GravityFieldData {
         let mut c_nm = DMatrix::from_element(3, 3, 0.0);
         c_nm[(2, 0)] = j2;
 
-        HarmonicsMem {
+        GravityFieldData {
             degree: 2,
             order: 0,
             c_nm,
@@ -53,7 +80,7 @@ impl HarmonicsMem {
     ///
     /// Use the embedded Earth parameter. If others are needed, load from `from_shadr` or `from_egm`.
     /// *WARNING:* This is an EARTH gravity model, and _should not_ be used around any other body.
-    pub fn j2_jgm3() -> HarmonicsMem {
+    pub fn j2_jgm3() -> GravityFieldData {
         Self::from_j2(-4.841_653_748_864_70e-04)
     }
 
@@ -61,14 +88,14 @@ impl HarmonicsMem {
     ///
     /// Use the embedded Earth parameter. If others are needed, load from `from_shadr` or `from_egm`.
     /// *WARNING:* This is an EARTH gravity model, and _should not_ be used around any other body.
-    pub fn j2_jgm2() -> HarmonicsMem {
+    pub fn j2_jgm2() -> GravityFieldData {
         Self::from_j2(-4.841_653_9e-04)
     }
 
     /// Initialize `HarmonicsMem` as J<sub>2</sub> only using the EGM2008 model (from the GRACE mission, best model as of 2018)
     ///
     /// *WARNING:* This is an EARTH gravity model, and _should not_ be used around any other body.
-    pub fn j2_egm2008() -> HarmonicsMem {
+    pub fn j2_egm2008() -> GravityFieldData {
         Self::from_j2(-0.484_165_143_790_815e-03)
     }
 
@@ -79,26 +106,26 @@ impl HarmonicsMem {
     /// + Moon to 1500 (from SHADR file)
     /// + Mars to 120 (from SHADR file)
     /// + Venus to 150 (from SHADR file)
-    pub fn from_shadr(
-        filepath: &str,
+    pub fn from_shadr<P: AsRef<Path> + Debug>(
+        filepath: P,
         degree: usize,
         order: usize,
         gunzipped: bool,
-    ) -> Result<HarmonicsMem, NyxError> {
+    ) -> Result<GravityFieldData, NyxError> {
         Self::load(
-            gunzipped, true, //SHADR has a header which we ignore
-            degree, order, filepath,
+            filepath, gunzipped, true, //SHADR has a header which we ignore
+            degree, order,
         )
     }
 
-    pub fn from_cof(
-        filepath: &str,
+    pub fn from_cof<P: AsRef<Path> + Debug>(
+        filepath: P,
         degree: usize,
         order: usize,
         gunzipped: bool,
-    ) -> Result<HarmonicsMem, NyxError> {
-        let mut f = File::open(filepath).map_err(|_| NyxError::FileUnreadable {
-            msg: format!("File not found: {filepath}"),
+    ) -> Result<GravityFieldData, NyxError> {
+        let mut f = File::open(&filepath).map_err(|_| NyxError::FileUnreadable {
+            msg: format!("File not found: {filepath:?}"),
         })?;
         let mut buffer = vec![0; 0];
         if gunzipped {
@@ -295,12 +322,12 @@ impl HarmonicsMem {
         }
         if max_degree < degree || max_order < order {
             warn!(
-                "{filepath} only contained (degree, order) of ({max_degree}, {max_order}) instead of requested ({degree}, {order})"
+                "{filepath:?} only contained (degree, order) of ({max_degree}, {max_order}) instead of requested ({degree}, {order})"
             );
         } else {
-            info!("{filepath} loaded with (degree, order) = ({degree}, {order})");
+            info!("{filepath:?} loaded with (degree, order) = ({degree}, {order})");
         }
-        Ok(HarmonicsMem {
+        Ok(GravityFieldData {
             degree: max_degree,
             order: max_order,
             c_nm: c_nm_mat,
@@ -309,15 +336,15 @@ impl HarmonicsMem {
     }
 
     /// `load` handles the actual loading in memory.
-    fn load(
+    fn load<P: AsRef<Path> + Debug>(
+        filepath: P,
         gunzipped: bool,
         skip_first_line: bool,
         degree: usize,
         order: usize,
-        filepath: &str,
-    ) -> Result<HarmonicsMem, NyxError> {
-        let mut f = File::open(filepath).map_err(|_| NyxError::FileUnreadable {
-            msg: format!("File not found: {filepath}"),
+    ) -> Result<GravityFieldData, NyxError> {
+        let mut f = File::open(&filepath).map_err(|_| NyxError::FileUnreadable {
+            msg: format!("File not found: {filepath:?}"),
         })?;
         let mut buffer = vec![0; 0];
         if gunzipped {
@@ -427,12 +454,12 @@ impl HarmonicsMem {
         }
         if max_degree < degree || max_order < order {
             warn!(
-                "{filepath} only contained (degree, order) of ({max_degree}, {max_order}) instead of requested ({degree}, {order})",
+                "{filepath:?} only contained (degree, order) of ({max_degree}, {max_order}) instead of requested ({degree}, {order})",
             );
         } else {
-            info!("{filepath} loaded with (degree, order) = ({degree}, {order})");
+            info!("{filepath:?} loaded with (degree, order) = ({degree}, {order})");
         }
-        Ok(HarmonicsMem {
+        Ok(GravityFieldData {
             order: max_order,
             degree: max_degree,
             c_nm: c_nm_mat,
@@ -458,10 +485,10 @@ impl HarmonicsMem {
 
 #[test]
 fn test_load_harmonic_files() {
-    HarmonicsMem::from_cof("data/01_planetary/JGM3.cof.gz", 50, 50, true)
+    GravityFieldData::from_cof("data/01_planetary/JGM3.cof.gz", 50, 50, true)
         .expect("could not load JGM3");
 
-    HarmonicsMem::from_shadr(
+    GravityFieldData::from_shadr(
         "data/01_planetary/EGM2008_to2190_TideFree.gz",
         120,
         120,
@@ -469,7 +496,7 @@ fn test_load_harmonic_files() {
     )
     .expect("could not load EGM2008");
 
-    HarmonicsMem::from_shadr(
+    GravityFieldData::from_shadr(
         "data/01_planetary/Luna_jggrx_1500e_sha.tab.gz",
         1500,
         1500,

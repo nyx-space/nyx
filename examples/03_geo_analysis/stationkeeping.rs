@@ -15,9 +15,9 @@ use nyx::{
     cosmic::{GuidanceMode, Mass, MetaAlmanac, Orbit, SRPData},
     dynamics::{
         guidance::{Ruggiero, Thruster},
-        Harmonics, OrbitalDynamics, SolarPressure, SpacecraftDynamics,
+        GravityField, OrbitalDynamics, SolarPressure, SpacecraftDynamics,
     },
-    io::{gravity::HarmonicsMem, ExportCfg},
+    io::{gravity::GravityFieldData, ExportCfg},
     mc::{MonteCarlo, MvnSpacecraft, StateDispersion},
     md::prelude::{Objective, OrbitalElement, StateParameter},
     propagators::{ErrorControl, IntegratorOptions, Propagator},
@@ -82,13 +82,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     jgm3_meta.process(true)?;
 
-    let harmonics = Harmonics::from_stor(
+    let harmonics = GravityField::from_stor(
         almanac.frame_info(IAU_EARTH_FRAME)?,
-        HarmonicsMem::from_cof(&jgm3_meta.uri, 8, 8, true)?,
+        GravityFieldData::from_cof(&jgm3_meta.uri, 8, 8, true)?,
     );
     orbital_dyn.accel_models.push(harmonics);
 
-    let srp_dyn = SolarPressure::default(EARTH_J2000, almanac.clone())?;
+    let srp_dyn = SolarPressure::default_flux(EARTH_J2000, almanac.clone())?;
     let sc_dynamics = SpacecraftDynamics::from_model(orbital_dyn, srp_dyn)
         .with_guidance_law(ruggiero_ctrl.clone());
 

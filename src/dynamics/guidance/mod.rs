@@ -29,7 +29,7 @@ use serde::{Deserialize, Serialize};
 mod finiteburns;
 pub use finiteburns::FiniteBurns;
 
-mod mnvr;
+pub mod mnvr;
 pub use mnvr::{Maneuver, MnvrRepr};
 
 mod ruggiero;

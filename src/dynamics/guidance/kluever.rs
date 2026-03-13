@@ -26,7 +26,7 @@ use super::{
     GuidStateSnafu, GuidanceError, GuidanceLaw, GuidanceMode, GuidancePhysicsSnafu, Spacecraft,
     Vector3,
 };
-use crate::cosmic::eclipse::EclipseLocator;
+use crate::cosmic::eclipse::ShadowModel;
 pub use crate::md::objective::Objective;
 pub use crate::md::StateParameter;
 use crate::State;
@@ -259,7 +259,7 @@ impl GuidanceLaw for Kluever {
             if !self.achieved(sc).unwrap() {
                 // Check eclipse state if applicable.
                 if let Some(max_eclipse) = self.max_eclipse_prct {
-                    let locator = EclipseLocator::cislunar(almanac.clone());
+                    let locator = ShadowModel::cislunar(almanac.clone());
                     if locator
                         .compute(sc.orbit, almanac)
                         .expect("cannot compute eclipse")

@@ -4,7 +4,7 @@ extern crate pretty_env_logger;
 use anise::constants::frames::IAU_EARTH_FRAME;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::OrbitalDynamics;
-use nyx::dynamics::sph_harmonics::Harmonics;
+use nyx::dynamics::sph_harmonics::GravityField;
 use nyx::dynamics::SpacecraftDynamics;
 use nyx::io::ConfigRepr;
 use nyx::io::{gravity::*, ExportCfg};
@@ -1216,8 +1216,8 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect_cov_test(
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     let earth_sph_harm =
-        HarmonicsMem::from_cof("data/01_planetary/JGM3.cof.gz", 70, 70, true).unwrap();
-    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm);
+        GravityFieldData::from_cof("data/01_planetary/JGM3.cof.gz", 70, 70, true).unwrap();
+    let harmonics = GravityField::from_stor(iau_earth, earth_sph_harm);
     let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::from_model(harmonics));
     let setup = Propagator::new(orbital_dyn, IntegratorMethod::RungeKutta4, opts);
 

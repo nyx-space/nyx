@@ -26,12 +26,13 @@ use anise::almanac::Almanac;
 use anise::astro::Aberration;
 use hyperdual::linalg::norm;
 use hyperdual::{extract_jacobian_and_result, hyperspace_from_vector, Float, OHyperdual};
+use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::f64;
 use std::fmt;
 use std::sync::Arc;
 
-pub use super::sph_harmonics::Harmonics;
+pub use super::sph_harmonics::GravityField;
 
 /// `OrbitalDynamics` provides the equations of motion for any celestial dynamic, without state transition matrix computation.
 #[derive(Clone)]
@@ -167,6 +168,7 @@ impl OrbitalDynamics {
 }
 
 /// PointMasses model
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PointMasses {
     pub celestial_objects: Vec<i32>,
     /// Light-time correction computation if extra point masses are needed
