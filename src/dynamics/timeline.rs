@@ -16,24 +16,72 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use std::collections::BTreeMap;
+
 use anise::{
     frames::Frame,
     structure::spacecraft::{DragData, Inertia, Mass, SRPData},
 };
+use hifitime::Epoch;
+use indexmap::IndexMap;
 
 use crate::{
-    dynamics::{guidance::mnvr::ImpulsiveManeuver, Drag, PointMasses, SolarPressure},
+    dynamics::{
+        guidance::{mnvr::ImpulsiveManeuver, Maneuver, Thruster},
+        Drag, PointMasses, SolarPressure,
+    },
     io::gravity::GravityFieldConfig,
     propagators::{IntegratorMethod, IntegratorOptions},
 };
+
+#[derive(Clone, Debug)]
+pub struct SpacecraftTimeline {
+    pub timeline: BTreeMap<Epoch, TimelinePhase>,
+    pub thruster_sets: IndexMap<String, Thruster>,
+    pub propagators: IndexMap<String, PropagatorConfig>,
+}
+
+impl SpacecraftTimeline {
+    pub fn validate(&self) -> Result<(), String> {
+        // Check that the last statement is a terminate
+        if let Some((_, TimelinePhase::Phase { .. })) = self.timeline.iter().last() {
+            return Err("final phase must be a Terminate".into());
+        }
+
+        // Check that all of the thruster set indexes reference an available thruster
+        for (epoch, phase) in &self.timeline {
+            if let TimelinePhase::Phase {
+                name: _,
+                propagator,
+                guidance,
+                on_entry: _,
+            } = phase
+            {
+                // Check that the propagator exists
+                if self.propagators.get(propagator).is_none() {
+                    return Err(format!("{epoch}: no propagator named `{propagator}`"));
+                }
+                if let Some(guidance) = guidance {
+                    let thruster = guidance.thruster_model();
+                    if self.thruster_sets.get(thruster).is_none() {
+                        return Err(format!("{epoch}: no thruster set named {thruster}"));
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
 
 #[derive(Clone, Debug)]
 pub enum TimelinePhase {
     Terminate,
     Phase {
         name: String,
-        propagator: Box<PropagatorConfig>,
+        propagator: String,
         guidance: Option<Box<GuidanceConfig>>,
+        /// The discrete event will be applied ONCE before the equation of motions are integrated.
         on_entry: Option<Box<DiscreteEvent>>,
     },
 }
@@ -60,7 +108,29 @@ pub struct ForceModels {
 }
 
 #[derive(Clone, Debug)]
-pub enum GuidanceConfig {}
+pub enum GuidanceConfig {
+    FiniteBurn {
+        maneuver: Maneuver,
+        thruster_model: String,
+    },
+    // TODO: Enable config
+    Ruggiero {
+        thruster_model: String,
+    },
+    Kluever {
+        thruster_model: String,
+    },
+}
+
+impl GuidanceConfig {
+    pub fn thruster_model(&self) -> &str {
+        match self {
+            Self::FiniteBurn { thruster_model, .. } => thruster_model,
+            Self::Ruggiero { thruster_model } => thruster_model,
+            Self::Kluever { thruster_model } => thruster_model,
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub enum DiscreteEvent {
@@ -70,7 +140,7 @@ pub enum DiscreteEvent {
     },
     Docking {
         impulsive_maneuver: Option<ImpulsiveManeuver>,
-        decrement_properties: Option<PhysicalProperties>,
+        increment_properties: Option<PhysicalProperties>,
     },
     CentralBodySwap {
         new_central_body: Frame,
