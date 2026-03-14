@@ -16,10 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::md::trajectory::TrajError;
 use crate::md::StateParameter;
 pub use crate::md::TargetingError;
 use crate::{cosmic::AstroError, io::ConfigError};
+use crate::{md::trajectory::TrajError, propagators::PropagationError};
 use anise::errors::{AlmanacError, PhysicsError};
 use hifitime::Epoch;
 use snafu::prelude::*;
@@ -28,54 +28,48 @@ use std::convert::From;
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub(crate)))]
 pub enum NyxError {
-    #[snafu(display("Maximum iterations of {msg} reached"))]
-    MaxIterReached { msg: String },
     #[snafu(display("Covariance is not positive semi definite"))]
     CovarianceMatrixNotPsd,
-    #[snafu(display("Unavailable parameter {param:?}: {msg}"))]
-    StateParameterUnavailable { param: StateParameter, msg: String },
-    #[snafu(display("Could not load file: {msg}"))]
-    LoadingError { msg: String },
     #[snafu(display("Could not read file: {msg}"))]
-    FileUnreadable { msg: String },
-    #[snafu(display("Cosm object not found: `{needle}` (available: {haystack:?})"))]
-    ObjectNotFound {
-        needle: String,
-        haystack: Vec<String>,
+    FileUnreadable {
+        msg: String,
     },
-    #[snafu(display("No interpolation data: {msg}"))]
-    NoInterpolationData { msg: String },
-    #[snafu(display("Invalid interpolation data: {msg}"))]
-    InvalidInterpolationData { msg: String },
     #[snafu(display("No state data: {msg}"))]
-    NoStateData { msg: String },
+    NoStateData {
+        msg: String,
+    },
     #[snafu(display("Happens when trying to modify a polynomial's (error)-th error but the polynomial has less orders than that"))]
-    PolynomialOrderError { order: usize },
-    #[snafu(display(
-        "An objective based analysis or control was attempted, but no objective was defined"
-    ))]
-    NoObjectiveDefined,
-    #[snafu(display("This computation requires the orbit to be hyperbolic: {msg}"))]
-    NotHyperbolic { msg: String },
+    PolynomialOrderError {
+        order: usize,
+    },
     #[snafu(display("Monte Carlo error: {msg}"))]
-    MonteCarlo { msg: String },
+    MonteCarlo {
+        msg: String,
+    },
     #[snafu(display("CCSDS error: {msg}"))]
-    CCSDS { msg: String },
-    #[snafu(display("Error: {msg}"))]
-    CustomError { msg: String },
+    CCSDS {
+        msg: String,
+    },
     #[snafu(display("Trajectory error: {source}"))]
-    Trajectory { source: TrajError },
-    #[snafu(display("Math domain error: {msg}"))]
-    MathDomain { msg: String },
+    Trajectory {
+        source: TrajError,
+    },
     #[snafu(display("Guidance law config error: {msg}"))]
-    GuidanceConfigError { msg: String },
+    GuidanceConfigError {
+        msg: String,
+    },
     #[snafu(display("Config error: {source}"))]
-    ConfigError { source: ConfigError },
+    ConfigError {
+        source: ConfigError,
+    },
     #[snafu(display("issue due to Almanac: {action} {source}"))]
     FromAlmanacError {
         #[snafu(source(from(AlmanacError, Box::new)))]
         source: Box<AlmanacError>,
         action: &'static str,
+    },
+    FromPropError {
+        source: PropagationError,
     },
 }
 

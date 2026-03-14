@@ -180,6 +180,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     trajectory.to_oem_file(
         "./01_cubesat_hf_prop.oem",
+        "CUBESAT-ID".to_string(),
+        Some("Nyx Space".to_string()),
+        Some("CUBESAT".to_string()),
         ExportCfg::builder().step(Unit::Minute * 2).build(),
     )?;
 

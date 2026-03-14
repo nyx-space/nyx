@@ -16,33 +16,30 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use anise::analysis::prelude::OrbitalElement;
-use anise::astro::Aberration;
-use anise::constants::orientations::J2000;
-use anise::errors::AlmanacError;
-use anise::prelude::{Almanac, Frame, Orbit};
-use arrow::array::RecordBatchReader;
-use arrow::array::{Float64Array, StringArray};
-use hifitime::TimeSeries;
-use log::{debug, info, warn};
-use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
-use snafu::{ensure, ResultExt};
-
 use super::TrajError;
 use super::{ExportCfg, Traj};
 use crate::cosmic::Spacecraft;
 use crate::errors::{FromAlmanacSnafu, NyxError};
-use crate::io::watermark::prj_name_ver;
 use crate::io::{InputOutputError, MissingDataSnafu, ParquetSnafu, StdIOSnafu};
 use crate::md::prelude::{Interpolatable, StateParameter};
-use crate::time::{Duration, Epoch, Format, Formatter, TimeUnits};
+use crate::time::{Duration, Epoch, TimeUnits};
 use crate::State;
-use std::collections::{HashMap, HashSet};
+use anise::analysis::prelude::OrbitalElement;
+use anise::astro::Aberration;
+use anise::ephemerides::ephemeris::Ephemeris;
+use anise::ephemerides::EphemerisError;
+use anise::errors::AlmanacError;
+use anise::prelude::{Almanac, Frame};
+use arrow::array::RecordBatchReader;
+use arrow::array::{Float64Array, StringArray};
+use hifitime::TimeSeries;
+use log::info;
+use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+use snafu::{ensure, ResultExt};
+use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
-use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use std::sync::Arc;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
@@ -152,154 +149,9 @@ impl Traj<Spacecraft> {
         traj.to_parquet(path, cfg)
     }
 
-    /// Initialize a new spacecraft trajectory from the path to a CCSDS OEM file.
-    ///
-    /// CCSDS OEM only contains the orbit information but Nyx builds spacecraft trajectories.
-    /// If not spacecraft template is provided, then a default massless spacecraft will be built.
-    pub fn from_oem_file<P: AsRef<Path>>(
-        path: P,
-        tpl_option: Option<Spacecraft>,
-    ) -> Result<Self, NyxError> {
-        // Open the file
-        let file = File::open(path).map_err(|e| NyxError::CCSDS {
-            msg: format!("File opening error: {e}"),
-        })?;
-        let reader = BufReader::new(file);
-
-        let template = tpl_option.unwrap_or_default();
-
-        // Parse the Orbit Element messages
-        let mut time_system = String::new();
-
-        let ignored_tokens: HashSet<_> = [
-            "CCSDS_OMM_VERS".to_string(),
-            "CREATION_DATE".to_string(),
-            "ORIGINATOR".to_string(),
-        ]
-        .into();
-
-        let mut traj = Self::default();
-
-        let mut parse = false;
-
-        let mut center_name = None;
-        let mut orient_name = None;
-
-        'lines: for (lno, line) in reader.lines().enumerate() {
-            let line = line.map_err(|e| NyxError::CCSDS {
-                msg: format!("File read error: {e}"),
-            })?;
-            let line = line.trim();
-            if line.is_empty() {
-                continue;
-            }
-
-            if ignored_tokens.iter().any(|t| line.starts_with(t)) {
-                continue 'lines;
-            }
-            if line.starts_with("OBJECT_NAME") {
-                // Extract the object ID from the line
-                let parts: Vec<&str> = line.split('=').collect();
-                let name = parts[1].trim().to_string();
-                debug!("[line: {}] Found object {name}", lno + 1);
-                traj.name = Some(name);
-            } else if line.starts_with("CENTER_NAME") {
-                let parts: Vec<&str> = line.split('=').collect();
-                center_name = Some(parts[1].trim().to_owned());
-            } else if line.starts_with("REF_FRAME") {
-                let parts: Vec<&str> = line.split('=').collect();
-                orient_name = Some(parts[1].trim().to_owned());
-            } else if line.starts_with("TIME_SYSTEM") {
-                let parts: Vec<&str> = line.split('=').collect();
-                time_system = parts[1].trim().to_string();
-                debug!("[line: {}] Found time system `{time_system}`", lno + 1);
-            } else if line.starts_with("META_STOP") {
-                // We can start parsing now
-                parse = true;
-            } else if line.starts_with("META_START") {
-                // Stop the parsing
-                parse = false;
-            } else if line.starts_with("COVARIANCE_START") {
-                // Stop the parsing
-                warn!("[line: {}] Skipping covariance in OEM parsing", lno + 1);
-                parse = false;
-            } else if parse {
-                let frame = Frame::from_name(
-                    center_name.clone().unwrap().as_str(),
-                    orient_name.clone().unwrap().as_str(),
-                )
-                .map_err(|e| NyxError::CCSDS {
-                    msg: format!("frame error `{center_name:?} {orient_name:?}`: {e}"),
-                })?;
-                // Split the line into components
-                let parts: Vec<&str> = line.split_whitespace().collect();
-
-                if parts.len() < 7 {
-                    debug!("[line: {}] Could not understand `{parts:?}`", lno + 1);
-                } else {
-                    // Extract the values
-                    let epoch_str = format!("{} {time_system}", parts[0]);
-                    match parts[1].parse::<f64>() {
-                        Ok(x_km) => {
-                            // Look good!
-                            let y_km = parts[2].parse::<f64>().unwrap();
-                            let z_km = parts[3].parse::<f64>().unwrap();
-                            let vx_km_s = parts[4].parse::<f64>().unwrap();
-                            let vy_km_s = parts[5].parse::<f64>().unwrap();
-                            let vz_km_s = parts[6].parse::<f64>().unwrap();
-
-                            let epoch =
-                                Epoch::from_str(epoch_str.trim()).map_err(|e| NyxError::CCSDS {
-                                    msg: format!("Parsing epoch error: {e}"),
-                                })?;
-
-                            let orbit = Orbit::new(
-                                x_km, y_km, z_km, vx_km_s, vy_km_s, vz_km_s, epoch, frame,
-                            );
-
-                            traj.states.push(template.with_orbit(orbit));
-                        }
-                        Err(_) => {
-                            // Probably a comment
-                            debug!("[line: {}] Could not parse `{parts:?}`", lno + 1);
-                            continue;
-                        }
-                    };
-                }
-            }
-        }
-
-        traj.finalize();
-
-        Ok(traj)
-    }
-
-    pub fn to_oem_file<P: AsRef<Path>>(
-        &self,
-        path: P,
-        cfg: ExportCfg,
-    ) -> Result<PathBuf, NyxError> {
-        if self.states.is_empty() {
-            return Err(NyxError::CCSDS {
-                msg: "Cannot export an empty trajectory to OEM".to_string(),
-            });
-        }
-        let tick = Epoch::now().unwrap();
-        info!("Exporting trajectory to CCSDS OEM file...");
-
-        // Grab the path here before we move stuff.
-        let path_buf = cfg.actual_path(path);
-
-        let metadata = cfg.metadata.unwrap_or_default();
-
-        let file = File::create(&path_buf).map_err(|e| NyxError::CCSDS {
-            msg: format!("File creation error: {e}"),
-        })?;
-        let mut writer = BufWriter::new(file);
-
-        let err_hdlr = |e| NyxError::CCSDS {
-            msg: format!("Could not write: {e}"),
-        };
+    /// Export this spacecraft trajectory estimate to an ANISE Ephemeris
+    pub fn to_ephemeris(&self, object_id: String, cfg: ExportCfg) -> Ephemeris {
+        let mut ephem = Ephemeris::new(object_id);
 
         // Build the states iterator -- this does require copying the current states but I can't either get a reference or a copy of all the states.
         let states = if cfg.start_epoch.is_some() || cfg.end_epoch.is_some() || cfg.step.is_some() {
@@ -312,126 +164,43 @@ impl Traj<Spacecraft> {
             self.states.to_vec()
         };
 
-        // Epoch formmatter.
-        let iso8601_no_ts = Format::from_str("%Y-%m-%dT%H:%M:%S.%f").unwrap();
-
-        // Write mandatory metadata
-        writeln!(writer, "CCSDS_OMM_VERS = 2.0").map_err(err_hdlr)?;
-
-        writeln!(
-            writer,
-            "COMMENT Built by {} -- https://nyxspace.com/\n",
-            prj_name_ver()
-        )
-        .map_err(err_hdlr)?;
-        writeln!(
-            writer,
-            "COMMENT Nyx Space provided under the AGPL v3 open source license -- https://nyxspace.com/pricing\n"
-        )
-        .map_err(err_hdlr)?;
-
-        writeln!(
-            writer,
-            "CREATION_DATE = {}",
-            Formatter::new(Epoch::now().unwrap(), iso8601_no_ts)
-        )
-        .map_err(err_hdlr)?;
-        writeln!(
-            writer,
-            "ORIGINATOR = {}\n",
-            metadata
-                .get("originator")
-                .unwrap_or(&"Nyx Space".to_string())
-        )
-        .map_err(err_hdlr)?;
-
-        writeln!(writer, "META_START").map_err(err_hdlr)?;
-        // Write optional metadata
-        if let Some(object_name) = metadata.get("object_name") {
-            writeln!(writer, "\tOBJECT_NAME = {object_name}").map_err(err_hdlr)?;
-        } else if let Some(object_name) = &self.name {
-            writeln!(writer, "\tOBJECT_NAME = {object_name}").map_err(err_hdlr)?;
-        }
-
-        let first_orbit = states[0].orbit;
-        let first_frame = first_orbit.frame;
-        let frame_str = format!(
-            "{first_frame:e} {}",
-            match first_frame.orientation_id {
-                J2000 => "ICRF".to_string(),
-                _ => format!("{first_frame:o}"),
-            }
-        );
-        let splt: Vec<&str> = frame_str.split(' ').collect();
-        let center = splt[0];
-        let ref_frame = frame_str.replace(center, " ");
-        writeln!(
-            writer,
-            "\tREF_FRAME = {}",
-            match ref_frame.trim() {
-                "J2000" => "ICRF",
-                _ => ref_frame.trim(),
-            }
-        )
-        .map_err(err_hdlr)?;
-
-        writeln!(writer, "\tCENTER_NAME = {center}",).map_err(err_hdlr)?;
-
-        writeln!(writer, "\tTIME_SYSTEM = {}", first_orbit.epoch.time_scale).map_err(err_hdlr)?;
-
-        writeln!(
-            writer,
-            "\tSTART_TIME = {}",
-            Formatter::new(states[0].epoch(), iso8601_no_ts)
-        )
-        .map_err(err_hdlr)?;
-        writeln!(
-            writer,
-            "\tUSEABLE_START_TIME = {}",
-            Formatter::new(states[0].epoch(), iso8601_no_ts)
-        )
-        .map_err(err_hdlr)?;
-        writeln!(
-            writer,
-            "\tUSEABLE_STOP_TIME = {}",
-            Formatter::new(states[states.len() - 1].epoch(), iso8601_no_ts)
-        )
-        .map_err(err_hdlr)?;
-        writeln!(
-            writer,
-            "\tSTOP_TIME = {}",
-            Formatter::new(states[states.len() - 1].epoch(), iso8601_no_ts)
-        )
-        .map_err(err_hdlr)?;
-
-        writeln!(writer, "META_STOP\n").map_err(err_hdlr)?;
-
         for sc_state in &states {
-            let state = sc_state.orbit;
-            writeln!(
-                writer,
-                "{} {:E} {:E} {:E} {:E} {:E} {:E}",
-                Formatter::new(state.epoch, iso8601_no_ts),
-                state.radius_km.x,
-                state.radius_km.y,
-                state.radius_km.z,
-                state.velocity_km_s.x,
-                state.velocity_km_s.y,
-                state.velocity_km_s.z
-            )
-            .map_err(err_hdlr)?;
+            ephem.insert_orbit(sc_state.orbit());
         }
 
-        #[allow(clippy::writeln_empty_string)]
-        writeln!(writer, "").map_err(err_hdlr)?;
+        ephem
+    }
 
-        // Return the path this was written to
-        let tock_time = Epoch::now().unwrap() - tick;
-        info!(
-            "Trajectory written to {} in {tock_time}",
-            path_buf.display()
-        );
-        Ok(path_buf)
+    /// Initialize a new spacecraft trajectory from the path to a CCSDS OEM file.
+    ///
+    /// CCSDS OEM only contains the orbit information but Nyx builds spacecraft trajectories.
+    /// If not spacecraft template is provided, then a default massless spacecraft will be built.
+    pub fn from_oem_file<P: AsRef<Path>>(
+        path: P,
+        tpl_option: Option<Spacecraft>,
+    ) -> Result<Self, EphemerisError> {
+        // Read the ephemeris
+        let ephem = Ephemeris::from_ccsds_oem_file(path)?;
+        // Rebuild a trajectory by applying the template
+        let template = tpl_option.unwrap_or_default();
+        let mut traj = Self::default();
+        for record in &ephem {
+            traj.states.push(template.with_orbit(record.orbit));
+        }
+
+        Ok(traj)
+    }
+
+    pub fn to_oem_file<P: AsRef<Path>>(
+        &self,
+        path: P,
+        object_id: String,
+        originator: Option<String>,
+        object_name: Option<String>,
+        cfg: ExportCfg,
+    ) -> Result<(), EphemerisError> {
+        let ephem = self.to_ephemeris(object_id, cfg);
+        ephem.write_ccsds_oem(path, originator, object_name)
     }
 
     pub fn from_parquet<P: AsRef<Path>>(path: P) -> Result<Self, InputOutputError> {
@@ -719,9 +488,16 @@ mod ut_ccsds_oem {
         .iter()
         .collect();
 
-        let out_path = traj.to_oem_file(path.clone(), cfg).unwrap();
+        traj.to_oem_file(
+            &path,
+            "TEST-OBJ-ID".to_string(),
+            Some("Test Suite".to_string()),
+            Some("TEST_OBJ".to_string()),
+            cfg,
+        )
+        .unwrap();
         // And reload, make sure we have the same data.
-        let traj_reloaded: Traj<Spacecraft> = Traj::from_oem_file(out_path, None).unwrap();
+        let traj_reloaded: Traj<Spacecraft> = Traj::from_oem_file(&path, None).unwrap();
 
         assert_eq!(traj_reloaded, traj);
 
@@ -736,9 +512,16 @@ mod ut_ccsds_oem {
             .start_epoch(traj.first().orbit.epoch + 1.seconds())
             .end_epoch(traj.last().orbit.epoch - 1.seconds())
             .build();
-        let out_path = traj.to_oem_file(path, cfg).unwrap();
+        traj.to_oem_file(
+            &path,
+            "TEST-OBJ-ID".to_string(),
+            Some("Test Suite".to_string()),
+            Some("TEST_OBJ".to_string()),
+            cfg,
+        )
+        .unwrap();
         // And reload, make sure we have the same data.
-        let traj_reloaded: Traj<Spacecraft> = Traj::from_oem_file(out_path, None).unwrap();
+        let traj_reloaded: Traj<Spacecraft> = Traj::from_oem_file(path, None).unwrap();
 
         // Note that the number of states has changed because we interpolated with a step similar to the original one but
         // we started with a different time.
@@ -808,10 +591,17 @@ mod ut_ccsds_oem {
         .iter()
         .collect();
 
-        let out_path = traj.to_oem_file(path, ExportCfg::default()).unwrap();
+        traj.to_oem_file(
+            &path,
+            "TEST-OBJ-ID".to_string(),
+            Some("Test Suite".to_string()),
+            Some("TEST_OBJ".to_string()),
+            ExportCfg::default(),
+        )
+        .unwrap();
 
         // And reload
-        let traj_reloaded: Traj<Spacecraft> = Traj::from_oem_file(out_path, None).unwrap();
+        let traj_reloaded: Traj<Spacecraft> = Traj::from_oem_file(path, None).unwrap();
 
         assert_eq!(traj, traj_reloaded);
     }

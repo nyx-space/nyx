@@ -43,7 +43,6 @@ const NORM_ERR: f64 = 1e-4;
 #[derive(Clone)]
 pub struct SpacecraftDynamics {
     pub orbital_dyn: OrbitalDynamics,
-    // TODO: https://github.com/nyx-space/nyx/issues/214
     pub force_models: Vec<Arc<dyn ForceModel>>,
     pub guid_law: Option<Arc<dyn GuidanceLaw>>,
     pub decrement_mass: bool,
@@ -143,6 +142,12 @@ impl fmt::Display for SpacecraftDynamics {
             force_models,
             self.orbital_dyn
         )
+    }
+}
+
+impl fmt::Debug for SpacecraftDynamics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self}")
     }
 }
 
