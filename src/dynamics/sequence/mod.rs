@@ -172,13 +172,13 @@ impl SpacecraftSequence {
                         info!("[{epoch}] executing {name}");
                         if let Some(discrete_event) = on_entry {
                             match &**discrete_event {
-                                DiscreteEvent::CentralBodySwap { new_central_body } => {
-                                    if !new_central_body.orient_origin_match(state.orbit.frame)
-                                        || new_central_body.ephem_origin_match(state.orbit.frame)
+                                DiscreteEvent::FrameSwap { new_frame } => {
+                                    if !new_frame.orient_origin_match(state.orbit.frame)
+                                        || !new_frame.ephem_origin_match(state.orbit.frame)
                                     {
                                         state = state.with_orbit(
                                             almanac
-                                                .translate_to(state.orbit, *new_central_body, None)
+                                                .translate_to(state.orbit, *new_frame, None)
                                                 .map_err(|source| {
                                                     anise::errors::AlmanacError::Ephemeris {
                                                         action: "central body swap",
@@ -189,9 +189,7 @@ impl SpacecraftSequence {
                                                     action: "central body swap",
                                                 })?,
                                         );
-                                        info!(
-                                            "[{epoch}] central body swapped to {new_central_body}"
-                                        );
+                                        info!("[{epoch}] central body swapped to {new_frame}");
                                     }
                                 }
                                 DiscreteEvent::Staging {

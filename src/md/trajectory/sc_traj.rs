@@ -187,6 +187,7 @@ impl Traj<Spacecraft> {
         for record in &ephem {
             traj.states.push(template.with_orbit(record.orbit));
         }
+        traj.name = Some(ephem.object_id);
 
         Ok(traj)
     }
@@ -421,7 +422,7 @@ mod ut_ccsds_oem {
 
         // This trajectory has two duplicate epochs, which should be removed by the call to finalize()
         assert_eq!(traj.states.len(), 361);
-        assert_eq!(traj.name.unwrap(), "TEST_OBJ".to_string());
+        assert_eq!(traj.name.unwrap(), "0000-000A".to_string());
     }
 
     #[test]
@@ -443,7 +444,7 @@ mod ut_ccsds_oem {
         let traj: Traj<Spacecraft> = Traj::from_oem_file(path, None).unwrap();
 
         assert_eq!(traj.states.len(), 61);
-        assert_eq!(traj.name.unwrap(), "TEST_OBJ".to_string());
+        assert_eq!(traj.name.unwrap(), "0000-000A".to_string());
     }
 
     #[test]
@@ -468,7 +469,7 @@ mod ut_ccsds_oem {
         let traj: Traj<Spacecraft> = Traj::from_oem_file(path, None).unwrap();
 
         assert_eq!(traj.states.len(), 181);
-        assert_eq!(traj.name.as_ref().unwrap(), &"TEST_OBJ".to_string());
+        assert_eq!(traj.name.as_ref().unwrap(), &"0000-000A".to_string());
 
         // Reexport this to CCSDS.
         let cfg = ExportCfg::builder()
@@ -490,7 +491,7 @@ mod ut_ccsds_oem {
 
         traj.to_oem_file(
             &path,
-            "TEST-OBJ-ID".to_string(),
+            "0000-000A".to_string(),
             Some("Test Suite".to_string()),
             Some("TEST_OBJ".to_string()),
             cfg,
@@ -593,9 +594,9 @@ mod ut_ccsds_oem {
 
         traj.to_oem_file(
             &path,
-            "TEST-OBJ-ID".to_string(),
+            "TEST_MOON_OBJ".to_string(),
             Some("Test Suite".to_string()),
-            Some("TEST_OBJ".to_string()),
+            Some("TEST_MOON_OBJ".to_string()),
             ExportCfg::default(),
         )
         .unwrap();

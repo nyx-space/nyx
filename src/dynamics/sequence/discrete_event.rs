@@ -33,8 +33,8 @@ pub enum DiscreteEvent {
         impulsive_maneuver: Option<ImpulsiveManeuver>,
         increment_properties: Option<PhysicalProperties>,
     },
-    CentralBodySwap {
-        new_central_body: Frame,
+    FrameSwap {
+        new_frame: Frame,
     },
 }
 
