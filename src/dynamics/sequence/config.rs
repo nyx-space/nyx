@@ -15,8 +15,8 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-
 use anise::frames::FrameUid;
+use std::sync::Arc;
 
 use crate::{
     dynamics::{guidance::Maneuver, Drag, PointMasses, SolarPressure},
@@ -52,15 +52,15 @@ pub struct PropagatorConfig {
 /// Acceleration models alter the orbital dynamics
 #[derive(Clone, Debug)]
 pub struct AccelModels {
-    pub point_masses: Option<PointMasses>,
+    pub point_masses: Option<Arc<PointMasses>>,
     pub gravity_field: Option<(GravityFieldConfig, FrameUid)>,
 }
 
 /// Force models alter the spacecraft dynamics (they need a mass).
 #[derive(Clone, Debug)]
 pub struct ForceModels {
-    pub solar_pressure: Option<SolarPressure>,
-    pub drag: Option<Drag>,
+    pub solar_pressure: Option<Arc<SolarPressure>>,
+    pub drag: Option<Arc<Drag>>,
 }
 
 #[derive(Clone, Debug)]

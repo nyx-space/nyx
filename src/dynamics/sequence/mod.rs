@@ -22,10 +22,9 @@ use std::sync::Arc;
 use anise::prelude::Almanac;
 use hifitime::Epoch;
 use indexmap::IndexMap;
-use log::info;
+use log::{debug, info};
 use snafu::ResultExt;
 
-use crate::dynamics::sequence::discrete_event::DiscreteEvent;
 use crate::dynamics::{guidance::Thruster, SpacecraftDynamics};
 use crate::dynamics::{GravityField, OrbitalDynamics};
 use crate::errors::{FromAlmanacSnafu, FromPropSnafu};
@@ -34,12 +33,13 @@ use crate::md::Trajectory;
 use crate::propagators::Propagator;
 use crate::{NyxError, Spacecraft, State};
 
-pub mod config;
-pub mod discrete_event;
+mod config;
+mod discrete_event;
 
-use config::*;
+pub use config::*;
+pub use discrete_event::*;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct SpacecraftSequence {
     pub seq: BTreeMap<Epoch, Phase>,
     pub thruster_sets: IndexMap<String, Thruster>,
@@ -101,9 +101,7 @@ impl SpacecraftSequence {
                     // Build the orbital dynamics
                     let mut orbital_dyn = OrbitalDynamics::two_body();
                     if let Some(point_masses) = &cfg.accel_models.point_masses {
-                        orbital_dyn
-                            .accel_models
-                            .push(Arc::new(point_masses.clone()));
+                        orbital_dyn.accel_models.push(point_masses.clone());
                     }
                     if let Some((gravity_cfg, frame_uid)) = &cfg.accel_models.gravity_field {
                         let grav_data = GravityFieldData::from_config(gravity_cfg.clone())
@@ -117,17 +115,18 @@ impl SpacecraftSequence {
                     let mut sc_dyn = SpacecraftDynamics::new(orbital_dyn);
 
                     if let Some(srp) = &cfg.force_models.solar_pressure {
-                        sc_dyn.force_models.push(Arc::new(srp.clone()));
+                        sc_dyn.force_models.push(srp.clone());
                     }
 
                     if let Some(drag) = &cfg.force_models.drag {
-                        sc_dyn.force_models.push(Arc::new(drag.clone()));
+                        sc_dyn.force_models.push(drag.clone());
                     }
 
                     // And set it all up!
                     let setup = Propagator::new(sc_dyn, cfg.method, cfg.options);
 
                     self.prop_setups.insert(propagator.clone(), setup);
+                    debug!("built `{propagator}`");
                 }
             }
         }
@@ -136,22 +135,22 @@ impl SpacecraftSequence {
     }
 
     /// Propagate this plan starting the relevant phase for the probided state, and propagating until the end of the plan
-    /// or until the provided phase name.
+    /// or until the provided phase name. Returns the trajectory for each phase, allowing for each phase to be in its own central body.
     pub fn propagate(
         &self,
         mut state: Spacecraft,
         until_phase: Option<String>,
         almanac: Arc<Almanac>,
-    ) -> Result<Trajectory, NyxError> {
+    ) -> Result<Vec<Trajectory>, NyxError> {
         let mut phase_iterator = self.seq.range(state.epoch()..).peekable();
 
-        let mut traj = Trajectory::new();
+        let mut trajs = Vec::with_capacity(self.seq.len());
 
         while let Some((epoch, phase)) = phase_iterator.next() {
             match phase {
                 Phase::Terminate => {
                     info!("[{epoch}] plan completed");
-                    return Ok(traj);
+                    return Ok(trajs);
                 }
                 Phase::Phase {
                     name,
@@ -163,7 +162,7 @@ impl SpacecraftSequence {
                     // Check stop condition
                     if let Some(ref target) = until_phase {
                         if target == name {
-                            return Ok(traj);
+                            return Ok(trajs);
                         }
                     }
 
@@ -252,7 +251,7 @@ impl SpacecraftSequence {
                             .0;
 
                         // Include the guidance if any is available
-                        let (next_state, phase_traj) = if let Some(guid_cfg) = guidance {
+                        let (next_state, mut phase_traj) = if let Some(guid_cfg) = guidance {
                             // Clone the propagator to add the dynamics
                             let mut setup = self.prop_setups[propagator].clone();
                             match &**guid_cfg {
@@ -276,13 +275,8 @@ impl SpacecraftSequence {
                                 .context(FromPropSnafu)?
                         };
                         state = next_state;
-                        // Append all the states
-                        phase_traj
-                            .states
-                            .iter()
-                            .copied()
-                            .for_each(|sc_state| traj.states.push(sc_state));
-                        traj.finalize();
+                        phase_traj.name = Some(name.clone());
+                        trajs.push(phase_traj);
                     }
                 }
             }

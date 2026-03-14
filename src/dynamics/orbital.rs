@@ -185,10 +185,10 @@ impl PointMasses {
     }
 
     /// Initializes the point masses gravities with the provided list of bodies, and accounting for some light time correction
-    pub fn with_correction(celestial_objects: Vec<i32>, correction: Aberration) -> Self {
+    pub fn with_correction(celestial_objects: Vec<i32>, correction: Option<Aberration>) -> Self {
         Self {
             celestial_objects,
-            correction: Some(correction),
+            correction,
         }
     }
 }

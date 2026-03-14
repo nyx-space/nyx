@@ -190,6 +190,7 @@ pub enum GuidanceError {
 }
 
 /// Local frame options, used notably for guidance laws.
+/// TODO: Replace with ANISE enum, which is identical
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LocalFrame {
     Inertial,
