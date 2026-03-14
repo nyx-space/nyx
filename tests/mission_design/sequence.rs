@@ -105,7 +105,7 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
     // Setup the spacecraft sequence
     sc_seq.seq.insert(
         epoch,
-        Phase::Phase {
+        Phase::Activity {
             name: "Parking orbit checkout".to_string(),
             propagator: "Near Earth".into(),
             guidance: None,
@@ -116,7 +116,7 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
 
     sc_seq.seq.insert(
         epoch + Unit::Hour * 1.5,
-        Phase::Phase {
+        Phase::Activity {
             name: "Separation and vehicle checkout".to_string(),
             propagator: "Near Earth".to_string(),
             guidance: None,
@@ -136,7 +136,7 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
 
     sc_seq.seq.insert(
         mnvr_start,
-        Phase::Phase {
+        Phase::Activity {
             name: "Finite Maneuver".to_string(),
             propagator: "Cislunar".to_string(),
             guidance: Some(Box::new(GuidanceConfig::FiniteBurn {

@@ -29,7 +29,7 @@ use crate::dynamics::sequence::discrete_event::DiscreteEvent;
 #[derive(Clone, Debug)]
 pub enum Phase {
     Terminate,
-    Phase {
+    Activity {
         name: String,
         propagator: String,
         guidance: Option<Box<GuidanceConfig>>,

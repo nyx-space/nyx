@@ -20,7 +20,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use anise::prelude::Almanac;
-use hifitime::Epoch;
+use hifitime::{Epoch, Unit};
 use indexmap::IndexMap;
 use log::{debug, info};
 use snafu::ResultExt;
@@ -50,13 +50,13 @@ pub struct SpacecraftSequence {
 impl SpacecraftSequence {
     pub fn validate(&self) -> Result<(), String> {
         // Check that the last statement is a terminate
-        if let Some((_, Phase::Phase { .. })) = self.seq.iter().last() {
+        if let Some((_, Phase::Activity { .. })) = self.seq.iter().last() {
             return Err("final phase must be a Terminate".into());
         }
 
         // Check that all of the thruster set indexes reference an available thruster
         for (epoch, phase) in &self.seq {
-            if let Phase::Phase {
+            if let Phase::Activity {
                 name: _,
                 propagator,
                 guidance,
@@ -86,7 +86,7 @@ impl SpacecraftSequence {
         self.validate()?;
 
         for phase in self.seq.values() {
-            if let Phase::Phase {
+            if let Phase::Activity {
                 name: _,
                 propagator,
                 guidance: _,
@@ -142,6 +142,7 @@ impl SpacecraftSequence {
         until_phase: Option<String>,
         almanac: Arc<Almanac>,
     ) -> Result<Vec<Trajectory>, NyxError> {
+        let tick = Epoch::now().unwrap();
         let mut phase_iterator = self.seq.range(state.epoch()..).peekable();
 
         let mut trajs = Vec::with_capacity(self.seq.len());
@@ -149,10 +150,11 @@ impl SpacecraftSequence {
         while let Some((epoch, phase)) = phase_iterator.next() {
             match phase {
                 Phase::Terminate => {
-                    info!("[{epoch}] plan completed");
+                    let tock = (Epoch::now().unwrap() - tick).round(Unit::Millisecond * 1);
+                    info!("[{epoch}] plan completed in {tock}");
                     return Ok(trajs);
                 }
-                Phase::Phase {
+                Phase::Activity {
                     name,
                     propagator,
                     guidance,
