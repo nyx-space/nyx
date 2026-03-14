@@ -25,6 +25,7 @@ use indexmap::IndexMap;
 use log::{debug, info};
 use snafu::ResultExt;
 
+use crate::dynamics::guidance::{Kluever, Ruggiero};
 use crate::dynamics::{guidance::Thruster, SpacecraftDynamics};
 use crate::dynamics::{GravityField, OrbitalDynamics};
 use crate::errors::{FromAlmanacSnafu, FromPropSnafu};
@@ -168,7 +169,9 @@ impl SpacecraftSequence {
                         }
                     }
 
-                    if !disabled {
+                    if *disabled {
+                        info!("[{epoch}] skipping disabled {name}");
+                    } else {
                         info!("[{epoch}] executing {name}");
                         if let Some(discrete_event) = on_entry {
                             match &**discrete_event {
@@ -262,7 +265,31 @@ impl SpacecraftSequence {
                                     setup.dynamics.guid_law = Some(Arc::new(*maneuver));
                                     state.thruster = Some(self.thruster_sets[thruster_model]);
                                 }
-                                _ => unimplemented!(),
+                                GuidanceConfig::Ruggiero {
+                                    thruster_model,
+                                    objectives,
+                                    max_eclipse_prct,
+                                } => {
+                                    let guid = Ruggiero {
+                                        objectives: objectives.clone(),
+                                        max_eclipse_prct: *max_eclipse_prct,
+                                        init_state: state,
+                                    };
+                                    setup.dynamics.guid_law = Some(Arc::new(guid));
+                                    state.thruster = Some(self.thruster_sets[thruster_model]);
+                                }
+                                GuidanceConfig::Kluever {
+                                    thruster_model,
+                                    objectives,
+                                    max_eclipse_prct,
+                                } => {
+                                    let guid = Kluever {
+                                        objectives: objectives.clone(),
+                                        max_eclipse_prct: *max_eclipse_prct,
+                                    };
+                                    setup.dynamics.guid_law = Some(Arc::new(guid));
+                                    state.thruster = Some(self.thruster_sets[thruster_model]);
+                                }
                             }
                             setup
                                 .with(state, almanac.clone())
@@ -274,6 +301,7 @@ impl SpacecraftSequence {
                                 .until_epoch_with_traj(*end_time)
                                 .context(FromPropSnafu)?
                         };
+                        info!("[{epoch}] {name} completed: {next_state:x}");
                         state = next_state;
                         phase_traj.name = Some(name.clone());
                         trajs.push(phase_traj);

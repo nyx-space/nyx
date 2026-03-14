@@ -21,6 +21,7 @@ use std::sync::Arc;
 use crate::{
     dynamics::{guidance::Maneuver, Drag, PointMasses, SolarPressure},
     io::gravity::GravityFieldConfig,
+    md::objective::Objective,
     propagators::{IntegratorMethod, IntegratorOptions},
 };
 
@@ -69,12 +70,19 @@ pub enum GuidanceConfig {
         maneuver: Maneuver,
         thruster_model: String,
     },
-    // TODO: Enable config
     Ruggiero {
         thruster_model: String,
+        /// Stores the objectives, and their associated efficiency threshold (set to zero if not minimum efficiency).
+        objectives: Vec<(Objective, f64)>,
+        /// If defined, coast until vehicle is out of the provided eclipse state.
+        max_eclipse_prct: Option<f64>,
     },
     Kluever {
         thruster_model: String,
+        /// Stores the objectives, and their associated weights (set to zero to disable).
+        objectives: Vec<(Objective, f64)>,
+        /// If defined, coast until vehicle is out of the provided eclipse state.
+        max_eclipse_prct: Option<f64>,
     },
 }
 
@@ -82,8 +90,8 @@ impl GuidanceConfig {
     pub fn thruster_model(&self) -> &str {
         match self {
             Self::FiniteBurn { thruster_model, .. } => thruster_model,
-            Self::Ruggiero { thruster_model } => thruster_model,
-            Self::Kluever { thruster_model } => thruster_model,
+            Self::Ruggiero { thruster_model, .. } => thruster_model,
+            Self::Kluever { thruster_model, .. } => thruster_model,
         }
     }
 }

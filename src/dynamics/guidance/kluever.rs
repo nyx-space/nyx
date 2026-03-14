@@ -36,10 +36,8 @@ use std::sync::Arc;
 /// Kluever defines a blended closed loop guidance law for low-thrust orbit transfers.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Kluever {
-    /// Stores the objectives
-    pub objectives: Vec<Objective>,
-    /// Stores the weights for each objective
-    pub weights: Vec<f64>,
+    /// Stores the objectives and their associated weights
+    pub objectives: Vec<(Objective, f64)>,
     /// If defined, coast until vehicle is out of the provided eclipse state.
     pub max_eclipse_prct: Option<f64>,
 }
@@ -48,8 +46,11 @@ impl Kluever {
     /// Creates a new Kluever blended control law.
     pub fn new(objectives: &[Objective], weights: &[f64]) -> Arc<Self> {
         Arc::new(Self {
-            objectives: objectives.to_vec(),
-            weights: weights.to_vec(),
+            objectives: objectives
+                .iter()
+                .copied()
+                .zip(weights.iter().copied())
+                .collect(),
             max_eclipse_prct: None,
         })
     }
@@ -65,8 +66,7 @@ impl fmt::Display for Kluever {
         let obj_msg = self
             .objectives
             .iter()
-            .enumerate()
-            .map(|(i, obj)| format!("{obj} (weight: {:.3})", self.weights[i]))
+            .map(|(obj, weight)| format!("{obj} (weight: {weight:.3})"))
             .collect::<Vec<String>>();
         write!(
             f,
@@ -83,7 +83,7 @@ impl fmt::Display for Kluever {
 impl GuidanceLaw for Kluever {
     /// Returns whether the guidance law has achieved all goals
     fn achieved(&self, state: &Spacecraft) -> Result<bool, GuidanceError> {
-        for obj in &self.objectives {
+        for (obj, _weight) in &self.objectives {
             if !obj
                 .assess_value(state.value(obj.parameter).context(GuidStateSnafu)?)
                 .0
@@ -131,9 +131,8 @@ impl GuidanceLaw for Kluever {
         let l_rad = u_rad + raan_rad;
         let (sin_l, cos_l) = l_rad.sin_cos();
 
-        for (i, obj) in self.objectives.iter().enumerate() {
-            let weight = self.weights[i];
-            if weight == 0.0 {
+        for (obj, weight) in &self.objectives {
+            if *weight == 0.0 {
                 continue;
             }
 

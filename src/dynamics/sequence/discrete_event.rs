@@ -18,7 +18,7 @@
 
 use anise::{
     frames::Frame,
-    structure::spacecraft::{DragData, Inertia, Mass, SRPData},
+    structure::spacecraft::{DragData, Mass, SRPData},
 };
 
 use crate::dynamics::guidance::mnvr::ImpulsiveManeuver;
@@ -43,5 +43,4 @@ pub struct PhysicalProperties {
     pub mass: Option<Mass>,
     pub srp: Option<SRPData>,
     pub drag: Option<DragData>,
-    pub inertia: Option<Inertia>,
 }

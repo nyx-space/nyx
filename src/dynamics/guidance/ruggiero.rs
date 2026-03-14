@@ -41,7 +41,7 @@ pub struct Ruggiero {
     pub objectives: Vec<(Objective, f64)>,
     /// If defined, coast until vehicle is out of the provided eclipse state.
     pub max_eclipse_prct: Option<f64>,
-    init_state: Spacecraft,
+    pub init_state: Spacecraft,
 }
 
 /// The Ruggiero is a locally optimal guidance law of a state for specific osculating elements.

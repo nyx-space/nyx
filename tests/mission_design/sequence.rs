@@ -16,6 +16,8 @@ use nyx_space::dynamics::guidance::mnvr::ImpulsiveManeuver;
 use nyx_space::dynamics::guidance::{LocalFrame, Maneuver};
 use nyx_space::dynamics::PointMasses;
 use nyx_space::io::gravity::GravityFieldConfig;
+use nyx_space::md::prelude::{Objective, OrbitalElement};
+use nyx_space::md::StateParameter;
 use rstest::*;
 use std::sync::Arc;
 
@@ -121,6 +123,7 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
             propagator: "Near Earth".to_string(),
             guidance: None,
             on_entry: Some(Box::new(DiscreteEvent::Staging {
+                // Separation event is a discrete event
                 impulsive_maneuver: Some(ImpulsiveManeuver {
                     dv_km_s: Vector3::new(25.0e-6, 0.0, 0.0),
                     local_frame: LocalFrame::VNC,
@@ -156,6 +159,211 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
 
     // All sequences MUST end with a Terminate phase.
     sc_seq.seq.insert(epoch + Unit::Day * 30, Phase::Terminate);
+
+    // Initialize the propagators.
+    sc_seq.setup(almanac.clone()).unwrap();
+
+    // Set up the initial state
+
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+
+    let orbit =
+        Orbit::try_keplerian_altitude(300.0, 2e-4, 28.5, 10.0, 0.0, 0.0, epoch, eme2k).unwrap();
+
+    let sc = Spacecraft::builder()
+        .srp(SRPData {
+            area_m2: 16.0,
+            coeff_reflectivity: 1.2,
+        })
+        .mass(Mass::from_dry_and_prop_masses(300.0, 250.0))
+        .orbit(orbit)
+        .build();
+
+    println!("{sc:x}");
+
+    // Propagate, returning a vector of trajectories, one per phase.
+    let trajectories = sc_seq.propagate(sc, None, almanac.clone()).unwrap();
+    // Minus one because there is no trajectory for the terminate phase.
+    assert_eq!(trajectories.len(), sc_seq.seq.len() - 1);
+}
+
+// TODO: Add Rugg and Kluever cases!
+#[rstest]
+#[case(GuidanceConfig::Ruggiero {
+    thruster_model: "HET".to_string(),
+    objectives: vec![
+        (
+            Objective::new(
+                StateParameter::Element(OrbitalElement::SemiMajorAxis),
+                7_300.0,
+            ),
+            0.0,
+        ),
+        (
+            Objective::new(StateParameter::Element(OrbitalElement::Eccentricity), 1e-4),
+            0.0,
+        ),
+    ],
+    max_eclipse_prct: Some(0.5),
+},
+    GuidanceConfig::Ruggiero {
+    thruster_model: "HET".to_string(),
+    objectives: vec![
+        (
+            Objective::new(
+                StateParameter::Element(OrbitalElement::SemiMajorAxis),
+                8_000.0,
+            ),
+            0.0,
+        ),
+        (
+            Objective::new(StateParameter::Element(OrbitalElement::Eccentricity), 1e-4),
+            0.0,
+        ),
+        (
+            Objective::new(StateParameter::Element(OrbitalElement::Inclination), 35.0),
+            0.0,
+        ),
+    ],
+    max_eclipse_prct: Some(0.5),}, "Ruggiero")]
+#[case(GuidanceConfig::Kluever {
+    thruster_model: "HET".to_string(),
+    objectives: vec![
+        (
+            Objective::new(
+                StateParameter::Element(OrbitalElement::SemiMajorAxis),
+                7_300.0,
+            ),
+            1.0,
+        ),
+        (
+            Objective::new(StateParameter::Element(OrbitalElement::Eccentricity), 1e-4),
+            1.0,
+        ),
+    ],
+    max_eclipse_prct: Some(0.5),
+},
+    GuidanceConfig::Kluever {
+    thruster_model: "HET".to_string(),
+    objectives: vec![
+        (
+            Objective::new(
+                StateParameter::Element(OrbitalElement::SemiMajorAxis),
+                8_000.0,
+            ),
+            1.0,
+        ),
+        (
+            Objective::new(StateParameter::Element(OrbitalElement::Eccentricity), 1e-4),
+            1.0,
+        ),
+        (
+            Objective::new(StateParameter::Element(OrbitalElement::Inclination), 35.0),
+            1.0,
+        ),
+    ],
+    max_eclipse_prct: Some(0.5),}, "Kluever")]
+fn spacecraft_low_thrust_orbit_raise(
+    #[case] first_raise: GuidanceConfig,
+    #[case] second_raise: GuidanceConfig,
+    #[case] alias: &'static str,
+    almanac: Arc<Almanac>,
+) {
+    let _ = pel::try_init();
+    // The sequence is in ABSOLUTE epochs, so let's define the starting epoch now.
+    let epoch = Epoch::from_gregorian_utc_at_midnight(2010, 12, 21);
+
+    // Build an orbit raising sequence from deployment until station.
+    let mut sc_seq = SpacecraftSequence::default();
+    // Build the propagators.
+    sc_seq.propagators.insert(
+        "Earth MPOP".to_string(),
+        PropagatorConfig {
+            method: IntegratorMethod::DormandPrince78,
+            options: IntegratorOptions::builder()
+                .min_step(Unit::Second * 1)
+                .build(),
+            accel_models: AccelModels {
+                point_masses: Some(PointMasses::new(vec![EARTH, MOON])),
+                gravity_field: Some((
+                    GravityFieldConfig {
+                        filepath: "data/01_planetary/EGM2008_to2190_TideFree.gz".into(),
+                        gunzipped: true,
+                        degree: 8,
+                        order: 8,
+                    },
+                    IAU_EARTH_FRAME.into(),
+                )),
+            },
+            force_models: ForceModels {
+                solar_pressure: None,
+                drag: Some(Drag::std_atm1976(almanac.clone()).unwrap()),
+            },
+        },
+    );
+
+    // Setup the thruster models
+    sc_seq.thruster_sets.insert(
+        "HET".to_string(),
+        Thruster {
+            thrust_N: 0.5,
+            isp_s: 3000.0,
+        },
+    );
+
+    // Setup the spacecraft sequence
+    sc_seq.seq.insert(
+        epoch,
+        Phase::Activity {
+            name: "Parking orbit checkout".to_string(),
+            propagator: "Earth MPOP".into(),
+            guidance: None,
+            on_entry: None,
+            disabled: false,
+        },
+    );
+
+    sc_seq.seq.insert(
+        epoch + Unit::Hour * 1.5,
+        Phase::Activity {
+            name: "Separation and vehicle checkout".to_string(),
+            propagator: "Earth MPOP".to_string(),
+            guidance: None,
+            on_entry: Some(Box::new(DiscreteEvent::Staging {
+                impulsive_maneuver: Some(ImpulsiveManeuver {
+                    dv_km_s: Vector3::new(25.0e-6, 0.0, 0.0),
+                    local_frame: LocalFrame::VNC,
+                }),
+                decrement_properties: None,
+            })),
+            disabled: false,
+        },
+    );
+
+    sc_seq.seq.insert(
+        epoch + Unit::Day * 1 + Unit::Hour * 1.5,
+        Phase::Activity {
+            name: format!("Raise to higher checkout for {alias}"),
+            propagator: "Earth MPOP".to_string(),
+            guidance: Some(Box::new(first_raise)),
+            on_entry: None,
+            disabled: false,
+        },
+    );
+
+    sc_seq.seq.insert(
+        epoch + Unit::Day * 30,
+        Phase::Activity {
+            name: format!("Raise to station for {alias}"),
+            propagator: "Earth MPOP".to_string(),
+            guidance: Some(Box::new(second_raise)),
+            on_entry: None,
+            disabled: false,
+        },
+    );
+
+    // All sequences MUST end with a Terminate phase.
+    sc_seq.seq.insert(epoch + Unit::Day * 90, Phase::Terminate);
 
     // Initialize the propagators.
     sc_seq.setup(almanac.clone()).unwrap();
