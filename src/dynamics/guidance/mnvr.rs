@@ -40,6 +40,12 @@ pub struct ImpulsiveManeuver {
     pub dv_km_s: Vector3<f64>,
 }
 
+impl fmt::Display for ImpulsiveManeuver {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:.3} m/s in {:?}", self.dv_km_s * 1e3, self.local_frame)
+    }
+}
+
 /// Maneuver defines a single maneuver. Direction MUST be in the VNC frame (Velocity / Normal / Cross).
 /// It may be used with a maneuver scheduler.
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]

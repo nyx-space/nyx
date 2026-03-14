@@ -25,9 +25,10 @@ use indexmap::IndexMap;
 use log::info;
 use snafu::ResultExt;
 
+use crate::dynamics::sequence::discrete_event::DiscreteEvent;
 use crate::dynamics::{guidance::Thruster, SpacecraftDynamics};
 use crate::dynamics::{GravityField, OrbitalDynamics};
-use crate::errors::FromPropSnafu;
+use crate::errors::{FromAlmanacSnafu, FromPropSnafu};
 use crate::io::gravity::GravityFieldData;
 use crate::md::Trajectory;
 use crate::propagators::Propagator;
@@ -37,26 +38,25 @@ pub mod config;
 pub mod discrete_event;
 
 use config::*;
-use discrete_event::*;
 
 #[derive(Clone, Debug)]
-pub struct SpacecraftPlan {
-    pub timeline: BTreeMap<Epoch, TimelinePhase>,
+pub struct SpacecraftSequence {
+    pub seq: BTreeMap<Epoch, Phase>,
     pub thruster_sets: IndexMap<String, Thruster>,
     pub propagators: IndexMap<String, PropagatorConfig>,
     prop_setups: IndexMap<String, Propagator<SpacecraftDynamics>>,
 }
 
-impl SpacecraftPlan {
+impl SpacecraftSequence {
     pub fn validate(&self) -> Result<(), String> {
         // Check that the last statement is a terminate
-        if let Some((_, TimelinePhase::Phase { .. })) = self.timeline.iter().last() {
+        if let Some((_, Phase::Phase { .. })) = self.seq.iter().last() {
             return Err("final phase must be a Terminate".into());
         }
 
         // Check that all of the thruster set indexes reference an available thruster
-        for (epoch, phase) in &self.timeline {
-            if let TimelinePhase::Phase {
+        for (epoch, phase) in &self.seq {
+            if let Phase::Phase {
                 name: _,
                 propagator,
                 guidance,
@@ -85,8 +85,8 @@ impl SpacecraftPlan {
         // Don't set up anything if this is not a valid timeline
         self.validate()?;
 
-        for phase in self.timeline.values() {
-            if let TimelinePhase::Phase {
+        for phase in self.seq.values() {
+            if let Phase::Phase {
                 name: _,
                 propagator,
                 guidance: _,
@@ -143,17 +143,17 @@ impl SpacecraftPlan {
         until_phase: Option<String>,
         almanac: Arc<Almanac>,
     ) -> Result<Trajectory, NyxError> {
-        let mut phase_iterator = self.timeline.range(state.epoch()..).peekable();
+        let mut phase_iterator = self.seq.range(state.epoch()..).peekable();
 
         let mut traj = Trajectory::new();
 
         while let Some((epoch, phase)) = phase_iterator.next() {
             match phase {
-                TimelinePhase::Terminate => {
+                Phase::Terminate => {
                     info!("[{epoch}] plan completed");
                     return Ok(traj);
                 }
-                TimelinePhase::Phase {
+                Phase::Phase {
                     name,
                     propagator,
                     guidance,
@@ -169,7 +169,82 @@ impl SpacecraftPlan {
 
                     if !disabled {
                         info!("[{epoch}] executing {name}");
-                        // TODO: Apply the on_entry condition
+                        if let Some(discrete_event) = on_entry {
+                            match &**discrete_event {
+                                DiscreteEvent::CentralBodySwap { new_central_body } => {
+                                    if !new_central_body.orient_origin_match(state.orbit.frame)
+                                        || new_central_body.ephem_origin_match(state.orbit.frame)
+                                    {
+                                        state = state.with_orbit(
+                                            almanac
+                                                .translate_to(state.orbit, *new_central_body, None)
+                                                .map_err(|source| {
+                                                    anise::errors::AlmanacError::Ephemeris {
+                                                        action: "central body swap",
+                                                        source: Box::new(source),
+                                                    }
+                                                })
+                                                .context(FromAlmanacSnafu {
+                                                    action: "central body swap",
+                                                })?,
+                                        );
+                                        info!(
+                                            "[{epoch}] central body swapped to {new_central_body}"
+                                        );
+                                    }
+                                }
+                                DiscreteEvent::Staging {
+                                    impulsive_maneuver,
+                                    decrement_properties,
+                                } => {
+                                    if let Some(mnvr) = impulsive_maneuver {
+                                        info!("[{epoch}] staging, with maneuver {mnvr}");
+                                        state = state
+                                            .with_orbit(state.orbit.with_dv_km_s(mnvr.dv_km_s));
+                                    }
+                                    if let Some(decr) = decrement_properties {
+                                        if let Some(mass) = decr.mass {
+                                            state.mass.dry_mass_kg -= mass.dry_mass_kg;
+                                            state.mass.prop_mass_kg -= mass.prop_mass_kg;
+                                            state.mass.extra_mass_kg -= mass.extra_mass_kg;
+                                        }
+                                        if let Some(srp) = decr.srp {
+                                            state.srp.area_m2 -= srp.area_m2;
+                                            state.srp.coeff_reflectivity -= srp.coeff_reflectivity;
+                                        }
+                                        if let Some(drag) = decr.drag {
+                                            state.drag.area_m2 -= drag.area_m2;
+                                            state.drag.coeff_drag -= drag.coeff_drag;
+                                        }
+                                    }
+                                }
+                                DiscreteEvent::Docking {
+                                    impulsive_maneuver,
+                                    increment_properties,
+                                } => {
+                                    if let Some(mnvr) = impulsive_maneuver {
+                                        info!("[{epoch}] docking, with maneuver {mnvr}");
+                                        state = state
+                                            .with_orbit(state.orbit.with_dv_km_s(mnvr.dv_km_s));
+                                    }
+                                    if let Some(incr) = increment_properties {
+                                        if let Some(mass) = incr.mass {
+                                            state.mass.dry_mass_kg += mass.dry_mass_kg;
+                                            state.mass.prop_mass_kg += mass.prop_mass_kg;
+                                            state.mass.extra_mass_kg += mass.extra_mass_kg;
+                                        }
+                                        if let Some(srp) = incr.srp {
+                                            state.srp.area_m2 += srp.area_m2;
+                                            state.srp.coeff_reflectivity += srp.coeff_reflectivity;
+                                        }
+                                        if let Some(drag) = incr.drag {
+                                            state.drag.area_m2 += drag.area_m2;
+                                            state.drag.coeff_drag += drag.coeff_drag;
+                                        }
+                                    }
+                                }
+                            }
+                        }
 
                         let end_time = phase_iterator
                             .peek()
@@ -183,9 +258,10 @@ impl SpacecraftPlan {
                             match &**guid_cfg {
                                 GuidanceConfig::FiniteBurn {
                                     maneuver,
-                                    thruster_model: _,
+                                    thruster_model,
                                 } => {
                                     setup.dynamics.guid_law = Some(Arc::new(*maneuver));
+                                    state.thruster = Some(self.thruster_sets[thruster_model]);
                                 }
                                 _ => unimplemented!(),
                             }

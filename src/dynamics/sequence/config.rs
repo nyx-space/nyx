@@ -24,10 +24,10 @@ use crate::{
     propagators::{IntegratorMethod, IntegratorOptions},
 };
 
-use crate::dynamics::timeline::DiscreteEvent;
+use crate::dynamics::sequence::discrete_event::DiscreteEvent;
 
 #[derive(Clone, Debug)]
-pub enum TimelinePhase {
+pub enum Phase {
     Terminate,
     Phase {
         name: String,
