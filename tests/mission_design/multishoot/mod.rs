@@ -21,7 +21,7 @@ fn almanac() -> Arc<Almanac> {
 }
 
 #[rstest]
-fn alt_orbit_raising_cov_test(almanac: Arc<Almanac>) {
+fn alt_orbit_raising(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
     let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
     let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();

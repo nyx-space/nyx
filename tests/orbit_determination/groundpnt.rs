@@ -33,7 +33,7 @@ fn almanac() -> Arc<Almanac> {
 }
 
 #[rstest]
-fn ground_pnt_lunar_cov_test(almanac: Arc<Almanac>) {
+fn ground_pnt_lunar(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
     let moon_iau = almanac.frame_info(IAU_MOON_FRAME).unwrap();

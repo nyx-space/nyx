@@ -32,7 +32,7 @@ fn almanac() -> Arc<Almanac> {
 /// format and then feed it tracking data for estimation.
 #[rstest]
 fn spacecraft_sequence(almanac: Arc<Almanac>) {
-    pel::init();
+    let _ = pel::try_init();
     // The sequence is in ABSOLUTE epochs, so let's define the starting epoch now.
     let epoch = Epoch::from_gregorian_utc_at_midnight(2010, 12, 21);
 

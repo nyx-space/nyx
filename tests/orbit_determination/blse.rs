@@ -33,7 +33,7 @@ fn almanac() -> Arc<Almanac> {
 #[case(BLSSolver::LevenbergMarquardt, 10.seconds(), 10.minutes(), false)]
 #[case(BLSSolver::NormalEquations, 60.seconds(), 2.minutes(), true)]
 // #[case(BLSSolver::LevenbergMarquardt, 10.seconds(), 10.minutes(), true)]
-fn blse_robust_large_disp_cov_test(
+fn blse_robust_large_disp(
     #[case] solver: BLSSolver,
     #[case] sample: Duration,
     #[case] offset: Duration,

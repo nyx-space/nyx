@@ -258,7 +258,7 @@ fn od_val_sc_mb_srp_reals_duals_models(
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn od_val_sc_srp_estimation_cov_test(
+fn od_val_sc_srp_estimation(
     almanac: Arc<Almanac>,
     sim_devices: BTreeMap<String, GroundStation>,
     proc_devices: BTreeMap<String, GroundStation>,

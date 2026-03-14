@@ -210,7 +210,7 @@ fn trkconfig_invalid(traj: Traj<Spacecraft>, devices: BTreeMap<String, GroundSta
 
 /// Test a delayed start of the configuration
 #[rstest]
-fn trkconfig_delayed_start_cov_test(
+fn trkconfig_delayed_start(
     traj: Traj<Spacecraft>,
     mut devices: BTreeMap<String, GroundStation>,
     almanac: Arc<Almanac>,
