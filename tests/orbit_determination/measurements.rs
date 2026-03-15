@@ -549,7 +549,7 @@ fn val_measurement_noise(almanac: Arc<Almanac>) {
         // We expect 99.7% to be in-family for 3-sigma -- but we allow a larger deviation
         println!("percentage IN FAMILY for {msr_type:?} = {prct_in_family:.4} %");
 
-        assert!((prct_in_family - 99.1).abs() < 0.3);
+        assert!(prct_in_family > 99.1);
     }
 
     let hdrs = vec![
