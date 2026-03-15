@@ -3,7 +3,7 @@ extern crate nyx_space as nyx;
 use anise::astro::Occultation;
 use anise::constants::celestial_objects::{JUPITER_BARYCENTER, SUN};
 use anise::constants::frames::SUN_J2000;
-use nyx::cosmic::eclipse::EclipseLocator;
+use nyx::cosmic::eclipse::ShadowModel;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::SpacecraftDynamics;
@@ -47,7 +47,7 @@ fn leo_sun_earth_eclipses(almanac: Arc<Almanac>) {
     });
 
     // Initialize the EclipseLocator
-    let e_loc = EclipseLocator {
+    let e_loc = ShadowModel {
         light_source: almanac.frame_info(SUN_J2000).unwrap(),
         shadow_bodies: vec![eme2k],
     };
@@ -99,7 +99,7 @@ fn geo_sun_earth_eclipses(almanac: Arc<Almanac>) {
     });
 
     // Initialize the EclipseLocator
-    let e_loc = EclipseLocator {
+    let e_loc = ShadowModel {
         light_source: almanac.frame_info(SUN_J2000).unwrap(),
         shadow_bodies: vec![eme2k],
     };

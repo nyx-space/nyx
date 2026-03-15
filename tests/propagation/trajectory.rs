@@ -28,7 +28,7 @@ fn almanac() -> Arc<Almanac> {
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn traj_ephem_forward_cov_test(almanac: Arc<Almanac>) {
+fn traj_ephem_forward(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
     // Test that we can correctly interpolate a spacecraft orbit
 

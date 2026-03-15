@@ -32,6 +32,20 @@ use snafu::ResultExt;
 use std::fmt;
 use std::sync::Arc;
 
+/// Impulsive maneuver defines an instantaneous state change which causes a discontinuity in the trajectory.
+/// While useful for preliminary design, it is not typically relevant for spaceflight operations
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ImpulsiveManeuver {
+    pub local_frame: LocalFrame,
+    pub dv_km_s: Vector3<f64>,
+}
+
+impl fmt::Display for ImpulsiveManeuver {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:.3} m/s in {:?}", self.dv_km_s * 1e3, self.local_frame)
+    }
+}
+
 /// Maneuver defines a single maneuver. Direction MUST be in the VNC frame (Velocity / Normal / Cross).
 /// It may be used with a maneuver scheduler.
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]

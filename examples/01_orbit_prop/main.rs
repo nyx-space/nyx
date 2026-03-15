@@ -14,8 +14,8 @@ use hifitime::{Epoch, Unit};
 use log::warn;
 use nyx::{
     cosmic::{Mass, MetaAlmanac, Orbit, SRPData},
-    dynamics::{Harmonics, OrbitalDynamics, SolarPressure, SpacecraftDynamics},
-    io::{gravity::HarmonicsMem, ExportCfg},
+    dynamics::{GravityField, OrbitalDynamics, SolarPressure, SpacecraftDynamics},
+    io::{gravity::GravityFieldData, ExportCfg},
     od::GroundStation,
     propagators::Propagator,
     Spacecraft, State,
@@ -120,9 +120,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Build the spherical harmonics.
     // The harmonics must be computed in the body fixed frame.
     // We're using the long term prediction of the Earth centered Earth fixed frame, IAU Earth.
-    let harmonics_21x21 = Harmonics::from_stor(
+    let harmonics_21x21 = GravityField::from_stor(
         almanac.frame_info(IAU_EARTH_FRAME)?,
-        HarmonicsMem::from_cof(&jgm3_meta.uri, 21, 21, true).unwrap(),
+        GravityFieldData::from_cof(&jgm3_meta.uri, 21, 21, true).unwrap(),
     );
 
     // Include the spherical harmonics into the orbital dynamics.
@@ -130,7 +130,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // We define the solar radiation pressure, using the default solar flux and accounting only
     // for the eclipsing caused by the Earth.
-    let srp_dyn = SolarPressure::default(EARTH_J2000, almanac.clone())?;
+    let srp_dyn = SolarPressure::default_flux(EARTH_J2000, almanac.clone())?;
 
     // Finalize setting up the dynamics, specifying the force models (orbital_dyn) separately from the
     // acceleration models (SRP in this case). Use `from_models` to specify multiple accel models.
@@ -180,6 +180,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     trajectory.to_oem_file(
         "./01_cubesat_hf_prop.oem",
+        "CUBESAT-ID".to_string(),
+        Some("Nyx Space".to_string()),
+        Some("CUBESAT".to_string()),
         ExportCfg::builder().step(Unit::Minute * 2).build(),
     )?;
 

@@ -17,7 +17,7 @@ fn almanac() -> Arc<Almanac> {
 
 #[rstest]
 fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
-    use nyx::cosmic::eclipse::EclipseLocator;
+    use nyx::cosmic::eclipse::ShadowModel;
     use nyx::md::prelude::*;
     use nyx::od::GroundStation;
 
@@ -79,7 +79,7 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
     }
 
     // Find all eclipses!
-    let e_loc = EclipseLocator {
+    let e_loc = ShadowModel {
         light_source: SUN_J2000,
         shadow_bodies: vec![eme2k],
     };

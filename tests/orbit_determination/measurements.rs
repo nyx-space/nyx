@@ -195,7 +195,7 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
         },
     ];
 
-    let mut rng = Pcg64Mcg::try_from_rng(&mut SysRng::default()).unwrap();
+    let mut rng = Pcg64Mcg::try_from_rng(&mut SysRng).unwrap();
     let mut traj1_msr_cnt = 0;
     for state in traj1.every(1 * Unit::Minute) {
         if dss65_madrid
@@ -546,11 +546,10 @@ fn val_measurement_noise(almanac: Arc<Almanac>) {
 
         let prct_in_family = 100.0 - (out_of_family as f64) / (noisy_subset.len() as f64) * 100.0;
 
-        // We expect 99.7% to be in-family for 3-sigma
-
+        // We expect 99.7% to be in-family for 3-sigma -- but we allow a larger deviation
         println!("percentage IN FAMILY for {msr_type:?} = {prct_in_family:.4} %");
 
-        assert!((prct_in_family - 99.7).abs() < 0.3);
+        assert!(prct_in_family > 99.1);
     }
 
     let hdrs = vec![

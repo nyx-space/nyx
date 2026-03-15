@@ -202,7 +202,7 @@ fn conv_tgt_sma_ecc(almanac: Arc<Almanac>) {
 }
 
 #[rstest]
-fn tgt_hd_sma_ecc_cov_test(almanac: Arc<Almanac>) {
+fn tgt_hd_sma_ecc(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
     let eme2k = almanac.frame_info(EARTH_J2000).unwrap();

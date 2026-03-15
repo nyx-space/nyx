@@ -6,7 +6,7 @@ use anise::constants::frames::{EARTH_ITRF93, IAU_EARTH_FRAME};
 use hifitime::MJD_J2000;
 use nalgebra::{Const, OMatrix};
 use nyx::cosmic::{assert_orbit_eq_or_abs, Orbit};
-use nyx::dynamics::Harmonics;
+use nyx::dynamics::GravityField;
 use nyx::dynamics::{Dynamics, OrbitalDynamics, PointMasses, SpacecraftDynamics};
 use nyx::io::gravity::*;
 use nyx::linalg::Vector6;
@@ -873,8 +873,8 @@ fn val_earth_sph_harmonics_j2(almanac: Arc<Almanac>) {
         .unwrap()
         .with_mu_km3_s2(monte_earth_gm);
 
-    let earth_sph_harm = HarmonicsMem::from_j2(monte_earth_j2);
-    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm);
+    let earth_sph_harm = GravityFieldData::from_j2(monte_earth_j2);
+    let harmonics = GravityField::from_stor(iau_earth, earth_sph_harm);
 
     let dt = Epoch::from_mjd_tai(MJD_J2000);
     let state = Orbit::cartesian(
@@ -940,8 +940,8 @@ fn val_earth_sph_harmonics_12x12(almanac_gmat: Arc<Almanac>) {
     let itrf93 = almanac.frame_info(EARTH_ITRF93).unwrap();
 
     let earth_sph_harm =
-        HarmonicsMem::from_cof("data/01_planetary/JGM3.cof.gz", 12, 12, true).unwrap();
-    let harmonics = Harmonics::from_stor(itrf93, earth_sph_harm);
+        GravityFieldData::from_cof("data/01_planetary/JGM3.cof.gz", 12, 12, true).unwrap();
+    let harmonics = GravityField::from_stor(itrf93, earth_sph_harm);
 
     let dt = Epoch::from_mjd_tai(MJD_J2000);
     let state = Orbit::cartesian(
@@ -1026,8 +1026,8 @@ fn val_earth_sph_harmonics_70x70(almanac_gmat: Arc<Almanac>) {
     let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
 
     let earth_sph_harm =
-        HarmonicsMem::from_cof("data/01_planetary/JGM3.cof.gz", 70, 70, true).unwrap();
-    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm);
+        GravityFieldData::from_cof("data/01_planetary/JGM3.cof.gz", 70, 70, true).unwrap();
+    let harmonics = GravityField::from_stor(iau_earth, earth_sph_harm);
 
     let dt = Epoch::from_mjd_tai(MJD_J2000);
     let state = Orbit::cartesian(
@@ -1077,8 +1077,8 @@ fn val_earth_sph_harmonics_70x70_partials(almanac_gmat: Arc<Almanac>) {
     let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
 
     let earth_sph_harm =
-        HarmonicsMem::from_cof("data/01_planetary/JGM3.cof.gz", 70, 70, true).unwrap();
-    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm);
+        GravityFieldData::from_cof("data/01_planetary/JGM3.cof.gz", 70, 70, true).unwrap();
+    let harmonics = GravityField::from_stor(iau_earth, earth_sph_harm);
 
     let dt = Epoch::from_mjd_tai(MJD_J2000);
     let state = Orbit::cartesian(
@@ -1133,11 +1133,16 @@ fn val_ioastro_earth_egm2008_10x10(almanac: Arc<Almanac>) {
     );
 
     // Configure the EGM2008 model
-    let hh = HarmonicsMem::from_shadr("data/01_planetary/EGM2008_to2190_TideFree.gz", 10, 10, true)
-        .unwrap();
+    let hh = GravityFieldData::from_config(GravityFieldConfig {
+        filepath: "data/01_planetary/EGM2008_to2190_TideFree.gz".into(),
+        gunzipped: true,
+        degree: 10,
+        order: 10,
+    })
+    .unwrap();
 
     let mut orbital_dyn = OrbitalDynamics::point_masses(vec![SUN, MOON]);
-    orbital_dyn.accel_models.push(Harmonics::from_stor(
+    orbital_dyn.accel_models.push(GravityField::from_stor(
         almanac.frame_info(EARTH_ITRF93).unwrap(),
         hh,
     ));
@@ -1153,7 +1158,7 @@ fn val_ioastro_earth_egm2008_10x10(almanac: Arc<Almanac>) {
     );
 
     let final_state = setup
-        .with(orbit.into(), almanac.into())
+        .with(orbit.into(), almanac)
         .for_duration(Unit::Day * 1)
         .unwrap();
 
@@ -1191,15 +1196,15 @@ fn hf_prop(almanac: Arc<Almanac>) {
 
     extern crate pretty_env_logger;
     let _ = pretty_env_logger::try_init();
-    use nyx::dynamics::sph_harmonics::Harmonics;
+    use nyx::dynamics::sph_harmonics::GravityField;
     use nyx::io::gravity::*;
 
     let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
     let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
 
     let earth_sph_harm =
-        HarmonicsMem::from_cof("data/01_planetary/JGM3.cof.gz", 21, 21, true).unwrap();
-    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm);
+        GravityFieldData::from_cof("data/01_planetary/JGM3.cof.gz", 21, 21, true).unwrap();
+    let harmonics = GravityField::from_stor(iau_earth, earth_sph_harm);
 
     let dt = Epoch::from_mjd_tai(MJD_J2000);
     let state = Orbit::cartesian(

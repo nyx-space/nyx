@@ -26,7 +26,6 @@ use rand::rngs::SysRng;
 use rand::SeedableRng;
 use rand_pcg::Pcg64Mcg;
 
-use crate::dynamics::NyxError;
 use crate::io::ConfigError;
 use crate::md::trajectory::Interpolatable;
 use crate::od::msr::TrackingDataArc;
@@ -171,14 +170,14 @@ where
     pub fn generate_measurements(
         &mut self,
         almanac: Arc<Almanac>,
-    ) -> Result<TrackingDataArc, NyxError> {
+    ) -> Result<TrackingDataArc, ConfigError> {
         let mut measurements = BTreeMap::new();
 
         for (name, device) in self.devices.iter_mut() {
             if let Some(cfg) = self.configs.get(name) {
                 if cfg.scheduler.is_some() {
                     if cfg.strands.is_none() {
-                        return Err(NyxError::CustomError {
+                        return Err(ConfigError::InvalidConfig {
                             msg: format!(
                                 "schedule for {name} must be built before generating measurements"
                             ),

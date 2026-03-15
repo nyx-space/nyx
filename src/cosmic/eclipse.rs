@@ -26,13 +26,13 @@ pub use super::{Frame, Orbit, Spacecraft};
 use std::fmt;
 use std::sync::Arc;
 
-#[derive(Clone)]
-pub struct EclipseLocator {
+#[derive(Clone, Debug)]
+pub struct ShadowModel {
     pub light_source: Frame,
     pub shadow_bodies: Vec<Frame>,
 }
 
-impl fmt::Display for EclipseLocator {
+impl fmt::Display for ShadowModel {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let shadow_bodies: Vec<String> = self
             .shadow_bodies
@@ -48,7 +48,7 @@ impl fmt::Display for EclipseLocator {
     }
 }
 
-impl EclipseLocator {
+impl ShadowModel {
     /// Creates a new typical eclipse locator.
     /// The light source is the Sun, and the shadow bodies are the Earth and the Moon.
     pub fn cislunar(almanac: Arc<Almanac>) -> Self {

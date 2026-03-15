@@ -26,7 +26,7 @@ use super::{
     unit_vector_from_plane_angles, GuidStateSnafu, GuidanceError, GuidanceLaw, GuidanceMode,
     GuidancePhysicsSnafu, NyxError, Orbit, Spacecraft, Vector3,
 };
-use crate::cosmic::eclipse::EclipseLocator;
+use crate::cosmic::eclipse::ShadowModel;
 pub use crate::md::objective::Objective;
 pub use crate::md::StateParameter;
 use crate::State;
@@ -35,15 +35,13 @@ use std::fmt;
 use std::sync::Arc;
 
 /// Ruggiero defines the closed loop guidance law from IEPC 2011-102
-#[derive(Copy, Clone, Default, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct Ruggiero {
-    /// Stores the objectives
-    pub objectives: [Option<Objective>; 5],
-    /// Stores the minimum efficiency to correct a given orbital element, defaults to zero (i.e. always correct)
-    pub ηthresholds: [f64; 5],
+    /// Stores the objectives, and their associated efficiency threshold (set to zero if not minimum efficiency).
+    pub objectives: Vec<(Objective, f64)>,
     /// If defined, coast until vehicle is out of the provided eclipse state.
     pub max_eclipse_prct: Option<f64>,
-    init_state: Spacecraft,
+    pub init_state: Spacecraft,
 }
 
 /// The Ruggiero is a locally optimal guidance law of a state for specific osculating elements.
@@ -64,8 +62,7 @@ impl Ruggiero {
         ηthresholds: &[f64],
         initial: Spacecraft,
     ) -> Result<Arc<Self>, NyxError> {
-        let mut objs: [Option<Objective>; 5] = [None, None, None, None, None];
-        let mut eff: [f64; 5] = [0.0; 5];
+        let mut objs = Vec::with_capacity(5);
         if objectives.len() > 5 || objectives.is_empty() {
             return Err(NyxError::GuidanceConfigError {
                 msg: format!(
@@ -83,7 +80,7 @@ impl Ruggiero {
             });
         }
 
-        for (i, obj) in objectives.iter().enumerate() {
+        for (obj, ηthreshold) in objectives.iter().copied().zip(ηthresholds.iter().copied()) {
             if [
                 StateParameter::Element(OrbitalElement::SemiMajorAxis),
                 StateParameter::Element(OrbitalElement::Eccentricity),
@@ -93,21 +90,16 @@ impl Ruggiero {
             ]
             .contains(&obj.parameter)
             {
-                objs[i] = Some(*obj);
+                objs.push((obj, ηthreshold));
             } else {
                 return Err(NyxError::GuidanceConfigError {
                     msg: format!("Objective {} not supported in Ruggerio", obj.parameter),
                 });
             }
         }
-        for i in 0..objectives.len() {
-            objs[i] = Some(objectives[i]);
-            eff[i] = ηthresholds[i];
-        }
         Ok(Arc::new(Self {
             objectives: objs,
             init_state: initial,
-            ηthresholds: eff,
             max_eclipse_prct: None,
         }))
     }
@@ -119,8 +111,7 @@ impl Ruggiero {
         initial: Spacecraft,
         max_eclipse: f64,
     ) -> Result<Arc<Self>, NyxError> {
-        let mut objs: [Option<Objective>; 5] = [None, None, None, None, None];
-        let eff: [f64; 5] = [0.0; 5];
+        let mut objs = Vec::with_capacity(5);
         if objectives.len() > 5 || objectives.is_empty() {
             return Err(NyxError::GuidanceConfigError {
                 msg: format!(
@@ -129,8 +120,7 @@ impl Ruggiero {
                 ),
             });
         }
-
-        for (i, obj) in objectives.iter().enumerate() {
+        for obj in objectives {
             if [
                 StateParameter::Element(OrbitalElement::SemiMajorAxis),
                 StateParameter::Element(OrbitalElement::Eccentricity),
@@ -140,20 +130,16 @@ impl Ruggiero {
             ]
             .contains(&obj.parameter)
             {
-                objs[i] = Some(*obj);
+                objs.push((*obj, 0.0));
             } else {
                 return Err(NyxError::GuidanceConfigError {
                     msg: format!("Objective {} not supported in Ruggerio", obj.parameter),
                 });
             }
         }
-        for i in 0..objectives.len() {
-            objs[i] = Some(objectives[i]);
-        }
         Ok(Arc::new(Self {
             objectives: objs,
             init_state: initial,
-            ηthresholds: eff,
             max_eclipse_prct: Some(max_eclipse),
         }))
     }
@@ -248,8 +234,7 @@ impl Ruggiero {
     pub fn status(&self, state: &Spacecraft) -> Vec<String> {
         self.objectives
             .iter()
-            .flatten()
-            .map(|obj| {
+            .map(|(obj, _)| {
                 let (ok, err) = obj.assess(state).unwrap();
                 format!(
                     "{} achieved: {}\t error = {:.5} {}",
@@ -268,8 +253,7 @@ impl fmt::Display for Ruggiero {
         let obj_msg = self
             .objectives
             .iter()
-            .flatten()
-            .map(|obj| format!("{obj}"))
+            .map(|(obj, _)| format!("{obj}"))
             .collect::<Vec<String>>();
         write!(
             f,
@@ -286,7 +270,7 @@ impl fmt::Display for Ruggiero {
 impl GuidanceLaw for Ruggiero {
     /// Returns whether the guidance law has achieved all goals
     fn achieved(&self, state: &Spacecraft) -> Result<bool, GuidanceError> {
-        for obj in self.objectives.iter().flatten() {
+        for (obj, _) in self.objectives.iter() {
             if !obj
                 .assess_value(state.value(obj.parameter).context(GuidStateSnafu)?)
                 .0
@@ -301,8 +285,8 @@ impl GuidanceLaw for Ruggiero {
         if sc.mode() == GuidanceMode::Thrust {
             let osc = sc.orbit;
             let mut steering = Vector3::zeros();
-            for (i, obj) in self.objectives.iter().flatten().enumerate() {
-                let weight = self.weighting(obj, sc, self.ηthresholds[i]);
+            for (obj, ηthreshold) in &self.objectives {
+                let weight = self.weighting(obj, sc, *ηthreshold);
                 if weight.abs() <= 0.0 {
                     continue;
                 }
@@ -429,7 +413,7 @@ impl GuidanceLaw for Ruggiero {
             if !self.achieved(sc).unwrap() {
                 // Check eclipse state if applicable.
                 if let Some(max_eclipse) = self.max_eclipse_prct {
-                    let locator = EclipseLocator::cislunar(almanac.clone());
+                    let locator = ShadowModel::cislunar(almanac.clone());
                     if locator
                         .compute(sc.orbit, almanac)
                         .expect("cannot compute eclipse")

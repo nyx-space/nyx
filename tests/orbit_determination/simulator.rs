@@ -127,7 +127,7 @@ fn tracking_data(
 }
 
 #[rstest]
-fn continuous_tracking_cov_test(tracking_data: TrackingDataArc) {
+fn continuous_tracking(tracking_data: TrackingDataArc) {
     let arc = tracking_data;
 
     let _ = pretty_env_logger::try_init();
@@ -221,7 +221,7 @@ fn continuous_tracking_cov_test(tracking_data: TrackingDataArc) {
 }
 
 #[rstest]
-fn od_with_modulus_cov_test(
+fn od_with_modulus(
     spacecraft: Spacecraft,
     tracking_data: TrackingDataArc,
     mut devices: BTreeMap<String, GroundStation>,
@@ -331,7 +331,7 @@ fn od_with_modulus_cov_test(
 }
 
 #[rstest]
-fn od_with_modulus_as_bias_cov_test(
+fn od_with_modulus_as_bias(
     spacecraft: Spacecraft,
     mut tracking_data: TrackingDataArc,
     mut devices: BTreeMap<String, GroundStation>,

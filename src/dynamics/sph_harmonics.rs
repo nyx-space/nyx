@@ -22,7 +22,7 @@ use snafu::ResultExt;
 
 use crate::cosmic::{AstroPhysicsSnafu, Frame, Orbit};
 use crate::dynamics::AccelModel;
-use crate::io::gravity::HarmonicsMem;
+use crate::io::gravity::GravityFieldData;
 use crate::linalg::{DMatrix, Matrix3, Vector3, Vector4, U7};
 use hyperdual::linalg::norm;
 use hyperdual::{hyperspace_from_vector, Float, OHyperdual};
@@ -33,9 +33,9 @@ use std::sync::Arc;
 use super::{DynamicsAlmanacSnafu, DynamicsAstroSnafu, DynamicsError};
 
 #[derive(Clone)]
-pub struct Harmonics {
+pub struct GravityField {
     compute_frame: Frame,
-    stor: HarmonicsMem,
+    stor: GravityFieldData,
     a_nm: DMatrix<f64>,
     b_nm: DMatrix<f64>,
     c_nm: DMatrix<f64>,
@@ -48,9 +48,9 @@ pub struct Harmonics {
     vr11_h: DMatrix<OHyperdual<f64, U7>>,
 }
 
-impl Harmonics {
+impl GravityField {
     /// Create a new Harmonics dynamical model from the provided gravity potential storage instance.
-    pub fn from_stor(compute_frame: Frame, stor: HarmonicsMem) -> Arc<Self> {
+    pub fn from_stor(compute_frame: Frame, stor: GravityFieldData) -> Arc<Self> {
         let degree_np2 = stor.max_degree_n() + 2;
         let mut a_nm = DMatrix::from_element(degree_np2 + 1, degree_np2 + 1, 0.0);
         let mut b_nm = DMatrix::from_element(degree_np2, degree_np2, 0.0);
@@ -134,7 +134,7 @@ impl Harmonics {
     }
 }
 
-impl fmt::Display for Harmonics {
+impl fmt::Display for GravityField {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -146,7 +146,7 @@ impl fmt::Display for Harmonics {
     }
 }
 
-impl AccelModel for Harmonics {
+impl AccelModel for GravityField {
     fn eom(&self, osc: &Orbit, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
         // Convert the osculating orbit to the correct frame (needed for multiple harmonic fields)
         let state = almanac

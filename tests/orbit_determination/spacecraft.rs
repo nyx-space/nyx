@@ -118,7 +118,7 @@ fn od_val_sc_mb_srp_reals_duals_models(
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
     let sc_dynamics = SpacecraftDynamics::from_model(
         orbital_dyn,
-        SolarPressure::default(eme2k, almanac.clone()).unwrap(),
+        SolarPressure::default_flux(eme2k, almanac.clone()).unwrap(),
     );
 
     let sc_init_state = Spacecraft::from_srp_defaults(initial_state, dry_mass_kg, sc_area);
@@ -258,7 +258,7 @@ fn od_val_sc_mb_srp_reals_duals_models(
 
 #[allow(clippy::identity_op)]
 #[rstest]
-fn od_val_sc_srp_estimation_cov_test(
+fn od_val_sc_srp_estimation(
     almanac: Arc<Almanac>,
     sim_devices: BTreeMap<String, GroundStation>,
     proc_devices: BTreeMap<String, GroundStation>,
@@ -286,7 +286,7 @@ fn od_val_sc_srp_estimation_cov_test(
     let orbital_dyn = OrbitalDynamics::point_masses(bodies);
     let sc_dynamics = SpacecraftDynamics::from_model(
         orbital_dyn,
-        SolarPressure::default(eme2k, almanac.clone()).unwrap(),
+        SolarPressure::default_flux(eme2k, almanac.clone()).unwrap(),
     );
 
     let truth_cr = 1.123;

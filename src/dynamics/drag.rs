@@ -100,7 +100,7 @@ impl ForceModel for ConstantDrag {
 }
 
 /// `Drag` implements all three drag models.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Drag {
     /// Density computation method
     pub density: AtmDensity,

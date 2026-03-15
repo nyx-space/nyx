@@ -39,7 +39,7 @@ fn almanac() -> Arc<Almanac> {
 #[rstest]
 #[case(false)]
 #[case(true)]
-fn interlink_nrho_llo_cov_test(#[case] disperse: bool, almanac: Arc<Almanac>) {
+fn interlink_nrho_llo(#[case] disperse: bool, almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
     let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
