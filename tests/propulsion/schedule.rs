@@ -1,7 +1,10 @@
 extern crate nyx_space as nyx;
 use self::nyx::cosmic::{GuidanceMode, Orbit, Spacecraft};
-use self::nyx::dynamics::guidance::{FiniteBurns, Maneuver, Thruster};
-use self::nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
+use self::nyx::dynamics::guidance::{Maneuver, Thruster};
+use self::nyx::dynamics::sequence::{
+    AccelModels, ForceModels, GuidanceConfig, Phase, PropagatorConfig, SpacecraftSequence,
+};
+use self::nyx::dynamics::{OrbitalDynamics, PointMasses, SpacecraftDynamics};
 use self::nyx::linalg::Vector3;
 use self::nyx::propagators::{IntegratorOptions, Propagator};
 use self::nyx::time::{Epoch, Unit};
@@ -22,11 +25,6 @@ fn almanac() -> Arc<Almanac> {
 
 #[rstest]
 fn val_transfer_schedule_no_depl(almanac: Arc<Almanac>) {
-    /*
-        NOTE: Due to how lifetime of variables work in Rust, we need to define all of the
-        components of a spacecraft before defining the spacecraft itself.
-    */
-
     let eme2k = almanac
         .frame_info(EARTH_J2000)
         .unwrap()
@@ -52,10 +50,6 @@ fn val_transfer_schedule_no_depl(almanac: Arc<Almanac>) {
 
     let end_time = start_time + prop_time;
 
-    // Define the dynamics
-    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
-    let orbital_dyn = OrbitalDynamics::point_masses(bodies);
-
     // Define the maneuver and its schedule
     let mnvr0 = Maneuver::from_time_invariant(
         Epoch::from_gregorian_tai_at_midnight(2002, 1, 1),
@@ -65,17 +59,49 @@ fn val_transfer_schedule_no_depl(almanac: Arc<Almanac>) {
         LocalFrame::VNC,
     );
 
-    let schedule = FiniteBurns::from_mnvrs(vec![mnvr0]);
+    let mut sc_seq = SpacecraftSequence::default();
 
-    // And create the spacecraft with that controller
-    // Disable prop mass decrement
-    let sc = SpacecraftDynamics::from_guidance_law_no_decr(orbital_dyn, schedule);
-    // Setup a propagator, and propagate for that duration
-    // NOTE: We specify the use an RK89 to match the GMAT setup.
-    let final_state = Propagator::rk89(sc, IntegratorOptions::with_fixed_step(10.0 * Unit::Second))
-        .with(sc_state, almanac)
-        .for_duration(prop_time)
-        .unwrap();
+    sc_seq.propagators.insert(
+        "Earth".to_string(),
+        PropagatorConfig {
+            method: nyx::propagators::IntegratorMethod::RungeKutta89,
+            options: IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
+            accel_models: AccelModels {
+                point_masses: Some(PointMasses::new(vec![MOON, SUN, JUPITER_BARYCENTER])),
+                gravity_field: None,
+            },
+            force_models: ForceModels {
+                solar_pressure: None,
+                drag: None,
+            },
+        },
+    );
+
+    sc_seq
+        .thruster_sets
+        .insert("Monoprop".to_string(), monoprop);
+
+    sc_seq.seq.insert(
+        start_time,
+        Phase::Activity {
+            name: "Burn".to_string(),
+            propagator: "Earth".to_string(),
+            guidance: Some(Box::new(GuidanceConfig::FiniteBurn {
+                maneuver: mnvr0,
+                thruster_model: "Monoprop".to_string(),
+                disable_prop_mass: true,
+            })),
+            on_entry: None,
+            disabled: false,
+        },
+    );
+
+    sc_seq.seq.insert(end_time, Phase::Terminate);
+
+    sc_seq.setup(almanac.clone()).unwrap();
+
+    let trajectories = sc_seq.propagate(sc_state, None, almanac).unwrap();
+    let final_state = trajectories.last().unwrap().last();
 
     // Compute the errors
     let rslt = Orbit::cartesian(
@@ -141,7 +167,7 @@ fn val_transfer_schedule_depl(almanac: Arc<Almanac>) {
 
     // Define the dynamics
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
-    let orbital_dyn = OrbitalDynamics::point_masses(bodies);
+    let orbital_dyn = OrbitalDynamics::point_masses(bodies.clone());
 
     // With 100% thrust: RSS errors:     pos = 3.14651e1 km      vel = 3.75245e-2 km/s
 
@@ -154,17 +180,49 @@ fn val_transfer_schedule_depl(almanac: Arc<Almanac>) {
         LocalFrame::VNC,
     );
 
-    let schedule = FiniteBurns::from_mnvrs(vec![mnvr0]);
+    let mut sc_seq = SpacecraftSequence::default();
 
-    // And create the spacecraft with that controller
-    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, schedule);
-    // Setup a propagator, and propagate for that duration
-    // NOTE: We specify the use an RK89 to match the GMAT setup.
-    let setup = Propagator::rk89(sc, IntegratorOptions::with_fixed_step(10.0 * Unit::Second));
-    let final_state = setup
-        .with(sc_state, almanac.clone())
-        .for_duration(prop_time)
-        .unwrap();
+    sc_seq.propagators.insert(
+        "Earth".to_string(),
+        PropagatorConfig {
+            method: nyx::propagators::IntegratorMethod::RungeKutta89,
+            options: IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
+            accel_models: AccelModels {
+                point_masses: Some(PointMasses::new(bodies)),
+                gravity_field: None,
+            },
+            force_models: ForceModels {
+                solar_pressure: None,
+                drag: None,
+            },
+        },
+    );
+
+    sc_seq
+        .thruster_sets
+        .insert("Monoprop".to_string(), monoprop);
+
+    sc_seq.seq.insert(
+        start_time,
+        Phase::Activity {
+            name: "Burn".to_string(),
+            propagator: "Earth".to_string(),
+            guidance: Some(Box::new(GuidanceConfig::FiniteBurn {
+                maneuver: mnvr0,
+                thruster_model: "Monoprop".to_string(),
+                disable_prop_mass: false,
+            })),
+            on_entry: None,
+            disabled: false,
+        },
+    );
+
+    sc_seq.seq.insert(end_time, Phase::Terminate);
+
+    sc_seq.setup(almanac.clone()).unwrap();
+
+    let trajectories = sc_seq.propagate(sc_state, None, almanac.clone()).unwrap();
+    let final_state = trajectories.last().unwrap().last();
 
     // Compute the errors
     let rslt = Orbit::cartesian(
@@ -201,8 +259,16 @@ fn val_transfer_schedule_depl(almanac: Arc<Almanac>) {
     assert!(delta_prop_mass < 1e-5, "incorrect prop mass");
 
     // Now, test that backward propagation of maneuvers also works.
+    // SpacecraftSequence does not directly support backwards propagation of sequences right now,
+    // so we set up a reverse propagator manually with the maneuver.
+    let backward_sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, Arc::new(mnvr0));
+    let setup = Propagator::rk89(
+        backward_sc,
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
+    );
+
     let backward_state = setup
-        .with(final_state, almanac)
+        .with(*final_state, almanac)
         .for_duration(-prop_time)
         .unwrap();
     println!("Reached: {backward_state}\nWanted:  {sc_state}");
@@ -397,51 +463,114 @@ fn finite_burns_respects_gaps_between_maneuvers(almanac: Arc<Almanac>) {
         LocalFrame::VNC,
     );
 
-    let schedule = FiniteBurns::from_mnvrs(vec![mnvr0, mnvr1]);
+    let mut sc_seq = SpacecraftSequence::default();
 
-    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
-    let orbital_dyn = OrbitalDynamics::point_masses(bodies);
-    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, schedule);
+    sc_seq.propagators.insert(
+        "Earth".to_string(),
+        PropagatorConfig {
+            method: nyx::propagators::IntegratorMethod::RungeKutta89,
+            options: IntegratorOptions::with_fixed_step(1.0 * Unit::Second),
+            accel_models: AccelModels {
+                point_masses: Some(PointMasses::new(vec![MOON, SUN, JUPITER_BARYCENTER])),
+                gravity_field: None,
+            },
+            force_models: ForceModels {
+                solar_pressure: None,
+                drag: None,
+            },
+        },
+    );
 
-    let setup = Propagator::rk89(sc, IntegratorOptions::with_fixed_step(1.0 * Unit::Second));
+    sc_seq
+        .thruster_sets
+        .insert("Monoprop".to_string(), monoprop);
 
-    let (_, traj) = setup
-        .with(sc_state, almanac)
-        .until_epoch_with_traj(start_time + 300.0 * Unit::Second)
-        .unwrap();
+    sc_seq.seq.insert(
+        start_time,
+        Phase::Activity {
+            name: "Initial Coast".to_string(),
+            propagator: "Earth".to_string(),
+            guidance: None,
+            on_entry: None,
+            disabled: false,
+        },
+    );
 
-    let m_during_first = traj
-        .at(start_time + 30.0 * Unit::Second)
-        .unwrap()
-        .mass
-        .prop_mass_kg;
-    let m_after_first = traj
-        .at(start_time + 70.0 * Unit::Second)
-        .unwrap()
-        .mass
-        .prop_mass_kg;
-    let m_in_gap = traj
-        .at(start_time + 150.0 * Unit::Second)
-        .unwrap()
-        .mass
-        .prop_mass_kg;
-    let m_during_second = traj
-        .at(start_time + 220.0 * Unit::Second)
-        .unwrap()
-        .mass
-        .prop_mass_kg;
+    sc_seq.seq.insert(
+        mnvr0.start,
+        Phase::Activity {
+            name: "Burn 1".to_string(),
+            propagator: "Earth".to_string(),
+            guidance: Some(Box::new(GuidanceConfig::FiniteBurn {
+                maneuver: mnvr0,
+                thruster_model: "Monoprop".to_string(),
+                disable_prop_mass: false,
+            })),
+            on_entry: None,
+            disabled: false,
+        },
+    );
 
-    let m_after_second = traj
-        .at(start_time + 250.0 * Unit::Second)
-        .unwrap()
-        .mass
-        .prop_mass_kg;
+    sc_seq.seq.insert(
+        mnvr0.end,
+        Phase::Activity {
+            name: "Intermediate Coast".to_string(),
+            propagator: "Earth".to_string(),
+            guidance: None,
+            on_entry: None,
+            disabled: false,
+        },
+    );
 
-    let m_after_second_2 = traj
-        .at(start_time + 280.0 * Unit::Second)
-        .unwrap()
-        .mass
-        .prop_mass_kg;
+    sc_seq.seq.insert(
+        mnvr1.start,
+        Phase::Activity {
+            name: "Burn 2".to_string(),
+            propagator: "Earth".to_string(),
+            guidance: Some(Box::new(GuidanceConfig::FiniteBurn {
+                maneuver: mnvr1,
+                thruster_model: "Monoprop".to_string(),
+                disable_prop_mass: false,
+            })),
+            on_entry: None,
+            disabled: false,
+        },
+    );
+
+    sc_seq.seq.insert(
+        mnvr1.end,
+        Phase::Activity {
+            name: "Final Coast".to_string(),
+            propagator: "Earth".to_string(),
+            guidance: None,
+            on_entry: None,
+            disabled: false,
+        },
+    );
+
+    sc_seq
+        .seq
+        .insert(start_time + 300.0 * Unit::Second, Phase::Terminate);
+
+    sc_seq.setup(almanac.clone()).unwrap();
+
+    let trajectories = sc_seq.propagate(sc_state, None, almanac).unwrap();
+
+    let get_mass_at = |epoch| {
+        trajectories
+            .iter()
+            .find_map(|t| t.at(epoch).ok())
+            .unwrap()
+            .mass
+            .prop_mass_kg
+    };
+
+    let m_during_first = get_mass_at(start_time + 30.0 * Unit::Second);
+    let m_after_first = get_mass_at(start_time + 70.0 * Unit::Second);
+    let m_in_gap = get_mass_at(start_time + 150.0 * Unit::Second);
+    let m_during_second = get_mass_at(start_time + 220.0 * Unit::Second);
+    let m_after_second = get_mass_at(start_time + 250.0 * Unit::Second);
+    let m_after_second_2 = get_mass_at(start_time + 280.0 * Unit::Second);
 
     assert!(
         m_after_first < m_during_first,

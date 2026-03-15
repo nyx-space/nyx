@@ -151,6 +151,7 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
                     LocalFrame::VNC,
                 ),
                 thruster_model: "BiProp".to_string(),
+                disable_prop_mass: false,
             })),
             on_entry: None,
             disabled: false,
@@ -191,6 +192,7 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
 #[rstest]
 #[case(GuidanceConfig::Ruggiero {
     thruster_model: "HET".to_string(),
+    disable_prop_mass: false,
     objectives: vec![
         (
             Objective::new(
@@ -208,6 +210,7 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
 },
     GuidanceConfig::Ruggiero {
     thruster_model: "HET".to_string(),
+    disable_prop_mass: false,
     objectives: vec![
         (
             Objective::new(
@@ -228,6 +231,7 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
     max_eclipse_prct: Some(0.5),}, "Ruggiero")]
 #[case(GuidanceConfig::Kluever {
     thruster_model: "HET".to_string(),
+    disable_prop_mass: false,
     objectives: vec![
         (
             Objective::new(
@@ -245,6 +249,7 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
 },
     GuidanceConfig::Kluever {
     thruster_model: "HET".to_string(),
+    disable_prop_mass: false,
     objectives: vec![
         (
             Objective::new(

@@ -26,9 +26,6 @@ use anise::prelude::Almanac;
 use der::{Decode, Encode, Reader};
 use serde::{Deserialize, Serialize};
 
-mod finiteburns;
-pub use finiteburns::FiniteBurns;
-
 pub mod mnvr;
 pub use mnvr::{Maneuver, MnvrRepr};
 

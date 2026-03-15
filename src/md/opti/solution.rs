@@ -181,24 +181,26 @@ impl<const V: usize, const O: usize> fmt::Display for TargeterSolution<V, O> {
         let mut is_only_position = true;
         let mut is_only_velocity = true;
         for (i, var) in self.variables.iter().enumerate() {
-            let unit = match var.component {
+            let (unit, mulp) = match var.component {
                 Vary::PositionX | Vary::PositionY | Vary::PositionZ => {
                     is_only_velocity = false;
-                    "m"
+                    ("m", 1e3)
                 }
                 Vary::VelocityX | Vary::VelocityY | Vary::VelocityZ => {
                     is_only_position = false;
-                    "m/s"
+                    ("m/s", 1e3)
                 }
                 _ => {
                     is_only_position = false;
                     is_only_velocity = false;
-                    ""
+                    ("", 1.0)
                 }
             };
             corrmsg.push_str(&format!(
                 "\n\t\t{:?} = {:.3} {}",
-                var.component, self.correction[i], unit
+                var.component,
+                self.correction[i] * mulp,
+                unit
             ));
         }
 
