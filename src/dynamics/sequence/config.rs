@@ -67,11 +67,13 @@ pub struct ForceModels {
 #[derive(Clone, Debug)]
 pub enum GuidanceConfig {
     FiniteBurn {
-        maneuver: Maneuver,
         thruster_model: String,
+        disable_prop_mass: bool,
+        maneuver: Maneuver,
     },
     Ruggiero {
         thruster_model: String,
+        disable_prop_mass: bool,
         /// Stores the objectives, and their associated efficiency threshold (set to zero if not minimum efficiency).
         objectives: Vec<(Objective, f64)>,
         /// If defined, coast until vehicle is out of the provided eclipse state.
@@ -79,6 +81,7 @@ pub enum GuidanceConfig {
     },
     Kluever {
         thruster_model: String,
+        disable_prop_mass: bool,
         /// Stores the objectives, and their associated weights (set to zero to disable).
         objectives: Vec<(Objective, f64)>,
         /// If defined, coast until vehicle is out of the provided eclipse state.
@@ -92,6 +95,19 @@ impl GuidanceConfig {
             Self::FiniteBurn { thruster_model, .. } => thruster_model,
             Self::Ruggiero { thruster_model, .. } => thruster_model,
             Self::Kluever { thruster_model, .. } => thruster_model,
+        }
+    }
+    pub fn disable_prop_mass(&self) -> bool {
+        match self {
+            Self::FiniteBurn {
+                disable_prop_mass, ..
+            } => *disable_prop_mass,
+            Self::Ruggiero {
+                disable_prop_mass, ..
+            } => *disable_prop_mass,
+            Self::Kluever {
+                disable_prop_mass, ..
+            } => *disable_prop_mass,
         }
     }
 }

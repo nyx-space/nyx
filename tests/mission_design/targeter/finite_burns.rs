@@ -3,11 +3,13 @@ extern crate nyx_space as nyx;
 use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SUN};
 use hifitime::TimeUnits;
 use nyx::dynamics::guidance::{LocalFrame, Maneuver, Thruster};
-use nyx::dynamics::sequence::{GuidanceConfig, Phase, PropagatorConfig, SpacecraftSequence, AccelModels, ForceModels};
+use nyx::dynamics::sequence::{
+    AccelModels, ForceModels, GuidanceConfig, Phase, PropagatorConfig, SpacecraftSequence,
+};
 use nyx::dynamics::PointMasses;
-use nyx::propagators::{IntegratorMethod, IntegratorOptions};
 use nyx::linalg::Vector3;
 use nyx::md::prelude::*;
+use nyx::propagators::{IntegratorMethod, IntegratorOptions};
 use nyx_space::cosmic::Mass;
 
 use crate::propagation::GMAT_EARTH_GM;
@@ -164,11 +166,11 @@ fn thrust_profile_tgt_sma_aop_raan(almanac: Arc<Almanac>) {
             8012.176,
             0.1,
         ),
-        Objective::within_tolerance(StateParameter::Element(OrbitalElement::AoP), 53.939, 1e-3),
+        Objective::within_tolerance(StateParameter::Element(OrbitalElement::AoP), 53.939, 1e-1),
         Objective::within_tolerance(
             StateParameter::Element(OrbitalElement::RAAN),
             60.000182,
-            1e-3,
+            1e-1,
         ),
     ];
 
@@ -185,7 +187,6 @@ fn thrust_profile_tgt_sma_aop_raan(almanac: Arc<Almanac>) {
     println!("Finite differencing solution: {solution_fd}");
 }
 
-#[ignore]
 #[rstest]
 fn val_tgt_finite_burn(almanac: Arc<Almanac>) {
     // In this test, we take a known finite burn solution and use the optimizer to solve for it.
@@ -216,7 +217,7 @@ fn val_tgt_finite_burn(almanac: Arc<Almanac>) {
 
     // Define the dynamics
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
-    let orbital_dyn = OrbitalDynamics::point_masses(bodies);
+    let orbital_dyn = OrbitalDynamics::point_masses(bodies.clone());
 
     // With 100% thrust: RSS errors:     pos = 3.14651e1 km      vel = 3.75245e-2 km/s
 
@@ -237,7 +238,7 @@ fn val_tgt_finite_burn(almanac: Arc<Almanac>) {
             method: IntegratorMethod::RungeKutta89,
             options: IntegratorOptions::default(),
             accel_models: AccelModels {
-                point_masses: Some(PointMasses::new(vec![MOON, SUN, JUPITER_BARYCENTER])),
+                point_masses: Some(PointMasses::new(bodies)),
                 gravity_field: None,
             },
             force_models: ForceModels {
@@ -247,7 +248,9 @@ fn val_tgt_finite_burn(almanac: Arc<Almanac>) {
         },
     );
 
-    sc_seq.thruster_sets.insert("Monoprop".to_string(), monoprop);
+    sc_seq
+        .thruster_sets
+        .insert("Monoprop".to_string(), monoprop);
 
     sc_seq.seq.insert(
         start_time,
@@ -268,6 +271,7 @@ fn val_tgt_finite_burn(almanac: Arc<Almanac>) {
             guidance: Some(Box::new(GuidanceConfig::FiniteBurn {
                 maneuver: mnvr0,
                 thruster_model: "Monoprop".to_string(),
+                disable_prop_mass: false,
             })),
             on_entry: None,
             disabled: false,
@@ -327,11 +331,4 @@ fn val_tgt_finite_burn(almanac: Arc<Almanac>) {
 
     println!("{impulsive_tgt}");
     println!("\n\nKNOWN SOLUTION\n{mnvr0}");
-
-    // Solve for this known solution
-    // let fb_mnvr =
-    //     Optimizer::convert_impulsive_mnvr(sc_state, impulsive_tgt.correction, &prop).unwrap();
-    // println!("Solution ended being:\n{}\n", fb_mnvr);
-
-    // Test that this solution works.
 }

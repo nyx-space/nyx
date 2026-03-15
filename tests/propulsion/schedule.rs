@@ -1,8 +1,10 @@
 extern crate nyx_space as nyx;
 use self::nyx::cosmic::{GuidanceMode, Orbit, Spacecraft};
 use self::nyx::dynamics::guidance::{Maneuver, Thruster};
-use self::nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics, PointMasses};
-use self::nyx::dynamics::sequence::{GuidanceConfig, Phase, PropagatorConfig, SpacecraftSequence, AccelModels, ForceModels};
+use self::nyx::dynamics::sequence::{
+    AccelModels, ForceModels, GuidanceConfig, Phase, PropagatorConfig, SpacecraftSequence,
+};
+use self::nyx::dynamics::{OrbitalDynamics, PointMasses, SpacecraftDynamics};
 use self::nyx::linalg::Vector3;
 use self::nyx::propagators::{IntegratorOptions, Propagator};
 use self::nyx::time::{Epoch, Unit};
@@ -23,11 +25,6 @@ fn almanac() -> Arc<Almanac> {
 
 #[rstest]
 fn val_transfer_schedule_no_depl(almanac: Arc<Almanac>) {
-    /*
-        NOTE: Due to how lifetime of variables work in Rust, we need to define all of the
-        components of a spacecraft before defining the spacecraft itself.
-    */
-
     let eme2k = almanac
         .frame_info(EARTH_J2000)
         .unwrap()
@@ -42,7 +39,7 @@ fn val_transfer_schedule_no_depl(almanac: Arc<Almanac>) {
     // Define the thruster
     let monoprop = Thruster {
         thrust_N: 10.0,
-        isp_s: f64::INFINITY, // Set to infinity to disable mass depletion
+        isp_s: 300.0,
     };
     let dry_mass = 1e3;
     let prop_mass = 756.0;
@@ -52,10 +49,6 @@ fn val_transfer_schedule_no_depl(almanac: Arc<Almanac>) {
     let prop_time = 50.0 * Unit::Minute;
 
     let end_time = start_time + prop_time;
-
-    // Define the dynamics
-    let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
-    let _orbital_dyn = OrbitalDynamics::point_masses(bodies);
 
     // Define the maneuver and its schedule
     let mnvr0 = Maneuver::from_time_invariant(
@@ -84,7 +77,9 @@ fn val_transfer_schedule_no_depl(almanac: Arc<Almanac>) {
         },
     );
 
-    sc_seq.thruster_sets.insert("Monoprop".to_string(), monoprop);
+    sc_seq
+        .thruster_sets
+        .insert("Monoprop".to_string(), monoprop);
 
     sc_seq.seq.insert(
         start_time,
@@ -94,6 +89,7 @@ fn val_transfer_schedule_no_depl(almanac: Arc<Almanac>) {
             guidance: Some(Box::new(GuidanceConfig::FiniteBurn {
                 maneuver: mnvr0,
                 thruster_model: "Monoprop".to_string(),
+                disable_prop_mass: true,
             })),
             on_entry: None,
             disabled: false,
@@ -171,7 +167,7 @@ fn val_transfer_schedule_depl(almanac: Arc<Almanac>) {
 
     // Define the dynamics
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
-    let orbital_dyn = OrbitalDynamics::point_masses(bodies);
+    let orbital_dyn = OrbitalDynamics::point_masses(bodies.clone());
 
     // With 100% thrust: RSS errors:     pos = 3.14651e1 km      vel = 3.75245e-2 km/s
 
@@ -192,7 +188,7 @@ fn val_transfer_schedule_depl(almanac: Arc<Almanac>) {
             method: nyx::propagators::IntegratorMethod::RungeKutta89,
             options: IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
             accel_models: AccelModels {
-                point_masses: Some(PointMasses::new(vec![MOON, SUN, JUPITER_BARYCENTER])),
+                point_masses: Some(PointMasses::new(bodies)),
                 gravity_field: None,
             },
             force_models: ForceModels {
@@ -202,7 +198,9 @@ fn val_transfer_schedule_depl(almanac: Arc<Almanac>) {
         },
     );
 
-    sc_seq.thruster_sets.insert("Monoprop".to_string(), monoprop);
+    sc_seq
+        .thruster_sets
+        .insert("Monoprop".to_string(), monoprop);
 
     sc_seq.seq.insert(
         start_time,
@@ -212,6 +210,7 @@ fn val_transfer_schedule_depl(almanac: Arc<Almanac>) {
             guidance: Some(Box::new(GuidanceConfig::FiniteBurn {
                 maneuver: mnvr0,
                 thruster_model: "Monoprop".to_string(),
+                disable_prop_mass: false,
             })),
             on_entry: None,
             disabled: false,
@@ -263,7 +262,10 @@ fn val_transfer_schedule_depl(almanac: Arc<Almanac>) {
     // SpacecraftSequence does not directly support backwards propagation of sequences right now,
     // so we set up a reverse propagator manually with the maneuver.
     let backward_sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, Arc::new(mnvr0));
-    let setup = Propagator::rk89(backward_sc, IntegratorOptions::with_fixed_step(-10.0 * Unit::Second));
+    let setup = Propagator::rk89(
+        backward_sc,
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
+    );
 
     let backward_state = setup
         .with(*final_state, almanac)
@@ -479,7 +481,9 @@ fn finite_burns_respects_gaps_between_maneuvers(almanac: Arc<Almanac>) {
         },
     );
 
-    sc_seq.thruster_sets.insert("Monoprop".to_string(), monoprop);
+    sc_seq
+        .thruster_sets
+        .insert("Monoprop".to_string(), monoprop);
 
     sc_seq.seq.insert(
         start_time,
@@ -500,6 +504,7 @@ fn finite_burns_respects_gaps_between_maneuvers(almanac: Arc<Almanac>) {
             guidance: Some(Box::new(GuidanceConfig::FiniteBurn {
                 maneuver: mnvr0,
                 thruster_model: "Monoprop".to_string(),
+                disable_prop_mass: false,
             })),
             on_entry: None,
             disabled: false,
@@ -525,6 +530,7 @@ fn finite_burns_respects_gaps_between_maneuvers(almanac: Arc<Almanac>) {
             guidance: Some(Box::new(GuidanceConfig::FiniteBurn {
                 maneuver: mnvr1,
                 thruster_model: "Monoprop".to_string(),
+                disable_prop_mass: false,
             })),
             on_entry: None,
             disabled: false,
@@ -542,7 +548,9 @@ fn finite_burns_respects_gaps_between_maneuvers(almanac: Arc<Almanac>) {
         },
     );
 
-    sc_seq.seq.insert(start_time + 300.0 * Unit::Second, Phase::Terminate);
+    sc_seq
+        .seq
+        .insert(start_time + 300.0 * Unit::Second, Phase::Terminate);
 
     sc_seq.setup(almanac.clone()).unwrap();
 

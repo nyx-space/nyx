@@ -259,14 +259,17 @@ impl SpacecraftSequence {
                             let mut setup = self.prop_setups[propagator].clone();
                             match &**guid_cfg {
                                 GuidanceConfig::FiniteBurn {
-                                    maneuver,
                                     thruster_model,
+                                    disable_prop_mass,
+                                    maneuver,
                                 } => {
                                     setup.dynamics.guid_law = Some(Arc::new(*maneuver));
+                                    setup.dynamics.decrement_mass = !*disable_prop_mass;
                                     state.thruster = Some(self.thruster_sets[thruster_model]);
                                 }
                                 GuidanceConfig::Ruggiero {
                                     thruster_model,
+                                    disable_prop_mass,
                                     objectives,
                                     max_eclipse_prct,
                                 } => {
@@ -276,10 +279,12 @@ impl SpacecraftSequence {
                                         init_state: state,
                                     };
                                     setup.dynamics.guid_law = Some(Arc::new(guid));
+                                    setup.dynamics.decrement_mass = !*disable_prop_mass;
                                     state.thruster = Some(self.thruster_sets[thruster_model]);
                                 }
                                 GuidanceConfig::Kluever {
                                     thruster_model,
+                                    disable_prop_mass,
                                     objectives,
                                     max_eclipse_prct,
                                 } => {
@@ -288,6 +293,7 @@ impl SpacecraftSequence {
                                         max_eclipse_prct: *max_eclipse_prct,
                                     };
                                     setup.dynamics.guid_law = Some(Arc::new(guid));
+                                    setup.dynamics.decrement_mass = !*disable_prop_mass;
                                     state.thruster = Some(self.thruster_sets[thruster_model]);
                                 }
                             }
