@@ -28,7 +28,9 @@ use crate::State;
 use anise::prelude::Almanac;
 use hifitime::{Duration, TimeUnits};
 use serde::{Deserialize, Serialize};
+use serde_dhall::{SimpleType, StaticType};
 use snafu::ResultExt;
+use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 
@@ -43,6 +45,19 @@ pub struct ImpulsiveManeuver {
 impl fmt::Display for ImpulsiveManeuver {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:.3} m/s in {:?}", self.dv_km_s * 1e3, self.local_frame)
+    }
+}
+
+impl StaticType for ImpulsiveManeuver {
+    fn static_type() -> serde_dhall::SimpleType {
+        let mut fields = HashMap::new();
+
+        fields.insert("local_frame".to_string(), LocalFrame::static_type());
+        fields.insert("dv_x_km_s".to_string(), f64::static_type());
+        fields.insert("dv_y_km_s".to_string(), f64::static_type());
+        fields.insert("dv_z_km_s".to_string(), f64::static_type());
+
+        SimpleType::Record(fields)
     }
 }
 

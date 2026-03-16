@@ -11,6 +11,7 @@ use self::nyx::time::{Epoch, Unit};
 use self::nyx::utils::rss_orbit_vec_errors;
 use crate::propagation::GMAT_EARTH_GM;
 use nyx::dynamics::guidance::LocalFrame;
+use nyx_space::dynamics::sequence::SteeringLaw;
 use std::sync::Arc;
 
 use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SUN};
@@ -86,8 +87,8 @@ fn val_transfer_schedule_no_depl(almanac: Arc<Almanac>) {
         Phase::Activity {
             name: "Burn".to_string(),
             propagator: "Earth".to_string(),
-            guidance: Some(Box::new(GuidanceConfig::FiniteBurn {
-                maneuver: mnvr0,
+            guidance: Some(Box::new(GuidanceConfig {
+                law: SteeringLaw::FiniteBurn(mnvr0),
                 thruster_model: "Monoprop".to_string(),
                 disable_prop_mass: true,
             })),
@@ -207,8 +208,8 @@ fn val_transfer_schedule_depl(almanac: Arc<Almanac>) {
         Phase::Activity {
             name: "Burn".to_string(),
             propagator: "Earth".to_string(),
-            guidance: Some(Box::new(GuidanceConfig::FiniteBurn {
-                maneuver: mnvr0,
+            guidance: Some(Box::new(GuidanceConfig {
+                law: SteeringLaw::FiniteBurn(mnvr0),
                 thruster_model: "Monoprop".to_string(),
                 disable_prop_mass: false,
             })),
@@ -501,8 +502,8 @@ fn finite_burns_respects_gaps_between_maneuvers(almanac: Arc<Almanac>) {
         Phase::Activity {
             name: "Burn 1".to_string(),
             propagator: "Earth".to_string(),
-            guidance: Some(Box::new(GuidanceConfig::FiniteBurn {
-                maneuver: mnvr0,
+            guidance: Some(Box::new(GuidanceConfig {
+                law: SteeringLaw::FiniteBurn(mnvr0),
                 thruster_model: "Monoprop".to_string(),
                 disable_prop_mass: false,
             })),
@@ -527,8 +528,8 @@ fn finite_burns_respects_gaps_between_maneuvers(almanac: Arc<Almanac>) {
         Phase::Activity {
             name: "Burn 2".to_string(),
             propagator: "Earth".to_string(),
-            guidance: Some(Box::new(GuidanceConfig::FiniteBurn {
-                maneuver: mnvr1,
+            guidance: Some(Box::new(GuidanceConfig {
+                law: SteeringLaw::FiniteBurn(mnvr1),
                 thruster_model: "Monoprop".to_string(),
                 disable_prop_mass: false,
             })),

@@ -25,6 +25,7 @@ use anise::math::rotation::DCM;
 use anise::prelude::Almanac;
 use der::{Decode, Encode, Reader};
 use serde::{Deserialize, Serialize};
+use serde_dhall::StaticType;
 
 pub mod mnvr;
 pub use mnvr::{Maneuver, MnvrRepr};
@@ -89,6 +90,18 @@ impl<'a> Decode<'a> for Thruster {
             isp_s: decoder.decode()?,
         })
     }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ObjectiveEfficiency {
+    pub objective: Objective,
+    pub efficiency: f64,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ObjectiveWeight {
+    pub objective: Objective,
+    pub weight: f64,
 }
 
 /// The `GuidanceLaw` trait handles guidance laws, optimizations, and other such methods for
@@ -188,7 +201,7 @@ pub enum GuidanceError {
 
 /// Local frame options, used notably for guidance laws.
 /// TODO: Replace with ANISE enum, which is identical
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, StaticType)]
 pub enum LocalFrame {
     Inertial,
     RIC,

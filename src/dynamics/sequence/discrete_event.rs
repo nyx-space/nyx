@@ -20,11 +20,13 @@ use anise::{
     frames::Frame,
     structure::spacecraft::{DragData, Mass, SRPData},
 };
-use serde_dhall::StaticType;
+use serde::{Deserialize, Serialize};
+use serde_dhall::{SimpleType, StaticType};
+use std::collections::HashMap;
 
 use crate::dynamics::guidance::mnvr::ImpulsiveManeuver;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
 pub enum DiscreteEvent {
     Staging {
         impulsive_maneuver: Option<ImpulsiveManeuver>,
@@ -39,9 +41,44 @@ pub enum DiscreteEvent {
     },
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PhysicalProperties {
     pub mass: Option<Mass>,
     pub srp: Option<SRPData>,
     pub drag: Option<DragData>,
+}
+
+impl StaticType for PhysicalProperties {
+    fn static_type() -> serde_dhall::SimpleType {
+        let mut fields = HashMap::new();
+        // TODO: Switch to ANISE's type once released.
+
+        #[allow(dead_code)]
+        #[derive(StaticType)]
+        struct MassClone {
+            dry_mass_kg: f64,
+            prop_mass_kg: f64,
+            extra_mass_kg: f64,
+        }
+
+        #[allow(dead_code)]
+        #[derive(StaticType)]
+        struct Srp {
+            area_m2: f64,
+            coeff_reflectivity: f64,
+        }
+
+        #[allow(dead_code)]
+        #[derive(StaticType)]
+        struct Drag {
+            area_m2: f64,
+            coeff_drag: f64,
+        }
+
+        fields.insert("mass".to_string(), MassClone::static_type());
+        fields.insert("srp".to_string(), Srp::static_type());
+        fields.insert("drag".to_string(), Drag::static_type());
+
+        SimpleType::Record(fields)
+    }
 }

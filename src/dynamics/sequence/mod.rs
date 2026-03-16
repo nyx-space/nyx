@@ -23,7 +23,6 @@ use anise::prelude::Almanac;
 use hifitime::{Epoch, Unit};
 use indexmap::IndexMap;
 use log::{debug, info};
-use serde_dhall::StaticType;
 use snafu::ResultExt;
 
 use crate::dynamics::guidance::{Kluever, Ruggiero};
@@ -71,7 +70,7 @@ impl SpacecraftSequence {
                     return Err(format!("{epoch}: no propagator named `{propagator}`"));
                 }
                 if let Some(guidance) = guidance {
-                    let thruster = guidance.thruster_model();
+                    let thruster = &guidance.thruster_model;
                     if self.thruster_sets.get(thruster).is_none() {
                         return Err(format!("{epoch}: no thruster set named {thruster}"));
                     }
@@ -258,19 +257,13 @@ impl SpacecraftSequence {
                         let (next_state, mut phase_traj) = if let Some(guid_cfg) = guidance {
                             // Clone the propagator to add the dynamics
                             let mut setup = self.prop_setups[propagator].clone();
-                            match &**guid_cfg {
-                                GuidanceConfig::FiniteBurn {
-                                    thruster_model,
-                                    disable_prop_mass,
-                                    maneuver,
-                                } => {
+                            setup.dynamics.decrement_mass = !guid_cfg.disable_prop_mass;
+                            state.thruster = Some(self.thruster_sets[&guid_cfg.thruster_model]);
+                            match &guid_cfg.law {
+                                SteeringLaw::FiniteBurn(maneuver) => {
                                     setup.dynamics.guid_law = Some(Arc::new(*maneuver));
-                                    setup.dynamics.decrement_mass = !*disable_prop_mass;
-                                    state.thruster = Some(self.thruster_sets[thruster_model]);
                                 }
-                                GuidanceConfig::Ruggiero {
-                                    thruster_model,
-                                    disable_prop_mass,
+                                SteeringLaw::Ruggiero {
                                     objectives,
                                     max_eclipse_prct,
                                 } => {
@@ -280,12 +273,8 @@ impl SpacecraftSequence {
                                         init_state: state,
                                     };
                                     setup.dynamics.guid_law = Some(Arc::new(guid));
-                                    setup.dynamics.decrement_mass = !*disable_prop_mass;
-                                    state.thruster = Some(self.thruster_sets[thruster_model]);
                                 }
-                                GuidanceConfig::Kluever {
-                                    thruster_model,
-                                    disable_prop_mass,
+                                SteeringLaw::Kluever {
                                     objectives,
                                     max_eclipse_prct,
                                 } => {
@@ -294,8 +283,6 @@ impl SpacecraftSequence {
                                         max_eclipse_prct: *max_eclipse_prct,
                                     };
                                     setup.dynamics.guid_law = Some(Arc::new(guid));
-                                    setup.dynamics.decrement_mass = !*disable_prop_mass;
-                                    state.thruster = Some(self.thruster_sets[thruster_model]);
                                 }
                             }
                             setup
