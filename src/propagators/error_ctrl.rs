@@ -15,8 +15,8 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-
 use serde::{Deserialize, Serialize};
+use serde_dhall::StaticType;
 
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OVector, U3};
@@ -26,7 +26,7 @@ use crate::linalg::{DefaultAllocator, DimName, OVector, U3};
 const REL_ERR_THRESH: f64 = 0.1;
 
 /// The Error Control manages how a propagator computes the error in the current step.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default, StaticType)]
 pub enum ErrorControl {
     /// An RSS state error control which effectively for the provided vector composed of two vectors of the same unit, both of size 3 (e.g. position + velocity).
     RSSCartesianState,

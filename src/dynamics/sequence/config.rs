@@ -16,6 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 use anise::frames::FrameUid;
+use serde::{Deserialize, Serialize};
+use serde_dhall::{SimpleType, StaticType};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::{
@@ -42,7 +45,7 @@ pub enum Phase {
 }
 
 /// Propagator config includes the method, options, and all dynamics
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
 pub struct PropagatorConfig {
     pub method: IntegratorMethod,
     pub options: IntegratorOptions,
@@ -51,14 +54,14 @@ pub struct PropagatorConfig {
 }
 
 /// Acceleration models alter the orbital dynamics
-#[derive(Clone, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct AccelModels {
     pub point_masses: Option<Arc<PointMasses>>,
     pub gravity_field: Option<(GravityFieldConfig, FrameUid)>,
 }
 
 /// Force models alter the spacecraft dynamics (they need a mass).
-#[derive(Clone, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ForceModels {
     pub solar_pressure: Option<Arc<SolarPressure>>,
     pub drag: Option<Arc<Drag>>,
@@ -109,5 +112,45 @@ impl GuidanceConfig {
                 disable_prop_mass, ..
             } => *disable_prop_mass,
         }
+    }
+}
+
+impl StaticType for AccelModels {
+    fn static_type() -> serde_dhall::SimpleType {
+        let mut fields = HashMap::new();
+
+        fields.insert(
+            "point_masses".to_string(),
+            SimpleType::Optional(Box::new(PointMasses::static_type())),
+        );
+
+        #[allow(dead_code)]
+        #[derive(StaticType)]
+        struct GravityFieldDhall(GravityFieldConfig, FrameUid);
+
+        fields.insert(
+            "gravity_field".to_string(),
+            SimpleType::Optional(Box::new(GravityFieldDhall::static_type())),
+        );
+
+        SimpleType::Record(fields)
+    }
+}
+
+impl StaticType for ForceModels {
+    fn static_type() -> serde_dhall::SimpleType {
+        let mut fields = HashMap::new();
+
+        fields.insert(
+            "solar_pressure".to_string(),
+            SimpleType::Optional(Box::new(SolarPressure::static_type())),
+        );
+
+        fields.insert(
+            "drag".to_string(),
+            SimpleType::Optional(Box::new(Drag::static_type())),
+        );
+
+        SimpleType::Record(fields)
     }
 }

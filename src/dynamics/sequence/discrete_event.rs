@@ -20,6 +20,7 @@ use anise::{
     frames::Frame,
     structure::spacecraft::{DragData, Mass, SRPData},
 };
+use serde_dhall::StaticType;
 
 use crate::dynamics::guidance::mnvr::ImpulsiveManeuver;
 

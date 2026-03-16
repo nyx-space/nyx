@@ -17,7 +17,7 @@
 */
 
 /* NOTE: This code is effectively a clone of bacon-sci, MIT License, by Wyatt Campbell. */
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::ops;
 

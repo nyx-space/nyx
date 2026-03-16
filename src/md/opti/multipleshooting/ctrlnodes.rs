@@ -21,7 +21,7 @@ use crate::time::Epoch;
 use crate::NyxError;
 use anise::analysis::prelude::OrbitalElement;
 use anise::prelude::Frame;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::convert::Into;
 use std::str::FromStr;
 

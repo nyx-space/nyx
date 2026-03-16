@@ -40,8 +40,7 @@ anise = { version = "0.9.6", features = ["analysis"] }
 flate2 = { version = "1.0", features = [
     "rust_backend",
 ], default-features = false }
-serde = "1.0"
-serde_derive = "1.0"
+serde = {version = "1.0", features = ["derive", "rc"]}
 hyperdual = "1.4.0"
 rand = "0.10"
 rand_distr = "0.6"

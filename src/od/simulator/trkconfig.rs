@@ -27,7 +27,7 @@ use hifitime::{Duration, Epoch, TimeScale};
 use pyo3::{exceptions::PyValueError, prelude::*, types::PyBytes, types::PyType};
 
 use serde::Deserialize;
-use serde_derive::Serialize;
+use serde::Serialize;
 use std::fmt::Debug;
 use std::str::FromStr;
 use typed_builder::TypedBuilder;

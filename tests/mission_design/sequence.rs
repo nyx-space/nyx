@@ -161,6 +161,14 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
     // All sequences MUST end with a Terminate phase.
     sc_seq.seq.insert(epoch + Unit::Day * 30, Phase::Terminate);
 
+    // Test Dhall serialization
+    println!(
+        "{}",
+        serde_dhall::serialize(&sc_seq.propagators["Near Earth"])
+            .static_type_annotation()
+            .to_string()
+            .unwrap()
+    );
     // Initialize the propagators.
     sc_seq.setup(almanac.clone()).unwrap();
 
@@ -188,7 +196,6 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
     assert_eq!(trajectories.len(), sc_seq.seq.len() - 1);
 }
 
-// TODO: Add Rugg and Kluever cases!
 #[rstest]
 #[case(GuidanceConfig::Ruggiero {
     thruster_model: "HET".to_string(),

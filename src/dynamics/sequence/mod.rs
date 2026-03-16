@@ -23,6 +23,7 @@ use anise::prelude::Almanac;
 use hifitime::{Epoch, Unit};
 use indexmap::IndexMap;
 use log::{debug, info};
+use serde_dhall::StaticType;
 use snafu::ResultExt;
 
 use crate::dynamics::guidance::{Kluever, Ruggiero};

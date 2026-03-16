@@ -23,7 +23,7 @@ pub use crate::State;
 use der::{Decode, Encode, Enumerated, Reader};
 use hifitime::{Duration, Unit};
 use serde::Deserialize;
-use serde_derive::Serialize;
+use serde::Serialize;
 use std::fmt::Debug;
 use typed_builder::TypedBuilder;
 

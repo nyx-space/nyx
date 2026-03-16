@@ -27,7 +27,9 @@ use anise::astro::Aberration;
 use hyperdual::linalg::norm;
 use hyperdual::{extract_jacobian_and_result, hyperspace_from_vector, Float, OHyperdual};
 use serde::{Deserialize, Serialize};
+use serde_dhall::{SimpleType, StaticType};
 use snafu::ResultExt;
+use std::collections::HashMap;
 use std::f64;
 use std::fmt;
 use std::sync::Arc;
@@ -299,5 +301,29 @@ impl AccelModel for PointMasses {
         }
 
         Ok((fx, grad))
+    }
+}
+impl StaticType for PointMasses {
+    fn static_type() -> SimpleType {
+        let mut fields = HashMap::new();
+
+        fields.insert("celestial_objects".to_string(), Vec::<i32>::static_type());
+
+        // Manually define the record for Aberration right here
+        // instead of calling Aberration::static_type()
+        let aberration_fields = {
+            let mut f = HashMap::new();
+            f.insert("converged".to_string(), bool::static_type());
+            f.insert("stellar".to_string(), bool::static_type());
+            f.insert("transmit_mode".to_string(), bool::static_type());
+            SimpleType::Record(f)
+        };
+
+        fields.insert(
+            "correction".to_string(),
+            SimpleType::Optional(Box::new(aberration_fields)),
+        );
+
+        SimpleType::Record(fields)
     }
 }

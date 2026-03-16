@@ -18,7 +18,7 @@
 
 use anise::astro::AzElRange;
 use arrow::datatypes::{DataType, Field};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, str::FromStr};
 
 use crate::{io::InputOutputError, od::ODError};

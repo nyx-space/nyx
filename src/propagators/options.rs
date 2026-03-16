@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use serde_dhall::{SimpleType, StaticType};
+use std::collections::HashMap;
 use std::fmt;
 
 use crate::time::{Duration, Unit};
@@ -176,6 +178,33 @@ impl Default for IntegratorOptions {
     }
 }
 
+impl StaticType for IntegratorOptions {
+    fn static_type() -> SimpleType {
+        let mut fields = HashMap::new();
+
+        // Duration fields (handled as strings/Text)
+        fields.insert("init_step".to_string(), SimpleType::Text);
+        fields.insert("min_step".to_string(), SimpleType::Text);
+        fields.insert("max_step".to_string(), SimpleType::Text);
+
+        // Standard scalars
+        fields.insert("tolerance".to_string(), SimpleType::Double);
+        fields.insert("attempts".to_string(), SimpleType::Natural);
+        fields.insert("fixed_step".to_string(), SimpleType::Bool);
+
+        // Nested types
+        // Note: ErrorControl must also implement StaticType
+        fields.insert("error_ctrl".to_string(), ErrorControl::static_type());
+
+        // Optional field
+        fields.insert(
+            "integration_frame".to_string(),
+            SimpleType::Optional(Box::new(Frame::static_type())),
+        );
+
+        SimpleType::Record(fields)
+    }
+}
 #[cfg(test)]
 mod ut_integr_opts {
     use hifitime::Unit;

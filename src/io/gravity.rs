@@ -20,6 +20,9 @@ use crate::linalg::DMatrix;
 use crate::NyxError;
 use flate2::read::GzDecoder;
 use log::{info, warn};
+use serde::{Deserialize, Serialize};
+use serde_dhall::{SimpleType, StaticType};
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fs::File;
 use std::io::prelude::*;
@@ -29,7 +32,7 @@ use std::str::FromStr;
 /// Configuration holder for gravity field.
 ///
 /// Data is first loaded as a SHADR, if that fails, Nyx will try to load it as a COF file.
-#[derive(Clone, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct GravityFieldConfig {
     /// Path to the file, relative to the current working director
     pub filepath: PathBuf,
@@ -480,6 +483,19 @@ impl GravityFieldData {
     /// Returns the C_nm and S_nm for the provided order and degree.
     pub fn cs_nm(&self, degree: usize, order: usize) -> (f64, f64) {
         (self.c_nm[(degree, order)], self.s_nm[(degree, order)])
+    }
+}
+
+impl StaticType for GravityFieldConfig {
+    fn static_type() -> SimpleType {
+        let mut fields = HashMap::new();
+
+        fields.insert("filepath".to_string(), String::static_type());
+        fields.insert("gunzipped".to_string(), bool::static_type());
+        fields.insert("degree".to_string(), usize::static_type());
+        fields.insert("order".to_string(), usize::static_type());
+
+        SimpleType::Record(fields)
     }
 }
 

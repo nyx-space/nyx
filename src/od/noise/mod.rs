@@ -26,7 +26,7 @@ use parquet::arrow::ArrowWriter;
 use rand::rngs::SysRng;
 use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg64Mcg;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fs::File;
 use std::ops::{Mul, MulAssign};
