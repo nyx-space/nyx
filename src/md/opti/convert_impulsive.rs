@@ -19,7 +19,8 @@
 use rayon::prelude::*;
 use snafu::ResultExt;
 
-use crate::dynamics::guidance::{ra_dec_from_unit_vector, GuidanceError, LocalFrame, Mnvr};
+use anise::astro::ephemeris::LocalFrame;
+use crate::dynamics::guidance::{ra_dec_from_unit_vector, GuidanceError,  Mnvr};
 use crate::linalg::{SMatrix, SVector, Vector3};
 use crate::md::objective::Objective;
 use crate::md::{prelude::*, PropSnafu, TargetingError};

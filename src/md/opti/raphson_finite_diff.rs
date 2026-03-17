@@ -19,7 +19,9 @@
 use super::solution::TargeterSolution;
 use super::targeter::Targeter;
 use crate::cosmic::{AstroAlmanacSnafu, AstroPhysicsSnafu};
-use crate::dynamics::guidance::{GuidanceError, LocalFrame, Maneuver, MnvrRepr};
+use anise::astro::ephemeris::LocalFrame;
+use crate::dynamics::guidance::LocalFrameExt;
+use crate::dynamics::guidance::{GuidanceError,  Maneuver, MnvrRepr};
 use crate::errors::TargetingError;
 use crate::linalg::{SMatrix, SVector, Vector6};
 use crate::md::{prelude::*, AstroSnafu, GuidanceSnafu, UnderdeterminedProblemSnafu};

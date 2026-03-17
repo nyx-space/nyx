@@ -20,6 +20,7 @@ use crate::cosmic::AstroPhysicsSnafu;
 pub use crate::errors::NyxError;
 use crate::errors::StateAstroSnafu;
 use crate::linalg::allocator::Allocator;
+use crate::dynamics::guidance::LocalFrameExt;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
 use crate::md::StateParameter;
 pub use crate::od::estimate::{Estimate, KfEstimate, Residual};

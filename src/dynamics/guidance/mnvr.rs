@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use crate::dynamics::guidance::LocalFrameExt;
 use super::{
     ra_dec_from_unit_vector, GuidanceError, GuidanceLaw, GuidancePhysicsSnafu, LocalFrame,
 };

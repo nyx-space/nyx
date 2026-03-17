@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::dynamics::guidance::LocalFrame;
+use anise::ephemerides::ephemeris::LocalFrame;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector, U3, U6};
 use crate::time::{Duration, Epoch};

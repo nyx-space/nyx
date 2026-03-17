@@ -29,7 +29,9 @@ use rand_pcg::Pcg64Mcg;
 use typed_builder::TypedBuilder;
 
 use crate::mc::MvnSpacecraft;
-use crate::{dynamics::guidance::LocalFrame, Spacecraft};
+use anise::astro::ephemeris::LocalFrame;
+use crate::dynamics::guidance::LocalFrameExt;
+use crate::Spacecraft;
 
 use super::{Estimate, KfEstimate};
 
@@ -236,7 +238,7 @@ impl fmt::LowerHex for KfEstimate<Spacecraft> {
 mod ut_sc_uncertainty {
 
     use super::{Spacecraft, SpacecraftUncertainty};
-    use crate::dynamics::guidance::LocalFrame;
+    use anise::ephemerides::ephemeris::LocalFrame;
     use crate::GMAT_EARTH_GM;
     use anise::analysis::prelude::OrbitalElement;
     use anise::constants::frames::EME2000;

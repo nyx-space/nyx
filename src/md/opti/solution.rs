@@ -19,7 +19,8 @@
 use hifitime::TimeUnits;
 use snafu::{ensure, ResultExt};
 
-use crate::dynamics::guidance::{LocalFrame, Maneuver, MnvrRepr};
+use anise::astro::ephemeris::LocalFrame;
+use crate::dynamics::guidance::{ Maneuver, MnvrRepr};
 use crate::linalg::SVector;
 use crate::md::objective::Objective;
 use crate::md::{prelude::*, GuidanceSnafu, NotFiniteSnafu, TargetingError};

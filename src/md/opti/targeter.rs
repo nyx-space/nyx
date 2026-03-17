@@ -19,7 +19,7 @@
 use snafu::ResultExt;
 
 use crate::cosmic::AstroPhysicsSnafu;
-use crate::dynamics::guidance::LocalFrame;
+use anise::ephemerides::ephemeris::LocalFrame;
 use crate::errors::TargetingError;
 use crate::md::objective::Objective;
 use crate::md::prelude::*;
