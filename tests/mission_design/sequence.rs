@@ -13,7 +13,7 @@ use nyx::propagators::{IntegratorMethod, IntegratorOptions};
 use nyx::time::{Epoch, Unit};
 use nyx_space::cosmic::{Mass, SRPData};
 use nyx_space::dynamics::guidance::mnvr::ImpulsiveManeuver;
-use nyx_space::dynamics::guidance::{LocalFrame, Maneuver};
+use nyx_space::dynamics::guidance::{LocalFrame, Maneuver, ObjectiveEfficiency, ObjectiveWeight};
 use nyx_space::dynamics::PointMasses;
 use nyx_space::io::gravity::GravityFieldConfig;
 use nyx_space::md::prelude::{Objective, OrbitalElement};
@@ -163,12 +163,21 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
 
     // Test Dhall serialization
     println!(
-        "{}",
+        "== NEAR EARTH ==\n{}\n",
         serde_dhall::serialize(&sc_seq.propagators["Near Earth"])
             .static_type_annotation()
             .to_string()
             .unwrap()
     );
+
+    println!(
+        "== GUIDANCE ==\n{}",
+        serde_dhall::serialize(&sc_seq.seq[&mnvr_start])
+            .static_type_annotation()
+            .to_string()
+            .unwrap()
+    );
+
     // Initialize the propagators.
     sc_seq.setup(almanac.clone()).unwrap();
 
@@ -202,17 +211,17 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
     disable_prop_mass: false,
     law: SteeringLaw::Ruggiero {
         objectives: vec![
-            (
-                Objective::new(
+            ObjectiveEfficiency{
+                objective: Objective::new(
                     StateParameter::Element(OrbitalElement::SemiMajorAxis),
                     7_300.0,
                 ),
-                0.0,
-            ),
-            (
-                Objective::new(StateParameter::Element(OrbitalElement::Eccentricity), 1e-4),
-                0.0,
-            ),
+                efficiency: 0.0,
+            },
+            ObjectiveEfficiency {
+                objective: Objective::new(StateParameter::Element(OrbitalElement::Eccentricity), 1e-4),
+                efficiency: 0.0,
+            },
         ],
         max_eclipse_prct: Some(0.5),
     }
@@ -222,21 +231,21 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
     disable_prop_mass: false,
     law: SteeringLaw::Ruggiero {
         objectives: vec![
-            (
-                Objective::new(
+            ObjectiveEfficiency {
+                objective: Objective::new(
                     StateParameter::Element(OrbitalElement::SemiMajorAxis),
                     8_000.0,
                 ),
-                0.0,
-            ),
-            (
-                Objective::new(StateParameter::Element(OrbitalElement::Eccentricity), 1e-4),
-                0.0,
-            ),
-            (
-                Objective::new(StateParameter::Element(OrbitalElement::Inclination), 35.0),
-                0.0,
-            ),
+                efficiency: 0.0,
+            },
+            ObjectiveEfficiency {
+                objective: Objective::new(StateParameter::Element(OrbitalElement::Eccentricity), 1e-4),
+                efficiency: 0.0,
+            },
+           ObjectiveEfficiency {
+               objective: Objective::new(StateParameter::Element(OrbitalElement::Inclination), 35.0),
+               efficiency: 0.0,
+            },
         ],
         max_eclipse_prct: Some(0.5)
     }}, "Ruggiero")]
@@ -245,17 +254,17 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
     disable_prop_mass: false,
     law: SteeringLaw::Kluever {
         objectives: vec![
-            (
-                Objective::new(
+            ObjectiveWeight{
+               objective: Objective::new(
                     StateParameter::Element(OrbitalElement::SemiMajorAxis),
                     7_300.0,
                 ),
-                1.0,
-            ),
-            (
-                Objective::new(StateParameter::Element(OrbitalElement::Eccentricity), 1e-4),
-                1.0,
-            ),
+               weight: 1.0,
+            },
+            ObjectiveWeight {
+               objective: Objective::new(StateParameter::Element(OrbitalElement::Eccentricity), 1e-4),
+               weight: 1.0,
+            },
         ],
         max_eclipse_prct: Some(0.5),
     }
@@ -265,21 +274,21 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
     disable_prop_mass: false,
     law: SteeringLaw::Kluever {
     objectives: vec![
-        (
-            Objective::new(
+        ObjectiveWeight {
+           objective: Objective::new(
                 StateParameter::Element(OrbitalElement::SemiMajorAxis),
                 8_000.0,
             ),
-            1.0,
-        ),
-        (
-            Objective::new(StateParameter::Element(OrbitalElement::Eccentricity), 1e-4),
-            1.0,
-        ),
-        (
-            Objective::new(StateParameter::Element(OrbitalElement::Inclination), 35.0),
-            1.0,
-        ),
+           weight: 1.0,
+        },
+        ObjectiveWeight {
+           objective:  Objective::new(StateParameter::Element(OrbitalElement::Eccentricity), 1e-4),
+           weight: 1.0,
+        },
+        ObjectiveWeight {
+           objective:  Objective::new(StateParameter::Element(OrbitalElement::Inclination), 35.0),
+           weight: 1.0,
+        },
     ],
     max_eclipse_prct: Some(0.5)}}, "Kluever")]
 fn spacecraft_low_thrust_orbit_raise(

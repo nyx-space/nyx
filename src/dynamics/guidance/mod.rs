@@ -92,13 +92,13 @@ impl<'a> Decode<'a> for Thruster {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
 pub struct ObjectiveEfficiency {
     pub objective: Objective,
     pub efficiency: f64,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
 pub struct ObjectiveWeight {
     pub objective: Objective,
     pub weight: f64,

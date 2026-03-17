@@ -18,6 +18,7 @@
 
 /* NOTE: This code is effectively a clone of bacon-sci, MIT License, by Wyatt Campbell. */
 use serde::{Deserialize, Serialize};
+use serde_dhall::StaticType;
 use std::fmt;
 use std::ops;
 
@@ -243,24 +244,33 @@ impl<const S1: usize, const S2: usize> ops::Sub<Polynomial<S2>> for Polynomial<S
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize, StaticType)]
 pub enum CommonPolynomial {
-    Constant(f64),
+    Constant {
+        a: f64,
+    },
     /// Linear(a, b) <=> f(x) = ax + b (order is FLIPPED from Polynomial<N> structure)
-    Linear(f64, f64),
+    Linear {
+        a: f64,
+        b: f64,
+    },
     /// Quadratic(a, b, c) <=> f(x) = ax^2 + bx + c (order is FLIPPED from Polynomial<N> structure)
-    Quadratic(f64, f64, f64),
+    Quadratic {
+        a: f64,
+        b: f64,
+        c: f64,
+    },
 }
 
 impl CommonPolynomial {
     pub fn eval(&self, x: f64) -> f64 {
         match *self {
-            Self::Constant(a) => Polynomial::<1> { coefficients: [a] }.eval(x),
-            Self::Linear(a, b) => Polynomial::<2> {
+            Self::Constant { a } => Polynomial::<1> { coefficients: [a] }.eval(x),
+            Self::Linear { a, b } => Polynomial::<2> {
                 coefficients: [b, a],
             }
             .eval(x),
-            Self::Quadratic(a, b, c) => Polynomial::<3> {
+            Self::Quadratic { a, b, c } => Polynomial::<3> {
                 coefficients: [c, b, a],
             }
             .eval(x),
@@ -269,12 +279,12 @@ impl CommonPolynomial {
 
     pub fn deriv(&self, x: f64) -> f64 {
         match *self {
-            Self::Constant(a) => Polynomial::<1> { coefficients: [a] }.deriv(x),
-            Self::Linear(a, b) => Polynomial::<2> {
+            Self::Constant { a } => Polynomial::<1> { coefficients: [a] }.deriv(x),
+            Self::Linear { a, b } => Polynomial::<2> {
                 coefficients: [b, a],
             }
             .deriv(x),
-            Self::Quadratic(a, b, c) => Polynomial::<3> {
+            Self::Quadratic { a, b, c } => Polynomial::<3> {
                 coefficients: [c, b, a],
             }
             .deriv(x),
@@ -283,19 +293,19 @@ impl CommonPolynomial {
 
     pub fn coeff_in_order(&self, order: usize) -> Result<f64, NyxError> {
         match *self {
-            Self::Constant(a) => {
+            Self::Constant { a } => {
                 if order == 0 {
                     Ok(a)
                 } else {
                     Err(NyxError::PolynomialOrderError { order })
                 }
             }
-            Self::Linear(a, b) => match order {
+            Self::Linear { a, b } => match order {
                 0 => Ok(b),
                 1 => Ok(a),
                 _ => Err(NyxError::PolynomialOrderError { order }),
             },
-            Self::Quadratic(a, b, c) => match order {
+            Self::Quadratic { a, b, c } => match order {
                 0 => Ok(c),
                 1 => Ok(b),
                 2 => Ok(a),
@@ -306,22 +316,23 @@ impl CommonPolynomial {
 
     pub fn with_val_in_order(self, new_val: f64, order: usize) -> Result<Self, NyxError> {
         match self {
-            Self::Constant(_) => {
+            Self::Constant { .. } => {
                 if order != 0 {
                     Err(NyxError::PolynomialOrderError { order })
                 } else {
-                    Ok(Self::Constant(new_val))
+                    Ok(Self::Constant { a: new_val })
                 }
             }
-            Self::Linear(x, y) => match order {
-                0 => Ok(Self::Linear(new_val, y)),
-                1 => Ok(Self::Linear(x, new_val)),
+            Self::Linear { a, b } => match order {
+                0 => Ok(Self::Linear { a: new_val, b }),
+                1 => Ok(Self::Linear { a, b: new_val }),
+
                 _ => Err(NyxError::PolynomialOrderError { order }),
             },
-            Self::Quadratic(x, y, z) => match order {
-                0 => Ok(Self::Quadratic(new_val, y, z)),
-                1 => Ok(Self::Quadratic(x, new_val, z)),
-                2 => Ok(Self::Quadratic(x, y, new_val)),
+            Self::Quadratic { a, b, c } => match order {
+                0 => Ok(Self::Quadratic { a: new_val, b, c }),
+                1 => Ok(Self::Quadratic { a, b: new_val, c }),
+                2 => Ok(Self::Quadratic { a, b, c: new_val }),
                 _ => Err(NyxError::PolynomialOrderError { order }),
             },
         }
@@ -329,22 +340,36 @@ impl CommonPolynomial {
 
     pub fn add_val_in_order(self, new_val: f64, order: usize) -> Result<Self, NyxError> {
         match self {
-            Self::Constant(x) => {
+            Self::Constant { a } => {
                 if order != 0 {
                     Err(NyxError::PolynomialOrderError { order })
                 } else {
-                    Ok(Self::Constant(new_val + x))
+                    Ok(Self::Constant { a: new_val + a })
                 }
             }
-            Self::Linear(x, y) => match order {
-                0 => Ok(Self::Linear(new_val + x, y)),
-                1 => Ok(Self::Linear(x, new_val + y)),
+            Self::Linear { a, b } => match order {
+                0 => Ok(Self::Linear { a: new_val + a, b }),
+
+                1 => Ok(Self::Linear { a, b: new_val + b }),
+
                 _ => Err(NyxError::PolynomialOrderError { order }),
             },
-            Self::Quadratic(x, y, z) => match order {
-                0 => Ok(Self::Quadratic(new_val + x, y, z)),
-                1 => Ok(Self::Quadratic(x, new_val + y, z)),
-                2 => Ok(Self::Quadratic(x, y, new_val + z)),
+            Self::Quadratic { a, b, c } => match order {
+                0 => Ok(Self::Quadratic {
+                    a: new_val + a,
+                    b,
+                    c,
+                }),
+                1 => Ok(Self::Quadratic {
+                    a,
+                    b: new_val + b,
+                    c,
+                }),
+                2 => Ok(Self::Quadratic {
+                    a,
+                    b,
+                    c: new_val + c,
+                }),
                 _ => Err(NyxError::PolynomialOrderError { order }),
             },
         }
@@ -355,15 +380,15 @@ impl fmt::Display for CommonPolynomial {
     /// Prints the polynomial with the least significant coefficients first
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Self::Constant(a) => write!(f, "{}", Polynomial::<1> { coefficients: [a] }),
-            Self::Linear(a, b) => write!(
+            Self::Constant { a } => write!(f, "{}", Polynomial::<1> { coefficients: [a] }),
+            Self::Linear { a, b } => write!(
                 f,
                 "{}",
                 Polynomial::<2> {
                     coefficients: [b, a],
                 }
             ),
-            Self::Quadratic(a, b, c) => write!(
+            Self::Quadratic { a, b, c } => write!(
                 f,
                 "{}",
                 Polynomial::<3> {
@@ -380,7 +405,7 @@ mod ut_poly {
 
     #[test]
     fn poly_constant() {
-        let c = CommonPolynomial::Constant(10.0);
+        let c = CommonPolynomial::Constant { a: 10.0 };
         for i in -100..=100 {
             assert!(
                 (c.eval(i as f64) - 10.0).abs() < f64::EPSILON,
@@ -391,7 +416,7 @@ mod ut_poly {
 
     #[test]
     fn poly_linear() {
-        let c = CommonPolynomial::Linear(2.0, 10.0);
+        let c = CommonPolynomial::Linear { a: 2.0, b: 10.0 };
         for i in -100..=100 {
             let x = i as f64;
             let expect = 2.0 * x + 10.0;
@@ -408,7 +433,11 @@ mod ut_poly {
             coefficients: [101.0, -2.0, 3.0],
         };
         let p2 = 2.0 * p;
-        let c = CommonPolynomial::Quadratic(3.0, -2.0, 101.0);
+        let c = CommonPolynomial::Quadratic {
+            a: 3.0,
+            b: -2.0,
+            c: 101.0,
+        };
         for i in -100..=100 {
             let x = i as f64;
             let expect = 3.0 * x.powi(2) - 2.0 * x + 101.0;
@@ -441,7 +470,14 @@ mod ut_poly {
         println!("{p}");
         assert_eq!(
             format!("{p}"),
-            format!("{}", CommonPolynomial::Quadratic(3.0, -2.0, 101.0))
+            format!(
+                "{}",
+                CommonPolynomial::Quadratic {
+                    a: 3.0,
+                    b: -2.0,
+                    c: 101.0
+                }
+            )
         );
     }
 
@@ -504,7 +540,11 @@ mod ut_poly {
 
     #[test]
     fn poly_serde() {
-        let c = CommonPolynomial::Quadratic(3.0, -2.0, 101.0);
+        let c = CommonPolynomial::Quadratic {
+            a: 3.0,
+            b: -2.0,
+            c: 101.0,
+        };
         let c_yml = serde_yml::to_string(&c).unwrap();
         println!("{c_yml}");
         let c2 = serde_yml::from_str(&c_yml).unwrap();

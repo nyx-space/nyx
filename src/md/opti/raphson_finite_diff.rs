@@ -78,8 +78,16 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
             end: achievement_epoch,
             thrust_prct: 1.0,
             representation: MnvrRepr::Angles {
-                azimuth: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
-                elevation: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
+                azimuth: CommonPolynomial::Quadratic {
+                    a: 0.0,
+                    b: 0.0,
+                    c: 0.0,
+                },
+                elevation: CommonPolynomial::Quadratic {
+                    a: 0.0,
+                    b: 0.0,
+                    c: 0.0,
+                },
             },
             frame: LocalFrame::RCN,
         };

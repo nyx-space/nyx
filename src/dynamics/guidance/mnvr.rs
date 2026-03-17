@@ -110,6 +110,20 @@ impl fmt::Display for Maneuver {
     }
 }
 
+impl StaticType for Maneuver {
+    fn static_type() -> SimpleType {
+        let mut fields = HashMap::new();
+
+        fields.insert("start".to_string(), SimpleType::Text);
+        fields.insert("end".to_string(), SimpleType::Text);
+        fields.insert("thrust_prct".to_string(), SimpleType::Double);
+        fields.insert("representation".to_string(), MnvrRepr::static_type());
+        fields.insert("frame".to_string(), LocalFrame::static_type());
+
+        SimpleType::Record(fields)
+    }
+}
+
 /// Defines the available maneuver representations.
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum MnvrRepr {
@@ -133,6 +147,32 @@ impl fmt::Display for MnvrRepr {
                 "\tazimuth (in-plane) α: {azimuth}\n\televation (out-of-plane) β: {elevation}"
             ),
         }
+    }
+}
+
+impl StaticType for MnvrRepr {
+    fn static_type() -> SimpleType {
+        let mut variants = HashMap::new();
+
+        let mut vec_repr = HashMap::new();
+
+        vec_repr.insert("_1".to_string(), f64::static_type());
+        vec_repr.insert("_2".to_string(), f64::static_type());
+        vec_repr.insert("_3".to_string(), f64::static_type());
+
+        variants.insert("Vector".to_string(), Some(SimpleType::Record(vec_repr)));
+
+        // Handle the Angles { azimuth, elevation } variant
+        let mut angles_fields = HashMap::new();
+        angles_fields.insert("azimuth".to_string(), CommonPolynomial::static_type());
+        angles_fields.insert("elevation".to_string(), CommonPolynomial::static_type());
+
+        variants.insert(
+            "Angles".to_string(),
+            Some(SimpleType::Record(angles_fields)),
+        );
+
+        SimpleType::Union(variants)
     }
 }
 
@@ -261,8 +301,8 @@ impl Maneuver {
             }
             if rate.norm() < f64::EPSILON && accel.norm() < f64::EPSILON {
                 self.representation = MnvrRepr::Angles {
-                    azimuth: CommonPolynomial::Constant(alpha),
-                    elevation: CommonPolynomial::Constant(delta),
+                    azimuth: CommonPolynomial::Constant { a: alpha },
+                    elevation: CommonPolynomial::Constant { a: delta },
                 };
             } else {
                 let (alpha_dt, delta_dt) = ra_dec_from_unit_vector(rate);
@@ -277,8 +317,14 @@ impl Maneuver {
                 }
                 if accel.norm() < f64::EPSILON {
                     self.representation = MnvrRepr::Angles {
-                        azimuth: CommonPolynomial::Linear(alpha_dt, alpha),
-                        elevation: CommonPolynomial::Linear(delta_dt, delta),
+                        azimuth: CommonPolynomial::Linear {
+                            a: alpha_dt,
+                            b: alpha,
+                        },
+                        elevation: CommonPolynomial::Linear {
+                            a: delta_dt,
+                            b: delta,
+                        },
                     };
                 } else {
                     let (alpha_ddt, delta_ddt) = ra_dec_from_unit_vector(accel);
@@ -293,8 +339,16 @@ impl Maneuver {
                     }
 
                     self.representation = MnvrRepr::Angles {
-                        azimuth: CommonPolynomial::Quadratic(alpha_ddt, alpha_dt, alpha),
-                        elevation: CommonPolynomial::Quadratic(delta_ddt, delta_dt, delta),
+                        azimuth: CommonPolynomial::Quadratic {
+                            a: alpha_ddt,
+                            b: alpha_dt,
+                            c: alpha,
+                        },
+                        elevation: CommonPolynomial::Quadratic {
+                            a: delta_ddt,
+                            b: delta_dt,
+                            c: delta,
+                        },
                     };
                 }
             }

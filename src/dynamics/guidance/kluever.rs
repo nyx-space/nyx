@@ -27,6 +27,7 @@ use super::{
     Vector3,
 };
 use crate::cosmic::eclipse::ShadowModel;
+use crate::dynamics::guidance::ObjectiveWeight;
 pub use crate::md::objective::Objective;
 pub use crate::md::StateParameter;
 use crate::State;
@@ -37,7 +38,7 @@ use std::sync::Arc;
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Kluever {
     /// Stores the objectives and their associated weights
-    pub objectives: Vec<(Objective, f64)>,
+    pub objectives: Vec<ObjectiveWeight>,
     /// If defined, coast until vehicle is out of the provided eclipse state.
     pub max_eclipse_prct: Option<f64>,
 }
@@ -50,6 +51,10 @@ impl Kluever {
                 .iter()
                 .copied()
                 .zip(weights.iter().copied())
+                .map(|(obj, w)| ObjectiveWeight {
+                    objective: obj,
+                    weight: w,
+                })
                 .collect(),
             max_eclipse_prct: None,
         })
@@ -66,7 +71,11 @@ impl fmt::Display for Kluever {
         let obj_msg = self
             .objectives
             .iter()
-            .map(|(obj, weight)| format!("{obj} (weight: {weight:.3})"))
+            .map(|objective| {
+                let obj = objective.objective;
+                let weight = objective.weight;
+                format!("{obj} (weight: {weight:.3})")
+            })
             .collect::<Vec<String>>();
         write!(
             f,
@@ -83,9 +92,14 @@ impl fmt::Display for Kluever {
 impl GuidanceLaw for Kluever {
     /// Returns whether the guidance law has achieved all goals
     fn achieved(&self, state: &Spacecraft) -> Result<bool, GuidanceError> {
-        for (obj, _weight) in &self.objectives {
+        for obj in &self.objectives {
             if !obj
-                .assess_value(state.value(obj.parameter).context(GuidStateSnafu)?)
+                .objective
+                .assess_value(
+                    state
+                        .value(obj.objective.parameter)
+                        .context(GuidStateSnafu)?,
+                )
                 .0
             {
                 return Ok(false);
@@ -131,8 +145,10 @@ impl GuidanceLaw for Kluever {
         let l_rad = u_rad + raan_rad;
         let (sin_l, cos_l) = l_rad.sin_cos();
 
-        for (obj, weight) in &self.objectives {
-            if *weight == 0.0 {
+        for objective in &self.objectives {
+            let obj = objective.objective;
+            let weight = objective.weight;
+            if weight == 0.0 {
                 continue;
             }
 

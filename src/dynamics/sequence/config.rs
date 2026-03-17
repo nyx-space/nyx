@@ -22,15 +22,17 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::{
-    dynamics::{guidance::Maneuver, Drag, PointMasses, SolarPressure},
+    dynamics::{
+        guidance::{Maneuver, ObjectiveEfficiency, ObjectiveWeight},
+        Drag, PointMasses, SolarPressure,
+    },
     io::gravity::GravityFieldConfig,
-    md::objective::Objective,
     propagators::{IntegratorMethod, IntegratorOptions},
 };
 
 use crate::dynamics::sequence::discrete_event::DiscreteEvent;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Phase {
     Terminate,
     Activity {
@@ -42,6 +44,42 @@ pub enum Phase {
         /// Allows disabling a phase without removing it
         disabled: bool,
     },
+}
+
+impl StaticType for Phase {
+    fn static_type() -> SimpleType {
+        let mut variants = HashMap::new();
+
+        // Handle the Vector(Vector3<f64>) variant
+        // Most math crates serialize Vector3 as a list of 3 doubles
+        variants.insert("Terminate".to_string(), None);
+
+        //  Activity variant (Record variant)
+        let mut activity_fields = HashMap::new();
+
+        activity_fields.insert("name".to_string(), String::static_type());
+        activity_fields.insert("propagator".to_string(), String::static_type());
+
+        // Use the StaticType impl of the boxed inner types
+        activity_fields.insert(
+            "guidance".to_string(),
+            <Option<GuidanceConfig> as StaticType>::static_type(),
+        );
+
+        activity_fields.insert(
+            "on_entry".to_string(),
+            <Option<DiscreteEvent> as StaticType>::static_type(),
+        );
+
+        activity_fields.insert("disabled".to_string(), bool::static_type());
+
+        variants.insert(
+            "Activity".to_string(),
+            Some(SimpleType::Record(activity_fields)),
+        );
+
+        SimpleType::Union(variants)
+    }
 }
 
 /// Propagator config includes the method, options, and all dynamics
@@ -67,25 +105,25 @@ pub struct ForceModels {
     pub drag: Option<Arc<Drag>>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
 pub struct GuidanceConfig {
     pub thruster_model: String,
     pub disable_prop_mass: bool,
     pub law: SteeringLaw,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
 pub enum SteeringLaw {
     FiniteBurn(Maneuver),
     Kluever {
         /// Stores the objectives, and their associated weights (set to zero to disable).
-        objectives: Vec<(Objective, f64)>,
+        objectives: Vec<ObjectiveWeight>,
         /// If defined, coast until vehicle is out of the provided eclipse state.
         max_eclipse_prct: Option<f64>,
     },
     Ruggiero {
         /// Stores the objectives, and their associated efficiency threshold (set to zero if not minimum efficiency).
-        objectives: Vec<(Objective, f64)>,
+        objectives: Vec<ObjectiveEfficiency>,
         /// If defined, coast until vehicle is out of the provided eclipse state.
         max_eclipse_prct: Option<f64>,
     },
