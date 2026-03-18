@@ -52,10 +52,13 @@ impl StaticType for ImpulsiveManeuver {
     fn static_type() -> serde_dhall::SimpleType {
         let mut fields = HashMap::new();
 
+        let mut dv_rcrd = HashMap::new();
+        dv_rcrd.insert("_1".to_string(), f64::static_type());
+        dv_rcrd.insert("_2".to_string(), f64::static_type());
+        dv_rcrd.insert("_3".to_string(), f64::static_type());
+
         fields.insert("local_frame".to_string(), LocalFrame::static_type());
-        fields.insert("dv_x_km_s".to_string(), f64::static_type());
-        fields.insert("dv_y_km_s".to_string(), f64::static_type());
-        fields.insert("dv_z_km_s".to_string(), f64::static_type());
+        fields.insert("dv_km_s".to_string(), SimpleType::Record(dv_rcrd));
 
         SimpleType::Record(fields)
     }

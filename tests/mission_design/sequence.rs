@@ -163,16 +163,8 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
 
     // Test Dhall serialization
     println!(
-        "== NEAR EARTH ==\n{}\n",
-        serde_dhall::serialize(&sc_seq.propagators["Near Earth"])
-            .static_type_annotation()
-            .to_string()
-            .unwrap()
-    );
-
-    println!(
-        "== GUIDANCE ==\n{}",
-        serde_dhall::serialize(&sc_seq.seq[&mnvr_start])
+        "== FULL SEQUENCE ==\n{}\n",
+        serde_dhall::serialize(&sc_seq)
             .static_type_annotation()
             .to_string()
             .unwrap()

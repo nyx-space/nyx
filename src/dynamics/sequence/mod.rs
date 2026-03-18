@@ -23,7 +23,10 @@ use anise::prelude::Almanac;
 use hifitime::{Epoch, Unit};
 use indexmap::IndexMap;
 use log::{debug, info};
+use serde::{Deserialize, Serialize};
+use serde_dhall::{SimpleType, StaticType};
 use snafu::ResultExt;
+use std::collections::HashMap;
 
 use crate::dynamics::guidance::{Kluever, Ruggiero};
 use crate::dynamics::{guidance::Thruster, SpacecraftDynamics};
@@ -40,11 +43,15 @@ mod discrete_event;
 pub use config::*;
 pub use discrete_event::*;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct SpacecraftSequence {
+    #[serde(serialize_with = "map_as_pairs", deserialize_with = "pairs_as_map")]
     pub seq: BTreeMap<Epoch, Phase>,
+    #[serde(with = "indexmap::map::serde_seq")]
     pub thruster_sets: IndexMap<String, Thruster>,
+    #[serde(with = "indexmap::map::serde_seq")]
     pub propagators: IndexMap<String, PropagatorConfig>,
+    #[serde(skip)]
     prop_setups: IndexMap<String, Propagator<SpacecraftDynamics>>,
 }
 
@@ -305,4 +312,66 @@ impl SpacecraftSequence {
         }
         unreachable!("spacecraft plan never finished?!")
     }
+}
+
+impl StaticType for SpacecraftSequence {
+    fn static_type() -> serde_dhall::SimpleType {
+        let mut repr = HashMap::new();
+
+        // seq maps to "sequence" in Dhall
+        // Serialized as List { _1: Text, _2: Phase }
+        let mut seq_entry = HashMap::new();
+        seq_entry.insert("_1".to_string(), SimpleType::Text); // Epoch serializes to Text
+        seq_entry.insert("_2".to_string(), Phase::static_type());
+
+        repr.insert(
+            "seq".to_string(),
+            SimpleType::List(Box::new(SimpleType::Record(seq_entry))),
+        );
+
+        // thruster_sets maps to "thruster_set" in Dhall (matches your serialization name)
+        // Serialized as List { _1: Text, _2: Thruster }
+        let mut thruster_sets = HashMap::new();
+        thruster_sets.insert("_1".to_string(), SimpleType::Text);
+        thruster_sets.insert("_2".to_string(), Thruster::static_type());
+
+        repr.insert(
+            "thruster_sets".to_string(), // Keep as "thruster_set" if that's your Dhall preference
+            SimpleType::List(Box::new(SimpleType::Record(thruster_sets))),
+        );
+
+        let mut propagators = HashMap::new();
+        propagators.insert("_1".to_string(), SimpleType::Text);
+        propagators.insert("_2".to_string(), PropagatorConfig::static_type());
+
+        repr.insert(
+            "propagators".to_string(), // Keep as "thruster_set" if that's your Dhall preference
+            SimpleType::List(Box::new(SimpleType::Record(propagators))),
+        );
+
+        SimpleType::Record(repr)
+    }
+}
+
+/* serialization helper functions */
+
+fn map_as_pairs<S, K, V>(map: &BTreeMap<K, V>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+    K: Serialize + Clone,
+    V: Serialize + Clone,
+{
+    // This turns the map into a sequence of (K, V) which Serde-Dhall sees as {_1, _2}
+    serializer.collect_seq(map.iter())
+}
+
+// You'll need a symmetric deserializer if you plan to read these back
+fn pairs_as_map<'de, D, K, V>(deserializer: D) -> Result<BTreeMap<K, V>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    K: Deserialize<'de> + Ord,
+    V: Deserialize<'de>,
+{
+    let pairs: Vec<(K, V)> = Vec::deserialize(deserializer)?;
+    Ok(pairs.into_iter().collect())
 }
