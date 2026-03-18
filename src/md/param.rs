@@ -21,6 +21,7 @@ use arrow::datatypes::{DataType, Field};
 use core::fmt;
 
 use serde::{Deserialize, Serialize};
+use serde_dhall::StaticType;
 use std::collections::HashMap;
 
 #[cfg(feature = "python")]
@@ -28,7 +29,7 @@ use pyo3::prelude::*;
 
 #[cfg_attr(feature = "python", pyclass)]
 #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
-#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize, StaticType)]
 pub enum StateParameter {
     Element(OrbitalElement),
     /// B-Plane B⋅R

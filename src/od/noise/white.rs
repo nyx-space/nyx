@@ -24,7 +24,7 @@ use der::Sequence;
 use hifitime::{Duration, Epoch};
 use rand::{Rng, RngExt};
 use rand_distr::Normal;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "python")]
 use pyo3::prelude::*;

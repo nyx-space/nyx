@@ -25,6 +25,7 @@ use anise::math::rotation::DCM;
 use anise::prelude::Almanac;
 use der::{Decode, Encode, Reader};
 use serde::{Deserialize, Serialize};
+use serde_dhall::StaticType;
 
 pub mod mnvr;
 pub use mnvr::{Maneuver, MnvrRepr};
@@ -45,7 +46,7 @@ use pyo3::prelude::*;
 /// Defines a thruster with a maximum isp and a maximum thrust.
 #[allow(non_snake_case)]
 #[cfg_attr(feature = "python", pyclass(get_all, set_all))]
-#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize, StaticType)]
 pub struct Thruster {
     /// The thrust is to be provided in Newtons
     pub thrust_N: f64,
@@ -89,6 +90,18 @@ impl<'a> Decode<'a> for Thruster {
             isp_s: decoder.decode()?,
         })
     }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
+pub struct ObjectiveEfficiency {
+    pub objective: Objective,
+    pub efficiency: f64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
+pub struct ObjectiveWeight {
+    pub objective: Objective,
+    pub weight: f64,
 }
 
 /// The `GuidanceLaw` trait handles guidance laws, optimizations, and other such methods for
@@ -188,7 +201,7 @@ pub enum GuidanceError {
 
 /// Local frame options, used notably for guidance laws.
 /// TODO: Replace with ANISE enum, which is identical
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, StaticType)]
 pub enum LocalFrame {
     Inertial,
     RIC,

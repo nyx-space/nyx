@@ -16,18 +16,23 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 use anise::frames::FrameUid;
+use serde::{Deserialize, Serialize};
+use serde_dhall::{SimpleType, StaticType};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::{
-    dynamics::{guidance::Maneuver, Drag, PointMasses, SolarPressure},
+    dynamics::{
+        guidance::{Maneuver, ObjectiveEfficiency, ObjectiveWeight},
+        Drag, PointMasses, SolarPressure,
+    },
     io::gravity::GravityFieldConfig,
-    md::objective::Objective,
     propagators::{IntegratorMethod, IntegratorOptions},
 };
 
 use crate::dynamics::sequence::discrete_event::DiscreteEvent;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Phase {
     Terminate,
     Activity {
@@ -41,8 +46,44 @@ pub enum Phase {
     },
 }
 
+impl StaticType for Phase {
+    fn static_type() -> SimpleType {
+        let mut variants = HashMap::new();
+
+        // Handle the Vector(Vector3<f64>) variant
+        // Most math crates serialize Vector3 as a list of 3 doubles
+        variants.insert("Terminate".to_string(), None);
+
+        //  Activity variant (Record variant)
+        let mut activity_fields = HashMap::new();
+
+        activity_fields.insert("name".to_string(), String::static_type());
+        activity_fields.insert("propagator".to_string(), String::static_type());
+
+        // Use the StaticType impl of the boxed inner types
+        activity_fields.insert(
+            "guidance".to_string(),
+            <Option<GuidanceConfig> as StaticType>::static_type(),
+        );
+
+        activity_fields.insert(
+            "on_entry".to_string(),
+            <Option<DiscreteEvent> as StaticType>::static_type(),
+        );
+
+        activity_fields.insert("disabled".to_string(), bool::static_type());
+
+        variants.insert(
+            "Activity".to_string(),
+            Some(SimpleType::Record(activity_fields)),
+        );
+
+        SimpleType::Union(variants)
+    }
+}
+
 /// Propagator config includes the method, options, and all dynamics
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
 pub struct PropagatorConfig {
     pub method: IntegratorMethod,
     pub options: IntegratorOptions,
@@ -51,63 +92,79 @@ pub struct PropagatorConfig {
 }
 
 /// Acceleration models alter the orbital dynamics
-#[derive(Clone, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct AccelModels {
     pub point_masses: Option<Arc<PointMasses>>,
     pub gravity_field: Option<(GravityFieldConfig, FrameUid)>,
 }
 
 /// Force models alter the spacecraft dynamics (they need a mass).
-#[derive(Clone, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ForceModels {
     pub solar_pressure: Option<Arc<SolarPressure>>,
     pub drag: Option<Arc<Drag>>,
 }
 
-#[derive(Clone, Debug)]
-pub enum GuidanceConfig {
-    FiniteBurn {
-        thruster_model: String,
-        disable_prop_mass: bool,
-        maneuver: Maneuver,
-    },
-    Ruggiero {
-        thruster_model: String,
-        disable_prop_mass: bool,
-        /// Stores the objectives, and their associated efficiency threshold (set to zero if not minimum efficiency).
-        objectives: Vec<(Objective, f64)>,
+#[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
+pub struct GuidanceConfig {
+    pub thruster_model: String,
+    pub disable_prop_mass: bool,
+    pub law: SteeringLaw,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
+pub enum SteeringLaw {
+    FiniteBurn(Maneuver),
+    Kluever {
+        /// Stores the objectives, and their associated weights (set to zero to disable).
+        objectives: Vec<ObjectiveWeight>,
         /// If defined, coast until vehicle is out of the provided eclipse state.
         max_eclipse_prct: Option<f64>,
     },
-    Kluever {
-        thruster_model: String,
-        disable_prop_mass: bool,
-        /// Stores the objectives, and their associated weights (set to zero to disable).
-        objectives: Vec<(Objective, f64)>,
+    Ruggiero {
+        /// Stores the objectives, and their associated efficiency threshold (set to zero if not minimum efficiency).
+        objectives: Vec<ObjectiveEfficiency>,
         /// If defined, coast until vehicle is out of the provided eclipse state.
         max_eclipse_prct: Option<f64>,
     },
 }
 
-impl GuidanceConfig {
-    pub fn thruster_model(&self) -> &str {
-        match self {
-            Self::FiniteBurn { thruster_model, .. } => thruster_model,
-            Self::Ruggiero { thruster_model, .. } => thruster_model,
-            Self::Kluever { thruster_model, .. } => thruster_model,
-        }
+impl StaticType for AccelModels {
+    fn static_type() -> serde_dhall::SimpleType {
+        let mut fields = HashMap::new();
+
+        fields.insert(
+            "point_masses".to_string(),
+            SimpleType::Optional(Box::new(PointMasses::static_type())),
+        );
+
+        #[allow(dead_code)]
+        #[derive(StaticType)]
+        struct GravityFieldDhall(GravityFieldConfig, FrameUid);
+
+        fields.insert(
+            "gravity_field".to_string(),
+            SimpleType::Optional(Box::new(GravityFieldDhall::static_type())),
+        );
+
+        SimpleType::Record(fields)
     }
-    pub fn disable_prop_mass(&self) -> bool {
-        match self {
-            Self::FiniteBurn {
-                disable_prop_mass, ..
-            } => *disable_prop_mass,
-            Self::Ruggiero {
-                disable_prop_mass, ..
-            } => *disable_prop_mass,
-            Self::Kluever {
-                disable_prop_mass, ..
-            } => *disable_prop_mass,
-        }
+}
+
+impl StaticType for ForceModels {
+    fn static_type() -> serde_dhall::SimpleType {
+        let mut fields = HashMap::new();
+
+        fields.insert(
+            "solar_pressure".to_string(),
+            SimpleType::Optional(Box::new(SolarPressure::static_type())),
+        );
+
+        fields.insert(
+            "drag".to_string(),
+            SimpleType::Optional(Box::new(Drag::static_type())),
+        );
+
+        SimpleType::Record(fields)
     }
 }

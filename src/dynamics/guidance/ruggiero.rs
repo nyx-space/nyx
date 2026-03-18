@@ -27,6 +27,7 @@ use super::{
     GuidancePhysicsSnafu, NyxError, Orbit, Spacecraft, Vector3,
 };
 use crate::cosmic::eclipse::ShadowModel;
+use crate::dynamics::guidance::ObjectiveEfficiency;
 pub use crate::md::objective::Objective;
 pub use crate::md::StateParameter;
 use crate::State;
@@ -38,7 +39,7 @@ use std::sync::Arc;
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub struct Ruggiero {
     /// Stores the objectives, and their associated efficiency threshold (set to zero if not minimum efficiency).
-    pub objectives: Vec<(Objective, f64)>,
+    pub objectives: Vec<ObjectiveEfficiency>,
     /// If defined, coast until vehicle is out of the provided eclipse state.
     pub max_eclipse_prct: Option<f64>,
     pub init_state: Spacecraft,
@@ -90,7 +91,10 @@ impl Ruggiero {
             ]
             .contains(&obj.parameter)
             {
-                objs.push((obj, ηthreshold));
+                objs.push(ObjectiveEfficiency {
+                    objective: obj,
+                    efficiency: ηthreshold,
+                });
             } else {
                 return Err(NyxError::GuidanceConfigError {
                     msg: format!("Objective {} not supported in Ruggerio", obj.parameter),
@@ -130,7 +134,10 @@ impl Ruggiero {
             ]
             .contains(&obj.parameter)
             {
-                objs.push((*obj, 0.0));
+                objs.push(ObjectiveEfficiency {
+                    objective: *obj,
+                    efficiency: 0.0,
+                });
             } else {
                 return Err(NyxError::GuidanceConfigError {
                     msg: format!("Objective {} not supported in Ruggerio", obj.parameter),
@@ -234,14 +241,14 @@ impl Ruggiero {
     pub fn status(&self, state: &Spacecraft) -> Vec<String> {
         self.objectives
             .iter()
-            .map(|(obj, _)| {
-                let (ok, err) = obj.assess(state).unwrap();
+            .map(|obj| {
+                let (ok, err) = obj.objective.assess(state).unwrap();
                 format!(
                     "{} achieved: {}\t error = {:.5} {}",
-                    obj,
+                    obj.objective,
                     ok,
                     err,
-                    obj.parameter.unit()
+                    obj.objective.parameter.unit()
                 )
             })
             .collect::<Vec<String>>()
@@ -253,7 +260,7 @@ impl fmt::Display for Ruggiero {
         let obj_msg = self
             .objectives
             .iter()
-            .map(|(obj, _)| format!("{obj}"))
+            .map(|obj| format!("{}", obj.objective))
             .collect::<Vec<String>>();
         write!(
             f,
@@ -270,9 +277,14 @@ impl fmt::Display for Ruggiero {
 impl GuidanceLaw for Ruggiero {
     /// Returns whether the guidance law has achieved all goals
     fn achieved(&self, state: &Spacecraft) -> Result<bool, GuidanceError> {
-        for (obj, _) in self.objectives.iter() {
+        for obj in self.objectives.iter() {
             if !obj
-                .assess_value(state.value(obj.parameter).context(GuidStateSnafu)?)
+                .objective
+                .assess_value(
+                    state
+                        .value(obj.objective.parameter)
+                        .context(GuidStateSnafu)?,
+                )
                 .0
             {
                 return Ok(false);
@@ -285,8 +297,10 @@ impl GuidanceLaw for Ruggiero {
         if sc.mode() == GuidanceMode::Thrust {
             let osc = sc.orbit;
             let mut steering = Vector3::zeros();
-            for (obj, ηthreshold) in &self.objectives {
-                let weight = self.weighting(obj, sc, *ηthreshold);
+            for objective in &self.objectives {
+                let obj = objective.objective;
+                let ηthreshold = objective.efficiency;
+                let weight = self.weighting(&obj, sc, ηthreshold);
                 if weight.abs() <= 0.0 {
                     continue;
                 }

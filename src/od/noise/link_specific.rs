@@ -19,7 +19,7 @@
 use super::{StochasticNoise, WhiteNoise};
 use anise::constants::SPEED_OF_LIGHT_KM_S;
 use hifitime::Duration;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::f64::consts::TAU;
 
 /// Signal power to noise density for stochastic modeling, typical values.

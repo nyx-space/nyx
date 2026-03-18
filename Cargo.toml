@@ -36,12 +36,12 @@ der = { version = "0.7", features = ["derive", "alloc", "real"] }
 nalgebra = "0.34"
 log = "0.4"
 hifitime = "4.2.5"
-anise = { version = "0.9.6", features = ["analysis"] }
+# anise = { version = "0.9.6", features = ["analysis"] }
+anise = { git = "https://github.com/nyx-space/anise", package = "anise", features = ["analysis"] }
 flate2 = { version = "1.0", features = [
     "rust_backend",
 ], default-features = false }
-serde = "1.0"
-serde_derive = "1.0"
+serde = {version = "1.0", features = ["derive", "rc"]}
 hyperdual = "1.4.0"
 rand = "0.10"
 rand_distr = "0.6"

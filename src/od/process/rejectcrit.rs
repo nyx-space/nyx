@@ -17,7 +17,7 @@
 */
 
 use crate::io::ConfigRepr;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 /// Reject measurements if the prefit is greater than the provided sigmas deviation from the measurement noise.
 ///

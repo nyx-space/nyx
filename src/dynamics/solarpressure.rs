@@ -24,6 +24,8 @@ use anise::almanac::Almanac;
 use anise::constants::frames::{EARTH_J2000, SUN_J2000};
 use hyperdual::{hyperspace_from_vector, linalg::norm, Float, OHyperdual};
 use log::warn;
+use serde::{Deserialize, Serialize};
+use serde_dhall::StaticType;
 use snafu::ResultExt;
 use std::fmt;
 use std::sync::Arc;
@@ -33,7 +35,7 @@ use std::sync::Arc;
 pub const SOLAR_FLUX_W_m2: f64 = 1367.0;
 
 /// Computation of solar radiation pressure is based on STK: <http://help.agi.com/stk/index.htm#gator/eq-solar.htm> .
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
 pub struct SolarPressure {
     /// solar flux at 1 AU, in W/m^2
     pub phi: f64,

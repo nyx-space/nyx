@@ -21,12 +21,14 @@ use anise::analysis::prelude::Event;
 use anise::astro::Occultation;
 use anise::constants::frames::{EARTH_J2000, MOON_J2000, SUN_J2000};
 use anise::errors::AlmanacResult;
+use serde::{Deserialize, Serialize};
+use serde_dhall::StaticType;
 
 pub use super::{Frame, Orbit, Spacecraft};
 use std::fmt;
 use std::sync::Arc;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
 pub struct ShadowModel {
     pub light_source: Frame,
     pub shadow_bodies: Vec<Frame>,

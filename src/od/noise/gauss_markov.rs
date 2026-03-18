@@ -22,7 +22,7 @@ use hifitime::{Duration, Epoch, TimeUnits};
 use der::{Decode, Encode, Reader};
 use rand::{Rng, RngExt};
 use rand_distr::Normal;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::ops::{Mul, MulAssign};
 

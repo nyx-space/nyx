@@ -25,11 +25,13 @@ use super::{
 };
 use crate::cosmic::{AstroError, AstroPhysicsSnafu, Frame, Spacecraft};
 use crate::linalg::{Matrix4x3, Vector3};
+use serde::{Deserialize, Serialize};
+use serde_dhall::StaticType;
 use std::fmt;
 use std::sync::Arc;
 
 /// Density in kg/m^3 and altitudes in meters, not kilometers!
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, StaticType)]
 pub enum AtmDensity {
     Constant(f64),
     Exponential { rho0: f64, r0: f64, ref_alt_m: f64 },
@@ -100,7 +102,7 @@ impl ForceModel for ConstantDrag {
 }
 
 /// `Drag` implements all three drag models.
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, StaticType)]
 pub struct Drag {
     /// Density computation method
     pub density: AtmDensity,

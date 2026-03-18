@@ -11,6 +11,7 @@ use nyx::linalg::Vector3;
 use nyx::md::prelude::*;
 use nyx::propagators::{IntegratorMethod, IntegratorOptions};
 use nyx_space::cosmic::Mass;
+use nyx_space::dynamics::sequence::SteeringLaw;
 
 use crate::propagation::GMAT_EARTH_GM;
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
@@ -268,10 +269,10 @@ fn val_tgt_finite_burn(almanac: Arc<Almanac>) {
         Phase::Activity {
             name: "Burn".to_string(),
             propagator: "Earth".to_string(),
-            guidance: Some(Box::new(GuidanceConfig::FiniteBurn {
-                maneuver: mnvr0,
+            guidance: Some(Box::new(GuidanceConfig {
                 thruster_model: "Monoprop".to_string(),
                 disable_prop_mass: false,
+                law: SteeringLaw::FiniteBurn(mnvr0),
             })),
             on_entry: None,
             disabled: false,

@@ -19,10 +19,11 @@
 use super::StateParameter;
 use crate::{errors::StateError, Spacecraft, State};
 use serde::{Deserialize, Serialize};
+use serde_dhall::StaticType;
 use std::fmt;
 
 /// Defines a state parameter event finder
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, StaticType)]
 pub struct Objective {
     /// The state parameter to target
     pub parameter: StateParameter,

@@ -20,10 +20,12 @@ use anise::{
     frames::Frame,
     structure::spacecraft::{DragData, Mass, SRPData},
 };
+use serde::{Deserialize, Serialize};
+use serde_dhall::StaticType;
 
 use crate::dynamics::guidance::mnvr::ImpulsiveManeuver;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
 pub enum DiscreteEvent {
     Staging {
         impulsive_maneuver: Option<ImpulsiveManeuver>,
@@ -38,7 +40,7 @@ pub enum DiscreteEvent {
     },
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
 pub struct PhysicalProperties {
     pub mass: Option<Mass>,
     pub srp: Option<SRPData>,

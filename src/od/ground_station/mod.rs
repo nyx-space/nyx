@@ -31,7 +31,7 @@ use crate::od::NoiseNotConfiguredSnafu;
 use crate::time::Epoch;
 use hifitime::Duration;
 use rand_pcg::Pcg64Mcg;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::fmt::{self, Debug};
 
 pub mod builtin;

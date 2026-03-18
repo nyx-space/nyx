@@ -13,7 +13,7 @@ use nyx::propagators::{IntegratorMethod, IntegratorOptions};
 use nyx::time::{Epoch, Unit};
 use nyx_space::cosmic::{Mass, SRPData};
 use nyx_space::dynamics::guidance::mnvr::ImpulsiveManeuver;
-use nyx_space::dynamics::guidance::{LocalFrame, Maneuver};
+use nyx_space::dynamics::guidance::{LocalFrame, Maneuver, ObjectiveEfficiency, ObjectiveWeight};
 use nyx_space::dynamics::PointMasses;
 use nyx_space::io::gravity::GravityFieldConfig;
 use nyx_space::md::prelude::{Objective, OrbitalElement};
@@ -142,14 +142,14 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
         Phase::Activity {
             name: "Finite Maneuver".to_string(),
             propagator: "Cislunar".to_string(),
-            guidance: Some(Box::new(GuidanceConfig::FiniteBurn {
-                maneuver: Maneuver::from_time_invariant(
+            guidance: Some(Box::new(GuidanceConfig {
+                law: SteeringLaw::FiniteBurn(Maneuver::from_time_invariant(
                     mnvr_start,
                     mnvr_end,
                     1.0,
                     Vector3::new(1.0, 0.0, 0.0),
                     LocalFrame::VNC,
-                ),
+                )),
                 thruster_model: "BiProp".to_string(),
                 disable_prop_mass: false,
             })),
@@ -160,6 +160,15 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
 
     // All sequences MUST end with a Terminate phase.
     sc_seq.seq.insert(epoch + Unit::Day * 30, Phase::Terminate);
+
+    // Test Dhall serialization
+    println!(
+        "== FULL SEQUENCE ==\n{}\n",
+        serde_dhall::serialize(&sc_seq)
+            .static_type_annotation()
+            .to_string()
+            .unwrap()
+    );
 
     // Initialize the propagators.
     sc_seq.setup(almanac.clone()).unwrap();
@@ -188,86 +197,92 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
     assert_eq!(trajectories.len(), sc_seq.seq.len() - 1);
 }
 
-// TODO: Add Rugg and Kluever cases!
 #[rstest]
-#[case(GuidanceConfig::Ruggiero {
+#[case(GuidanceConfig {
     thruster_model: "HET".to_string(),
     disable_prop_mass: false,
-    objectives: vec![
-        (
-            Objective::new(
-                StateParameter::Element(OrbitalElement::SemiMajorAxis),
-                7_300.0,
-            ),
-            0.0,
-        ),
-        (
-            Objective::new(StateParameter::Element(OrbitalElement::Eccentricity), 1e-4),
-            0.0,
-        ),
-    ],
-    max_eclipse_prct: Some(0.5),
+    law: SteeringLaw::Ruggiero {
+        objectives: vec![
+            ObjectiveEfficiency{
+                objective: Objective::new(
+                    StateParameter::Element(OrbitalElement::SemiMajorAxis),
+                    7_300.0,
+                ),
+                efficiency: 0.0,
+            },
+            ObjectiveEfficiency {
+                objective: Objective::new(StateParameter::Element(OrbitalElement::Eccentricity), 1e-4),
+                efficiency: 0.0,
+            },
+        ],
+        max_eclipse_prct: Some(0.5),
+    }
 },
-    GuidanceConfig::Ruggiero {
+    GuidanceConfig {
     thruster_model: "HET".to_string(),
     disable_prop_mass: false,
+    law: SteeringLaw::Ruggiero {
+        objectives: vec![
+            ObjectiveEfficiency {
+                objective: Objective::new(
+                    StateParameter::Element(OrbitalElement::SemiMajorAxis),
+                    8_000.0,
+                ),
+                efficiency: 0.0,
+            },
+            ObjectiveEfficiency {
+                objective: Objective::new(StateParameter::Element(OrbitalElement::Eccentricity), 1e-4),
+                efficiency: 0.0,
+            },
+           ObjectiveEfficiency {
+               objective: Objective::new(StateParameter::Element(OrbitalElement::Inclination), 35.0),
+               efficiency: 0.0,
+            },
+        ],
+        max_eclipse_prct: Some(0.5)
+    }}, "Ruggiero")]
+#[case(GuidanceConfig {
+    thruster_model: "HET".to_string(),
+    disable_prop_mass: false,
+    law: SteeringLaw::Kluever {
+        objectives: vec![
+            ObjectiveWeight{
+               objective: Objective::new(
+                    StateParameter::Element(OrbitalElement::SemiMajorAxis),
+                    7_300.0,
+                ),
+               weight: 1.0,
+            },
+            ObjectiveWeight {
+               objective: Objective::new(StateParameter::Element(OrbitalElement::Eccentricity), 1e-4),
+               weight: 1.0,
+            },
+        ],
+        max_eclipse_prct: Some(0.5),
+    }
+},
+    GuidanceConfig {
+    thruster_model: "HET".to_string(),
+    disable_prop_mass: false,
+    law: SteeringLaw::Kluever {
     objectives: vec![
-        (
-            Objective::new(
+        ObjectiveWeight {
+           objective: Objective::new(
                 StateParameter::Element(OrbitalElement::SemiMajorAxis),
                 8_000.0,
             ),
-            0.0,
-        ),
-        (
-            Objective::new(StateParameter::Element(OrbitalElement::Eccentricity), 1e-4),
-            0.0,
-        ),
-        (
-            Objective::new(StateParameter::Element(OrbitalElement::Inclination), 35.0),
-            0.0,
-        ),
+           weight: 1.0,
+        },
+        ObjectiveWeight {
+           objective:  Objective::new(StateParameter::Element(OrbitalElement::Eccentricity), 1e-4),
+           weight: 1.0,
+        },
+        ObjectiveWeight {
+           objective:  Objective::new(StateParameter::Element(OrbitalElement::Inclination), 35.0),
+           weight: 1.0,
+        },
     ],
-    max_eclipse_prct: Some(0.5),}, "Ruggiero")]
-#[case(GuidanceConfig::Kluever {
-    thruster_model: "HET".to_string(),
-    disable_prop_mass: false,
-    objectives: vec![
-        (
-            Objective::new(
-                StateParameter::Element(OrbitalElement::SemiMajorAxis),
-                7_300.0,
-            ),
-            1.0,
-        ),
-        (
-            Objective::new(StateParameter::Element(OrbitalElement::Eccentricity), 1e-4),
-            1.0,
-        ),
-    ],
-    max_eclipse_prct: Some(0.5),
-},
-    GuidanceConfig::Kluever {
-    thruster_model: "HET".to_string(),
-    disable_prop_mass: false,
-    objectives: vec![
-        (
-            Objective::new(
-                StateParameter::Element(OrbitalElement::SemiMajorAxis),
-                8_000.0,
-            ),
-            1.0,
-        ),
-        (
-            Objective::new(StateParameter::Element(OrbitalElement::Eccentricity), 1e-4),
-            1.0,
-        ),
-        (
-            Objective::new(StateParameter::Element(OrbitalElement::Inclination), 35.0),
-            1.0,
-        ),
-    ],
-    max_eclipse_prct: Some(0.5),}, "Kluever")]
+    max_eclipse_prct: Some(0.5)}}, "Kluever")]
 fn spacecraft_low_thrust_orbit_raise(
     #[case] first_raise: GuidanceConfig,
     #[case] second_raise: GuidanceConfig,
