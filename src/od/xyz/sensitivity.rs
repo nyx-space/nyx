@@ -10,8 +10,8 @@ use std::sync::Arc;
 
 use super::XyzDevice;
 use crate::od::msr::measurement::Measurement;
-use crate::od::msr::MeasurementType;
 use crate::od::msr::sensitivity::{ScalarSensitivity, ScalarSensitivityT, TrackerSensitivity};
+use crate::od::msr::MeasurementType;
 
 impl TrackerSensitivity<Spacecraft, Spacecraft> for XyzDevice
 where
@@ -30,7 +30,7 @@ where
         DefaultAllocator: Allocator<M> + Allocator<M, <Spacecraft as State>::Size>,
     {
         // Rebuild each row of the scalar sensitivities.
-        let mut mat = OMatrix::<f64, M, <Spacecraft as State>::Size>::identity();
+        let mut mat = OMatrix::<f64, M, <Spacecraft as State>::Size>::zeros();
         for (ith_row, msr_type) in msr_types.iter().enumerate() {
             if !msr.data.contains_key(msr_type) {
                 // Skip computation, this row is zero anyway.
@@ -59,40 +59,24 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, XyzDevice>
         _tx: &XyzDevice,
         _almanac: Arc<Almanac>,
     ) -> Result<Self, ODError> {
-        match msr_type {
-            MeasurementType::X => {
-                let mut sensitivity_row = OMatrix::<f64, U1, <Spacecraft as State>::Size>::zeros();
-                sensitivity_row[(0, 0)] = 1.0;
-
-                Ok(Self {
-                    sensitivity_row,
-                    _rx: PhantomData::<_>,
-                    _tx: PhantomData::<_>,
+        let idx = match msr_type {
+            MeasurementType::X => 0,
+            MeasurementType::Y => 1,
+            MeasurementType::Z => 2,
+            _ => {
+                return Err(ODError::MeasurementSimError {
+                    details: format!("{msr_type:?} is not supported by XyzDevice"),
                 })
             }
-            MeasurementType::Y => {
-                let mut sensitivity_row = OMatrix::<f64, U1, <Spacecraft as State>::Size>::zeros();
-                sensitivity_row[(0, 1)] = 1.0;
+        };
 
-                Ok(Self {
-                    sensitivity_row,
-                    _rx: PhantomData::<_>,
-                    _tx: PhantomData::<_>,
-                })
-            }
-            MeasurementType::Z => {
-                let mut sensitivity_row = OMatrix::<f64, U1, <Spacecraft as State>::Size>::zeros();
-                sensitivity_row[(0, 2)] = 1.0;
+        let mut sensitivity_row = OMatrix::<f64, U1, <Spacecraft as State>::Size>::zeros();
+        sensitivity_row[(0, idx)] = 1.0;
 
-                Ok(Self {
-                    sensitivity_row,
-                    _rx: PhantomData::<_>,
-                    _tx: PhantomData::<_>,
-                })
-            }
-            _ => Err(ODError::MeasurementSimError {
-                details: format!("{msr_type:?} is not supported by XyzDevice"),
-            }),
-        }
+        Ok(Self {
+            sensitivity_row,
+            _rx: PhantomData::<_>,
+            _tx: PhantomData::<_>,
+        })
     }
 }

@@ -1,12 +1,12 @@
 pub mod sensitivity;
 pub mod trk_device;
 
-use crate::od::noise::StochasticNoise;
+use crate::io::ConfigRepr;
 use crate::od::msr::MeasurementType;
+use crate::od::noise::StochasticNoise;
 use indexmap::IndexMap;
 use indexmap::IndexSet;
 use serde::{Deserialize, Serialize};
-use crate::io::ConfigRepr;
 use std::fmt::Display;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -29,7 +29,10 @@ impl XyzDevice {
         if self.stochastic_noises.is_none() {
             self.stochastic_noises = Some(IndexMap::new());
         }
-        self.stochastic_noises.as_mut().unwrap().insert(msr_type, noise);
+        self.stochastic_noises
+            .as_mut()
+            .unwrap()
+            .insert(msr_type, noise);
         self.measurement_types.insert(msr_type);
         self
     }

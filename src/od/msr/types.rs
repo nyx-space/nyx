@@ -70,7 +70,9 @@ impl MeasurementType {
             | MeasurementType::Elevation
             | MeasurementType::ReceiveFrequency
             | MeasurementType::TransmitFrequency
-            | MeasurementType::X | MeasurementType::Y | MeasurementType::Z => false,
+            | MeasurementType::X
+            | MeasurementType::Y
+            | MeasurementType::Z => false,
         }
     }
 

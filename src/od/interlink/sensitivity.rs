@@ -162,7 +162,9 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, InterlinkTxSpacecraft>
             | MeasurementType::Elevation
             | MeasurementType::ReceiveFrequency
             | MeasurementType::TransmitFrequency
-            | MeasurementType::X | MeasurementType::Y | MeasurementType::Z => Err(ODError::MeasurementSimError {
+            | MeasurementType::X
+            | MeasurementType::Y
+            | MeasurementType::Z => Err(ODError::MeasurementSimError {
                 details: format!("{msr_type:?} is not supported for interlink"),
             }),
         }

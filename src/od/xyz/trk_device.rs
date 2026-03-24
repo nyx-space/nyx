@@ -1,15 +1,16 @@
 use crate::md::prelude::Traj;
 use crate::od::msr::measurement::Measurement;
 use crate::od::msr::MeasurementType;
+use crate::od::NoiseNotConfiguredSnafu;
 use crate::od::{ODError, ODTrajSnafu, TrackingDevice};
 use crate::time::Epoch;
 use crate::Spacecraft;
 use anise::errors::AlmanacResult;
 use anise::frames::Frame;
 use anise::prelude::{Almanac, Orbit};
-use indexmap::IndexSet;
+use indexmap::{IndexMap, IndexSet};
 use rand_pcg::Pcg64Mcg;
-use snafu::ResultExt;
+use snafu::{ensure, ResultExt};
 use std::sync::Arc;
 
 use super::XyzDevice;
@@ -36,7 +37,12 @@ impl TrackingDevice<Spacecraft> for XyzDevice {
         self.name.clone()
     }
 
-    fn location(&self, _epoch: Epoch, _frame: Frame, _almanac: Arc<Almanac>) -> AlmanacResult<Orbit> {
+    fn location(
+        &self,
+        _epoch: Epoch,
+        _frame: Frame,
+        _almanac: Arc<Almanac>,
+    ) -> AlmanacResult<Orbit> {
         // XyzDevice does not have a location
         unimplemented!("XyzDevice does not have a location")
     }
@@ -48,39 +54,38 @@ impl TrackingDevice<Spacecraft> for XyzDevice {
         _almanac: Arc<Almanac>,
     ) -> Result<Option<Measurement>, ODError> {
         let mut msr = Measurement::new(self.name.clone(), rx.orbit.epoch);
+        let mut noises = IndexMap::with_capacity(self.measurement_types.len());
 
-        let mut noise_x = 0.0;
-        let mut noise_y = 0.0;
-        let mut noise_z = 0.0;
+        if let Some(rng) = rng {
+            ensure!(
+                self.stochastic_noises.is_some(),
+                NoiseNotConfiguredSnafu {
+                    kind: "ground station stochastics".to_string(),
+                }
+            );
 
-        if let Some(rng_gen) = rng {
-            use rand_distr::{Distribution, Normal};
+            let stochastics = self.stochastic_noises.as_mut().unwrap();
 
-            if self.measurement_types.contains(&MeasurementType::X) {
-                let cov = self.measurement_covar(MeasurementType::X, rx.orbit.epoch)?;
-                let normal = Normal::new(0.0, cov.sqrt()).unwrap();
-                noise_x = normal.sample(rng_gen);
-            }
-            if self.measurement_types.contains(&MeasurementType::Y) {
-                let cov = self.measurement_covar(MeasurementType::Y, rx.orbit.epoch)?;
-                let normal = Normal::new(0.0, cov.sqrt()).unwrap();
-                noise_y = normal.sample(rng_gen);
-            }
-            if self.measurement_types.contains(&MeasurementType::Z) {
-                let cov = self.measurement_covar(MeasurementType::Z, rx.orbit.epoch)?;
-                let normal = Normal::new(0.0, cov.sqrt()).unwrap();
-                noise_z = normal.sample(rng_gen);
+            for msr_type in &self.measurement_types {
+                noises.insert(
+                    *msr_type,
+                    stochastics
+                        .get_mut(msr_type)
+                        .ok_or(ODError::NoiseNotConfigured {
+                            kind: format!("{msr_type:?}"),
+                        })?
+                        .sample(rx.orbit.epoch, rng),
+                );
             }
         }
 
-        if self.measurement_types.contains(&MeasurementType::X) {
-            msr.push(MeasurementType::X, rx.orbit.radius_km.x + noise_x + self.measurement_bias(MeasurementType::X, rx.orbit.epoch)?);
-        }
-        if self.measurement_types.contains(&MeasurementType::Y) {
-            msr.push(MeasurementType::Y, rx.orbit.radius_km.y + noise_y + self.measurement_bias(MeasurementType::Y, rx.orbit.epoch)?);
-        }
-        if self.measurement_types.contains(&MeasurementType::Z) {
-            msr.push(MeasurementType::Z, rx.orbit.radius_km.z + noise_z + self.measurement_bias(MeasurementType::Z, rx.orbit.epoch)?);
+        for (ii, msr_type) in self.measurement_types.iter().copied().enumerate() {
+            msr.push(
+                msr_type,
+                rx.orbit.radius_km[ii]
+                    + noises.get(&msr_type).unwrap_or(&0.0)
+                    + self.measurement_bias(msr_type, rx.orbit.epoch)?,
+            );
         }
 
         Ok(Some(msr))
