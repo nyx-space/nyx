@@ -61,11 +61,17 @@ pub mod snc;
 /// Provides the Batch least squares initial state solver.
 pub mod blse;
 
+/// Provides Position, Navigation, and Timing capabilities for spacecraft assets
 #[cfg(feature = "premium")]
 pub mod interlink;
 
+/// Provides Position, Navigation, and Timing capabilities for assets on the surface of celestial objects
 #[cfg(feature = "premium")]
 pub mod groundpnt;
+
+/// Provides post-filtering for GNSS/GPS devices
+#[cfg(feature = "premium")]
+pub mod position;
 
 /// A helper type for spacecraft orbit determination.
 pub type SpacecraftKalmanOD = self::process::KalmanODProcess<

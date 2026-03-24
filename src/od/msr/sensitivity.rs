@@ -234,6 +234,11 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
                     details: format!("{msr_type:?} is only supported in CCSDS TDM parsing"),
                 })
             }
+            MeasurementType::X | MeasurementType::Y | MeasurementType::Z => {
+                Err(ODError::MeasurementSimError {
+                    details: format!("{msr_type:?} is not supported for ground stations"),
+                })
+            }
         }
     }
 }

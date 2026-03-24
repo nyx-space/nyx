@@ -42,6 +42,12 @@ pub enum MeasurementType {
     ReceiveFrequency = 4,
     #[serde(rename = "transmit_freq")]
     TransmitFrequency = 5,
+    #[serde(rename = "x")]
+    X = 6,
+    #[serde(rename = "y")]
+    Y = 7,
+    #[serde(rename = "z")]
+    Z = 8,
 }
 
 impl MeasurementType {
@@ -52,6 +58,7 @@ impl MeasurementType {
             Self::Doppler => "km/s",
             Self::Azimuth | Self::Elevation => "deg",
             Self::ReceiveFrequency | Self::TransmitFrequency => "Hz",
+            Self::X | Self::Y | Self::Z => "km",
         }
     }
 
@@ -62,7 +69,10 @@ impl MeasurementType {
             MeasurementType::Azimuth
             | MeasurementType::Elevation
             | MeasurementType::ReceiveFrequency
-            | MeasurementType::TransmitFrequency => false,
+            | MeasurementType::TransmitFrequency
+            | MeasurementType::X
+            | MeasurementType::Y
+            | MeasurementType::Z => false,
         }
     }
 
@@ -89,6 +99,9 @@ impl MeasurementType {
             Self::Elevation => Ok(aer.elevation_deg + noise),
             Self::ReceiveFrequency | Self::TransmitFrequency => Err(ODError::MeasurementSimError {
                 details: format!("{self:?} is only supported in CCSDS TDM parsing"),
+            }),
+            Self::X | Self::Y | Self::Z => Err(ODError::MeasurementSimError {
+                details: format!("{self:?} must be computed directly from the state"),
             }),
         }
     }
@@ -121,6 +134,9 @@ impl MeasurementType {
             Self::ReceiveFrequency | Self::TransmitFrequency => Err(ODError::MeasurementSimError {
                 details: format!("{self:?} is only supported in CCSDS TDM parsing"),
             }),
+            Self::X | Self::Y | Self::Z => Err(ODError::MeasurementSimError {
+                details: format!("{self:?} is not supported for two way measurements"),
+            }),
         }
     }
 
@@ -133,6 +149,9 @@ impl MeasurementType {
             MeasurementType::Elevation => "ANGLE_2",
             MeasurementType::ReceiveFrequency => "RECEIVE_FREQ",
             MeasurementType::TransmitFrequency => "TRANSMIT_FREQ",
+            MeasurementType::X => "X",
+            MeasurementType::Y => "Y",
+            MeasurementType::Z => "Z",
         }
     }
 }
@@ -146,6 +165,9 @@ impl FromStr for MeasurementType {
             "doppler" => Ok(Self::Doppler),
             "azimuth" => Ok(Self::Azimuth),
             "elevation" => Ok(Self::Elevation),
+            "x" => Ok(Self::X),
+            "y" => Ok(Self::Y),
+            "z" => Ok(Self::Z),
             _ => Err(InputOutputError::UnsupportedData {
                 which: s.to_string(),
             }),

@@ -24,6 +24,9 @@ mod interlink;
 #[cfg(feature = "premium")]
 mod groundpnt;
 
+#[cfg(feature = "premium")]
+mod gps_position;
+
 macro_rules! f64_nil {
     ($x:expr, $msg:expr) => {
         assert!($x.abs() < f64::EPSILON, $msg)
