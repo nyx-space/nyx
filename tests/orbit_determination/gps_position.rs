@@ -5,15 +5,15 @@ use nyx_space::cosmic::Orbit;
 use nyx_space::dynamics::orbital::OrbitalDynamics;
 use nyx_space::dynamics::SpacecraftDynamics;
 use nyx_space::md::prelude::*;
+use nyx_space::od::position::PositionDevice;
 use nyx_space::od::prelude::*;
-use nyx_space::od::xyz::XyzDevice;
 use nyx_space::time::Epoch;
 use nyx_space::Spacecraft;
 use nyx_space::State;
 use std::collections::BTreeMap;
 
 #[test]
-fn test_xyz_filtering() {
+fn test_gps_od_position_filtering() {
     let almanac = crate::test_almanac_arcd();
 
     let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
@@ -37,7 +37,7 @@ fn test_xyz_filtering() {
         bias: None,
     };
 
-    let device = XyzDevice::new("GPS".to_string())
+    let device = PositionDevice::new("GPS".to_string())
         .with_noise(MeasurementType::X, meter_level_noise)
         .with_noise(MeasurementType::Y, meter_level_noise)
         .with_noise(MeasurementType::Z, meter_level_noise);
@@ -69,7 +69,7 @@ fn test_xyz_filtering() {
     est_sc.orbit.velocity_km_s.y -= 1e-3;
     est_sc.orbit.velocity_km_s.z += 1e-3;
 
-    let od = KalmanODProcess::<SpacecraftDynamics, Const<3>, Const<3>, XyzDevice>::new(
+    let od = KalmanODProcess::<SpacecraftDynamics, Const<3>, Const<3>, PositionDevice>::new(
         sim_prop,
         KalmanVariant::ReferenceUpdate,
         None,

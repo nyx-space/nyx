@@ -13,9 +13,9 @@ use rand_pcg::Pcg64Mcg;
 use snafu::{ensure, ResultExt};
 use std::sync::Arc;
 
-use super::XyzDevice;
+use super::PositionDevice;
 
-impl TrackingDevice<Spacecraft> for XyzDevice {
+impl TrackingDevice<Spacecraft> for PositionDevice {
     fn measurement_types(&self) -> &IndexSet<MeasurementType> {
         &self.measurement_types
     }

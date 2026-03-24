@@ -8,12 +8,12 @@ use nalgebra::{DimName, OMatrix, U1};
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use super::XyzDevice;
+use super::PositionDevice;
 use crate::od::msr::measurement::Measurement;
 use crate::od::msr::sensitivity::{ScalarSensitivity, ScalarSensitivityT, TrackerSensitivity};
 use crate::od::msr::MeasurementType;
 
-impl TrackerSensitivity<Spacecraft, Spacecraft> for XyzDevice
+impl TrackerSensitivity<Spacecraft, Spacecraft> for PositionDevice
 where
     DefaultAllocator: Allocator<<Spacecraft as State>::Size>
         + Allocator<<Spacecraft as State>::VecLength>
@@ -37,10 +37,10 @@ where
                 continue;
             }
             let scalar_h =
-                <ScalarSensitivity<Spacecraft, Spacecraft, XyzDevice> as ScalarSensitivityT<
+                <ScalarSensitivity<Spacecraft, Spacecraft, PositionDevice> as ScalarSensitivityT<
                     Spacecraft,
                     Spacecraft,
-                    XyzDevice,
+                    PositionDevice,
                 >>::new(*msr_type, msr, rx, self, almanac.clone())?;
 
             mat.set_row(ith_row, &scalar_h.sensitivity_row);
@@ -49,14 +49,14 @@ where
     }
 }
 
-impl ScalarSensitivityT<Spacecraft, Spacecraft, XyzDevice>
-    for ScalarSensitivity<Spacecraft, Spacecraft, XyzDevice>
+impl ScalarSensitivityT<Spacecraft, Spacecraft, PositionDevice>
+    for ScalarSensitivity<Spacecraft, Spacecraft, PositionDevice>
 {
     fn new(
         msr_type: MeasurementType,
         _msr: &Measurement,
         _rx: &Spacecraft,
-        _tx: &XyzDevice,
+        _tx: &PositionDevice,
         _almanac: Arc<Almanac>,
     ) -> Result<Self, ODError> {
         let idx = match msr_type {

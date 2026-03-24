@@ -9,14 +9,15 @@ use indexmap::IndexSet;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
+/// Position device can be used to post-filter position measurements from GNSS/GPS devices.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct XyzDevice {
+pub struct PositionDevice {
     pub name: String,
     pub stochastic_noises: Option<IndexMap<MeasurementType, StochasticNoise>>,
     pub measurement_types: IndexSet<MeasurementType>,
 }
 
-impl XyzDevice {
+impl PositionDevice {
     pub fn new(name: String) -> Self {
         Self {
             name,
@@ -38,10 +39,10 @@ impl XyzDevice {
     }
 }
 
-impl ConfigRepr for XyzDevice {}
+impl ConfigRepr for PositionDevice {}
 
-impl Display for XyzDevice {
+impl Display for PositionDevice {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "XyzDevice({})", self.name)
+        write!(f, "PositionDevice({})", self.name)
     }
 }
