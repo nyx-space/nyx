@@ -278,8 +278,9 @@ where
             }
         }
 
+        let p_ht = covar_bar * h_tilde.transpose();
         // Project the propagated covariance into the measurement space.
-        let h_p_ht = &h_tilde * covar_bar * &h_tilde.transpose();
+        let h_p_ht = &h_tilde * &p_ht;
 
         // Compute the innovation matrix (S_k).
         let s_k = &h_p_ht + &r_k;
@@ -350,7 +351,6 @@ where
         // Prepare the RHS of the linear system: (P * H^T)^T = H * P
         // We want to solve: S_k * K^T = H * P
         // So K = (S_k \ (H * P))^T
-        let p_ht = covar_bar * h_tilde.transpose();
         let rhs = p_ht.transpose();
 
         // Solve for Gain using Cholesky
@@ -365,7 +365,7 @@ where
             None => {
                 // If this fails, revert the LU decomposition of nalgebra
                 // Invert the innovation covariance.
-                match s_k.try_inverse() {
+                match s_k.clone().try_inverse() {
                     Some(s_k_inv) => covar_bar * &h_tilde.transpose() * &s_k_inv,
                     None => {
                         eprintln!(
@@ -417,10 +417,9 @@ where
         };
 
         // Compute covariance (Joseph update)
-        let first_term =
-            OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity() - &gain * &h_tilde;
-        let covar =
-            first_term * covar_bar * first_term.transpose() + &gain * &r_k * &gain.transpose();
+        let k_hp = &gain * &rhs;
+        let hp_kt = k_hp.transpose();
+        let covar = covar_bar - k_hp - hp_kt + &gain * &s_k * gain.transpose();
 
         // Force symmetry on the covariance
         let covar = 0.5 * (covar + covar.transpose());
