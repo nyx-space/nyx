@@ -87,7 +87,7 @@ where
         Self {
             epoch,
             prefit,
-            postfit: OVector::<f64, M>::zeros(),
+            postfit: OVector::<f64, M>::zeros() * f64::NAN,
             ratio,
             tracker_msr_noise: tracker_msr_covar.map(|x| x.sqrt()),
             rejected: true,
