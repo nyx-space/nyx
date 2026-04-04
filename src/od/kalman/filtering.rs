@@ -184,7 +184,7 @@ where
         let innovation_trend = s_k.diagonal().map(|r| r.sqrt());
 
         if let Some(resid_reject) = resid_rejection {
-            if ratio.abs() > resid_reject.num_sigmas {
+            if ratio > resid_reject.num_sigmas {
                 // Reject this whole measurement and perform only a time update
                 let pred_est = self.time_update(nominal_state)?;
                 return Ok((

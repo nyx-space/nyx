@@ -123,10 +123,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("{dynamics}");
 
-    let setup = Propagator::rk89(
-        dynamics.clone(),
-        IntegratorOptions::builder().max_step(1.minutes()).build(),
-    );
+    let setup = Propagator::rk89(dynamics.clone(), IntegratorOptions::default());
 
     let truth_traj = setup
         .with(orbiter, almanac.clone())
@@ -183,8 +180,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         .build();
 
     // Build the filter initial estimate, which we will reuse in the filter.
-    let mut initial_estimate = sc.to_estimate()?;
-    initial_estimate.covar *= 3.0;
+    let initial_estimate = sc.to_estimate()?;
+    // initial_estimate.covar *= 3.0;
 
     println!("== FILTER STATE ==\n{orbiter:x}\n{initial_estimate}");
 
@@ -201,12 +198,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     // We'll set up the OD process to reject measurements whose residuals are move than 3 sigmas away from what we expect.
     let odp = SpacecraftKalmanScalarOD::new(
         setup,
-        KalmanVariant::DeviationTracking,
+        KalmanVariant::ReferenceUpdate,
         Some(ResidRejectCrit::default()),
         proc_devices,
         almanac.clone(),
-    )
-    .with_process_noise(process_noise);
+    );
+    // .with_process_noise(process_noise);
 
     let od_sol = odp.process_arc(initial_estimate, &arc)?;
 
@@ -234,44 +231,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     od_sol.to_parquet(
         "./data/04_output/06_lunar_od_results.parquet",
-        ExportCfg::default(),
-    )?;
-
-    // Create the ephemeris
-    let ephem = od_sol.to_ephemeris("LRO rebuilt".to_string());
-    let ephem_start = ephem.start_epoch().unwrap();
-    let ephem_end = ephem.end_epoch().unwrap();
-    // Check that the covariance is PSD throughout the ephemeris by interpolating it.
-    for epoch in TimeSeries::inclusive(ephem_start, ephem_end, Unit::Minute * 5) {
-        ephem
-            .covar_at(
-                epoch,
-                anise::ephemerides::ephemeris::LocalFrame::RIC,
-                &almanac,
-            )
-            .unwrap_or_else(|e| panic!("covar not PSD at {epoch}: {e}"));
-    }
-    // Export as BSP!
-    ephem
-        .write_spice_bsp(-85, "./data/04_output/06_lunar_rebuilt.bsp", None)
-        .expect("could not built BSP");
-    let new_almanac = Almanac::default()
-        .load("./data/04_output/06_lunar_rebuilt.bsp")
-        .unwrap();
-    new_almanac.describe(None, None, None, None, None, None, None, None);
-    let (spk_start, spk_end) = new_almanac.spk_domain(-85).unwrap();
-
-    assert!((ephem_start - spk_start).abs() < Unit::Microsecond * 1);
-    assert!((ephem_end - spk_end).abs() < Unit::Microsecond * 1);
-
-    // In our case, we have the truth trajectory from NASA.
-    // So we can compute the RIC state difference between the real LRO ephem and what we've just estimated.
-    // Export the OD trajectory first.
-    let od_trajectory = od_sol.to_traj()?;
-    // Build the RIC difference.
-    od_trajectory.ric_diff_to_parquet(
-        &truth_traj,
-        "./data/04_output/06_lunar_od_truth_error.parquet",
         ExportCfg::default(),
     )?;
 
