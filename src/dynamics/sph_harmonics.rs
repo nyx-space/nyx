@@ -256,158 +256,144 @@ impl AccelModel for GravityField {
         Ok(dcm.rot_mat * accel)
     }
 
-    fn dual_eom(
+    fn gradient(
         &self,
         osc: &Orbit,
         almanac: Arc<Almanac>,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
-        // // Convert the osculating orbit to the correct frame (needed for multiple harmonic fields)
-        // let state = almanac
-        //     .transform_to(*osc, self.compute_frame, None)
-        //     .context(DynamicsAlmanacSnafu {
-        //         action: "transforming into gravity field frame",
-        //     })?;
+        // Convert the osculating orbit to the correct frame (needed for multiple harmonic fields)
+        let state = almanac
+            .transform_to(*osc, self.compute_frame, None)
+            .context(DynamicsAlmanacSnafu {
+                action: "transforming into gravity field frame",
+            })?;
 
-        // let radius: Vector3<OHyperdual<f64, U7>> = hyperspace_from_vector(&state.radius_km);
+        let radius: Vector3<OHyperdual<f64, U7>> = hyperspace_from_vector(&state.radius_km);
 
-        // // Using the GMAT notation, with extra character for ease of highlight
-        // let r_ = norm(&radius);
-        // let s_ = radius[0] / r_;
-        // let t_ = radius[1] / r_;
-        // let u_ = radius[2] / r_;
-        // let max_degree = self.stor.max_degree_n(); // In GMAT, the order is NN
-        // let max_order = self.stor.max_order_m(); // In GMAT, the order is MM
+        // Using the GMAT notation, with extra character for ease of highlight
+        let r_ = norm(&radius);
+        let s_ = radius[0] / r_;
+        let t_ = radius[1] / r_;
+        let u_ = radius[2] / r_;
+        let max_degree = self.stor.max_degree_n(); // In GMAT, the order is NN
+        let max_order = self.stor.max_order_m(); // In GMAT, the order is MM
 
-        // // Create the associated Legendre polynomials. Note that we add three items as per GMAT (this may be useful for the STM)
-        // let mut a_nm = self.a_nm_h.clone();
+        // Create the associated Legendre polynomials. Note that we add three items as per GMAT (this may be useful for the STM)
+        let mut a_nm = self.a_nm_h.clone();
 
-        // // Initialize the diagonal elements (not a function of the input)
-        // a_nm[(1, 0)] = u_ * 3.0f64.sqrt();
-        // for n in 1..=max_degree + 1 {
-        //     let nf64 = n as f64;
-        //     // Off diagonal
-        //     a_nm[(n + 1, n)] = OHyperdual::from((2.0 * nf64 + 3.0).sqrt()) * u_ * a_nm[(n, n)];
-        // }
+        // Initialize the diagonal elements (not a function of the input)
+        a_nm[(1, 0)] = u_ * 3.0f64.sqrt();
+        for n in 1..=max_degree + 1 {
+            let nf64 = n as f64;
+            // Off diagonal
+            a_nm[(n + 1, n)] = OHyperdual::from((2.0 * nf64 + 3.0).sqrt()) * u_ * a_nm[(n, n)];
+        }
 
-        // for m in 0..=max_order + 1 {
-        //     for n in (m + 2)..=max_degree + 1 {
-        //         let hm_idx = (n, m);
-        //         a_nm[hm_idx] = u_ * self.b_nm_h[hm_idx] * a_nm[(n - 1, m)]
-        //             - self.c_nm_h[hm_idx] * a_nm[(n - 2, m)];
-        //     }
-        // }
-
-        // // Generate r_m and i_m
-        // let mut r_m = Vec::with_capacity(min(max_degree, max_order) + 1);
-        // let mut i_m = Vec::with_capacity(min(max_degree, max_order) + 1);
-
-        // r_m.push(OHyperdual::<f64, U7>::from(1.0));
-        // i_m.push(OHyperdual::<f64, U7>::from(0.0));
-
-        // for m in 1..=min(max_degree, max_order) {
-        //     r_m.push(s_ * r_m[m - 1] - t_ * i_m[m - 1]);
-        //     i_m.push(s_ * i_m[m - 1] + t_ * r_m[m - 1]);
-        // }
-
-        // let real_eq_radius_km = self
-        //     .compute_frame
-        //     .mean_equatorial_radius_km()
-        //     .context(AstroPhysicsSnafu)
-        //     .context(DynamicsAstroSnafu)?;
-
-        // let real_mu_km3_s2 = self
-        //     .compute_frame
-        //     .mu_km3_s2()
-        //     .context(AstroPhysicsSnafu)
-        //     .context(DynamicsAstroSnafu)?;
-
-        // let eq_radius = OHyperdual::<f64, U7>::from(real_eq_radius_km);
-        // let rho = eq_radius / r_;
-        // let mut rho_np1 = OHyperdual::<f64, U7>::from(real_mu_km3_s2) / r_ * rho;
-
-        // let mut a0 = OHyperdual::<f64, U7>::from(0.0);
-        // let mut a1 = OHyperdual::<f64, U7>::from(0.0);
-        // let mut a2 = OHyperdual::<f64, U7>::from(0.0);
-        // let mut a3 = OHyperdual::<f64, U7>::from(0.0);
-        // let sqrt2 = OHyperdual::<f64, U7>::from(2.0.sqrt());
-
-        // for n in 1..=max_degree {
-        //     let mut sum0 = OHyperdual::from(0.0);
-        //     let mut sum1 = OHyperdual::from(0.0);
-        //     let mut sum2 = OHyperdual::from(0.0);
-        //     let mut sum3 = OHyperdual::from(0.0);
-        //     rho_np1 *= rho;
-
-        //     for m in 0..=min(n, max_order) {
-        //         let (c_valf64, s_valf64) = self.stor.cs_nm(n, m);
-        //         let c_val = OHyperdual::<f64, U7>::from(c_valf64);
-        //         let s_val = OHyperdual::<f64, U7>::from(s_valf64);
-
-        //         let d_ = (c_val * r_m[m] + s_val * i_m[m]) * sqrt2;
-        //         let e_ = if m == 0 {
-        //             OHyperdual::from(0.0)
-        //         } else {
-        //             (c_val * r_m[m - 1] + s_val * i_m[m - 1]) * sqrt2
-        //         };
-        //         let f_ = if m == 0 {
-        //             OHyperdual::from(0.0)
-        //         } else {
-        //             (s_val * r_m[m - 1] - c_val * i_m[m - 1]) * sqrt2
-        //         };
-
-        //         sum0 += OHyperdual::from(m as f64) * a_nm[(n, m)] * e_;
-        //         sum1 += OHyperdual::from(m as f64) * a_nm[(n, m)] * f_;
-        //         sum2 += self.vr01_h[(n, m)] * a_nm[(n, m + 1)] * d_;
-        //         sum3 += self.vr11_h[(n, m)] * a_nm[(n + 1, m + 1)] * d_;
-        //     }
-        //     let rr = rho_np1 / eq_radius;
-        //     a0 += rr * sum0;
-        //     a1 += rr * sum1;
-        //     a2 += rr * sum2;
-        //     a3 -= rr * sum3;
-        // }
-
-        // let dcm = almanac
-        //     .rotate(self.compute_frame, osc.frame, osc.epoch)
-        //     .context(OrientationSnafu {
-        //         action: "transform state dcm",
-        //     })
-        //     .context(DynamicsAlmanacSnafu {
-        //         action: "transforming into gravity field frame",
-        //     })?
-        //     .rot_mat;
-
-        // // Convert DCM to OHyperdual DCMs
-        // let mut dcm_d = Matrix3::<OHyperdual<f64, U7>>::zeros();
-        // for i in 0..3 {
-        //     for j in 0..3 {
-        //         dcm_d[(i, j)] = OHyperdual::from_fn(|k| {
-        //             if k == 0 {
-        //                 dcm[(i, j)]
-        //             } else if i + 1 == k {
-        //                 1.0
-        //             } else {
-        //                 0.0
-        //             }
-        //         })
-        //     }
-        // }
-
-        // let accel = dcm_d * Vector3::new(a0 + a3 * s_, a1 + a3 * t_, a2 + a3 * u_);
-        // Extract data
-        let dx = self.eom(osc, almanac.clone())?;
-        let mut grad = Matrix3::zeros();
-        for i in 0..3 {
-            // NOTE: Although the hyperdual state is of size 7, we're only setting the values up to 3 (Matrix3)
-            let mut pos_vel = osc.to_cartesian_pos_vel();
-            pos_vel[i] += 1.0e-3;
-            let this_osc = Orbit::from_cartesian_pos_vel(pos_vel, osc.epoch, osc.frame);
-            let this_dx = self.eom(&this_osc, almanac.clone())?;
-
-            for j in 0..3 {
-                grad[(j, i)] += (this_dx - dx)[j] * 1e3;
+        for m in 0..=max_order + 1 {
+            for n in (m + 2)..=max_degree + 1 {
+                let hm_idx = (n, m);
+                a_nm[hm_idx] = u_ * self.b_nm_h[hm_idx] * a_nm[(n - 1, m)]
+                    - self.c_nm_h[hm_idx] * a_nm[(n - 2, m)];
             }
         }
+
+        // Generate r_m and i_m
+        let mut r_m = Vec::with_capacity(min(max_degree, max_order) + 1);
+        let mut i_m = Vec::with_capacity(min(max_degree, max_order) + 1);
+
+        r_m.push(OHyperdual::<f64, U7>::from(1.0));
+        i_m.push(OHyperdual::<f64, U7>::from(0.0));
+
+        for m in 1..=min(max_degree, max_order) {
+            r_m.push(s_ * r_m[m - 1] - t_ * i_m[m - 1]);
+            i_m.push(s_ * i_m[m - 1] + t_ * r_m[m - 1]);
+        }
+
+        let real_eq_radius_km = self
+            .compute_frame
+            .mean_equatorial_radius_km()
+            .context(AstroPhysicsSnafu)
+            .context(DynamicsAstroSnafu)?;
+
+        let real_mu_km3_s2 = self
+            .compute_frame
+            .mu_km3_s2()
+            .context(AstroPhysicsSnafu)
+            .context(DynamicsAstroSnafu)?;
+
+        let eq_radius = OHyperdual::<f64, U7>::from(real_eq_radius_km);
+        let rho = eq_radius / r_;
+        let mut rho_np1 = OHyperdual::<f64, U7>::from(real_mu_km3_s2) / r_ * rho;
+
+        let mut a0 = OHyperdual::<f64, U7>::from(0.0);
+        let mut a1 = OHyperdual::<f64, U7>::from(0.0);
+        let mut a2 = OHyperdual::<f64, U7>::from(0.0);
+        let mut a3 = OHyperdual::<f64, U7>::from(0.0);
+        let sqrt2 = OHyperdual::<f64, U7>::from(2.0.sqrt());
+
+        for n in 1..=max_degree {
+            let mut sum0 = OHyperdual::from(0.0);
+            let mut sum1 = OHyperdual::from(0.0);
+            let mut sum2 = OHyperdual::from(0.0);
+            let mut sum3 = OHyperdual::from(0.0);
+            rho_np1 *= rho;
+
+            for m in 0..=min(n, max_order) {
+                let (c_valf64, s_valf64) = self.stor.cs_nm(n, m);
+                let c_val = OHyperdual::<f64, U7>::from(c_valf64);
+                let s_val = OHyperdual::<f64, U7>::from(s_valf64);
+
+                let d_ = (c_val * r_m[m] + s_val * i_m[m]) * sqrt2;
+                let e_ = if m == 0 {
+                    OHyperdual::from(0.0)
+                } else {
+                    (c_val * r_m[m - 1] + s_val * i_m[m - 1]) * sqrt2
+                };
+                let f_ = if m == 0 {
+                    OHyperdual::from(0.0)
+                } else {
+                    (s_val * r_m[m - 1] - c_val * i_m[m - 1]) * sqrt2
+                };
+
+                sum0 += OHyperdual::from(m as f64) * a_nm[(n, m)] * e_;
+                sum1 += OHyperdual::from(m as f64) * a_nm[(n, m)] * f_;
+                sum2 += self.vr01_h[(n, m)] * a_nm[(n, m + 1)] * d_;
+                sum3 += self.vr11_h[(n, m)] * a_nm[(n + 1, m + 1)] * d_;
+            }
+            let rr = rho_np1 / eq_radius;
+            a0 += rr * sum0;
+            a1 += rr * sum1;
+            a2 += rr * sum2;
+            a3 -= rr * sum3;
+        }
+
+        let dcm = almanac
+            .rotate(self.compute_frame, osc.frame, osc.epoch)
+            .context(OrientationSnafu {
+                action: "transform state dcm",
+            })
+            .context(DynamicsAlmanacSnafu {
+                action: "transforming into gravity field frame",
+            })?
+            .rot_mat;
+
+        let accel_local = Vector3::new(a0 + a3 * s_, a1 + a3 * t_, a2 + a3 * u_);
+        let dx = dcm
+            * Vector3::new(
+                accel_local[0].real(),
+                accel_local[1].real(),
+                accel_local[2].real(),
+            );
+
+        let mut grad_local = Matrix3::zeros();
+        for i in 0..3 {
+            // For each acceleration component
+            for j in 1..4 {
+                // For each derivative wrt to the position
+                grad_local[(i, j - 1)] += accel_local[i][j];
+            }
+        }
+        let grad = dcm * grad_local * dcm.transpose();
         Ok((dx, grad))
     }
 }

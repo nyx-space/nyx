@@ -154,7 +154,7 @@ impl OrbitalDynamics {
 
         // Apply the acceleration models
         for model in &self.accel_models {
-            let (model_acc, model_grad) = model.dual_eom(osc, almanac.clone())?;
+            let (model_acc, model_grad) = model.gradient(osc, almanac.clone())?;
             for i in 0..3 {
                 dx[i + 3] += model_acc[i];
                 for j in 1..4 {
@@ -242,7 +242,7 @@ impl AccelModel for PointMasses {
         Ok(d_x)
     }
 
-    fn dual_eom(
+    fn gradient(
         &self,
         osc: &Orbit,
         almanac: Arc<Almanac>,

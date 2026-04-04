@@ -170,7 +170,7 @@ impl ForceModel for SolarPressure {
         Ok(1e-3 * ctx.srp.coeff_reflectivity * ctx.srp.area_m2 * flux_pressure * r_sun_unit)
     }
 
-    fn dual_eom(
+    fn gradient(
         &self,
         ctx: &Spacecraft,
         almanac: Arc<Almanac>,

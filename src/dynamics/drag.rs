@@ -90,7 +90,7 @@ impl ForceModel for ConstantDrag {
             * velocity)
     }
 
-    fn dual_eom(
+    fn gradient(
         &self,
         _osc_ctx: &Spacecraft,
         _almanac: Arc<Almanac>,
@@ -269,7 +269,7 @@ impl ForceModel for Drag {
         }
     }
 
-    fn dual_eom(
+    fn gradient(
         &self,
         _osc_ctx: &Spacecraft,
         _almanac: Arc<Almanac>,
