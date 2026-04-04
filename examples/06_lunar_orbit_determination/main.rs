@@ -181,7 +181,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Build the filter initial estimate, which we will reuse in the filter.
     let initial_estimate = sc.to_estimate()?;
-    // initial_estimate.covar *= 3.0;
 
     println!("== FILTER STATE ==\n{orbiter:x}\n{initial_estimate}");
 
@@ -202,8 +201,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         Some(ResidRejectCrit::default()),
         proc_devices,
         almanac.clone(),
-    );
-    // .with_process_noise(process_noise);
+    )
+    .with_process_noise(process_noise);
 
     let od_sol = odp.process_arc(initial_estimate, &arc)?;
 
