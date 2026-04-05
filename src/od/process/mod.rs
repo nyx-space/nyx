@@ -376,7 +376,7 @@ where
                                         if kf.replace_state() && !residual.rejected {
                                             // Only update the state of the EKF if the residual was not rejected.
                                             prop_instance.state = estimate.state();
-                                            traj.states.truncate(traj.states.len() - 1);
+                                            traj.states.pop();
                                             traj.states.push(prop_instance.state);
                                         }
 

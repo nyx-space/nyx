@@ -181,7 +181,8 @@ where
         let ratio = (whitened_resid.norm_squared() / (M::DIM as f64)).sqrt();
 
         // Compute the physical 1-sigma envelop. Using the diagonal of S_k (not L) is correct for physical innovation plots.
-        let innovation_trend = l_matrix.diagonal();
+        // let innovation_trend = l_matrix.diagonal();
+        let innovation_trend = s_k.diagonal().map(|x| x.sqrt());
 
         if let Some(resid_reject) = resid_rejection {
             if ratio > resid_reject.num_sigmas {
