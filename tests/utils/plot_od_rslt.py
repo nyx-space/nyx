@@ -99,7 +99,7 @@ def main(path: str, wstats: bool, error_ric: str):
                     y=df[y],
                     mode="lines",
                     name=trace_type,
-                    line=dict(dash="dash", color="black"),
+                    line=dict(color="black"),
                     legendgroup=trace_type,
                     connectgaps=True,
                     showlegend=(trace_type not in legend_added)

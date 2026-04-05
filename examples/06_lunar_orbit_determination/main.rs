@@ -186,7 +186,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Build the SNC in the Moon J2000 frame, specified as a velocity noise over time.
     let process_noise = ProcessNoise3D::from_velocity_km_s(
-        &[1e-12, 1e-12, 1e-12],
+        &[1e-13, 1e-13, 1e-13],
         1 * Unit::Hour,
         10 * Unit::Minute,
         None,

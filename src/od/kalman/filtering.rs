@@ -181,24 +181,22 @@ where
         let ratio = (whitened_resid.norm_squared() / (M::DIM as f64)).sqrt();
 
         // Compute the physical 1-sigma envelop. Using the diagonal of S_k (not L) is correct for physical innovation plots.
-        let innovation_trend = s_k.diagonal().map(|r| r.sqrt());
+        let innovation_trend = l_matrix.diagonal();
 
         if let Some(resid_reject) = resid_rejection {
             if ratio > resid_reject.num_sigmas {
                 // Reject this whole measurement and perform only a time update
                 let pred_est = self.time_update(nominal_state)?;
-                return Ok((
-                    pred_est,
-                    Residual::rejected(
-                        epoch,
-                        prefit,
-                        ratio,
-                        innovation_trend,
-                        real_obs,
-                        computed_obs,
-                    ),
-                    None,
-                ));
+                let resid = Residual::rejected(
+                    epoch,
+                    prefit,
+                    ratio,
+                    innovation_trend,
+                    real_obs,
+                    computed_obs,
+                );
+
+                return Ok((pred_est, resid, None));
             }
         }
 
@@ -256,18 +254,16 @@ where
                 // so we just apply it directly to the prefit residual.
                 let state_hat = &gain * &prefit;
                 let postfit = &prefit - (&h_tilde * state_hat);
-                (
-                    state_hat,
-                    Residual::accepted(
-                        epoch,
-                        prefit,
-                        postfit,
-                        ratio,
-                        innovation_trend,
-                        real_obs,
-                        computed_obs,
-                    ),
-                )
+                let resid = Residual::accepted(
+                    epoch,
+                    prefit,
+                    postfit,
+                    ratio,
+                    innovation_trend,
+                    real_obs,
+                    computed_obs,
+                );
+                (state_hat, resid)
             }
             KalmanVariant::DeviationTracking => {
                 // Time update
