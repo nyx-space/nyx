@@ -216,22 +216,33 @@ impl AccelModel for GravityField {
 
             for m in 0..=min(n, max_order) {
                 let (c_val, s_val) = self.stor.cs_nm(n, m);
-                let d_ = (c_val * r_m[m] + s_val * i_m[m]) * 2.0.sqrt();
+                let d_ = unsafe {
+                    (c_val * r_m.get_unchecked(m) + s_val * i_m.get_unchecked(m)) * 2.0.sqrt()
+                };
                 let e_ = if m == 0 {
                     0.0
                 } else {
-                    (c_val * r_m[m - 1] + s_val * i_m[m - 1]) * 2.0.sqrt()
+                    unsafe {
+                        (c_val * r_m.get_unchecked(m - 1) + s_val * i_m.get_unchecked(m - 1))
+                            * 2.0.sqrt()
+                    }
                 };
                 let f_ = if m == 0 {
                     0.0
                 } else {
-                    (s_val * r_m[m - 1] - c_val * i_m[m - 1]) * 2.0.sqrt()
+                    unsafe {
+                        (s_val * r_m.get_unchecked(m - 1) - c_val * i_m.get_unchecked(m - 1))
+                            * 2.0.sqrt()
+                    }
                 };
 
-                sum.x += (m as f64) * a_nm[(n, m)] * e_;
-                sum.y += (m as f64) * a_nm[(n, m)] * f_;
-                sum.z += self.vr01[(n, m)] * a_nm[(n, m + 1)] * d_;
-                sum.w -= self.vr11[(n, m)] * a_nm[(n + 1, m + 1)] * d_;
+                unsafe {
+                    sum.x += (m as f64) * a_nm.get_unchecked((n, m)) * e_;
+                    sum.y += (m as f64) * a_nm.get_unchecked((n, m)) * f_;
+                    sum.z += self.vr01.get_unchecked((n, m)) * a_nm.get_unchecked((n, m + 1)) * d_;
+                    sum.w -=
+                        self.vr11.get_unchecked((n, m)) * a_nm.get_unchecked((n + 1, m + 1)) * d_;
+                }
             }
             let rr = rho_np1 / eq_radius_km;
             accel4 += rr * sum;
