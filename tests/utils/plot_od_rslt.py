@@ -15,6 +15,10 @@ def convert_units(df):
             new_col = col.replace("(km/s)", "(m/s)")
             rename_dict[col] = new_col
             exprs.append(pl.col(col) * 1000)
+        elif "(km^2)" in col:
+            new_col = col.replace("(km^2)", "(m^2)")
+            rename_dict[col] = new_col
+            exprs.append(pl.col(col) * 1_000_000)
         elif "(km)" in col:
             new_col = col.replace("(km)", "(m)")
             rename_dict[col] = new_col
