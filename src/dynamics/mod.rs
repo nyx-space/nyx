@@ -145,7 +145,7 @@ pub trait ForceModel: Send + Sync + fmt::Display {
     /// Force models must implement their partials, although those will only be called if the propagation requires the
     /// computation of the STM. The `osc_ctx` is the osculating context, i.e. it changes for each sub-step of the integrator.
     /// The last row corresponds to the partials of the parameter of this force model wrt the position, i.e. this only applies to conservative forces.
-    fn dual_eom(
+    fn gradient(
         &self,
         osc_ctx: &Spacecraft,
         almanac: Arc<Almanac>,
@@ -161,7 +161,7 @@ pub trait AccelModel: Send + Sync + fmt::Display {
 
     /// Acceleration models must implement their partials, although those will only be called if the propagation requires the
     /// computation of the STM.
-    fn dual_eom(
+    fn gradient(
         &self,
         osc_ctx: &Orbit,
         almanac: Arc<Almanac>,

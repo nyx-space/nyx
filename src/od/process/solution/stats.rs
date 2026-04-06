@@ -21,6 +21,7 @@ use crate::linalg::{DefaultAllocator, DimName};
 use crate::md::trajectory::Interpolatable;
 pub use crate::od::estimate::*;
 pub use crate::od::*;
+use log::warn;
 use msr::sensitivity::TrackerSensitivity;
 use statrs::distribution::{ContinuousCDF, Normal};
 use std::ops::Add;
@@ -145,8 +146,10 @@ where
         let n = self.residuals.iter().flatten().count();
         if n == 0 {
             return Err(ODError::ODNoResiduals {
-                action: "percentage of residuals within threshold",
+                action: "evaluating residual normality",
             });
+        } else if n < 35 {
+            warn!("KS normality test unreliable for n={n} < 35; skipping");
         }
         let ks_stat = self.ks_test_normality()?;
 

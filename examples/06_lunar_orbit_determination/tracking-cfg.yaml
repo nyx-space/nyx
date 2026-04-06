@@ -1,0 +1,27 @@
+DSS-65 Madrid:
+  scheduler:
+    # If there is an upcoming overlap, Madrid continues tracking instead of the next station
+    handoff: Greedy
+    cadence: Continuous
+    # min samples, i.e. 30 minutes arc minimum because of the 1 min sampling.
+    # This minimum samples does NOT include the handoff logic, only the visibility.
+    min_samples: 30
+    sample_alignment: 10 s
+  sampling: 1 min
+
+DSS-34 Canberra:
+  scheduler:
+    # If there is an upcoming overlap, Goldstone will handoff to the next station even if it can still see LRO
+    handoff: Eager
+    cadence: Continuous
+    min_samples: 30
+    sample_alignment: 10 s
+  sampling: 1 min
+
+DSS-13 Goldstone:
+  scheduler:
+    handoff: Greedy
+    cadence: Continuous
+    min_samples: 30
+    sample_alignment: 10 s
+  sampling: 1 min

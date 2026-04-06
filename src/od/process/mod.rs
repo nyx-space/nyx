@@ -219,7 +219,7 @@ where
                 let next_step_size = delta_t.min(prop_instance.step_size).min(self.max_step);
 
                 // Remove old states from the trajectory
-                // This is a manual implementation of `retaint` because we know it's a sorted vec, so no need to resort every time
+                // This is a manual implementation of `retain` because we know it's a sorted vec, so no need to resort every time
                 let mut index = traj.states.len();
                 while index > 0 {
                     index -= 1;
@@ -243,7 +243,7 @@ where
                 // Now that we've advanced the propagator, let's see whether we're at the time of the next measurement.
 
                 // Extract the state and update the STM in the filter.
-                let nominal_state = prop_instance.state;
+                let mut nominal_state = prop_instance.state;
                 // Get the datetime and info needed to compute the theoretical measurement according to the model
                 epoch = nominal_state.epoch();
 
@@ -268,64 +268,67 @@ where
                         // Get the computed observations
                         match devices.get_mut(&msr.tracker) {
                             Some(device) => {
-                                if let Some(computed_meas) =
-                                    device.measure(epoch, &traj, None, self.almanac.clone())?
-                                {
-                                    let msr_types = device.measurement_types();
+                                let msr_types = device.measurement_types().clone();
 
-                                    // Perform several measurement updates to ensure the desired dimensionality.
-                                    let windows = msr_types.len() / MsrSize::DIM;
-                                    let mut msr_rejected = false;
-                                    for wno in 0..=windows {
-                                        let mut cur_msr_types = IndexSet::new();
-                                        for msr_type in msr_types
-                                            .iter()
-                                            .copied()
-                                            .skip(wno * MsrSize::DIM)
-                                            .take(MsrSize::DIM)
-                                        {
-                                            cur_msr_types.insert(msr_type);
-                                        }
+                                // Perform several measurement updates to ensure the desired dimensionality.
+                                let windows = msr_types.len() / MsrSize::DIM;
+                                let mut msr_rejected = false;
+                                for wno in 0..=windows {
+                                    // Update the nominal state in case we're ingesting several measurements
+                                    // sequentially for the same epoch.
+                                    nominal_state = prop_instance.state;
+                                    let mut cur_msr_types = IndexSet::new();
+                                    for msr_type in msr_types
+                                        .iter()
+                                        .copied()
+                                        .skip(wno * MsrSize::DIM)
+                                        .take(MsrSize::DIM)
+                                    {
+                                        cur_msr_types.insert(msr_type);
+                                    }
 
-                                        if cur_msr_types.is_empty() {
-                                            // We've processed all measurements.
-                                            break;
-                                        }
+                                    if cur_msr_types.is_empty() {
+                                        // We've processed all measurements.
+                                        break;
+                                    }
 
-                                        // If this measurement type is unavailable, continue to the next one.
-                                        if !msr.availability(&cur_msr_types)
-                                            .iter()
-                                            .any(|avail| *avail)
-                                        {
-                                            continue;
-                                        }
+                                    // If this measurement type is unavailable, continue to the next one.
+                                    if !msr.availability(&cur_msr_types)
+                                        .iter()
+                                        .any(|avail| *avail)
+                                    {
+                                        continue;
+                                    }
 
-                                        // Grab the un-modulo'd real observation
-                                        let mut real_obs: OVector<f64, MsrSize> =
-                                            msr.observation(&cur_msr_types);
+                                    // Grab the un-modulo'd real observation
+                                    let mut real_obs: OVector<f64, MsrSize> =
+                                        msr.observation(&cur_msr_types);
 
-                                        // Check that the observation is valid.
-                                        for val in real_obs.iter().copied() {
-                                            ensure!(
-                                                val.is_finite(),
-                                                InvalidMeasurementSnafu {
-                                                    epoch: *epoch_ref,
-                                                    val
-                                                }
-                                            );
-                                        }
+                                    // Check that the observation is valid.
+                                    for val in real_obs.iter().copied() {
+                                        ensure!(
+                                            val.is_finite(),
+                                            InvalidMeasurementSnafu {
+                                                epoch: *epoch_ref,
+                                                val
+                                            }
+                                        );
+                                    }
 
-                                        // Compute device specific matrices
-                                        let h_tilde = device.h_tilde::<MsrSize>(
-                                            msr,
-                                            &cur_msr_types,
-                                            &nominal_state,
-                                            self.almanac.clone(),
-                                        )?;
+                                    // Compute device specific matrices
+                                    let h_tilde = device.h_tilde::<MsrSize>(
+                                        msr,
+                                        &cur_msr_types,
+                                        &nominal_state,
+                                        self.almanac.clone(),
+                                    )?;
 
-                                        let measurement_covar = device
-                                            .measurement_covar_matrix(&cur_msr_types, epoch)?;
+                                    let measurement_covar = device
+                                        .measurement_covar_matrix(&cur_msr_types, epoch)?;
 
+                                    if let Some(computed_meas) =
+                                        device.measure(epoch, &traj, None, self.almanac.clone())?
+                                    {
                                         // Apply any biases on the computed observation
                                         let computed_obs = computed_meas
                                             .observation::<MsrSize>(&cur_msr_types)
@@ -370,24 +373,27 @@ where
                                             msr_rejected = true;
                                         }
 
-                                        if kf.replace_state() {
+                                        if kf.replace_state() && !residual.rejected {
+                                            // Only update the state of the EKF if the residual was not rejected.
                                             prop_instance.state = estimate.state();
+                                            traj.states.pop();
+                                            traj.states.push(prop_instance.state);
                                         }
 
                                         prop_instance.state.reset_stm();
 
                                         od_sol.push_measurement_update(estimate, residual, gain);
-                                    }
-                                    if msr_rejected {
-                                        msr_rejected_cnt += 1;
+                                        if msr_rejected {
+                                            msr_rejected_cnt += 1;
+                                        } else {
+                                            msr_accepted_cnt += 1;
+                                        }
                                     } else {
-                                        msr_accepted_cnt += 1;
+                                        debug!(
+                                            "Device {} does not expect measurement at {epoch}, skipping",
+                                            msr.tracker
+                                        );
                                     }
-                                } else {
-                                    debug!(
-                                        "Device {} does not expect measurement at {epoch}, skipping",
-                                        msr.tracker
-                                    );
                                 }
                             }
                             None => {
@@ -396,8 +402,8 @@ where
                                         "Tracker {} is not in the list of configured devices",
                                         msr.tracker
                                     );
+                                    unknown_trackers.insert(msr.tracker.clone());
                                 }
-                                unknown_trackers.insert(msr.tracker.clone());
                             }
                         }
                     }

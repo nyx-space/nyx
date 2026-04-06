@@ -216,22 +216,33 @@ impl AccelModel for GravityField {
 
             for m in 0..=min(n, max_order) {
                 let (c_val, s_val) = self.stor.cs_nm(n, m);
-                let d_ = (c_val * r_m[m] + s_val * i_m[m]) * 2.0.sqrt();
+                let d_ = unsafe {
+                    (c_val * r_m.get_unchecked(m) + s_val * i_m.get_unchecked(m)) * 2.0.sqrt()
+                };
                 let e_ = if m == 0 {
                     0.0
                 } else {
-                    (c_val * r_m[m - 1] + s_val * i_m[m - 1]) * 2.0.sqrt()
+                    unsafe {
+                        (c_val * r_m.get_unchecked(m - 1) + s_val * i_m.get_unchecked(m - 1))
+                            * 2.0.sqrt()
+                    }
                 };
                 let f_ = if m == 0 {
                     0.0
                 } else {
-                    (s_val * r_m[m - 1] - c_val * i_m[m - 1]) * 2.0.sqrt()
+                    unsafe {
+                        (s_val * r_m.get_unchecked(m - 1) - c_val * i_m.get_unchecked(m - 1))
+                            * 2.0.sqrt()
+                    }
                 };
 
-                sum.x += (m as f64) * a_nm[(n, m)] * e_;
-                sum.y += (m as f64) * a_nm[(n, m)] * f_;
-                sum.z += self.vr01[(n, m)] * a_nm[(n, m + 1)] * d_;
-                sum.w -= self.vr11[(n, m)] * a_nm[(n + 1, m + 1)] * d_;
+                unsafe {
+                    sum.x += (m as f64) * a_nm.get_unchecked((n, m)) * e_;
+                    sum.y += (m as f64) * a_nm.get_unchecked((n, m)) * f_;
+                    sum.z += self.vr01.get_unchecked((n, m)) * a_nm.get_unchecked((n, m + 1)) * d_;
+                    sum.w -=
+                        self.vr11.get_unchecked((n, m)) * a_nm.get_unchecked((n + 1, m + 1)) * d_;
+                }
             }
             let rr = rho_np1 / eq_radius_km;
             accel4 += rr * sum;
@@ -256,7 +267,10 @@ impl AccelModel for GravityField {
         Ok(dcm.rot_mat * accel)
     }
 
-    fn dual_eom(
+    /// The gradient computation of the gravity field skip bound checks on the matrix fetching via the get_unchecked.
+    /// This approach allows the gradient to be calculated to full machine precision while, surprisingly, being slightly
+    /// faster than a single forward different gradient approach.
+    fn gradient(
         &self,
         osc: &Orbit,
         almanac: Arc<Almanac>,
@@ -279,7 +293,11 @@ impl AccelModel for GravityField {
         let max_order = self.stor.max_order_m(); // In GMAT, the order is MM
 
         // Create the associated Legendre polynomials. Note that we add three items as per GMAT (this may be useful for the STM)
-        let mut a_nm = self.a_nm_h.clone();
+        let mut a_nm = DMatrix::from_element(max_degree + 3, max_degree + 3, OHyperdual::from(0.0));
+        // Copy only the pre-computed diagonals from self.a_nm_h manually
+        for i in 0..=max_degree + 1 {
+            a_nm[(i, i)] = self.a_nm_h[(i, i)];
+        }
 
         // Initialize the diagonal elements (not a function of the input)
         a_nm[(1, 0)] = u_ * 3.0f64.sqrt();
@@ -343,22 +361,35 @@ impl AccelModel for GravityField {
                 let c_val = OHyperdual::<f64, U7>::from(c_valf64);
                 let s_val = OHyperdual::<f64, U7>::from(s_valf64);
 
-                let d_ = (c_val * r_m[m] + s_val * i_m[m]) * sqrt2;
+                let d_ = unsafe {
+                    (c_val * r_m.get_unchecked(m) + s_val * i_m.get_unchecked(m)) * sqrt2
+                };
                 let e_ = if m == 0 {
                     OHyperdual::from(0.0)
                 } else {
-                    (c_val * r_m[m - 1] + s_val * i_m[m - 1]) * sqrt2
+                    unsafe {
+                        (c_val * r_m.get_unchecked(m - 1) + s_val * i_m.get_unchecked(m - 1))
+                            * sqrt2
+                    }
                 };
                 let f_ = if m == 0 {
                     OHyperdual::from(0.0)
                 } else {
-                    (s_val * r_m[m - 1] - c_val * i_m[m - 1]) * sqrt2
+                    unsafe {
+                        (s_val * r_m.get_unchecked(m - 1) - c_val * i_m.get_unchecked(m - 1))
+                            * sqrt2
+                    }
                 };
 
-                sum0 += OHyperdual::from(m as f64) * a_nm[(n, m)] * e_;
-                sum1 += OHyperdual::from(m as f64) * a_nm[(n, m)] * f_;
-                sum2 += self.vr01_h[(n, m)] * a_nm[(n, m + 1)] * d_;
-                sum3 += self.vr11_h[(n, m)] * a_nm[(n + 1, m + 1)] * d_;
+                unsafe {
+                    sum0 += OHyperdual::from(m as f64) * a_nm.get_unchecked((n, m)) * e_;
+                    sum1 += OHyperdual::from(m as f64) * a_nm.get_unchecked((n, m)) * f_;
+                    sum2 +=
+                        *self.vr01_h.get_unchecked((n, m)) * *a_nm.get_unchecked((n, m + 1)) * d_;
+                    sum3 += *self.vr11_h.get_unchecked((n, m))
+                        * *a_nm.get_unchecked((n + 1, m + 1))
+                        * d_;
+                }
             }
             let rr = rho_np1 / eq_radius;
             a0 += rr * sum0;
@@ -377,33 +408,23 @@ impl AccelModel for GravityField {
             })?
             .rot_mat;
 
-        // Convert DCM to OHyperdual DCMs
-        let mut dcm_d = Matrix3::<OHyperdual<f64, U7>>::zeros();
-        for i in 0..3 {
-            for j in 0..3 {
-                dcm_d[(i, j)] = OHyperdual::from_fn(|k| {
-                    if k == 0 {
-                        dcm[(i, j)]
-                    } else if i + 1 == k {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                })
-            }
-        }
+        let accel_local = Vector3::new(a0 + a3 * s_, a1 + a3 * t_, a2 + a3 * u_);
+        let dx = dcm
+            * Vector3::new(
+                accel_local[0].real(),
+                accel_local[1].real(),
+                accel_local[2].real(),
+            );
 
-        let accel = dcm_d * Vector3::new(a0 + a3 * s_, a1 + a3 * t_, a2 + a3 * u_);
-        // Extract data
-        let mut dx = Vector3::zeros();
-        let mut grad = Matrix3::zeros();
+        let mut grad_local = Matrix3::zeros();
         for i in 0..3 {
-            dx[i] += accel[i].real();
-            // NOTE: Although the hyperdual state is of size 7, we're only setting the values up to 3 (Matrix3)
+            // For each acceleration component
             for j in 1..4 {
-                grad[(i, j - 1)] += accel[i][j];
+                // For each derivative wrt to the position
+                grad_local[(i, j - 1)] += accel_local[i][j];
             }
         }
+        let grad = dcm * grad_local * dcm.transpose();
         Ok((dx, grad))
     }
 }

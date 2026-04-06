@@ -3,6 +3,7 @@ from scipy import stats
 import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
+from plotly.subplots import make_subplots
 import click
 
 
@@ -56,7 +57,16 @@ def main(path: str, wstats: bool, error_ric: str):
             )
 
     # Plot the measurement residuals and their noises.
-    for msr in msr_types:
+    fig = make_subplots(
+            rows=len(msr_types),
+            cols=1,
+            subplot_titles=[msr for msr in msr_types],
+            vertical_spacing=0.1
+        )
+    legend_added = set()  # Track which trace names are already in legend
+
+    for idx, msr in enumerate(msr_types, start=1):
+        unit = msr.split()[-1][1:-1]
         y_cols = [
             f"{col}: {msr}"
             for col in [
@@ -66,22 +76,42 @@ def main(path: str, wstats: bool, error_ric: str):
                 "Measurement noise -3-Sigma",
             ]
         ]
-        fig = px.scatter(df, x="Epoch (UTC)", y=y_cols)
-        fig.update_traces(
-            mode="lines",
-            selector=dict(name=f"Measurement noise 3-Sigma: {msr}"),
-            connectgaps=True,
-            line=dict(dash="dash", color="black"),
-        )
-        fig.update_traces(
-            mode="lines",
-            selector=dict(name=f"Measurement noise -3-Sigma: {msr}"),
-            connectgaps=True,
-            line=dict(dash="dash", color="black"),
-        )
-        unit = msr.split()[-1][1:-1]
-        fig.update_layout(yaxis_title=unit)
-        fig.show()
+        for y in y_cols[:2]:
+            fig.add_trace(
+                go.Scatter(
+                    x=df["Epoch (UTC)"],
+                    y=df[y],
+                    mode="markers",
+                    name=y,
+                    legendgroup=y,
+                    marker=dict(color="blue" if "Prefit" in y else "red"),
+                    showlegend=True
+                ),
+                row=idx, col=1
+            )
+
+        # Add 3-sigma bounds
+        for y in y_cols[2:]:
+            trace_type = "3-Sigma bounds"
+            fig.add_trace(
+                go.Scatter(
+                    x=df["Epoch (UTC)"],
+                    y=df[y],
+                    mode="lines",
+                    name=trace_type,
+                    line=dict(color="black"),
+                    legendgroup=trace_type,
+                    connectgaps=True,
+                    showlegend=(trace_type not in legend_added)
+                ),
+                row=idx, col=1
+            )
+            legend_added.add(trace_type)
+
+        fig.update_yaxes(title_text=unit, row=idx, col=1)
+    fig.update_layout(title_text="Measurement Residuals")
+    fig.update_xaxes(matches='x')
+    fig.show()
 
     # Plot the residual ratios
     px.scatter(df, x="Epoch (UTC)", y="Residual ratio", color="Residual Rejected").show()

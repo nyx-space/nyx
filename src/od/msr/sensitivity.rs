@@ -142,17 +142,13 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
 
         match msr_type {
             MeasurementType::Doppler => {
-                // If we have a simultaneous measurement of the range, use that, otherwise we compute the expected range.
-                let ρ_km = match msr.data.get(&MeasurementType::Range) {
-                    Some(range_km) => *range_km,
-                    None => {
-                        tx.azimuth_elevation_of(receiver, None, &almanac)
-                            .context(ODAlmanacSnafu {
-                                action: "computing range for Doppler measurement",
-                            })?
-                            .range_km
-                    }
-                };
+                // Always recompute the expected to range, a better model for scalar OD processing.
+                let ρ_km = tx
+                    .azimuth_elevation_of(receiver, None, &almanac)
+                    .context(ODAlmanacSnafu {
+                        action: "computing range for Doppler measurement",
+                    })?
+                    .range_km;
 
                 let ρ_dot_km_s = msr.data.get(&MeasurementType::Doppler).unwrap();
                 let m11 = delta_r.x / ρ_km;

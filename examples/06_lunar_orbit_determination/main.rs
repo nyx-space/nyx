@@ -1,4 +1,4 @@
-#![doc = include_str!("./README.md")]
+// #![doc = include_str!("./README.md")]
 extern crate log;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger as pel;
@@ -24,13 +24,15 @@ use nyx::{
         prelude::{KalmanVariant, TrackingArcSim, TrkConfig},
         process::{Estimate, NavSolution, ResidRejectCrit, SpacecraftUncertainty},
         snc::ProcessNoise3D,
-        GroundStation, SpacecraftKalmanOD,
+        GroundStation, SpacecraftKalmanOD, SpacecraftKalmanScalarOD,
     },
-    propagators::Propagator,
+    propagators::{IntegratorOptions, Propagator},
     Orbit, Spacecraft, State,
 };
 
 use std::{collections::BTreeMap, error::Error, path::PathBuf, str::FromStr, sync::Arc};
+
+// TODO: Convert this to a Spacecraft Sequence
 
 fn main() -> Result<(), Box<dyn Error>> {
     pel::init();
@@ -42,73 +44,46 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Dynamics models require planetary constants and ephemerides to be defined.
     // Let's start by grabbing those by using ANISE's MetaAlmanac.
 
-    let data_folder: PathBuf = [env!("CARGO_MANIFEST_DIR"), "examples", "04_lro_od"]
-        .iter()
-        .collect();
+    let data_folder: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "examples",
+        "06_lunar_orbit_determination",
+    ]
+    .iter()
+    .collect();
 
-    let meta = data_folder.join("lro-dynamics.dhall");
+    let meta = data_folder.join("metaalmanac.dhall");
 
     // Load this ephem in the general Almanac we're using for this analysis.
-    let mut almanac = MetaAlmanac::new(meta.to_string_lossy().as_ref())
+    let almanac = MetaAlmanac::new(meta.to_string_lossy().as_ref())
         .map_err(Box::new)?
         .process(true)
         .map_err(Box::new)?;
 
-    let mut moon_pc = almanac.get_planetary_data_from_id(MOON).unwrap();
-    moon_pc.mu_km3_s2 = 4902.74987;
-    almanac.set_planetary_data_from_id(MOON, moon_pc).unwrap();
-
-    let mut earth = almanac.get_planetary_data_from_id(EARTH).unwrap();
-    earth.mu_km3_s2 = 398600.436;
-    almanac.set_planetary_data_from_id(EARTH, earth).unwrap();
-
-    // Save this new kernel for reuse.
-    // In an operational context, this would be part of the "Lock" process, and should not change throughout the mission.
-    almanac
-        .planetary_data
-        .values()
-        .next()
-        .unwrap()
-        .save_as(&data_folder.join("lro-specific.pca"), true)?;
-
     // Lock the almanac (an Arc is a read only structure).
     let almanac = Arc::new(almanac);
 
-    // Orbit determination requires a Trajectory structure, which can be saved as parquet file.
-    // In our case, the trajectory comes from the BSP file, so we need to build a Trajectory from the almanac directly.
-    // To query the Almanac, we need to build the LRO frame in the J2000 orientation in our case.
-    // Inspecting the LRO BSP in the ANISE GUI shows us that NASA has assigned ID -85 to LRO.
-    let lro_frame = Frame::from_ephem_j2000(-85);
+    // Build a nominal trajectory
+    // TODO: Switch this to a sequence once the OD over a spacecraft sequence is implemented.
+
+    let epoch = Epoch::from_gregorian_utc_at_noon(2024, 2, 29);
+    let moon_j2000 = almanac.frame_info(MOON_J2000)?;
 
     // To build the trajectory we need to provide a spacecraft template.
-    let sc_template = Spacecraft::builder()
-        .mass(Mass::from_dry_and_prop_masses(1018.0, 900.0)) // Launch masses
+    let orbiter = Spacecraft::builder()
+        .mass(Mass::from_dry_and_prop_masses(1018.0, 900.0))
         .srp(SRPData {
-            // SRP configuration is arbitrary, but we will be estimating it anyway.
             area_m2: 3.9 * 2.7,
             coeff_reflectivity: 0.96,
         })
-        .orbit(Orbit::zero(MOON_J2000)) // Setting a zero orbit here because it's just a template
+        .orbit(Orbit::try_keplerian_altitude(
+            150.0, 0.00212, 33.6, 45.0, 45.0, 0.0, epoch, moon_j2000,
+        )?) // Setting a zero orbit here because it's just a template
         .build();
-    // Now we can build the trajectory from the BSP file.
-    // We'll arbitrarily set the tracking arc to 24 hours with a five second time step.
-    let traj_as_flown = Traj::from_bsp(
-        lro_frame,
-        MOON_J2000,
-        almanac.clone(),
-        sc_template,
-        5.seconds(),
-        Some(Epoch::from_str("2024-01-01 00:00:00 UTC")?),
-        Some(Epoch::from_str("2024-01-02 00:00:00 UTC")?),
-        Aberration::LT,
-        Some("LRO".to_string()),
-    )?;
 
-    println!("{traj_as_flown}");
-
-    // ====================== //
-    // === MODEL MATCHING === //
-    // ====================== //
+    // ========================== //
+    // === BUILD NOMINAL TRAJ === //
+    // ========================== //
 
     // Set up the spacecraft dynamics.
 
@@ -140,7 +115,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // We define the solar radiation pressure, using the default solar flux and accounting only
     // for the eclipsing caused by the Earth and Moon.
     // Note that by default, enabling the SolarPressure model will also enable the estimation of the coefficient of reflectivity.
-    let srp_dyn = SolarPressure::new(vec![EARTH_J2000, MOON_J2000], almanac.clone())?;
+    let srp_dyn = SolarPressure::new(vec![MOON_J2000], almanac.clone())?;
 
     // Finalize setting up the dynamics, specifying the force models (orbital_dyn) separately from the
     // acceleration models (SRP in this case). Use `from_models` to specify multiple accel models.
@@ -148,91 +123,33 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("{dynamics}");
 
-    // Now we can build the propagator.
-    let setup = Propagator::default_dp78(dynamics.clone());
+    let setup = Propagator::rk89(dynamics.clone(), IntegratorOptions::default());
 
-    // For reference, let's build the trajectory with Nyx's models from that LRO state.
-    let (sim_final, traj_as_sim) = setup
-        .with(*traj_as_flown.first(), almanac.clone())
-        .until_epoch_with_traj(traj_as_flown.last().epoch())?;
-
-    println!("SIM INIT:  {:x}", traj_as_flown.first());
-    println!("SIM FINAL: {sim_final:x}");
-    // Compute RIC difference between SIM and LRO ephem
-    let sim_lro_delta = sim_final
-        .orbit
-        .ric_difference(&traj_as_flown.last().orbit)?;
-    println!("{traj_as_sim}");
-    println!(
-        "SIM v LRO - RIC Position (m): {:.3}",
-        sim_lro_delta.radius_km * 1e3
-    );
-    println!(
-        "SIM v LRO - RIC Velocity (m/s): {:.3}",
-        sim_lro_delta.velocity_km_s * 1e3
-    );
-
-    traj_as_sim.ric_diff_to_parquet(
-        &traj_as_flown,
-        "./data/04_output/04_lro_sim_truth_error.parquet",
-        ExportCfg::default(),
-    )?;
+    let truth_traj = setup
+        .with(orbiter, almanac.clone())
+        .for_duration_with_traj(Unit::Day * 2)?
+        .1;
 
     // ==================== //
     // === OD SIMULATOR === //
     // ==================== //
 
-    // After quite some time trying to exactly match the model, we still end up with an oscillatory difference on the order of 150 meters between the propagated state
-    // and the truth LRO state.
-
-    // Therefore, we will actually run an estimation from a dispersed LRO state.
-    // The sc_seed is the true LRO state from the BSP.
-    let sc_seed = *traj_as_flown.first();
-
     // Load the Deep Space Network ground stations.
     // Nyx allows you to build these at runtime but it's pretty static so we can just load them from YAML.
-    let ground_station_file: PathBuf = [
-        env!("CARGO_MANIFEST_DIR"),
-        "examples",
-        "04_lro_od",
-        "dsn-network.yaml",
-    ]
-    .iter()
-    .collect();
-
+    let ground_station_file = data_folder.join("dsn-network.yaml");
     let devices = GroundStation::load_named(ground_station_file)?;
 
-    let mut proc_devices = devices.clone();
-
-    // Increase the noise in the devices to accept more measurements.
-    for gs in proc_devices.values_mut() {
-        if let Some(noise) = &mut gs
-            .stochastic_noises
-            .as_mut()
-            .unwrap()
-            .get_mut(&MeasurementType::Range)
-        {
-            *noise.white_noise.as_mut().unwrap() *= 3.0;
-        }
-    }
+    let proc_devices = devices.clone();
 
     // Typical OD software requires that you specify your own tracking schedule or you'll have overlapping measurements.
     // Nyx can build a tracking schedule for you based on the first station with access.
-    let trkconfg_yaml: PathBuf = [
-        env!("CARGO_MANIFEST_DIR"),
-        "examples",
-        "04_lro_od",
-        "tracking-cfg.yaml",
-    ]
-    .iter()
-    .collect();
-
-    let configs: BTreeMap<String, TrkConfig> = TrkConfig::load_named(trkconfg_yaml)?;
+    let configs: BTreeMap<String, TrkConfig> =
+        TrkConfig::load_named(data_folder.join("tracking-cfg.yaml"))?;
 
     // Build the tracking arc simulation to generate a "standard measurement".
     let mut trk = TrackingArcSim::<Spacecraft, GroundStation>::with_seed(
         devices.clone(),
-        traj_as_flown.clone(),
+        truth_traj.clone(),
         configs,
         123, // Set a seed for reproducibility
     )?;
@@ -240,7 +157,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     trk.build_schedule(almanac.clone())?;
     let arc = trk.generate_measurements(almanac.clone())?;
     // Save the simulated tracking data
-    arc.to_parquet_simple("./data/04_output/04_lro_simulated_tracking.parquet")?;
+    arc.to_parquet_simple("./data/04_output/06_lunar_simulated_tracking.parquet")?;
 
     // We'll note that in our case, we have continuous coverage of LRO when the vehicle is not behind the Moon.
     println!("{arc}");
@@ -252,7 +169,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // ===================== //
 
     let sc = SpacecraftUncertainty::builder()
-        .nominal(sc_seed)
+        .nominal(orbiter)
         .frame(LocalFrame::RIC)
         .x_km(0.5)
         .y_km(0.5)
@@ -263,14 +180,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         .build();
 
     // Build the filter initial estimate, which we will reuse in the filter.
-    let mut initial_estimate = sc.to_estimate()?;
-    initial_estimate.covar *= 3.0;
+    let initial_estimate = sc.to_estimate()?;
 
-    println!("== FILTER STATE ==\n{sc_seed:x}\n{initial_estimate}");
+    println!("== FILTER STATE ==\n{orbiter:x}\n{initial_estimate}");
 
     // Build the SNC in the Moon J2000 frame, specified as a velocity noise over time.
     let process_noise = ProcessNoise3D::from_velocity_km_s(
-        &[1e-12, 1e-12, 1e-12],
+        &[1e-13, 1e-13, 1e-13],
         1 * Unit::Hour,
         10 * Unit::Minute,
         None,
@@ -279,7 +195,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("{process_noise}");
 
     // We'll set up the OD process to reject measurements whose residuals are move than 3 sigmas away from what we expect.
-    let odp = SpacecraftKalmanOD::new(
+    let odp = SpacecraftKalmanScalarOD::new(
         setup,
         KalmanVariant::ReferenceUpdate,
         Some(ResidRejectCrit::default()),
@@ -294,7 +210,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("{final_est}");
 
-    let ric_err = traj_as_flown
+    let ric_err = truth_traj
         .at(final_est.epoch())?
         .orbit
         .ric_difference(&final_est.orbital_state())?;
@@ -313,45 +229,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Ratios normal? {}", od_sol.is_normal(None).unwrap());
 
     od_sol.to_parquet(
-        "./data/04_output/04_lro_od_results.parquet",
+        "./data/04_output/06_lunar_od_results.parquet",
         ExportCfg::default(),
     )?;
 
-    // Create the ephemeris
-    let ephem = od_sol.to_ephemeris("LRO rebuilt".to_string());
-    let ephem_start = ephem.start_epoch().unwrap();
-    let ephem_end = ephem.end_epoch().unwrap();
-    // Check that the covariance is PSD throughout the ephemeris by interpolating it.
-    for epoch in TimeSeries::inclusive(ephem_start, ephem_end, Unit::Minute * 5) {
-        ephem
-            .covar_at(
-                epoch,
-                anise::ephemerides::ephemeris::LocalFrame::RIC,
-                &almanac,
-            )
-            .unwrap_or_else(|e| panic!("covar not PSD at {epoch}: {e}"));
-    }
-    // Export as BSP!
-    ephem
-        .write_spice_bsp(-85, "./data/04_output/04_lro_rebuilt.bsp", None)
-        .expect("could not built BSP");
-    let new_almanac = Almanac::default()
-        .load("./data/04_output/04_lro_rebuilt.bsp")
-        .unwrap();
-    new_almanac.describe(None, None, None, None, None, None, None, None);
-    let (spk_start, spk_end) = new_almanac.spk_domain(-85).unwrap();
-
-    assert!((ephem_start - spk_start).abs() < Unit::Microsecond * 1);
-    assert!((ephem_end - spk_end).abs() < Unit::Microsecond * 1);
-
-    // In our case, we have the truth trajectory from NASA.
-    // So we can compute the RIC state difference between the real LRO ephem and what we've just estimated.
-    // Export the OD trajectory first.
     let od_trajectory = od_sol.to_traj()?;
     // Build the RIC difference.
     od_trajectory.ric_diff_to_parquet(
-        &traj_as_flown,
-        "./data/04_output/04_lro_od_truth_error.parquet",
+        &truth_traj,
+        "./data/04_output/06_lunar_od_truth_error.parquet",
         ExportCfg::default(),
     )?;
 

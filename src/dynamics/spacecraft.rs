@@ -328,7 +328,7 @@ impl Dynamics for SpacecraftDynamics {
         // Call the EOMs
         let total_mass = ctx.mass_kg();
         for model in &self.force_models {
-            let (model_frc, model_grad) = model.dual_eom(ctx, almanac.clone())?;
+            let (model_frc, model_grad) = model.gradient(ctx, almanac.clone())?;
             for i in 0..3 {
                 // Add the velocity changes
                 d_x[i + 3] += model_frc[i] / total_mass;
