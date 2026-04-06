@@ -233,5 +233,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         ExportCfg::default(),
     )?;
 
+    let od_trajectory = od_sol.to_traj()?;
+    // Build the RIC difference.
+    od_trajectory.ric_diff_to_parquet(
+        &truth_traj,
+        "./data/04_output/06_lunar_od_truth_error.parquet",
+        ExportCfg::default(),
+    )?;
+
     Ok(())
 }
