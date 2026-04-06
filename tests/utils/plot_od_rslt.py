@@ -7,6 +7,28 @@ from plotly.subplots import make_subplots
 import click
 
 
+def convert_units(df):
+    rename_dict = {}
+    exprs = []
+    for col in df.columns:
+        if "(km/s)" in col:
+            new_col = col.replace("(km/s)", "(m/s)")
+            rename_dict[col] = new_col
+            exprs.append(pl.col(col) * 1000)
+        elif "(km^2)" in col:
+            new_col = col.replace("(km^2)", "(m^2)")
+            rename_dict[col] = new_col
+            exprs.append(pl.col(col) * 1_000_000)
+        elif "(km)" in col:
+            new_col = col.replace("(km)", "(m)")
+            rename_dict[col] = new_col
+            exprs.append(pl.col(col) * 1000)
+
+    if exprs:
+        df = df.with_columns(exprs).rename(rename_dict)
+    return df
+
+
 @click.command
 @click.option("-p", "--path", type=str)
 @click.option("-s", "--wstats", type=bool, default=False)
@@ -17,25 +39,27 @@ def main(path: str, wstats: bool, error_ric: str):
     df = df.with_columns(
         pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f")
     ).sort("Epoch (UTC)", descending=False)
+    df = convert_units(df)
 
     if error_ric:
         ricdf = pl.read_parquet(error_ric)
         ricdf = ricdf.with_columns(
             pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f")
         ).sort("Epoch (UTC)", descending=False)
+        ricdf = convert_units(ricdf)
 
         px.line(
             ricdf,
             x="Epoch (UTC)",
-            y=["Delta X (RIC) (km)", "Delta Y (RIC) (km)", "Delta Z (RIC) (km)"],
+            y=["Delta X (RIC) (m)", "Delta Y (RIC) (m)", "Delta Z (RIC) (m)"],
         ).show()
         px.line(
             ricdf,
             x="Epoch (UTC)",
-            y=["Delta Vx (RIC) (km/s)", "Delta Vy (RIC) (km/s)", "Delta Vz (RIC) (km/s)"],
+            y=["Delta Vx (RIC) (m/s)", "Delta Vy (RIC) (m/s)", "Delta Vz (RIC) (m/s)"],
         ).show()
 
-    all_msr_types = ["Range (km)", "Doppler (km/s)", "Azimuth (deg)", "Elevation (deg)"]
+    all_msr_types = ["Range (m)", "Doppler (m/s)", "Azimuth (deg)", "Elevation (deg)"]
     msr_type_count = 0
     msr_types = []
 
@@ -121,7 +145,7 @@ def main(path: str, wstats: bool, error_ric: str):
     px.line(
         df,
         x="Epoch (UTC)",
-        y=["Sigma X (RIC) (km)", "Sigma Y (RIC) (km)", "Sigma Z (RIC) (km)"],
+        y=["Sigma X (RIC) (m)", "Sigma Y (RIC) (m)", "Sigma Z (RIC) (m)"],
     ).show()
 
     if wstats:
