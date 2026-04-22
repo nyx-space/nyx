@@ -186,8 +186,7 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                     .context(AstroSnafu)?
                     .rot_mat;
 
-                let velocity_correction =
-                    dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
+                let velocity_correction = dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
                 xi.orbit.apply_dv_km_s(velocity_correction);
             } else {
                 xi.orbit.radius_km += state_correction.fixed_rows::<3>(0).to_owned();
