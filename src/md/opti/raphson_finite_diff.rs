@@ -95,7 +95,7 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
         let mut finite_burn_target = false;
 
         // Apply the initial guess: first accumulate, then apply once (matching
-        // the pattern used in the iteration loop at lines ~608-729).
+        // the pattern used in the iteration loop).
         for (i, var) in self.variables.iter().enumerate() {
             // Check the validity (this function will report to log and raise an error)
             var.valid()?;
