@@ -64,9 +64,7 @@ impl TransferKind {
         match self {
             TransferKind::Auto => {
                 let mut dnu = r_final[1].atan2(r_final[0]) - r_init[1].atan2(r_init[0]);
-                if dnu > TAU {
-                    dnu -= TAU;
-                } else if dnu < 0.0 {
+                if dnu < 0.0 {
                     dnu += TAU;
                 }
 
