@@ -63,14 +63,20 @@ pub fn izzo(input: LambertInput, kind: TransferKind) -> Result<LambertSolution, 
     let mut i_h = i_r1.cross(&i_r2);
     i_h /= i_h.norm(); // Ensure normalization
 
+    // Normalize orientation so i_h points along +z, matching the
+    // lamberthub reference. The user's prograde/retrograde choice is
+    // then applied on its own, decoupled from ECI-frame parity.
+    if i_h.z < 0.0 {
+        i_h = -i_h;
+    }
+
     // Geometry of the problem
     let lambda = 1.0 - c_norm / s;
     let mut m_lambda = lambda.sqrt();
 
     let retrograde = matches!(kind, TransferKind::LongWay);
 
-    let (mut i_t1, mut i_t2) = if i_h.z < 0.0 || retrograde {
-        // Transfer angle greater than 180 degrees
+    let (mut i_t1, mut i_t2) = if retrograde {
         m_lambda = -m_lambda;
         (i_r1.cross(&i_h), i_r2.cross(&i_h))
     } else {
@@ -512,6 +518,48 @@ mod ut_lambert_izzo {
         assert!(
             (sol.v_inf_outgoing_right_ascension_deg() + 152.2652291).abs() < 1e-6,
             "wrong outgoing RA"
+        );
+    }
+
+    #[test]
+    fn test_lambert_izzo_direction_toggle_ih_negative() {
+        // Regression: geometry with i_h.z < 0 must still respect the caller's
+        // ShortWay/LongWay choice. The pre-fix branch
+        // `if i_h.z < 0.0 || retrograde` collapsed both into one solution.
+        let frame = Frame {
+            ephemeris_id: 301,
+            orientation_id: 0,
+            mu_km3_s2: Some(3.98600433e5),
+            shape: None,
+        };
+        let t0 = Epoch::from_gregorian_utc_at_midnight(2025, 1, 1);
+
+        // r1 × r2 = (0, 3.5e6, -4.9e7) → i_h.z < 0
+        let r1 = Vector3::new(7000.0, 0.0, 0.0);
+        let r2 = Vector3::new(0.0, -7000.0, -500.0);
+
+        let initial = Orbit {
+            radius_km: r1,
+            velocity_km_s: Vector3::zeros(),
+            epoch: t0,
+            frame,
+        };
+        let final_ = Orbit {
+            radius_km: r2,
+            velocity_km_s: Vector3::zeros(),
+            epoch: t0 + Unit::Minute * 60.0,
+            frame,
+        };
+        let input = LambertInput::from_planetary_states(initial, final_).unwrap();
+
+        let short = izzo(input, TransferKind::ShortWay).unwrap();
+        let long = izzo(input, TransferKind::LongWay).unwrap();
+
+        assert!(
+            (short.v_init_km_s - long.v_init_km_s).norm() > 1e-3,
+            "direction toggle ignored — short and long-way collapsed: short={:?}, long={:?}",
+            short.v_init_km_s,
+            long.v_init_km_s,
         );
     }
 }
