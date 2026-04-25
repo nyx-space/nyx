@@ -74,7 +74,21 @@ pub fn izzo(input: LambertInput, kind: TransferKind) -> Result<LambertSolution, 
     let lambda = 1.0 - c_norm / s;
     let mut m_lambda = lambda.sqrt();
 
-    let retrograde = matches!(kind, TransferKind::LongWay);
+    let revs = match kind {
+        TransferKind::NRevs(n) => n.into(),
+        _ => 0_u32,
+    };
+
+    // Izzo's `find_xy` handles multi-rev geometry, so the direction toggle
+    // below is only meaningful for single-rev kinds; default NRevs to the
+    // prograde branch to preserve historical behavior. `direction_of_motion`
+    // returns `MultiRevNotSupported` for NRevs, hence the guard.
+    let dm = if matches!(kind, TransferKind::NRevs(_)) {
+        1.0
+    } else {
+        kind.direction_of_motion(&r_final, &r_init)?
+    };
+    let retrograde = dm < 0.0;
 
     let (mut i_t1, mut i_t2) = if retrograde {
         m_lambda = -m_lambda;
@@ -93,10 +107,7 @@ pub fn izzo(input: LambertInput, kind: TransferKind) -> Result<LambertSolution, 
     let (x, y) = find_xy(
         m_lambda,
         t,
-        match kind {
-            TransferKind::NRevs(revs) => revs.into(),
-            _ => 0,
-        },
+        revs,
         MAX_ITERATIONS,
         LAMBERT_EPSILON,
         LAMBERT_EPSILON,
@@ -560,6 +571,84 @@ mod ut_lambert_izzo {
             "direction toggle ignored — short and long-way collapsed: short={:?}, long={:?}",
             short.v_init_km_s,
             long.v_init_km_s,
+        );
+    }
+
+    #[test]
+    fn test_lambert_izzo_auto_matches_longway_for_long_arc() {
+        let frame = Frame {
+            ephemeris_id: 301,
+            orientation_id: 0,
+            mu_km3_s2: Some(3.98600433e5),
+            shape: None,
+        };
+        let t0 = Epoch::from_gregorian_utc_at_midnight(2025, 1, 1);
+
+        // dnu = 3pi/2: Auto should pick long-way.
+        let initial = Orbit {
+            radius_km: Vector3::new(8000.0, 0.0, 0.0),
+            velocity_km_s: Vector3::zeros(),
+            epoch: t0,
+            frame,
+        };
+        let final_ = Orbit {
+            radius_km: Vector3::new(0.0, -8000.0, 0.0),
+            velocity_km_s: Vector3::zeros(),
+            epoch: t0 + Unit::Minute * 60.0,
+            frame,
+        };
+        let input = LambertInput::from_planetary_states(initial, final_).unwrap();
+
+        let auto = izzo(input, TransferKind::Auto).unwrap();
+        let long = izzo(input, TransferKind::LongWay).unwrap();
+        let short = izzo(input, TransferKind::ShortWay).unwrap();
+
+        assert!(
+            (auto.v_init_km_s - long.v_init_km_s).norm() < 1e-10,
+            "Auto should match LongWay for long-arc geometry",
+        );
+        assert!(
+            (auto.v_init_km_s - short.v_init_km_s).norm() > 1e-3,
+            "Auto should differ from ShortWay for long-arc geometry",
+        );
+    }
+
+    #[test]
+    fn test_lambert_izzo_auto_matches_shortway_for_short_arc() {
+        let frame = Frame {
+            ephemeris_id: 301,
+            orientation_id: 0,
+            mu_km3_s2: Some(3.98600433e5),
+            shape: None,
+        };
+        let t0 = Epoch::from_gregorian_utc_at_midnight(2025, 1, 1);
+
+        // dnu = pi/2: Auto should pick short-way.
+        let initial = Orbit {
+            radius_km: Vector3::new(8000.0, 0.0, 0.0),
+            velocity_km_s: Vector3::zeros(),
+            epoch: t0,
+            frame,
+        };
+        let final_ = Orbit {
+            radius_km: Vector3::new(0.0, 8000.0, 0.0),
+            velocity_km_s: Vector3::zeros(),
+            epoch: t0 + Unit::Minute * 60.0,
+            frame,
+        };
+        let input = LambertInput::from_planetary_states(initial, final_).unwrap();
+
+        let auto = izzo(input, TransferKind::Auto).unwrap();
+        let short = izzo(input, TransferKind::ShortWay).unwrap();
+        let long = izzo(input, TransferKind::LongWay).unwrap();
+
+        assert!(
+            (auto.v_init_km_s - short.v_init_km_s).norm() < 1e-10,
+            "Auto should match ShortWay for short-arc geometry",
+        );
+        assert!(
+            (auto.v_init_km_s - long.v_init_km_s).norm() > 1e-3,
+            "Auto should differ from LongWay for short-arc geometry",
         );
     }
 }
