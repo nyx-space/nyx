@@ -30,7 +30,7 @@ use typed_builder::TypedBuilder;
 
 use super::{AstroPhysicsSnafu, BPlane, State};
 use crate::cosmic::AstroAnalysisSnafu;
-use crate::dynamics::guidance::Thruster;
+use crate::dynamics::guidance::{plane_angles_from_unit_vector, LocalFrame, Thruster};
 use crate::dynamics::DynamicsError;
 use crate::errors::{StateAstroSnafu, StateError};
 use crate::io::ConfigRepr;
@@ -81,6 +81,32 @@ impl From<GuidanceMode> for f64 {
     }
 }
 
+/// Applied thrust direction stored in inertial coordinates for the current propagated state.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "python", pyclass)]
+pub struct ThrustDirection {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+}
+
+impl From<Vector3<f64>> for ThrustDirection {
+    fn from(vector: Vector3<f64>) -> Self {
+        // Normalize just in case
+        Self {
+            x: vector[0] / vector.norm(),
+            y: vector[1] / vector.norm(),
+            z: vector[2] / vector.norm(),
+        }
+    }
+}
+
+impl From<ThrustDirection> for Vector3<f64> {
+    fn from(direction: ThrustDirection) -> Self {
+        Vector3::new(direction.x, direction.y, direction.z)
+    }
+}
+
 /// A spacecraft state, composed of its orbit, its masses (dry, prop, extra, all in kg), its SRP configuration, its drag configuration, its thruster configuration, and its guidance mode.
 ///
 /// Optionally, the spacecraft state can also store the state transition matrix from the start of the propagation until the current time (i.e. trajectory STM, not step-size STM).
@@ -105,6 +131,10 @@ pub struct Spacecraft {
     #[builder(default)]
     #[serde(default)]
     pub mode: GuidanceMode,
+    /// Optionally stores the applied thrust direction for this state in inertial coordinates.
+    #[builder(default, setter(strip_option))]
+    #[serde(default)]
+    pub thrust_direction: Option<ThrustDirection>,
     /// Optionally stores the state transition matrix from the start of the propagation until the current time (i.e. trajectory STM, not step-size STM)
     /// STM is contains position and velocity, Cr, Cd, prop mass
     #[builder(default, setter(strip_option))]
@@ -121,6 +151,7 @@ impl Default for Spacecraft {
             drag: DragData::default(),
             thruster: None,
             mode: GuidanceMode::default(),
+            thrust_direction: None,
             stm: None,
         }
     }
@@ -283,6 +314,33 @@ impl Spacecraft {
 
     pub fn mut_mode(&mut self, mode: GuidanceMode) {
         self.mode = mode;
+    }
+
+    /// Return the thrust direction, if there one a predefined one, as a unit vector.
+    pub fn thrust_direction(&self) -> Option<Vector3<f64>> {
+        self.thrust_direction.map(Into::into)
+    }
+
+    /// Set the thrust direction from its unit vector.
+    pub fn mut_thrust_direction(&mut self, direction: Option<Vector3<f64>>) {
+        self.thrust_direction = direction.map(Into::into);
+    }
+
+    /// Return the thrust angles in degrees for the provided frame.
+    /// NOTE: the in-plane and out-of-plane angles differ between the VNC and the RCN frames!
+    pub fn thrust_angles_deg(&self, frame: LocalFrame) -> PhysicsResult<Option<(f64, f64)>> {
+        if let Some(thrust_dir_inertial) = self.thrust_direction() {
+            let dcm_local_to_inertial = frame.dcm_to_inertial(self.orbit)?;
+            let thrust_dir_local = dcm_local_to_inertial.transpose() * thrust_dir_inertial;
+            let (in_plane_rad, out_of_plane_rad) = plane_angles_from_unit_vector(thrust_dir_local);
+
+            Ok(Some((
+                in_plane_rad.to_degrees(),
+                out_of_plane_rad.to_degrees(),
+            )))
+        } else {
+            Ok(None)
+        }
     }
 }
 
@@ -470,6 +528,30 @@ impl State for Spacecraft {
                 Some(thruster) => Ok(thruster.isp_s),
                 None => Err(StateError::NoThrusterAvail),
             },
+            StateParameter::ThrustX() => self
+                .thrust_direction()
+                .map(|direction| direction[0])
+                .ok_or(StateError::Unavailable { param }),
+            StateParameter::ThrustY() => self
+                .thrust_direction()
+                .map(|direction| direction[1])
+                .ok_or(StateError::Unavailable { param }),
+            StateParameter::ThrustZ() => self
+                .thrust_direction()
+                .map(|direction| direction[2])
+                .ok_or(StateError::Unavailable { param }),
+            StateParameter::ThrustInPlane(frame) => self
+                .thrust_angles_deg(frame)
+                .context(AstroPhysicsSnafu)
+                .context(StateAstroSnafu { param })?
+                .map(|(in_plane_deg, _)| in_plane_deg)
+                .ok_or(StateError::Unavailable { param }),
+            StateParameter::ThrustOutOfPlane(frame) => self
+                .thrust_angles_deg(frame)
+                .context(AstroPhysicsSnafu)
+                .context(StateAstroSnafu { param })?
+                .map(|(_, out_of_plane_deg)| out_of_plane_deg)
+                .ok_or(StateError::Unavailable { param }),
             StateParameter::Thrust() => match self.thruster {
                 Some(thruster) => Ok(thruster.thrust_N),
                 None => Err(StateError::NoThrusterAvail),
@@ -505,6 +587,39 @@ impl State for Spacecraft {
                 Some(ref mut thruster) => thruster.isp_s = val,
                 None => return Err(StateError::NoThrusterAvail),
             },
+            StateParameter::ThrustX() => {
+                let mut direction = self.thrust_direction();
+                if direction.is_none() {
+                    direction = Some(Vector3::zeros());
+                }
+                if let Some(mut direction) = direction {
+                    direction[0] = val;
+                    self.mut_thrust_direction(Some(direction));
+                }
+            }
+            StateParameter::ThrustY() => {
+                let mut direction = self.thrust_direction();
+                if direction.is_none() {
+                    direction = Some(Vector3::zeros());
+                }
+                if let Some(mut direction) = direction {
+                    direction[1] = val;
+                    self.mut_thrust_direction(Some(direction));
+                }
+            }
+            StateParameter::ThrustZ() => {
+                let mut direction = self.thrust_direction();
+                if direction.is_none() {
+                    direction = Some(Vector3::zeros());
+                }
+                if let Some(mut direction) = direction {
+                    direction[2] = val;
+                    self.mut_thrust_direction(Some(direction));
+                }
+            }
+            StateParameter::ThrustInPlane(_) | StateParameter::ThrustOutOfPlane(_) => {
+                return Err(StateError::ReadOnly { param })
+            }
             StateParameter::Thrust() => match self.thruster {
                 Some(ref mut thruster) => thruster.thrust_N = val,
                 None => return Err(StateError::NoThrusterAvail),
@@ -634,6 +749,7 @@ impl<'a> Decode<'a> for Spacecraft {
             drag,
             thruster,
             mode,
+            thrust_direction: None,
             stm: None,
         })
     }

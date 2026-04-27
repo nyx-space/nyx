@@ -258,7 +258,7 @@ where
 
         // Use the first successful run to build up some data shared for all
         let mut frame = EARTH_J2000;
-        let mut fields = match cfg.fields {
+        let requested_fields = match cfg.fields {
             Some(fields) => fields,
             None => S::export_params(),
         };
@@ -275,9 +275,6 @@ where
                 if start.is_none() {
                     // No need to check other states.
                     frame = success.state.frame();
-
-                    // Check that we can retrieve this information
-                    fields.retain(|param| success.state.value(*param).is_ok());
 
                     start = Some(success.traj.first().epoch());
                     end = Some(success.state.epoch());
@@ -326,8 +323,27 @@ where
                 })?,
         )]);
 
-        for field in &fields {
-            hdrs.push(field.to_field(more_meta.clone()));
+        let mut fields = Vec::new();
+        let mut field_nullable = Vec::new();
+        for field in requested_fields {
+            let mut any_ok = false;
+            let mut any_err = false;
+            for state in &all_states {
+                if state.value(field).is_ok() {
+                    any_ok = true;
+                } else {
+                    any_err = true;
+                }
+            }
+
+            if any_ok {
+                fields.push(field);
+                field_nullable.push(any_err);
+            }
+        }
+
+        for (field, nullable) in fields.iter().zip(field_nullable.iter().copied()) {
+            hdrs.push(field.to_field(more_meta.clone()).with_nullable(nullable));
         }
 
         // Build the schema
@@ -353,14 +369,21 @@ where
             if field == StateParameter::GuidanceMode() {
                 let mut guid_mode = StringBuilder::new();
                 for s in &all_states {
-                    guid_mode
-                        .append_value(format!("{:?}", GuidanceMode::from(s.value(field).unwrap())));
+                    match s.value(field) {
+                        Ok(value) => {
+                            guid_mode.append_value(format!("{:?}", GuidanceMode::from(value)));
+                        }
+                        Err(_) => guid_mode.append_null(),
+                    }
                 }
                 record.push(Arc::new(guid_mode.finish()));
             } else {
                 let mut data = Float64Builder::new();
                 for s in &all_states {
-                    data.append_value(s.value(field).unwrap());
+                    match s.value(field) {
+                        Ok(value) => data.append_value(value),
+                        Err(_) => data.append_null(),
+                    };
                 }
                 record.push(Arc::new(data.finish()));
             }

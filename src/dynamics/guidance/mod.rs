@@ -30,6 +30,9 @@ use serde_dhall::StaticType;
 pub mod mnvr;
 pub use mnvr::{Maneuver, MnvrRepr};
 
+mod replay;
+pub use replay::ThrustDirectionReplay;
+
 mod ruggiero;
 pub use ruggiero::{Objective, Ruggiero, StateParameter};
 
@@ -133,12 +136,12 @@ fn unit_vector_from_plane_angles(alpha: f64, beta: f64) -> Vector3<f64> {
     )
 }
 
-/// Converts the provided unit vector into in-plane and out-of-plane angles in the RCN frame, returned in radians
+/// Converts the provided unit vector into in-plane and out-of-plane angles, returned in radians
 pub fn plane_angles_from_unit_vector(vhat: Vector3<f64>) -> (f64, f64) {
     (vhat[1].atan2(vhat[0]), vhat[2].asin())
 }
 
-/// Converts the alpha (in-plane) and beta (out-of-plane) angles in the RCN frame to the unit vector in the RCN frame
+/// Converts the alpha (in-plane) and beta (out-of-plane) angles in the RCN frame to the unit vector
 pub(crate) fn unit_vector_from_ra_dec(alpha: f64, delta: f64) -> Vector3<f64> {
     Vector3::new(
         delta.cos() * alpha.cos(),
@@ -147,7 +150,7 @@ pub(crate) fn unit_vector_from_ra_dec(alpha: f64, delta: f64) -> Vector3<f64> {
     )
 }
 
-/// Converts the provided unit vector into in-plane and out-of-plane angles in the RCN frame, returned in radians
+/// Converts the provided unit vector into in-plane and out-of-plane angles, returned in radians
 pub(crate) fn ra_dec_from_unit_vector(vhat: Vector3<f64>) -> (f64, f64) {
     let alpha = vhat[1].atan2(vhat[0]);
     let delta = vhat[2].asin();

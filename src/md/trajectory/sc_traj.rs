@@ -18,7 +18,8 @@
 
 use super::TrajError;
 use super::{ExportCfg, Traj};
-use crate::cosmic::Spacecraft;
+use crate::cosmic::{GuidanceMode, Spacecraft};
+use crate::dynamics::guidance::{ThrustDirectionReplay, Thruster};
 use crate::errors::{FromAlmanacSnafu, NyxError};
 use crate::io::{InputOutputError, MissingDataSnafu, ParquetSnafu, StdIOSnafu};
 use crate::md::prelude::{Interpolatable, StateParameter};
@@ -31,7 +32,7 @@ use anise::ephemerides::EphemerisError;
 use anise::errors::AlmanacError;
 use anise::prelude::{Almanac, Frame};
 use arrow::array::RecordBatchReader;
-use arrow::array::{Float64Array, StringArray};
+use arrow::array::{Array, Float64Array, StringArray};
 use hifitime::TimeSeries;
 use log::info;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
@@ -45,6 +46,10 @@ use std::sync::Arc;
 use std::time::Instant;
 
 impl Traj<Spacecraft> {
+    pub fn to_thrust_direction_replay(&self) -> Arc<ThrustDirectionReplay> {
+        ThrustDirectionReplay::from_trajectory(self.clone())
+    }
+
     /// Builds a new trajectory built from the SPICE BSP (SPK) file loaded in the provided Almanac, provided the start and stop epochs.
     ///
     /// If the start and stop epochs are not provided, then the full domain of the trajectory will be used.
@@ -227,6 +232,7 @@ impl Traj<Spacecraft> {
         // Check the schema
         let mut has_epoch = false; // Required
         let mut frame = None;
+        let mut has_guidance_mode = false;
 
         let mut found_fields = vec![
             (StateParameter::Element(OrbitalElement::X), false),
@@ -235,7 +241,13 @@ impl Traj<Spacecraft> {
             (StateParameter::Element(OrbitalElement::VX), false),
             (StateParameter::Element(OrbitalElement::VY), false),
             (StateParameter::Element(OrbitalElement::VZ), false),
+            (StateParameter::DryMass(), false),
+            (StateParameter::Isp(), false),
             (StateParameter::PropMass(), false),
+            (StateParameter::Thrust(), false),
+            (StateParameter::ThrustX(), false),
+            (StateParameter::ThrustY(), false),
+            (StateParameter::ThrustZ(), false),
         ];
 
         let reader = builder.build().context(ParquetSnafu {
@@ -245,6 +257,8 @@ impl Traj<Spacecraft> {
         for field in &reader.schema().fields {
             if field.name().as_str() == "Epoch (UTC)" {
                 has_epoch = true;
+            } else if field.name().as_str() == "guidance_mode" {
+                has_guidance_mode = true;
             } else {
                 for potential_field in &mut found_fields {
                     if field.name() == potential_field.0.to_field(None).name() {
@@ -283,7 +297,7 @@ impl Traj<Spacecraft> {
             }
         );
 
-        for (field, exists) in found_fields.iter().take(found_fields.len() - 1) {
+        for (field, exists) in found_fields.iter().take(6) {
             ensure!(
                 exists,
                 MissingDataSnafu {
@@ -292,7 +306,11 @@ impl Traj<Spacecraft> {
             );
         }
 
-        let sc_compat = found_fields.last().unwrap().1;
+        let sc_compat = found_fields
+            .iter()
+            .find(|(field, _)| *field == StateParameter::PropMass())
+            .map(|(_, exists)| *exists)
+            .unwrap_or(false);
 
         let expected_type = std::any::type_name::<Spacecraft>()
             .split("::")
@@ -311,9 +329,10 @@ impl Traj<Spacecraft> {
             );
         } else if sc_compat {
             // Not a spacecraft, remove the prop mass
-            if let Some(last_field) = found_fields.last_mut() {
-                if last_field.0 == StateParameter::PropMass() && last_field.1 {
-                    last_field.1 = false;
+            for found_field in &mut found_fields {
+                if found_field.0 == StateParameter::PropMass() && found_field.1 {
+                    found_field.1 = false;
+                    break;
                 }
             }
         }
@@ -333,28 +352,31 @@ impl Traj<Spacecraft> {
                 .unwrap();
 
             let mut shared_data = vec![];
-
-            for (field, _) in found_fields.iter().take(found_fields.len() - 1) {
-                shared_data.push(
+            let guidance_mode_data = if has_guidance_mode {
+                Some(
                     batch
-                        .column_by_name(field.to_field(None).name())
+                        .column_by_name(StateParameter::GuidanceMode().to_field(None).name())
                         .unwrap()
                         .as_any()
-                        .downcast_ref::<Float64Array>()
+                        .downcast_ref::<StringArray>()
                         .unwrap(),
-                );
-            }
+                )
+            } else {
+                None
+            };
 
-            if expected_type == "Spacecraft" {
-                // Read the prop only if this is a spacecraft we're building
-                shared_data.push(
-                    batch
-                        .column_by_name("prop_mass (kg)")
-                        .unwrap()
-                        .as_any()
-                        .downcast_ref::<Float64Array>()
-                        .unwrap(),
-                );
+            for (field, exists) in &found_fields {
+                if *exists {
+                    shared_data.push((
+                        *field,
+                        batch
+                            .column_by_name(field.to_field(None).name())
+                            .unwrap()
+                            .as_any()
+                            .downcast_ref::<Float64Array>()
+                            .unwrap(),
+                    ));
+                }
             }
 
             // Grab the frame -- it should have been serialized with all of the data so we don't need to reload it.
@@ -369,10 +391,25 @@ impl Traj<Spacecraft> {
                 })?);
                 state.set_frame(frame.unwrap()); // We checked it was set above with an ensure! call
                 state.unset_stm(); // We don't have any STM data, so let's unset this.
+                if found_fields.iter().any(|(field, exists)| {
+                    *exists && matches!(field, StateParameter::Isp() | StateParameter::Thrust())
+                }) {
+                    state.thruster = Some(Thruster {
+                        thrust_N: 0.0,
+                        isp_s: 0.0,
+                    });
+                }
+                if let Some(guidance_mode_data) = guidance_mode_data {
+                    state.mut_mode(match guidance_mode_data.value(i) {
+                        "Thrust" => GuidanceMode::Thrust,
+                        "Inhibit" => GuidanceMode::Inhibit,
+                        _ => GuidanceMode::Coast,
+                    });
+                }
 
-                for (j, (param, exists)) in found_fields.iter().enumerate() {
-                    if *exists {
-                        state.set_value(*param, shared_data[j].value(i)).unwrap();
+                for (param, data) in &shared_data {
+                    if data.is_valid(i) {
+                        state.set_value(*param, data.value(i)).unwrap();
                     }
                 }
 
@@ -390,14 +427,22 @@ impl Traj<Spacecraft> {
 #[cfg(test)]
 mod ut_ccsds_oem {
 
+    use crate::cosmic::GuidanceMode;
+    use crate::dynamics::guidance::{LocalFrame, Objective, Ruggiero, Thruster};
     use crate::md::prelude::{OrbitalDynamics, Propagator, SpacecraftDynamics};
+    use crate::md::StateParameter;
     use crate::time::{Epoch, TimeUnits};
     use crate::Spacecraft;
+    use crate::State;
     use crate::{io::ExportCfg, md::prelude::Traj, Orbit};
     use anise::almanac::Almanac;
+    use anise::analysis::prelude::OrbitalElement;
     use anise::constants::frames::MOON_J2000;
+    use arrow::array::{Array, Float64Array};
+    use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
     use pretty_env_logger;
     use std::env;
+    use std::fs::File;
     use std::str::FromStr;
     use std::sync::Arc;
     use std::{collections::HashMap, path::PathBuf};
@@ -605,5 +650,139 @@ mod ut_ccsds_oem {
         let traj_reloaded: Traj<Spacecraft> = Traj::from_oem_file(path, None).unwrap();
 
         assert_eq!(traj, traj_reloaded);
+    }
+
+    #[test]
+    fn test_parquet_exports_thrust_angles() {
+        let _ = pretty_env_logger::try_init();
+
+        let manifest_dir =
+            PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string()));
+
+        let almanac = Almanac::new(
+            &manifest_dir
+                .clone()
+                .join("data/01_planetary/pck08.pca")
+                .to_string_lossy(),
+        )
+        .unwrap()
+        .load(
+            &manifest_dir
+                .join("data/01_planetary/de440s.bsp")
+                .to_string_lossy(),
+        )
+        .unwrap();
+
+        let almanac = Arc::new(almanac);
+
+        let eme2k = almanac
+            .frame_info(anise::constants::frames::EARTH_J2000)
+            .unwrap();
+        let epoch = Epoch::from_gregorian_utc_at_noon(2021, 1, 1);
+        let orbit = Orbit::try_keplerian_altitude(900.0, 5e-5, 5e-3, 0.0, 178.0, 0.0, epoch, eme2k)
+            .unwrap();
+
+        let objectives = &[Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::AoP),
+            183.0,
+            5e-3,
+        )];
+
+        let guidance = Ruggiero::simple(objectives, orbit.into()).unwrap();
+        let spacecraft = Spacecraft::from_thruster(
+            orbit,
+            300.0,
+            67.0,
+            Thruster {
+                thrust_N: 89e-3,
+                isp_s: 1650.0,
+            },
+            GuidanceMode::Thrust,
+        );
+
+        let (_, traj) = Propagator::default(SpacecraftDynamics::from_guidance_law(
+            OrbitalDynamics::two_body(),
+            guidance,
+        ))
+        .with(spacecraft, almanac.clone())
+        .for_duration_with_traj(5.minutes())
+        .unwrap();
+
+        let path = manifest_dir
+            .join("data/04_output")
+            .join("thrust_axes_export_test.parquet");
+
+        traj.to_parquet(&path, ExportCfg::default()).unwrap();
+
+        // Reload the trajectory and replay
+        let reloaded = Traj::<Spacecraft>::from_parquet(&path).unwrap();
+        assert_eq!(reloaded.first().mode(), GuidanceMode::Thrust);
+        assert!(reloaded
+            .states
+            .iter()
+            .skip(1)
+            .any(|state| state.thrust_direction().is_some()));
+
+        let reader = ParquetRecordBatchReaderBuilder::try_new(File::open(&path).unwrap())
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let in_plane_name = StateParameter::ThrustInPlane(LocalFrame::RCN)
+            .to_field(None)
+            .name()
+            .to_string();
+        let out_of_plane_name = StateParameter::ThrustOutOfPlane(LocalFrame::RCN)
+            .to_field(None)
+            .name()
+            .to_string();
+
+        let batch = reader.into_iter().next().unwrap().unwrap();
+        let in_plane = batch
+            .column_by_name(&in_plane_name)
+            .unwrap()
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        let out_of_plane = batch
+            .column_by_name(&out_of_plane_name)
+            .unwrap()
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+
+        assert!(in_plane.is_null(0));
+        assert!(out_of_plane.is_null(0));
+        assert!((1..batch.num_rows()).any(|idx| in_plane.is_valid(idx)));
+        assert!((1..batch.num_rows()).any(|idx| out_of_plane.is_valid(idx)));
+
+        let replay_guidance = reloaded.to_thrust_direction_replay();
+        let replay_initial_state = reloaded.first().to_owned();
+        let replay_duration = reloaded.last().epoch() - reloaded.first().epoch();
+        let replay_dynamics =
+            SpacecraftDynamics::from_guidance_law(OrbitalDynamics::two_body(), replay_guidance);
+        let (replayed_end, _) = Propagator::default(replay_dynamics)
+            .with(replay_initial_state, almanac)
+            .for_duration_with_traj(replay_duration)
+            .unwrap();
+
+        let truth_end = traj.last();
+        let pos_err_km = (replayed_end.orbit.radius_km - truth_end.orbit.radius_km).norm();
+        let vel_err_km_s =
+            (replayed_end.orbit.velocity_km_s - truth_end.orbit.velocity_km_s).norm();
+        let prop_err_kg = (replayed_end.mass.prop_mass_kg - truth_end.mass.prop_mass_kg).abs();
+
+        assert!(
+            dbg!(pos_err_km) < 1e-3,
+            "replay position error too large: {pos_err_km} km"
+        );
+        assert!(
+            dbg!(vel_err_km_s) < 1e-5,
+            "replay velocity error too large: {vel_err_km_s} km/s"
+        );
+        assert!(
+            dbg!(prop_err_kg) < 1e-8,
+            "replay prop mass error too large: {prop_err_kg} kg"
+        );
     }
 }

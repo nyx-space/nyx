@@ -233,6 +233,17 @@ where
         // Grab the path here before we move stuff.
         let path_buf = cfg.actual_path(path);
 
+        // Build the states iterator -- this does require copying the current states but I can't either get a reference or a copy of all the states.
+        let states = if cfg.start_epoch.is_some() || cfg.end_epoch.is_some() || cfg.step.is_some() {
+            // Must interpolate the data!
+            let start = cfg.start_epoch.unwrap_or_else(|| self.first().epoch());
+            let end = cfg.end_epoch.unwrap_or_else(|| self.last().epoch());
+            let step = cfg.step.unwrap_or_else(|| 1.minutes());
+            self.every_between(step, start, end).collect::<Vec<S>>()
+        } else {
+            self.states.to_vec()
+        };
+
         // Build the schema
         let mut hdrs = vec![Field::new("Epoch (UTC)", DataType::Utf8, false)];
 
@@ -250,32 +261,37 @@ where
                 })?,
         )]);
 
-        let mut fields = match cfg.fields {
+        let requested_fields = match cfg.fields {
             Some(fields) => fields,
             None => S::export_params(),
         };
 
-        // Check that we can retrieve this information
-        fields.retain(|param| self.first().value(*param).is_ok());
+        let mut fields = Vec::new();
+        let mut field_nullable = Vec::new();
+        for field in requested_fields {
+            let mut any_ok = false;
+            let mut any_err = false;
+            for state in &states {
+                if state.value(field).is_ok() {
+                    any_ok = true;
+                } else {
+                    any_err = true;
+                }
+            }
 
-        for field in &fields {
-            hdrs.push(field.to_field(more_meta.clone()));
+            if any_ok {
+                fields.push(field);
+                field_nullable.push(any_err);
+            }
+        }
+
+        for (field, nullable) in fields.iter().zip(field_nullable.iter().copied()) {
+            hdrs.push(field.to_field(more_meta.clone()).with_nullable(nullable));
         }
 
         // Build the schema
         let schema = Arc::new(Schema::new(hdrs));
         let mut record: Vec<Arc<dyn Array>> = Vec::new();
-
-        // Build the states iterator -- this does require copying the current states but I can't either get a reference or a copy of all the states.
-        let states = if cfg.start_epoch.is_some() || cfg.end_epoch.is_some() || cfg.step.is_some() {
-            // Must interpolate the data!
-            let start = cfg.start_epoch.unwrap_or_else(|| self.first().epoch());
-            let end = cfg.end_epoch.unwrap_or_else(|| self.last().epoch());
-            let step = cfg.step.unwrap_or_else(|| 1.minutes());
-            self.every_between(step, start, end).collect::<Vec<S>>()
-        } else {
-            self.states.to_vec()
-        };
 
         // Build all of the records
 
@@ -291,14 +307,21 @@ where
             if field == StateParameter::GuidanceMode() {
                 let mut guid_mode = StringBuilder::new();
                 for s in &states {
-                    guid_mode
-                        .append_value(format!("{:?}", GuidanceMode::from(s.value(field).unwrap())));
+                    match s.value(field) {
+                        Ok(value) => {
+                            guid_mode.append_value(format!("{:?}", GuidanceMode::from(value)));
+                        }
+                        Err(_) => guid_mode.append_null(),
+                    }
                 }
                 record.push(Arc::new(guid_mode.finish()));
             } else {
                 let mut data = Float64Builder::new();
                 for s in &states {
-                    data.append_value(s.value(field).unwrap());
+                    match s.value(field) {
+                        Ok(value) => data.append_value(value),
+                        Err(_) => data.append_null(),
+                    };
                 }
                 record.push(Arc::new(data.finish()));
             }
