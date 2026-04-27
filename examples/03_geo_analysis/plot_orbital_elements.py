@@ -11,9 +11,9 @@ def plot_orbit_elements(
     Plots the orbital elements: SMA, ECC, INC, RAAN, AOP, TA, True Longitude, AOL
     """
 
-    df = df.with_columns(pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f")).sort(
-        "Epoch (UTC)", descending=False
-    )
+    df = df.with_columns(
+        pl.col("Epoch (UTC)").str.to_datetime("%Y-%m-%dT%H:%M:%S%.f")
+    ).sort("Epoch (UTC)", descending=False)
 
     columns = [
         "sma (km)",
@@ -56,7 +56,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="3D traj plotter")
     parser.add_argument("pq", type=str, help="Path to the parquet file")
     args = parser.parse_args()
-    
+
     df = pl.read_parquet(args.pq)
 
     plot_orbit_elements(df)
