@@ -147,6 +147,8 @@ mod ut_lambert_gooding {
             orientation_id: 0,
             mu_km3_s2: Some(3.98600433e5),
             shape: None,
+            frozen_epoch: None,
+            force_inertial: false,
         };
         let initial_state = Orbit {
             radius_km: Vector3::new(15945.34, 0.0, 0.0),
@@ -188,6 +190,8 @@ mod ut_lambert_gooding {
             orientation_id: 0,
             mu_km3_s2: Some(3.98600433e5),
             shape: None,
+            frozen_epoch: None,
+            force_inertial: false,
         };
         let initial_state = Orbit {
             radius_km: Vector3::new(15945.34, 0.0, 0.0),
