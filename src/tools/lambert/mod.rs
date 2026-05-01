@@ -63,10 +63,8 @@ impl TransferKind {
     ) -> Result<f64, LambertError> {
         match self {
             TransferKind::Auto => {
-                let mut dnu = r_final[1].atan2(r_final[0]) - r_init[1].atan2(r_final[1]);
-                if dnu > TAU {
-                    dnu -= TAU;
-                } else if dnu < 0.0 {
+                let mut dnu = r_final[1].atan2(r_final[0]) - r_init[1].atan2(r_init[0]);
+                if dnu < 0.0 {
                     dnu += TAU;
                 }
 
@@ -171,5 +169,38 @@ impl LambertSolution {
     /// Returns the c3 computed as the departure v infinity norm squared
     pub fn c3_km2_s2(&self) -> f64 {
         self.v_inf_outgoing_km_s().norm_squared()
+    }
+}
+
+#[cfg(test)]
+mod ut_lambert_transfer_kind {
+    use super::{TransferKind, Vector3};
+
+    #[test]
+    fn test_auto_direction_of_motion_long_way() {
+        // Regression: Δν = 3π/2 (r_init on +x, r_final on -y) must select
+        // the long way (-1.0). The pre-fix expression
+        // `r_init[1].atan2(r_final[1])` yielded the short way (+1.0).
+        let r_init = Vector3::new(8000.0, 0.0, 0.0);
+        let r_final = Vector3::new(0.0, -8000.0, 0.0);
+
+        let dm = TransferKind::Auto
+            .direction_of_motion(&r_final, &r_init)
+            .unwrap();
+
+        assert_eq!(dm, -1.0, "Auto should pick long-way for Δν=3π/2; got {dm}");
+    }
+
+    #[test]
+    fn test_auto_direction_of_motion_short_way() {
+        // Sanity companion: Δν = π/2 (+x → +y) must select short way.
+        let r_init = Vector3::new(8000.0, 0.0, 0.0);
+        let r_final = Vector3::new(0.0, 8000.0, 0.0);
+
+        let dm = TransferKind::Auto
+            .direction_of_motion(&r_final, &r_init)
+            .unwrap();
+
+        assert_eq!(dm, 1.0, "Auto should pick short-way for Δν=π/2; got {dm}");
     }
 }

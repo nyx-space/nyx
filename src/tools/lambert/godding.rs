@@ -215,4 +215,44 @@ mod ut_lambert_gooding {
         assert!((sol.v_init_km_s - exp_vi).norm() < 1e-6);
         assert!((sol.v_final_km_s - exp_vf).norm() < 1e-6);
     }
+
+    #[test]
+    fn test_lambert_gooding_direction_toggle_ih_negative() {
+        // Symmetry lock: on the Gooding path, the direction toggle is a
+        // simple ±1 on the chord term, independent of i_h.z. This test
+        // pins that invariant so ShortWay/LongWay can never collapse
+        // to a single solution on i_h.z<0 geometries.
+        let frame = Frame {
+            ephemeris_id: 301,
+            orientation_id: 0,
+            mu_km3_s2: Some(3.98600433e5),
+            shape: None,
+        };
+        let t0 = Epoch::from_gregorian_utc_at_midnight(2025, 1, 1);
+
+        let r1 = Vector3::new(7000.0, 0.0, 0.0);
+        let r2 = Vector3::new(0.0, -7000.0, -500.0);
+
+        let initial = Orbit {
+            radius_km: r1,
+            velocity_km_s: Vector3::zeros(),
+            epoch: t0,
+            frame,
+        };
+        let final_ = Orbit {
+            radius_km: r2,
+            velocity_km_s: Vector3::zeros(),
+            epoch: t0 + Unit::Minute * 60.0,
+            frame,
+        };
+        let input = LambertInput::from_planetary_states(initial, final_).unwrap();
+
+        let short = gooding(input, TransferKind::ShortWay).unwrap();
+        let long = gooding(input, TransferKind::LongWay).unwrap();
+
+        assert!(
+            (short.v_init_km_s - long.v_init_km_s).norm() > 1e-3,
+            "Gooding short/long-way collapsed on i_h.z<0 geometry",
+        );
+    }
 }
