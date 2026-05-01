@@ -827,8 +827,10 @@ orbit:
     frame:
       ephemeris_id: 399
       orientation_id: 1
+      force_inertial: false
       mu_km3_s2: null
       shape: null
+      frozen_epoch: null
 mass:
     dry_mass_kg: 500.0
     prop_mass_kg: 159.0
@@ -859,8 +861,10 @@ orbit:
     frame:
         ephemeris_id: 399
         orientation_id: 1
+        force_inertial: false
         mu_km3_s2: null
         shape: null
+        frozen_epoch: null
 mass:
     dry_mass_kg: 500.0
     prop_mass_kg: 159.0
@@ -899,8 +903,10 @@ orbit:
     frame:
         ephemeris_id: 399
         orientation_id: 1
+        force_inertial: false
         mu_km3_s2: null
         shape: null
+        frozen_epoch: null
 mass:
     dry_mass_kg: 500.0
     prop_mass_kg: 159.0

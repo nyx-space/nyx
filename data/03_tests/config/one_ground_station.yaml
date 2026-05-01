@@ -3,11 +3,13 @@ location:
   frame:
     ephemeris_id: 399
     orientation_id: 399
+    force_inertial: false
+    frozen_epoch: null
   latitude_deg: 2.3522
   longitude_deg: 48.8566
   height_km: 0.4
   terrain_mask:
-    - azimuth_deg: 0.0  
+    - azimuth_deg: 0.0
       elevation_mask_deg: 5.0
   terrain_mask_ignored: false
 stochastic_noises:
