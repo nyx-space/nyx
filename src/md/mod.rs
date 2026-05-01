@@ -96,7 +96,10 @@ pub enum TargetingError {
     #[snafu(display("Jacobian is signular"))]
     SingularJacobian,
     #[snafu(display("propagation error during targeting: {source}"))]
-    PropError { source: PropagationError },
+    PropError {
+        #[snafu(source(from(PropagationError, Box::new)))]
+        source: Box<PropagationError>,
+    },
     #[snafu(display("during an optimization, encountered {source}"))]
     TargetingTrajError { source: TrajError },
     #[snafu(display("during an optimization targets are too close"))]

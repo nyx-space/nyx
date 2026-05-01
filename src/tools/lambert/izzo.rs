@@ -546,6 +546,8 @@ mod ut_lambert_izzo {
             orientation_id: 0,
             mu_km3_s2: Some(3.98600433e5),
             shape: None,
+            frozen_epoch: None,
+            force_inertial: false,
         };
         let t0 = Epoch::from_gregorian_utc_at_midnight(2025, 1, 1);
 
@@ -585,6 +587,8 @@ mod ut_lambert_izzo {
             orientation_id: 0,
             mu_km3_s2: Some(3.98600433e5),
             shape: None,
+            frozen_epoch: None,
+            force_inertial: false,
         };
         let t0 = Epoch::from_gregorian_utc_at_midnight(2025, 1, 1);
 
@@ -624,6 +628,8 @@ mod ut_lambert_izzo {
             orientation_id: 0,
             mu_km3_s2: Some(3.98600433e5),
             shape: None,
+            frozen_epoch: None,
+            force_inertial: false,
         };
         let t0 = Epoch::from_gregorian_utc_at_midnight(2025, 1, 1);
 

@@ -6,31 +6,29 @@ extern crate pretty_env_logger as pel;
 use anise::{
     almanac::metaload::MetaFile,
     constants::{
-        celestial_objects::{EARTH, JUPITER_BARYCENTER, MOON, SUN},
-        frames::{EARTH_J2000, MOON_J2000, MOON_PA_FRAME},
+        celestial_objects::{EARTH, JUPITER_BARYCENTER, SUN},
+        frames::{MOON_J2000, MOON_PA_FRAME},
     },
-    prelude::Almanac,
 };
-use hifitime::{Epoch, TimeSeries, TimeUnits, Unit};
+use hifitime::{Epoch, Unit};
 use nyx::{
-    cosmic::{Aberration, Frame, Mass, MetaAlmanac, SRPData},
+    cosmic::{Mass, MetaAlmanac, SRPData},
     dynamics::{
         guidance::LocalFrame, GravityField, OrbitalDynamics, SolarPressure, SpacecraftDynamics,
     },
     io::{ConfigRepr, ExportCfg},
-    md::prelude::{GravityFieldData, Traj},
+    md::prelude::GravityFieldData,
     od::{
-        msr::MeasurementType,
         prelude::{KalmanVariant, TrackingArcSim, TrkConfig},
         process::{Estimate, NavSolution, ResidRejectCrit, SpacecraftUncertainty},
         snc::ProcessNoise3D,
-        GroundStation, SpacecraftKalmanOD, SpacecraftKalmanScalarOD,
+        GroundStation, SpacecraftKalmanScalarOD,
     },
     propagators::{IntegratorOptions, Propagator},
-    Orbit, Spacecraft, State,
+    Orbit, Spacecraft,
 };
 
-use std::{collections::BTreeMap, error::Error, path::PathBuf, str::FromStr, sync::Arc};
+use std::{collections::BTreeMap, error::Error, path::PathBuf, sync::Arc};
 
 // TODO: Convert this to a Spacecraft Sequence
 
