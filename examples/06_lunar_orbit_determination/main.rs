@@ -184,7 +184,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Build the SNC in the Moon J2000 frame, specified as a velocity noise over time.
     let process_noise = ProcessNoise3D::from_velocity_km_s(
-        &[1e-13, 1e-13, 1e-13],
+        &[1e-14, 1e-14, 1e-14],
         1 * Unit::Hour,
         10 * Unit::Minute,
         None,
@@ -224,7 +224,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         "Percentage within +/-3: {}",
         od_sol.residual_ratio_within_threshold(3.0).unwrap()
     );
-    println!("Ratios normal? {}", od_sol.is_normal(None).unwrap());
+    println!("Whitened residuals normal? {}", od_sol.is_normal(None)?);
+    println!("NIS test success? {}", od_sol.is_nis_consistent(None)?);
 
     od_sol.to_parquet(
         "./data/04_output/06_lunar_od_results.parquet",

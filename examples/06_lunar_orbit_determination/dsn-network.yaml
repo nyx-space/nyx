@@ -11,6 +11,8 @@ DSS-65 Madrid:
     frame:
       ephemeris_id: 399
       orientation_id: 399
+      force_inertial: false
+      frozen_epoch: null
   elevation_mask_deg: 5.0
   stochastic_noises:
     range_km:
@@ -32,6 +34,8 @@ DSS-34 Canberra:
     frame:
       ephemeris_id: 399
       orientation_id: 399
+      force_inertial: false
+      frozen_epoch: null
     latitude_deg: -35.398333
     longitude_deg: 148.981944
     height_km: 0.691750
@@ -59,6 +63,8 @@ DSS-13 Goldstone:
     frame:
       ephemeris_id: 399
       orientation_id: 399
+      force_inertial: false
+      frozen_epoch: null
     latitude_deg: 35.247164
     longitude_deg: 243.205
     height_km: 1.071149

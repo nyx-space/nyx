@@ -1,7 +1,6 @@
-import polars as pl
 import plotly.graph_objects as go
+import polars as pl
 from plotly.subplots import make_subplots
-
 
 if __name__ == "__main__":
     df = pl.read_parquet("03_geo_raise.parquet")

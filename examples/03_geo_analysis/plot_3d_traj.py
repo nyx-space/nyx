@@ -1,7 +1,8 @@
 import argparse
-import polars as pl
-import plotly.graph_objs as go
+
 import numpy as np
+import plotly.graph_objs as go
+import polars as pl
 
 
 def build_sphere(size, num_points=500, color=(86, 180, 233), opacity=1.0):

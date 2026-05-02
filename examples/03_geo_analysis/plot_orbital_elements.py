@@ -1,6 +1,7 @@
 import argparse
-import polars as pl
+
 import plotly.graph_objs as go
+import polars as pl
 from plotly.subplots import make_subplots
 
 

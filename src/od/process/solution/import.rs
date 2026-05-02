@@ -285,7 +285,7 @@ where
             let mut residual_data_cols: HashMap<MeasurementType, BTreeMap<String, Float64Array>> = HashMap::new();
             for msr_type in &measurement_types_found {
                  let mut type_cols = BTreeMap::new();
-                 let prefixes = ["Prefit residual", "Postfit residual", "Measurement noise", "Real observation", "Computed observation"];
+                 let prefixes = ["Prefit residual", "Whitened residual", "Postfit residual", "Measurement noise", "Real observation", "Computed observation"];
                  for prefix in prefixes {
                       // Again, guessing column name format
                       let base_name = format!("{}: {:?} ({})", prefix, msr_type, msr_type.unit());
@@ -423,6 +423,7 @@ where
                 let current_residual: Option<Residual<MsrSize>> = if let (Some(is_rejected), Some(tracker), Some(ratio)) = (is_rejected_opt, tracker_opt.clone(), ratio_opt) {
                      // It's a measurement update
                      let mut prefit_vec = OVector::<f64, MsrSize>::zeros();
+                     let mut whitened_vec = OVector::<f64, MsrSize>::zeros();
                      let mut postfit_vec = OVector::<f64, MsrSize>::zeros();
                      let mut noise_vec = OVector::<f64, MsrSize>::zeros();
                      let mut real_obs_vec = OVector::<f64, MsrSize>::zeros();
@@ -435,14 +436,16 @@ where
 
                            // Check if data exists for this type *at this row*
                            let prefit_val = type_cols.get("Prefit residual").and_then(|col| if col.is_valid(i) { Some(col.value(i)) } else { None });
+                           let whitened_resid_val = type_cols.get("Whitened residual").and_then(|col| if col.is_valid(i) { Some(col.value(i)) } else { None });
                            let postfit_val = type_cols.get("Postfit residual").and_then(|col| if col.is_valid(i) { Some(col.value(i)) } else { None });
                            let noise_val = type_cols.get("Measurement noise").and_then(|col| if col.is_valid(i) { Some(col.value(i)) } else { None });
                            let real_val = type_cols.get("Real observation").and_then(|col| if col.is_valid(i) { Some(col.value(i)) } else { None });
                            let comp_val = type_cols.get("Computed observation").and_then(|col| if col.is_valid(i) { Some(col.value(i)) } else { None });
 
                            // Only include if *at least one* value is present for this type in this row
-                           if prefit_val.is_some() || postfit_val.is_some() || noise_val.is_some() || real_val.is_some() || comp_val.is_some() {
-                                prefit_vec[msr_idx] = prefit_val.unwrap_or(f64::NAN); // Or handle differently
+                           if prefit_val.is_some() || whitened_resid_val.is_some() || postfit_val.is_some() || noise_val.is_some() || real_val.is_some() || comp_val.is_some() {
+                                prefit_vec[msr_idx] = prefit_val.unwrap_or(f64::NAN);
+                                whitened_vec[msr_idx] = whitened_resid_val.unwrap_or(f64::NAN);
                                 postfit_vec[msr_idx] = postfit_val.unwrap_or(f64::NAN);
                                 noise_vec[msr_idx] = noise_val.unwrap_or(f64::NAN);
                                 real_obs_vec[msr_idx] = real_val.unwrap_or(f64::NAN);
@@ -459,6 +462,7 @@ where
                      let resid = Residual {
                           epoch,
                           prefit: prefit_vec,
+                          whitened_resid: whitened_vec,
                           postfit: postfit_vec,
                           tracker_msr_noise: noise_vec,
                           ratio,

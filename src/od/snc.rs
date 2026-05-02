@@ -259,6 +259,10 @@ where
                 }
             }
 
+            if delta_t > self.disable_time {
+                return Ok(None);
+            }
+
             // Let's compute the Gamma matrix, an approximation of the time integral
             // which assumes that the acceleration is constant between these two measurements.
             let mut gamma = OMatrix::<f64, S, A>::zeros();
