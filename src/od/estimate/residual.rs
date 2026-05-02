@@ -164,6 +164,13 @@ where
             .map(|idx| self.computed_obs[idx])
     }
 
+    /// Returns the whitened residual for this measurement type, if available
+    pub fn whitened_resid(&self, msr_type: MeasurementType) -> Option<f64> {
+        self.msr_types
+            .get_index_of(&msr_type)
+            .map(|idx| self.whitened_resid[idx])
+    }
+
     /// Returns the normalized innovation squared (NIS) as the norm squares of the whitened residual
     pub fn nis(&self) -> f64 {
         self.whitened_resid.norm_squared()

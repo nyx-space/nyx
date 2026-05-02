@@ -178,7 +178,7 @@ where
     /// Returns Ok(true) if the filter is consistent, Ok(false) if the filter
     /// is over-confident or under-confident, or an error if no residuals are available.
     pub fn is_nis_consistent(&self, alpha: Option<f64>) -> Result<bool, ODError> {
-        let n = self.residuals.iter().flatten().count();
+        let n = self.accepted_residuals().iter().count();
 
         if n == 0 {
             return Err(ODError::ODNoResiduals {
@@ -202,15 +202,9 @@ where
 
         // For a two-sided test, we need the standard normal quantile for 1 - (alpha / 2).
         // If alpha = 0.05, the critical z-score is approximately 1.95996.
-        let z_critical = match alpha {
-            a if (a - 0.05).abs() < 1e-6 => 1.95996,
-            a if (a - 0.01).abs() < 1e-6 => 2.57583,
-            a if (a - 0.10).abs() < 1e-6 => 1.64485,
-            _ => {
-                warn!("Unsupported alpha value {alpha}. Defaulting to 0.05");
-                1.95996
-            }
-        };
+        let z_critical = Normal::new(0.0, 1.0)
+            .unwrap()
+            .inverse_cdf(1.0 - alpha / 2.0);
 
         // Use the Wilson-Hilferty transformation to approximate the Chi-squared
         // lower and upper critical bounds.
