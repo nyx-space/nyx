@@ -36,6 +36,9 @@ where
     pub prefit: OVector<f64, M>,
     /// The postfit residual in the units of the measurement type
     pub postfit: OVector<f64, M>,
+    /// Whitened prefit innovation: L^-1 * prefit, where S = L * L^T
+    /// Dimensionless, components should be approximately ~N(0, 1) if the model and covariance are consistent.
+    pub whitened_resid: OVector<f64, M>,
     /// The prefit residual ratio computed as the Mahalanobis distance, i.e. it is always positive
     /// and computed as `r' * (H*P*H')^-1 * r`, where `r` is the prefit residual, `H` is the sensitivity matrix, and `P` is the covariance matrix.
     /// To assess the performance, look at the Chi Square distribution for the number of measurements, e.g. 2 for range and range-rate.
@@ -65,6 +68,7 @@ where
             epoch: Epoch::from_tai_seconds(0.0),
             prefit: OVector::<f64, M>::zeros(),
             postfit: OVector::<f64, M>::zeros(),
+            whitened_resid: OVector::<f64, M>::zeros(),
             tracker_msr_noise: OVector::<f64, M>::zeros(),
             ratio: 0.0,
             rejected: true,
@@ -79,6 +83,7 @@ where
     pub fn rejected(
         epoch: Epoch,
         prefit: OVector<f64, M>,
+        whitened_resid: OVector<f64, M>,
         ratio: f64,
         tracker_msr_noise: OVector<f64, M>,
         real_obs: OVector<f64, M>,
@@ -88,6 +93,7 @@ where
             epoch,
             prefit,
             postfit: OVector::<f64, M>::zeros() * f64::NAN,
+            whitened_resid,
             ratio,
             tracker_msr_noise,
             rejected: true,
@@ -101,6 +107,7 @@ where
     pub fn accepted(
         epoch: Epoch,
         prefit: OVector<f64, M>,
+        whitened_resid: OVector<f64, M>,
         postfit: OVector<f64, M>,
         ratio: f64,
         tracker_msr_noise: OVector<f64, M>,
@@ -110,6 +117,7 @@ where
         Self {
             epoch,
             prefit,
+            whitened_resid,
             postfit,
             ratio,
             tracker_msr_noise,
@@ -154,6 +162,18 @@ where
         self.msr_types
             .get_index_of(&msr_type)
             .map(|idx| self.computed_obs[idx])
+    }
+
+    /// Returns the whitened residual for this measurement type, if available
+    pub fn whitened_resid(&self, msr_type: MeasurementType) -> Option<f64> {
+        self.msr_types
+            .get_index_of(&msr_type)
+            .map(|idx| self.whitened_resid[idx])
+    }
+
+    /// Returns the normalized innovation squared (NIS) as the norm squares of the whitened residual
+    pub fn nis(&self) -> f64 {
+        self.whitened_resid.norm_squared()
     }
 }
 

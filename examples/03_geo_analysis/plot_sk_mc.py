@@ -1,6 +1,5 @@
-import polars as pl
 import plotly.graph_objs as go
-
+import polars as pl
 
 if __name__ == "__main__":
     df = pl.read_parquet("03_geo_sk.parquet")

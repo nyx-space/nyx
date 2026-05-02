@@ -1,6 +1,7 @@
 import click
-import polars as pl
 import plotly.express as px
+import polars as pl
+
 
 @click.command
 @click.option("-p", "--path", type=str, default="./data/04_output/04_lro_simulated_tracking.parquet")

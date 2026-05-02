@@ -411,7 +411,7 @@ where
                     let msr_prct = (10.0 * (msr_cnt as f64) / (num_msrs as f64)) as usize;
                     if !reported[msr_prct] {
                         let msg = format!(
-                            "{:>3}% done - {msr_accepted_cnt:.0} measurements accepted, {:.0} rejected",
+                            "{:>3}% done - {epoch} - {msr_accepted_cnt:.0} measurements accepted, {:.0} rejected",
                             10 * msr_prct, msr_rejected_cnt
                         );
                         if msr_accepted_cnt < msr_rejected_cnt {
@@ -442,7 +442,7 @@ where
         if !reported[10] {
             let tock_time = Epoch::now().unwrap() - tick;
             info!(
-                "100% done - {msr_accepted_cnt} measurements accepted, {msr_rejected_cnt} rejected (done in {tock_time})",
+                "100% done - {epoch} - {msr_accepted_cnt} measurements accepted, {msr_rejected_cnt} rejected (done in {tock_time})",
             );
         }
 
