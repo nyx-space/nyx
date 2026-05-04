@@ -23,6 +23,7 @@ pub(crate) const INTERPOLATION_SAMPLES: usize = 13;
 
 use super::StateParameter;
 use crate::cosmic::Frame;
+use crate::dynamics::guidance::LocalFrame;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 use crate::time::Epoch;
@@ -100,6 +101,8 @@ impl Interpolatable for Spacecraft {
             / (last.epoch() - first.epoch()).to_seconds();
 
         self.mass.prop_mass_kg += prop_kg_dt * (epoch - first.epoch()).to_seconds();
+        // Thrust direction is a discrete guidance output and should not be interpolated.
+        self.thrust_direction = None;
 
         Ok(self)
     }
@@ -135,6 +138,11 @@ impl Interpolatable for Spacecraft {
             StateParameter::Isp(),
             StateParameter::GuidanceMode(),
             StateParameter::Thrust(),
+            StateParameter::ThrustX(),
+            StateParameter::ThrustY(),
+            StateParameter::ThrustZ(),
+            StateParameter::ThrustInPlane(LocalFrame::RCN),
+            StateParameter::ThrustOutOfPlane(LocalFrame::RCN),
         ]
     }
 }

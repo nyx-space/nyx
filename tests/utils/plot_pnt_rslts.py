@@ -1,9 +1,9 @@
-import polars as pl
-import numpy as np
-import plotly.graph_objects as go
-from plotly.colors import sample_colorscale
-import plotly.express as px
 import click
+import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
+import polars as pl
+from plotly.colors import sample_colorscale
 
 color_scale = "phase"
 

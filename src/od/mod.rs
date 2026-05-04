@@ -119,9 +119,15 @@ pub mod prelude {
 #[snafu(visibility(pub(crate)))]
 pub enum ODError {
     #[snafu(display("during an orbit determination, encountered {source}"))]
-    ODPropError { source: PropagationError },
+    ODPropError {
+        #[snafu(source(from(PropagationError, Box::new)))]
+        source: Box<PropagationError>,
+    },
     #[snafu(display("during an orbit determination, encountered {source}"))]
-    ODDynamicsError { source: DynamicsError },
+    ODDynamicsError {
+        #[snafu(source(from(DynamicsError, Box::new)))]
+        source: Box<DynamicsError>,
+    },
     #[snafu(display("at least {need} measurements required for {action}"))]
     TooFewMeasurements { need: usize, action: &'static str },
     #[snafu(display("invalid step size: {step}"))]

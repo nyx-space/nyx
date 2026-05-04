@@ -190,6 +190,7 @@ where
                 let resid = Residual::rejected(
                     epoch,
                     prefit,
+                    whitened_resid,
                     ratio,
                     innovation_trend,
                     real_obs,
@@ -257,6 +258,7 @@ where
                 let resid = Residual::accepted(
                     epoch,
                     prefit,
+                    whitened_resid,
                     postfit,
                     ratio,
                     innovation_trend,
@@ -274,6 +276,7 @@ where
                     Residual::accepted(
                         epoch,
                         prefit,
+                        whitened_resid,
                         postfit,
                         ratio,
                         innovation_trend,

@@ -1,10 +1,12 @@
-import polars as pl
-from scipy import stats
-import numpy as np
-import plotly.graph_objects as go
-import plotly.express as px
-from plotly.subplots import make_subplots
 import click
+import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
+import polars as pl
+from plotly.subplots import make_subplots
+from scipy import stats
+
+TEMPLATE = "seaborn"
 
 
 def convert_units(df):
@@ -28,6 +30,25 @@ def convert_units(df):
         df = df.with_columns(exprs).rename(rename_dict)
     return df
 
+def autocorr(x: np.ndarray, max_lag: int) -> np.ndarray:
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+
+    if len(x) < 3:
+        return np.array([])
+
+    x = x - np.mean(x)
+    denom = np.dot(x, x)
+
+    if denom == 0.0:
+        return np.zeros(max_lag + 1)
+
+    max_lag = min(max_lag, len(x) - 1)
+
+    return np.array([
+        np.dot(x[:-lag], x[lag:]) / denom if lag > 0 else 1.0
+        for lag in range(max_lag + 1)
+    ])
 
 @click.command
 @click.option("-p", "--path", type=str)
@@ -48,16 +69,34 @@ def main(path: str, wstats: bool, error_ric: str):
         ).sort("Epoch (UTC)", descending=False)
         ricdf = convert_units(ricdf)
 
-        px.line(
+        ric_fig = make_subplots(
+            rows=2,
+            cols=1,
+            subplot_titles=["RIC position error (m)", "RIC velocity error (m/s)"],
+            vertical_spacing=0.1,
+        )
+        this_ric_fig = px.line(
             ricdf,
             x="Epoch (UTC)",
             y=["Delta X (RIC) (m)", "Delta Y (RIC) (m)", "Delta Z (RIC) (m)"],
-        ).show()
-        px.line(
+            template="seaborn",
+        )
+        for trace in this_ric_fig.data:
+            ric_fig.add_trace(trace, row=1, col=1)
+
+        this_ric_fig = px.line(
             ricdf,
             x="Epoch (UTC)",
-            y=["Delta Vx (RIC) (m/s)", "Delta Vy (RIC) (m/s)", "Delta Vz (RIC) (m/s)"],
-        ).show()
+            y=[
+                "Delta Vx (RIC) (m/s)",
+                "Delta Vy (RIC) (m/s)",
+                "Delta Vz (RIC) (m/s)",
+            ],
+            template="seaborn",
+        )
+        for trace in this_ric_fig.data:
+            ric_fig.add_trace(trace, row=2, col=1)
+        ric_fig.show()
 
     all_msr_types = ["Range (m)", "Doppler (m/s)", "Azimuth (deg)", "Elevation (deg)"]
     msr_type_count = 0
@@ -82,11 +121,11 @@ def main(path: str, wstats: bool, error_ric: str):
 
     # Plot the measurement residuals and their noises.
     fig = make_subplots(
-            rows=len(msr_types),
-            cols=1,
-            subplot_titles=[msr for msr in msr_types],
-            vertical_spacing=0.1
-        )
+        rows=len(msr_types),
+        cols=1,
+        subplot_titles=[msr for msr in msr_types],
+        vertical_spacing=0.1,
+    )
     legend_added = set()  # Track which trace names are already in legend
 
     for idx, msr in enumerate(msr_types, start=1):
@@ -109,9 +148,10 @@ def main(path: str, wstats: bool, error_ric: str):
                     name=y,
                     legendgroup=y,
                     marker=dict(color="blue" if "Prefit" in y else "red"),
-                    showlegend=True
+                    showlegend=True,
                 ),
-                row=idx, col=1
+                row=idx,
+                col=1,
             )
 
         # Add 3-sigma bounds
@@ -126,27 +166,213 @@ def main(path: str, wstats: bool, error_ric: str):
                     line=dict(color="black"),
                     legendgroup=trace_type,
                     connectgaps=True,
-                    showlegend=(trace_type not in legend_added)
+                    showlegend=(trace_type not in legend_added),
                 ),
-                row=idx, col=1
+                row=idx,
+                col=1,
             )
             legend_added.add(trace_type)
 
         fig.update_yaxes(title_text=unit, row=idx, col=1)
-    fig.update_layout(title_text="Measurement Residuals")
-    fig.update_xaxes(matches='x')
+    fig.update_layout(title_text="Measurement Residuals", template="seaborn")
+    fig.update_xaxes(matches="x")
     fig.show()
 
-    # Plot the residual ratios
-    px.scatter(df, x="Epoch (UTC)", y="Residual ratio", color="Residual Rejected").show()
-    px.scatter(df, x="Epoch (UTC)", y="Residual ratio", color="Tracker").show()
-
-    # Plot the RIC uncertainty
-    px.line(
+    # Plot the RIC uncertainty for position and velocity
+    sigma_fig = make_subplots(
+        rows=2,
+        cols=1,
+        subplot_titles=[
+            "RIC 1-sigma position uncertainty (m)",
+            "RIC 1-sigma velocity uncertainty (m/s)",
+        ],
+        vertical_spacing=0.1,
+    )
+    this_fig = px.line(
         df,
         x="Epoch (UTC)",
         y=["Sigma X (RIC) (m)", "Sigma Y (RIC) (m)", "Sigma Z (RIC) (m)"],
-    ).show()
+        template=TEMPLATE,
+    )
+    for trace in this_fig.data:
+        sigma_fig.add_trace(trace, row=1, col=1)
+
+    this_fig = px.line(
+        df,
+        x="Epoch (UTC)",
+        y=["Sigma Vx (RIC) (m/s)", "Sigma Vy (RIC) (m/s)", "Sigma Vz (RIC) (m/s)"],
+        template=TEMPLATE,
+    )
+    for trace in this_fig.data:
+        sigma_fig.add_trace(trace, row=2, col=1)
+    sigma_fig.show()
+
+    # Create one QQ plot per whitened residual (there is only one if scalar processing of measurements)
+    whitened_resids = [c for c in df.columns if "Whitened residual" in c]
+
+    # Plot the residual ratios
+    for whitened_resid in whitened_resids:
+        # 1. Create the subplot figure: 2 rows, 1 column
+        # shared_xaxes=True links zooming/panning across both rows
+        fig = make_subplots(
+            rows=4,
+            cols=2,
+            shared_xaxes=False,
+            vertical_spacing=0.08,
+            horizontal_spacing=0.07,
+            specs=[
+                [{"colspan": 2}, None],
+                [{"colspan": 2}, None],
+                [{"colspan": 2}, None],
+                [{}, {}],
+            ],
+            subplot_titles=(
+                "Rejected Status",
+                "By Tracker",
+                "Autocorrelation by Tracker",
+                "Accepted Residuals Histogram",
+                "Accepted Residuals QQ Plot",
+            ),
+        )
+        # Generate the "Rejected" plot
+        # We use px to get the traces, then add them to the subplot
+        fig_rej = px.scatter(
+            df, x="Epoch (UTC)", y=whitened_resid, color="Residual Rejected"
+        )
+        for trace in fig_rej.data:
+            fig.add_trace(trace, row=1, col=1)
+
+        # Generate the "Tracker" plot
+        fig_track = px.scatter(df, x="Epoch (UTC)", y=whitened_resid, color="Tracker")
+        for trace in fig_track.data:
+            # We set showlegend=True to avoid duplicate legend entries if needed
+            fig.add_trace(trace, row=2, col=1)
+
+        df_accepted = df.filter(~pl.col("Residual Rejected"))
+        fig_hist = px.histogram(
+            df_accepted, x=whitened_resid, color="Tracker", barmode="overlay"
+        )
+        for trace in fig_hist.data:
+            trace.showlegend = False
+            fig.add_trace(trace, row=4, col=1)
+
+        # Generate the QQ plot
+        sample = df_accepted[whitened_resid].drop_nulls().to_numpy()
+
+        # QQ data
+        (osm, osr), (slope, intercept, r) = stats.probplot(sample, dist="norm", fit=True)
+
+        x_line = np.linspace(np.min(osm), np.max(osm), 200)
+
+        # QQ scatter
+        fig.add_trace(
+            go.Scatter(
+                x=osm,
+                y=osr,
+                mode="markers",
+                name=f"{whitened_resid} QQ",
+                marker=dict(color="blue"),
+            ),
+            row=4,
+            col=2,
+        )
+
+        # Standard-normal expected line: this is the important one for whitened residuals
+        fig.add_trace(
+            go.Scatter(
+                x=x_line,
+                y=x_line,
+                mode="lines",
+                name="Expected N(0,1)",
+                line=dict(color="red", dash="dash"),
+            ),
+            row=4,
+            col=2,
+        )
+
+        # Optional fitted line, useful to see empirical bias/scale
+        fig.add_trace(
+            go.Scatter(
+                x=x_line,
+                y=slope * x_line + intercept,
+                mode="lines",
+                name=f"Fitted normal: μ={intercept:.3f}, σ={slope:.3f}, R={r:.3f}",
+                line=dict(color="gray"),
+            ),
+            row=4,
+            col=2,
+        )
+
+        for tracker in df_accepted["Tracker"].unique().to_list():
+            tracker_df = (
+                df_accepted
+                .filter(pl.col("Tracker") == tracker)
+                .sort("Epoch (UTC)")
+            )
+
+            x = tracker_df[whitened_resid].drop_nulls().to_numpy()
+
+            if len(x) < 5:
+                continue
+
+            max_lag = 30
+            rho = autocorr(x, max_lag=max_lag)
+            lags = np.arange(len(rho))
+
+            fig.add_trace(
+                go.Bar(
+                    x=lags,
+                    y=rho,
+                    name=f"{tracker} ACF",
+                    showlegend=False,
+                    opacity=0.7,
+                ),
+                row=3,
+                col=1,
+            )
+
+            # Approximate 95% white-noise bounds
+            bound = 1.96 / np.sqrt(len(x))
+
+            fig.add_trace(
+                go.Scatter(
+                    x=[0, len(rho) - 1],
+                    y=[bound, bound],
+                    mode="lines",
+                    line=dict(dash="dash"),
+                    name=f"{tracker} +95%",
+                    showlegend=False,
+                ),
+                row=3,
+                col=1,
+            )
+
+            fig.add_trace(
+                go.Scatter(
+                    x=[0, len(rho) - 1],
+                    y=[-bound, -bound],
+                    mode="lines",
+                    line=dict(dash="dash"),
+                    name=f"{tracker} -95%",
+                    showlegend=False,
+                ),
+                row=3,
+                col=1,
+            )
+
+        # Global Layout Updates
+        fig.update_layout(
+            title_text=f"Comprehensive Residual Analysis: {whitened_resid}",
+            template="seaborn",
+        )
+        # Update axes titles for clarity
+        fig.update_yaxes(title_text=whitened_resid, row=1, col=1)
+        fig.update_yaxes(title_text=whitened_resid, row=2, col=1)
+        fig.update_yaxes(title_text="Count", row=3, col=1)
+        fig.update_xaxes(title_text="Theoretical N(0,1) Quantiles", row=3, col=2)
+        fig.update_yaxes(title_text="Sample Quantiles", row=3, col=2)
+
+        fig.show()
 
     if wstats:
         for msr in msr_types:
@@ -156,60 +382,9 @@ def main(path: str, wstats: bool, error_ric: str):
                 y=[f"Real observation: {msr}", f"Computed observation: {msr}"],
             ).show()
 
-        # Convert the Polars column to a NumPy array for compatibility with scipy and Plotly
-        residual_ratio = df["Residual ratio"].drop_nulls().to_numpy()
-
         gain_columns = [c for c in df.columns if "Gain" in c]
         fs_ratio_columns = [c for c in df.columns if "Filter-smoother ratio" in c]
         is_filter_run = len(df[gain_columns].drop_nulls()) > 0
-
-        # Create QQ plot
-        qq = stats.probplot(residual_ratio)
-        x_qq = np.array([qq[0][0][0], qq[0][0][-1]])
-        y_qq = np.array([qq[0][1][0], qq[0][1][-1]])
-
-        # Create the QQ plot figure
-        fig_qq = go.Figure()
-
-        # Add scatter points
-        fig_qq.add_trace(
-            go.Scatter(
-                x=qq[0][0],
-                y=qq[0][1],
-                mode="markers",
-                name="Residuals ratios (QQ)",
-                marker=dict(color="blue"),
-            )
-        )
-
-        # Add the theoretical line
-        fig_qq.add_trace(
-            go.Scatter(
-                x=x_qq,
-                y=y_qq,
-                mode="lines",
-                name="Theoretical Normal",
-                line=dict(color="red"),
-            )
-        )
-
-        # Update layout
-        fig_qq.update_layout(
-            title="Normal Q-Q Plot",
-            xaxis_title="Theoretical Quantiles",
-            yaxis_title="Sample Quantiles",
-        )
-
-        # Show QQ plot
-        fig_qq.show()
-
-        px.histogram(
-            df,
-            x="Residual ratio",
-            color="Tracker",
-            marginal="rug",  # can be `box`, `violin`
-            hover_data=df.columns,
-        ).show()
 
         # Plot the filter gains or filter-smoother ratios
         if is_filter_run:

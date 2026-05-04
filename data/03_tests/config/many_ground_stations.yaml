@@ -6,6 +6,8 @@
     frame:
       ephemeris_id: 399
       orientation_id: 399
+      force_inertial: false
+      frozen_epoch: null
     terrain_mask:
       - azimuth_deg: 0.0
         elevation_mask_deg: 5.0
@@ -29,6 +31,8 @@
     frame:
       ephemeris_id: 399
       orientation_id: 399
+      force_inertial: false
+      frozen_epoch: null
     latitude_deg: -35.398333
     longitude_deg: 148.981944
     height_km: 0.691750

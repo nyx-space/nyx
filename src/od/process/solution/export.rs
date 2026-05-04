@@ -257,6 +257,13 @@ where
                     .with_name(format!("Prefit residual: {f:?} ({})", f.unit())),
             );
         }
+        for j in 0..MsrSize::DIM {
+            msr_fields.push(Field::new(
+                format!("Whitened residual #{j}"),
+                DataType::Float64,
+                true,
+            ));
+        }
         for f in &self.measurement_types {
             msr_fields.push(
                 f.to_field()
@@ -461,6 +468,20 @@ where
             }
             record.push(Arc::new(data.finish()));
         }
+
+        // Whitened residual
+        for j in 0..MsrSize::DIM {
+            let mut data = Float64Builder::new();
+            for resid_opt in &residuals {
+                if let Some(resid) = resid_opt {
+                    data.append_value(resid.whitened_resid[j])
+                } else {
+                    data.append_null();
+                }
+            }
+            record.push(Arc::new(data.finish()));
+        }
+
         // Postfit
         for msr_type in &self.measurement_types {
             let mut data = Float64Builder::new();

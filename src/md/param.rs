@@ -20,6 +20,7 @@ use anise::analysis::prelude::OrbitalElement;
 use arrow::datatypes::{DataType, Field};
 use core::fmt;
 
+use crate::dynamics::guidance::LocalFrame;
 use serde::{Deserialize, Serialize};
 use serde_dhall::StaticType;
 use std::collections::HashMap;
@@ -52,6 +53,16 @@ pub enum StateParameter {
     Isp(),
     /// prop mass in kilograms
     PropMass(),
+    /// Inertial thrust-direction x component
+    ThrustX(),
+    /// Inertial thrust-direction y component
+    ThrustY(),
+    /// Inertial thrust-direction z component
+    ThrustZ(),
+    /// In-plane thrust angle in degrees for the requested local frame
+    ThrustInPlane(LocalFrame),
+    /// Out-of-plane thrust angle in degrees for the requested local frame
+    ThrustOutOfPlane(LocalFrame),
     /// Thrust (Newtons)
     Thrust(),
     /// Total mass
@@ -97,6 +108,11 @@ impl StateParameter {
                 | Self::Cd()
                 | Self::Isp()
                 | Self::GuidanceMode()
+                | Self::ThrustX()
+                | Self::ThrustY()
+                | Self::ThrustZ()
+                | Self::ThrustInPlane(_)
+                | Self::ThrustOutOfPlane(_)
                 | Self::Thrust()
         )
     }
@@ -107,6 +123,8 @@ impl StateParameter {
             Self::BdotR() | Self::BdotT() => "km",
 
             Self::DryMass() | Self::PropMass() => "kg",
+            Self::ThrustX() | Self::ThrustY() | Self::ThrustZ() => "unitless",
+            Self::ThrustInPlane(_) | Self::ThrustOutOfPlane(_) => "deg",
             Self::Isp() => "isp",
             Self::Thrust() => "N",
             _ => "",
@@ -166,6 +184,13 @@ impl fmt::Display for StateParameter {
             Self::GuidanceMode() => "guidance_mode",
             Self::Isp() => "isp",
             Self::PropMass() => "prop_mass",
+            Self::ThrustX() => "thrust_x",
+            Self::ThrustY() => "thrust_y",
+            Self::ThrustZ() => "thrust_z",
+            Self::ThrustInPlane(frame) => return write!(f, "thrust_in_plane ({frame:?}) (deg)"),
+            Self::ThrustOutOfPlane(frame) => {
+                return write!(f, "thrust_out_of_plane ({frame:?}) (deg)")
+            }
             Self::Thrust() => "thrust",
             Self::TotalMass() => "total_mass",
         };

@@ -60,9 +60,41 @@ impl Kluever {
         })
     }
 
-    /// Sets the maximum eclipse during which we can thrust.
-    pub fn set_max_eclipse(&mut self, max_eclipse: f64) {
-        self.max_eclipse_prct = Some(max_eclipse);
+    /// Creates a new Kluever blended control law, specifying a maximum allowable eclipse for thrusting.
+    pub fn from_max_eclipse(
+        objectives: &[Objective],
+        weights: &[f64],
+        max_eclipse: f64,
+    ) -> Arc<Self> {
+        Arc::new(Self {
+            objectives: objectives
+                .iter()
+                .copied()
+                .zip(weights.iter().copied())
+                .map(|(obj, w)| ObjectiveWeight {
+                    objective: obj,
+                    weight: w,
+                })
+                .collect(),
+            max_eclipse_prct: Some(max_eclipse),
+        })
+    }
+
+    /// Returns whether the guidance law has achieved all goals
+    pub fn status(&self, state: &Spacecraft) -> Vec<String> {
+        self.objectives
+            .iter()
+            .map(|obj| {
+                let (ok, err) = obj.objective.assess(state).unwrap();
+                format!(
+                    "{} achieved: {}\t error = {:.5} {}",
+                    obj.objective,
+                    ok,
+                    err,
+                    obj.objective.parameter.unit()
+                )
+            })
+            .collect::<Vec<String>>()
     }
 }
 

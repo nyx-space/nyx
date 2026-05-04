@@ -6,31 +6,29 @@ extern crate pretty_env_logger as pel;
 use anise::{
     almanac::metaload::MetaFile,
     constants::{
-        celestial_objects::{EARTH, JUPITER_BARYCENTER, MOON, SUN},
-        frames::{EARTH_J2000, MOON_J2000, MOON_PA_FRAME},
+        celestial_objects::{EARTH, JUPITER_BARYCENTER, SUN},
+        frames::{MOON_J2000, MOON_PA_FRAME},
     },
-    prelude::Almanac,
 };
-use hifitime::{Epoch, TimeSeries, TimeUnits, Unit};
+use hifitime::{Epoch, Unit};
 use nyx::{
-    cosmic::{Aberration, Frame, Mass, MetaAlmanac, SRPData},
+    cosmic::{Mass, MetaAlmanac, SRPData},
     dynamics::{
         guidance::LocalFrame, GravityField, OrbitalDynamics, SolarPressure, SpacecraftDynamics,
     },
     io::{ConfigRepr, ExportCfg},
-    md::prelude::{GravityFieldData, Traj},
+    md::prelude::GravityFieldData,
     od::{
-        msr::MeasurementType,
         prelude::{KalmanVariant, TrackingArcSim, TrkConfig},
         process::{Estimate, NavSolution, ResidRejectCrit, SpacecraftUncertainty},
         snc::ProcessNoise3D,
-        GroundStation, SpacecraftKalmanOD, SpacecraftKalmanScalarOD,
+        GroundStation, SpacecraftKalmanScalarOD,
     },
     propagators::{IntegratorOptions, Propagator},
-    Orbit, Spacecraft, State,
+    Orbit, Spacecraft,
 };
 
-use std::{collections::BTreeMap, error::Error, path::PathBuf, str::FromStr, sync::Arc};
+use std::{collections::BTreeMap, error::Error, path::PathBuf, sync::Arc};
 
 // TODO: Convert this to a Spacecraft Sequence
 
@@ -186,7 +184,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Build the SNC in the Moon J2000 frame, specified as a velocity noise over time.
     let process_noise = ProcessNoise3D::from_velocity_km_s(
-        &[1e-13, 1e-13, 1e-13],
+        &[1e-14, 1e-14, 1e-14],
         1 * Unit::Hour,
         10 * Unit::Minute,
         None,
@@ -226,7 +224,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         "Percentage within +/-3: {}",
         od_sol.residual_ratio_within_threshold(3.0).unwrap()
     );
-    println!("Ratios normal? {}", od_sol.is_normal(None).unwrap());
+    println!("Whitened residuals normal? {}", od_sol.is_normal(None)?);
+    println!("NIS test success? {}", od_sol.is_nis_consistent(None)?);
 
     od_sol.to_parquet(
         "./data/04_output/06_lunar_od_results.parquet",

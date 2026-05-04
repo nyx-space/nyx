@@ -94,7 +94,8 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
 
         let mut finite_burn_target = false;
 
-        // Apply the initial guess
+        // Apply the initial guess: first accumulate, then apply once (matching
+        // the pattern used in the iteration loop).
         for (i, var) in self.variables.iter().enumerate() {
             // Check the validity (this function will report to log and raise an error)
             var.valid()?;
@@ -171,25 +172,26 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                 info!("Initial maneuver guess: {mnvr}");
             } else {
                 state_correction[var.component.vec_index()] += var.init_guess;
-                // Now, let's apply the correction to the initial state
-                if let Some(frame) = self.correction_frame {
-                    // The following will error if the frame is not local
-                    let dcm_vnc2inertial = frame
-                        .dcm_to_inertial(xi.orbit)
-                        .context(AstroPhysicsSnafu)
-                        .context(AstroSnafu)?
-                        .rot_mat;
-
-                    let velocity_correction =
-                        dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
-                    xi.orbit.apply_dv_km_s(velocity_correction);
-                } else {
-                    xi.orbit.radius_km += state_correction.fixed_rows::<3>(0).to_owned();
-                    xi.orbit.velocity_km_s += state_correction.fixed_rows::<3>(3).to_owned();
-                }
             }
 
             total_correction[i] += var.init_guess;
+        }
+
+        // Apply the accumulated initial guess to xi (once, after the loop)
+        if !finite_burn_target {
+            if let Some(frame) = self.correction_frame {
+                let dcm_vnc2inertial = frame
+                    .dcm_to_inertial(xi.orbit)
+                    .context(AstroPhysicsSnafu)
+                    .context(AstroSnafu)?
+                    .rot_mat;
+
+                let velocity_correction = dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
+                xi.orbit.apply_dv_km_s(velocity_correction);
+            } else {
+                xi.orbit.radius_km += state_correction.fixed_rows::<3>(0).to_owned();
+                xi.orbit.velocity_km_s += state_correction.fixed_rows::<3>(3).to_owned();
+            }
         }
 
         let mut prev_err_norm = f64::INFINITY;
@@ -545,8 +547,7 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                         .dcm_to_inertial(corrected_state.orbit)
                         .context(AstroPhysicsSnafu)
                         .context(AstroSnafu)?
-                        .rot_mat
-                        .transpose();
+                        .rot_mat;
 
                     let velocity_correction =
                         dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);

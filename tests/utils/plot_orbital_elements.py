@@ -1,7 +1,8 @@
-import polars as pl
-import plotly.graph_objs as go
-from plotly.subplots import make_subplots
 import click
+import plotly.graph_objs as go
+import polars as pl
+from plotly.subplots import make_subplots
+
 
 @click.command
 @click.option("-p", "--path", type=str)

@@ -190,6 +190,7 @@ pub enum DynamicsError {
     #[snafu(display("dynamical model issue due to planetary data: {action} {source}"))]
     DynamicsPlanetaryError {
         action: &'static str,
-        source: PlanetaryDataError,
+        #[snafu(source(from(PlanetaryDataError, Box::new)))]
+        source: Box<PlanetaryDataError>,
     },
 }

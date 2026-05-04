@@ -87,6 +87,10 @@ To run the [orbit raise analysis](./raise.rs) example, just execute:
 RUST_LOG=info cargo run --example 03_geo_raise --release
 ```
 
+The most indicative plot is the evolution of the in-plane and out-of-plane angles versus the argument of latitude and semi major axis: it shows how the thrust angles evolve per orbit as the vehicle raises.
+
+![Steering law evolution Ruggiero](./plots/steering-law-evolution-vs-energy.png)
+
 To build the following plots, use the `plot_3d_traj.py` script and the `plot_orbital_elements.py` scripts.
 
 ![Orbital elements during orbit raise](./plots/raise-keplerian-oe.png)

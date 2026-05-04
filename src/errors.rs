@@ -31,37 +31,21 @@ pub enum NyxError {
     #[snafu(display("Covariance is not positive semi definite"))]
     CovarianceMatrixNotPsd,
     #[snafu(display("Could not read file: {msg}"))]
-    FileUnreadable {
-        msg: String,
-    },
+    FileUnreadable { msg: String },
     #[snafu(display("No state data: {msg}"))]
-    NoStateData {
-        msg: String,
-    },
+    NoStateData { msg: String },
     #[snafu(display("Happens when trying to modify a polynomial's (error)-th error but the polynomial has less orders than that"))]
-    PolynomialOrderError {
-        order: usize,
-    },
+    PolynomialOrderError { order: usize },
     #[snafu(display("Monte Carlo error: {msg}"))]
-    MonteCarlo {
-        msg: String,
-    },
+    MonteCarlo { msg: String },
     #[snafu(display("CCSDS error: {msg}"))]
-    CCSDS {
-        msg: String,
-    },
+    CCSDS { msg: String },
     #[snafu(display("Trajectory error: {source}"))]
-    Trajectory {
-        source: TrajError,
-    },
+    Trajectory { source: TrajError },
     #[snafu(display("Guidance law config error: {msg}"))]
-    GuidanceConfigError {
-        msg: String,
-    },
+    GuidanceConfigError { msg: String },
     #[snafu(display("Config error: {source}"))]
-    ConfigError {
-        source: ConfigError,
-    },
+    ConfigError { source: ConfigError },
     #[snafu(display("issue due to Almanac: {action} {source}"))]
     FromAlmanacError {
         #[snafu(source(from(AlmanacError, Box::new)))]
@@ -69,7 +53,8 @@ pub enum NyxError {
         action: &'static str,
     },
     FromPropError {
-        source: PropagationError,
+        #[snafu(source(from(PropagationError, Box::new)))]
+        source: Box<PropagationError>,
     },
 }
 

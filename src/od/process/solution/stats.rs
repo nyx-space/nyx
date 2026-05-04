@@ -89,15 +89,14 @@ where
         }
     }
 
-    /// Computes the Kolmogorov–Smirnov statistic for the aggregated residual ratios, by tracker and measurement type.
+    /// Computes the Kolmogorov–Smirnov statistic for the aggregated residual ratios of the accepted residuals.
     ///
     /// Returns Ok(ks_statistic) if residuals are available.
     pub fn ks_test_normality(&self) -> Result<f64, ODError> {
         let mut residual_ratios = self
-            .residuals
+            .accepted_residuals()
             .iter()
-            .flatten()
-            .map(|resid| resid.ratio)
+            .flat_map(|resid| resid.whitened_resid.into_iter().copied())
             .collect::<Vec<f64>>();
 
         if residual_ratios.is_empty() {
@@ -131,7 +130,7 @@ where
         Ok(d_stat)
     }
 
-    /// Checks whether the residual ratios pass a normality test at a given significance level `alpha`, default to 0.05.
+    /// Checks whether the whitened residuals of the accepted residuals pass a normality test at a given significance level `alpha`, default to 0.05.
     ///
     /// This uses a simplified KS-test threshold: D_alpha = c(α) / √n.
     /// For example, for α = 0.05, c(α) is approximately 1.36.
@@ -162,5 +161,67 @@ where
         let d_critical = c_alpha / (n as f64).sqrt();
 
         Ok(ks_stat <= d_critical)
+    }
+
+    /// Checks whether the filter innovations are statistically consistent
+    /// by performing a Chi-squared test on the Normalized Innovation Squared (NIS).
+    ///
+    /// For each accepted residual, NIS is computed as:
+    /// ```text
+    ///     prefit^T * S_k^-1 * prefit
+    /// ```
+    ///
+    /// The sum of NIS values should fall within the confidence interval of a
+    /// Chi-squared distribution with degrees of freedom `k = n * m`, where `n`
+    /// is the number of residuals and `m` is the measurement dimension.
+    ///
+    /// Returns Ok(true) if the filter is consistent, Ok(false) if the filter
+    /// is over-confident or under-confident, or an error if no residuals are available.
+    pub fn is_nis_consistent(&self, alpha: Option<f64>) -> Result<bool, ODError> {
+        let n = self.accepted_residuals().iter().count();
+
+        if n == 0 {
+            return Err(ODError::ODNoResiduals {
+                action: "evaluating NIS consistency",
+            });
+        }
+
+        // Sum the NIS across all residuals.
+        // Assuming your Residual struct has an `nis` field or a method to compute it
+        // from the ratio: `ratio.powi(2) * measurement_dim`
+        let nis_sum: f64 = self.accepted_residuals().iter().map(|r| r.nis()).sum();
+
+        // Total degrees of freedom: number of residuals * measurement dimension.
+        // Adjust `M::DIM` based on how you access the dimension in this scope.
+        let k = (n * MsrSize::DIM) as f64;
+        if k < 35.0 {
+            warn!("NIS consistency test lacks statistical power for n*MsrSize={k} < 35");
+        }
+        // Default to a 5% probability of Type I error (95% confidence interval)
+        let alpha = alpha.unwrap_or(0.05);
+
+        // For a two-sided test, we need the standard normal quantile for 1 - (alpha / 2).
+        // If alpha = 0.05, the critical z-score is approximately 1.95996.
+        let z_critical = Normal::new(0.0, 1.0)
+            .unwrap()
+            .inverse_cdf(1.0 - alpha / 2.0);
+
+        // Use the Wilson-Hilferty transformation to approximate the Chi-squared
+        // lower and upper critical bounds.
+        let factor = 2.0 / (9.0 * k);
+        let lower_bound = k * (1.0 - factor - z_critical * factor.sqrt()).powi(3);
+        let upper_bound = k * (1.0 - factor + z_critical * factor.sqrt()).powi(3);
+
+        if nis_sum > upper_bound {
+            warn!("NIS consistency test failed high: NIS sum {nis_sum:.6} > upper bound {upper_bound:.6}. Innovations are larger than expected.");
+            warn!("Filter may be overconfident: P, R, or Q may be too small, or the dynamics/measurement model may be biased.");
+            Ok(false)
+        } else if nis_sum < lower_bound {
+            warn!("NIS consistency test failed low: NIS sum {nis_sum:.6} < lower bound {lower_bound:.6}. Innovations are smaller than expected.");
+            warn!("Filter may be underconfident: P, R, or Q may be too large.");
+            Ok(false)
+        } else {
+            Ok(true)
+        }
     }
 }

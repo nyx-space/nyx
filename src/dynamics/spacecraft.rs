@@ -169,11 +169,22 @@ impl Dynamics for SpacecraftDynamics {
 
         if let Some(guid_law) = &self.guid_law {
             let mut state = next_state;
+            // In a single clause, check that the throttle call is OK and its value positive
+            // And convert the Result to an Option on the direction to return the option of a vector
+            // for the next thrust direction.
+            let thrust_direction = match guid_law.throttle(&state) {
+                Ok(throttle) if throttle > 0.0 => guid_law.direction(&state).ok(),
+                _ => None,
+            };
+
+            state.mut_thrust_direction(thrust_direction);
             // Update the control mode
             guid_law.next(&mut state, almanac.clone());
             Ok(state)
         } else {
-            Ok(next_state)
+            let mut state = next_state;
+            state.mut_thrust_direction(None);
+            Ok(state)
         }
     }
 
