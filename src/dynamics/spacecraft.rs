@@ -198,7 +198,10 @@ impl Dynamics for SpacecraftDynamics {
         // Rebuild the osculating state for the EOM context.
         let osc_sc = ctx.set_with_delta_seconds(delta_t_s, state);
 
-        ensure!(osc_sc.mass_kg() > 0.0, MasslessSpacecraftSnafu);
+        if !self.force_models.is_empty() {
+            ensure!(osc_sc.mass_kg() > 0.0, MasslessSpacecraftSnafu);
+        }
+
         let mut d_x = OVector::<f64, Const<90>>::zeros();
 
         // Maybe I use this only when estimating the orbit state from a spacecraft, but that functionality will soon disappear.

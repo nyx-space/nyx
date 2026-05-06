@@ -33,6 +33,7 @@ use rayon::prelude::ParallelIterator;
 use snafu::ResultExt;
 use std::f64;
 use std::sync::mpsc::channel;
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
 use super::PropInstance;
