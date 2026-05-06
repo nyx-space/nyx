@@ -33,6 +33,8 @@ use rayon::prelude::ParallelIterator;
 use snafu::ResultExt;
 use std::f64;
 use std::sync::mpsc::channel;
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::Instant;
 
 use super::PropInstance;
 
@@ -147,6 +149,10 @@ where
         let mut traj = Traj::new();
         let start_state = self.state;
 
+        // Keep our own tick because it's only available to the propagate function.
+        #[cfg(not(target_arch = "wasm32"))]
+        let tick = Instant::now();
+
         let rx = {
             // Channels that have a single state for the propagator
             let (tx, rx) = channel();
@@ -187,10 +193,20 @@ where
         };
 
         // Else Brent solver between these states
-
         let event_epoch = brent_solver(traj_at, event, last_traj_state.epoch(), end_state.epoch())
             .context(PropAnalysisSnafu)?;
 
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            if self.log_progress {
+                let tock: Duration = tick.elapsed().into();
+                if trigger > 1 {
+                    info!("\t... event #{trigger} found in {tock}");
+                } else {
+                    info!("\t... event found in {tock}");
+                }
+            }
+        }
         Ok((traj.at(event_epoch).context(TrajectoryEventSnafu)?, traj))
     }
 }

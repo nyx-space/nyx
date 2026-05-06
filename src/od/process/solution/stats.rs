@@ -17,12 +17,14 @@
 */
 
 use crate::linalg::allocator::Allocator;
-use crate::linalg::{DefaultAllocator, DimName};
-use crate::md::trajectory::Interpolatable;
+use crate::linalg::{DefaultAllocator, DimMin, DimName, DimSub};
+use crate::md::trajectory::{Interpolatable, Traj};
 pub use crate::od::estimate::*;
 pub use crate::od::*;
 use log::warn;
 use msr::sensitivity::TrackerSensitivity;
+use nalgebra::Const;
+use snafu::ResultExt;
 use statrs::distribution::{ContinuousCDF, Normal};
 use std::ops::Add;
 
@@ -178,7 +180,7 @@ where
     /// Returns Ok(true) if the filter is consistent, Ok(false) if the filter
     /// is over-confident or under-confident, or an error if no residuals are available.
     pub fn is_nis_consistent(&self, alpha: Option<f64>) -> Result<bool, ODError> {
-        let n = self.accepted_residuals().iter().count();
+        let n = self.accepted_residuals().len();
 
         if n == 0 {
             return Err(ODError::ODNoResiduals {
@@ -219,6 +221,132 @@ where
         } else if nis_sum < lower_bound {
             warn!("NIS consistency test failed low: NIS sum {nis_sum:.6} < lower bound {lower_bound:.6}. Innovations are smaller than expected.");
             warn!("Filter may be underconfident: P, R, or Q may be too large.");
+            Ok(false)
+        } else {
+            Ok(true)
+        }
+    }
+
+    /// Checks whether the filter estimates are statistically consistent
+    /// by performing a Chi-squared test on the Normalized Estimation Error Squared (NEES).
+    ///
+    /// For each estimate, NEES is computed as:
+    /// ```text
+    ///     error^T * P^-1 * error
+    /// ```
+    /// where `error` is the difference between the estimated state and the true state,
+    /// and `P` is the estimated state covariance matrix.
+    ///
+    /// The sum of NEES values should fall within the confidence interval of a
+    /// Chi-squared distribution with degrees of freedom `k = n * dim`, where `n`
+    /// is the number of estimates and `dim` is the state dimension.
+    ///
+    /// Returns Ok(true) if the filter is consistent, Ok(false) if the filter
+    /// is over-confident or under-confident, or an error if no estimates are available.
+    pub fn is_nees_consistent(
+        &self,
+        truth_traj: &Traj<StateType>,
+        alpha: Option<f64>,
+    ) -> Result<bool, ODError>
+    where
+        StateType::Size: DimMin<StateType::Size>,
+        <StateType::Size as DimMin<StateType::Size>>::Output: DimSub<Const<1>>,
+        <<StateType as State>::Size as DimMin<<StateType as State>::Size>>::Output:
+            DimSub<Const<1>>,
+        DefaultAllocator: Allocator<StateType::Size, Const<1>>
+            + Allocator<Const<1>, <StateType as State>::Size>
+            + Allocator<<StateType::Size as DimMin<StateType::Size>>::Output, StateType::Size>
+            + Allocator<StateType::Size, <StateType::Size as DimMin<StateType::Size>>::Output>
+            + Allocator<<StateType::Size as DimMin<StateType::Size>>::Output>
+            + Allocator<
+                <<StateType::Size as DimMin<StateType::Size>>::Output as DimSub<Const<1>>>::Output,
+            >,
+    {
+        let n = self.estimates.len();
+
+        if n == 0 {
+            return Err(ODError::ODNoResiduals {
+                action: "evaluating NEES consistency",
+            });
+        }
+
+        let mut nees_sum = 0.0;
+        let mut state_dim_f64 = 0.0_f64;
+
+        for est in &self.estimates {
+            let epoch = est.epoch();
+
+            let truth_state = truth_traj.at(epoch).context(ODTrajSnafu {
+                details: "interpolating truth during NEES test",
+            })?;
+
+            // Extract the state vectors
+            let x_est = est.state().to_state_vector();
+            let x_true = truth_state.to_state_vector();
+            let error = x_est - x_true;
+
+            // Extract the covariance and compute its inverse
+            // Extract the covariance
+            let p_mat = est.covar();
+
+            // Compute the Singular Value Decomposition (SVD) instead of ivnerting as-is.
+            // This enables support for non-estimated parameters.
+            let svd = p_mat.svd(true, true);
+
+            // Define a small tolerance for zero-variance detection
+            let epsilon = 1e-12;
+
+            // Compute the Moore-Penrose pseudo-inverse
+            let p_inv = svd
+                .clone()
+                .pseudo_inverse(epsilon)
+                .map_err(|_| ODError::SingularInformationMatrix)?;
+
+            // Dynamically determine the rank (number of actively estimated parameters)
+            // nalgebra's SVD provides a built-in rank evaluation
+            let active_dim = svd.rank(epsilon) as f64;
+
+            // Update the computed degree of freedom, it's fixed but the SVD might cause weird rounding
+            state_dim_f64 = state_dim_f64.max(active_dim);
+
+            // Compute NEES for this epoch: error^T * P^+ * error
+            let nees_matrix = error.transpose() * p_inv * &error;
+            nees_sum += nees_matrix[(0, 0)];
+
+            // Capture the state dimension for the degrees of freedom calculation
+            if state_dim_f64 == 0.0 {
+                state_dim_f64 = error.nrows() as f64;
+            }
+        }
+
+        // Total degrees of freedom: number of estimates * state dimension
+        let k = (n as f64) * state_dim_f64;
+
+        if k < 35.0 {
+            warn!("NEES consistency test lacks statistical power for n*StateDim={k} < 35");
+        }
+
+        // Default to a 5% probability of Type I error (95% confidence interval)
+        let alpha = alpha.unwrap_or(0.05);
+
+        // For a two-sided test, we need the standard normal quantile for 1 - (alpha / 2).
+        let z_critical = Normal::new(0.0, 1.0)
+            .unwrap()
+            .inverse_cdf(1.0 - alpha / 2.0);
+
+        // Use the Wilson-Hilferty transformation to approximate the Chi-squared
+        // lower and upper critical bounds.
+        let factor = 2.0 / (9.0 * k);
+        let lower_bound = k * (1.0 - factor - z_critical * factor.sqrt()).powi(3);
+        let upper_bound = k * (1.0 - factor + z_critical * factor.sqrt()).powi(3);
+
+        if nees_sum > upper_bound {
+            warn!("NEES consistency test failed high: NEES sum {nees_sum:.6} > upper bound {upper_bound:.6}. Estimation errors are larger than the covariance suggests.");
+            warn!("Filter is overconfident: P is too small. Process noise Q may be too low, or there are unmodeled dynamic biases.");
+            Ok(false)
+        } else if nees_sum < lower_bound {
+            warn!("NEES consistency test failed low: NEES sum {nees_sum:.6} < lower bound {lower_bound:.6}. Estimation errors are smaller than expected.");
+            warn!("Filter is underconfident: P is too large. Process noise Q may be too high, or measurement noise R is overestimated.");
             Ok(false)
         } else {
             Ok(true)

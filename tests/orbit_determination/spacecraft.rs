@@ -372,7 +372,7 @@ fn od_val_sc_srp_estimation(
         .build();
 
     // Define the initial orbit estimate
-    let initial_estimate = sc.to_estimate().unwrap();
+    let initial_estimate = sc.to_estimate_randomized(Some(789)).unwrap();
 
     let odp = SpacecraftKalmanOD::new(
         setup,
@@ -456,6 +456,15 @@ fn od_val_sc_srp_estimation(
         od_sol.residual_ratio_within_threshold(3.0).unwrap()
     );
     println!("Ratios normal? {}", od_sol.is_normal(None).unwrap());
+    println!(
+        "NIS test passed? {}",
+        od_sol.is_nis_consistent(None).unwrap()
+    );
+    // NEES test, using the truth trajectory
+    println!(
+        "NEES test passed? {}",
+        od_sol.is_nees_consistent(&traj, None).unwrap()
+    );
 
     // Regression tests, not solution test
     assert_eq!(

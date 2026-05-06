@@ -172,6 +172,8 @@ pub trait AccelModel: Send + Sync + fmt::Display {
 #[derive(Debug, PartialEq, Snafu)]
 #[snafu(visibility(pub(crate)))]
 pub enum DynamicsError {
+    #[snafu(display("spacecraft total mass is zero, cannot compute any force model"))]
+    MasslessSpacecraft,
     /// Fuel exhausted at the provided spacecraft state
     #[snafu(display("fuel exhausted at {sc}"))]
     FuelExhausted { sc: Box<Spacecraft> },
