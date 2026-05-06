@@ -25,7 +25,7 @@ use crate::time::{Duration, Epoch, Unit};
 use crate::State;
 use anise::almanac::Almanac;
 use anise::errors::MathError;
-use log::{debug, info, warn};
+use log::{info, warn};
 use rayon::iter::ParallelBridge;
 use rayon::prelude::ParallelIterator;
 use snafu::ResultExt;
@@ -159,7 +159,7 @@ where
                     {
                         if self.log_progress {
                             let tock: Duration = tick.elapsed().into();
-                            debug!("Done in {tock}");
+                            info!("\t... done in {tock}");
                         }
                     }
 
@@ -449,16 +449,16 @@ where
                     if self.details.error < self.prop.opts.tolerance {
                         // Let's increase the step size for the next iteration.
                         // Error is less than tolerance, let's attempt to increase the step for the next iteration.
-                        let proposed_step = 0.9
+                        let proposed_step_s = 0.9
                             * step_size_s
                             * (self.prop.opts.tolerance / self.details.error)
                                 .powf(1.0 / f64::from(self.prop.method.order()));
 
                         step_size_s =
-                            if proposed_step.abs() > self.prop.opts.max_step.to_seconds().abs() {
-                                self.prop.opts.max_step.to_seconds() * proposed_step.signum()
+                            if proposed_step_s.abs() > self.prop.opts.max_step.to_seconds().abs() {
+                                self.prop.opts.max_step.to_seconds() * proposed_step_s.signum()
                             } else {
-                                proposed_step
+                                proposed_step_s
                             };
                     }
                     // In all cases, let's update the step size to whatever was the adapted step size

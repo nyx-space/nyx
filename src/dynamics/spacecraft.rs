@@ -18,13 +18,13 @@
 
 use anise::prelude::Almanac;
 use log::{error, warn};
-use snafu::ResultExt;
+use snafu::{ensure, ResultExt};
 
 use super::guidance::{ra_dec_from_unit_vector, GuidanceError, GuidanceLaw};
 use super::orbital::OrbitalDynamics;
 use super::{Dynamics, DynamicsGuidanceSnafu, ForceModel};
 pub use crate::cosmic::{GuidanceMode, Spacecraft, STD_GRAVITY};
-use crate::dynamics::DynamicsError;
+use crate::dynamics::{DynamicsError, MasslessSpacecraftSnafu};
 
 use crate::linalg::{Const, DimName, OMatrix, OVector, Vector3};
 pub use crate::md::prelude::SolarPressure;
@@ -197,6 +197,8 @@ impl Dynamics for SpacecraftDynamics {
     ) -> Result<OVector<f64, Const<90>>, DynamicsError> {
         // Rebuild the osculating state for the EOM context.
         let osc_sc = ctx.set_with_delta_seconds(delta_t_s, state);
+
+        ensure!(osc_sc.mass_kg() > 0.0, MasslessSpacecraftSnafu);
         let mut d_x = OVector::<f64, Const<90>>::zeros();
 
         // Maybe I use this only when estimating the orbit state from a spacecraft, but that functionality will soon disappear.
