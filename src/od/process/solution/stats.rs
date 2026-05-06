@@ -178,7 +178,7 @@ where
     /// Returns Ok(true) if the filter is consistent, Ok(false) if the filter
     /// is over-confident or under-confident, or an error if no residuals are available.
     pub fn is_nis_consistent(&self, alpha: Option<f64>) -> Result<bool, ODError> {
-        let n = self.accepted_residuals().iter().count();
+        let n = self.accepted_residuals().len();
 
         if n == 0 {
             return Err(ODError::ODNoResiduals {
