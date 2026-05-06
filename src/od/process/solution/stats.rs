@@ -271,13 +271,11 @@ where
         }
 
         let mut nees_sum = 0.0;
-        let mut state_dim_f64 = 0.0;
+        let mut state_dim_f64 = 0.0_f64;
 
         for est in &self.estimates {
             let epoch = est.epoch();
 
-            // Query the true state at this exact epoch.
-            // Depending on your Nyx version, this might be `interpolate(epoch)` or `at(epoch)`.
             let truth_state = truth_traj.at(epoch).context(ODTrajSnafu {
                 details: "interpolating truth during NEES test",
             })?;
@@ -295,21 +293,21 @@ where
             // This enables support for non-estimated parameters.
             let svd = p_mat.svd(true, true);
 
-            // 2. Define a small tolerance for zero-variance detection
+            // Define a small tolerance for zero-variance detection
             let epsilon = 1e-12;
 
-            // 3. Compute the Moore-Penrose pseudo-inverse
+            // Compute the Moore-Penrose pseudo-inverse
             let p_inv = svd
                 .clone()
                 .pseudo_inverse(epsilon)
                 .map_err(|_| ODError::SingularInformationMatrix)?;
 
-            // 4. Dynamically determine the rank (number of actively estimated parameters)
+            // Dynamically determine the rank (number of actively estimated parameters)
             // nalgebra's SVD provides a built-in rank evaluation
             let active_dim = svd.rank(epsilon) as f64;
 
-            // Add to the running total of degrees of freedom
-            state_dim_f64 += active_dim;
+            // Update the computed degree of freedom, it's fixed but the SVD might cause weird rounding
+            state_dim_f64 = state_dim_f64.max(active_dim);
 
             // Compute NEES for this epoch: error^T * P^+ * error
             let nees_matrix = error.transpose() * p_inv * &error;
