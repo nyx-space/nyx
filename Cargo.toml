@@ -35,9 +35,8 @@ github = { repository = "nyx-space/nyx", branch = "master" }
 der = { version = "0.7", features = ["derive", "alloc", "real"] }
 nalgebra = "0.34"
 log = "0.4"
-hifitime = "4.2.5"
-# anise = { version = "0.9.6", features = ["analysis"] }
-anise = { git = "https://github.com/nyx-space/anise", package = "anise", features = ["analysis"] }
+hifitime = "4.3.0"
+anise = { version = "0.10.0", features = ["analysis"] }
 flate2 = { version = "1.0", features = [
     "rust_backend",
 ], default-features = false }
