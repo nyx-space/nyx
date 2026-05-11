@@ -401,6 +401,49 @@ impl TrackingDataArc {
         self.force_reject = true;
         self
     }
+
+    /// Splits a long tracking data arc into smaller chunks, each up to `max_duration` long.
+    /// This is inspired by JPL MONTE's long arc setup to ensure BLSE convergence on manageable chunks.
+    pub fn chunk(&self, max_duration: Duration) -> Vec<TrackingDataArc> {
+        let mut chunks = Vec::new();
+        if self.is_empty() {
+            return chunks;
+        }
+
+        let mut current_chunk = TrackingDataArc {
+            source: self.source.clone(),
+            moduli: self.moduli.clone(),
+            force_reject: self.force_reject,
+            ..Default::default()
+        };
+
+        let mut chunk_start_epoch = self.start_epoch().unwrap();
+
+        for (epoch, msr) in &self.measurements {
+            if *epoch - chunk_start_epoch > max_duration {
+                // Save current chunk and start a new one
+                if !current_chunk.is_empty() {
+                    chunks.push(current_chunk);
+                }
+                current_chunk = TrackingDataArc {
+                    source: self.source.clone(),
+                    moduli: self.moduli.clone(),
+                    force_reject: self.force_reject,
+                    ..Default::default()
+                };
+                chunk_start_epoch = *epoch;
+            }
+            current_chunk.measurements.insert(*epoch, msr.clone());
+        }
+
+        // Add the last chunk
+        if !current_chunk.is_empty() {
+            chunks.push(current_chunk);
+        }
+
+        chunks
+    }
+
 }
 
 impl fmt::Display for TrackingDataArc {

@@ -149,7 +149,7 @@ where
         arc: &TrackingDataArc,
     ) -> Result<BLSSolution<D::StateType>, ODError> {
         let measurements = &arc.measurements;
-        let num_measurements = measurements.len();
+        let num_measurements = measurements.values().filter(|m| !m.rejected).count();
         let mut devices = self.devices.clone();
 
         ensure!(
@@ -197,6 +197,9 @@ where
             let mut stm = StateMatrix::<D>::identity();
 
             for (epoch_ref, msr) in measurements.iter() {
+                if msr.rejected {
+                    continue;
+                }
                 let msr_epoch = *epoch_ref;
 
                 loop {
@@ -440,5 +443,100 @@ where
             final_corr_pos_km: corr_pos_km,
             converged,
         })
+    }
+
+    /// Evaluates the RMS of a given state over a tracking data arc without performing any estimation.
+    /// This is useful to check that a given solution is consistent across overlapping or disjoint data arcs.
+    pub fn evaluate(
+        &self,
+        state: D::StateType,
+        arc: &TrackingDataArc,
+    ) -> Result<f64, ODError> {
+        let measurements = &arc.measurements;
+        let num_measurements = measurements.values().filter(|m| !m.rejected).count();
+        let mut devices = self.devices.clone();
+
+        ensure!(
+            num_measurements >= 1,
+            TooFewMeasurementsSnafu {
+                need: 1_usize,
+                action: "BLSE Evaluate"
+            }
+        );
+
+        let mut sum_sq_weighted_residuals = 0.0;
+        let mut unknown_trackers = IndexSet::new();
+
+        let mut prop_inst = self.prop.with(state.with_stm(), self.almanac.clone()).quiet();
+        let mut epoch = state.epoch();
+
+        for (epoch_ref, msr) in measurements.iter() {
+            if msr.rejected {
+                continue;
+            }
+            let msr_epoch = *epoch_ref;
+
+            loop {
+                let delta_t = msr_epoch - epoch;
+                if delta_t <= Duration::ZERO {
+                    break;
+                }
+
+                let next_step = delta_t.min(prop_inst.step_size).min(self.max_step);
+                let this_state = prop_inst.for_duration(next_step).context(ODPropSnafu)?;
+                epoch = this_state.epoch();
+
+                if (epoch - msr_epoch).abs() < self.epoch_precision {
+                    let device = match devices.get_mut(&msr.tracker) {
+                        Some(d) => d,
+                        None => {
+                            if !unknown_trackers.contains(&msr.tracker) {
+                                error!(
+                                    "Tracker {} is not in the list of configured devices",
+                                    msr.tracker
+                                );
+                            }
+                            unknown_trackers.insert(msr.tracker.clone());
+                            continue;
+                        }
+                    };
+
+                    for msr_type in msr.data.keys().copied() {
+                        let mut msr_types = IndexSet::new();
+                        msr_types.insert(msr_type);
+
+                        let computed_meas_opt = device
+                            .measure_instantaneous(this_state, None, self.almanac.clone())?;
+
+                        let computed_meas = match computed_meas_opt {
+                            Some(cm) => cm,
+                            None => continue,
+                        };
+
+                        let computed_obs = computed_meas.observation::<U1>(&msr_types)[0];
+                        let real_obs = msr.observation::<U1>(&msr_types)[0];
+
+                        ensure!(
+                            real_obs.is_finite(),
+                            InvalidMeasurementSnafu {
+                                epoch: msr_epoch,
+                                val: real_obs
+                            }
+                        );
+
+                        let residual = real_obs - computed_obs;
+                        let r_matrix = device.measurement_covar_matrix::<U1>(&msr_types, msr_epoch)?;
+                        let r_variance = r_matrix[(0, 0)];
+
+                        ensure!(r_variance > 0.0, SingularNoiseRkSnafu);
+                        let weight = 1.0 / r_variance;
+
+                        sum_sq_weighted_residuals += weight * residual * residual;
+                    }
+                }
+            }
+        }
+
+        Ok((sum_sq_weighted_residuals / num_measurements as f64).sqrt())
     }
 }
