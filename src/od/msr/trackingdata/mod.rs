@@ -410,35 +410,27 @@ impl TrackingDataArc {
             return chunks;
         }
 
-        let mut current_chunk = TrackingDataArc {
-            source: self.source.clone(),
-            moduli: self.moduli.clone(),
-            force_reject: self.force_reject,
-            ..Default::default()
-        };
+        let end_epoch = self.end_epoch().unwrap();
+        let mut chunk_start = self.start_epoch().unwrap();
 
-        let mut chunk_start_epoch = self.start_epoch().unwrap();
-
-        for (epoch, msr) in &self.measurements {
-            if *epoch - chunk_start_epoch > max_duration {
-                // Save current chunk and start a new one
-                if !current_chunk.is_empty() {
-                    chunks.push(current_chunk);
-                }
-                current_chunk = TrackingDataArc {
-                    source: self.source.clone(),
-                    moduli: self.moduli.clone(),
-                    force_reject: self.force_reject,
-                    ..Default::default()
-                };
-                chunk_start_epoch = *epoch;
+        while chunk_start <= end_epoch {
+            let chunk_end = chunk_start + max_duration;
+            let sub_arc = self.clone().filter_by_epoch(chunk_start..chunk_end);
+            if !sub_arc.is_empty() {
+                chunks.push(sub_arc);
             }
-            current_chunk.measurements.insert(*epoch, msr.clone());
-        }
-
-        // Add the last chunk
-        if !current_chunk.is_empty() {
-            chunks.push(current_chunk);
+            // Move start to the next measurement's epoch after chunk_end
+            let mut found_next = false;
+            for (epoch, _) in self.measurements.range(chunk_end..) {
+                if *epoch >= chunk_end {
+                    chunk_start = *epoch;
+                    found_next = true;
+                    break;
+                }
+            }
+            if !found_next {
+                break;
+            }
         }
 
         chunks
