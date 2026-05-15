@@ -435,7 +435,6 @@ impl TrackingDataArc {
 
         chunks
     }
-
 }
 
 impl fmt::Display for TrackingDataArc {

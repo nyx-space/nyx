@@ -136,6 +136,19 @@ fn blse_robust_large_disp(
         .almanac(almanac.clone())
         .build();
 
+    let this_arc = &arc.filter_by_offset(..offset);
+
+    let initial_rms = blse
+        .evaluate(
+            if disperse {
+                initial_estimate.nominal_state
+            } else {
+                initial_state
+            },
+            &this_arc,
+        )
+        .unwrap();
+
     let blse_solution = blse
         .estimate(
             if disperse {
@@ -143,7 +156,7 @@ fn blse_robust_large_disp(
             } else {
                 initial_state
             },
-            &arc.filter_by_offset(..offset),
+            this_arc,
         )
         .expect("blse should not fail");
 
@@ -183,4 +196,17 @@ fn blse_robust_large_disp(
 
     let kf_est: KfEstimate<Spacecraft> = blse_solution.into();
     println!("{kf_est}");
+
+    let final_rms = blse.evaluate(kf_est.state(), &this_arc).unwrap();
+    println!(
+        "[disp={disperse}] Final RMS = {final_rms}\tInitial RMS = {initial_rms}\tBetter? {}",
+        final_rms <= initial_rms
+    );
+
+    if disperse {
+        assert!(
+            final_rms <= initial_rms,
+            "BLSE failed to find a better solution"
+        );
+    }
 }
