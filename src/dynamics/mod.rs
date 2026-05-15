@@ -62,6 +62,10 @@ pub use self::drag::*;
 pub mod sph_harmonics;
 pub use self::sph_harmonics::*;
 
+/// Define the solid tide models.
+pub mod solid_tides;
+pub use self::solid_tides::*;
+
 pub mod sequence;
 
 /// The `Dynamics` trait handles and stores any equation of motion *and* the state is integrated.
