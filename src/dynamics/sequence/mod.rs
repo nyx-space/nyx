@@ -24,6 +24,8 @@ use hifitime::{Epoch, Unit};
 use indexmap::IndexMap;
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
 use serde_dhall::{SimpleType, StaticType};
 use snafu::ResultExt;
 use std::collections::HashMap;
@@ -44,6 +46,7 @@ pub use config::*;
 pub use discrete_event::*;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "python", pyclass)]
 pub struct SpacecraftSequence {
     #[serde(serialize_with = "map_as_pairs", deserialize_with = "pairs_as_map")]
     pub seq: BTreeMap<Epoch, Phase>,
@@ -375,3 +378,4 @@ where
     let pairs: Vec<(K, V)> = Vec::deserialize(deserializer)?;
     Ok(pairs.into_iter().collect())
 }
+pub mod python;
