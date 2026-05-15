@@ -162,6 +162,7 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, InterlinkTxSpacecraft>
             | MeasurementType::Elevation
             | MeasurementType::ReceiveFrequency
             | MeasurementType::TransmitFrequency
+            | MeasurementType::TransmitFrequencyRate
             | MeasurementType::X
             | MeasurementType::Y
             | MeasurementType::Z => Err(ODError::MeasurementSimError {
