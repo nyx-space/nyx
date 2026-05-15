@@ -378,4 +378,5 @@ where
     let pairs: Vec<(K, V)> = Vec::deserialize(deserializer)?;
     Ok(pairs.into_iter().collect())
 }
+#[cfg(feature = "python")]
 pub mod python;
