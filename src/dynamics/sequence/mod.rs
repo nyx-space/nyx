@@ -23,9 +23,9 @@ use anise::prelude::Almanac;
 use hifitime::{Epoch, Unit};
 use indexmap::IndexMap;
 use log::{debug, info};
-use serde::{Deserialize, Serialize};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
+use serde::{Deserialize, Serialize};
 use serde_dhall::{SimpleType, StaticType};
 use snafu::ResultExt;
 use std::collections::HashMap;
