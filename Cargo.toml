@@ -68,6 +68,7 @@ statrs = "0.18.0"
 num-traits = "=0.2.19"
 # Optional dependencies
 pyo3 = { version = "0.28", features = ["multiple-pymethods"], optional = true }
+radiate = "1.2.22"
 
 [features]
 default = ["premium"]
@@ -135,4 +136,9 @@ doc-scrape-examples = true
 [[example]]
 name = "06_seq_od"
 path = "examples/06_lunar_orbit_determination/main.rs"
+doc-scrape-examples = true
+
+[[example]]
+name = "03_geo_raise_optim"
+path = "examples/03_geo_analysis/raise_optim.rs"
 doc-scrape-examples = true
