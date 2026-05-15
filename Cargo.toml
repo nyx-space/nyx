@@ -68,7 +68,7 @@ statrs = "0.18.0"
 num-traits = "=0.2.19"
 # Optional dependencies
 pyo3 = { version = "0.28", features = ["multiple-pymethods"], optional = true }
-radiate = "1.2.22"
+
 
 [features]
 default = ["premium"]
@@ -82,6 +82,7 @@ rstest = "0.26.1"
 pretty_env_logger = "0.5"
 serde_arrow = { version = "0.14", features = ["arrow-58"] }
 toml = "1.0.0"
+radiate = "1.2.22"
 
 [build-dependencies]
 shadow-rs = "2.0.0"
@@ -124,6 +125,11 @@ path = "examples/03_geo_analysis/stationkeeping.rs"
 doc-scrape-examples = true
 
 [[example]]
+name = "03_geo_raise_optim"
+path = "examples/03_geo_analysis/raise_optim.rs"
+doc-scrape-examples = true
+
+[[example]]
 name = "04_lro_od"
 path = "examples/04_lro_od/main.rs"
 doc-scrape-examples = true
@@ -138,7 +144,4 @@ name = "06_seq_od"
 path = "examples/06_lunar_orbit_determination/main.rs"
 doc-scrape-examples = true
 
-[[example]]
-name = "03_geo_raise_optim"
-path = "examples/03_geo_analysis/raise_optim.rs"
-doc-scrape-examples = true
+
