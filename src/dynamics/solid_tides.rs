@@ -484,7 +484,6 @@ mod tests {
     use std::str::FromStr;
 
     #[test]
-    #[ignore = "Requires LFS kernels to be loaded"]
     fn test_solid_tides_earth() {
         let mut almanac = Almanac::default();
         // Load kernels
