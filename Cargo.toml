@@ -36,7 +36,7 @@ der = { version = "0.7", features = ["derive", "alloc", "real"] }
 nalgebra = "0.34"
 log = "0.4"
 hifitime = "4.3.0"
-anise = { version = "0.10.0", features = ["analysis"] }
+anise = { version = "0.10.1", features = ["analysis"] }
 flate2 = { version = "1.0", features = [
     "rust_backend",
 ], default-features = false }
@@ -69,6 +69,7 @@ num-traits = "=0.2.19"
 # Optional dependencies
 pyo3 = { version = "0.28", features = ["multiple-pymethods"], optional = true }
 
+
 [features]
 default = ["premium"]
 # Premium feature is NOT available to most commercial entities. Refer to the README.
@@ -81,6 +82,7 @@ rstest = "0.26.1"
 pretty_env_logger = "0.5"
 serde_arrow = { version = "0.14", features = ["arrow-58"] }
 toml = "1.0.0"
+radiate = "1.2.22"
 
 [build-dependencies]
 shadow-rs = "2.0.0"
@@ -123,6 +125,11 @@ path = "examples/03_geo_analysis/stationkeeping.rs"
 doc-scrape-examples = true
 
 [[example]]
+name = "03_geo_raise_optim"
+path = "examples/03_geo_analysis/raise_optim.rs"
+doc-scrape-examples = true
+
+[[example]]
 name = "04_lro_od"
 path = "examples/04_lro_od/main.rs"
 doc-scrape-examples = true
@@ -136,3 +143,5 @@ doc-scrape-examples = true
 name = "06_seq_od"
 path = "examples/06_lunar_orbit_determination/main.rs"
 doc-scrape-examples = true
+
+
