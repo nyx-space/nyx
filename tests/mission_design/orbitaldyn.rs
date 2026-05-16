@@ -1196,7 +1196,7 @@ fn hf_prop(almanac: Arc<Almanac>) {
 
     extern crate pretty_env_logger;
     let _ = pretty_env_logger::try_init();
-    use nyx::dynamics::sph_harmonics::GravityField;
+    use nyx::dynamics::gravity_field::GravityField;
     use nyx::io::gravity::*;
 
     let eme2k = almanac.frame_info(EARTH_J2000).unwrap();

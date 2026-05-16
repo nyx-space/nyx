@@ -3,8 +3,8 @@ extern crate pretty_env_logger;
 
 use anise::constants::frames::IAU_EARTH_FRAME;
 use nyx::cosmic::Orbit;
+use nyx::dynamics::gravity_field::GravityField;
 use nyx::dynamics::orbital::OrbitalDynamics;
-use nyx::dynamics::sph_harmonics::GravityField;
 use nyx::dynamics::SpacecraftDynamics;
 use nyx::io::ConfigRepr;
 use nyx::io::{gravity::*, ExportCfg};

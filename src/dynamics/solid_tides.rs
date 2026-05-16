@@ -16,15 +16,18 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use anise::constants::frames::{IAU_EARTH_FRAME, MOON_J2000, SUN_J2000};
+use anise::constants::frames::SUN_J2000;
 use anise::errors::OrientationSnafu;
 use anise::prelude::Almanac;
 use serde::{Deserialize, Serialize};
 use serde_dhall::StaticType;
 use snafu::ResultExt;
+use typed_builder::TypedBuilder;
 
 use crate::cosmic::{AstroPhysicsSnafu, Epoch, Frame, Orbit};
-use crate::dynamics::{AccelModel, DynamicsAlmanacSnafu, DynamicsAstroSnafu, DynamicsError};
+use crate::dynamics::{
+    AccelModel, DynamicsAlmanacSnafu, DynamicsAstroSnafu, DynamicsError, DynamicsPlanetarySnafu,
+};
 use crate::linalg::{Matrix3, Vector3, Vector4, U7};
 use hyperdual::linalg::norm;
 use hyperdual::{hyperspace_from_vector, OHyperdual};
@@ -34,178 +37,224 @@ use std::sync::Arc;
 /// `SolidTides` implements the solid tide acceleration model.
 /// It accounts for the crust deformation due to the Moon and the Sun.
 /// Formulas are based on IERS 2010 Conventions.
-#[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
+#[derive(Clone, Debug, Serialize, Deserialize, StaticType, TypedBuilder)]
 pub struct SolidTides {
-    /// Frame in which the gravity field is defined (e.g. IAU Earth)
-    pub compute_frame: Frame,
-    /// Mean equatorial radius of the central body (km)
-    pub eq_radius_km: f64,
-    /// Gravitational parameter of the central body (km^3/s^2)
-    pub mu_km3_s2: f64,
-    /// Degree-2 Love number
+    /// The body-fixed frame of the central body being deformed.
+    pub frame: Frame,
+    /// 2nd degree Love number
     pub k2: f64,
-    /// Degree-3 Love number
+    /// 3rd degree Love number
     pub k3: f64,
-    /// Frame for querying Moon position
-    pub moon_frame: Frame,
-    /// Frame for querying Sun position
-    pub sun_frame: Frame,
+    /// The collection of celestial bodies raising the tide.
+    pub perturbers: Vec<TidalPerturber>,
 }
 
-impl Default for SolidTides {
-    fn default() -> Self {
-        Self {
-            compute_frame: IAU_EARTH_FRAME.into(),
-            eq_radius_km: 6378.1363, // Default Earth radius
-            mu_km3_s2: 398600.4415,  // Default Earth GM
-            k2: 0.30190,
-            k3: 0.093,
-            moon_frame: MOON_J2000.into(),
-            sun_frame: SUN_J2000.into(),
+#[derive(Clone, Debug, Serialize, Deserialize, StaticType, TypedBuilder)]
+pub struct TidalPerturber {
+    /// The frame used to resolve the state of the perturber relative to central_frame.
+    pub frame: Frame,
+    /// Optimization flag: true only if (R_eq / r_j)^4 is large enough to warrant k3.
+    /// Set to True for the Earth system
+    pub compute_degree_3: bool,
+}
+
+impl TidalPerturber {
+    fn compute_pert(
+        &self,
+        epoch: Epoch,
+        tidal_model: &SolidTides,
+        almanac: &Almanac,
+        delta_c: &mut [[f64; 4]; 4],
+        delta_s: &mut [[f64; 4]; 4],
+    ) -> Result<(), DynamicsError> {
+        let radius_km = almanac
+            .transform(self.frame, tidal_model.frame, epoch, None)
+            .context(DynamicsAlmanacSnafu {
+                action: "Moon position in ECEF",
+            })?
+            .radius_km;
+
+        let r_body = radius_km.norm();
+        let s_body = radius_km.x / r_body;
+        let t_body = radius_km.y / r_body;
+        let u_body = radius_km.z / r_body;
+
+        let sin_phi = u_body;
+        let cos_phi = (1.0 - sin_phi.powi(2)).max(0.0).sqrt();
+        let cos_lambda = if cos_phi > 1e-12 {
+            s_body / cos_phi
+        } else {
+            1.0
+        };
+        let sin_lambda = if cos_phi > 1e-12 {
+            t_body / cos_phi
+        } else {
+            0.0
+        };
+
+        // Fully normalized Associated Legendre Polynomials P_nm(sin_phi) for n=2,3
+        let p20 = 0.5 * (3.0 * sin_phi.powi(2) - 1.0) * 5.0f64.sqrt();
+        let p21 = 3.0 * sin_phi * cos_phi * (5.0 / 3.0f64).sqrt();
+        let p22 = 3.0 * cos_phi.powi(2) * (5.0 / 12.0f64).sqrt();
+
+        let p30 = 0.5 * (5.0 * sin_phi.powi(3) - 3.0 * sin_phi) * 7.0f64.sqrt();
+        let p31 = 1.5 * (5.0 * sin_phi.powi(2) - 1.0) * cos_phi * (7.0 / 6.0f64).sqrt();
+        let p32 = 15.0 * sin_phi * cos_phi.powi(2) * (7.0 / 60.0f64).sqrt();
+        let p33 = 15.0 * cos_phi.powi(3) * (7.0 / 360.0f64).sqrt();
+
+        let primary_mu_km3_s2 = tidal_model
+            .frame
+            .mu_km3_s2()
+            .context(AstroPhysicsSnafu)
+            .context(DynamicsAstroSnafu)?;
+
+        let primary_eq_radius_km = tidal_model
+            .frame
+            .mean_equatorial_radius_km()
+            .context(AstroPhysicsSnafu)
+            .context(DynamicsAstroSnafu)?;
+
+        let secondary_mu_km3_s2 = self
+            .frame
+            .mu_km3_s2()
+            .context(AstroPhysicsSnafu)
+            .context(DynamicsAstroSnafu)?;
+
+        let gm_ratio = secondary_mu_km3_s2 / primary_mu_km3_s2;
+        let r_ratio = primary_eq_radius_km / r_body;
+
+        let m = if self.compute_degree_3 { 3 } else { 2 };
+
+        for n in 2..=m {
+            let kn = if n == 2 {
+                tidal_model.k2
+            } else {
+                tidal_model.k3
+            };
+            let common = kn / (2.0 * n as f64 + 1.0) * gm_ratio * r_ratio.powi(n as i32 + 1);
+
+            for m in 0..=n {
+                let p_nm = match (n, m) {
+                    (2, 0) => p20,
+                    (2, 1) => p21,
+                    (2, 2) => p22,
+                    (3, 0) => p30,
+                    (3, 1) => p31,
+                    (3, 2) => p32,
+                    (3, 3) => p33,
+                    _ => 0.0,
+                };
+
+                let (cos_ml, sin_ml) = match m {
+                    0 => (1.0, 0.0),
+                    1 => (cos_lambda, sin_lambda),
+                    2 => (
+                        cos_lambda.powi(2) - sin_lambda.powi(2),
+                        2.0 * sin_lambda * cos_lambda,
+                    ),
+                    3 => (
+                        cos_lambda * (cos_lambda.powi(2) - 3.0 * sin_lambda.powi(2)),
+                        sin_lambda * (3.0 * cos_lambda.powi(2) - sin_lambda.powi(2)),
+                    ),
+                    _ => (0.0, 0.0),
+                };
+
+                delta_c[n][m] += common * p_nm * cos_ml;
+                delta_s[n][m] += common * p_nm * sin_ml;
+            }
         }
+
+        Ok(())
     }
 }
 
 impl SolidTides {
-    /// Create a new SolidTides model for Earth using default values from IERS 2010.
-    pub fn new(_almanac: Arc<Almanac>) -> Result<Arc<Self>, DynamicsError> {
-        let compute_frame = Frame::from(IAU_EARTH_FRAME);
-        let eq_radius_km = compute_frame
-            .mean_equatorial_radius_km()
-            .context(AstroPhysicsSnafu)
-            .context(DynamicsAstroSnafu)?;
-        let mu_km3_s2 = compute_frame
-            .mu_km3_s2()
-            .context(AstroPhysicsSnafu)
-            .context(DynamicsAstroSnafu)?;
+    /// Initializes solid tides with the Moon and the Sun, where the k3 is only computed for the Moon.
+    /// Sets the k2 Love number to 0.3019 and the k3 Love number to 0.093
+    pub fn earth_moon_system(
+        mut earth_frame: Frame,
+        mut moon_frame: Frame,
+        almanac: Arc<Almanac>,
+    ) -> Result<Arc<Self>, DynamicsError> {
+        let mut sun_j2k = almanac
+            .frame_info(SUN_J2000)
+            .context(DynamicsPlanetarySnafu {
+                action: "fetching sun frame",
+            })?;
 
-        Ok(Arc::new(Self {
-            compute_frame,
-            eq_radius_km,
-            mu_km3_s2,
-            ..Default::default()
-        }))
+        // Repeat for the Earth and Moon
+        for frame in [&mut earth_frame, &mut moon_frame, &mut sun_j2k] {
+            if frame.mu_km3_s2.is_none() {
+                *frame = almanac.frame_info(*frame).context(DynamicsPlanetarySnafu {
+                    action: "fetching sun frame",
+                })?;
+            }
+
+            // Ensure the gravitational parameter is set.
+            frame
+                .mu_km3_s2()
+                .context(AstroPhysicsSnafu)
+                .context(DynamicsAstroSnafu)?;
+
+            // Ensure the equatorial radius is set.
+            frame
+                .mean_equatorial_radius_km()
+                .context(AstroPhysicsSnafu)
+                .context(DynamicsAstroSnafu)?;
+        }
+
+        let me = Self::builder()
+            .k2(0.3019)
+            .k3(0.093)
+            .frame(earth_frame)
+            .perturbers(vec![
+                TidalPerturber::builder()
+                    .frame(moon_frame)
+                    .compute_degree_3(true)
+                    .build(),
+                TidalPerturber::builder()
+                    .frame(sun_j2k)
+                    .compute_degree_3(true)
+                    .build(),
+            ])
+            .build();
+
+        Ok(Arc::new(me))
     }
 
     /// Internal helper to compute tidal delta coefficients
-    fn compute_deltas(
+    fn accumulate_deltas(
         &self,
         epoch: Epoch,
         almanac: Arc<Almanac>,
     ) -> Result<([[f64; 4]; 4], [[f64; 4]; 4]), DynamicsError> {
-        let moon_in_ecef = almanac
-            .transform(self.moon_frame, self.compute_frame, epoch, None)
-            .context(DynamicsAlmanacSnafu {
-                action: "Moon position in ECEF",
-            })?;
-        let sun_in_ecef = almanac
-            .transform(self.sun_frame, self.compute_frame, epoch, None)
-            .context(DynamicsAlmanacSnafu {
-                action: "Sun position in ECEF",
-            })?;
-
-        let moon_gm = self
-            .moon_frame
-            .mu_km3_s2()
-            .context(AstroPhysicsSnafu)
-            .context(DynamicsAstroSnafu)?;
-        let sun_gm = self
-            .sun_frame
-            .mu_km3_s2()
-            .context(AstroPhysicsSnafu)
-            .context(DynamicsAstroSnafu)?;
-
         let mut delta_c = [[0.0f64; 4]; 4];
         let mut delta_s = [[0.0f64; 4]; 4];
 
-        for (body_pos, body_gm) in [
-            (moon_in_ecef.radius_km, moon_gm),
-            (sun_in_ecef.radius_km, sun_gm),
-        ] {
-            let r_body = body_pos.norm();
-            let s_body = body_pos.x / r_body;
-            let t_body = body_pos.y / r_body;
-            let u_body = body_pos.z / r_body;
-
-            let sin_phi = u_body;
-            let cos_phi = (1.0 - sin_phi.powi(2)).max(0.0).sqrt();
-            let cos_lambda = if cos_phi > 1e-12 {
-                s_body / cos_phi
-            } else {
-                1.0
-            };
-            let sin_lambda = if cos_phi > 1e-12 {
-                t_body / cos_phi
-            } else {
-                0.0
-            };
-
-            // Fully normalized Associated Legendre Polynomials P_nm(sin_phi) for n=2,3
-            let p20 = 0.5 * (3.0 * sin_phi.powi(2) - 1.0) * 5.0f64.sqrt();
-            let p21 = 3.0 * sin_phi * cos_phi * (5.0 / 3.0f64).sqrt();
-            let p22 = 3.0 * cos_phi.powi(2) * (5.0 / 12.0f64).sqrt();
-
-            let p30 = 0.5 * (5.0 * sin_phi.powi(3) - 3.0 * sin_phi) * 7.0f64.sqrt();
-            let p31 = 1.5 * (5.0 * sin_phi.powi(2) - 1.0) * cos_phi * (7.0 / 6.0f64).sqrt();
-            let p32 = 15.0 * sin_phi * cos_phi.powi(2) * (7.0 / 60.0f64).sqrt();
-            let p33 = 15.0 * cos_phi.powi(3) * (7.0 / 360.0f64).sqrt();
-
-            let gm_ratio = body_gm / self.mu_km3_s2;
-            let r_ratio = self.eq_radius_km / r_body;
-
-            for n in 2..=3 {
-                let kn = if n == 2 { self.k2 } else { self.k3 };
-                let common = kn / (2.0 * n as f64 + 1.0) * gm_ratio * r_ratio.powi(n as i32 + 1);
-
-                for m in 0..=n {
-                    let p_nm = match (n, m) {
-                        (2, 0) => p20,
-                        (2, 1) => p21,
-                        (2, 2) => p22,
-                        (3, 0) => p30,
-                        (3, 1) => p31,
-                        (3, 2) => p32,
-                        (3, 3) => p33,
-                        _ => 0.0,
-                    };
-
-                    let (cos_ml, sin_ml) = match m {
-                        0 => (1.0, 0.0),
-                        1 => (cos_lambda, sin_lambda),
-                        2 => (
-                            cos_lambda.powi(2) - sin_lambda.powi(2),
-                            2.0 * sin_lambda * cos_lambda,
-                        ),
-                        3 => (
-                            cos_lambda * (cos_lambda.powi(2) - 3.0 * sin_lambda.powi(2)),
-                            sin_lambda * (3.0 * cos_lambda.powi(2) - sin_lambda.powi(2)),
-                        ),
-                        _ => (0.0, 0.0),
-                    };
-
-                    delta_c[n][m] += common * p_nm * cos_ml;
-                    delta_s[n][m] += common * p_nm * sin_ml;
-                }
-            }
+        for pert in &self.perturbers {
+            pert.compute_pert(epoch, &self, &almanac, &mut delta_c, &mut delta_s)?;
         }
+
         Ok((delta_c, delta_s))
     }
 }
 
 impl AccelModel for SolidTides {
     fn eom(&self, osc: &Orbit, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
-        let (delta_c, delta_s) = self.compute_deltas(osc.epoch, almanac.clone())?;
+        let (delta_c, delta_s) = self.accumulate_deltas(osc.epoch, almanac.clone())?;
 
-        let sc_in_ecef = almanac
-            .transform_to(*osc, self.compute_frame, None)
+        // Convert the osculating orbit to the correct frame (needed for multiple harmonic fields)
+        let state = almanac
+            .transform_to(*osc, self.frame, None)
             .context(DynamicsAlmanacSnafu {
-                action: "transforming sc state to ECEF",
+                action: "transforming into solid tides frame",
             })?;
 
-        let r_sc = sc_in_ecef.rmag_km();
-        let s_sc = sc_in_ecef.radius_km.x / r_sc;
-        let t_sc = sc_in_ecef.radius_km.y / r_sc;
-        let u_sc = sc_in_ecef.radius_km.z / r_sc;
+        // Using the GMAT notation, with extra character for ease of highlight
+        let r_ = state.rmag_km();
+        let s_ = state.radius_km.x / r_;
+        let t_ = state.radius_km.y / r_;
+        let u_ = state.radius_km.z / r_;
 
         // Associated Legendre polynomials a_nm (scaled as in sph_harmonics.rs)
         let mut a_nm = [[0.0f64; 6]; 6];
@@ -213,13 +262,15 @@ impl AccelModel for SolidTides {
         for n in 1..=4 {
             a_nm[n][n] = (1.0 + 1.0 / (2.0 * n as f64)).sqrt() * a_nm[n - 1][n - 1];
         }
-        a_nm[1][0] = u_sc * 3.0f64.sqrt();
+        a_nm[1][0] = u_ * 3.0f64.sqrt();
         for n in 1..=4 {
-            a_nm[n + 1][n] = (2.0 * n as f64 + 3.0).sqrt() * u_sc * a_nm[n][n];
+            a_nm[n + 1][n] = (2.0 * n as f64 + 3.0).sqrt() * u_ * a_nm[n][n];
         }
 
         let b_nm = |n: usize, m: usize| {
-            (((2.0 * n as f64 + 1.0) * (2.0 * n as f64 - 1.0)) / ((n as f64 + m as f64) * (n as f64 - m as f64))).sqrt()
+            (((2.0 * n as f64 + 1.0) * (2.0 * n as f64 - 1.0))
+                / ((n as f64 + m as f64) * (n as f64 - m as f64)))
+                .sqrt()
         };
         let c_nm = |n: usize, m: usize| {
             (((2.0 * n as f64 + 1.0) * (n as f64 + m as f64 - 1.0) * (n as f64 - m as f64 - 1.0))
@@ -229,7 +280,7 @@ impl AccelModel for SolidTides {
 
         for m in 0..=3 {
             for n in (m + 2)..=4 {
-                a_nm[n][m] = u_sc * b_nm(n, m) * a_nm[n - 1][m] - c_nm(n, m) * a_nm[n - 2][m];
+                a_nm[n][m] = u_ * b_nm(n, m) * a_nm[n - 1][m] - c_nm(n, m) * a_nm[n - 2][m];
             }
         }
 
@@ -238,12 +289,25 @@ impl AccelModel for SolidTides {
         r_m[0] = 1.0;
         i_m[0] = 0.0;
         for m in 1..=3 {
-            r_m[m] = s_sc * r_m[m - 1] - t_sc * i_m[m - 1];
-            i_m[m] = s_sc * i_m[m - 1] + t_sc * r_m[m - 1];
+            r_m[m] = s_ * r_m[m - 1] - t_ * i_m[m - 1];
+            i_m[m] = s_ * i_m[m - 1] + t_ * r_m[m - 1];
         }
 
-        let rho = self.eq_radius_km / r_sc;
-        let mut rho_np1 = self.mu_km3_s2 / r_sc * rho;
+        let eq_radius_km = self
+            .frame
+            .mean_equatorial_radius_km()
+            .context(AstroPhysicsSnafu)
+            .context(DynamicsAstroSnafu)?;
+
+        let mu_km3_s2 = self
+            .frame
+            .mu_km3_s2()
+            .context(AstroPhysicsSnafu)
+            .context(DynamicsAstroSnafu)?;
+
+        let rho = eq_radius_km / r_;
+
+        let mut rho_np1 = mu_km3_s2 / r_ * rho;
         let mut accel4 = Vector4::zeros();
 
         let vr01 = |n: usize, m: usize| {
@@ -295,17 +359,17 @@ impl AccelModel for SolidTides {
                 sum.z += vr01(n, m) * a_nm[n][m + 1] * d_;
                 sum.w -= vr11(n, m) * a_nm[n + 1][m + 1] * d_;
             }
-            accel4 += (rho_np1 / self.eq_radius_km) * sum;
+            accel4 += (rho_np1 / eq_radius_km) * sum;
         }
 
         let accel_ecef = Vector3::new(
-            accel4.x + accel4.w * s_sc,
-            accel4.y + accel4.w * t_sc,
-            accel4.z + accel4.w * u_sc,
+            accel4.x + accel4.w * s_,
+            accel4.y + accel4.w * t_,
+            accel4.z + accel4.w * u_,
         );
 
         let dcm = almanac
-            .rotate(self.compute_frame, osc.frame, osc.epoch)
+            .rotate(self.frame, osc.frame, osc.epoch)
             .context(OrientationSnafu {
                 action: "rotating accel back to integration frame",
             })
@@ -322,33 +386,39 @@ impl AccelModel for SolidTides {
         osc: &Orbit,
         almanac: Arc<Almanac>,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
-        let (delta_c, delta_s) = self.compute_deltas(osc.epoch, almanac.clone())?;
+        let (delta_c, delta_s) = self.accumulate_deltas(osc.epoch, almanac.clone())?;
 
-        let sc_in_ecef = almanac
-            .transform_to(*osc, self.compute_frame, None)
+        // Convert the osculating orbit to the correct frame (needed for multiple harmonic fields)
+        let state = almanac
+            .transform_to(*osc, self.frame, None)
             .context(DynamicsAlmanacSnafu {
-                action: "transforming sc state to ECEF",
+                action: "transforming into gravity field frame",
             })?;
 
-        let radius: Vector3<OHyperdual<f64, U7>> = hyperspace_from_vector(&sc_in_ecef.radius_km);
-        let r_sc = norm(&radius);
-        let s_sc = radius[0] / r_sc;
-        let t_sc = radius[1] / r_sc;
-        let u_sc = radius[2] / r_sc;
+        let radius: Vector3<OHyperdual<f64, U7>> = hyperspace_from_vector(&state.radius_km);
+
+        // Using the GMAT notation, with extra character for ease of highlight
+        let r_ = norm(&radius);
+        let s_ = radius[0] / r_;
+        let t_ = radius[1] / r_;
+        let u_ = radius[2] / r_;
 
         // Legendre polynomials recursion in Hyperdual
         let mut a_nm = [[OHyperdual::<f64, U7>::from(0.0); 6]; 6];
         a_nm[0][0] = OHyperdual::from(1.0);
         for n in 1..=4 {
-            a_nm[n][n] = OHyperdual::from((1.0 + 1.0 / (2.0 * n as f64)).sqrt()) * a_nm[n - 1][n - 1];
+            a_nm[n][n] =
+                OHyperdual::from((1.0 + 1.0 / (2.0 * n as f64)).sqrt()) * a_nm[n - 1][n - 1];
         }
-        a_nm[1][0] = u_sc * OHyperdual::from(3.0f64.sqrt());
+        a_nm[1][0] = u_ * OHyperdual::from(3.0f64.sqrt());
         for n in 1..=4 {
-            a_nm[n + 1][n] = OHyperdual::from((2.0 * n as f64 + 3.0).sqrt()) * u_sc * a_nm[n][n];
+            a_nm[n + 1][n] = OHyperdual::from((2.0 * n as f64 + 3.0).sqrt()) * u_ * a_nm[n][n];
         }
 
         let b_nm = |n: usize, m: usize| {
-            (((2.0 * n as f64 + 1.0) * (2.0 * n as f64 - 1.0)) / ((n as f64 + m as f64) * (n as f64 - m as f64))).sqrt()
+            (((2.0 * n as f64 + 1.0) * (2.0 * n as f64 - 1.0))
+                / ((n as f64 + m as f64) * (n as f64 - m as f64)))
+                .sqrt()
         };
         let c_nm = |n: usize, m: usize| {
             (((2.0 * n as f64 + 1.0) * (n as f64 + m as f64 - 1.0) * (n as f64 - m as f64 - 1.0))
@@ -358,7 +428,7 @@ impl AccelModel for SolidTides {
 
         for m in 0..=3 {
             for n in (m + 2)..=4 {
-                a_nm[n][m] = u_sc * OHyperdual::from(b_nm(n, m)) * a_nm[n - 1][m]
+                a_nm[n][m] = u_ * OHyperdual::from(b_nm(n, m)) * a_nm[n - 1][m]
                     - OHyperdual::from(c_nm(n, m)) * a_nm[n - 2][m];
             }
         }
@@ -368,13 +438,25 @@ impl AccelModel for SolidTides {
         r_m[0] = OHyperdual::from(1.0);
         i_m[0] = OHyperdual::from(0.0);
         for m in 1..=3 {
-            r_m[m] = s_sc * r_m[m - 1] - t_sc * i_m[m - 1];
-            i_m[m] = s_sc * i_m[m - 1] + t_sc * r_m[m - 1];
+            r_m[m] = s_ * r_m[m - 1] - t_ * i_m[m - 1];
+            i_m[m] = s_ * i_m[m - 1] + t_ * r_m[m - 1];
         }
 
-        let eq_radius = OHyperdual::<f64, U7>::from(self.eq_radius_km);
-        let rho = eq_radius / r_sc;
-        let mut rho_np1 = OHyperdual::<f64, U7>::from(self.mu_km3_s2) / r_sc * rho;
+        let real_eq_radius_km = self
+            .frame
+            .mean_equatorial_radius_km()
+            .context(AstroPhysicsSnafu)
+            .context(DynamicsAstroSnafu)?;
+
+        let real_mu_km3_s2 = self
+            .frame
+            .mu_km3_s2()
+            .context(AstroPhysicsSnafu)
+            .context(DynamicsAstroSnafu)?;
+
+        let eq_radius = OHyperdual::<f64, U7>::from(real_eq_radius_km);
+        let rho = eq_radius / r_;
+        let mut rho_np1 = OHyperdual::<f64, U7>::from(real_mu_km3_s2) / r_ * rho;
 
         let mut a0 = OHyperdual::<f64, U7>::from(0.0);
         let mut a1 = OHyperdual::<f64, U7>::from(0.0);
@@ -440,10 +522,10 @@ impl AccelModel for SolidTides {
             a3 -= rr * sum3;
         }
 
-        let accel_local = Vector3::new(a0 + a3 * s_sc, a1 + a3 * t_sc, a2 + a3 * u_sc);
+        let accel_local = Vector3::new(a0 + a3 * s_, a1 + a3 * t_, a2 + a3 * u_);
 
         let dcm = almanac
-            .rotate(self.compute_frame, osc.frame, osc.epoch)
+            .rotate(self.frame, osc.frame, osc.epoch)
             .context(OrientationSnafu {
                 action: "rotating accel back to integration frame",
             })
@@ -472,15 +554,15 @@ impl AccelModel for SolidTides {
 
 impl fmt::Display for SolidTides {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Solid tides for {}", self.compute_frame)
+        write!(f, "Solid tides for {}", self.frame)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anise::constants::frames::EARTH_J2000;
     use crate::cosmic::Orbit;
+    use anise::constants::frames::{EARTH_J2000, IAU_EARTH_FRAME, IAU_MOON_FRAME};
     use std::str::FromStr;
 
     #[test]
@@ -493,14 +575,10 @@ mod tests {
 
         let epoch = Epoch::from_str("2024-01-01T12:00:00 UTC").unwrap();
         let frame = Frame::from(EARTH_J2000);
-        let sc_orbit = Orbit::cartesian(
-            7000.0, 0.0, 0.0,
-            0.0, 7.5, 0.0,
-            epoch,
-            frame
-        );
+        let sc_orbit = Orbit::cartesian(7000.0, 0.0, 0.0, 0.0, 7.5, 0.0, epoch, frame);
 
-        let tides = SolidTides::new(almanac.clone()).unwrap();
+        let tides = SolidTides::earth_moon_system(IAU_EARTH_FRAME, IAU_MOON_FRAME, almanac.clone())
+            .expect("could not init solid tides");
         let acc = tides.eom(&sc_orbit, almanac.clone()).unwrap();
 
         println!("Solid tides acceleration: {:?}", acc);
@@ -508,7 +586,7 @@ mod tests {
         assert!(acc.norm() > 0.0);
         assert!(acc.norm() < 1e-6);
 
-        let (acc_grad, grad) = tides.gradient(&sc_orbit, almanac.clone()).unwrap();
+        let (acc_grad, grad) = tides.gradient(&sc_orbit, almanac).unwrap();
         assert!((acc - acc_grad).norm() < 1e-12);
         assert!(grad.norm() > 0.0);
     }
