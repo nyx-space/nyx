@@ -2,7 +2,7 @@
 name = "nyx-space"
 build = "build.rs"
 version = "2.4.0"
-edition = "2021"
+edition = "2024"
 authors = ["Christopher Rabotin <christopher.rabotin@gmail.com>"]
 description = "A high-fidelity space mission toolkit, with orbit propagation, estimation and some systems engineering"
 homepage = "https://nyxspace.com"

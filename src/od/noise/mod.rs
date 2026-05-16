@@ -245,11 +245,11 @@ impl Mul<f64> for StochasticNoise {
     type Output = Self;
 
     fn mul(mut self, rhs: f64) -> Self::Output {
-        if let Some(mut wn) = &mut self.white_noise {
-            wn *= rhs;
+        if let Some(wn) = &mut self.white_noise {
+            *wn *= rhs;
         }
-        if let Some(mut gm) = &mut self.bias {
-            gm *= rhs;
+        if let Some(gm) = &mut self.bias {
+            *gm *= rhs;
         }
 
         self
