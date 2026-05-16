@@ -1,0 +1,137 @@
+[package]
+name = "nyx-space"
+build = "build.rs"
+
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
+license.workspace = true
+exclude.workspace = true
+
+
+[badges]
+maintenance = { status = "actively-developed" }
+github = { repository = "nyx-space/nyx", branch = "master" }
+
+[dependencies]
+anise = {workspace = true}
+hifitime = {workspace = true}
+
+der = { version = "0.7", features = ["derive", "alloc", "real"] }
+nalgebra = "0.34"
+log = "0.4"
+flate2 = { version = "1.0", features = [
+    "rust_backend",
+], default-features = false }
+serde = {version = "1.0", features = ["derive", "rc"]}
+hyperdual = "1.4.0"
+rand = "0.10"
+rand_distr = "0.6"
+regex = "1.5"
+rayon = "1.6"
+approx = "0.5"
+rand_pcg = "0.10"
+indicatif = { version = "0.18", features = ["rayon"], default-features = false }
+rstats = "2.0.1"
+parquet = { version = "58.0.0", default-features = false, features = [
+    "arrow",
+    "zstd",
+] }
+arrow = "58.0.0"
+shadow-rs = { version = "2.0.0", default-features = false }
+serde_yml = "0.0.12"
+whoami = "2.1.1"
+either = { version = "1.8.1", features = ["serde"] }
+num = "0.4.0"
+typed-builder = "0.23.0"
+snafu = { version = "0.9.0", features = ["backtrace"] }
+serde_dhall = "0.13"
+indexmap = { version = "2.6.0", features = ["serde"] }
+statrs = "0.18.0"
+num-traits = "=0.2.19"
+# Optional dependencies
+pyo3 = { version = "0.28", features = ["multiple-pymethods"], optional = true }
+
+
+[features]
+default = ["premium"]
+# Premium feature is NOT available to most commercial entities. Refer to the README.
+premium = []
+python = ["pyo3", "hifitime/python", "anise/python"]
+
+[dev-dependencies]
+polars = { version = "0.51.0", features = ["parquet"] }
+rstest = "0.26.1"
+pretty_env_logger = "0.5"
+serde_arrow = { version = "0.14", features = ["arrow-58"] }
+toml = "1.0.0"
+radiate = "1.2.22"
+
+[build-dependencies]
+shadow-rs = "2.0.0"
+
+# Uncomment to speed up local builds
+# [profile.dev.package."*"]
+# opt-level = 3
+
+[target.x86_64-unknown-linux-gnu]
+# For flamegraph -- https://github.com/flamegraph-rs/flamegraph
+linker = "/usr/bin/clang"
+rustflags = ["-Clink-arg=-fuse-ld=lld", "-Clink-arg=-Wl,--no-rosegment"]
+
+[package.metadata.docs.rs]
+cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
+
+[[example]]
+name = "01_orbit_prop"
+path = "examples/01_orbit_prop/main.rs"
+doc-scrape-examples = true
+
+[[example]]
+name = "02_jwst"
+path = "examples/02_jwst_covar_monte_carlo/main.rs"
+doc-scrape-examples = true
+
+[[example]]
+name = "03_geo_drift"
+path = "examples/03_geo_analysis/drift.rs"
+doc-scrape-examples = true
+
+[[example]]
+name = "03_geo_raise"
+path = "examples/03_geo_analysis/raise.rs"
+doc-scrape-examples = true
+
+[[example]]
+name = "03_geo_sk"
+path = "examples/03_geo_analysis/stationkeeping.rs"
+doc-scrape-examples = true
+
+[[example]]
+name = "03_geo_raise_optim"
+path = "examples/03_geo_analysis/raise_optim.rs"
+doc-scrape-examples = true
+
+[[example]]
+name = "04_lro_od"
+path = "examples/04_lro_od/main.rs"
+doc-scrape-examples = true
+
+[[example]]
+name = "05_caps"
+path = "examples/05_cislunar_spacecraft_link_od/main.rs"
+doc-scrape-examples = true
+
+[[example]]
+name = "06_seq_od"
+path = "examples/06_lunar_orbit_determination/main.rs"
+doc-scrape-examples = true
+
+
