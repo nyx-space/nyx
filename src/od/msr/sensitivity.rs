@@ -225,11 +225,11 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
                     _tx: PhantomData::<_>,
                 })
             }
-            MeasurementType::ReceiveFrequency | MeasurementType::TransmitFrequency => {
-                Err(ODError::MeasurementSimError {
-                    details: format!("{msr_type:?} is only supported in CCSDS TDM parsing"),
-                })
-            }
+            MeasurementType::ReceiveFrequency
+            | MeasurementType::TransmitFrequency
+            | MeasurementType::TransmitFrequencyRate => Err(ODError::MeasurementSimError {
+                details: format!("{msr_type:?} is only supported in CCSDS TDM parsing"),
+            }),
             MeasurementType::X | MeasurementType::Y | MeasurementType::Z => {
                 Err(ODError::MeasurementSimError {
                     details: format!("{msr_type:?} is not supported for ground stations"),

@@ -22,8 +22,7 @@ use crate::io::{InputOutputError, StdIOSnafu};
 use crate::od::msr::{Measurement, MeasurementType};
 use anise::constants::SPEED_OF_LIGHT_KM_S;
 use hifitime::efmt::{Format, Formatter};
-use hifitime::prelude::Epoch;
-use hifitime::TimeScale;
+use hifitime::{Duration, Epoch, TimeScale};
 use indexmap::{IndexMap, IndexSet};
 use log::{error, info, warn};
 use snafu::ResultExt;
@@ -63,7 +62,7 @@ impl TrackingDataArc {
     ///
     /// ### Time systems / time scales
     ///
-    /// All timescales supported by hifitime are supported here. This includes: UTC, TAI, GPS, TT, TDB, TAI, GST, QZSST.
+    /// All timescales supported by hifitime are supported here. This includes: UTC, TAI, GPS, TT, TDB, TAI, GST, QZSST, TL, TCL.
     ///
     /// ### Path
     ///
@@ -167,6 +166,7 @@ impl TrackingDataArc {
                 if [
                     MeasurementType::ReceiveFrequency,
                     MeasurementType::TransmitFrequency,
+                    MeasurementType::TransmitFrequencyRate,
                 ]
                 .contains(&mtype)
                 {
@@ -200,11 +200,13 @@ impl TrackingDataArc {
                             info!("turn-around ratio is {ta_num}/{ta_denom}");
                             drop_freq_data = false;
                         } else {
-                            error!("turn-around denominator `{ta_denom_str}` is not a valid double precision float");
+                            error!(
+                                "turn-around denominator `{ta_denom_str}` is not a valid integer"
+                            );
                             drop_freq_data = true;
                         }
                     } else {
-                        error!("turn-around numerator `{ta_num_str}` is not a valid double precision float");
+                        error!("turn-around numerator `{ta_num_str}` is not a valid integer");
                         drop_freq_data = true;
                     }
                 } else {
@@ -237,9 +239,11 @@ impl TrackingDataArc {
         let mut freq_types = IndexSet::new();
         freq_types.insert(MeasurementType::ReceiveFrequency);
         freq_types.insert(MeasurementType::TransmitFrequency);
+        freq_types.insert(MeasurementType::TransmitFrequencyRate);
 
         let mut latest_transmit_freq = None;
-        let mut malformed_warning = 0;
+        let mut latest_transmit_epoch = None;
+        let mut latest_transmit_rate = 0.0;
 
         let mut all_applied_corrections = IndexSet::new();
 
@@ -253,6 +257,7 @@ impl TrackingDataArc {
                     MeasurementType::Elevation,
                     MeasurementType::ReceiveFrequency,
                     MeasurementType::TransmitFrequency,
+                    MeasurementType::TransmitFrequencyRate,
                 ] {
                     let kw = format!("CORRECTION_{}", msr_type.ccsds_tdm_name());
                     if let Some(correction_str) = metadata.get(&kw) {
@@ -273,55 +278,50 @@ impl TrackingDataArc {
                 continue;
             }
 
-            let avail = measurement.availability(&freq_types);
-            let use_prev_transmit_freq: bool;
-            let num_freq_msr = avail
-                .iter()
-                .copied()
-                .map(|v| if v { 1 } else { 0 })
-                .sum::<u8>();
-            if num_freq_msr == 0 {
-                // No frequency measurements
-                continue;
-            } else if num_freq_msr == 1 {
-                // avail[0] means that Receive Freq is available
-                // avail[1] means that Transmit Freq is available
-                // We can only compute Doppler data from one data point if that data point
-                // if the receive frequency and the transmit frequency was previously set.
-                if let Some(latest_transmit_freq) = latest_transmit_freq {
-                    if avail[0] {
-                        use_prev_transmit_freq = true;
-                        if malformed_warning == 0 {
-                            warn!(
-                                "no transmit frequency at {epoch}, using {latest_transmit_freq} Hz",
-                            );
-                        }
-                        malformed_warning += 1;
-                    } else {
-                        use_prev_transmit_freq = false;
-                    }
-                } else {
-                    warn!("only one of receive or transmit frequencies found at {epoch}, ignoring");
-                    for freq in &freq_types {
-                        measurement.data.swap_remove(freq);
-                    }
-                    continue;
+            // Update the transmit frequency and rate if they are set.
+            if let Some(rate) = measurement
+                .data
+                .get(&MeasurementType::TransmitFrequencyRate)
+            {
+                if let (Some(last_f), Some(last_e)) = (latest_transmit_freq, latest_transmit_epoch)
+                {
+                    let dt: Duration = *epoch - last_e;
+                    latest_transmit_freq = Some(last_f + latest_transmit_rate * dt.to_seconds());
                 }
-            } else {
-                use_prev_transmit_freq = false;
+                latest_transmit_epoch = Some(*epoch);
+                latest_transmit_rate = *rate;
             }
 
-            if !use_prev_transmit_freq {
-                // Update the latest transmit frequency since it's set.
-                latest_transmit_freq = Some(
-                    *measurement
-                        .data
-                        .get(&MeasurementType::TransmitFrequency)
-                        .unwrap(),
-                );
+            if let Some(freq) = measurement.data.get(&MeasurementType::TransmitFrequency) {
+                latest_transmit_freq = Some(*freq);
+                latest_transmit_epoch = Some(*epoch);
             }
 
-            let transmit_freq_hz = latest_transmit_freq.unwrap();
+            if !measurement
+                .data
+                .contains_key(&MeasurementType::ReceiveFrequency)
+            {
+                // If there's no receive frequency, we just continue (having updated the transmit freq rate)
+                // but we must remove the transmit freq rate from the measurement.
+                for freq in &freq_types {
+                    measurement.data.swap_remove(freq);
+                }
+                continue;
+            }
+
+            // There is a receive frequency
+            if latest_transmit_freq.is_none() {
+                warn!("receive frequency found at {epoch} but no transmit frequency was ever set, ignoring");
+                for freq in &freq_types {
+                    measurement.data.swap_remove(freq);
+                }
+                continue;
+            }
+
+            let dt: Duration = *epoch - latest_transmit_epoch.unwrap();
+            let transmit_freq_hz =
+                latest_transmit_freq.unwrap() + latest_transmit_rate * dt.to_seconds();
+
             let receive_freq_hz = *measurement
                 .data
                 .get(&MeasurementType::ReceiveFrequency)
@@ -340,10 +340,6 @@ impl TrackingDataArc {
             measurement
                 .data
                 .insert(MeasurementType::Doppler, rho_dot_km_s);
-        }
-
-        if malformed_warning > 1 {
-            warn!("missing transmit frequency warning occured {malformed_warning} times",);
         }
 
         if !all_applied_corrections.is_empty() {
@@ -368,6 +364,9 @@ impl TrackingDataArc {
         } else {
             None
         };
+
+        // Remove measurements that have no data left after our processing.
+        measurements.retain(|_, m| !m.data.is_empty());
 
         let trk = Self {
             measurements,
@@ -604,6 +603,12 @@ fn parse_measurement_line(
         | "RECEIVE_FREQ_4" | "RECEIVE_FREQ_5" => MeasurementType::ReceiveFrequency,
         "TRANSMIT_FREQ" | "TRANSMIT_FREQ_1" | "TRANSMIT_FREQ_2" | "TRANSMIT_FREQ_3"
         | "TRANSMIT_FREQ_4" | "TRANSMIT_FREQ_5" => MeasurementType::TransmitFrequency,
+        "TRANSMIT_FREQ_RATE"
+        | "TRANSMIT_FREQ_RATE_1"
+        | "TRANSMIT_FREQ_RATE_2"
+        | "TRANSMIT_FREQ_RATE_3"
+        | "TRANSMIT_FREQ_RATE_4"
+        | "TRANSMIT_FREQ_RATE_5" => MeasurementType::TransmitFrequencyRate,
         _ => {
             return Err(InputOutputError::UnsupportedData {
                 which: mtype_str.to_string(),

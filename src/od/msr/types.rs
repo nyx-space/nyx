@@ -42,6 +42,8 @@ pub enum MeasurementType {
     ReceiveFrequency = 4,
     #[serde(rename = "transmit_freq")]
     TransmitFrequency = 5,
+    #[serde(rename = "transmit_freq_rate")]
+    TransmitFrequencyRate = 9,
     #[serde(rename = "x")]
     X = 6,
     #[serde(rename = "y")]
@@ -58,6 +60,7 @@ impl MeasurementType {
             Self::Doppler => "km/s",
             Self::Azimuth | Self::Elevation => "deg",
             Self::ReceiveFrequency | Self::TransmitFrequency => "Hz",
+            Self::TransmitFrequencyRate => "Hz/s",
             Self::X | Self::Y | Self::Z => "km",
         }
     }
@@ -70,6 +73,7 @@ impl MeasurementType {
             | MeasurementType::Elevation
             | MeasurementType::ReceiveFrequency
             | MeasurementType::TransmitFrequency
+            | MeasurementType::TransmitFrequencyRate
             | MeasurementType::X
             | MeasurementType::Y
             | MeasurementType::Z => false,
@@ -97,9 +101,11 @@ impl MeasurementType {
             Self::Doppler => Ok(aer.range_rate_km_s + noise),
             Self::Azimuth => Ok(aer.azimuth_deg + noise),
             Self::Elevation => Ok(aer.elevation_deg + noise),
-            Self::ReceiveFrequency | Self::TransmitFrequency => Err(ODError::MeasurementSimError {
-                details: format!("{self:?} is only supported in CCSDS TDM parsing"),
-            }),
+            Self::ReceiveFrequency | Self::TransmitFrequency | Self::TransmitFrequencyRate => {
+                Err(ODError::MeasurementSimError {
+                    details: format!("{self:?} is only supported in CCSDS TDM parsing"),
+                })
+            }
             Self::X | Self::Y | Self::Z => Err(ODError::MeasurementSimError {
                 details: format!("{self:?} must be computed directly from the state"),
             }),
@@ -131,9 +137,11 @@ impl MeasurementType {
                 let el_deg = (aer_t1.elevation_deg + aer_t0.elevation_deg) * 0.5;
                 Ok(el_deg + noise / 2.0_f64.sqrt())
             }
-            Self::ReceiveFrequency | Self::TransmitFrequency => Err(ODError::MeasurementSimError {
-                details: format!("{self:?} is only supported in CCSDS TDM parsing"),
-            }),
+            Self::ReceiveFrequency | Self::TransmitFrequency | Self::TransmitFrequencyRate => {
+                Err(ODError::MeasurementSimError {
+                    details: format!("{self:?} is only supported in CCSDS TDM parsing"),
+                })
+            }
             Self::X | Self::Y | Self::Z => Err(ODError::MeasurementSimError {
                 details: format!("{self:?} is not supported for two way measurements"),
             }),
@@ -149,6 +157,7 @@ impl MeasurementType {
             MeasurementType::Elevation => "ANGLE_2",
             MeasurementType::ReceiveFrequency => "RECEIVE_FREQ",
             MeasurementType::TransmitFrequency => "TRANSMIT_FREQ",
+            MeasurementType::TransmitFrequencyRate => "TRANSMIT_FREQ_RATE",
             MeasurementType::X => "X",
             MeasurementType::Y => "Y",
             MeasurementType::Z => "Z",
