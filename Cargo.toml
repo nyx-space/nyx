@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["nyx-core"]
+members = ["nyx-core", "nyx-py"]
 
 [workspace.package]
 version = "2.4.0"

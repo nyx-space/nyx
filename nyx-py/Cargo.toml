@@ -1,0 +1,25 @@
+[package]
+name = "nyx-py"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description.workspace = true
+homepage.workspace = true
+repository.workspace = true
+categories.workspace = true
+readme.workspace = true
+license.workspace = true
+exclude.workspace = true
+
+[lib]
+name = "nyx_space"
+
+
+[dependencies]
+hifitime = {workspace = true, features = ["python"]}
+anise = {workspace = true, features=["python", "analysis"]}
+nyx-space = { workspace = true, features = ["python"] }
+
+pyo3 = { version = "0.28", features = ["multiple-pymethods"] }
+pyo3-log = "0.13.3"
+

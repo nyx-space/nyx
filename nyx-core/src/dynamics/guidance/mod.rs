@@ -203,8 +203,10 @@ pub enum GuidanceError {
 }
 
 /// Local frame options, used notably for guidance laws.
-/// TODO: Replace with ANISE enum, which is identical
+/// TODO: Replace with ANISE enum, which is identical, but needs Serialize/Deserialize implemented.
+/// https://github.com/nyx-space/anise/issues/725
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, StaticType)]
+#[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub enum LocalFrame {
     Inertial,
     RIC,
