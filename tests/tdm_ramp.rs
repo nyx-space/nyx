@@ -24,9 +24,7 @@ DATA_START
 DATA_STOP
 "#;
 
-    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    path.push("target");
-    path.push("test_ramp.tdm");
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/test_ramp.tdm");
 
     // Ensure directory exists
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -41,9 +39,15 @@ DATA_STOP
     assert_eq!(arc.len(), 1);
     let (epoch, msr) = arc.measurements.iter().next().unwrap();
 
-    assert_eq!(*epoch, Epoch::from_gregorian_utc(2023, 2, 22, 19, 18, 27, 160_000_000));
+    assert_eq!(
+        *epoch,
+        Epoch::from_gregorian_utc(2023, 2, 22, 19, 18, 27, 160_000_000)
+    );
 
-    let doppler = msr.data.get(&MeasurementType::Doppler).expect("Doppler measurement missing");
+    let doppler = msr
+        .data
+        .get(&MeasurementType::Doppler)
+        .expect("Doppler measurement missing");
 
     // Expected calculation:
     // T0 = 19:18:17.160, F0 = 2.1e9, R0 = 1.0
@@ -58,5 +62,8 @@ DATA_STOP
     // rho_dot = (1524.127089 * 299792.458) / (2 * 2280543002.714932) = 0.1001782921
 
     let expected_rho_dot = 0.1001782921;
-    assert!((doppler - expected_rho_dot).abs() < 1e-8, "Doppler value mismatch: got {}, expected {}", doppler, expected_rho_dot);
+    assert!(
+        (doppler - expected_rho_dot).abs() < 1e-8,
+        "Doppler value mismatch: got {doppler}, expected {expected_rho_dot}",
+    );
 }

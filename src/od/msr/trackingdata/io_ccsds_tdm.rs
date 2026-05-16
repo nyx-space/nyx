@@ -22,8 +22,7 @@ use crate::io::{InputOutputError, StdIOSnafu};
 use crate::od::msr::{Measurement, MeasurementType};
 use anise::constants::SPEED_OF_LIGHT_KM_S;
 use hifitime::efmt::{Format, Formatter};
-use hifitime::prelude::Epoch;
-use hifitime::TimeScale;
+use hifitime::{Duration, Epoch, TimeScale};
 use indexmap::{IndexMap, IndexSet};
 use log::{error, info, warn};
 use snafu::ResultExt;
@@ -63,7 +62,7 @@ impl TrackingDataArc {
     ///
     /// ### Time systems / time scales
     ///
-    /// All timescales supported by hifitime are supported here. This includes: UTC, TAI, GPS, TT, TDB, TAI, GST, QZSST.
+    /// All timescales supported by hifitime are supported here. This includes: UTC, TAI, GPS, TT, TDB, TAI, GST, QZSST, TL, TCL.
     ///
     /// ### Path
     ///
@@ -201,11 +200,13 @@ impl TrackingDataArc {
                             info!("turn-around ratio is {ta_num}/{ta_denom}");
                             drop_freq_data = false;
                         } else {
-                            error!("turn-around denominator `{ta_denom_str}` is not a valid double precision float");
+                            error!(
+                                "turn-around denominator `{ta_denom_str}` is not a valid integer"
+                            );
                             drop_freq_data = true;
                         }
                     } else {
-                        error!("turn-around numerator `{ta_num_str}` is not a valid double precision float");
+                        error!("turn-around numerator `{ta_num_str}` is not a valid integer");
                         drop_freq_data = true;
                     }
                 } else {
@@ -278,9 +279,13 @@ impl TrackingDataArc {
             }
 
             // Update the transmit frequency and rate if they are set.
-            if let Some(rate) = measurement.data.get(&MeasurementType::TransmitFrequencyRate) {
-                if let (Some(last_f), Some(last_e)) = (latest_transmit_freq, latest_transmit_epoch) {
-                    let dt: hifitime::Duration = *epoch - last_e;
+            if let Some(rate) = measurement
+                .data
+                .get(&MeasurementType::TransmitFrequencyRate)
+            {
+                if let (Some(last_f), Some(last_e)) = (latest_transmit_freq, latest_transmit_epoch)
+                {
+                    let dt: Duration = *epoch - last_e;
                     latest_transmit_freq = Some(last_f + latest_transmit_rate * dt.to_seconds());
                 }
                 latest_transmit_epoch = Some(*epoch);
@@ -292,16 +297,19 @@ impl TrackingDataArc {
                 latest_transmit_epoch = Some(*epoch);
             }
 
-            if !measurement.data.contains_key(&MeasurementType::ReceiveFrequency) {
-                // If there's no receive frequency, we just continue (having updated the transmit freq/rate)
-                // but we must remove the transmit freq/rate from the measurement.
+            if !measurement
+                .data
+                .contains_key(&MeasurementType::ReceiveFrequency)
+            {
+                // If there's no receive frequency, we just continue (having updated the transmit freq rate)
+                // but we must remove the transmit freq rate from the measurement.
                 for freq in &freq_types {
                     measurement.data.swap_remove(freq);
                 }
                 continue;
             }
 
-            // We have a receive frequency!
+            // There is a receive frequency
             if latest_transmit_freq.is_none() {
                 warn!("receive frequency found at {epoch} but no transmit frequency was ever set, ignoring");
                 for freq in &freq_types {
@@ -310,8 +318,10 @@ impl TrackingDataArc {
                 continue;
             }
 
-            let dt: hifitime::Duration = *epoch - latest_transmit_epoch.unwrap();
-            let transmit_freq_hz = latest_transmit_freq.unwrap() + latest_transmit_rate * dt.to_seconds();
+            let dt: Duration = *epoch - latest_transmit_epoch.unwrap();
+            let transmit_freq_hz =
+                latest_transmit_freq.unwrap() + latest_transmit_rate * dt.to_seconds();
+
             let receive_freq_hz = *measurement
                 .data
                 .get(&MeasurementType::ReceiveFrequency)
@@ -355,7 +365,7 @@ impl TrackingDataArc {
             None
         };
 
-        // Filter out any measurements that have no data left.
+        // Remove measurements that have no data left after our processing.
         measurements.retain(|_, m| !m.data.is_empty());
 
         let trk = Self {
@@ -593,10 +603,12 @@ fn parse_measurement_line(
         | "RECEIVE_FREQ_4" | "RECEIVE_FREQ_5" => MeasurementType::ReceiveFrequency,
         "TRANSMIT_FREQ" | "TRANSMIT_FREQ_1" | "TRANSMIT_FREQ_2" | "TRANSMIT_FREQ_3"
         | "TRANSMIT_FREQ_4" | "TRANSMIT_FREQ_5" => MeasurementType::TransmitFrequency,
-        "TRANSMIT_FREQ_RATE" | "TRANSMIT_FREQ_RATE_1" | "TRANSMIT_FREQ_RATE_2"
-        | "TRANSMIT_FREQ_RATE_3" | "TRANSMIT_FREQ_RATE_4" | "TRANSMIT_FREQ_RATE_5" => {
-            MeasurementType::TransmitFrequencyRate
-        }
+        "TRANSMIT_FREQ_RATE"
+        | "TRANSMIT_FREQ_RATE_1"
+        | "TRANSMIT_FREQ_RATE_2"
+        | "TRANSMIT_FREQ_RATE_3"
+        | "TRANSMIT_FREQ_RATE_4"
+        | "TRANSMIT_FREQ_RATE_5" => MeasurementType::TransmitFrequencyRate,
         _ => {
             return Err(InputOutputError::UnsupportedData {
                 which: mtype_str.to_string(),
