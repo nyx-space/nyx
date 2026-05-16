@@ -34,7 +34,8 @@ use super::{DynamicsAlmanacSnafu, DynamicsAstroSnafu, DynamicsError};
 
 #[derive(Clone)]
 pub struct GravityField {
-    compute_frame: Frame,
+    /// The frame in which the gravity field is defined.
+    frame: Frame,
     stor: GravityFieldData,
     a_nm: DMatrix<f64>,
     b_nm: DMatrix<f64>,
@@ -50,7 +51,7 @@ pub struct GravityField {
 
 impl GravityField {
     /// Create a new Harmonics dynamical model from the provided gravity potential storage instance.
-    pub fn from_stor(compute_frame: Frame, stor: GravityFieldData) -> Arc<Self> {
+    pub fn from_stor(frame: Frame, stor: GravityFieldData) -> Arc<Self> {
         let degree_np2 = stor.max_degree_n() + 2;
         let mut a_nm = DMatrix::from_element(degree_np2 + 1, degree_np2 + 1, 0.0);
         let mut b_nm = DMatrix::from_element(degree_np2, degree_np2, 0.0);
@@ -118,7 +119,7 @@ impl GravityField {
         }
 
         Arc::new(Self {
-            compute_frame,
+            frame,
             stor,
             a_nm,
             b_nm,
@@ -139,7 +140,7 @@ impl fmt::Display for GravityField {
         write!(
             f,
             "{} gravity field {}x{} (order x degree)",
-            self.compute_frame,
+            self.frame,
             self.stor.max_order_m(),
             self.stor.max_degree_n(),
         )
@@ -150,7 +151,7 @@ impl AccelModel for GravityField {
     fn eom(&self, osc: &Orbit, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
         // Convert the osculating orbit to the correct frame (needed for multiple harmonic fields)
         let state = almanac
-            .transform_to(*osc, self.compute_frame, None)
+            .transform_to(*osc, self.frame, None)
             .context(DynamicsAlmanacSnafu {
                 action: "transforming into gravity field frame",
             })?;
@@ -195,13 +196,13 @@ impl AccelModel for GravityField {
         }
 
         let eq_radius_km = self
-            .compute_frame
+            .frame
             .mean_equatorial_radius_km()
             .context(AstroPhysicsSnafu)
             .context(DynamicsAstroSnafu)?;
 
         let mu_km3_s2 = self
-            .compute_frame
+            .frame
             .mu_km3_s2()
             .context(AstroPhysicsSnafu)
             .context(DynamicsAstroSnafu)?;
@@ -256,7 +257,7 @@ impl AccelModel for GravityField {
         // As discussed with Sai, if the Earth was spinning faster, would the acceleration due to the harmonics be any different?
         // No. Therefore, we do not need to account for the transport theorem here.
         let dcm = almanac
-            .rotate(self.compute_frame, osc.frame, osc.epoch)
+            .rotate(self.frame, osc.frame, osc.epoch)
             .context(OrientationSnafu {
                 action: "transform state dcm",
             })
@@ -277,7 +278,7 @@ impl AccelModel for GravityField {
     ) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
         // Convert the osculating orbit to the correct frame (needed for multiple harmonic fields)
         let state = almanac
-            .transform_to(*osc, self.compute_frame, None)
+            .transform_to(*osc, self.frame, None)
             .context(DynamicsAlmanacSnafu {
                 action: "transforming into gravity field frame",
             })?;
@@ -328,13 +329,13 @@ impl AccelModel for GravityField {
         }
 
         let real_eq_radius_km = self
-            .compute_frame
+            .frame
             .mean_equatorial_radius_km()
             .context(AstroPhysicsSnafu)
             .context(DynamicsAstroSnafu)?;
 
         let real_mu_km3_s2 = self
-            .compute_frame
+            .frame
             .mu_km3_s2()
             .context(AstroPhysicsSnafu)
             .context(DynamicsAstroSnafu)?;
@@ -399,7 +400,7 @@ impl AccelModel for GravityField {
         }
 
         let dcm = almanac
-            .rotate(self.compute_frame, osc.frame, osc.epoch)
+            .rotate(self.frame, osc.frame, osc.epoch)
             .context(OrientationSnafu {
                 action: "transform state dcm",
             })

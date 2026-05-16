@@ -34,7 +34,7 @@ use std::f64;
 use std::fmt;
 use std::sync::Arc;
 
-pub use super::sph_harmonics::GravityField;
+pub use super::gravity_field::GravityField;
 
 /// `OrbitalDynamics` provides the equations of motion for any celestial dynamic, without state transition matrix computation.
 #[derive(Clone)]

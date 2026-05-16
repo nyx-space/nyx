@@ -57,10 +57,16 @@ pub use self::solarpressure::*;
 pub mod drag;
 pub use self::drag::*;
 
-/// Define the spherical harmonic models.
+/// Define the gravity field models.
 /// This module allows loading gravity models from [PDS](http://pds-geosciences.wustl.edu/), [EGM2008](http://earth-info.nga.mil/GandG/wgs84/gravitymod/egm2008/) and GMAT's own COF files.
-pub mod sph_harmonics;
-pub use self::sph_harmonics::*;
+pub mod gravity_field;
+pub use self::gravity_field::*;
+
+/// Define the solid tide models.
+#[cfg(feature = "premium")]
+pub mod solid_tides;
+#[cfg(feature = "premium")]
+pub use self::solid_tides::*;
 
 pub mod sequence;
 
