@@ -232,13 +232,14 @@ impl SolidTides {
         let mut delta_s = [[0.0f64; 4]; 4];
 
         for pert in &self.perturbers {
-            pert.compute_pert(epoch, &self, &almanac, &mut delta_c, &mut delta_s)?;
+            pert.compute_pert(epoch, self, &almanac, &mut delta_c, &mut delta_s)?;
         }
 
         Ok((delta_c, delta_s))
     }
 }
 
+#[allow(clippy::needless_range_loop)]
 impl AccelModel for SolidTides {
     fn eom(&self, osc: &Orbit, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
         let (delta_c, delta_s) = self.accumulate_deltas(osc.epoch, almanac.clone())?;
