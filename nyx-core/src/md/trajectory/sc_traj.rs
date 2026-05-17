@@ -452,7 +452,7 @@ mod ut_ccsds_oem {
         // All three samples were taken from https://github.com/bradsease/oem/blob/main/tests/samples/real/
         let path: PathBuf = [
             env!("CARGO_MANIFEST_DIR"),
-            "data",
+            "../data",
             "03_tests",
             "ccsds",
             "oem",
@@ -475,7 +475,7 @@ mod ut_ccsds_oem {
         // All three samples were taken from https://github.com/bradsease/oem/blob/main/tests/samples/real/
         let path: PathBuf = [
             env!("CARGO_MANIFEST_DIR"),
-            "data",
+            "../data",
             "03_tests",
             "ccsds",
             "oem",
@@ -500,7 +500,7 @@ mod ut_ccsds_oem {
         // All three samples were taken from https://github.com/bradsease/oem/blob/main/tests/samples/real/
         let path: PathBuf = [
             env!("CARGO_MANIFEST_DIR"),
-            "data",
+            "../data",
             "03_tests",
             "ccsds",
             "oem",
@@ -527,7 +527,7 @@ mod ut_ccsds_oem {
 
         let path: PathBuf = [
             env!("CARGO_MANIFEST_DIR"),
-            "data",
+            "../data",
             "04_output",
             "GEO_20s_rebuilt.oem",
         ]
@@ -594,13 +594,13 @@ mod ut_ccsds_oem {
         let almanac = Almanac::new(
             &manifest_dir
                 .clone()
-                .join("data/01_planetary/pck08.pca")
+                .join("../data/01_planetary/pck08.pca")
                 .to_string_lossy(),
         )
         .unwrap()
         .load(
             &manifest_dir
-                .join("data/01_planetary/de440s.bsp")
+                .join("../data/01_planetary/de440s.bsp")
                 .to_string_lossy(),
         )
         .unwrap();
@@ -630,7 +630,7 @@ mod ut_ccsds_oem {
         // Export CCSDS OEM file
         let path: PathBuf = [
             env!("CARGO_MANIFEST_DIR"),
-            "data",
+            "../data",
             "04_output",
             "moon_45days.oem",
         ]
@@ -662,13 +662,13 @@ mod ut_ccsds_oem {
         let almanac = Almanac::new(
             &manifest_dir
                 .clone()
-                .join("data/01_planetary/pck08.pca")
+                .join("../data/01_planetary/pck08.pca")
                 .to_string_lossy(),
         )
         .unwrap()
         .load(
             &manifest_dir
-                .join("data/01_planetary/de440s.bsp")
+                .join("../data/01_planetary/de440s.bsp")
                 .to_string_lossy(),
         )
         .unwrap();
@@ -709,7 +709,7 @@ mod ut_ccsds_oem {
         .unwrap();
 
         let path = manifest_dir
-            .join("data/04_output")
+            .join("../data/04_output")
             .join("thrust_axes_export_test.parquet");
 
         traj.to_parquet(&path, ExportCfg::default()).unwrap();

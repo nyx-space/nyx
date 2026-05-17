@@ -422,11 +422,11 @@ mod gs_ut {
         use hifitime::TimeUnits;
 
         let test_data: PathBuf = [
-            env::var("CARGO_MANIFEST_DIR").unwrap(),
-            "data".to_string(),
-            "03_tests".to_string(),
-            "config".to_string(),
-            "one_ground_station.yaml".to_string(),
+            env!("CARGO_MANIFEST_DIR"),
+            "../data",
+            "03_tests",
+            "config",
+            "one_ground_station.yaml",
         ]
         .iter()
         .collect();
@@ -487,11 +487,11 @@ mod gs_ut {
         use std::path::PathBuf;
 
         let test_file: PathBuf = [
-            env::var("CARGO_MANIFEST_DIR").unwrap(),
-            "data".to_string(),
-            "03_tests".to_string(),
-            "config".to_string(),
-            "many_ground_stations.yaml".to_string(),
+            env!("CARGO_MANIFEST_DIR"),
+            "../data",
+            "03_tests",
+            "config",
+            "many_ground_stations.yaml",
         ]
         .iter()
         .collect();

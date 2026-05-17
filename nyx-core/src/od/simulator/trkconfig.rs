@@ -476,8 +476,8 @@ mod trkconfig_ut {
 
         // Load the tracking configuration from the test data.
         let trkconfg_yaml: PathBuf = [
-            &env::var("CARGO_MANIFEST_DIR").unwrap(),
-            "data",
+            env!("CARGO_MANIFEST_DIR"),
+            "../data",
             "03_tests",
             "config",
             "tracking_cfg.yaml",

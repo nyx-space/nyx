@@ -286,11 +286,11 @@ mod ut_gm {
         assert_eq!(gm_deser, gm);
 
         let test_data: PathBuf = [
-            env::var("CARGO_MANIFEST_DIR").unwrap(),
-            "data".to_string(),
-            "03_tests".to_string(),
-            "config".to_string(),
-            "high-prec-network.yaml".to_string(),
+            env!("CARGO_MANIFEST_DIR"),
+            "../data",
+            "03_tests",
+            "config",
+            "high-prec-network.yaml",
         ]
         .iter()
         .collect();

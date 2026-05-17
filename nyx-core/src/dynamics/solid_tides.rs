@@ -564,14 +564,22 @@ mod tests {
     use super::*;
     use crate::cosmic::Orbit;
     use anise::constants::frames::{EARTH_J2000, IAU_EARTH_FRAME, IAU_MOON_FRAME};
+    use std::path::PathBuf;
     use std::str::FromStr;
 
     #[test]
     fn test_solid_tides_earth() {
+        let data_folder: PathBuf = [env!("CARGO_MANIFEST_DIR"), "../data/01_planetary"]
+            .iter()
+            .collect();
         let mut almanac = Almanac::default();
         // Load kernels
-        almanac = almanac.load("data/01_planetary/de440s.bsp").unwrap();
-        almanac = almanac.load("data/01_planetary/pck08.pca").unwrap();
+        almanac = almanac
+            .load(data_folder.join("de440s.bsp").to_str().unwrap())
+            .unwrap();
+        almanac = almanac
+            .load(data_folder.join("pck08.pca").to_str().unwrap())
+            .unwrap();
         let almanac = Arc::new(almanac);
 
         let epoch = Epoch::from_str("2024-01-01T12:00:00 UTC").unwrap();

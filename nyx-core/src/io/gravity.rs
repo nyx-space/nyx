@@ -172,7 +172,7 @@ impl GravityFieldData {
                         Err(_) => {
                             return Err(NyxError::FileUnreadable {
                                 msg: format!(
-                                    "Harmonics file: 
+                                    "Harmonics file:
                                 could not parse degree `{item}` on line {lno}"
                                 ),
                             });
@@ -183,7 +183,7 @@ impl GravityFieldData {
                         Err(_) => {
                             return Err(NyxError::FileUnreadable {
                                 msg: format!(
-                                    "Harmonics file: 
+                                    "Harmonics file:
                                 could not parse order `{item}` on line {lno}"
                                 ),
                             });
@@ -199,7 +199,7 @@ impl GravityFieldData {
                                 Err(_) => {
                                     return Err(NyxError::FileUnreadable {
                                         msg: format!(
-                                            "Harmonics file: 
+                                            "Harmonics file:
                                         could not parse C_nm `{item}` on line {lno}"
                                         ),
                                     });
@@ -221,7 +221,7 @@ impl GravityFieldData {
                                         Err(_) => {
                                             return Err(NyxError::FileUnreadable {
                                                 msg: format!(
-                                                    "Harmonics file: 
+                                                    "Harmonics file:
                                                 could not parse C_nm `{item}` on line {lno}"
                                                 ),
                                             });
@@ -234,7 +234,7 @@ impl GravityFieldData {
                                         Err(_) => {
                                             return Err(NyxError::FileUnreadable {
                                                 msg: format!(
-                                                    "Harmonics file: 
+                                                    "Harmonics file:
                                                 could not parse S_nm `{item}` on line {lno}"
                                                 ),
                                             });
@@ -248,7 +248,7 @@ impl GravityFieldData {
                                         Err(_) => {
                                             return Err(NyxError::FileUnreadable {
                                                 msg: format!(
-                                                    "Harmonics file: 
+                                                    "Harmonics file:
                                                 could not parse C_nm `{item}` on line {lno}"
                                                 ),
                                             });
@@ -261,7 +261,7 @@ impl GravityFieldData {
                                         Err(_) => {
                                             return Err(NyxError::FileUnreadable {
                                                 msg: format!(
-                                                    "Harmonics file: 
+                                                    "Harmonics file:
                                                 could not parse S_nm `{item}` on line {lno}"
                                                 ),
                                             });
@@ -275,7 +275,7 @@ impl GravityFieldData {
                                     Err(_) => {
                                         return Err(NyxError::FileUnreadable {
                                             msg: format!(
-                                                "Harmonics file: 
+                                                "Harmonics file:
                                             could not parse C_nm `{item}` on line {lno}"
                                             ),
                                         });
@@ -290,7 +290,7 @@ impl GravityFieldData {
                         Err(_) => {
                             return Err(NyxError::FileUnreadable {
                                 msg: format!(
-                                    "Harmonics file: 
+                                    "Harmonics file:
                                 could not parse S_nm `{item}` on line {lno}"
                                 ),
                             });
@@ -389,7 +389,7 @@ impl GravityFieldData {
                         Err(_) => {
                             return Err(NyxError::FileUnreadable {
                                 msg: format!(
-                                    "Harmonics file: 
+                                    "Harmonics file:
                                 could not parse degree on line {lno} (`{item}`)",
                                 ),
                             });
@@ -400,7 +400,7 @@ impl GravityFieldData {
                         Err(_) => {
                             return Err(NyxError::FileUnreadable {
                                 msg: format!(
-                                    "Harmonics file: 
+                                    "Harmonics file:
                                 could not parse order on line {lno} (`{item}`)"
                                 ),
                             });
@@ -411,7 +411,7 @@ impl GravityFieldData {
                         Err(_) => {
                             return Err(NyxError::FileUnreadable {
                                 msg: format!(
-                                    "Harmonics file: 
+                                    "Harmonics file:
                                 could not parse C_nm `{item}` on line {lno}"
                                 ),
                             });
@@ -422,7 +422,7 @@ impl GravityFieldData {
                         Err(_) => {
                             return Err(NyxError::FileUnreadable {
                                 msg: format!(
-                                    "Harmonics file: 
+                                    "Harmonics file:
                                 could not parse S_nm `{item}` on line {lno}"
                                 ),
                             });
@@ -499,13 +499,18 @@ impl StaticType for GravityFieldConfig {
     }
 }
 
+#[cfg(test)]
 #[test]
 fn test_load_harmonic_files() {
-    GravityFieldData::from_cof("data/01_planetary/JGM3.cof.gz", 50, 50, true)
+    let data_folder: PathBuf = [env!("CARGO_MANIFEST_DIR"), "../data/01_planetary"]
+        .iter()
+        .collect();
+
+    GravityFieldData::from_cof(data_folder.join("JGM3.cof.gz"), 50, 50, true)
         .expect("could not load JGM3");
 
     GravityFieldData::from_shadr(
-        "data/01_planetary/EGM2008_to2190_TideFree.gz",
+        data_folder.join("EGM2008_to2190_TideFree.gz"),
         120,
         120,
         true,
@@ -513,7 +518,7 @@ fn test_load_harmonic_files() {
     .expect("could not load EGM2008");
 
     GravityFieldData::from_shadr(
-        "data/01_planetary/Luna_jggrx_1500e_sha.tab.gz",
+        data_folder.join("Luna_jggrx_1500e_sha.tab.gz"),
         1500,
         1500,
         true,

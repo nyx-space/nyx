@@ -314,7 +314,7 @@ mod ut_stochastics {
     fn test_simulate_zero() {
         let path: PathBuf = [
             env!("CARGO_MANIFEST_DIR"),
-            "data",
+            "../data",
             "04_output",
             "stochastics_zero.parquet",
         ]
@@ -332,7 +332,7 @@ mod ut_stochastics {
     fn test_simulate_constant() {
         let path: PathBuf = [
             env!("CARGO_MANIFEST_DIR"),
-            "data",
+            "../data",
             "04_output",
             "stochastics_constant.parquet",
         ]
@@ -354,7 +354,7 @@ mod ut_stochastics {
     fn test_simulate_dsn_range() {
         let path: PathBuf = [
             env!("CARGO_MANIFEST_DIR"),
-            "data",
+            "../data",
             "04_output",
             "stochastics_dsn_range.parquet",
         ]
@@ -372,7 +372,7 @@ mod ut_stochastics {
     fn test_simulate_dsn_range_gm_only() {
         let path: PathBuf = [
             env!("CARGO_MANIFEST_DIR"),
-            "data",
+            "../data",
             "04_output",
             "stochastics_dsn_range_gm_only.parquet",
         ]
