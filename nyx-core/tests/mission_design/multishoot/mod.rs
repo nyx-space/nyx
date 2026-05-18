@@ -98,7 +98,7 @@ fn alt_orbit_raising(almanac: Arc<Almanac>) {
 
     let mut full_traj = all_trajectories[0].clone();
 
-    let output_path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "data", "04_output"]
+    let output_path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "../data", "04_output"]
         .iter()
         .collect();
 
@@ -271,7 +271,7 @@ fn vmag_orbit_raising(almanac: Arc<Almanac>) {
 
     let mut full_traj = all_trajectories[0].clone();
 
-    let output_path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "data", "04_output"]
+    let output_path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "../data", "04_output"]
         .iter()
         .collect();
 

@@ -588,8 +588,7 @@ mod ut_ccsds_oem {
     fn test_moon_frame_long_prop() {
         use std::path::PathBuf;
 
-        let manifest_dir =
-            PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string()));
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
         let almanac = Almanac::new(
             &manifest_dir
@@ -656,8 +655,7 @@ mod ut_ccsds_oem {
     fn test_parquet_exports_thrust_angles() {
         let _ = pretty_env_logger::try_init();
 
-        let manifest_dir =
-            PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string()));
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
         let almanac = Almanac::new(
             &manifest_dir

@@ -26,7 +26,7 @@ fn devices() -> BTreeMap<String, GroundStation> {
     // Load the ground stations from the test data.
     let ground_station_file: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "data",
+        "../data",
         "03_tests",
         "config",
         "many_ground_stations.yaml",
@@ -85,7 +85,7 @@ fn tracking_data(
     // Save the trajectory to parquet
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "data",
+        "../data",
         "04_output",
         "tracking_truth_ephem.parquet",
     ]
@@ -105,7 +105,7 @@ fn tracking_data(
     // Load the tracking configuration from the test data.
     let trkconfg_yaml: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "data",
+        "../data",
         "03_tests",
         "config",
         "tracking_cfg.yaml",
@@ -135,7 +135,7 @@ fn continuous_tracking(tracking_data: TrackingDataArc) {
     // And serialize to disk
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "data",
+        "../data",
         "04_output",
         "simple_arc.parquet",
     ]
@@ -158,7 +158,7 @@ fn continuous_tracking(tracking_data: TrackingDataArc) {
     // Serialize as TDM
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "data",
+        "../data",
         "04_output",
         "simple_arc.tdm",
     ]
@@ -208,7 +208,7 @@ fn continuous_tracking(tracking_data: TrackingDataArc) {
 
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "data",
+        "../data",
         "04_output",
         "simple_arc_downsampled.parquet",
     ]
@@ -288,7 +288,7 @@ fn od_with_modulus(
 
     od_sol
         .to_parquet(
-            "./data/04_output/od_with_modulus.parquet",
+            "../data/04_output/od_with_modulus.parquet",
             ExportCfg::default(),
         )
         .unwrap();

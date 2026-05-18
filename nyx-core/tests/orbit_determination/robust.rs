@@ -134,7 +134,7 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
     let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
 
     // And serialize to disk
-    let path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "data", "04_output"]
+    let path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "../data", "04_output"]
         .iter()
         .collect();
 

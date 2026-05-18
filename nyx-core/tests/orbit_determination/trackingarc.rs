@@ -49,7 +49,7 @@ fn devices() -> BTreeMap<String, GroundStation> {
     // Load the ground stations from the test data.
     let ground_station_file: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "data",
+        "../data",
         "03_tests",
         "config",
         "many_ground_stations.yaml",
@@ -74,7 +74,7 @@ fn trk_simple(
     // Path to output data
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "data",
+        "../data",
         "04_output",
         "tracking_truth_ephem.parquet",
     ]
@@ -96,7 +96,7 @@ fn trk_simple(
     // Load the tracking configuration from the test data.
     let trkconfg_yaml: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "data",
+        "../data",
         "03_tests",
         "config",
         "tracking_cfg.yaml",
@@ -133,7 +133,7 @@ fn trk_simple(
     // And serialize to disk
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "data",
+        "../data",
         "04_output",
         "simple_arc.parquet",
     ]

@@ -130,7 +130,7 @@ fn od_val_sc_mb_srp_reals_duals_models(
     // Test the exporting of a spacecraft trajectory
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "data",
+        "../data",
         "04_output",
         "sc_truth_val.parquet",
     ]
@@ -315,7 +315,7 @@ fn od_val_sc_srp_estimation(
     // Test the exporting of a spacecraft trajectory
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "data",
+        "../data",
         "04_output",
         "sc_srp_truth.parquet",
     ]

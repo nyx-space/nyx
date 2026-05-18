@@ -80,7 +80,7 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(
     let mut configs = BTreeMap::new();
     let trkconfig_yaml: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "data",
+        "../data",
         "03_tests",
         "config",
         "trk_cfg_od_val.yaml",
@@ -235,7 +235,7 @@ fn od_tb_val_with_arc(
     // Save the trajectory to parquet
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "data",
+        "../data",
         "04_output",
         "od_val_with_arc_truth_ephem.parquet",
     ]
@@ -246,7 +246,7 @@ fn od_tb_val_with_arc(
     // Load the tracking configs
     let trkconfig_yaml: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "data",
+        "../data",
         "03_tests",
         "config",
         "trk_cfg_od_val_arc.yaml",
@@ -265,7 +265,7 @@ fn od_tb_val_with_arc(
     // And serialize to disk
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "data",
+        "../data",
         "04_output",
         "two_body_od_val_arc.parquet",
     ]
@@ -420,7 +420,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
     // And serialize to disk
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "data",
+        "../data",
         "04_output",
         "od_tb_val_ckf_fixed_step_perfect_stations.parquet",
     ]
@@ -463,7 +463,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
 
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "data",
+        "../data",
         "04_output",
         "tb_ckf.parquet",
     ]
@@ -681,7 +681,7 @@ fn od_tb_val_az_el_ckf_fixed_step_perfect_stations(
     // And serialize to disk
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "data",
+        "../data",
         "04_output",
         "od_tb_val_az_el_ckf_fixed_step_perfect_stations.parquet",
     ]
@@ -724,7 +724,7 @@ fn od_tb_val_az_el_ckf_fixed_step_perfect_stations(
 
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "data",
+        "../data",
         "04_output",
         "tb_ckf.parquet",
     ]
@@ -1216,7 +1216,7 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect(
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     let earth_sph_harm =
-        GravityFieldData::from_cof("data/01_planetary/JGM3.cof.gz", 70, 70, true).unwrap();
+        GravityFieldData::from_cof("../data/01_planetary/JGM3.cof.gz", 70, 70, true).unwrap();
     let harmonics = GravityField::from_stor(iau_earth, earth_sph_harm);
     let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::from_model(harmonics));
     let setup = Propagator::new(orbital_dyn, IntegratorMethod::RungeKutta4, opts);

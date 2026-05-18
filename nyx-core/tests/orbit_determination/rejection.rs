@@ -76,7 +76,7 @@ fn od_rejection_test(
     let mut configs = BTreeMap::new();
     let trkconfig_yaml: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "data",
+        "../data",
         "03_tests",
         "config",
         "trk_cfg_od_val.yaml",

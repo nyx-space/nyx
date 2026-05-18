@@ -38,8 +38,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // === ALMANAC SET UP === //
     // ====================== //
 
-    let manifest_dir =
-        PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string()));
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
     let out = manifest_dir.join("data/04_output/");
 

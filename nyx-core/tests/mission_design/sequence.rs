@@ -50,7 +50,7 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
                 point_masses: Some(PointMasses::new(vec![EARTH, MOON])),
                 gravity_field: Some((
                     GravityFieldConfig {
-                        filepath: "data/01_planetary/EGM2008_to2190_TideFree.gz".into(),
+                        filepath: "../data/01_planetary/EGM2008_to2190_TideFree.gz".into(),
                         gunzipped: true,
                         degree: 21,
                         order: 21,
@@ -74,7 +74,7 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
                 point_masses: Some(PointMasses::new(vec![EARTH, MOON])),
                 gravity_field: Some((
                     GravityFieldConfig {
-                        filepath: "data/01_planetary/EGM2008_to2190_TideFree.gz".into(),
+                        filepath: "../data/01_planetary/EGM2008_to2190_TideFree.gz".into(),
                         gunzipped: true,
                         degree: 8,
                         order: 8,
@@ -307,7 +307,7 @@ fn spacecraft_low_thrust_orbit_raise(
                 point_masses: Some(PointMasses::new(vec![EARTH, MOON])),
                 gravity_field: Some((
                     GravityFieldConfig {
-                        filepath: "data/01_planetary/EGM2008_to2190_TideFree.gz".into(),
+                        filepath: "../data/01_planetary/EGM2008_to2190_TideFree.gz".into(),
                         gunzipped: true,
                         degree: 8,
                         order: 8,

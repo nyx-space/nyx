@@ -40,7 +40,7 @@ fn multi_thread_monte_carlo_demo(almanac: Arc<Almanac>) {
     let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
 
     let earth_sph_harm =
-        GravityFieldData::from_cof("data/01_planetary/JGM3.cof.gz", 70, 70, true).unwrap();
+        GravityFieldData::from_cof("../data/01_planetary/JGM3.cof.gz", 70, 70, true).unwrap();
     let harmonics = GravityField::from_stor(iau_earth, earth_sph_harm);
 
     let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);

@@ -940,7 +940,7 @@ fn val_earth_sph_harmonics_12x12(almanac_gmat: Arc<Almanac>) {
     let itrf93 = almanac.frame_info(EARTH_ITRF93).unwrap();
 
     let earth_sph_harm =
-        GravityFieldData::from_cof("data/01_planetary/JGM3.cof.gz", 12, 12, true).unwrap();
+        GravityFieldData::from_cof("../data/01_planetary/JGM3.cof.gz", 12, 12, true).unwrap();
     let harmonics = GravityField::from_stor(itrf93, earth_sph_harm);
 
     let dt = Epoch::from_mjd_tai(MJD_J2000);
@@ -1026,7 +1026,7 @@ fn val_earth_sph_harmonics_70x70(almanac_gmat: Arc<Almanac>) {
     let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
 
     let earth_sph_harm =
-        GravityFieldData::from_cof("data/01_planetary/JGM3.cof.gz", 70, 70, true).unwrap();
+        GravityFieldData::from_cof("../data/01_planetary/JGM3.cof.gz", 70, 70, true).unwrap();
     let harmonics = GravityField::from_stor(iau_earth, earth_sph_harm);
 
     let dt = Epoch::from_mjd_tai(MJD_J2000);
@@ -1077,7 +1077,7 @@ fn val_earth_sph_harmonics_70x70_partials(almanac_gmat: Arc<Almanac>) {
     let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
 
     let earth_sph_harm =
-        GravityFieldData::from_cof("data/01_planetary/JGM3.cof.gz", 70, 70, true).unwrap();
+        GravityFieldData::from_cof("../data/01_planetary/JGM3.cof.gz", 70, 70, true).unwrap();
     let harmonics = GravityField::from_stor(iau_earth, earth_sph_harm);
 
     let dt = Epoch::from_mjd_tai(MJD_J2000);
@@ -1203,7 +1203,7 @@ fn hf_prop(almanac: Arc<Almanac>) {
     let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
 
     let earth_sph_harm =
-        GravityFieldData::from_cof("data/01_planetary/JGM3.cof.gz", 21, 21, true).unwrap();
+        GravityFieldData::from_cof("../data/01_planetary/JGM3.cof.gz", 21, 21, true).unwrap();
     let harmonics = GravityField::from_stor(iau_earth, earth_sph_harm);
 
     let dt = Epoch::from_mjd_tai(MJD_J2000);

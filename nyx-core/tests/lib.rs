@@ -17,38 +17,35 @@ use propagation::{GMAT_EARTH_GM, GMAT_MOON_GM, GMAT_SUN_GM};
 fn base_almanac() -> Almanac {
     use std::path::PathBuf;
 
-    let manifest_dir =
-        PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string()));
+    let manifest_dir: PathBuf = vec![env!("CARGO_MANIFEST_DIR"), "../data", "01_planetary"]
+        .iter()
+        .collect();
 
-    Almanac::new(
-        &manifest_dir
-            .clone()
-            .join("data/01_planetary/pck08.pca")
-            .to_string_lossy(),
-    )
-    .unwrap()
-    .load("data/01_planetary/earth_longterm_000101_251211_250915.bpc")
-    .unwrap()
-    .load(
-        &manifest_dir
-            .join("data/01_planetary/earth_latest_high_prec.bpc")
-            .to_string_lossy(),
-    )
-    .unwrap()
+    Almanac::new(&manifest_dir.join("pck08.pca").to_string_lossy())
+        .unwrap()
+        .load(
+            &manifest_dir
+                .join("earth_longterm_000101_251211_250915.bpc")
+                .to_string_lossy(),
+        )
+        .unwrap()
+        .load(
+            &manifest_dir
+                .join("earth_latest_high_prec.bpc")
+                .to_string_lossy(),
+        )
+        .unwrap()
 }
 
 pub fn test_almanac() -> Almanac {
     use std::path::PathBuf;
 
-    let manifest_dir =
-        PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string()));
+    let manifest_dir: PathBuf = vec![env!("CARGO_MANIFEST_DIR"), "../data", "01_planetary"]
+        .iter()
+        .collect();
 
     base_almanac()
-        .load(
-            &manifest_dir
-                .join("data/01_planetary/de440s.bsp")
-                .to_string_lossy(),
-        )
+        .load(&manifest_dir.join("de440s.bsp").to_string_lossy())
         .unwrap()
 }
 
