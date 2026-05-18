@@ -193,9 +193,10 @@ where
                 .zip(self.gains.iter().zip(self.filter_smoother_ratios.iter())),
         ) {
             if let Some(resid) = resid_opt
-                && (resid.tracker.is_none() || resid.tracker.as_ref().unwrap() == &excluded_tracker) {
-                    continue;
-                }
+                && (resid.tracker.is_none() || resid.tracker.as_ref().unwrap() == &excluded_tracker)
+            {
+                continue;
+            }
             // Otherwise, include in the result.
             estimates.push(est.clone());
             residuals.push(resid_opt.clone());

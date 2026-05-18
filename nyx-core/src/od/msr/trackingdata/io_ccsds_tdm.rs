@@ -123,9 +123,10 @@ impl TrackingDataArc {
                     current_tracker = line.split('=').nth(1).unwrap_or("").trim().to_string();
                     // If aliases are provided, try to map them.
                     if let Some(aliases) = &aliases
-                        && let Some(alias) = aliases.get(&current_tracker) {
-                            current_tracker = alias.clone();
-                        }
+                        && let Some(alias) = aliases.get(&current_tracker)
+                    {
+                        current_tracker = alias.clone();
+                    }
                 } else if line.starts_with("TIME_SYSTEM") {
                     let ts = line.split('=').nth(1).unwrap_or("UTC").trim();
                     // Support for all time scales of hifitime
@@ -539,10 +540,11 @@ impl TrackingDataArc {
                     writeln!(writer, "\tRANGE_UNITS = km").map_err(err_hdlr)?;
 
                     if let Some(moduli) = &self.moduli
-                        && let Some(range_modulus) = moduli.get(&MeasurementType::Range) {
-                            writeln!(writer, "\tRANGE_MODULUS = {range_modulus:E}")
-                                .map_err(err_hdlr)?;
-                        }
+                        && let Some(range_modulus) = moduli.get(&MeasurementType::Range)
+                    {
+                        writeln!(writer, "\tRANGE_MODULUS = {range_modulus:E}")
+                            .map_err(err_hdlr)?;
+                    }
                 }
 
                 if types.contains(&MeasurementType::Azimuth)

@@ -184,21 +184,22 @@ where
         let innovation_trend = s_k.diagonal().map(|x| x.sqrt());
 
         if let Some(resid_reject) = resid_rejection
-            && ratio > resid_reject.num_sigmas {
-                // Reject this whole measurement and perform only a time update
-                let pred_est = self.time_update(nominal_state)?;
-                let resid = Residual::rejected(
-                    epoch,
-                    prefit,
-                    whitened_resid,
-                    ratio,
-                    innovation_trend,
-                    real_obs,
-                    computed_obs,
-                );
+            && ratio > resid_reject.num_sigmas
+        {
+            // Reject this whole measurement and perform only a time update
+            let pred_est = self.time_update(nominal_state)?;
+            let resid = Residual::rejected(
+                epoch,
+                prefit,
+                whitened_resid,
+                ratio,
+                innovation_trend,
+                real_obs,
+                computed_obs,
+            );
 
-                return Ok((pred_est, resid, None));
-            }
+            return Ok((pred_est, resid, None));
+        }
 
         // Instead of inverting the innovation matrix S_k, we will use the (super short) arXiv paper 1111.4144
         // which shows how to use the Cholesky decomposition to invert a matrix, core tenets repeated here for my reference.

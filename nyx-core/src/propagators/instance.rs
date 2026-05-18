@@ -117,28 +117,29 @@ where
         // Transform the state if needed
         let mut original_frame = None;
         if let Some(integration_frame) = self.prop.opts.integration_frame
-            && integration_frame != self.state.orbit().frame {
-                original_frame = Some(self.state.orbit().frame);
-                let mut new_orbit = self
-                    .almanac
-                    .transform_to(self.state.orbit(), integration_frame, None)
-                    .context(DynamicsAlmanacSnafu {
-                        action: "transforming state into desired integration frame",
-                    })
-                    .context(DynamicsSnafu)?;
-                // If the integration frame has parameters, we set them here.
-                if let Some(mu_km3_s2) = integration_frame.mu_km3_s2 {
-                    new_orbit.frame.mu_km3_s2 = Some(mu_km3_s2);
-                }
-                // If the integration frame has parameters, we set them here.
-                if let Some(shape) = integration_frame.shape {
-                    new_orbit.frame.shape = Some(shape);
-                }
-                if self.log_progress {
-                    info!("State transformed to the integration frame {integration_frame}");
-                }
-                self.state.set_orbit(new_orbit);
+            && integration_frame != self.state.orbit().frame
+        {
+            original_frame = Some(self.state.orbit().frame);
+            let mut new_orbit = self
+                .almanac
+                .transform_to(self.state.orbit(), integration_frame, None)
+                .context(DynamicsAlmanacSnafu {
+                    action: "transforming state into desired integration frame",
+                })
+                .context(DynamicsSnafu)?;
+            // If the integration frame has parameters, we set them here.
+            if let Some(mu_km3_s2) = integration_frame.mu_km3_s2 {
+                new_orbit.frame.mu_km3_s2 = Some(mu_km3_s2);
             }
+            // If the integration frame has parameters, we set them here.
+            if let Some(shape) = integration_frame.shape {
+                new_orbit.frame.shape = Some(shape);
+            }
+            if self.log_progress {
+                info!("State transformed to the integration frame {integration_frame}");
+            }
+            self.state.set_orbit(new_orbit);
+        }
 
         #[cfg(not(target_arch = "wasm32"))]
         let tick = Instant::now();
@@ -186,9 +187,10 @@ where
 
                 // Publish to channel if provided
                 if let Some(ref chan) = maybe_tx_chan
-                    && let Err(e) = chan.send(self.state) {
-                        warn!("{e} when sending on channel")
-                    }
+                    && let Err(e) = chan.send(self.state)
+                {
+                    warn!("{e} when sending on channel")
+                }
 
                 // Restore the step size for subsequent calls
                 self.set_step(prev_step_size, prev_step_kind);
@@ -239,20 +241,22 @@ where
                 self.single_step()?;
 
                 if let Some(ref mut condition) = stop_condition
-                    && condition(self.state)? {
-                        // Stopping condition triggered. We don't send
-                        // the new state on the channel for the caller to know that the exact
-                        // condition they are seeking is between the last state on the channel
-                        // and the state we're returning
+                    && condition(self.state)?
+                {
+                    // Stopping condition triggered. We don't send
+                    // the new state on the channel for the caller to know that the exact
+                    // condition they are seeking is between the last state on the channel
+                    // and the state we're returning
 
-                        return Ok(self.state);
-                    }
+                    return Ok(self.state);
+                }
 
                 // Publish to channel if provided
                 if let Some(ref chan) = maybe_tx_chan
-                    && let Err(e) = chan.send(self.state) {
-                        warn!("{e} when sending on channel")
-                    }
+                    && let Err(e) = chan.send(self.state)
+                {
+                    warn!("{e} when sending on channel")
+                }
             }
         }
     }

@@ -45,7 +45,7 @@ impl SharedState {
 
         let harmonics = GravityField::from_stor(
             almanac.frame_info(IAU_EARTH_FRAME)?,
-            GravityFieldData::from_cof(&jgm3_meta.uri, 8, 8, true)?,
+            GravityFieldData::from_cof(&jgm3_meta.uri, 4, 4, true)?,
         );
         let srp_dyn = SolarPressure::default_flux(EARTH_J2000, almanac.clone())?;
 
@@ -67,7 +67,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let codec = FloatCodec::vector(3, 0.1_f32..1.0_f32); // 3 weights for SMA, Ecc, Inc
     let problem = EngineProblem {
         objective: radiate::Objective::Multi(vec![Optimize::Minimize, Optimize::Minimize]), // NSGA2 Multi Objective
-        codec: Arc::new(codec.clone()),
+        codec: Arc::new(codec),
         fitness_fn: Some(Arc::new(move |weights: Vec<f32>| {
             // Full 60 days propagation for evaluating the actual performance, but running fast due to shared state
             let (prop_usage, penalty) =
@@ -78,11 +78,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     let mut engine = GeneticEngine::<FloatChromosome<f32>, Vec<f32>>::builder()
-        .codec(codec)
-        .executor(Executor::FixedSizedWorkerPool(8))
-        .problem(problem)
         .population_size(20)
+        .parallel()
+        .multi_objective(vec![Optimize::Minimize, Optimize::Minimize])
         .survivor_selector(NSGA2Selector::new())
+        .problem(problem)
         .build();
 
     let result = engine.run(|generation: &Generation<FloatChromosome<f32>, Vec<f32>>| {
@@ -96,13 +96,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         generation.index() >= 10 // Max generations
     });
 
-    let best_as_string = result
+    let best_weights = result
         .value()
         .iter()
-        .map(|w| w.to_string())
+        .map(|w| format!("W: = {w}"))
         .collect::<Vec<String>>()
         .join(", ");
-    println!("Optimization finished. Best weights: [{}]", best_as_string);
+    let best_score = result
+        .score()
+        .iter()
+        .enumerate()
+        .map(|(i, w)| format!("S[{i}]: = {w}"))
+        .collect::<Vec<String>>()
+        .join(", ");
+    println!("Optimization finished. Best weights: [{best_weights}] -> Best score: [{best_score}]");
 
     Ok(())
 }

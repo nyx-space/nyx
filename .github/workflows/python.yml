@@ -44,7 +44,7 @@ jobs:
             # If we're running on rhel centos, install needed packages.
             if command -v yum &> /dev/null; then
                 echo "CENTOS"
-                yum update -y && yum install -y perl-core openssl openssl-devel pkgconfig libatomic
+                yum update -y && yum install -y perl-core openssl openssl-devel pkgconfig libatomic clang
 
                 # If we're running on i686 we need to symlink libatomic
                 # in order to build openssl with -latomic flag.
@@ -54,7 +54,7 @@ jobs:
             else
                 # If we're running on debian-based system.
                 echo "DEBIAN LIKE"
-                apt update -y && apt-get install -y libssl-dev openssl pkg-config
+                apt update -y && apt-get install -y libssl-dev openssl pkg-config clang
             fi
 
       - name: Upload wheels
@@ -112,6 +112,8 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: 3.14
+      - name: Remove cargo config # https://github.com/briansmith/ring/discussions/2528#discussioncomment-13255568
+        run: rm -f .cargo/config.toml
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:

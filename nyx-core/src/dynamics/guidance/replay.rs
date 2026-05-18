@@ -59,9 +59,10 @@ impl ThrustDirectionReplay {
         };
 
         if let Some(command) = command
-            && (command.thrust_direction().is_some() || command.mode() != GuidanceMode::Thrust) {
-                return Some(command);
-            }
+            && (command.thrust_direction().is_some() || command.mode() != GuidanceMode::Thrust)
+        {
+            return Some(command);
+        }
 
         if self.profile.first().mode() == GuidanceMode::Thrust {
             return self

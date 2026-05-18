@@ -311,87 +311,86 @@ impl TrackingArcSim<Spacecraft, GroundStation> {
 
         for (name, loc_id) in &loc_ids {
             if let Some(cfg) = self.configs.get(name)
-                && let Some(scheduler) = cfg.scheduler {
-                    info!("Building schedule for {name}");
-                    if scheduler.handoff == Handoff::Overlap {
-                        warn!(
-                            "Overlapping measurements on {name} is no longer supported on identical epochs."
-                        );
-                    }
-                    built_cfg.get_mut(name).unwrap().scheduler = None;
-                    built_cfg.get_mut(name).unwrap().strands = Some(Vec::new());
-
-                    let visibilty_arcs = almanac.report_visibility_arcs(
-                        traj,
-                        *loc_id,
-                        traj.first().epoch(),
-                        traj.last().epoch(),
-                        cfg.sampling,
-                        None,
-                    )?;
-
-                    for arc in visibilty_arcs {
-                        let strand_start = arc.rise.orbit.epoch;
-                        let strand_end = arc.fall.orbit.epoch;
-
-                        if strand_end - strand_start
-                            < cfg.sampling * i64::from(scheduler.min_samples)
-                        {
-                            info!(
-                                "Too few samples from {name} opportunity from {strand_start} to {strand_end}, discarding strand",
-                            );
-                            continue;
-                        }
-
-                        let mut strand_range = Strand {
-                            start: strand_start,
-                            end: strand_end,
-                        };
-
-                        // If there is an alignment, apply it
-                        if let Some(alignment) = scheduler.sample_alignment {
-                            strand_range.start = strand_range.start.round(alignment);
-                            strand_range.end = strand_range.end.round(alignment);
-                        }
-
-                        if let Cadence::Intermittent { on, off } = scheduler.cadence {
-                            // Check that the next start time is within the allocated time
-                            if let Some(prev_strand) =
-                                built_cfg[name].strands.as_ref().unwrap().last()
-                                && prev_strand.end + off > strand_range.start {
-                                    // We're turning on the tracking sooner than the schedule allows, so let's fix that.
-                                    strand_range.start = prev_strand.end + off;
-                                    // Check that we didn't eat into the whole tracking opportunity
-                                    if strand_range.start > strand_end {
-                                        // Lost this whole opportunity.
-                                        info!(
-                                            "Discarding {name} opportunity from {strand_start} to {strand_end} due to cadence {:?}",
-                                            scheduler.cadence
-                                        );
-                                        continue;
-                                    }
-                                }
-                            // Check that we aren't tracking for longer than configured
-                            if strand_range.end - strand_range.start > on {
-                                strand_range.end = strand_range.start + on;
-                            }
-                        }
-
-                        // We've found when the spacecraft is below the horizon, so this is a new strand.
-                        built_cfg
-                            .get_mut(name)
-                            .unwrap()
-                            .strands
-                            .as_mut()
-                            .unwrap()
-                            .push(strand_range);
-                    }
-
-                    info!(
-                        "Built {} tracking strands for {name}",
-                        built_cfg[name].strands.as_ref().unwrap().len()
+                && let Some(scheduler) = cfg.scheduler
+            {
+                info!("Building schedule for {name}");
+                if scheduler.handoff == Handoff::Overlap {
+                    warn!(
+                        "Overlapping measurements on {name} is no longer supported on identical epochs."
                     );
                 }
+                built_cfg.get_mut(name).unwrap().scheduler = None;
+                built_cfg.get_mut(name).unwrap().strands = Some(Vec::new());
+
+                let visibilty_arcs = almanac.report_visibility_arcs(
+                    traj,
+                    *loc_id,
+                    traj.first().epoch(),
+                    traj.last().epoch(),
+                    cfg.sampling,
+                    None,
+                )?;
+
+                for arc in visibilty_arcs {
+                    let strand_start = arc.rise.orbit.epoch;
+                    let strand_end = arc.fall.orbit.epoch;
+
+                    if strand_end - strand_start < cfg.sampling * i64::from(scheduler.min_samples) {
+                        info!(
+                            "Too few samples from {name} opportunity from {strand_start} to {strand_end}, discarding strand",
+                        );
+                        continue;
+                    }
+
+                    let mut strand_range = Strand {
+                        start: strand_start,
+                        end: strand_end,
+                    };
+
+                    // If there is an alignment, apply it
+                    if let Some(alignment) = scheduler.sample_alignment {
+                        strand_range.start = strand_range.start.round(alignment);
+                        strand_range.end = strand_range.end.round(alignment);
+                    }
+
+                    if let Cadence::Intermittent { on, off } = scheduler.cadence {
+                        // Check that the next start time is within the allocated time
+                        if let Some(prev_strand) = built_cfg[name].strands.as_ref().unwrap().last()
+                            && prev_strand.end + off > strand_range.start
+                        {
+                            // We're turning on the tracking sooner than the schedule allows, so let's fix that.
+                            strand_range.start = prev_strand.end + off;
+                            // Check that we didn't eat into the whole tracking opportunity
+                            if strand_range.start > strand_end {
+                                // Lost this whole opportunity.
+                                info!(
+                                    "Discarding {name} opportunity from {strand_start} to {strand_end} due to cadence {:?}",
+                                    scheduler.cadence
+                                );
+                                continue;
+                            }
+                        }
+                        // Check that we aren't tracking for longer than configured
+                        if strand_range.end - strand_range.start > on {
+                            strand_range.end = strand_range.start + on;
+                        }
+                    }
+
+                    // We've found when the spacecraft is below the horizon, so this is a new strand.
+                    built_cfg
+                        .get_mut(name)
+                        .unwrap()
+                        .strands
+                        .as_mut()
+                        .unwrap()
+                        .push(strand_range);
+                }
+
+                info!(
+                    "Built {} tracking strands for {name}",
+                    built_cfg[name].strands.as_ref().unwrap().len()
+                );
+            }
         }
         // Build all of the strands, remembering which tracker they come from.
         let mut cfg_as_vec = Vec::new();

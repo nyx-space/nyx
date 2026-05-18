@@ -247,6 +247,6 @@ fn ground_pnt_lunar(almanac: Arc<Almanac>) {
     assert!(final_err_m < init_err_m);
 
     pnt_sol
-        .to_parquet("data/04_output/lunar_pnt.pq", ExportCfg::default())
+        .to_parquet("../data/04_output/lunar_pnt.pq", ExportCfg::default())
         .unwrap();
 }

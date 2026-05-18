@@ -104,40 +104,42 @@ impl SpacecraftSequence {
                 on_entry: _,
                 disabled,
             } = phase
-                && !disabled && self.prop_setups.get(propagator).is_none() {
-                    // Set up the propagator -- fetch the config first
-                    // We know the config exists because validate would catch missing names.
-                    let cfg = &self.propagators[propagator];
-                    // Build the orbital dynamics
-                    let mut orbital_dyn = OrbitalDynamics::two_body();
-                    if let Some(point_masses) = &cfg.accel_models.point_masses {
-                        orbital_dyn.accel_models.push(point_masses.clone());
-                    }
-                    if let Some((gravity_cfg, frame_uid)) = &cfg.accel_models.gravity_field {
-                        let grav_data = GravityFieldData::from_config(gravity_cfg.clone())
-                            .map_err(|e| e.to_string())?;
-                        let compute_frame =
-                            almanac.frame_info(*frame_uid).map_err(|e| e.to_string())?;
-                        let gravity_field = GravityField::from_stor(compute_frame, grav_data);
-                        orbital_dyn.accel_models.push(gravity_field);
-                    }
-                    // Build the spacecraft dynamics
-                    let mut sc_dyn = SpacecraftDynamics::new(orbital_dyn);
-
-                    if let Some(srp) = &cfg.force_models.solar_pressure {
-                        sc_dyn.force_models.push(srp.clone());
-                    }
-
-                    if let Some(drag) = &cfg.force_models.drag {
-                        sc_dyn.force_models.push(drag.clone());
-                    }
-
-                    // And set it all up!
-                    let setup = Propagator::new(sc_dyn, cfg.method, cfg.options);
-
-                    self.prop_setups.insert(propagator.clone(), setup);
-                    debug!("built `{propagator}`");
+                && !disabled
+                && self.prop_setups.get(propagator).is_none()
+            {
+                // Set up the propagator -- fetch the config first
+                // We know the config exists because validate would catch missing names.
+                let cfg = &self.propagators[propagator];
+                // Build the orbital dynamics
+                let mut orbital_dyn = OrbitalDynamics::two_body();
+                if let Some(point_masses) = &cfg.accel_models.point_masses {
+                    orbital_dyn.accel_models.push(point_masses.clone());
                 }
+                if let Some((gravity_cfg, frame_uid)) = &cfg.accel_models.gravity_field {
+                    let grav_data = GravityFieldData::from_config(gravity_cfg.clone())
+                        .map_err(|e| e.to_string())?;
+                    let compute_frame =
+                        almanac.frame_info(*frame_uid).map_err(|e| e.to_string())?;
+                    let gravity_field = GravityField::from_stor(compute_frame, grav_data);
+                    orbital_dyn.accel_models.push(gravity_field);
+                }
+                // Build the spacecraft dynamics
+                let mut sc_dyn = SpacecraftDynamics::new(orbital_dyn);
+
+                if let Some(srp) = &cfg.force_models.solar_pressure {
+                    sc_dyn.force_models.push(srp.clone());
+                }
+
+                if let Some(drag) = &cfg.force_models.drag {
+                    sc_dyn.force_models.push(drag.clone());
+                }
+
+                // And set it all up!
+                let setup = Propagator::new(sc_dyn, cfg.method, cfg.options);
+
+                self.prop_setups.insert(propagator.clone(), setup);
+                debug!("built `{propagator}`");
+            }
         }
 
         Ok(())
@@ -172,9 +174,10 @@ impl SpacecraftSequence {
                 } => {
                     // Check stop condition
                     if let Some(ref target) = until_phase
-                        && target == name {
-                            return Ok(trajs);
-                        }
+                        && target == name
+                    {
+                        return Ok(trajs);
+                    }
 
                     if *disabled {
                         info!("[{epoch}] skipping disabled {name}");
