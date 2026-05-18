@@ -54,7 +54,7 @@ jobs:
             else
                 # If we're running on debian-based system.
                 echo "DEBIAN LIKE"
-                apt update -y && apt-get install -y libssl-dev openssl pkg-config clang
+                apt update -y && apt-get install -y libssl-dev openssl pkg-config clang build-essential glibc-dev
             fi
 
       - name: Upload wheels

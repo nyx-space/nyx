@@ -4,7 +4,7 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger as pel;
 
 use anise::{
-    almanac::{Almanac, metaload::MetaFile},
+    almanac::{metaload::MetaFile, Almanac},
     constants::{
         celestial_objects::{MOON, SUN},
         frames::{EARTH_J2000, IAU_EARTH_FRAME},
@@ -13,15 +13,15 @@ use anise::{
 use hifitime::{Epoch, TimeUnits, Unit};
 use log::info;
 use nyx::{
-    Spacecraft,
     cosmic::{GuidanceMode, Mass, MetaAlmanac, Orbit, SRPData},
     dynamics::{
-        GravityField, OrbitalDynamics, SolarPressure, SpacecraftDynamics,
         guidance::{Ruggiero, Thruster},
+        GravityField, OrbitalDynamics, SolarPressure, SpacecraftDynamics,
     },
     io::gravity::GravityFieldData,
     md::prelude::{Objective, OrbitalElement, StateParameter},
     propagators::{ErrorControl, IntegratorOptions, Propagator},
+    Spacecraft,
 };
 use radiate::*;
 use std::{error::Error, sync::Arc};
@@ -66,13 +66,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Set up the genetic algorithm optimization
     let codec = FloatCodec::vector(3, 0.1_f32..1.0_f32); // 3 weights for SMA, Ecc, Inc
     let problem = EngineProblem {
-        objective: radiate::Objective::Multi(vec![Optimize::Minimize, Optimize::Minimize]), // NSGA2 Multi Objective
+        objective: radiate::Objective::Single(Optimize::Minimize),
         codec: Arc::new(codec),
         fitness_fn: Some(Arc::new(move |weights: Vec<f32>| {
             // Full 60 days propagation for evaluating the actual performance, but running fast due to shared state
             let (prop_usage, penalty) =
                 evaluate_weights(&weights, 60.0, shared_state.clone()).unwrap_or((1e6, 1e6));
-            Score::from(vec![prop_usage as f32, penalty as f32])
+
+            Score::from(prop_usage as f32 * penalty as f32)
         })),
         raw_fitness_fn: None,
     };
@@ -80,20 +81,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut engine = GeneticEngine::<FloatChromosome<f32>, Vec<f32>>::builder()
         .population_size(20)
         .parallel()
-        .multi_objective(vec![Optimize::Minimize, Optimize::Minimize])
-        .survivor_selector(NSGA2Selector::new())
         .problem(problem)
         .build();
 
     let result = engine.run(|generation: &Generation<FloatChromosome<f32>, Vec<f32>>| {
         let scores = generation.score().as_slice();
-        println!(
-            "[ {:?} ]: Best Score: Prop usage {:.3} kg, Penalty {:.3}",
-            generation.index(),
-            scores[0],
-            scores[1]
-        );
-        generation.index() >= 10 // Max generations
+        println!("[ {:?} ]: Best Score: {:.3}", generation.index(), scores[0],);
+        generation.index() >= 5 // Max generations
     });
 
     let best_weights = result
