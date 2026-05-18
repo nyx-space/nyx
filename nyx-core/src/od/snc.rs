@@ -171,24 +171,22 @@ where
     ///  1. Start time of this matrix is _after_ epoch
     ///  2. Time between epoch and previous epoch (set in the Kalman filter!) is longer than disabling time
     pub fn to_matrix(&self, epoch: Epoch) -> Option<OMatrix<f64, A, A>> {
-        if let Some(start_time) = self.start_time {
-            if start_time > epoch {
+        if let Some(start_time) = self.start_time
+            && start_time > epoch {
                 // This SNC applies only later
                 debug!("@{epoch} SNC starts at {start_time}");
                 return None;
             }
-        }
 
         // Check the disable time, and return no SNC if the previous SNC was computed too long ago
-        if let Some(prev_epoch) = self.prev_epoch {
-            if epoch - prev_epoch > self.disable_time {
+        if let Some(prev_epoch) = self.prev_epoch
+            && epoch - prev_epoch > self.disable_time {
                 debug!(
                     "@{} SNC disabled: prior use greater than {}",
                     epoch, self.disable_time
                 );
                 return None;
             }
-        }
         // Build a static matrix
         let mut snc = OMatrix::<f64, A, A>::zeros();
         for i in 0..self.diag.nrows() {

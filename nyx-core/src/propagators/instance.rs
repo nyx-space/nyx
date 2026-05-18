@@ -116,8 +116,8 @@ where
 
         // Transform the state if needed
         let mut original_frame = None;
-        if let Some(integration_frame) = self.prop.opts.integration_frame {
-            if integration_frame != self.state.orbit().frame {
+        if let Some(integration_frame) = self.prop.opts.integration_frame
+            && integration_frame != self.state.orbit().frame {
                 original_frame = Some(self.state.orbit().frame);
                 let mut new_orbit = self
                     .almanac
@@ -139,7 +139,6 @@ where
                 }
                 self.state.set_orbit(new_orbit);
             }
-        }
 
         #[cfg(not(target_arch = "wasm32"))]
         let tick = Instant::now();
@@ -186,11 +185,10 @@ where
                 self.single_step()?;
 
                 // Publish to channel if provided
-                if let Some(ref chan) = maybe_tx_chan {
-                    if let Err(e) = chan.send(self.state) {
+                if let Some(ref chan) = maybe_tx_chan
+                    && let Err(e) = chan.send(self.state) {
                         warn!("{e} when sending on channel")
                     }
-                }
 
                 // Restore the step size for subsequent calls
                 self.set_step(prev_step_size, prev_step_kind);
@@ -240,8 +238,8 @@ where
 
                 self.single_step()?;
 
-                if let Some(ref mut condition) = stop_condition {
-                    if condition(self.state)? {
+                if let Some(ref mut condition) = stop_condition
+                    && condition(self.state)? {
                         // Stopping condition triggered. We don't send
                         // the new state on the channel for the caller to know that the exact
                         // condition they are seeking is between the last state on the channel
@@ -249,14 +247,12 @@ where
 
                         return Ok(self.state);
                     }
-                }
 
                 // Publish to channel if provided
-                if let Some(ref chan) = maybe_tx_chan {
-                    if let Err(e) = chan.send(self.state) {
+                if let Some(ref chan) = maybe_tx_chan
+                    && let Err(e) = chan.send(self.state) {
                         warn!("{e} when sending on channel")
                     }
-                }
             }
         }
     }

@@ -101,10 +101,10 @@ impl ExportCfg {
     /// Modifies the provided path to include the timestamp if required.
     pub(crate) fn actual_path<P: AsRef<Path>>(&self, path: P) -> PathBuf {
         let mut path_buf = path.as_ref().to_path_buf();
-        if self.timestamp {
-            if let Some(file_name) = path_buf.file_name() {
-                if let Some(file_name_str) = file_name.to_str() {
-                    if let Some(extension) = path_buf.extension() {
+        if self.timestamp
+            && let Some(file_name) = path_buf.file_name()
+                && let Some(file_name_str) = file_name.to_str()
+                    && let Some(extension) = path_buf.extension() {
                         let stamp = Formatter::new(
                             Epoch::now().unwrap(),
                             Format::from_str("%Y-%m-%dT%H-%M-%S").unwrap(),
@@ -113,10 +113,7 @@ impl ExportCfg {
                         let file_name = file_name_str.replace(&format!(".{ext}"), "");
                         let new_file_name = format!("{file_name}-{stamp}.{ext}");
                         path_buf.set_file_name(new_file_name);
-                    }
-                }
-            }
-        };
+                    };
         path_buf
     }
 }

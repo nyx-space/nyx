@@ -196,8 +196,8 @@ where
         // --- Pre-parse Measurement Types from Schema ---
         // Infer measurement types from residual column names
         for field in schema.fields() {
-             if let Some(msr_type_str) = field.name().strip_prefix("Prefit residual: ") {
-                 if let Some(bracket_pos) = msr_type_str.find(" (") {
+             if let Some(msr_type_str) = field.name().strip_prefix("Prefit residual: ")
+                 && let Some(bracket_pos) = msr_type_str.find(" (") {
                      let type_name = &msr_type_str[..bracket_pos];
                      if let Ok(msr_type) = MeasurementType::from_str(type_name) {
                           measurement_types_found.insert(msr_type);
@@ -205,7 +205,6 @@ where
                          warn!("Could not parse measurement type from column: {}", field.name());
                      }
                  }
-             }
         }
         if measurement_types_found.is_empty() {
              warn!("Could not automatically detect any measurement types from Parquet column names. Residuals may not be loaded correctly.");
@@ -289,11 +288,10 @@ where
                  for prefix in prefixes {
                       // Again, guessing column name format
                       let base_name = format!("{}: {:?} ({})", prefix, msr_type, msr_type.unit());
-                      if let Ok(col) = get_col(&base_name) {
-                            if let Some(arr) = col.as_any().downcast_ref::<Float64Array>() {
+                      if let Ok(col) = get_col(&base_name)
+                            && let Some(arr) = col.as_any().downcast_ref::<Float64Array>() {
                                  type_cols.insert(prefix.to_string(), arr.clone());
                             }
-                      }
                  }
                  residual_data_cols.insert(*msr_type, type_cols);
             }

@@ -104,8 +104,7 @@ impl SpacecraftSequence {
                 on_entry: _,
                 disabled,
             } = phase
-            {
-                if !disabled && self.prop_setups.get(propagator).is_none() {
+                && !disabled && self.prop_setups.get(propagator).is_none() {
                     // Set up the propagator -- fetch the config first
                     // We know the config exists because validate would catch missing names.
                     let cfg = &self.propagators[propagator];
@@ -139,7 +138,6 @@ impl SpacecraftSequence {
                     self.prop_setups.insert(propagator.clone(), setup);
                     debug!("built `{propagator}`");
                 }
-            }
         }
 
         Ok(())
@@ -173,11 +171,10 @@ impl SpacecraftSequence {
                     disabled,
                 } => {
                     // Check stop condition
-                    if let Some(ref target) = until_phase {
-                        if target == name {
+                    if let Some(ref target) = until_phase
+                        && target == name {
                             return Ok(trajs);
                         }
-                    }
 
                     if *disabled {
                         info!("[{epoch}] skipping disabled {name}");

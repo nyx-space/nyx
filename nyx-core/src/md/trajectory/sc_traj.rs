@@ -263,8 +263,8 @@ impl Traj<Spacecraft> {
                 for potential_field in &mut found_fields {
                     if field.name() == potential_field.0.to_field(None).name() {
                         potential_field.1 = true;
-                        if potential_field.0 != StateParameter::PropMass() {
-                            if let Some(frame_info) = field.metadata().get("Frame") {
+                        if potential_field.0 != StateParameter::PropMass()
+                            && let Some(frame_info) = field.metadata().get("Frame") {
                                 // Frame is expected to be serialized as Dhall.
                                 match serde_dhall::from_str(frame_info).parse::<Frame>() {
                                     Err(e) => {
@@ -276,7 +276,6 @@ impl Traj<Spacecraft> {
                                     Ok(deser_frame) => frame = Some(deser_frame),
                                 };
                             }
-                        }
                         break;
                     }
                 }

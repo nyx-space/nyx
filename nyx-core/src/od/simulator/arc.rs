@@ -310,8 +310,8 @@ impl TrackingArcSim<Spacecraft, GroundStation> {
         let traj = &self.trajectory;
 
         for (name, loc_id) in &loc_ids {
-            if let Some(cfg) = self.configs.get(name) {
-                if let Some(scheduler) = cfg.scheduler {
+            if let Some(cfg) = self.configs.get(name)
+                && let Some(scheduler) = cfg.scheduler {
                     info!("Building schedule for {name}");
                     if scheduler.handoff == Handoff::Overlap {
                         warn!(
@@ -358,8 +358,7 @@ impl TrackingArcSim<Spacecraft, GroundStation> {
                             // Check that the next start time is within the allocated time
                             if let Some(prev_strand) =
                                 built_cfg[name].strands.as_ref().unwrap().last()
-                            {
-                                if prev_strand.end + off > strand_range.start {
+                                && prev_strand.end + off > strand_range.start {
                                     // We're turning on the tracking sooner than the schedule allows, so let's fix that.
                                     strand_range.start = prev_strand.end + off;
                                     // Check that we didn't eat into the whole tracking opportunity
@@ -372,7 +371,6 @@ impl TrackingArcSim<Spacecraft, GroundStation> {
                                         continue;
                                     }
                                 }
-                            }
                             // Check that we aren't tracking for longer than configured
                             if strand_range.end - strand_range.start > on {
                                 strand_range.end = strand_range.start + on;
@@ -394,7 +392,6 @@ impl TrackingArcSim<Spacecraft, GroundStation> {
                         built_cfg[name].strands.as_ref().unwrap().len()
                     );
                 }
-            }
         }
         // Build all of the strands, remembering which tracker they come from.
         let mut cfg_as_vec = Vec::new();

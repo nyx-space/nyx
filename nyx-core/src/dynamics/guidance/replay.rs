@@ -58,11 +58,10 @@ impl ThrustDirectionReplay {
             Err(idx) => self.profile.states.get(idx - 1),
         };
 
-        if let Some(command) = command {
-            if command.thrust_direction().is_some() || command.mode() != GuidanceMode::Thrust {
+        if let Some(command) = command
+            && (command.thrust_direction().is_some() || command.mode() != GuidanceMode::Thrust) {
                 return Some(command);
             }
-        }
 
         if self.profile.first().mode() == GuidanceMode::Thrust {
             return self
