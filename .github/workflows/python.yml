@@ -29,7 +29,7 @@ jobs:
       - name: Setup Python on ${{ matrix.target }}
         uses: actions/setup-python@v6
         with:
-          python-version: 3.12
+          python-version: 3.14
 
       - name: Build wheels
         uses: PyO3/maturin-action@v1
@@ -58,7 +58,7 @@ jobs:
             fi
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-linux-${{ matrix.target }}
           path: nyx-py/dist
@@ -69,7 +69,7 @@ jobs:
         run: |
           set -e
           pip debug --verbose
-          pip install nyx_space --find-links anise-py/dist --force-reinstall
+          pip install nyx_space --find-links nyx-py/dist --force-reinstall
           pip install pytest numpy
           pytest
 
@@ -83,7 +83,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
-          python-version: 3.13
+          python-version: 3.14
           architecture: ${{ matrix.target }}
       - name: Build wheels
         uses: PyO3/maturin-action@v1
@@ -93,7 +93,7 @@ jobs:
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           working-directory: nyx-py
       - name: Upload wheels
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-windows-${{ matrix.target }}
           path: dist
@@ -111,7 +111,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.9"
+          python-version: 3.14
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -120,7 +120,7 @@ jobs:
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           working-directory: nyx-py
       - name: Upload wheels
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-macos-${{ matrix.platform.target }}
           path: dist
@@ -136,7 +136,7 @@ jobs:
   #         command: sdist
   #         args: --out dist
   #     - name: Upload sdist
-  #       uses: actions/upload-artifact@v6
+  #       uses: actions/upload-artifact@v7
   #       with:
   #         name: wheels-sdist
   #         path: dist
@@ -145,7 +145,7 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
-    needs: [linux, musllinux, windows, macos, sdist]
+    needs: [linux, windows, macos]
     permissions:
       # Use to sign the release artifacts
       id-token: write
