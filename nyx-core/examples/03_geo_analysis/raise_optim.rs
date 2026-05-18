@@ -4,7 +4,7 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger as pel;
 
 use anise::{
-    almanac::{metaload::MetaFile, Almanac},
+    almanac::{Almanac, metaload::MetaFile},
     constants::{
         celestial_objects::{MOON, SUN},
         frames::{EARTH_J2000, IAU_EARTH_FRAME},
@@ -13,15 +13,15 @@ use anise::{
 use hifitime::{Epoch, TimeUnits, Unit};
 use log::info;
 use nyx::{
+    Spacecraft,
     cosmic::{GuidanceMode, Mass, MetaAlmanac, Orbit, SRPData},
     dynamics::{
-        guidance::{Ruggiero, Thruster},
         GravityField, OrbitalDynamics, SolarPressure, SpacecraftDynamics,
+        guidance::{Ruggiero, Thruster},
     },
     io::gravity::GravityFieldData,
     md::prelude::{Objective, OrbitalElement, StateParameter},
     propagators::{ErrorControl, IntegratorOptions, Propagator},
-    Spacecraft,
 };
 use radiate::*;
 use std::{error::Error, sync::Arc};
@@ -60,6 +60,15 @@ impl SharedState {
 fn main() -> Result<(), Box<dyn Error>> {
     pel::init();
 
+    /* let (prop_usage_kg, penalty) = evaluate_weights(
+        &[0.22033301, 0.8512096, 0.49421895],
+        60.0,
+        Arc::new(SharedState::new()?),
+    )
+    .unwrap();
+
+    println!("Best weight prop usage = {prop_usage_kg:.3} kg \t penalty = {penalty:.3}"); */
+
     // Set up shared state (read large files only once!)
     let shared_state = Arc::new(SharedState::new()?);
 
@@ -74,7 +83,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 evaluate_weights(&weights, 60.0, shared_state.clone()).unwrap_or((1e6, 1e6));
 
             // The minimize seems to maximize on single objectives, so we make sure any penalty outweights the prop.
-            Score::from(prop_usage as f32 - penalty as f32)
+            Score::from(-(prop_usage + penalty) as f32)
         })),
         raw_fitness_fn: None,
     };
@@ -105,6 +114,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         .collect::<Vec<String>>()
         .join(", ");
     println!("Optimization finished. Best weights: [{best_weights}] -> Best score: [{best_score}]");
+
+    // Evaluate these weights.
+    let best_weights = result.value().iter().copied().collect::<Vec<f32>>();
+
+    let (prop_usage_kg, penalty) =
+        evaluate_weights(&best_weights, 60.0, Arc::new(SharedState::new()?)).unwrap();
+
+    println!("Best weight prop usage = {prop_usage_kg:.3} kg \t penalty = {penalty:.3}");
 
     Ok(())
 }
@@ -180,6 +197,7 @@ fn evaluate_weights(
         if !achieved {
             penalty += error.abs();
         }
+        info!("{obj} error: {error:.3}, achieved? {achieved}");
     }
 
     info!("{ηthresholds:?} -> {prop_usage:.3} kg\tpenalty = {penalty:.3}");
