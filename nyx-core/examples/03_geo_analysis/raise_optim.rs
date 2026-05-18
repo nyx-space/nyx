@@ -66,14 +66,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Set up the genetic algorithm optimization
     let codec = FloatCodec::vector(3, 0.1_f32..1.0_f32); // 3 weights for SMA, Ecc, Inc
     let problem = EngineProblem {
-        objective: radiate::Objective::Single(Optimize::Minimize),
+        objective: radiate::Objective::Single(Optimize::Maximize),
         codec: Arc::new(codec),
         fitness_fn: Some(Arc::new(move |weights: Vec<f32>| {
             // Full 60 days propagation for evaluating the actual performance, but running fast due to shared state
             let (prop_usage, penalty) =
                 evaluate_weights(&weights, 60.0, shared_state.clone()).unwrap_or((1e6, 1e6));
 
-            Score::from(prop_usage as f32 * penalty as f32)
+            // The minimize seems to maximize on single objectives, so we make sure any penalty outweights the prop.
+            Score::from(prop_usage as f32 - penalty as f32)
         })),
         raw_fitness_fn: None,
     };
