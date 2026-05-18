@@ -1,4 +1,4 @@
-from nyx_space import Spacecraft, Mass, SRPData, DragData, Thruster, GuidanceMode
+from nyx_space import Spacecraft, Mass, SRPData, DragData
 from nyx_space.monte_carlo import MvnSpacecraft, StateDispersion, StateParameter
 from nyx_space.anise import MetaAlmanac
 from nyx_space.anise.analysis import OrbitalElement
