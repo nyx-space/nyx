@@ -16,10 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::linalg::allocator::Allocator;
-use crate::linalg::DefaultAllocator;
-use crate::md::StateParameter;
 use crate::State;
+use crate::linalg::DefaultAllocator;
+use crate::linalg::allocator::Allocator;
+use crate::md::StateParameter;
 use rand_distr::{Distribution, Normal};
 
 /// A dispersions configuration, allows specifying min/max bounds (by default, they are not set)

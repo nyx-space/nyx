@@ -13,16 +13,16 @@ use anise::{
 use hifitime::{Epoch, Unit};
 use log::warn;
 use nyx::{
+    Spacecraft, State,
     cosmic::{Mass, MetaAlmanac, Orbit, SRPData},
     dynamics::{GravityField, OrbitalDynamics, SolarPressure, SpacecraftDynamics},
-    io::{gravity::GravityFieldData, ExportCfg},
+    io::{ExportCfg, gravity::GravityFieldData},
     od::GroundStation,
     propagators::Propagator,
-    Spacecraft, State,
 };
 use polars::{
     frame::column::ScalarColumn,
-    prelude::{df, AnyValue, ChunkCompareIneq, Column, DataType, Scalar},
+    prelude::{AnyValue, ChunkCompareIneq, Column, DataType, Scalar, df},
 };
 
 use std::{error::Error, sync::Arc};

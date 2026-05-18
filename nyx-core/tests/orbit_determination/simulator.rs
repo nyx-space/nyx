@@ -386,7 +386,7 @@ fn od_with_modulus_as_bias(
 
     od_sol
         .to_parquet(
-            "./data/04_output/od_with_modulus.parquet",
+            "../data/04_output/od_with_modulus.parquet",
             ExportCfg::default(),
         )
         .unwrap();

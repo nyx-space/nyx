@@ -25,15 +25,15 @@ use indexmap::IndexSet;
 use nalgebra::{DimName, OMatrix, OVector};
 use rand_pcg::Pcg64Mcg;
 
+use crate::Orbit;
 use crate::io::ConfigRepr;
-use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
+use crate::linalg::allocator::Allocator;
 use crate::md::prelude::{Frame, Traj};
 use crate::md::trajectory::Interpolatable;
-use crate::od::msr::measurement::Measurement as NewMeasurement;
-use crate::od::msr::MeasurementType;
 use crate::od::ODError;
-use crate::Orbit;
+use crate::od::msr::MeasurementType;
+use crate::od::msr::measurement::Measurement as NewMeasurement;
 
 /// Tracking device simulator.
 pub trait TrackingDevice<MsrIn>: Clone + ConfigRepr

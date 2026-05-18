@@ -31,8 +31,8 @@ use snafu::ResultExt;
 use std::collections::HashMap;
 
 use crate::dynamics::guidance::{Kluever, Ruggiero};
-use crate::dynamics::{guidance::Thruster, SpacecraftDynamics};
 use crate::dynamics::{GravityField, OrbitalDynamics};
+use crate::dynamics::{SpacecraftDynamics, guidance::Thruster};
 use crate::errors::{FromAlmanacSnafu, FromPropSnafu};
 use crate::io::gravity::GravityFieldData;
 use crate::md::Trajectory;

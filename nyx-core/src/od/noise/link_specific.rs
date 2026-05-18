@@ -187,7 +187,7 @@ impl StochasticNoise {
 
 #[cfg(test)]
 mod link_noise {
-    use super::{CarrierFreq, ChipRate, StochasticNoise, CN0, SN0};
+    use super::{CN0, CarrierFreq, ChipRate, SN0, StochasticNoise};
     use hifitime::Unit;
     #[test]
     fn nasa_dsac() {

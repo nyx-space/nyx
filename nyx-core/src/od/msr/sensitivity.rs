@@ -16,8 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
+use crate::linalg::allocator::Allocator;
 use crate::md::prelude::Interpolatable;
 use crate::od::{GroundStation, ODAlmanacSnafu, ODError, TrackingDevice};
 use crate::{Spacecraft, State};
@@ -28,8 +28,8 @@ use snafu::ResultExt;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use super::measurement::Measurement;
 use super::MeasurementType;
+use super::measurement::Measurement;
 
 pub trait ScalarSensitivityT<SolveState: State, Rx, Tx>
 where

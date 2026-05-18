@@ -254,7 +254,7 @@ where
                     _ => {
                         return Err(ODError::ODLimitation {
                             action: "only process noises of size 3x3 or 6x6 are supported",
-                        })
+                        });
                     }
                 }
             }

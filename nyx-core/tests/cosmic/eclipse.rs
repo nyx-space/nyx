@@ -3,13 +3,13 @@ extern crate nyx_space as nyx;
 use anise::astro::Occultation;
 use anise::constants::celestial_objects::{JUPITER_BARYCENTER, SUN};
 use anise::constants::frames::SUN_J2000;
-use nyx::cosmic::eclipse::ShadowModel;
 use nyx::cosmic::Orbit;
-use nyx::dynamics::orbital::OrbitalDynamics;
+use nyx::cosmic::eclipse::ShadowModel;
 use nyx::dynamics::SpacecraftDynamics;
+use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::propagators::{IntegratorOptions, Propagator};
 use nyx::time::{Epoch, Unit};
-use std::sync::{mpsc, Arc};
+use std::sync::{Arc, mpsc};
 use std::thread;
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};

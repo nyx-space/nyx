@@ -10,9 +10,9 @@ use anise::constants::frames::{EARTH_J2000, IAU_EARTH_FRAME, MOON_J2000};
 use anise::prelude::Almanac;
 use nalgebra::Vector3;
 use nyx::cosmic::Orbit;
+use nyx::dynamics::SpacecraftDynamics;
 use nyx::dynamics::guidance::{LocalFrame, Maneuver, Thruster};
 use nyx::dynamics::orbital::OrbitalDynamics;
-use nyx::dynamics::SpacecraftDynamics;
 use nyx::md::StateParameter;
 use nyx::propagators::{IntegratorOptions, Propagator};
 use nyx::time::{Epoch, TimeUnits};
@@ -56,7 +56,10 @@ fn stop_cond_3rd_apo(almanac: Arc<Almanac>) {
     let mut prev_event_match = events[0].orbit.epoch;
     for event_match in events.iter().skip(1) {
         let delta_period = event_match.orbit.epoch - prev_event_match - period;
-        assert!(delta_period.abs() < 0.5.seconds(), "in two body dyn, event finding should be extremely precise, instead time error of {delta_period}");
+        assert!(
+            delta_period.abs() < 0.5.seconds(),
+            "in two body dyn, event finding should be extremely precise, instead time error of {delta_period}"
+        );
         prev_event_match = event_match.orbit.epoch;
     }
 
@@ -117,7 +120,10 @@ fn stop_cond_3rd_peri(almanac: Arc<Almanac>) {
     for event_match in events.iter().skip(1) {
         let delta_period = event_match.orbit.epoch - prev_event_match - period;
         println!("{:x}", event_match.orbit);
-        assert!(delta_period.abs() < 0.3.seconds(), "in two body dyn, event finding should be extremely precise, instead time error of {delta_period}");
+        assert!(
+            delta_period.abs() < 0.3.seconds(),
+            "in two body dyn, event finding should be extremely precise, instead time error of {delta_period}"
+        );
         prev_event_match = event_match.orbit.epoch;
     }
 

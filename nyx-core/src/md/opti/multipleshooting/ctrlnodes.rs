@@ -16,9 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use crate::NyxError;
 use crate::md::prelude::{Objective, StateParameter};
 use crate::time::Epoch;
-use crate::NyxError;
 use anise::analysis::prelude::OrbitalElement;
 use anise::prelude::Frame;
 use serde::{Deserialize, Serialize};

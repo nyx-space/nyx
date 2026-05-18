@@ -20,7 +20,7 @@ use core::f64::consts::PI;
 
 use crate::errors::LambertError;
 
-use super::{LambertInput, LambertSolution, TransferKind, LAMBERT_EPSILON, MAX_ITERATIONS};
+use super::{LAMBERT_EPSILON, LambertInput, LambertSolution, MAX_ITERATIONS, TransferKind};
 
 /// Solve the Lambert boundary problem using Izzo's method.
 ///
@@ -440,7 +440,7 @@ pub fn householder(
 
 #[cfg(test)]
 mod ut_lambert_izzo {
-    use super::{izzo, LambertInput, TransferKind};
+    use super::{LambertInput, TransferKind, izzo};
     use crate::linalg::Vector3;
     use anise::prelude::{Frame, Orbit};
     use hifitime::{Epoch, Unit};

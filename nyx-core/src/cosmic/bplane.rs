@@ -30,7 +30,7 @@ use crate::utils::between_pm_180;
 use hyperdual::linalg::norm;
 use hyperdual::{Float, OHyperdual};
 
-use snafu::{ensure, ResultExt};
+use snafu::{ResultExt, ensure};
 use std::convert::From;
 use std::fmt;
 

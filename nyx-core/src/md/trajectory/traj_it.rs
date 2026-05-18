@@ -17,8 +17,8 @@
 */
 
 use super::{Interpolatable, Traj};
-use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
+use crate::linalg::allocator::Allocator;
 use crate::time::TimeSeries;
 use log::{error, log_enabled};
 pub struct TrajIterator<'a, S: Interpolatable>

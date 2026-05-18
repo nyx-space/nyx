@@ -5,13 +5,13 @@ extern crate rayon;
 
 use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SUN};
 use anise::constants::frames::IAU_EARTH_FRAME;
+use nyx::State;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::{GravityField, SpacecraftDynamics};
 use nyx::dynamics::{OrbitalDynamics, PointMasses};
 use nyx::io::gravity::*;
 use nyx::time::{Epoch, Unit};
-use nyx::State;
-use nyx::{propagators::*, Spacecraft};
+use nyx::{Spacecraft, propagators::*};
 use rand::rng;
 use rand_distr::{Distribution, Normal};
 use rayon::prelude::*;

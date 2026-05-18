@@ -16,8 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::io::watermark::prj_name_ver;
 use crate::io::ExportCfg;
+use crate::io::watermark::prj_name_ver;
 use crate::io::{InputOutputError, StdIOSnafu};
 use crate::od::msr::{Measurement, MeasurementType};
 use anise::constants::SPEED_OF_LIGHT_KM_S;
@@ -146,7 +146,7 @@ impl TrackingDataArc {
                                 which: format!(
                                     "found {cnt} paths in TDM, only 1 or 2 are supported"
                                 ),
-                            })
+                            });
                         }
                     }
                 }
@@ -210,11 +210,15 @@ impl TrackingDataArc {
                         drop_freq_data = true;
                     }
                 } else {
-                    error!("required turn-around denominator missing from metadata -- dropping ALL RECEIVE/TRANSMIT data");
+                    error!(
+                        "required turn-around denominator missing from metadata -- dropping ALL RECEIVE/TRANSMIT data"
+                    );
                     drop_freq_data = true;
                 }
             } else {
-                error!("required turn-around numerator missing from metadata -- dropping ALL RECEIVE/TRANSMIT data");
+                error!(
+                    "required turn-around numerator missing from metadata -- dropping ALL RECEIVE/TRANSMIT data"
+                );
                 drop_freq_data = true;
             }
         } else {
@@ -311,7 +315,9 @@ impl TrackingDataArc {
 
             // There is a receive frequency
             if latest_transmit_freq.is_none() {
-                warn!("receive frequency found at {epoch} but no transmit frequency was ever set, ignoring");
+                warn!(
+                    "receive frequency found at {epoch} but no transmit frequency was ever set, ignoring"
+                );
                 for freq in &freq_types {
                     measurement.data.swap_remove(freq);
                 }
@@ -612,7 +618,7 @@ fn parse_measurement_line(
         _ => {
             return Err(InputOutputError::UnsupportedData {
                 which: mtype_str.to_string(),
-            })
+            });
         }
     };
 

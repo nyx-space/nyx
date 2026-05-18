@@ -21,11 +21,11 @@ use std::sync::Arc;
 use anise::almanac::Almanac;
 
 use super::{IntegrationDetails, IntegratorMethod, IntegratorOptions, PropInstance};
+use crate::State;
 use crate::dynamics::Dynamics;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, OVector};
 use crate::time::Duration;
-use crate::State;
 
 /// A Propagator allows propagating a set of dynamics forward or backward in time.
 /// It is an EventTracker, without any event tracking. It includes the options, the integrator

@@ -1,11 +1,11 @@
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
-use nyx::linalg::{Matrix2, SMatrix, Vector2};
-use nyx::od::prelude::{Estimate, KalmanFilter, KalmanVariant, KfEstimate};
-use nyx::od::ODError;
 use nyx::Spacecraft;
 use nyx::State;
+use nyx::linalg::{Matrix2, SMatrix, Vector2};
+use nyx::od::ODError;
+use nyx::od::prelude::{Estimate, KalmanFilter, KalmanVariant, KfEstimate};
 
 mod blse;
 mod measurements;

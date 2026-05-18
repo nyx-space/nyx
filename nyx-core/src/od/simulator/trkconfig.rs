@@ -18,7 +18,7 @@
 
 use super::scheduler::Scheduler;
 use crate::io::ConfigRepr;
-use crate::io::{duration_from_str, duration_to_str, epoch_from_str, epoch_to_str, ConfigError};
+use crate::io::{ConfigError, duration_from_str, duration_to_str, epoch_from_str, epoch_to_str};
 use der::{Decode, Encode, Reader};
 use hifitime::TimeUnits;
 use hifitime::{Duration, Epoch, TimeScale};

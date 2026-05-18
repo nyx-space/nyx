@@ -20,13 +20,13 @@
 // potentially in a new file like `src/od/process/solution/import.rs`
 // and ensure necessary imports are present.
 
+use crate::Spacecraft;
 use crate::io::{ArrowSnafu, InputOutputError, MissingDataSnafu, ParquetSnafu, StdIOSnafu};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{Const, DefaultAllocator, DimName, OMatrix, OVector, SMatrix};
 use crate::od::estimate::*;
 use crate::od::msr::MeasurementType;
 use crate::od::*;
-use crate::Spacecraft;
 use anise::frames::Frame;
 use anise::prelude::Orbit;
 use anise::structure::spacecraft::{DragData, Mass, SRPData};

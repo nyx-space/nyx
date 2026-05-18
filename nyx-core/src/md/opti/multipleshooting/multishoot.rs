@@ -24,7 +24,7 @@ use super::{MultipleShootingError, TargetingSnafu};
 use crate::linalg::{DMatrix, DVector, SVector};
 use crate::md::opti::solution::TargeterSolution;
 use crate::md::targeter::Targeter;
-use crate::md::{prelude::*, TargetingError};
+use crate::md::{TargetingError, prelude::*};
 use crate::pseudo_inverse;
 use crate::{Orbit, Spacecraft};
 

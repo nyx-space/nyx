@@ -27,13 +27,13 @@ use arrow::{
     datatypes,
     record_batch::RecordBatchReader,
 };
-use hifitime::prelude::Epoch;
 use hifitime::TimeScale;
+use hifitime::prelude::Epoch;
 use indexmap::IndexMap;
 use log::{info, warn};
-use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::arrow::ArrowWriter;
-use snafu::{ensure, ResultExt};
+use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+use snafu::{ResultExt, ensure};
 use std::collections::{BTreeMap, HashMap};
 use std::error::Error;
 use std::fs::File;

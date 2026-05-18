@@ -17,12 +17,12 @@
 */
 
 use super::{DynamicsSnafu, IntegrationDetails, PropagationError, Propagator};
+use crate::State;
 use crate::dynamics::{Dynamics, DynamicsAlmanacSnafu};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, OVector};
 use crate::md::trajectory::{Interpolatable, Traj};
 use crate::time::{Duration, Epoch, Unit};
-use crate::State;
 use anise::almanac::Almanac;
 use anise::errors::MathError;
 use log::{info, warn};
@@ -30,8 +30,8 @@ use rayon::iter::ParallelBridge;
 use rayon::prelude::ParallelIterator;
 use snafu::ResultExt;
 use std::f64;
-use std::sync::mpsc::{channel, Sender};
 use std::sync::Arc;
+use std::sync::mpsc::{Sender, channel};
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 

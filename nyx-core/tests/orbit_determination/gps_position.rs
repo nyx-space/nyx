@@ -1,15 +1,15 @@
 use anise::constants::frames::EARTH_J2000;
 use hifitime::Unit;
 use nalgebra::{Const, OMatrix};
+use nyx_space::Spacecraft;
+use nyx_space::State;
 use nyx_space::cosmic::Orbit;
-use nyx_space::dynamics::orbital::OrbitalDynamics;
 use nyx_space::dynamics::SpacecraftDynamics;
+use nyx_space::dynamics::orbital::OrbitalDynamics;
 use nyx_space::md::prelude::*;
 use nyx_space::od::position::PositionDevice;
 use nyx_space::od::prelude::*;
 use nyx_space::time::Epoch;
-use nyx_space::Spacecraft;
-use nyx_space::State;
 use std::collections::BTreeMap;
 
 #[test]

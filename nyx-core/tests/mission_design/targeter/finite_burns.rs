@@ -2,11 +2,11 @@ extern crate nyx_space as nyx;
 
 use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SUN};
 use hifitime::TimeUnits;
+use nyx::dynamics::PointMasses;
 use nyx::dynamics::guidance::{LocalFrame, Maneuver, Thruster};
 use nyx::dynamics::sequence::{
     AccelModels, ForceModels, GuidanceConfig, Phase, PropagatorConfig, SpacecraftSequence,
 };
-use nyx::dynamics::PointMasses;
 use nyx::linalg::Vector3;
 use nyx::md::prelude::*;
 use nyx::propagators::{IntegratorMethod, IntegratorOptions};

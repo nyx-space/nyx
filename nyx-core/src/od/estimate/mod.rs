@@ -17,10 +17,10 @@
 */
 
 use super::State;
+use crate::Spacecraft;
 use crate::cosmic::Orbit;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, OMatrix, OVector};
-use crate::Spacecraft;
 use hifitime::Epoch;
 use std::cmp::PartialEq;
 use std::fmt;

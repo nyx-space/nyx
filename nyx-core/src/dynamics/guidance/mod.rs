@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::cosmic::{GuidanceMode, Orbit, Spacecraft, STD_GRAVITY};
+use crate::cosmic::{GuidanceMode, Orbit, STD_GRAVITY, Spacecraft};
 use crate::errors::{NyxError, StateError};
 use crate::linalg::Vector3;
 use anise::astro::PhysicsResult;
@@ -163,7 +163,9 @@ pub enum GuidanceError {
     NoThrustersDefined,
     #[snafu(display("Throttle is not between 0.0 and 1.0: {ratio}"))]
     ThrottleRatio { ratio: f64 },
-    #[snafu(display("Invalid finite burn control direction u = [{x}, {y}, {z}] => i-plane = {in_plane_deg} deg, Delta = {out_of_plane_deg} deg",))]
+    #[snafu(display(
+        "Invalid finite burn control direction u = [{x}, {y}, {z}] => i-plane = {in_plane_deg} deg, Delta = {out_of_plane_deg} deg",
+    ))]
     InvalidDirection {
         x: f64,
         y: f64,
@@ -171,7 +173,9 @@ pub enum GuidanceError {
         in_plane_deg: f64,
         out_of_plane_deg: f64,
     },
-    #[snafu(display("Invalid finite burn control rate u = [{x}, {y}, {z}] => in-plane = {in_plane_deg_s} deg/s, out of plane = {out_of_plane_deg_s} deg/s",))]
+    #[snafu(display(
+        "Invalid finite burn control rate u = [{x}, {y}, {z}] => in-plane = {in_plane_deg_s} deg/s, out of plane = {out_of_plane_deg_s} deg/s",
+    ))]
     InvalidRate {
         x: f64,
         y: f64,
@@ -179,7 +183,9 @@ pub enum GuidanceError {
         in_plane_deg_s: f64,
         out_of_plane_deg_s: f64,
     },
-    #[snafu(display("Invalid finite burn control acceleration u = [{x}, {y}, {z}] => in-plane = {in_plane_deg_s2} deg/s^2, out of plane = {out_of_plane_deg_s2} deg/s^2",))]
+    #[snafu(display(
+        "Invalid finite burn control acceleration u = [{x}, {y}, {z}] => in-plane = {in_plane_deg_s2} deg/s^2, out of plane = {out_of_plane_deg_s2} deg/s^2",
+    ))]
     InvalidAcceleration {
         x: f64,
         y: f64,

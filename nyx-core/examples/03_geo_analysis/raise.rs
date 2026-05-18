@@ -12,15 +12,15 @@ use anise::{
 };
 use hifitime::{Epoch, TimeUnits, Unit};
 use nyx::{
+    Spacecraft,
     cosmic::{GuidanceMode, Mass, MetaAlmanac, Orbit, SRPData},
     dynamics::{
-        guidance::{GuidanceLaw, Ruggiero, Thruster},
         GravityField, OrbitalDynamics, SolarPressure, SpacecraftDynamics,
+        guidance::{GuidanceLaw, Ruggiero, Thruster},
     },
-    io::{gravity::GravityFieldData, ExportCfg},
+    io::{ExportCfg, gravity::GravityFieldData},
     md::prelude::{Objective, OrbitalElement, StateParameter},
     propagators::{ErrorControl, IntegratorOptions, Propagator},
-    Spacecraft,
 };
 use std::{error::Error, sync::Arc};
 

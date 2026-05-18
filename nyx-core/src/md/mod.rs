@@ -16,19 +16,20 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use crate::Spacecraft;
 use crate::cosmic::AstroError;
 use crate::dynamics::guidance::GuidanceError;
 use crate::propagators::PropagationError;
-use crate::Spacecraft;
 use snafu::prelude::*;
 
 pub mod prelude {
     pub use super::{
+        StateParameter, Trajectory,
         targeter::*,
         trajectory::{ExportCfg, Interpolatable, Traj},
-        StateParameter, Trajectory,
     };
-    pub use crate::cosmic::{try_achieve_b_plane, BPlane, BPlaneTarget, GuidanceMode};
+    pub use crate::Spacecraft;
+    pub use crate::cosmic::{BPlane, BPlaneTarget, GuidanceMode, try_achieve_b_plane};
     pub use crate::dynamics::{
         Drag, GravityField, OrbitalDynamics, PointMasses, SolarPressure, SpacecraftDynamics,
     };
@@ -37,7 +38,6 @@ pub mod prelude {
     pub use crate::md::objective::Objective;
     pub use crate::propagators::{IntegratorOptions, Propagator};
     pub use crate::time::{Duration, Epoch, TimeUnits, Unit};
-    pub use crate::Spacecraft;
     pub use crate::{State, TimeTagged};
 
     pub use anise::analysis::event::Event;
@@ -83,7 +83,9 @@ pub enum TargetingError {
     Astro { source: AstroError },
     #[snafu(display("targeting aborted, too many iterations"))]
     TooManyIterations,
-    #[snafu(display("correction is ineffective at {action}: value at previous iteration {prev_val}, current value: {cur_val}"))]
+    #[snafu(display(
+        "correction is ineffective at {action}: value at previous iteration {prev_val}, current value: {cur_val}"
+    ))]
     CorrectionIneffective {
         prev_val: f64,
         cur_val: f64,

@@ -18,11 +18,11 @@
 
 use super::{DynamicsAlmanacSnafu, DynamicsError, DynamicsPlanetarySnafu, ForceModel};
 use crate::cosmic::eclipse::ShadowModel;
-use crate::cosmic::{Frame, Spacecraft, AU, SPEED_OF_LIGHT_M_S};
+use crate::cosmic::{AU, Frame, SPEED_OF_LIGHT_M_S, Spacecraft};
 use crate::linalg::{Const, Matrix4x3, Vector3};
 use anise::almanac::Almanac;
 use anise::constants::frames::{EARTH_J2000, SUN_J2000};
-use hyperdual::{hyperspace_from_vector, linalg::norm, Float, OHyperdual};
+use hyperdual::{Float, OHyperdual, hyperspace_from_vector, linalg::norm};
 use log::warn;
 use serde::{Deserialize, Serialize};
 use serde_dhall::StaticType;
@@ -131,11 +131,7 @@ impl SolarPressure {
 
 impl ForceModel for SolarPressure {
     fn estimation_index(&self) -> Option<usize> {
-        if self.estimate {
-            Some(6)
-        } else {
-            None
-        }
+        if self.estimate { Some(6) } else { None }
     }
 
     fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {

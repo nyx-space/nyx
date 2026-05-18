@@ -26,11 +26,11 @@ use super::{
     GuidStateSnafu, GuidanceError, GuidanceLaw, GuidanceMode, GuidancePhysicsSnafu, Spacecraft,
     Vector3,
 };
+use crate::State;
 use crate::cosmic::eclipse::ShadowModel;
 use crate::dynamics::guidance::ObjectiveWeight;
-pub use crate::md::objective::Objective;
 pub use crate::md::StateParameter;
-use crate::State;
+pub use crate::md::objective::Objective;
 use std::fmt;
 use std::sync::Arc;
 
@@ -260,7 +260,7 @@ impl GuidanceLaw for Kluever {
                 _ => {
                     return Err(GuidanceError::InvalidControl {
                         param: obj.parameter,
-                    })
+                    });
                 }
             }
         }

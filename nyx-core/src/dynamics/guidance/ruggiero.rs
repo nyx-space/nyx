@@ -23,14 +23,14 @@ use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 
 use super::{
-    unit_vector_from_plane_angles, GuidStateSnafu, GuidanceError, GuidanceLaw, GuidanceMode,
-    GuidancePhysicsSnafu, NyxError, Orbit, Spacecraft, Vector3,
+    GuidStateSnafu, GuidanceError, GuidanceLaw, GuidanceMode, GuidancePhysicsSnafu, NyxError,
+    Orbit, Spacecraft, Vector3, unit_vector_from_plane_angles,
 };
+use crate::State;
 use crate::cosmic::eclipse::ShadowModel;
 use crate::dynamics::guidance::ObjectiveEfficiency;
-pub use crate::md::objective::Objective;
 pub use crate::md::StateParameter;
-use crate::State;
+pub use crate::md::objective::Objective;
 use std::f64::consts::FRAC_PI_2 as half_pi;
 use std::fmt;
 use std::sync::Arc;

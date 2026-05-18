@@ -17,12 +17,12 @@
 */
 
 use hifitime::TimeUnits;
-use snafu::{ensure, ResultExt};
+use snafu::{ResultExt, ensure};
 
 use crate::dynamics::guidance::{LocalFrame, Maneuver, MnvrRepr};
 use crate::linalg::SVector;
 use crate::md::objective::Objective;
-use crate::md::{prelude::*, GuidanceSnafu, NotFiniteSnafu, TargetingError};
+use crate::md::{GuidanceSnafu, NotFiniteSnafu, TargetingError, prelude::*};
 pub use crate::md::{Variable, Vary};
 use crate::polyfit::CommonPolynomial;
 use std::fmt;
@@ -230,8 +230,19 @@ impl<const V: usize, const O: usize> fmt::Display for TargeterSolution<V, O> {
         writeln!(
             f,
             "Targeter solution correcting {:?} (converged in {:.3} seconds, {} iterations):\n\t{}\n\tAchieved @ {}:{}\n\tCorrected state:\n\t\t{}\n\t\t{:x}\n\tAchieved state:\n\t\t{}\n\t\t{:x}",
-            self.variables.iter().map(|v| format!("{:?}", v.component)).collect::<Vec<String>>(),
-            self.computation_dur.as_secs_f64(), self.iterations, corrmsg, self.achieved_state.epoch(), objmsg, self.corrected_state, self.corrected_state, self.achieved_state, self.achieved_state
+            self.variables
+                .iter()
+                .map(|v| format!("{:?}", v.component))
+                .collect::<Vec<String>>(),
+            self.computation_dur.as_secs_f64(),
+            self.iterations,
+            corrmsg,
+            self.achieved_state.epoch(),
+            objmsg,
+            self.corrected_state,
+            self.corrected_state,
+            self.achieved_state,
+            self.achieved_state
         )
     }
 }

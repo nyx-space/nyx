@@ -19,9 +19,9 @@
 pub use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName};
+use crate::od::State;
 pub use crate::od::estimate::{Estimate, KfEstimate, Residual};
 pub use crate::od::snc::ProcessNoise;
-use crate::od::State;
 pub use crate::time::{Epoch, Unit};
 
 pub mod filtering;

@@ -16,18 +16,18 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use crate::State;
 use crate::io::watermark::pq_writer;
 use crate::io::{ArrowSnafu, ExportCfg, ParquetSnafu, StdIOSnafu};
-use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
-use crate::md::trajectory::Interpolatable;
+use crate::linalg::allocator::Allocator;
 use crate::md::StateParameter;
+use crate::md::trajectory::Interpolatable;
 use crate::od::estimate::*;
 use crate::od::groundpnt::GroundAsset;
 use crate::od::interlink::InterlinkTxSpacecraft;
 use crate::od::process::ODSolution;
-use crate::State;
-use crate::{od::*, Spacecraft};
+use crate::{Spacecraft, od::*};
 use arrow::array::{Array, BooleanBuilder, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
@@ -104,7 +104,9 @@ where
         info!("Exporting orbit determination result to parquet file...");
 
         if cfg.step.is_some() {
-            warn!("The `step` parameter in the export is not supported for orbit determination exports.");
+            warn!(
+                "The `step` parameter in the export is not supported for orbit determination exports."
+            );
         }
 
         // Grab the path here before we move stuff.

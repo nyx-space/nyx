@@ -17,17 +17,17 @@
 */
 
 use super::{Estimate, State};
+use crate::Spacecraft;
 use crate::cosmic::{AstroError, AstroPhysicsSnafu};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, Matrix, OMatrix, OVector};
 use crate::mc::{MvnSpacecraft, StateDispersion};
-use crate::Spacecraft;
 use anise::analysis::prelude::OrbitalElement;
 use anise::astro::orbit_gradient::OrbitGrad;
 use nalgebra::Const;
 use nalgebra::SMatrix;
-use rand::rngs::SysRng;
 use rand::SeedableRng;
+use rand::rngs::SysRng;
 use rand_distr::Distribution;
 use rand_pcg::Pcg64Mcg;
 use snafu::ResultExt;
@@ -375,8 +375,8 @@ where
 #[cfg(test)]
 mod ut_kfest {
     use crate::{
-        mc::StateDispersion, md::StateParameter, od::estimate::KfEstimate, Spacecraft,
-        GMAT_EARTH_GM,
+        GMAT_EARTH_GM, Spacecraft, mc::StateDispersion, md::StateParameter,
+        od::estimate::KfEstimate,
     };
     use anise::analysis::prelude::OrbitalElement;
     use anise::{constants::frames::EARTH_J2000, prelude::Orbit};

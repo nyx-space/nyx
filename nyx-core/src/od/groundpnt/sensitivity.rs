@@ -16,11 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
+use crate::linalg::allocator::Allocator;
 use crate::od::groundpnt::GroundAsset;
 use crate::od::interlink::InterlinkTxSpacecraft;
-use crate::od::msr::{sensitivity::ScalarSensitivity, Measurement, MeasurementType};
+use crate::od::msr::{Measurement, MeasurementType, sensitivity::ScalarSensitivity};
 use crate::od::prelude::sensitivity::{ScalarSensitivityT, TrackerSensitivity};
 use crate::od::{ODAlmanacSnafu, ODError};
 use crate::{Spacecraft, State};

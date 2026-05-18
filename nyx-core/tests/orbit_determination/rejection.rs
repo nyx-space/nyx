@@ -3,8 +3,8 @@ extern crate pretty_env_logger;
 
 use anise::constants::frames::EARTH_J2000;
 use nyx::cosmic::Orbit;
-use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::SpacecraftDynamics;
+use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::io::ConfigRepr;
 use nyx::linalg::{SMatrix, SVector};
 use nyx::od::prelude::*;

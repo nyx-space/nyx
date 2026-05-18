@@ -22,20 +22,20 @@ use anise::structure::LocationDataSet;
 use hifitime::{Duration, Epoch, TimeSeries, TimeUnits};
 use log::{info, warn};
 use num::integer::gcd;
-use rand::rngs::SysRng;
 use rand::SeedableRng;
+use rand::rngs::SysRng;
 use rand_pcg::Pcg64Mcg;
 
+use crate::Spacecraft;
+use crate::State;
 use crate::io::ConfigError;
 use crate::md::trajectory::Interpolatable;
+use crate::od::GroundStation;
 use crate::od::msr::TrackingDataArc;
 use crate::od::prelude::Strand;
 use crate::od::simulator::Cadence;
-use crate::od::GroundStation;
-use crate::Spacecraft;
-use crate::State;
-use crate::{linalg::allocator::Allocator, od::TrackingDevice};
 use crate::{linalg::DefaultAllocator, md::prelude::Traj};
+use crate::{linalg::allocator::Allocator, od::TrackingDevice};
 use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::marker::PhantomData;
@@ -183,7 +183,9 @@ where
                             ),
                         });
                     } else {
-                        warn!("scheduler for {name} is ignored, using the defined tracking strands instead")
+                        warn!(
+                            "scheduler for {name} is ignored, using the defined tracking strands instead"
+                        )
                     }
                 }
 
@@ -212,9 +214,9 @@ where
                                     Err(e) => {
                                         if epoch != strand.end {
                                             warn!(
-                                            "Skipping the remaining strand #{ii} ending on {}: {e}",
-                                            strand.end
-                                        );
+                                                "Skipping the remaining strand #{ii} ending on {}: {e}",
+                                                strand.end
+                                            );
                                         }
                                         continue 'strands;
                                     }
@@ -312,7 +314,9 @@ impl TrackingArcSim<Spacecraft, GroundStation> {
                 if let Some(scheduler) = cfg.scheduler {
                     info!("Building schedule for {name}");
                     if scheduler.handoff == Handoff::Overlap {
-                        warn!("Overlapping measurements on {name} is no longer supported on identical epochs.");
+                        warn!(
+                            "Overlapping measurements on {name} is no longer supported on identical epochs."
+                        );
                     }
                     built_cfg.get_mut(name).unwrap().scheduler = None;
                     built_cfg.get_mut(name).unwrap().strands = Some(Vec::new());
@@ -334,8 +338,8 @@ impl TrackingArcSim<Spacecraft, GroundStation> {
                             < cfg.sampling * i64::from(scheduler.min_samples)
                         {
                             info!(
-                                    "Too few samples from {name} opportunity from {strand_start} to {strand_end}, discarding strand",
-                                );
+                                "Too few samples from {name} opportunity from {strand_start} to {strand_end}, discarding strand",
+                            );
                             continue;
                         }
 
@@ -361,7 +365,10 @@ impl TrackingArcSim<Spacecraft, GroundStation> {
                                     // Check that we didn't eat into the whole tracking opportunity
                                     if strand_range.start > strand_end {
                                         // Lost this whole opportunity.
-                                        info!("Discarding {name} opportunity from {strand_start} to {strand_end} due to cadence {:?}", scheduler.cadence);
+                                        info!(
+                                            "Discarding {name} opportunity from {strand_start} to {strand_end} due to cadence {:?}",
+                                            scheduler.cadence
+                                        );
                                         continue;
                                     }
                                 }

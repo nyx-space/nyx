@@ -189,7 +189,7 @@ impl fmt::Display for StateParameter {
             Self::ThrustZ() => "thrust_z",
             Self::ThrustInPlane(frame) => return write!(f, "thrust_in_plane ({frame:?}) (deg)"),
             Self::ThrustOutOfPlane(frame) => {
-                return write!(f, "thrust_out_of_plane ({frame:?}) (deg)")
+                return write!(f, "thrust_out_of_plane ({frame:?}) (deg)");
             }
             Self::Thrust() => "thrust",
             Self::TotalMass() => "total_mass",

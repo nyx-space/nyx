@@ -2,13 +2,13 @@ extern crate nyx_space as nyx;
 use std::sync::Arc;
 
 use hifitime::JD_J2000;
-use nyx::cosmic::{assert_orbit_eq_or_abs, Orbit};
-use nyx::dynamics::orbital::OrbitalDynamics;
+use nyx::cosmic::{Orbit, assert_orbit_eq_or_abs};
 use nyx::dynamics::SpacecraftDynamics;
+use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::propagators::error_ctrl::ErrorControl;
 use nyx::time::{Epoch, Unit};
 use nyx::utils::rss_orbit_errors;
-use nyx::{propagators::*, Spacecraft};
+use nyx::{Spacecraft, propagators::*};
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use rstest::*;

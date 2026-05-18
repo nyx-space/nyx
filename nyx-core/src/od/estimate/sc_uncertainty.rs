@@ -22,14 +22,14 @@ use anise::analysis::prelude::OrbitalElement;
 use anise::errors::MathError;
 use anise::{astro::PhysicsResult, errors::PhysicsError};
 use nalgebra::{SMatrix, SVector};
-use rand::rngs::SysRng;
 use rand::SeedableRng;
+use rand::rngs::SysRng;
 use rand_distr::Distribution;
 use rand_pcg::Pcg64Mcg;
 use typed_builder::TypedBuilder;
 
 use crate::mc::MvnSpacecraft;
-use crate::{dynamics::guidance::LocalFrame, Spacecraft};
+use crate::{Spacecraft, dynamics::guidance::LocalFrame};
 
 use super::{Estimate, KfEstimate};
 
@@ -236,8 +236,8 @@ impl fmt::LowerHex for KfEstimate<Spacecraft> {
 mod ut_sc_uncertainty {
 
     use super::{Spacecraft, SpacecraftUncertainty};
-    use crate::dynamics::guidance::LocalFrame;
     use crate::GMAT_EARTH_GM;
+    use crate::dynamics::guidance::LocalFrame;
     use anise::analysis::prelude::OrbitalElement;
     use anise::constants::frames::EME2000;
     use anise::prelude::{Epoch, Orbit};

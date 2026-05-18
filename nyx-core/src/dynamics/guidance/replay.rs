@@ -17,10 +17,10 @@
 */
 
 use super::{GuidanceError, GuidanceLaw};
+use crate::State;
 use crate::cosmic::{GuidanceMode, Spacecraft};
 use crate::linalg::Vector3;
 use crate::md::Trajectory;
-use crate::State;
 use anise::prelude::Almanac;
 use std::fmt;
 use std::sync::Arc;

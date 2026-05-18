@@ -3,7 +3,7 @@ extern crate nyx_space as nyx;
 use anise::analysis::prelude::Event;
 use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SUN};
 use anise::constants::frames::MOON_J2000;
-use nyx::cosmic::{try_achieve_b_plane, BPlane, BPlaneTarget, Orbit};
+use nyx::cosmic::{BPlane, BPlaneTarget, Orbit, try_achieve_b_plane};
 use nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
 use nyx::propagators::Propagator;
 use nyx::time::Epoch;

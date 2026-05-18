@@ -10,7 +10,7 @@ use self::nyx::md::StateParameter;
 use self::nyx::propagators::{IntegratorOptions, Propagator};
 use self::nyx::time::{Epoch, Unit};
 use anise::analysis::prelude::{
-    find_arc_intersections, Condition, Event, OrbitalElement, ScalarExpr,
+    Condition, Event, OrbitalElement, ScalarExpr, find_arc_intersections,
 };
 use der::{Decode, Encode};
 use nyx_space::State;
@@ -473,7 +473,7 @@ fn qlaw_as_ruggiero_case_f(almanac: Arc<Almanac>) {
         .unwrap();
 
     // Save as parquet
-    traj.to_parquet_simple("data/04_output/rugg_case_f.parquet")
+    traj.to_parquet_simple("../data/04_output/rugg_case_f.parquet")
         .unwrap();
 
     let prop_usage = prop_mass - final_state.mass.prop_mass_kg;

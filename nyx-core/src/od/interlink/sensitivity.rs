@@ -16,8 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
+use crate::linalg::allocator::Allocator;
 use crate::od::interlink::InterlinkTxSpacecraft;
 use crate::od::msr::{Measurement, MeasurementType};
 use crate::od::prelude::sensitivity::{ScalarSensitivityT, TrackerSensitivity};

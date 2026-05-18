@@ -16,9 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+pub use super::CostFunction;
 use super::ctrlnodes::Node;
 use super::multishoot::MultipleShooting;
-pub use super::CostFunction;
 use crate::errors::TargetingError;
 use crate::md::prelude::*;
 use crate::{Orbit, Spacecraft};

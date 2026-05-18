@@ -15,13 +15,13 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use super::{measurement::Measurement, MeasurementType};
+use super::{MeasurementType, measurement::Measurement};
 use core::fmt;
 use hifitime::prelude::{Duration, Epoch};
 use indexmap::{IndexMap, IndexSet};
 use log::{error, info, warn};
-use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
+use std::collections::btree_map::Entry;
 use std::ops::Bound::{self, Excluded, Included, Unbounded};
 use std::ops::{Add, AddAssign, RangeBounds};
 
@@ -348,7 +348,9 @@ impl TrackingDataArc {
         let current_step = self.min_duration_sep().unwrap();
 
         if current_step >= target_step {
-            warn!("cannot downsample tracking data from {current_step} to {target_step} (that would be upsampling)");
+            warn!(
+                "cannot downsample tracking data from {current_step} to {target_step} (that would be upsampling)"
+            );
             return self;
         }
 
@@ -358,7 +360,9 @@ impl TrackingDataArc {
         // Simple moving average as low-pass filter
         let window_size = (current_hz / target_hz).round() as usize;
 
-        info!("downsampling tracking data from {current_step} ({current_hz:.6} Hz) to {target_step} ({target_hz:.6} Hz) (N = {window_size})");
+        info!(
+            "downsampling tracking data from {current_step} ({current_hz:.6} Hz) to {target_step} ({target_hz:.6} Hz) (N = {window_size})"
+        );
 
         let mut result = TrackingDataArc {
             source: self.source.clone(),

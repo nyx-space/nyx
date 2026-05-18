@@ -19,7 +19,7 @@
 use anise::errors::{AlmanacError, PhysicsError};
 use snafu::Snafu;
 
-use crate::md::{trajectory::TrajError, TargetingError};
+use crate::md::{TargetingError, trajectory::TrajError};
 
 pub mod altitude_heuristic;
 pub mod ctrlnodes;

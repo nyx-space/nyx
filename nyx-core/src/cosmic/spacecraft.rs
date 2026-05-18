@@ -30,8 +30,8 @@ use typed_builder::TypedBuilder;
 
 use super::{AstroPhysicsSnafu, BPlane, State};
 use crate::cosmic::AstroAnalysisSnafu;
-use crate::dynamics::guidance::{plane_angles_from_unit_vector, LocalFrame, Thruster};
 use crate::dynamics::DynamicsError;
+use crate::dynamics::guidance::{LocalFrame, Thruster, plane_angles_from_unit_vector};
 use crate::errors::{StateAstroSnafu, StateError};
 use crate::io::ConfigRepr;
 use crate::linalg::{Const, DimName, OMatrix, OVector};
@@ -618,7 +618,7 @@ impl State for Spacecraft {
                 }
             }
             StateParameter::ThrustInPlane(_) | StateParameter::ThrustOutOfPlane(_) => {
-                return Err(StateError::ReadOnly { param })
+                return Err(StateError::ReadOnly { param });
             }
             StateParameter::Thrust() => match self.thruster {
                 Some(ref mut thruster) => thruster.thrust_N = val,

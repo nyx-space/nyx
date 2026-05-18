@@ -23,8 +23,8 @@ use std::sync::Arc;
 
 use crate::{
     dynamics::{
-        guidance::{Maneuver, ObjectiveEfficiency, ObjectiveWeight},
         Drag, PointMasses, SolarPressure,
+        guidance::{Maneuver, ObjectiveEfficiency, ObjectiveWeight},
     },
     io::gravity::GravityFieldConfig,
     propagators::{IntegratorMethod, IntegratorOptions},

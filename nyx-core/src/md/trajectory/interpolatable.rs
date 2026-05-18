@@ -17,15 +17,15 @@
 */
 
 use anise::analysis::prelude::OrbitalElement;
-use anise::math::interpolation::{hermite_eval, InterpolationError};
+use anise::math::interpolation::{InterpolationError, hermite_eval};
 
 pub(crate) const INTERPOLATION_SAMPLES: usize = 13;
 
 use super::StateParameter;
 use crate::cosmic::Frame;
 use crate::dynamics::guidance::LocalFrame;
-use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
+use crate::linalg::allocator::Allocator;
 use crate::time::Epoch;
 use crate::{Orbit, Spacecraft, State};
 

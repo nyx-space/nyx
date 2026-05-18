@@ -215,11 +215,17 @@ where
         let upper_bound = k * (1.0 - factor + z_critical * factor.sqrt()).powi(3);
 
         if nis_sum > upper_bound {
-            warn!("NIS consistency test failed high: NIS sum {nis_sum:.6} > upper bound {upper_bound:.6}. Innovations are larger than expected.");
-            warn!("Filter may be overconfident: P, R, or Q may be too small, or the dynamics/measurement model may be biased.");
+            warn!(
+                "NIS consistency test failed high: NIS sum {nis_sum:.6} > upper bound {upper_bound:.6}. Innovations are larger than expected."
+            );
+            warn!(
+                "Filter may be overconfident: P, R, or Q may be too small, or the dynamics/measurement model may be biased."
+            );
             Ok(false)
         } else if nis_sum < lower_bound {
-            warn!("NIS consistency test failed low: NIS sum {nis_sum:.6} < lower bound {lower_bound:.6}. Innovations are smaller than expected.");
+            warn!(
+                "NIS consistency test failed low: NIS sum {nis_sum:.6} < lower bound {lower_bound:.6}. Innovations are smaller than expected."
+            );
             warn!("Filter may be underconfident: P, R, or Q may be too large.");
             Ok(false)
         } else {
@@ -341,12 +347,20 @@ where
         let upper_bound = k * (1.0 - factor + z_critical * factor.sqrt()).powi(3);
 
         if nees_sum > upper_bound {
-            warn!("NEES consistency test failed high: NEES sum {nees_sum:.6} > upper bound {upper_bound:.6}. Estimation errors are larger than the covariance suggests.");
-            warn!("Filter is overconfident: P is too small. Process noise Q may be too low, or there are unmodeled dynamic biases.");
+            warn!(
+                "NEES consistency test failed high: NEES sum {nees_sum:.6} > upper bound {upper_bound:.6}. Estimation errors are larger than the covariance suggests."
+            );
+            warn!(
+                "Filter is overconfident: P is too small. Process noise Q may be too low, or there are unmodeled dynamic biases."
+            );
             Ok(false)
         } else if nees_sum < lower_bound {
-            warn!("NEES consistency test failed low: NEES sum {nees_sum:.6} < lower bound {lower_bound:.6}. Estimation errors are smaller than expected.");
-            warn!("Filter is underconfident: P is too large. Process noise Q may be too high, or measurement noise R is overestimated.");
+            warn!(
+                "NEES consistency test failed low: NEES sum {nees_sum:.6} < lower bound {lower_bound:.6}. Estimation errors are smaller than expected."
+            );
+            warn!(
+                "Filter is underconfident: P is too large. Process noise Q may be too high, or measurement noise R is overestimated."
+            );
             Ok(false)
         } else {
             Ok(true)

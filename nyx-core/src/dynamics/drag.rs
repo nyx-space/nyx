@@ -65,11 +65,7 @@ impl fmt::Display for ConstantDrag {
 
 impl ForceModel for ConstantDrag {
     fn estimation_index(&self) -> Option<usize> {
-        if self.estimate {
-            Some(7)
-        } else {
-            None
-        }
+        if self.estimate { Some(7) } else { None }
     }
 
     fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
@@ -158,11 +154,7 @@ impl fmt::Display for Drag {
 
 impl ForceModel for Drag {
     fn estimation_index(&self) -> Option<usize> {
-        if self.estimate {
-            Some(7)
-        } else {
-            None
-        }
+        if self.estimate { Some(7) } else { None }
     }
 
     fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {

@@ -17,8 +17,8 @@
 */
 
 use super::{MvnSpacecraft, StateDispersion};
-use crate::md::StateParameter;
 use crate::Spacecraft;
+use crate::md::StateParameter;
 use nalgebra::{SMatrix, SVector};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;

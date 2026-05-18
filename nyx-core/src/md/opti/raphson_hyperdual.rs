@@ -20,14 +20,14 @@ use super::solution::TargeterSolution;
 use crate::cosmic::{AstroAlmanacSnafu, AstroPhysicsSnafu};
 use crate::errors::TargetingError;
 use crate::linalg::{DMatrix, SVector};
-use crate::md::{prelude::*, PropSnafu, UnderdeterminedProblemSnafu};
 use crate::md::{AstroSnafu, StateParameter};
+use crate::md::{PropSnafu, UnderdeterminedProblemSnafu, prelude::*};
 pub use crate::md::{Variable, Vary};
 use crate::pseudo_inverse;
 use crate::utils::are_eigenvalues_stable;
 use anise::astro::orbit_gradient::OrbitGrad;
 use log::{debug, info, warn};
-use snafu::{ensure, ResultExt};
+use snafu::{ResultExt, ensure};
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
@@ -252,7 +252,7 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                         _ => {
                             return Err(TargetingError::UnsupportedVariable {
                                 var: var.to_string(),
-                            })
+                            });
                         }
                     }
                 }

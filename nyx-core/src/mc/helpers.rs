@@ -17,8 +17,8 @@
 */
 
 use super::{Distribution, Normal, Rng, Uniform};
-use crate::linalg::Vector3;
 use crate::NyxError;
+use crate::linalg::Vector3;
 
 /// Returns a unit vector from a normal distribution.
 /// Implements the Sphere Point Picking method: https://mathworld.wolfram.com/SpherePointPicking.html

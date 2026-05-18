@@ -6,14 +6,14 @@ extern crate pretty_env_logger;
 use anise::constants::celestial_objects::{EARTH, SUN};
 use anise::constants::frames::IAU_MOON_FRAME;
 use indexmap::IndexSet;
+use nyx::Spacecraft;
 use nyx::cosmic::Orbit;
-use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::SpacecraftDynamics;
+use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::md::prelude::*;
 use nyx::od::prelude::*;
 use nyx::propagators::Propagator;
 use nyx::time::{Epoch, TimeUnits};
-use nyx::Spacecraft;
 
 use anise::prelude::Almanac;
 use rstest::*;

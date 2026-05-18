@@ -1,16 +1,16 @@
+use crate::Spacecraft;
 use crate::md::prelude::Traj;
-use crate::od::msr::measurement::Measurement;
-use crate::od::msr::MeasurementType;
 use crate::od::NoiseNotConfiguredSnafu;
+use crate::od::msr::MeasurementType;
+use crate::od::msr::measurement::Measurement;
 use crate::od::{ODError, ODTrajSnafu, TrackingDevice};
 use crate::time::Epoch;
-use crate::Spacecraft;
 use anise::errors::AlmanacResult;
 use anise::frames::Frame;
 use anise::prelude::{Almanac, Orbit};
 use indexmap::{IndexMap, IndexSet};
 use rand_pcg::Pcg64Mcg;
-use snafu::{ensure, ResultExt};
+use snafu::{ResultExt, ensure};
 use std::sync::Arc;
 
 use super::PositionDevice;

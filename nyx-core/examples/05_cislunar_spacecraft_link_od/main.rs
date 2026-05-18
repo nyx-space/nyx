@@ -11,6 +11,7 @@ use anise::{
 };
 use hifitime::{Epoch, TimeUnits};
 use nyx::{
+    Orbit, Spacecraft, State,
     cosmic::Aberration,
     dynamics::{OrbitalDynamics, SpacecraftDynamics},
     io::ExportCfg,
@@ -18,7 +19,6 @@ use nyx::{
     od::interlink::InterlinkTxSpacecraft,
     od::noise::link_specific,
     od::prelude::*,
-    Orbit, Spacecraft, State,
 };
 
 use indexmap::{IndexMap, IndexSet};

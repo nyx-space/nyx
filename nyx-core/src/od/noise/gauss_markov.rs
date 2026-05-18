@@ -223,7 +223,7 @@ mod ut_gm {
 
     use hifitime::{Duration, Epoch, TimeUnits};
     use rand_pcg::Pcg64Mcg;
-    use rstats::{triangmat::Vecops, Stats};
+    use rstats::{Stats, triangmat::Vecops};
 
     use crate::{
         io::ConfigRepr,
@@ -253,7 +253,7 @@ mod ut_gm {
 
     #[test]
     fn zero_noise_test() {
-        use rstats::{triangmat::Vecops, Stats};
+        use rstats::{Stats, triangmat::Vecops};
 
         let mut gm = GaussMarkov::ZERO;
 

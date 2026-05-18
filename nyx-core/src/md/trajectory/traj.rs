@@ -17,18 +17,18 @@
 */
 
 use super::traj_it::TrajIterator;
-use super::{ExportCfg, InterpolationSnafu, INTERPOLATION_SAMPLES};
+use super::{ExportCfg, INTERPOLATION_SAMPLES, InterpolationSnafu};
 use super::{Interpolatable, TrajError};
 use crate::errors::NyxError;
-use crate::io::watermark::pq_writer;
 use crate::io::InputOutputError;
-use crate::linalg::allocator::Allocator;
+use crate::io::watermark::pq_writer;
 use crate::linalg::DefaultAllocator;
+use crate::linalg::allocator::Allocator;
 use crate::md::prelude::{GuidanceMode, StateParameter};
 use crate::md::trajectory::smooth_state_diff_in_place;
 use crate::time::{Duration, Epoch, TimeSeries, TimeUnits};
-use anise::analysis::specs::StateSpecTrait;
 use anise::analysis::AnalysisError;
+use anise::analysis::specs::StateSpecTrait;
 use anise::astro::orbit::Orbit;
 use anise::prelude::{Aberration, Almanac};
 use arrow::array::{Array, Float64Builder, StringBuilder};

@@ -15,20 +15,20 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use crate::md::trajectory::INTERPOLATION_SAMPLES;
 use crate::md::StateParameter;
+use crate::md::trajectory::INTERPOLATION_SAMPLES;
 use crate::od::DynamicsError;
 use crate::{cosmic::State, md::prelude::Interpolatable};
 use anise::analysis::prelude::OrbitalElement;
 use anise::errors::PhysicsError;
-use anise::math::interpolation::{hermite_eval, InterpolationError};
+use anise::math::interpolation::{InterpolationError, hermite_eval};
 use anise::prelude::Orbit;
 use anise::{astro::Location, prelude::Frame};
 use core::error::Error;
 use core::fmt;
 use core::ops::Add;
 use hifitime::Epoch;
-use hyperdual::{hyperspace_from_vector, OHyperdual};
+use hyperdual::{OHyperdual, hyperspace_from_vector};
 use nalgebra::{Const, DimName, Matrix6, OMatrix, OVector, Vector3, Vector6};
 use num_traits::Float;
 pub mod ground_dynamics;

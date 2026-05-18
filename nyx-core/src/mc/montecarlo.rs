@@ -17,29 +17,29 @@
 */
 
 use super::Pcg64Mcg;
+use crate::State;
 use crate::dynamics::Dynamics;
-use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
-use crate::mc::results::{PropResult, Results, Run};
+use crate::linalg::allocator::Allocator;
 use crate::mc::DispersedState;
+use crate::mc::results::{PropResult, Results, Run};
 use crate::md::trajectory::Interpolatable;
 use crate::propagators::Propagator;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::time::Unit;
 use crate::time::{Duration, Epoch};
-use crate::State;
 use anise::almanac::Almanac;
 use anise::analysis::event::Event;
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use log::info;
-use rand::rngs::SysRng;
 use rand::SeedableRng;
+use rand::rngs::SysRng;
 use rand_distr::Distribution;
 use rayon::prelude::ParallelIterator;
 use rayon::prelude::*;
 use std::fmt;
-use std::sync::mpsc::channel;
 use std::sync::Arc;
+use std::sync::mpsc::channel;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant as StdInstant;
 
@@ -194,7 +194,6 @@ where
     ) -> Results<S, PropResult<S>>
     where
         D: Dynamics<StateType = S>,
-
         DefaultAllocator: Allocator<<D::StateType as State>::Size>
             + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
             + Allocator<<D::StateType as State>::VecLength>,
@@ -216,7 +215,6 @@ where
     ) -> Results<S, PropResult<S>>
     where
         D: Dynamics<StateType = S>,
-
         DefaultAllocator: Allocator<<D::StateType as State>::Size>
             + Allocator<<D::StateType as State>::Size, <D::StateType as State>::Size>
             + Allocator<<D::StateType as State>::VecLength>,

@@ -17,7 +17,7 @@ use propagation::{GMAT_EARTH_GM, GMAT_MOON_GM, GMAT_SUN_GM};
 fn base_almanac() -> Almanac {
     use std::path::PathBuf;
 
-    let manifest_dir: PathBuf = vec![env!("CARGO_MANIFEST_DIR"), "../data", "01_planetary"]
+    let manifest_dir: PathBuf = vec![env!("CARGO_MANIFEST_DIR"), "../data/01_planetary"]
         .iter()
         .collect();
 
@@ -40,7 +40,7 @@ fn base_almanac() -> Almanac {
 pub fn test_almanac() -> Almanac {
     use std::path::PathBuf;
 
-    let manifest_dir: PathBuf = vec![env!("CARGO_MANIFEST_DIR"), "../data", "01_planetary"]
+    let manifest_dir: PathBuf = vec![env!("CARGO_MANIFEST_DIR"), "../data/01_planetary"]
         .iter()
         .collect();
 

@@ -18,7 +18,7 @@
 
 use crate::cosmic::Orbit;
 use crate::linalg::{
-    allocator::Allocator, DefaultAllocator, DimName, Matrix3, OVector, Vector3, Vector6,
+    DefaultAllocator, DimName, Matrix3, OVector, Vector3, Vector6, allocator::Allocator,
 };
 use nalgebra::Complex;
 

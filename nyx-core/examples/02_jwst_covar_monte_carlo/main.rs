@@ -12,13 +12,13 @@ use anise::{
 };
 use hifitime::{TimeUnits, Unit};
 use nyx::{
+    Spacecraft, State,
     cosmic::{Frame, Mass, MetaAlmanac, SRPData},
-    dynamics::{guidance::LocalFrame, OrbitalDynamics, SolarPressure, SpacecraftDynamics},
+    dynamics::{OrbitalDynamics, SolarPressure, SpacecraftDynamics, guidance::LocalFrame},
     io::ExportCfg,
     mc::MonteCarlo,
-    od::{prelude::KalmanVariant, process::SpacecraftUncertainty, SpacecraftKalmanOD},
+    od::{SpacecraftKalmanOD, prelude::KalmanVariant, process::SpacecraftUncertainty},
     propagators::Propagator,
-    Spacecraft, State,
 };
 
 use std::{collections::BTreeMap, error::Error, sync::Arc};

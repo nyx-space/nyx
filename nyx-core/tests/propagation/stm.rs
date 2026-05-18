@@ -3,12 +3,12 @@ use std::sync::Arc;
 
 use anise::constants::celestial_objects::{MOON, SUN};
 use der::{Decode, Encode};
+use nyx::State;
 use nyx::cosmic::{Orbit, Spacecraft};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::linalg::{Const, Matrix6, OVector};
 use nyx::propagators::*;
 use nyx::time::{Epoch, Unit};
-use nyx::State;
 use nyx_space::md::prelude::SpacecraftDynamics;
 
 // These tests compare the computation of the state transition matrix between the finite differencing methoid (common) and hyperdual numbers.

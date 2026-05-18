@@ -16,15 +16,15 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+pub use super::CostFunction;
 use super::ctrlnodes::Node;
 use super::multishoot::MultipleShooting;
-pub use super::CostFunction;
 use super::{
     MultiShootAlmanacSnafu, MultiShootPhysicsSnafu, MultiShootTrajSnafu, MultipleShootingError,
     TargetingSnafu,
 };
 use crate::errors::TargetingError;
-use crate::md::{prelude::*, PropSnafu};
+use crate::md::{PropSnafu, prelude::*};
 use crate::{Orbit, Spacecraft};
 use log::error;
 use snafu::ResultExt;

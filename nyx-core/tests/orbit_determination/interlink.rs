@@ -6,16 +6,16 @@ extern crate pretty_env_logger;
 use anise::constants::celestial_objects::{EARTH, SUN};
 use anise::constants::frames::{IAU_MOON_FRAME, MOON_J2000};
 use indexmap::{IndexMap, IndexSet};
+use nyx::Spacecraft;
 use nyx::cosmic::Orbit;
-use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::SpacecraftDynamics;
+use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::linalg::Const;
 use nyx::md::prelude::*;
 use nyx::od::interlink::InterlinkTxSpacecraft;
 use nyx::od::prelude::*;
 use nyx::propagators::Propagator;
 use nyx::time::{Epoch, TimeUnits};
-use nyx::Spacecraft;
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use rstest::*;
@@ -154,7 +154,7 @@ fn interlink_nrho_llo(#[case] disperse: bool, almanac: Arc<Almanac>) {
     let trk_data = trk_sim.generate_measurements(almanac.clone()).unwrap();
     println!("{trk_data}");
 
-    let out = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data/04_output/");
+    let out = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../data/04_output/");
 
     trk_data
         .to_parquet_simple(out.clone().join("nrho_interlink_msr.pq"))

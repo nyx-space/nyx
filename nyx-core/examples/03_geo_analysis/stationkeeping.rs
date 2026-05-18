@@ -12,16 +12,16 @@ use anise::{
 };
 use hifitime::{Epoch, TimeUnits, Unit};
 use nyx::{
+    Spacecraft, State,
     cosmic::{GuidanceMode, Mass, MetaAlmanac, Orbit, SRPData},
     dynamics::{
-        guidance::{Ruggiero, Thruster},
         GravityField, OrbitalDynamics, SolarPressure, SpacecraftDynamics,
+        guidance::{Ruggiero, Thruster},
     },
-    io::{gravity::GravityFieldData, ExportCfg},
+    io::{ExportCfg, gravity::GravityFieldData},
     mc::{MonteCarlo, MvnSpacecraft, StateDispersion},
     md::prelude::{Objective, OrbitalElement, StateParameter},
     propagators::{ErrorControl, IntegratorOptions, Propagator},
-    Spacecraft, State,
 };
 use std::{error::Error, sync::Arc};
 

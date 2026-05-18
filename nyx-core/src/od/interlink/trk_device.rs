@@ -23,18 +23,18 @@ use hifitime::{Duration, Epoch, TimeUnits};
 use indexmap::{IndexMap, IndexSet};
 use rand_pcg::Pcg64Mcg;
 use serde::{Deserialize, Serialize};
-use snafu::{ensure, ResultExt};
+use snafu::{ResultExt, ensure};
 
+use crate::Spacecraft;
+use crate::State;
 use crate::io::ConfigRepr;
-use crate::md::prelude::Traj;
 use crate::md::Trajectory;
+use crate::md::prelude::Traj;
+use crate::od::TrackingDevice;
 use crate::od::msr::MeasurementType;
 use crate::od::noise::StochasticNoise;
 use crate::od::prelude::{Measurement, NoiseNotConfiguredSnafu, ODError};
-use crate::od::TrackingDevice;
 use crate::od::{ODAlmanacSnafu, ODTrajSnafu};
-use crate::Spacecraft;
-use crate::State;
 
 use std::sync::Arc;
 

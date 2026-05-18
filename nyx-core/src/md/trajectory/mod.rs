@@ -24,8 +24,8 @@ mod sc_traj;
 mod traj;
 mod traj_it;
 
-pub use interpolatable::Interpolatable;
 pub(crate) use interpolatable::INTERPOLATION_SAMPLES;
+pub use interpolatable::Interpolatable;
 pub use traj::Traj;
 
 pub use crate::io::ExportCfg;
@@ -45,7 +45,9 @@ pub enum TrajError {
     NoInterpolationData { epoch: Epoch },
     #[snafu(display("Failed to create trajectory: {msg}"))]
     CreationError { msg: String },
-    #[snafu(display("Probable bug: Requested epoch {req_epoch}, corresponding to an offset of {req_dur} in a spline of duration {spline_dur}"))]
+    #[snafu(display(
+        "Probable bug: Requested epoch {req_epoch}, corresponding to an offset of {req_dur} in a spline of duration {spline_dur}"
+    ))]
     OutOfSpline {
         req_epoch: Epoch,
         req_dur: Duration,

@@ -12,11 +12,11 @@ use anise::{
 };
 use hifitime::{Epoch, Unit};
 use nyx::{
+    Spacecraft, State,
     cosmic::{Mass, MetaAlmanac, Orbit, SRPData},
     dynamics::{GravityField, OrbitalDynamics, SolarPressure, SpacecraftDynamics},
-    io::{gravity::GravityFieldData, ExportCfg},
+    io::{ExportCfg, gravity::GravityFieldData},
     propagators::Propagator,
-    Spacecraft, State,
 };
 use polars::{df, prelude::ParquetWriter};
 

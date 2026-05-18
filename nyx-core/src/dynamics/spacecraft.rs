@@ -18,17 +18,17 @@
 
 use anise::prelude::Almanac;
 use log::{error, warn};
-use snafu::{ensure, ResultExt};
+use snafu::{ResultExt, ensure};
 
-use super::guidance::{ra_dec_from_unit_vector, GuidanceError, GuidanceLaw};
+use super::guidance::{GuidanceError, GuidanceLaw, ra_dec_from_unit_vector};
 use super::orbital::OrbitalDynamics;
 use super::{Dynamics, DynamicsGuidanceSnafu, ForceModel};
-pub use crate::cosmic::{GuidanceMode, Spacecraft, STD_GRAVITY};
+pub use crate::cosmic::{GuidanceMode, STD_GRAVITY, Spacecraft};
 use crate::dynamics::{DynamicsError, MasslessSpacecraftSnafu};
 
+use crate::State;
 use crate::linalg::{Const, DimName, OMatrix, OVector, Vector3};
 pub use crate::md::prelude::SolarPressure;
-use crate::State;
 
 use std::fmt::{self, Write};
 use std::sync::Arc;

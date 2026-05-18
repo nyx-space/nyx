@@ -17,7 +17,7 @@
 */
 
 use super::StateParameter;
-use crate::{errors::StateError, Spacecraft, State};
+use crate::{Spacecraft, State, errors::StateError};
 use serde::{Deserialize, Serialize};
 use serde_dhall::StaticType;
 use std::fmt;

@@ -8,11 +8,11 @@
  * Documentation: https://nyxspace.com/
  */
 
+use anise::constants::SPEED_OF_LIGHT_KM_S;
 use anise::constants::celestial_objects::*;
 use anise::constants::orientations::*;
 use anise::constants::usual_planetary_constants::MEAN_EARTH_ANGULAR_VELOCITY_DEG_S;
 use anise::constants::usual_planetary_constants::MEAN_MOON_ANGULAR_VELOCITY_DEG_S;
-use anise::constants::SPEED_OF_LIGHT_KM_S;
 use pyo3::prelude::*;
 
 use anise::constants::frames::*;

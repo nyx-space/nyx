@@ -21,9 +21,9 @@ use nalgebra::DimName;
 pub use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, U3};
+use crate::od::State;
 pub use crate::od::estimate::{Estimate, KfEstimate, Residual};
 pub use crate::od::snc::ProcessNoise;
-use crate::od::State;
 pub use crate::time::{Epoch, Unit};
 
 use super::{KalmanFilter, KalmanVariant};

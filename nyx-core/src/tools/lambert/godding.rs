@@ -17,8 +17,8 @@
 */
 
 use super::{
-    LambertError, LambertInput, LambertSolution, TransferKind, LAMBERT_EPSILON,
-    LAMBERT_EPSILON_RAD, LAMBERT_EPSILON_TIME, MAX_ITERATIONS,
+    LAMBERT_EPSILON, LAMBERT_EPSILON_RAD, LAMBERT_EPSILON_TIME, LambertError, LambertInput,
+    LambertSolution, MAX_ITERATIONS, TransferKind,
 };
 
 use core::f64::consts::PI;
@@ -136,7 +136,7 @@ pub fn gooding(input: LambertInput, kind: TransferKind) -> Result<LambertSolutio
 #[cfg(test)]
 mod ut_lambert_gooding {
 
-    use super::{gooding, TransferKind};
+    use super::{TransferKind, gooding};
     use crate::{linalg::Vector3, tools::lambert::LambertInput};
     use anise::{frames::Frame, prelude::Orbit};
     use hifitime::{Epoch, Unit};

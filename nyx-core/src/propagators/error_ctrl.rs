@@ -123,11 +123,7 @@ impl ErrorControl {
             ErrorControl::RSSState => {
                 let mag = 0.5 * (candidate + cur_state).norm();
                 let err = error_est.norm();
-                if mag > REL_ERR_THRESH {
-                    err / mag
-                } else {
-                    err
-                }
+                if mag > REL_ERR_THRESH { err / mag } else { err }
             }
             ErrorControl::RSSStep => {
                 let mag = (candidate - cur_state).norm();
@@ -162,11 +158,7 @@ impl ErrorControl {
                     err += error_est[i].abs();
                 }
 
-                if mag > REL_ERR_THRESH {
-                    err / mag
-                } else {
-                    err
-                }
+                if mag > REL_ERR_THRESH { err / mag } else { err }
             }
             ErrorControl::LargestStep => {
                 let state_delta = candidate - cur_state;
@@ -177,11 +169,7 @@ impl ErrorControl {
                     err += error_est[i].abs();
                 }
 
-                if mag > REL_ERR_THRESH {
-                    err / mag
-                } else {
-                    err
-                }
+                if mag > REL_ERR_THRESH { err / mag } else { err }
             }
         }
     }
@@ -237,10 +225,6 @@ impl RSSState {
     {
         let mag = 0.5 * (candidate + cur_state).norm();
         let err = error_est.norm();
-        if mag > REL_ERR_THRESH {
-            err / mag
-        } else {
-            err
-        }
+        if mag > REL_ERR_THRESH { err / mag } else { err }
     }
 }

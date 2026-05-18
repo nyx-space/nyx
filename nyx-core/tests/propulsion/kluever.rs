@@ -1,12 +1,12 @@
 use anise::constants::frames::EARTH_J2000;
 use anise::prelude::Almanac;
+use nyx_space::State;
 use nyx_space::cosmic::{GuidanceMode, Mass, Orbit, Spacecraft};
 use nyx_space::dynamics::guidance::{Kluever, Objective, Thruster};
 use nyx_space::dynamics::{OrbitalDynamics, SpacecraftDynamics};
 use nyx_space::md::prelude::{OrbitalElement, StateParameter};
 use nyx_space::propagators::{IntegratorOptions, Propagator};
 use nyx_space::time::{Epoch, Unit};
-use nyx_space::State;
 use std::sync::Arc;
 
 use rstest::*;

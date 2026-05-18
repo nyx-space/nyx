@@ -16,9 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use crate::Spacecraft;
 use crate::cosmic::GuidanceMode;
 use crate::dynamics::guidance::Thruster;
-use crate::Spacecraft;
 use anise::prelude::Orbit;
 use anise::structure::spacecraft::{DragData, Mass, SRPData};
 use der::{Decode, Encode};

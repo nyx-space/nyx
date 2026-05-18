@@ -7,20 +7,20 @@ use anise::constants::celestial_objects::{EARTH, SUN};
 use anise::constants::frames::IAU_MOON_FRAME;
 use anise::math::Vector6;
 use indexmap::{IndexMap, IndexSet};
+use nyx::Spacecraft;
 use nyx::cosmic::Orbit;
-use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::SpacecraftDynamics;
+use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::linalg::Const;
 use nyx::md::prelude::*;
 use nyx::od::interlink::InterlinkTxSpacecraft;
 use nyx::od::prelude::*;
 use nyx::propagators::Propagator;
 use nyx::time::{Epoch, TimeUnits};
-use nyx::Spacecraft;
 
 use anise::prelude::Almanac;
-use nyx_space::od::groundpnt::ground_dynamics::GroundDynamics;
 use nyx_space::od::groundpnt::GroundAsset;
+use nyx_space::od::groundpnt::ground_dynamics::GroundDynamics;
 use rstest::*;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -177,7 +177,6 @@ fn ground_pnt_lunar(almanac: Arc<Almanac>) {
                 start: epoch,
                 end: llo_final.epoch(),
             }])
-            // .sampling(Unit::Second * 10)
             .build(),
     );
 
@@ -188,7 +187,7 @@ fn ground_pnt_lunar(almanac: Arc<Almanac>) {
     let trk_data = trk_sim.generate_measurements(almanac.clone()).unwrap();
     println!("{trk_data}");
 
-    let out = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data/04_output/");
+    let out = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../data/04_output/");
 
     trk_data
         .to_parquet_simple(out.clone().join("rover_pnt_msr.pq"))

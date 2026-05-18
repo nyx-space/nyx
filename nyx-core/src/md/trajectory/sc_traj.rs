@@ -18,17 +18,17 @@
 
 use super::TrajError;
 use super::{ExportCfg, Traj};
+use crate::State;
 use crate::cosmic::{GuidanceMode, Spacecraft};
 use crate::dynamics::guidance::{ThrustDirectionReplay, Thruster};
 use crate::errors::{FromAlmanacSnafu, NyxError};
 use crate::io::{InputOutputError, MissingDataSnafu, ParquetSnafu, StdIOSnafu};
 use crate::md::prelude::{Interpolatable, StateParameter};
 use crate::time::{Duration, Epoch, TimeUnits};
-use crate::State;
 use anise::analysis::prelude::OrbitalElement;
 use anise::astro::Aberration;
-use anise::ephemerides::ephemeris::Ephemeris;
 use anise::ephemerides::EphemerisError;
+use anise::ephemerides::ephemeris::Ephemeris;
 use anise::errors::AlmanacError;
 use anise::prelude::{Almanac, Frame};
 use arrow::array::RecordBatchReader;
@@ -36,7 +36,7 @@ use arrow::array::{Array, Float64Array, StringArray};
 use hifitime::TimeSeries;
 use log::info;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
-use snafu::{ensure, ResultExt};
+use snafu::{ResultExt, ensure};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
@@ -271,7 +271,7 @@ impl Traj<Spacecraft> {
                                         return Err(InputOutputError::ParseDhall {
                                             data: frame_info.to_string(),
                                             err: format!("{e}"),
-                                        })
+                                        });
                                     }
                                     Ok(deser_frame) => frame = Some(deser_frame),
                                 };
@@ -427,14 +427,14 @@ impl Traj<Spacecraft> {
 #[cfg(test)]
 mod ut_ccsds_oem {
 
-    use crate::cosmic::GuidanceMode;
-    use crate::dynamics::guidance::{LocalFrame, Objective, Ruggiero, Thruster};
-    use crate::md::prelude::{OrbitalDynamics, Propagator, SpacecraftDynamics};
-    use crate::md::StateParameter;
-    use crate::time::{Epoch, TimeUnits};
     use crate::Spacecraft;
     use crate::State;
-    use crate::{io::ExportCfg, md::prelude::Traj, Orbit};
+    use crate::cosmic::GuidanceMode;
+    use crate::dynamics::guidance::{LocalFrame, Objective, Ruggiero, Thruster};
+    use crate::md::StateParameter;
+    use crate::md::prelude::{OrbitalDynamics, Propagator, SpacecraftDynamics};
+    use crate::time::{Epoch, TimeUnits};
+    use crate::{Orbit, io::ExportCfg, md::prelude::Traj};
     use anise::almanac::Almanac;
     use anise::analysis::prelude::OrbitalElement;
     use anise::constants::frames::MOON_J2000;
@@ -715,11 +715,13 @@ mod ut_ccsds_oem {
         // Reload the trajectory and replay
         let reloaded = Traj::<Spacecraft>::from_parquet(&path).unwrap();
         assert_eq!(reloaded.first().mode(), GuidanceMode::Thrust);
-        assert!(reloaded
-            .states
-            .iter()
-            .skip(1)
-            .any(|state| state.thrust_direction().is_some()));
+        assert!(
+            reloaded
+                .states
+                .iter()
+                .skip(1)
+                .any(|state| state.thrust_direction().is_some())
+        );
 
         let reader = ParquetRecordBatchReaderBuilder::try_new(File::open(&path).unwrap())
             .unwrap()

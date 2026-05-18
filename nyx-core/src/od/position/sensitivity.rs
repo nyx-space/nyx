@@ -1,5 +1,5 @@
-use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
+use crate::linalg::allocator::Allocator;
 use crate::od::ODError;
 use crate::{Spacecraft, State};
 use anise::prelude::Almanac;
@@ -9,9 +9,9 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 
 use super::PositionDevice;
+use crate::od::msr::MeasurementType;
 use crate::od::msr::measurement::Measurement;
 use crate::od::msr::sensitivity::{ScalarSensitivity, ScalarSensitivityT, TrackerSensitivity};
-use crate::od::msr::MeasurementType;
 
 impl TrackerSensitivity<Spacecraft, Spacecraft> for PositionDevice
 where
@@ -66,7 +66,7 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, PositionDevice>
             _ => {
                 return Err(ODError::MeasurementSimError {
                     details: format!("{msr_type:?} is not supported by XyzDevice"),
-                })
+                });
             }
         };
 

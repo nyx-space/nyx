@@ -17,14 +17,14 @@
 */
 
 use super::{
-    ra_dec_from_unit_vector, GuidanceError, GuidanceLaw, GuidancePhysicsSnafu, LocalFrame,
+    GuidanceError, GuidanceLaw, GuidancePhysicsSnafu, LocalFrame, ra_dec_from_unit_vector,
 };
+use crate::State;
 use crate::cosmic::{GuidanceMode, Spacecraft};
 use crate::dynamics::guidance::unit_vector_from_ra_dec;
 use crate::linalg::Vector3;
 use crate::polyfit::CommonPolynomial;
 use crate::time::{Epoch, Unit};
-use crate::State;
 use anise::prelude::Almanac;
 use hifitime::{Duration, TimeUnits};
 use serde::{Deserialize, Serialize};

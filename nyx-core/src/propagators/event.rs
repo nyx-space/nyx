@@ -17,15 +17,15 @@
 */
 
 use super::PropagationError;
+use crate::State;
 use crate::dynamics::Dynamics;
-use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
+use crate::linalg::allocator::Allocator;
 use crate::md::trajectory::{Interpolatable, Traj};
 use crate::propagators::{PropAlmanacSnafu, PropAnalysisSnafu, TrajectoryEventSnafu};
 use crate::time::{Duration, Epoch};
-use crate::State;
 use anise::analysis::event::Event;
-use anise::analysis::{brent_solver, AnalysisError};
+use anise::analysis::{AnalysisError, brent_solver};
 use anise::frames::Frame;
 use log::info;
 use rayon::iter::ParallelBridge;

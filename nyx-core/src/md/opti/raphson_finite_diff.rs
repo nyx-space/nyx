@@ -22,7 +22,7 @@ use crate::cosmic::{AstroAlmanacSnafu, AstroPhysicsSnafu};
 use crate::dynamics::guidance::{GuidanceError, LocalFrame, Maneuver, MnvrRepr};
 use crate::errors::TargetingError;
 use crate::linalg::{SMatrix, SVector, Vector6};
-use crate::md::{prelude::*, AstroSnafu, GuidanceSnafu, UnderdeterminedProblemSnafu};
+use crate::md::{AstroSnafu, GuidanceSnafu, UnderdeterminedProblemSnafu, prelude::*};
 use crate::md::{PropSnafu, StateParameter};
 pub use crate::md::{Variable, Vary};
 use crate::polyfit::CommonPolynomial;
@@ -31,7 +31,7 @@ use anise::astro::orbit_gradient::OrbitGrad;
 use hifitime::TimeUnits;
 use log::{debug, error, info};
 use rayon::prelude::*;
-use snafu::{ensure, ResultExt};
+use snafu::{ResultExt, ensure};
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
@@ -104,9 +104,9 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                 if var.component.vec_index() < 3 {
                     // Then this is a position correction, which is not allowed if a frame is provided!
                     let msg = format!(
-                    "Variable is in frame {correction_frame:?} but that frame cannot be used for a {:?} correction",
-                    var.component
-                );
+                        "Variable is in frame {correction_frame:?} but that frame cannot be used for a {:?} correction",
+                        var.component
+                    );
                     error!("{msg}");
                     return Err(TargetingError::FrameError { msg });
                 }
