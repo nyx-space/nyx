@@ -1,0 +1,560 @@
+extern crate nalgebra as na;
+extern crate nyx_space as nyx;
+
+use std::sync::Arc;
+
+use self::nyx::cosmic::{GuidanceMode, Orbit, Spacecraft};
+use self::nyx::dynamics::guidance::{Objective, Ruggiero, Thruster};
+use self::nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
+use self::nyx::md::StateParameter;
+use self::nyx::propagators::{IntegratorOptions, Propagator};
+use self::nyx::time::{Epoch, Unit};
+use anise::analysis::prelude::{
+    Condition, Event, OrbitalElement, ScalarExpr, find_arc_intersections,
+};
+use der::{Decode, Encode};
+use nyx_space::State;
+
+/// NOTE: Herein shows the difference between the QLaw and Ruggiero (and other control laws).
+/// The Ruggiero control law takes quite some longer to converge than the QLaw.
+use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use nyx_space::propagators::IntegratorMethod;
+use rstest::*;
+
+#[fixture]
+fn almanac() -> Arc<Almanac> {
+    use crate::test_almanac_arcd;
+    test_almanac_arcd()
+}
+
+#[rstest]
+fn qlaw_as_ruggiero_case_a(almanac: Arc<Almanac>) {
+    // Source: AAS-2004-5089
+    let eme2k = almanac
+        .frame_info(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(398_600.433);
+
+    let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+
+    let orbit = Orbit::keplerian(7000.0, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, eme2k);
+
+    let prop_time = 39.91 * Unit::Day;
+
+    // Define the dynamics
+    let orbital_dyn = OrbitalDynamics::two_body();
+
+    // Define the thruster
+    let lowt = Thruster {
+        thrust_N: 1.0,
+        isp_s: 3100.0,
+    };
+
+    let objectives = &[
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::SemiMajorAxis),
+            42_000.0,
+            1.0,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Eccentricity),
+            0.01,
+            5e-5,
+        ),
+    ];
+
+    let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
+
+    let dry_mass = 1.0;
+    let prop_mass = 299.0;
+
+    let sc_state =
+        Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
+
+    let mut buf = vec![];
+    sc_state.encode_to_vec(&mut buf).expect("could not encode");
+    let rebuilt = Spacecraft::from_der(&buf).expect("could not decode");
+    assert_eq!(sc_state, rebuilt);
+
+    let sc_dynamics = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
+    println!("[qlaw_as_ruggiero_case_a] {orbit:x}");
+
+    let setup = Propagator::new(
+        sc_dynamics.clone(),
+        IntegratorMethod::RungeKutta4,
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
+    );
+    let mut prop = setup.with(sc_state, almanac.clone());
+    let (final_state, traj) = prop.for_duration_with_traj(prop_time).unwrap();
+    let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
+    println!("[qlaw_as_ruggiero_case_a] {:x}", final_state.orbit);
+    println!("[qlaw_as_ruggiero_case_a] prop usage: {prop_usage:.3} kg");
+    // Find all of the events
+    let sma_event = Event::new(
+        ScalarExpr::Element(OrbitalElement::SemiMajorAxis),
+        Condition::Between(41_999.0, 42_001.0),
+    );
+
+    let sma_arcs = almanac
+        .report_event_arcs(&traj, &sma_event, traj.start_epoch(), traj.end_epoch())
+        .unwrap();
+
+    let ecc_event = Event::new(
+        ScalarExpr::Element(OrbitalElement::Eccentricity),
+        Condition::Between(0.01 - 5e-5, 0.01 + 5e55),
+    );
+
+    let ecc_arcs = almanac
+        .report_event_arcs(&traj, &ecc_event, traj.start_epoch(), traj.end_epoch())
+        .unwrap();
+
+    let both_true = find_arc_intersections(vec![sma_arcs, ecc_arcs]);
+
+    assert!(!both_true.is_empty());
+
+    for (start, end) in both_true {
+        let dur = end - start;
+        let delta_to_end = end - final_state.epoch();
+        let from_start = start - start_time;
+        println!("[qlaw_as_ruggiero_case_a] Conditions met from {start} for {dur}");
+        println!(
+            "[qlaw_as_ruggiero_case_a] Conditions met in {from_start} after guidance law enabled"
+        );
+        // Ensure that the condition is valid until the end of this propagation.
+        assert!(delta_to_end.abs().to_seconds() < 1e-15);
+    }
+
+    assert!(
+        sc_dynamics.guidance_achieved(&final_state).unwrap(),
+        "objective not achieved"
+    );
+
+    assert!((prop_usage - 93.449).abs() < 1.0);
+}
+
+#[rstest]
+fn qlaw_as_ruggiero_case_b(almanac: Arc<Almanac>) {
+    // Source: AAS-2004-5089
+
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+
+    let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+
+    let orbit = Orbit::keplerian(24505.9, 0.725, 7.05, 0.0, 0.0, 0.0, start_time, eme2k);
+
+    let prop_time = 160.0 * Unit::Day;
+
+    // Define the dynamics
+    let orbital_dyn = OrbitalDynamics::two_body();
+
+    // Define the thruster
+    let lowt = Thruster {
+        thrust_N: 0.350,
+        isp_s: 2000.0,
+    };
+
+    let objectives = &[
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::SemiMajorAxis),
+            42_165.0,
+            20.0,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Eccentricity),
+            0.001,
+            5e-5,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Inclination),
+            0.05,
+            5e-3,
+        ),
+    ];
+
+    let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
+
+    let prop_mass = 1999.9;
+    let dry_mass = 0.1;
+
+    let sc_state =
+        Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
+
+    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
+    println!("[qlaw_as_ruggiero_case_b] {orbit:x}");
+
+    let final_state = Propagator::new(
+        sc.clone(),
+        IntegratorMethod::RungeKutta4,
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
+    )
+    .with(sc_state, almanac)
+    .for_duration(prop_time)
+    .unwrap();
+
+    let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
+    println!("[qlaw_as_ruggiero_case_b] {:x}", final_state.orbit);
+    println!("[qlaw_as_ruggiero_case_b] prop usage: {prop_usage:.3} kg");
+
+    assert!(
+        sc.guidance_achieved(&final_state).unwrap(),
+        "objective not achieved"
+    );
+
+    assert!((prop_usage - 223.515).abs() < 1.0);
+}
+
+#[rstest]
+fn qlaw_as_ruggiero_case_c(almanac: Arc<Almanac>) {
+    // Source: AAS-2004-5089
+
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+
+    let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+
+    let orbit = Orbit::keplerian(9222.7, 0.2, 0.573, 0.0, 0.0, 0.0, start_time, eme2k);
+
+    let prop_time = 3.0 * Unit::Day;
+
+    // Define the dynamics
+    let orbital_dyn = OrbitalDynamics::two_body();
+
+    // Define the thruster
+    let lowt = Thruster {
+        thrust_N: 9.3,
+        isp_s: 3100.0,
+    };
+
+    let objectives = &[
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::SemiMajorAxis),
+            30_000.0,
+            1.0,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Eccentricity),
+            0.7,
+            5e-5,
+        ),
+    ];
+
+    let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
+
+    let prop_mass = 299.9;
+    let dry_mass = 0.1;
+
+    let sc_state =
+        Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
+
+    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
+    println!("[qlaw_as_ruggiero_case_c] {orbit:x}");
+
+    let final_state = Propagator::new(
+        sc.clone(),
+        IntegratorMethod::RungeKutta4,
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
+    )
+    .with(sc_state, almanac)
+    .for_duration(prop_time)
+    .unwrap();
+
+    let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
+    println!("[qlaw_as_ruggiero_case_c] {:x}", final_state.orbit);
+    println!("[qlaw_as_ruggiero_case_c] prop usage: {prop_usage:.3} kg");
+
+    assert!(
+        sc.guidance_achieved(&final_state).unwrap(),
+        "objective not achieved"
+    );
+    assert!((prop_usage - 41.742).abs() < 1.0);
+}
+
+#[rstest]
+#[ignore = "https://gitlab.com/chrisrabotin/nyx/issues/103"]
+fn qlaw_as_ruggiero_case_d(almanac: Arc<Almanac>) {
+    // Broken: https://gitlab.com/chrisrabotin/nyx/issues/103
+    // Source: AAS-2004-5089
+
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+
+    let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+
+    let orbit = Orbit::keplerian(24505.9, 0.725, 0.06, 0.0, 0.0, 0.0, start_time, eme2k);
+
+    let prop_time = 113.0 * Unit::Day;
+
+    // Define the dynamics
+    let orbital_dyn = OrbitalDynamics::two_body();
+
+    // Define the thruster
+    let lowt = Thruster {
+        thrust_N: 89e-3,
+        isp_s: 1650.0,
+    };
+
+    let objectives = &[
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::SemiMajorAxis),
+            26_500.0,
+            1.0,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Inclination),
+            116.0,
+            5e-3,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Eccentricity),
+            0.7,
+            5e-5,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::RAAN),
+            360.0 - 90.0,
+            5e-3,
+        ),
+    ];
+
+    let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
+
+    let prop_mass = 67.0;
+    let dry_mass = 300.0;
+
+    let sc_state =
+        Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
+
+    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
+    println!("[qlaw_as_ruggiero_case_d] {orbit:x}");
+
+    let final_state = Propagator::new(
+        sc.clone(),
+        IntegratorMethod::RungeKutta4,
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
+    )
+    .with(sc_state, almanac)
+    .for_duration(prop_time)
+    .unwrap();
+
+    let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
+    println!("[qlaw_as_ruggiero_case_d] {:x}", final_state.orbit);
+    println!("[qlaw_as_ruggiero_case_d] prop usage: {prop_usage:.3} kg");
+
+    assert!(
+        sc.guidance_achieved(&final_state).unwrap(),
+        "objective not achieved"
+    );
+
+    assert!((prop_usage - 23.0).abs() < 1.0);
+}
+
+#[rstest]
+#[ignore = "https://gitlab.com/chrisrabotin/nyx/issues/103"]
+fn qlaw_as_ruggiero_case_e(almanac: Arc<Almanac>) {
+    // Broken: https://gitlab.com/chrisrabotin/nyx/issues/103
+    // Source: AAS-2004-5089
+
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+
+    let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+
+    let orbit = Orbit::keplerian(24505.9, 0.725, 0.06, 0.0, 0.0, 0.0, start_time, eme2k);
+
+    let prop_time = 400.0 * Unit::Day;
+
+    // Define the dynamics
+    let orbital_dyn = OrbitalDynamics::two_body();
+
+    // Define the thruster
+    let lowt = Thruster {
+        thrust_N: 89e-3,
+        isp_s: 1650.0,
+    };
+
+    let objectives = &[
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::SemiMajorAxis),
+            26_500.0,
+            1.0,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Eccentricity),
+            0.7,
+            5e-5,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Inclination),
+            116.0,
+            5e-3,
+        ),
+        Objective::within_tolerance(StateParameter::Element(OrbitalElement::RAAN), 270.0, 5e-3),
+        Objective::within_tolerance(StateParameter::Element(OrbitalElement::AoP), 180.0, 5e-3),
+    ];
+
+    let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
+
+    let prop_mass = 1999.9;
+    let dry_mass = 0.1;
+
+    let sc_state =
+        Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
+
+    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
+    println!("[qlaw_as_ruggiero_case_e] {orbit:x}");
+
+    let final_state = Propagator::new(
+        sc.clone(),
+        IntegratorMethod::RungeKutta4,
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
+    )
+    .with(sc_state, almanac)
+    .for_duration(prop_time)
+    .unwrap();
+
+    let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
+    println!("[qlaw_as_ruggiero_case_e] {:x}", final_state.orbit);
+    println!("[qlaw_as_ruggiero_case_e] prop usage: {prop_usage:.3} kg");
+
+    assert!(
+        sc.guidance_achieved(&final_state).unwrap(),
+        "objective not achieved"
+    );
+
+    assert!((prop_usage - 23.0).abs() < 1.0);
+}
+
+#[rstest]
+fn qlaw_as_ruggiero_case_f(almanac: Arc<Almanac>) {
+    // Source: AAS-2004-5089
+    /*
+        NOTE: Due to how lifetime of variables work in Rust, we need to define all of the
+        components of a spacecraft before defining the spacecraft itself.
+    */
+
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+
+    let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+
+    let orbit = Orbit::keplerian(15378.0, 0.01, 98.7, 0.0, 0.0, 0.0, start_time, eme2k);
+
+    let prop_time = 30.0 * Unit::Day;
+
+    // Define the dynamics
+    let orbital_dyn = OrbitalDynamics::two_body();
+
+    // Define the thruster
+    let lowt = Thruster {
+        thrust_N: 89e-3,
+        isp_s: 1650.0,
+    };
+
+    let objectives = &[Objective::new(
+        StateParameter::Element(OrbitalElement::Eccentricity),
+        0.15,
+    )];
+
+    let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
+
+    let prop_mass = 67.0;
+    let dry_mass = 300.0;
+
+    let sc_state =
+        Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
+
+    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
+    println!("[qlaw_as_ruggiero_case_f] {orbit:x}");
+
+    let setup = Propagator::new(
+        sc.clone(),
+        IntegratorMethod::RungeKutta4,
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
+    );
+    let (final_state, traj) = setup
+        .with(sc_state, almanac.clone())
+        .for_duration_with_traj(prop_time)
+        .unwrap();
+
+    // Save as parquet
+    traj.to_parquet_simple("../data/04_output/rugg_case_f.parquet")
+        .unwrap();
+
+    let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
+    println!("[qlaw_as_ruggiero_case_f] {:x}", final_state.orbit);
+    println!("[qlaw_as_ruggiero_case_f] prop usage: {prop_usage:.3} kg");
+
+    assert!(
+        sc.guidance_achieved(&final_state).unwrap(),
+        "objective not achieved"
+    );
+
+    assert!((prop_usage - 10.378).abs() < 1.0);
+}
+
+#[rstest]
+fn ruggiero_iepc_2011_102(almanac: Arc<Almanac>) {
+    // Source: IEPC 2011 102
+    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+
+    let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+
+    let orbit = Orbit::keplerian(24396.0, 0.7283, 7.0, 1.0, 1.0, 1.0, start_time, eme2k);
+
+    let prop_time = 105.0 * Unit::Day;
+
+    // Define the dynamics
+    let orbital_dyn = OrbitalDynamics::two_body();
+
+    // Define the thruster
+    let lowt = Thruster {
+        thrust_N: 89e-3,
+        isp_s: 1650.0,
+    };
+
+    let objectives = &[
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::SemiMajorAxis),
+            42_164.0,
+            20.0,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Inclination),
+            0.001,
+            5e-3,
+        ),
+        Objective::within_tolerance(
+            StateParameter::Element(OrbitalElement::Eccentricity),
+            0.011,
+            5e-5,
+        ),
+    ];
+
+    let ruggiero_ctrl = Ruggiero::simple(objectives, orbit.into()).unwrap();
+
+    let prop_mass = 67.0;
+    let dry_mass = 300.0;
+
+    let sc_state =
+        Spacecraft::from_thruster(orbit, dry_mass, prop_mass, lowt, GuidanceMode::Thrust);
+
+    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
+    println!("[ruggiero_iepc_2011_102] {orbit:x}");
+
+    let final_state = Propagator::new(
+        sc.clone(),
+        IntegratorMethod::RungeKutta4,
+        IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
+    )
+    .with(sc_state, almanac)
+    .for_duration(prop_time)
+    .unwrap();
+
+    let prop_usage = prop_mass - final_state.mass.prop_mass_kg;
+    println!("[ruggiero_iepc_2011_102] {:x}", final_state.orbit);
+    println!("[ruggiero_iepc_2011_102] prop usage: {prop_usage:.3} kg");
+
+    assert!(
+        sc.guidance_achieved(&final_state).unwrap(),
+        "objective not achieved"
+    );
+
+    // WARNING: Paper claims this can be done with only 49kg of prop.
+    assert!((prop_usage - 49.0).abs() < 1.0);
+}

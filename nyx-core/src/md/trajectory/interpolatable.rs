@@ -1,0 +1,148 @@
+/*
+    Nyx, blazing fast astrodynamics
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
+use anise::analysis::prelude::OrbitalElement;
+use anise::math::interpolation::{InterpolationError, hermite_eval};
+
+pub(crate) const INTERPOLATION_SAMPLES: usize = 13;
+
+use super::StateParameter;
+use crate::cosmic::Frame;
+use crate::dynamics::guidance::LocalFrame;
+use crate::linalg::DefaultAllocator;
+use crate::linalg::allocator::Allocator;
+use crate::time::Epoch;
+use crate::{Orbit, Spacecraft, State};
+
+/// States that can be interpolated should implement this trait.
+pub trait Interpolatable: State
+where
+    Self: Sized,
+    DefaultAllocator:
+        Allocator<Self::Size> + Allocator<Self::Size, Self::Size> + Allocator<Self::VecLength>,
+{
+    /// Interpolates a new state at the provided epochs given a slice of states.
+    fn interpolate(self, epoch: Epoch, states: &[Self]) -> Result<Self, InterpolationError>;
+
+    /// Returns the frame of this state
+    fn frame(&self) -> Frame;
+
+    /// Sets the frame of this state
+    fn set_frame(&mut self, frame: Frame);
+
+    /// List of state parameters that will be exported to a trajectory file in addition to the epoch (provided in this different formats).
+    fn export_params() -> Vec<StateParameter>;
+}
+
+impl Interpolatable for Spacecraft {
+    fn interpolate(mut self, epoch: Epoch, states: &[Self]) -> Result<Self, InterpolationError> {
+        // Interpolate the Orbit first
+        // Statically allocated arrays of the maximum number of samples
+        let mut epochs_tdb = [0.0; INTERPOLATION_SAMPLES];
+        let mut xs = [0.0; INTERPOLATION_SAMPLES];
+        let mut ys = [0.0; INTERPOLATION_SAMPLES];
+        let mut zs = [0.0; INTERPOLATION_SAMPLES];
+        let mut vxs = [0.0; INTERPOLATION_SAMPLES];
+        let mut vys = [0.0; INTERPOLATION_SAMPLES];
+        let mut vzs = [0.0; INTERPOLATION_SAMPLES];
+
+        for (cno, state) in states.iter().enumerate() {
+            xs[cno] = state.orbit.radius_km.x;
+            ys[cno] = state.orbit.radius_km.y;
+            zs[cno] = state.orbit.radius_km.z;
+            vxs[cno] = state.orbit.velocity_km_s.x;
+            vys[cno] = state.orbit.velocity_km_s.y;
+            vzs[cno] = state.orbit.velocity_km_s.z;
+            epochs_tdb[cno] = state.epoch().to_et_seconds();
+        }
+
+        // Ensure that if we don't have enough states, we only interpolate using what we have instead of INTERPOLATION_SAMPLES
+        let n = states.len();
+
+        let (x_km, vx_km_s) =
+            hermite_eval(&epochs_tdb[..n], &xs[..n], &vxs[..n], epoch.to_et_seconds())?;
+
+        let (y_km, vy_km_s) =
+            hermite_eval(&epochs_tdb[..n], &ys[..n], &vys[..n], epoch.to_et_seconds())?;
+
+        let (z_km, vz_km_s) =
+            hermite_eval(&epochs_tdb[..n], &zs[..n], &vzs[..n], epoch.to_et_seconds())?;
+
+        self.orbit = Orbit::new(
+            x_km,
+            y_km,
+            z_km,
+            vx_km_s,
+            vy_km_s,
+            vz_km_s,
+            epoch,
+            self.orbit.frame,
+        );
+
+        // Fuel is linearly interpolated -- should really be a Lagrange interpolation here
+        let first = states.first().unwrap();
+        let last = states.last().unwrap();
+        let prop_kg_dt = (last.mass.prop_mass_kg - first.mass.prop_mass_kg)
+            / (last.epoch() - first.epoch()).to_seconds();
+
+        self.mass.prop_mass_kg += prop_kg_dt * (epoch - first.epoch()).to_seconds();
+        // Thrust direction is a discrete guidance output and should not be interpolated.
+        self.thrust_direction = None;
+
+        Ok(self)
+    }
+
+    fn frame(&self) -> Frame {
+        self.orbit.frame
+    }
+
+    fn set_frame(&mut self, frame: Frame) {
+        self.orbit.frame = frame;
+    }
+
+    fn export_params() -> Vec<StateParameter> {
+        vec![
+            StateParameter::Element(OrbitalElement::X),
+            StateParameter::Element(OrbitalElement::Y),
+            StateParameter::Element(OrbitalElement::Z),
+            StateParameter::Element(OrbitalElement::VX),
+            StateParameter::Element(OrbitalElement::VY),
+            StateParameter::Element(OrbitalElement::VZ),
+            StateParameter::Element(OrbitalElement::SemiMajorAxis),
+            StateParameter::Element(OrbitalElement::Eccentricity),
+            StateParameter::Element(OrbitalElement::Inclination),
+            StateParameter::Element(OrbitalElement::RAAN),
+            StateParameter::Element(OrbitalElement::AoP),
+            StateParameter::Element(OrbitalElement::TrueAnomaly),
+            StateParameter::Element(OrbitalElement::AoL),
+            StateParameter::Element(OrbitalElement::TrueLongitude),
+            StateParameter::DryMass(),
+            StateParameter::PropMass(),
+            StateParameter::Cr(),
+            StateParameter::Cd(),
+            StateParameter::Isp(),
+            StateParameter::GuidanceMode(),
+            StateParameter::Thrust(),
+            StateParameter::ThrustX(),
+            StateParameter::ThrustY(),
+            StateParameter::ThrustZ(),
+            StateParameter::ThrustInPlane(LocalFrame::RCN),
+            StateParameter::ThrustOutOfPlane(LocalFrame::RCN),
+        ]
+    }
+}

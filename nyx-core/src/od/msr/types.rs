@@ -1,0 +1,189 @@
+/*
+    Nyx, blazing fast astrodynamics
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
+use anise::astro::AzElRange;
+use arrow::datatypes::{DataType, Field};
+use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, str::FromStr};
+
+use crate::{io::InputOutputError, od::ODError};
+
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
+#[cfg_attr(
+    feature = "python",
+    pyclass(from_py_object),
+    pyo3(module = "nyx_space.od")
+)]
+#[derive(Copy, Clone, Debug, Hash, Serialize, Deserialize, PartialEq, Eq, der::Enumerated)]
+#[repr(u8)]
+pub enum MeasurementType {
+    #[serde(rename = "range_km")]
+    Range = 0,
+    #[serde(rename = "doppler_km_s")]
+    Doppler = 1,
+    #[serde(rename = "azimuth_deg")]
+    Azimuth = 2,
+    #[serde(rename = "elevation_deg")]
+    Elevation = 3,
+    #[serde(rename = "receive_freq")]
+    ReceiveFrequency = 4,
+    #[serde(rename = "transmit_freq")]
+    TransmitFrequency = 5,
+    #[serde(rename = "transmit_freq_rate")]
+    TransmitFrequencyRate = 9,
+    #[serde(rename = "x")]
+    X = 6,
+    #[serde(rename = "y")]
+    Y = 7,
+    #[serde(rename = "z")]
+    Z = 8,
+}
+
+impl MeasurementType {
+    /// Returns the expected unit of this measurement type
+    pub fn unit(self) -> &'static str {
+        match self {
+            Self::Range => "km",
+            Self::Doppler => "km/s",
+            Self::Azimuth | Self::Elevation => "deg",
+            Self::ReceiveFrequency | Self::TransmitFrequency => "Hz",
+            Self::TransmitFrequencyRate => "Hz/s",
+            Self::X | Self::Y | Self::Z => "km",
+        }
+    }
+
+    /// Returns true if this measurement type could be a two-way measurement.
+    pub(crate) fn may_be_two_way(self) -> bool {
+        match self {
+            MeasurementType::Range | MeasurementType::Doppler => true,
+            MeasurementType::Azimuth
+            | MeasurementType::Elevation
+            | MeasurementType::ReceiveFrequency
+            | MeasurementType::TransmitFrequency
+            | MeasurementType::TransmitFrequencyRate
+            | MeasurementType::X
+            | MeasurementType::Y
+            | MeasurementType::Z => false,
+        }
+    }
+
+    /// Returns the fields for this kind of measurement. The metadata includes a `unit` field with the unit.
+    /// Column is nullable in case there is no such measurement at a given epoch.
+    pub fn to_field(&self) -> Field {
+        let mut meta = HashMap::new();
+        meta.insert("unit".to_string(), self.unit().to_string());
+
+        Field::new(
+            format!("{self:?} ({})", self.unit()),
+            DataType::Float64,
+            true,
+        )
+        .with_metadata(meta)
+    }
+
+    /// Computes the one way measurement from an AER object and the noise of this measurement type, returned in the units of this measurement type.
+    pub fn compute_one_way(self, aer: AzElRange, noise: f64) -> Result<f64, ODError> {
+        match self {
+            Self::Range => Ok(aer.range_km + noise),
+            Self::Doppler => Ok(aer.range_rate_km_s + noise),
+            Self::Azimuth => Ok(aer.azimuth_deg + noise),
+            Self::Elevation => Ok(aer.elevation_deg + noise),
+            Self::ReceiveFrequency | Self::TransmitFrequency | Self::TransmitFrequencyRate => {
+                Err(ODError::MeasurementSimError {
+                    details: format!("{self:?} is only supported in CCSDS TDM parsing"),
+                })
+            }
+            Self::X | Self::Y | Self::Z => Err(ODError::MeasurementSimError {
+                details: format!("{self:?} must be computed directly from the state"),
+            }),
+        }
+    }
+
+    /// Computes the two way measurement from two AER values and the noise of this measurement type, returned in the units of this measurement type.
+    /// Two way is modeled by averaging the measurement in between both times, and adding the noise divided by sqrt(2).
+    pub fn compute_two_way(
+        self,
+        aer_t0: AzElRange,
+        aer_t1: AzElRange,
+        noise: f64,
+    ) -> Result<f64, ODError> {
+        match self {
+            Self::Range => {
+                let range_km = (aer_t1.range_km + aer_t0.range_km) * 0.5;
+                Ok(range_km + noise / 2.0_f64.sqrt())
+            }
+            Self::Doppler => {
+                let doppler_km_s = (aer_t1.range_rate_km_s + aer_t0.range_rate_km_s) * 0.5;
+                Ok(doppler_km_s + noise / 2.0_f64.sqrt())
+            }
+            Self::Azimuth => {
+                let az_deg = (aer_t1.azimuth_deg + aer_t0.azimuth_deg) * 0.5;
+                Ok(az_deg + noise / 2.0_f64.sqrt())
+            }
+            Self::Elevation => {
+                let el_deg = (aer_t1.elevation_deg + aer_t0.elevation_deg) * 0.5;
+                Ok(el_deg + noise / 2.0_f64.sqrt())
+            }
+            Self::ReceiveFrequency | Self::TransmitFrequency | Self::TransmitFrequencyRate => {
+                Err(ODError::MeasurementSimError {
+                    details: format!("{self:?} is only supported in CCSDS TDM parsing"),
+                })
+            }
+            Self::X | Self::Y | Self::Z => Err(ODError::MeasurementSimError {
+                details: format!("{self:?} is not supported for two way measurements"),
+            }),
+        }
+    }
+
+    /// Returns the CCSDS TDM name for this measurement type.
+    pub fn ccsds_tdm_name(&self) -> &str {
+        match self {
+            MeasurementType::Range => "RANGE",
+            MeasurementType::Doppler => "DOPPLER_INTEGRATED",
+            MeasurementType::Azimuth => "ANGLE_1",
+            MeasurementType::Elevation => "ANGLE_2",
+            MeasurementType::ReceiveFrequency => "RECEIVE_FREQ",
+            MeasurementType::TransmitFrequency => "TRANSMIT_FREQ",
+            MeasurementType::TransmitFrequencyRate => "TRANSMIT_FREQ_RATE",
+            MeasurementType::X => "X",
+            MeasurementType::Y => "Y",
+            MeasurementType::Z => "Z",
+        }
+    }
+}
+
+impl FromStr for MeasurementType {
+    type Err = InputOutputError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "range" => Ok(Self::Range),
+            "doppler" => Ok(Self::Doppler),
+            "azimuth" => Ok(Self::Azimuth),
+            "elevation" => Ok(Self::Elevation),
+            "x" => Ok(Self::X),
+            "y" => Ok(Self::Y),
+            "z" => Ok(Self::Z),
+            _ => Err(InputOutputError::UnsupportedData {
+                which: s.to_string(),
+            }),
+        }
+    }
+}

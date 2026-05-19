@@ -24,13 +24,9 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
-          # targets: wasm32-unknown-unknown
 
       - name: Run cargo check
         run: cargo check
-
-      # - name: Run cargo check for WASM target
-      #   run: cargo check --target wasm32-unknown-unknown
 
   tests:
     strategy:
@@ -74,16 +70,17 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo-
 
       - name: Unit Test (debug)
-        run: ls -lR data/ && cargo test --lib
+        run: ls -lR data/ && cargo test --workspace --exclude nyx-py --lib
 
       - name: All integration tests (release)
-        run: cargo test --release --test "*"
+        run: cargo test --workspace --exclude nyx-py --release --test "*"
 
       - name: Doc Test
-        run: cargo test --doc
+        run: cargo test --workspace --exclude nyx-py --doc
 
       - name: Run examples
         run: |
+          cd nyx-core
           cargo build --example 01_orbit_prop --release
           cargo build --example 02_jwst --release
           cargo build --example 03_geo_drift --release
@@ -115,6 +112,7 @@ jobs:
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Generate full code coverage
         run: |
+          cd nyx-core
           cargo llvm-cov test --release --lib --no-report
           cargo llvm-cov test --release --no-report
           cargo llvm-cov report --release --lcov --output-path lcov.info
