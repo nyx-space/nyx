@@ -308,7 +308,7 @@ pub struct StochasticState {
 mod ut_stochastics {
     use std::path::PathBuf;
 
-    use super::{white::WhiteNoise, StochasticNoise};
+    use super::{StochasticNoise, white::WhiteNoise};
 
     #[test]
     fn test_simulate_zero() {

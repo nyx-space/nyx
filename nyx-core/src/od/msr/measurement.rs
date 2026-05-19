@@ -20,7 +20,7 @@ use super::MeasurementType;
 use hifitime::Epoch;
 use indexmap::{IndexMap, IndexSet};
 use log::debug;
-use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, OVector};
+use nalgebra::{DefaultAllocator, DimName, OVector, allocator::Allocator};
 use std::fmt;
 
 #[cfg(feature = "python")]

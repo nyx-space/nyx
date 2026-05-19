@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::cosmic::{GuidanceMode, Orbit, Spacecraft, STD_GRAVITY};
+use crate::cosmic::{GuidanceMode, Orbit, STD_GRAVITY, Spacecraft};
 use crate::errors::{NyxError, StateError};
 use crate::linalg::Vector3;
 use anise::astro::PhysicsResult;

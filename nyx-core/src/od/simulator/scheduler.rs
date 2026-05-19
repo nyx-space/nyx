@@ -16,10 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+pub use crate::State;
 use crate::io::{
     duration_from_str, duration_to_str, maybe_duration_from_str, maybe_duration_to_str,
 };
-pub use crate::State;
 use der::{Decode, Encode, Enumerated, Reader};
 use hifitime::{Duration, Unit};
 use serde::Deserialize;

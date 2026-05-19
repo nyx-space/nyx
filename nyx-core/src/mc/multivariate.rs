@@ -21,7 +21,7 @@ use crate::cosmic::AstroPhysicsSnafu;
 use crate::errors::StateError;
 use crate::md::prelude::BPlane;
 use crate::md::{AstroSnafu, StateParameter};
-use crate::{pseudo_inverse, NyxError, Spacecraft, State};
+use crate::{NyxError, Spacecraft, State, pseudo_inverse};
 use anise::analysis::prelude::OrbitalElement;
 use anise::astro::orbit_gradient::OrbitGrad;
 use nalgebra::{DMatrix, DVector, SMatrix, SVector};
@@ -334,9 +334,9 @@ impl Distribution<DispersedState<Spacecraft>> for MvnSpacecraft {
 #[cfg(test)]
 mod multivariate_ut {
     use super::*;
-    use crate::time::Epoch;
-    use crate::Spacecraft;
     use crate::GMAT_EARTH_GM;
+    use crate::Spacecraft;
+    use crate::time::Epoch;
     use anise::constants::frames::EARTH_J2000;
     use anise::prelude::Orbit;
     use rand::RngExt;
@@ -444,10 +444,12 @@ mod multivariate_ut {
         let std_dev = 1.0;
         let generator = MvnSpacecraft::new(
             state,
-            vec![StateDispersion::builder()
-                .param(StateParameter::Element(OrbitalElement::Rmag))
-                .std_dev(std_dev)
-                .build()],
+            vec![
+                StateDispersion::builder()
+                    .param(StateParameter::Element(OrbitalElement::Rmag))
+                    .std_dev(std_dev)
+                    .build(),
+            ],
         )
         .unwrap();
 
@@ -478,9 +480,9 @@ mod multivariate_ut {
         use anise::constants::frames::EARTH_J2000;
         use anise::prelude::Orbit;
 
-        use crate::time::Epoch;
-        use crate::Spacecraft;
         use crate::GMAT_EARTH_GM;
+        use crate::Spacecraft;
+        use crate::time::Epoch;
 
         use rand_pcg::Pcg64Mcg;
 
