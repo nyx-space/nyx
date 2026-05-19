@@ -46,7 +46,7 @@ pub use config::*;
 pub use discrete_event::*;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub struct SpacecraftSequence {
     #[serde(serialize_with = "map_as_pairs", deserialize_with = "pairs_as_map")]
     pub seq: BTreeMap<Epoch, Phase>,

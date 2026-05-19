@@ -37,7 +37,7 @@ jobs:
           target: ${{ matrix.target }}
           args: --release --out dist --find-interpreter
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-          manylinux: auto
+          manylinux: 2_28
           working-directory: nyx-py
           before-script-linux: |
             # Source: https://github.com/sfackler/rust-openssl/issues/2036#issuecomment-1724324145

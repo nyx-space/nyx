@@ -30,8 +30,8 @@ use typed_builder::TypedBuilder;
 
 use super::{AstroPhysicsSnafu, BPlane, State};
 use crate::cosmic::AstroAnalysisSnafu;
+use crate::dynamics::guidance::{plane_angles_from_unit_vector, LocalFrame, Thruster};
 use crate::dynamics::DynamicsError;
-use crate::dynamics::guidance::{LocalFrame, Thruster, plane_angles_from_unit_vector};
 use crate::errors::{StateAstroSnafu, StateError};
 use crate::io::ConfigRepr;
 use crate::linalg::{Const, DimName, OMatrix, OVector};
@@ -47,7 +47,7 @@ use std::ops::Add;
 use pyo3::prelude::*;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default, Enumerated)]
-#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyclass(from_py_object))]
 #[repr(u8)]
 pub enum GuidanceMode {
     /// Guidance is turned off and Guidance Law may switch mode to Thrust for next call
@@ -83,7 +83,7 @@ impl From<GuidanceMode> for f64 {
 
 /// Applied thrust direction stored in inertial coordinates for the current propagated state.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, Default)]
-#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub struct ThrustDirection {
     pub x: f64,
     pub y: f64,
@@ -111,7 +111,7 @@ impl From<ThrustDirection> for Vector3<f64> {
 ///
 /// Optionally, the spacecraft state can also store the state transition matrix from the start of the propagation until the current time (i.e. trajectory STM, not step-size STM).
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, TypedBuilder)]
-#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub struct Spacecraft {
     /// Initial orbit of the vehicle
     pub orbit: Orbit,

@@ -21,7 +21,7 @@ use crate::cosmic::AstroPhysicsSnafu;
 use crate::errors::StateError;
 use crate::md::prelude::BPlane;
 use crate::md::{AstroSnafu, StateParameter};
-use crate::{NyxError, Spacecraft, State, pseudo_inverse};
+use crate::{pseudo_inverse, NyxError, Spacecraft, State};
 use anise::analysis::prelude::OrbitalElement;
 use anise::astro::orbit_gradient::OrbitGrad;
 use nalgebra::{DMatrix, DVector, SMatrix, SVector};
@@ -57,7 +57,7 @@ use pyo3::prelude::*;
 /// 2.  **Geometry**: Uncertainties defined in orbital elements form complex shapes (like "bananas") in Cartesian space. A multivariate normal approximation in Cartesian space captures the principal axes and orientation of this uncertainty volume, which an axis-aligned bounding box (implied by independent sampling) effectively destroys.
 /// 3.  **Consistency**: By using the Jacobian transformation, we ensure that the generated samples, when mapped back to the parameter space (linearized), reproduce the input statistics (mean and standard deviation) provided by the user.
 #[derive(Clone, Debug)]
-#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub struct MvnSpacecraft {
     /// The template state
     pub template: Spacecraft,
@@ -334,9 +334,9 @@ impl Distribution<DispersedState<Spacecraft>> for MvnSpacecraft {
 #[cfg(test)]
 mod multivariate_ut {
     use super::*;
-    use crate::GMAT_EARTH_GM;
-    use crate::Spacecraft;
     use crate::time::Epoch;
+    use crate::Spacecraft;
+    use crate::GMAT_EARTH_GM;
     use anise::constants::frames::EARTH_J2000;
     use anise::prelude::Orbit;
     use rand::RngExt;
@@ -444,12 +444,10 @@ mod multivariate_ut {
         let std_dev = 1.0;
         let generator = MvnSpacecraft::new(
             state,
-            vec![
-                StateDispersion::builder()
-                    .param(StateParameter::Element(OrbitalElement::Rmag))
-                    .std_dev(std_dev)
-                    .build(),
-            ],
+            vec![StateDispersion::builder()
+                .param(StateParameter::Element(OrbitalElement::Rmag))
+                .std_dev(std_dev)
+                .build()],
         )
         .unwrap();
 
@@ -480,9 +478,9 @@ mod multivariate_ut {
         use anise::constants::frames::EARTH_J2000;
         use anise::prelude::Orbit;
 
-        use crate::GMAT_EARTH_GM;
-        use crate::Spacecraft;
         use crate::time::Epoch;
+        use crate::Spacecraft;
+        use crate::GMAT_EARTH_GM;
 
         use rand_pcg::Pcg64Mcg;
 

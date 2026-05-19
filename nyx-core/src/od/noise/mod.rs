@@ -57,7 +57,7 @@ pub trait Stochastics {
 ///
 /// This implementation distinguishes between the white noise model and the bias model. It also includes a constant offset.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "python", pyclass(get_all, set_all))]
+#[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct StochasticNoise {
     pub white_noise: Option<WhiteNoise>,
     pub bias: Option<GaussMarkov>,
@@ -308,7 +308,7 @@ pub struct StochasticState {
 mod ut_stochastics {
     use std::path::PathBuf;
 
-    use super::{StochasticNoise, white::WhiteNoise};
+    use super::{white::WhiteNoise, StochasticNoise};
 
     #[test]
     fn test_simulate_zero() {

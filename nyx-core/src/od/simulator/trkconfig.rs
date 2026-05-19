@@ -18,7 +18,7 @@
 
 use super::scheduler::Scheduler;
 use crate::io::ConfigRepr;
-use crate::io::{ConfigError, duration_from_str, duration_to_str, epoch_from_str, epoch_to_str};
+use crate::io::{duration_from_str, duration_to_str, epoch_from_str, epoch_to_str, ConfigError};
 use der::{Decode, Encode, Reader};
 use hifitime::TimeUnits;
 use hifitime::{Duration, Epoch, TimeScale};
@@ -36,7 +36,7 @@ use typed_builder::TypedBuilder;
 /// By default, the tracking configuration is continuous and the tracking arc is from the beginning of the simulation to the end.
 /// In Python, any value that is set to None at initialization will use the default values.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypedBuilder)]
-#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyclass(from_py_object))]
 #[builder(doc)]
 pub struct TrkConfig {
     /// Set to automatically build a tracking schedule based on some criteria
@@ -264,7 +264,7 @@ impl Default for TrkConfig {
 
 /// Stores a tracking strand with a start and end epoch
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
-#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub struct Strand {
     #[serde(serialize_with = "epoch_to_str", deserialize_with = "epoch_from_str")]
     pub start: Epoch,

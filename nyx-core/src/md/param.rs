@@ -28,7 +28,7 @@ use std::collections::HashMap;
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 
-#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyclass(from_py_object))]
 #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize, StaticType)]
 pub enum StateParameter {

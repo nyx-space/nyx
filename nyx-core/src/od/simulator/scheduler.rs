@@ -16,10 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub use crate::State;
 use crate::io::{
     duration_from_str, duration_to_str, maybe_duration_from_str, maybe_duration_to_str,
 };
+pub use crate::State;
 use der::{Decode, Encode, Enumerated, Reader};
 use hifitime::{Duration, Unit};
 use serde::Deserialize;
@@ -33,7 +33,7 @@ use pyo3::{exceptions::PyValueError, prelude::*, types::PyBytes, types::PyType};
 /// Defines the handoff from a current ground station to the next one that is visible to prevent overlapping of measurements
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize, Default, Enumerated)]
 #[repr(u8)]
-#[cfg_attr(feature = "python", pyclass(eq, eq_int))]
+#[cfg_attr(feature = "python", pyclass(from_py_object, eq, eq_int))]
 pub enum Handoff {
     /// If a new station is in visibility of the spacecraft, the "Eager" station will immediately stop tracking and switch over (default)
     #[default]
@@ -58,7 +58,7 @@ impl Handoff {
 
 /// A scheduler allows building a scheduling of spaceraft tracking for a set of ground stations.
 #[derive(Copy, Clone, Debug, Default, Deserialize, PartialEq, Serialize, TypedBuilder)]
-#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyclass(from_py_object))]
 #[builder(doc)]
 pub struct Scheduler {
     /// Handoff strategy if two trackers see the vehicle at the same time
@@ -101,7 +101,7 @@ pub enum Cadence {
 }
 
 #[cfg(feature = "python")]
-#[pyclass(name = "Cadence")]
+#[pyclass(from_py_object, name = "Cadence")]
 #[derive(Clone, Debug)]
 pub struct PyCadence {
     pub inner: Cadence,

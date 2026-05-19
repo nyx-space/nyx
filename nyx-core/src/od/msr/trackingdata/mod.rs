@@ -15,13 +15,13 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use super::{MeasurementType, measurement::Measurement};
+use super::{measurement::Measurement, MeasurementType};
 use core::fmt;
 use hifitime::prelude::{Duration, Epoch};
 use indexmap::{IndexMap, IndexSet};
 use log::{error, info, warn};
-use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
+use std::collections::BTreeMap;
 use std::ops::Bound::{self, Excluded, Included, Unbounded};
 use std::ops::{Add, AddAssign, RangeBounds};
 
@@ -74,7 +74,7 @@ mod python;
 /// Reference: JPL DESCANSO, document 214, _Pseudo-Noise and Regenerative Ranging_.
 ///
 #[derive(Clone, Default)]
-#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub struct TrackingDataArc {
     /// All measurements in this data arc
     pub measurements: BTreeMap<Epoch, Measurement>, // BUG: Consider a map of tracking to epoch!

@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::cosmic::{GuidanceMode, Orbit, STD_GRAVITY, Spacecraft};
+use crate::cosmic::{GuidanceMode, Orbit, Spacecraft, STD_GRAVITY};
 use crate::errors::{NyxError, StateError};
 use crate::linalg::Vector3;
 use anise::astro::PhysicsResult;
@@ -48,7 +48,7 @@ use pyo3::prelude::*;
 
 /// Defines a thruster with a maximum isp and a maximum thrust.
 #[allow(non_snake_case)]
-#[cfg_attr(feature = "python", pyclass(get_all, set_all))]
+#[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize, StaticType)]
 pub struct Thruster {
     /// The thrust is to be provided in Newtons

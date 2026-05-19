@@ -20,7 +20,7 @@ use super::MeasurementType;
 use hifitime::Epoch;
 use indexmap::{IndexMap, IndexSet};
 use log::debug;
-use nalgebra::{DefaultAllocator, DimName, OVector, allocator::Allocator};
+use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, OVector};
 use std::fmt;
 
 #[cfg(feature = "python")]
@@ -30,7 +30,11 @@ use pyo3::prelude::*;
 ///
 /// Note that two measurements are considered equal if the tracker and epoch match exactly, and if both have the same measurement types,
 /// and those measurements are equal to within 1e-10 (this allows for some leeway in TDM producers).
-#[cfg_attr(feature = "python", pyclass, pyo3(module = "nyx_space.od"))]
+#[cfg_attr(
+    feature = "python",
+    pyclass(from_py_object),
+    pyo3(module = "nyx_space.od")
+)]
 #[derive(Clone, Debug)]
 pub struct Measurement {
     /// Tracker alias which made this measurement

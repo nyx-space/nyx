@@ -46,7 +46,7 @@ use pyo3::types::{PyBytes, PyType};
 
 /// GroundStation defines a two-way ranging and doppler station.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub struct GroundStation {
     pub name: String,
     pub location: Location,

@@ -26,7 +26,11 @@ use crate::{io::InputOutputError, od::ODError};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 
-#[cfg_attr(feature = "python", pyclass, pyo3(module = "nyx_space.od"))]
+#[cfg_attr(
+    feature = "python",
+    pyclass(from_py_object),
+    pyo3(module = "nyx_space.od")
+)]
 #[derive(Copy, Clone, Debug, Hash, Serialize, Deserialize, PartialEq, Eq, der::Enumerated)]
 #[repr(u8)]
 pub enum MeasurementType {
