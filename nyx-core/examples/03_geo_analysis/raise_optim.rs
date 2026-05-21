@@ -95,13 +95,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         .build();
 
     // Wrap the engine with the UI
-    // let final_generation = engine
-    //     .run(|generation: &Generation<FloatChromosome<f32>, Vec<f32>>| generation.index() >= 5);
-    let final_generation = radiate::ui(engine)
-        .iter()
-        .until_converged(3, 10.0)
-        .last()
-        .unwrap();
+    let final_generation = engine.run(|generation: &Generation<FloatChromosome<f32>, Vec<f32>>| {
+        let scores = generation.score().as_slice();
+        println!(
+            "[ {:?} ]: Best Score: Prop usage {:.3} kg, Penalty {:.3}",
+            generation.index(),
+            scores[0],
+            scores[1]
+        );
+        generation.index() >= 5
+    });
 
     let best_weights = final_generation
         .value()

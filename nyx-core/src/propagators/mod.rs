@@ -41,6 +41,9 @@ use crate::{dynamics::DynamicsError, io::ConfigError, md::trajectory::TrajError,
 pub use options::*;
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "python")]
+mod python;
+
 /// Stores the details of the previous integration step of a given propagator. Access as `my_prop.clone().latest_details()`.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct IntegrationDetails {

@@ -23,14 +23,17 @@ use std::sync::Arc;
 
 use crate::{
     dynamics::{
-        Drag, PointMasses, SolarPressure,
         guidance::{Maneuver, ObjectiveEfficiency, ObjectiveWeight},
+        Drag, PointMasses, SolarPressure,
     },
     io::gravity::GravityFieldConfig,
     propagators::{IntegratorMethod, IntegratorOptions},
 };
 
 use crate::dynamics::sequence::discrete_event::DiscreteEvent;
+
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Phase {
@@ -84,6 +87,7 @@ impl StaticType for Phase {
 
 /// Propagator config includes the method, options, and all dynamics
 #[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
+#[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub struct PropagatorConfig {
     pub method: IntegratorMethod,
     pub options: IntegratorOptions,
@@ -93,6 +97,7 @@ pub struct PropagatorConfig {
 
 /// Acceleration models alter the orbital dynamics
 #[derive(Clone, Serialize, Deserialize, Debug)]
+#[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub struct AccelModels {
     pub point_masses: Option<Arc<PointMasses>>,
     pub gravity_field: Option<(GravityFieldConfig, FrameUid)>,
@@ -100,6 +105,7 @@ pub struct AccelModels {
 
 /// Force models alter the spacecraft dynamics (they need a mass).
 #[derive(Clone, Serialize, Deserialize, Debug)]
+#[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub struct ForceModels {
     pub solar_pressure: Option<Arc<SolarPressure>>,
     pub drag: Option<Arc<Drag>>,
@@ -112,6 +118,7 @@ pub struct GuidanceConfig {
     pub law: SteeringLaw,
 }
 
+// NOTE: Steering laws are not yet available in Python =(
 #[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
 pub enum SteeringLaw {
     FiniteBurn(Maneuver),

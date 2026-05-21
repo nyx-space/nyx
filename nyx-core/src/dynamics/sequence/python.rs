@@ -1,7 +1,10 @@
-#[cfg(feature = "python")]
+use pyo3::exceptions::PyException;
 use {
-    super::SpacecraftSequence, crate::Spacecraft, anise::almanac::Almanac, pyo3::prelude::*,
-    std::sync::Arc,
+    super::{SpacecraftSequence, Thruster},
+    crate::Spacecraft,
+    anise::almanac::Almanac,
+    pyo3::prelude::*,
+    std::{collections::HashMap, sync::Arc},
 };
 
 #[cfg(feature = "python")]
@@ -52,5 +55,21 @@ impl SpacecraftSequence {
             .map(|traj| (traj.name, traj.states))
             .collect();
         Ok(result)
+    }
+
+    #[getter]
+    fn get_thruster_sets(&self) -> HashMap<String, Thruster> {
+        self.thruster_sets.clone()
+    }
+
+    fn thruster_set_insert(&mut self, name: String, thruster: Thruster) {
+        self.thruster_sets.insert(name, thruster);
+    }
+    fn thruster_set_remove(&mut self, name: String) -> PyResult<()> {
+        if self.thruster_sets.remove(&name).is_none() {
+            Err(PyException::new_err(format!("{name} not in thruster set")))
+        } else {
+            Ok(())
+        }
     }
 }

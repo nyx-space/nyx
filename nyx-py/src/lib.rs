@@ -81,7 +81,7 @@ fn monte_carlo(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
 }
 
 #[pymodule]
-fn mission_design(_py: Python, sm: &Bounde<PyModule>) -> PyResult<()> {
+fn mission_design(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
     sm.add_class::<SpacecraftSequence>()?;
 
     Ok(())

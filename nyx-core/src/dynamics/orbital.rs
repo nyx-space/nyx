@@ -25,7 +25,7 @@ use crate::linalg::{Const, Matrix3, Matrix6, OVector, Vector3, Vector6};
 use anise::almanac::Almanac;
 use anise::astro::Aberration;
 use hyperdual::linalg::norm;
-use hyperdual::{Float, OHyperdual, extract_jacobian_and_result, hyperspace_from_vector};
+use hyperdual::{extract_jacobian_and_result, hyperspace_from_vector, Float, OHyperdual};
 use serde::{Deserialize, Serialize};
 use serde_dhall::{SimpleType, StaticType};
 use snafu::ResultExt;
@@ -33,6 +33,9 @@ use std::collections::HashMap;
 use std::f64;
 use std::fmt;
 use std::sync::Arc;
+
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
 
 pub use super::gravity_field::GravityField;
 
@@ -171,6 +174,7 @@ impl OrbitalDynamics {
 
 /// PointMasses model
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct PointMasses {
     pub celestial_objects: Vec<i32>,
     /// Light-time correction computation if extra point masses are needed

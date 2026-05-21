@@ -50,10 +50,8 @@ pub use discrete_event::*;
 pub struct SpacecraftSequence {
     #[serde(serialize_with = "map_as_pairs", deserialize_with = "pairs_as_map")]
     pub seq: BTreeMap<Epoch, Phase>,
-    #[serde(with = "indexmap::map::serde_seq")]
-    pub thruster_sets: IndexMap<String, Thruster>,
-    #[serde(with = "indexmap::map::serde_seq")]
-    pub propagators: IndexMap<String, PropagatorConfig>,
+    pub thruster_sets: HashMap<String, Thruster>,
+    pub propagators: HashMap<String, PropagatorConfig>,
     #[serde(skip)]
     prop_setups: IndexMap<String, Propagator<SpacecraftDynamics>>,
 }

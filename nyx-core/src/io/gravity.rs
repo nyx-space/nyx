@@ -16,8 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::NyxError;
 use crate::linalg::DMatrix;
+use crate::NyxError;
 use flate2::read::GzDecoder;
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
@@ -29,10 +29,14 @@ use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
 /// Configuration holder for gravity field.
 ///
 /// Data is first loaded as a SHADR, if that fails, Nyx will try to load it as a COF file.
 #[derive(Clone, Serialize, Deserialize, Debug)]
+#[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct GravityFieldConfig {
     /// Path to the file, relative to the current working director
     pub filepath: PathBuf,

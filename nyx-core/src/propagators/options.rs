@@ -27,6 +27,9 @@ use anise::frames::Frame;
 use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
 /// Stores the integrator options, including the minimum and maximum step sizes, and the central body to perform the integration.
 ///
 /// Note that different step sizes and max errors are only used for adaptive
@@ -34,6 +37,7 @@ use typed_builder::TypedBuilder;
 /// use whichever adaptive step integrator is desired.  For example, initializing an RK45 with
 /// fixed step options will lead to an RK4 being used instead of an RK45.
 #[derive(Clone, Copy, Debug, TypedBuilder, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "python", pyclass(from_py_object))]
 #[builder(doc)]
 pub struct IntegratorOptions {
     #[builder(default_code = "60.0 * Unit::Second")]
@@ -125,7 +129,10 @@ impl IntegratorOptions {
         opts.set_max_step(max_step);
         opts
     }
+}
 
+#[cfg_attr(feature = "python", pymethods)]
+impl IntegratorOptions {
     /// Returns a string with the information about these options
     pub fn info(&self) -> String {
         format!("{self}")
