@@ -160,7 +160,9 @@ where
         let state_size = <Spacecraft as State>::Size::DIM;
 
         // State item names used in column naming
-        let state_items = ["X", "Y", "Z", "Vx", "Vy", "Vz", "Cr", "Cd", "Mass"];
+        let state_items = [
+            "X", "Y", "Z", "Vx", "Vy", "Vz", "Cr", "Cd", "Mass", "AlbedoCr",
+        ];
         let mut cov_units = vec![];
 
         for i in 0..state_items.len() {
@@ -389,7 +391,7 @@ where
                     }).build();
 
                 // Reconstruct Covariance
-                let mut covar = SMatrix::<f64, 9, 9>::zeros();
+                let mut covar = OMatrix::<f64, <Spacecraft as State>::Size, <Spacecraft as State>::Size>::zeros();
                 let mut cov_col_idx = 0;
                 for row in 0..state_size {
                     for col in row..state_size {
@@ -405,10 +407,10 @@ where
                 // Reconstruct KfEstimate
                 let estimate = KfEstimate {
                     nominal_state,
-                    state_deviation: OVector::<f64, Const<9>>::zeros(), // Deviation not stored
+                    state_deviation: OVector::<f64, Const<10>>::zeros(), // Deviation not stored
                     covar,
                     covar_bar: covar, // Not stored, use covar
-                    stm: OMatrix::<f64, Const<9>, Const<9>>::identity(), // Not stored
+                    stm: OMatrix::<f64, Const<10>, Const<10>>::identity(), // Not stored
                     predicted: false, // Not stored
                 };
                 estimates.push(estimate);

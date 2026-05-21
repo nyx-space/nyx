@@ -152,7 +152,7 @@ impl fmt::Debug for SpacecraftDynamics {
 }
 
 impl Dynamics for SpacecraftDynamics {
-    type HyperdualSize = Const<9>;
+    type HyperdualSize = Const<10>;
     type StateType = Spacecraft;
 
     fn finally(
@@ -191,10 +191,10 @@ impl Dynamics for SpacecraftDynamics {
     fn eom(
         &self,
         delta_t_s: f64,
-        state: &OVector<f64, Const<90>>,
+        state: &OVector<f64, Const<110>>,
         ctx: &Self::StateType,
         almanac: Arc<Almanac>,
-    ) -> Result<OVector<f64, Const<90>>, DynamicsError> {
+    ) -> Result<OVector<f64, Const<110>>, DynamicsError> {
         // Rebuild the osculating state for the EOM context.
         let osc_sc = ctx.set_with_delta_seconds(delta_t_s, state);
 
@@ -202,7 +202,7 @@ impl Dynamics for SpacecraftDynamics {
             ensure!(osc_sc.mass_kg() > 0.0, MasslessSpacecraftSnafu);
         }
 
-        let mut d_x = OVector::<f64, Const<90>>::zeros();
+        let mut d_x = OVector::<f64, Const<110>>::zeros();
 
         // Maybe I use this only when estimating the orbit state from a spacecraft, but that functionality will soon disappear.
         match ctx.stm {
@@ -314,11 +314,11 @@ impl Dynamics for SpacecraftDynamics {
         delta_t_s: f64,
         ctx: &Self::StateType,
         almanac: Arc<Almanac>,
-    ) -> Result<(OVector<f64, Const<9>>, OMatrix<f64, Const<9>, Const<9>>), DynamicsError> {
+    ) -> Result<(OVector<f64, Const<10>>, OMatrix<f64, Const<10>, Const<10>>), DynamicsError> {
         // Rebuild the appropriately sized state and STM.
         // This is the orbital state followed by Cr and Cd
-        let mut d_x = OVector::<f64, Const<9>>::zeros();
-        let mut grad = OMatrix::<f64, Const<9>, Const<9>>::zeros();
+        let mut d_x = OVector::<f64, Const<10>>::zeros();
+        let mut grad = OMatrix::<f64, Const<10>, Const<10>>::zeros();
 
         let (orb_state, orb_grad) =
             self.orbital_dyn

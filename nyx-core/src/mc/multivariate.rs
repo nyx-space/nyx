@@ -63,9 +63,9 @@ pub struct MvnSpacecraft {
     pub template: Spacecraft,
     pub dispersions: Vec<StateDispersion>,
     /// The mean of the multivariate normal distribution
-    pub mean: SVector<f64, 9>,
+    pub mean: SVector<f64, 10>,
     /// The dot product \sqrt{\vec s} \cdot \vec v, where S is the singular values and V the V matrix from the SVD decomp of the covariance of multivariate normal distribution
-    pub sqrt_s_v: SMatrix<f64, 9, 9>,
+    pub sqrt_s_v: SMatrix<f64, 10, 10>,
     /// The standard normal distribution used to seed the multivariate normal distribution
     pub std_norm_distr: Normal<f64>,
 }
@@ -81,8 +81,8 @@ impl MvnSpacecraft {
         template: Spacecraft,
         dispersions: Vec<StateDispersion>,
     ) -> Result<Self, Box<dyn Error>> {
-        let mut cov = SMatrix::<f64, 9, 9>::zeros();
-        let mut mean = SVector::<f64, 9>::zeros();
+        let mut cov = SMatrix::<f64, 10, 10>::zeros();
+        let mut mean = SVector::<f64, 10>::zeros();
 
         let orbit_dual = OrbitGrad::from(template.orbit);
         let mut b_plane = None;
@@ -168,13 +168,20 @@ impl MvnSpacecraft {
                 } else {
                     match disp.param {
                         StateParameter::Cr() => {
-                            cov[(7, 7)] = disp.mean.unwrap_or(0.0).powi(2);
+                            cov[(6, 6)] = disp.std_dev.unwrap_or(0.0).powi(2);
+                            mean[6] = disp.mean.unwrap_or(0.0);
                         }
                         StateParameter::Cd() => {
-                            cov[(8, 8)] = disp.mean.unwrap_or(0.0).powi(2);
+                            cov[(7, 7)] = disp.std_dev.unwrap_or(0.0).powi(2);
+                            mean[7] = disp.mean.unwrap_or(0.0);
                         }
                         StateParameter::DryMass() | StateParameter::PropMass() => {
-                            cov[(9, 9)] = disp.mean.unwrap_or(0.0).powi(2);
+                            cov[(8, 8)] = disp.std_dev.unwrap_or(0.0).powi(2);
+                            mean[8] = disp.mean.unwrap_or(0.0);
+                        }
+                        StateParameter::AlbedoCr() => {
+                            cov[(9, 9)] = disp.std_dev.unwrap_or(0.0).powi(2);
+                            mean[9] = disp.mean.unwrap_or(0.0);
                         }
                         _ => return Err(Box::new(StateError::ReadOnly { param: disp.param })),
                     }
@@ -182,7 +189,7 @@ impl MvnSpacecraft {
             }
         }
 
-        // At this point, the cov matrix is a 9x9 with all dispersions transformed into the Cartesian state space.
+        // At this point, the cov matrix is a 10x10 with all dispersions transformed into the Cartesian state space.
         let svd = cov.svd_unordered(false, true);
         if svd.v_t.is_none() {
             return Err(Box::new(NyxError::CovarianceMatrixNotPsd));
@@ -219,8 +226,8 @@ impl MvnSpacecraft {
     /// Initializes a new multivariate distribution using the state data in the spacecraft state space.
     pub fn from_spacecraft_cov(
         template: Spacecraft,
-        cov: SMatrix<f64, 9, 9>,
-        mean: SVector<f64, 9>,
+        cov: SMatrix<f64, 10, 10>,
+        mean: SVector<f64, 10>,
     ) -> Result<Self, Box<dyn Error>> {
         // Check that covariance is PSD by ensuring that all the eigenvalues are positive or nil
         match cov.eigenvalues() {
@@ -283,6 +290,10 @@ impl MvnSpacecraft {
                 .param(StateParameter::PropMass())
                 .std_dev(cov[(8, 8)])
                 .build(),
+            StateDispersion::builder()
+                .param(StateParameter::AlbedoCr())
+                .std_dev(cov[(9, 9)])
+                .build(),
         ];
 
         Ok(Self {
@@ -298,7 +309,7 @@ impl MvnSpacecraft {
 impl Distribution<DispersedState<Spacecraft>> for MvnSpacecraft {
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> DispersedState<Spacecraft> {
         // Generate the vector representing the state
-        let x_rng = SVector::<f64, 9>::from_fn(|_, _| self.std_norm_distr.sample(rng));
+        let x_rng = SVector::<f64, 10>::from_fn(|_, _| self.std_norm_distr.sample(rng));
         let x = self.sqrt_s_v * x_rng + self.mean;
         let mut state = self.template;
 
@@ -314,6 +325,8 @@ impl Distribution<DispersedState<Spacecraft>> for MvnSpacecraft {
                 state.drag.coeff_drag += val;
             } else if coord == 8 {
                 state.mass.prop_mass_kg += val;
+            } else if coord == 9 {
+                state.albedo.coeff_reflectivity += val;
             }
         }
 
@@ -373,7 +386,7 @@ mod multivariate_ut {
         let mut rng = rand::rng();
         let cov = SMatrix::<f64, 6, 6>::from_fn(|_, _| rng.random());
         let cov = cov * cov.transpose();
-        let mut cov_resized = SMatrix::<f64, 9, 9>::zeros();
+        let mut cov_resized = SMatrix::<f64, 10, 10>::zeros();
         cov_resized.fixed_view_mut::<6, 6>(0, 0).copy_from(&cov);
 
         let eme2k = EARTH_J2000.with_mu_km3_s2(GMAT_EARTH_GM);
@@ -395,7 +408,7 @@ mod multivariate_ut {
         let cov_inv = cov_resized.pseudo_inverse(1e-12).unwrap();
         let md: Vec<f64> = samples
             .map(|sample| {
-                let mut v = SVector::<f64, 9>::zeros();
+                let mut v = SVector::<f64, 10>::zeros();
                 for i in 0..6 {
                     v[i] = sample.state.orbit.to_cartesian_pos_vel()[i]
                         - state.orbit.to_cartesian_pos_vel()[i];

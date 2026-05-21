@@ -139,20 +139,24 @@ impl KfEstimate<Spacecraft> {
             (3.0 * (nominal_state.mass.prop_mass_kg - dispersed_state.state.mass.prop_mass_kg)
                 .abs())
             .powi(2),
+            (3.0 * (nominal_state.albedo.coeff_reflectivity
+                - dispersed_state.state.albedo.coeff_reflectivity)
+                .abs())
+            .powi(2),
         ];
 
-        let diag = OVector::<f64, Const<9>>::from_iterator(diag_data);
+        let diag = OVector::<f64, Const<10>>::from_iterator(diag_data);
 
         // Build the covar from the diagonal
         let covar = Matrix::from_diagonal(&diag);
 
         Ok(Self {
             nominal_state: dispersed_state.state,
-            state_deviation: OVector::<f64, Const<9>>::zeros(),
+            state_deviation: OVector::<f64, Const<10>>::zeros(),
             covar,
             covar_bar: covar,
             predicted: true,
-            stm: OMatrix::<f64, Const<9>, Const<9>>::identity(),
+            stm: OMatrix::<f64, Const<10>, Const<10>>::identity(),
         })
     }
 

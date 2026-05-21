@@ -39,6 +39,8 @@ pub enum StateParameter {
     BdotT(),
     /// B-Plane LTOF
     BLTOF(),
+    /// Albedo coefficient of reflectivity
+    AlbedoCr(),
     /// Coefficient of drag
     Cd(),
     /// Coefficient of reflectivity
@@ -105,6 +107,7 @@ impl StateParameter {
             Self::DryMass()
                 | Self::PropMass()
                 | Self::Cr()
+                | Self::AlbedoCr()
                 | Self::Cd()
                 | Self::Isp()
                 | Self::GuidanceMode()
@@ -121,6 +124,8 @@ impl StateParameter {
         match self {
             Self::Element(e) => e.unit(),
             Self::BdotR() | Self::BdotT() => "km",
+
+            Self::AlbedoCr() | Self::Cr() | Self::Cd() => "unitless",
 
             Self::DryMass() | Self::PropMass() => "kg",
             Self::ThrustX() | Self::ThrustY() | Self::ThrustZ() => "unitless",
@@ -177,6 +182,7 @@ impl fmt::Display for StateParameter {
             Self::BLTOF() => "BLToF",
             Self::BdotR() => "BdotR",
             Self::BdotT() => "BdotT",
+            Self::AlbedoCr() => "albedo_cr",
             Self::Cd() => "cd",
             Self::Cr() => "cr",
             Self::DryMass() => "dry_mass",

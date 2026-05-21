@@ -22,6 +22,8 @@ use anise::constants::frames::EARTH_J2000;
 pub use anise::prelude::Orbit;
 
 pub use anise::structure::spacecraft::{DragData, Mass, SRPData};
+/// Albedo data for a spacecraft
+pub type AlbedoData = SRPData;
 use der::{Decode, Encode, Enumerated, Reader};
 use nalgebra::Vector3;
 use serde::{Deserialize, Serialize};
@@ -122,6 +124,10 @@ pub struct Spacecraft {
     #[builder(default)]
     #[serde(default)]
     pub srp: SRPData,
+    /// Albedo configuration for this spacecraft
+    #[builder(default)]
+    #[serde(default)]
+    pub albedo: AlbedoData,
     #[builder(default)]
     #[serde(default)]
     pub drag: DragData,
@@ -136,10 +142,10 @@ pub struct Spacecraft {
     #[serde(default)]
     pub thrust_direction: Option<ThrustDirection>,
     /// Optionally stores the state transition matrix from the start of the propagation until the current time (i.e. trajectory STM, not step-size STM)
-    /// STM is contains position and velocity, Cr, Cd, prop mass
+    /// STM is contains position and velocity, Cr, Cd, prop mass, Albedo Cr
     #[builder(default, setter(strip_option))]
     #[serde(skip)]
-    pub stm: Option<OMatrix<f64, Const<9>, Const<9>>>,
+    pub stm: Option<OMatrix<f64, Const<10>, Const<10>>>,
 }
 
 impl Default for Spacecraft {
@@ -148,6 +154,7 @@ impl Default for Spacecraft {
             orbit: Orbit::zero(EARTH_J2000),
             mass: Mass::default(),
             srp: SRPData::default(),
+            albedo: AlbedoData::default(),
             drag: DragData::default(),
             thruster: None,
             mode: GuidanceMode::default(),
@@ -178,6 +185,10 @@ impl Spacecraft {
             orbit,
             mass: Mass::from_dry_and_prop_masses(dry_mass_kg, prop_mass_kg),
             srp: SRPData {
+                area_m2: srp_area_m2,
+                coeff_reflectivity,
+            },
+            albedo: AlbedoData {
                 area_m2: srp_area_m2,
                 coeff_reflectivity,
             },
@@ -212,6 +223,7 @@ impl Spacecraft {
             orbit,
             mass: Mass::from_dry_mass(dry_mass_kg),
             srp: SRPData::from_area(srp_area_m2),
+            albedo: AlbedoData::from_area(srp_area_m2),
             ..Default::default()
         }
     }
@@ -250,6 +262,28 @@ impl Spacecraft {
             coeff_reflectivity,
         };
 
+        self
+    }
+
+    /// Returns a copy of the state with a new albedo area and CR
+    pub fn with_albedo(mut self, area_m2: f64, coeff_reflectivity: f64) -> Self {
+        self.albedo = AlbedoData {
+            area_m2,
+            coeff_reflectivity,
+        };
+
+        self
+    }
+
+    /// Returns a copy of the state with a new albedo area
+    pub fn with_albedo_area(mut self, area_m2: f64) -> Self {
+        self.albedo.area_m2 = area_m2;
+        self
+    }
+
+    /// Returns a copy of the state with a new albedo coefficient of reflectivity
+    pub fn with_albedo_cr(mut self, coeff_reflectivity: f64) -> Self {
+        self.albedo.coeff_reflectivity = coeff_reflectivity;
         self
     }
 
@@ -294,7 +328,7 @@ impl Spacecraft {
 
     /// Sets the STM of this state of identity, which also enables computation of the STM for spacecraft navigation
     pub fn enable_stm(&mut self) {
-        self.stm = Some(OMatrix::<f64, Const<9>, Const<9>>::identity());
+        self.stm = Some(OMatrix::<f64, Const<10>, Const<10>>::identity());
     }
 
     /// Returns the total mass in kilograms
@@ -364,6 +398,7 @@ impl PartialEq for Spacecraft {
         self.orbit.eq_within(&other.orbit, 1e-9, 1e-12)
             && (self.mass - other.mass).abs().total_mass_kg() < mass_tol
             && self.srp == other.srp
+            && self.albedo == other.albedo
             && self.drag == other.drag
     }
 }
@@ -429,8 +464,8 @@ impl fmt::UpperHex for Spacecraft {
 }
 
 impl State for Spacecraft {
-    type Size = Const<9>;
-    type VecLength = Const<90>;
+    type Size = Const<10>;
+    type VecLength = Const<110>;
 
     /// Copies the current state but sets the STM to identity
     fn with_stm(mut self) -> Self {
@@ -439,7 +474,7 @@ impl State for Spacecraft {
     }
 
     fn reset_stm(&mut self) {
-        self.stm = Some(OMatrix::<f64, Const<9>, Const<9>>::identity());
+        self.stm = Some(OMatrix::<f64, Const<10>, Const<10>>::identity());
     }
 
     fn zeros() -> Self {
@@ -447,22 +482,21 @@ impl State for Spacecraft {
     }
 
     /// The vector is organized as such:
-    /// [X, Y, Z, Vx, Vy, Vz, Cr, Cd, Fuel mass, STM(9x9)]
-    fn to_vector(&self) -> OVector<f64, Const<90>> {
-        let mut vector = OVector::<f64, Const<90>>::zeros();
+    /// [X, Y, Z, Vx, Vy, Vz, Cr, Cd, Fuel mass, Albedo Cr, STM(10x10)]
+    fn to_vector(&self) -> OVector<f64, Const<110>> {
+        let mut vector = OVector::<f64, Const<110>>::zeros();
         // Set the orbit state info
         for (i, val) in self.orbit.radius_km.iter().enumerate() {
-            // Place the orbit state first, then skip three (Cr, Cd, Fuel), then copy orbit STM
             vector[i] = *val;
         }
         for (i, val) in self.orbit.velocity_km_s.iter().enumerate() {
-            // Place the orbit state first, then skip three (Cr, Cd, Fuel), then copy orbit STM
             vector[i + 3] = *val;
         }
         // Set the spacecraft parameters
         vector[6] = self.srp.coeff_reflectivity;
         vector[7] = self.drag.coeff_drag;
         vector[8] = self.mass.prop_mass_kg;
+        vector[9] = self.albedo.coeff_reflectivity;
         // Add the STM to the vector
         if let Some(stm) = self.stm {
             for (idx, stm_val) in stm.as_slice().iter().enumerate() {
@@ -473,8 +507,8 @@ impl State for Spacecraft {
     }
 
     /// Vector is expected to be organized as such:
-    /// [X, Y, Z, Vx, Vy, Vz, Cr, Cd, Fuel mass, STM(9x9)]
-    fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Const<90>>) {
+    /// [X, Y, Z, Vx, Vy, Vz, Cr, Cd, Fuel mass, Albedo Cr, STM(10x10)]
+    fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Const<110>>) {
         let sc_state =
             OVector::<f64, Self::Size>::from_column_slice(&vector.as_slice()[..Self::Size::dim()]);
 
@@ -494,6 +528,7 @@ impl State for Spacecraft {
         self.srp.coeff_reflectivity = sc_state[6].clamp(0.0, 2.0);
         self.drag.coeff_drag = sc_state[7];
         self.mass.prop_mass_kg = sc_state[8];
+        self.albedo.coeff_reflectivity = sc_state[9].clamp(0.0, 2.0);
     }
 
     /// diag(STM) = [X,Y,Z,Vx,Vy,Vz,Cr,Cd,Fuel]
@@ -521,6 +556,7 @@ impl State for Spacecraft {
         match param {
             StateParameter::Cd() => Ok(self.drag.coeff_drag),
             StateParameter::Cr() => Ok(self.srp.coeff_reflectivity),
+            StateParameter::AlbedoCr() => Ok(self.albedo.coeff_reflectivity),
             StateParameter::DryMass() => Ok(self.mass.dry_mass_kg),
             StateParameter::PropMass() => Ok(self.mass.prop_mass_kg),
             StateParameter::TotalMass() => Ok(self.mass.total_mass_kg()),
@@ -581,6 +617,7 @@ impl State for Spacecraft {
         match param {
             StateParameter::Cd() => self.drag.coeff_drag = val,
             StateParameter::Cr() => self.srp.coeff_reflectivity = val,
+            StateParameter::AlbedoCr() => self.albedo.coeff_reflectivity = val,
             StateParameter::PropMass() => self.mass.prop_mass_kg = val,
             StateParameter::DryMass() => self.mass.dry_mass_kg = val,
             StateParameter::Isp() => match self.thruster {
@@ -710,11 +747,11 @@ impl Add<OVector<f64, Const<6>>> for Spacecraft {
     }
 }
 
-impl Add<OVector<f64, Const<9>>> for Spacecraft {
+impl Add<OVector<f64, Const<10>>> for Spacecraft {
     type Output = Self;
 
     /// Adds the provided state deviation to this orbit
-    fn add(mut self, other: OVector<f64, Const<9>>) -> Self {
+    fn add(mut self, other: OVector<f64, Const<10>>) -> Self {
         let radius_km = other.fixed_rows::<3>(0).into_owned();
         let vel_km_s = other.fixed_rows::<3>(3).into_owned();
 
@@ -723,6 +760,7 @@ impl Add<OVector<f64, Const<9>>> for Spacecraft {
         self.srp.coeff_reflectivity = (self.srp.coeff_reflectivity + other[6]).clamp(0.0, 2.0);
         self.drag.coeff_drag += other[7];
         self.mass.prop_mass_kg += other[8];
+        self.albedo.coeff_reflectivity = (self.albedo.coeff_reflectivity + other[9]).clamp(0.0, 2.0);
 
         self
     }
@@ -733,6 +771,7 @@ impl<'a> Decode<'a> for Spacecraft {
         let orbit = decoder.decode()?;
         let mass = decoder.decode()?;
         let srp = decoder.decode()?;
+        let albedo = decoder.decode()?;
         let drag = decoder.decode()?;
         let mode = decoder.decode()?;
         // Decode the thruster last, checking the presence flag
@@ -746,6 +785,7 @@ impl<'a> Decode<'a> for Spacecraft {
             orbit,
             mass,
             srp,
+            albedo,
             drag,
             thruster,
             mode,
@@ -760,6 +800,7 @@ impl Encode for Spacecraft {
         self.orbit.encoded_len()?
             + self.mass.encoded_len()?
             + self.srp.encoded_len()?
+            + self.albedo.encoded_len()?
             + self.drag.encoded_len()?
             + self.mode.encoded_len()?
             + self.thruster.is_some().encoded_len()?
@@ -770,6 +811,7 @@ impl Encode for Spacecraft {
         self.orbit.encode(encoder)?;
         self.mass.encode(encoder)?;
         self.srp.encode(encoder)?;
+        self.albedo.encode(encoder)?;
         self.drag.encode(encoder)?;
         self.mode.encode(encoder)?;
         if let Some(thruster) = self.thruster {
@@ -838,6 +880,9 @@ mass:
 srp:
     area_m2: 2.0
     coeff_reflectivity: 1.8
+albedo:
+    area_m2: 2.0
+    coeff_reflectivity: 1.8
 drag:
     area_m2: 2.0
     coeff_drag: 2.2
@@ -870,6 +915,9 @@ mass:
     prop_mass_kg: 159.0
     extra_mass_kg: 0.0
 srp:
+    area_m2: 2.0
+    coeff_reflectivity: 1.8
+albedo:
     area_m2: 2.0
     coeff_reflectivity: 1.8
 drag:

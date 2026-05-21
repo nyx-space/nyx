@@ -21,6 +21,7 @@ use core::fmt;
 use anise::analysis::prelude::OrbitalElement;
 use anise::errors::MathError;
 use anise::{astro::PhysicsResult, errors::PhysicsError};
+use crate::linalg::{Const, OMatrix, OVector};
 use nalgebra::{SMatrix, SVector};
 use rand::SeedableRng;
 use rand::rngs::SysRng;
@@ -58,6 +59,8 @@ pub struct SpacecraftUncertainty {
     #[builder(default)]
     pub coeff_reflectivity: f64,
     #[builder(default)]
+    pub albedo_coeff_reflectivity: f64,
+    #[builder(default)]
     pub coeff_drag: f64,
     #[builder(default)]
     pub mass_kg: f64,
@@ -76,6 +79,7 @@ impl SpacecraftUncertainty {
             || self.vz_km_s < 0.0
             || self.coeff_drag < 0.0
             || self.coeff_reflectivity < 0.0
+            || self.albedo_coeff_reflectivity < 0.0
             || self.mass_kg < 0.0
         {
             return Err(PhysicsError::AppliedMath {
@@ -103,7 +107,7 @@ impl SpacecraftUncertainty {
         };
 
         let mut init_covar =
-            SMatrix::<f64, 9, 9>::from_diagonal(&SVector::<f64, 9>::from_iterator([
+            OMatrix::<f64, Const<10>, Const<10>>::from_diagonal(&OVector::<f64, Const<10>>::from_iterator([
                 0.0,
                 0.0,
                 0.0,
@@ -113,6 +117,7 @@ impl SpacecraftUncertainty {
                 self.coeff_reflectivity.powi(2),
                 self.coeff_drag.powi(2),
                 self.mass_kg.powi(2),
+                self.albedo_coeff_reflectivity.powi(2),
             ]));
 
         let other_cov = SMatrix::<f64, 6, 6>::from_diagonal(&SVector::<f64, 6>::from_iterator([
@@ -184,8 +189,8 @@ impl fmt::Display for SpacecraftUncertainty {
         )?;
         writeln!(
             f,
-            "σ_cr = {}  σ_cd = {}  σ_mass = {} kg",
-            self.coeff_reflectivity, self.coeff_drag, self.mass_kg
+            "σ_cr = {}  σ_albedo_cr = {}  σ_cd = {}  σ_mass = {} kg",
+            self.coeff_reflectivity, self.albedo_coeff_reflectivity, self.coeff_drag, self.mass_kg
         )
     }
 }
