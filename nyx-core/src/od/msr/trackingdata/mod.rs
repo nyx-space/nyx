@@ -15,13 +15,13 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use super::{MeasurementType, measurement::Measurement};
+use super::{measurement::Measurement, MeasurementType};
 use core::fmt;
 use hifitime::prelude::{Duration, Epoch};
 use indexmap::{IndexMap, IndexSet};
 use log::{error, info, warn};
-use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
+use std::collections::BTreeMap;
 use std::ops::Bound::{self, Excluded, Included, Unbounded};
 use std::ops::{Add, AddAssign, RangeBounds};
 
@@ -131,9 +131,6 @@ impl TrackingDataArc {
             Some(min_sep)
         }
     }
-}
-
-impl TrackingDataArc {
     /// Set (or overwrites) the modulus of the provided measurement type.
     pub fn set_moduli(&mut self, msr_type: MeasurementType, modulus: f64) {
         if modulus.is_nan() || modulus.abs() < f64::EPSILON {
@@ -160,6 +157,131 @@ impl TrackingDataArc {
         }
     }
 
+    /// Downsamples the tracking data to a lower frequency using a simple moving average low-pass filter followed by decimation,
+    /// returning new `TrackingDataArc` with downsampled measurements.
+    ///
+    /// It provides a computationally efficient approach to reduce the sampling rate while mitigating aliasing effects.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. A simple moving average filter is applied as a low-pass filter.
+    /// 2. Decimation is performed by selecting every Nth sample after filtering.
+    ///
+    /// # Advantages
+    ///
+    /// - Computationally efficient, suitable for large datasets common in spaceflight applications.
+    /// - Provides basic anti-aliasing, crucial for preserving signal integrity in orbit determination and tracking.
+    /// - Maintains phase information, important for accurate timing in spacecraft state estimation.
+    ///
+    /// # Limitations
+    ///
+    /// - The frequency response is not as sharp as more sophisticated filters (e.g., FIR, IIR).
+    /// - May not provide optimal stopband attenuation for high-precision applications.
+    ///
+    /// ## Considerations for Spaceflight Applications
+    ///
+    /// - Suitable for initial data reduction in ground station tracking pipelines.
+    /// - Adequate for many orbit determination and tracking tasks where computational speed is prioritized.
+    /// - For high-precision applications (e.g., interplanetary navigation), consider using more advanced filtering techniques.
+    ///
+    /// :type target_step: Duration
+    /// :rtype: Self
+    pub fn downsample(&self, target_step: Duration) -> Self {
+        if self.is_empty() {
+            return self.clone();
+        }
+        let current_step = self.min_duration_sep().unwrap();
+
+        if current_step >= target_step {
+            warn!(
+                "cannot downsample tracking data from {current_step} to {target_step} (that would be upsampling)"
+            );
+            return self.clone();
+        }
+
+        let current_hz = 1.0 / current_step.to_seconds();
+        let target_hz = 1.0 / target_step.to_seconds();
+
+        // Simple moving average as low-pass filter
+        let window_size = (current_hz / target_hz).round() as usize;
+
+        info!(
+            "downsampling tracking data from {current_step} ({current_hz:.6} Hz) to {target_step} ({target_hz:.6} Hz) (N = {window_size})"
+        );
+
+        let mut result = TrackingDataArc {
+            source: self.source.clone(),
+            ..Default::default()
+        };
+
+        let measurements: Vec<_> = self.measurements.iter().collect();
+
+        for (i, (epoch, _)) in measurements.iter().enumerate().step_by(window_size) {
+            let start = i.saturating_sub(window_size / 2);
+            let end = (i + window_size / 2 + 1).min(measurements.len());
+            let window = &measurements[start..end];
+
+            let mut filtered_measurement = Measurement {
+                tracker: window[0].1.tracker.clone(),
+                epoch: **epoch,
+                data: IndexMap::new(),
+                rejected: false,
+            };
+
+            // Apply moving average filter for each measurement type
+            for mtype in self.unique_types() {
+                let sum: f64 = window.iter().filter_map(|(_, m)| m.data.get(&mtype)).sum();
+                let count = window
+                    .iter()
+                    .filter(|(_, m)| m.data.contains_key(&mtype))
+                    .count();
+
+                if count > 0 {
+                    filtered_measurement.data.insert(mtype, sum / count as f64);
+                }
+            }
+
+            result.measurements.insert(**epoch, filtered_measurement);
+        }
+        result
+    }
+
+    /// Splits a long tracking data arc into smaller chunks, each up to `max_duration` long.
+    /// This is inspired by JPL MONTE's long arc setup to ensure BLSE convergence on manageable chunks.
+    pub fn chunk(&self, max_duration: Duration) -> Vec<TrackingDataArc> {
+        let mut chunks = Vec::new();
+        if self.is_empty() {
+            return chunks;
+        }
+
+        let end_epoch = self.end_epoch().unwrap();
+        let mut chunk_start = self.start_epoch().unwrap();
+
+        while chunk_start <= end_epoch {
+            let chunk_end = chunk_start + max_duration;
+            let sub_arc = self.clone().filter_by_epoch(chunk_start..chunk_end);
+            if !sub_arc.is_empty() {
+                chunks.push(sub_arc);
+            }
+            // Move start to the next measurement's epoch after chunk_end
+            let mut found_next = false;
+            for (epoch, _) in self.measurements.range(chunk_end..) {
+                if *epoch >= chunk_end {
+                    chunk_start = *epoch;
+                    found_next = true;
+                    break;
+                }
+            }
+            if !found_next {
+                break;
+            }
+        }
+
+        chunks
+    }
+}
+
+impl TrackingDataArc {
     /// Returns the unique list of aliases in this tracking data arc
     pub fn unique_aliases(&self) -> IndexSet<String> {
         self.unique().0
@@ -314,130 +436,9 @@ impl TrackingDataArc {
         self
     }
 
-    /// Downsamples the tracking data to a lower frequency using a simple moving average low-pass filter followed by decimation,
-    /// returning new `TrackingDataArc` with downsampled measurements.
-    ///
-    /// It provides a computationally efficient approach to reduce the sampling rate while mitigating aliasing effects.
-    ///
-    /// # Algorithm
-    ///
-    /// 1. A simple moving average filter is applied as a low-pass filter.
-    /// 2. Decimation is performed by selecting every Nth sample after filtering.
-    ///
-    /// # Advantages
-    ///
-    /// - Computationally efficient, suitable for large datasets common in spaceflight applications.
-    /// - Provides basic anti-aliasing, crucial for preserving signal integrity in orbit determination and tracking.
-    /// - Maintains phase information, important for accurate timing in spacecraft state estimation.
-    ///
-    /// # Limitations
-    ///
-    /// - The frequency response is not as sharp as more sophisticated filters (e.g., FIR, IIR).
-    /// - May not provide optimal stopband attenuation for high-precision applications.
-    ///
-    /// ## Considerations for Spaceflight Applications
-    ///
-    /// - Suitable for initial data reduction in ground station tracking pipelines.
-    /// - Adequate for many orbit determination and tracking tasks where computational speed is prioritized.
-    /// - For high-precision applications (e.g., interplanetary navigation), consider using more advanced filtering techniques.
-    ///
-    pub fn downsample(self, target_step: Duration) -> Self {
-        if self.is_empty() {
-            return self;
-        }
-        let current_step = self.min_duration_sep().unwrap();
-
-        if current_step >= target_step {
-            warn!(
-                "cannot downsample tracking data from {current_step} to {target_step} (that would be upsampling)"
-            );
-            return self;
-        }
-
-        let current_hz = 1.0 / current_step.to_seconds();
-        let target_hz = 1.0 / target_step.to_seconds();
-
-        // Simple moving average as low-pass filter
-        let window_size = (current_hz / target_hz).round() as usize;
-
-        info!(
-            "downsampling tracking data from {current_step} ({current_hz:.6} Hz) to {target_step} ({target_hz:.6} Hz) (N = {window_size})"
-        );
-
-        let mut result = TrackingDataArc {
-            source: self.source.clone(),
-            ..Default::default()
-        };
-
-        let measurements: Vec<_> = self.measurements.iter().collect();
-
-        for (i, (epoch, _)) in measurements.iter().enumerate().step_by(window_size) {
-            let start = i.saturating_sub(window_size / 2);
-            let end = (i + window_size / 2 + 1).min(measurements.len());
-            let window = &measurements[start..end];
-
-            let mut filtered_measurement = Measurement {
-                tracker: window[0].1.tracker.clone(),
-                epoch: **epoch,
-                data: IndexMap::new(),
-                rejected: false,
-            };
-
-            // Apply moving average filter for each measurement type
-            for mtype in self.unique_types() {
-                let sum: f64 = window.iter().filter_map(|(_, m)| m.data.get(&mtype)).sum();
-                let count = window
-                    .iter()
-                    .filter(|(_, m)| m.data.contains_key(&mtype))
-                    .count();
-
-                if count > 0 {
-                    filtered_measurement.data.insert(mtype, sum / count as f64);
-                }
-            }
-
-            result.measurements.insert(**epoch, filtered_measurement);
-        }
-        result
-    }
-
     pub fn resid_vs_ref_check(mut self) -> Self {
         self.force_reject = true;
         self
-    }
-
-    /// Splits a long tracking data arc into smaller chunks, each up to `max_duration` long.
-    /// This is inspired by JPL MONTE's long arc setup to ensure BLSE convergence on manageable chunks.
-    pub fn chunk(&self, max_duration: Duration) -> Vec<TrackingDataArc> {
-        let mut chunks = Vec::new();
-        if self.is_empty() {
-            return chunks;
-        }
-
-        let end_epoch = self.end_epoch().unwrap();
-        let mut chunk_start = self.start_epoch().unwrap();
-
-        while chunk_start <= end_epoch {
-            let chunk_end = chunk_start + max_duration;
-            let sub_arc = self.clone().filter_by_epoch(chunk_start..chunk_end);
-            if !sub_arc.is_empty() {
-                chunks.push(sub_arc);
-            }
-            // Move start to the next measurement's epoch after chunk_end
-            let mut found_next = false;
-            for (epoch, _) in self.measurements.range(chunk_end..) {
-                if *epoch >= chunk_end {
-                    chunk_start = *epoch;
-                    found_next = true;
-                    break;
-                }
-            }
-            if !found_next {
-                break;
-            }
-        }
-
-        chunks
     }
 }
 

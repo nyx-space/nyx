@@ -69,7 +69,7 @@ rstest = "0.26.1"
 pretty_env_logger = "0.5"
 serde_arrow = { version = "0.14", features = ["arrow-58"] }
 toml = "1.0.0"
-radiate = "1.2.22"
+radiate = {version = "1.2.22", features = ["ui"]}
 
 [build-dependencies]
 shadow-rs = "2.0.0"

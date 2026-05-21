@@ -1,15 +1,15 @@
-use anise::almanac::Almanac;
 use anise::almanac::metaload::{MetaAlmanac, MetaFile};
+use anise::almanac::Almanac;
 use anise::analysis::prelude::{
-    Condition, Event, EventArc, EventDetails, EventEdge, OrbitalElement, Plane, VisibilityArc,
-    find_arc_intersections,
+    find_arc_intersections, Condition, Event, EventArc, EventDetails, EventEdge, OrbitalElement,
+    Plane, VisibilityArc,
 };
 use anise::analysis::python::{
     PyFrameSpec, PyOrthogonalFrame, PyScalarExpr, PyStateSpec, PyVectorExpr,
 };
 use anise::analysis::report::PyReportScalars;
-use anise::astro::Aberration;
 use anise::astro::orbit::Orbit;
+use anise::astro::Aberration;
 use anise::astro::{AzElRange, Location, Occultation, TerrainMask};
 use anise::ephemerides::ephemeris::{Covariance, Ephemeris, EphemerisRecord, LocalFrame};
 use anise::frames::Frame;
@@ -25,12 +25,13 @@ use hifitime::python::*;
 use hifitime::ut1::*;
 use hifitime::*;
 use nyx_space::dynamics::guidance::Thruster;
+use nyx_space::dynamics::sequence::SpacecraftSequence;
 use nyx_space::mc::{MvnSpacecraft, StateDispersion};
 use nyx_space::md::StateParameter;
 use nyx_space::{
-    Spacecraft,
     cosmic::GuidanceMode,
     od::msr::{Measurement, MeasurementType, TrackingDataArc},
+    Spacecraft,
 };
 
 use pyo3::{prelude::*, wrap_pymodule};
@@ -79,7 +80,14 @@ fn monte_carlo(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
     Ok(())
 }
 
-/// Reexport hifitime as anise.time
+#[pymodule]
+fn mission_design(_py: Python, sm: &Bounde<PyModule>) -> PyResult<()> {
+    sm.add_class::<SpacecraftSequence>()?;
+
+    Ok(())
+}
+
+/// Reexport hifitime as nyx_space.time
 #[pymodule]
 fn time(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
     sm.add_class::<Epoch>()?;

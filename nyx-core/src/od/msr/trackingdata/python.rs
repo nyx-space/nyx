@@ -151,11 +151,6 @@ impl TrackingDataArc {
         self.clone().exclude_measurement_type(msr_type)
     }
 
-    #[pyo3(name = "downsample")]
-    fn py_downsample(&self, step: Duration) -> Self {
-        self.clone().downsample(step)
-    }
-
     #[pyo3(name = "resid_vs_ref_check")]
     fn py_resid_vs_ref_check(&self) -> Self {
         self.clone().resid_vs_ref_check()

@@ -4,7 +4,7 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger as pel;
 
 use anise::{
-    almanac::{Almanac, metaload::MetaFile},
+    almanac::{metaload::MetaFile, Almanac},
     constants::{
         celestial_objects::{MOON, SUN},
         frames::{EARTH_J2000, IAU_EARTH_FRAME},
@@ -13,15 +13,15 @@ use anise::{
 use hifitime::{Epoch, TimeUnits, Unit};
 use log::info;
 use nyx::{
-    Spacecraft,
     cosmic::{GuidanceMode, Mass, MetaAlmanac, Orbit, SRPData},
     dynamics::{
-        GravityField, OrbitalDynamics, SolarPressure, SpacecraftDynamics,
         guidance::{Ruggiero, Thruster},
+        GravityField, OrbitalDynamics, SolarPressure, SpacecraftDynamics,
     },
     io::gravity::GravityFieldData,
     md::prelude::{Objective, OrbitalElement, StateParameter},
     propagators::{ErrorControl, IntegratorOptions, Propagator},
+    Spacecraft,
 };
 use radiate::*;
 use std::{error::Error, sync::Arc};
@@ -75,15 +75,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Set up the genetic algorithm optimization
     let codec = FloatCodec::vector(3, 0.1_f32..1.0_f32); // 3 weights for SMA, Ecc, Inc
     let problem = EngineProblem {
-        objective: radiate::Objective::Single(Optimize::Maximize),
+        objective: radiate::Objective::Multi(vec![Optimize::Minimize, Optimize::Minimize]), // NSGA2 Multi Objective
         codec: Arc::new(codec),
         fitness_fn: Some(Arc::new(move |weights: Vec<f32>| {
             // Full 60 days propagation for evaluating the actual performance, but running fast due to shared state
             let (prop_usage, penalty) =
                 evaluate_weights(&weights, 60.0, shared_state.clone()).unwrap_or((1e6, 1e6));
-
-            // The minimize seems to maximize on single objectives, so we make sure any penalty outweights the prop.
-            Score::from(-(prop_usage + penalty) as f32)
+            Score::from(vec![prop_usage as f32, penalty as f32])
         })),
         raw_fitness_fn: None,
     };
@@ -91,22 +89,27 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut engine = GeneticEngine::<FloatChromosome<f32>, Vec<f32>>::builder()
         .population_size(20)
         .parallel()
+        .multi_objective(vec![Optimize::Minimize, Optimize::Minimize])
         .problem(problem)
+        .survivor_selector(NSGA2Selector::new())
         .build();
 
-    let result = engine.run(|generation: &Generation<FloatChromosome<f32>, Vec<f32>>| {
-        let scores = generation.score().as_slice();
-        println!("[ {:?} ]: Best Score: {:.3}", generation.index(), scores[0],);
-        generation.index() >= 5 // Max generations
-    });
+    // Wrap the engine with the UI
+    // let final_generation = engine
+    //     .run(|generation: &Generation<FloatChromosome<f32>, Vec<f32>>| generation.index() >= 5);
+    let final_generation = radiate::ui(engine)
+        .iter()
+        .until_converged(3, 10.0)
+        .last()
+        .unwrap();
 
-    let best_weights = result
+    let best_weights = final_generation
         .value()
         .iter()
         .map(|w| format!("W: = {w}"))
         .collect::<Vec<String>>()
         .join(", ");
-    let best_score = result
+    let best_score = final_generation
         .score()
         .iter()
         .enumerate()
@@ -116,7 +119,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Optimization finished. Best weights: [{best_weights}] -> Best score: [{best_score}]");
 
     // Evaluate these weights.
-    let best_weights = result.value().iter().copied().collect::<Vec<f32>>();
+    let best_weights = final_generation
+        .value()
+        .iter()
+        .copied()
+        .collect::<Vec<f32>>();
 
     let (prop_usage_kg, penalty) =
         evaluate_weights(&best_weights, 60.0, Arc::new(SharedState::new()?)).unwrap();
@@ -169,7 +176,6 @@ fn evaluate_weights(
         ),
     ];
 
-    // let kluever_ctrl = Kluever::from_max_eclipse(objectives, &weights_f64, 0.2);
     let ctrl = Ruggiero::from_ηthresholds(objectives, &ηthresholds, sc)?;
 
     let mut orbital_dyn = OrbitalDynamics::point_masses(vec![MOON, SUN]);
