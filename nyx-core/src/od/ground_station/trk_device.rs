@@ -22,6 +22,7 @@ use crate::md::prelude::{Interpolatable, Traj};
 use crate::od::msr::MeasurementType;
 use crate::od::msr::measurement::Measurement;
 use crate::time::Epoch;
+use anise::constants::SPEED_OF_LIGHT_KM_S;
 use anise::errors::AlmanacResult;
 use anise::frames::Frame;
 use anise::prelude::{Aberration, Almanac, Orbit};
@@ -132,8 +133,33 @@ impl TrackingDevice<Spacecraft> for GroundStation {
                 let mut msr = Measurement::new(self.name.clone(), epoch + noises[0].seconds());
 
                 for (ii, msr_type) in self.measurement_types.iter().enumerate() {
-                    let msr_value = msr_type.compute_two_way(aer_t0, aer_t1, noises[ii + 1])?;
-                    msr.push(*msr_type, msr_value);
+                    match msr_type {
+                        MeasurementType::ReceiveFrequency => {
+                            if let (Some(f_tx), Some(k)) =
+                                (self.transmit_freq_hz, self.turnaround_ratio)
+                            {
+                                let rho_dot =
+                                    MeasurementType::Doppler.compute_two_way(aer_t0, aer_t1, 0.0)?;
+                                // f_rx = f_tx * k * (1 - 2 * rho_dot / c)
+                                let f_rx = f_tx * k * (1.0 - 2.0 * rho_dot / SPEED_OF_LIGHT_KM_S);
+                                // Add noise
+                                msr.push(*msr_type, f_rx + noises[ii + 1]);
+                            }
+                        }
+                        MeasurementType::TransmitFrequency => {
+                            if let Some(f_tx) = self.transmit_freq_hz {
+                                msr.push(*msr_type, f_tx + noises[ii + 1]);
+                            }
+                        }
+                        MeasurementType::TransmitFrequencyRate => {
+                            // TransmitFrequencyRate is not supported in simulation yet.
+                        }
+                        _ => {
+                            let msr_value =
+                                msr_type.compute_two_way(aer_t0, aer_t1, noises[ii + 1])?;
+                            msr.push(*msr_type, msr_value);
+                        }
+                    }
                 }
 
                 Ok(Some(msr))
@@ -192,8 +218,30 @@ impl TrackingDevice<Spacecraft> for GroundStation {
             let mut msr = Measurement::new(self.name.clone(), rx.orbit.epoch + noises[0].seconds());
 
             for (ii, msr_type) in self.measurement_types.iter().enumerate() {
-                let msr_value = msr_type.compute_one_way(aer, noises[ii + 1])?;
-                msr.push(*msr_type, msr_value);
+                match msr_type {
+                    MeasurementType::ReceiveFrequency => {
+                        if let (Some(f_tx), Some(k)) = (self.transmit_freq_hz, self.turnaround_ratio)
+                        {
+                            let rho_dot = MeasurementType::Doppler.compute_one_way(aer, 0.0)?;
+                            // One way: f_rx = f_tx * k * (1 - rho_dot / c)
+                            let f_rx = f_tx * k * (1.0 - rho_dot / SPEED_OF_LIGHT_KM_S);
+                            // Add noise
+                            msr.push(*msr_type, f_rx + noises[ii + 1]);
+                        }
+                    }
+                    MeasurementType::TransmitFrequency => {
+                        if let Some(f_tx) = self.transmit_freq_hz {
+                            msr.push(*msr_type, f_tx + noises[ii + 1]);
+                        }
+                    }
+                    MeasurementType::TransmitFrequencyRate => {
+                        // TransmitFrequencyRate is not supported in simulation yet.
+                    }
+                    _ => {
+                        let msr_value = msr_type.compute_one_way(aer, noises[ii + 1])?;
+                        msr.push(*msr_type, msr_value);
+                    }
+                }
             }
 
             Ok(Some(msr))

@@ -21,6 +21,7 @@ use crate::linalg::allocator::Allocator;
 use crate::md::prelude::Interpolatable;
 use crate::od::{GroundStation, ODAlmanacSnafu, ODError, TrackingDevice};
 use crate::{Spacecraft, State};
+use anise::constants::SPEED_OF_LIGHT_KM_S;
 use anise::prelude::Almanac;
 use indexmap::IndexSet;
 use nalgebra::{DimName, OMatrix, U1};
@@ -225,11 +226,76 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
                     _tx: PhantomData::<_>,
                 })
             }
-            MeasurementType::ReceiveFrequency
-            | MeasurementType::TransmitFrequency
-            | MeasurementType::TransmitFrequencyRate => Err(ODError::MeasurementSimError {
-                details: format!("{msr_type:?} is only supported in CCSDS TDM parsing"),
-            }),
+            MeasurementType::ReceiveFrequency => {
+                // Formula from CCSDS TDM v2:
+                // rho_dot = (doppler_shift * c) / (2 * f_tx * k)
+                // where doppler_shift = f_tx * k - f_rx
+                // So f_rx = f_tx * k - (2 * f_tx * k / c) * rho_dot
+                // d(f_rx) / d(state) = - (2 * f_tx * k / c) * d(rho_dot) / d(state)
+
+                if let (Some(f_tx), Some(k)) = (tx.transmit_freq_hz, tx.turnaround_ratio) {
+                    // Compute Doppler sensitivity row.
+                    // We need to temporarily add Doppler to the measurement data so the Doppler sensitivity logic works.
+                    // Actually, let's just copy the Doppler logic and multiply by the factor.
+
+                    let ρ_km = tx
+                        .azimuth_elevation_of(receiver, None, &almanac)
+                        .context(ODAlmanacSnafu {
+                            action: "computing range for ReceiveFrequency sensitivity",
+                        })?
+                        .range_km;
+
+                    // We need a rho_dot. If we don't have it, we compute it.
+                    let ρ_dot_km_s = match msr.data.get(&MeasurementType::Doppler) {
+                        Some(val) => *val,
+                        None => {
+                            // Convert f_rx back to rho_dot for the sensitivity calculation.
+                            let f_rx = msr.data.get(&MeasurementType::ReceiveFrequency).unwrap();
+                            (f_tx * k - f_rx) * SPEED_OF_LIGHT_KM_S / (2.0 * f_tx * k)
+                        }
+                    };
+
+                    let m11 = delta_r.x / ρ_km;
+                    let m12 = delta_r.y / ρ_km;
+                    let m13 = delta_r.z / ρ_km;
+                    let m21 = delta_v.x / ρ_km - ρ_dot_km_s * delta_r.x / ρ_km.powi(2);
+                    let m22 = delta_v.y / ρ_km - ρ_dot_km_s * delta_r.y / ρ_km.powi(2);
+                    let m23 = delta_v.z / ρ_km - ρ_dot_km_s * delta_r.z / ρ_km.powi(2);
+
+                    let factor = -2.0 * f_tx * k / SPEED_OF_LIGHT_KM_S;
+
+                    let sensitivity_row =
+                        OMatrix::<f64, U1, <Spacecraft as State>::Size>::from_row_slice(&[
+                            m21 * factor,
+                            m22 * factor,
+                            m23 * factor,
+                            m11 * factor,
+                            m12 * factor,
+                            m13 * factor,
+                            0.0,
+                            0.0,
+                            0.0,
+                        ]);
+
+                    Ok(Self {
+                        sensitivity_row,
+                        _rx: PhantomData::<_>,
+                        _tx: PhantomData::<_>,
+                    })
+                } else {
+                    Err(ODError::MeasurementSimError {
+                        details: "ReceiveFrequency requires GroundStation to have transmit_freq_hz and turnaround_ratio set".to_string(),
+                    })
+                }
+            }
+            MeasurementType::TransmitFrequency | MeasurementType::TransmitFrequencyRate => {
+                // Sensitivity of transmit frequency is zero with respect to the spacecraft state.
+                Ok(Self {
+                    sensitivity_row: OMatrix::<f64, U1, <Spacecraft as State>::Size>::zeros(),
+                    _rx: PhantomData::<_>,
+                    _tx: PhantomData::<_>,
+                })
+            }
             MeasurementType::X | MeasurementType::Y | MeasurementType::Z => {
                 Err(ODError::MeasurementSimError {
                     details: format!("{msr_type:?} is not supported for ground stations"),

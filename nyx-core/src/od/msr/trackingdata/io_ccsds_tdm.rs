@@ -188,7 +188,7 @@ impl TrackingDataArc {
         }
 
         let mut turnaround_ratio = None;
-        let drop_freq_data;
+        let mut drop_freq_data = false;
         if has_freq_data {
             // If there is any frequency measurement, compute the turn-around ratio.
             if let Some(ta_num_str) = metadata.get("TURNAROUND_NUMERATOR") {
@@ -221,8 +221,6 @@ impl TrackingDataArc {
                 );
                 drop_freq_data = true;
             }
-        } else {
-            drop_freq_data = true;
         }
 
         let corrections_applied = if let Some(corr_flag) = metadata.get("CORRECTIONS_APPLIED") {
@@ -240,16 +238,15 @@ impl TrackingDataArc {
 
         // Now, let's convert the receive and transmit frequencies to Doppler measurements in velocity units.
         // We expect the transmit and receive frequencies to have the exact same timestamp.
-        let mut freq_types = IndexSet::new();
-        freq_types.insert(MeasurementType::ReceiveFrequency);
-        freq_types.insert(MeasurementType::TransmitFrequency);
-        freq_types.insert(MeasurementType::TransmitFrequencyRate);
 
         let mut latest_transmit_freq = None;
         let mut latest_transmit_epoch = None;
         let mut latest_transmit_rate = 0.0;
 
         let mut all_applied_corrections = IndexSet::new();
+
+        // If turnaround ratio is set, we might want to keep the frequency data.
+        // But for now, let's keep the existing logic that converts to Doppler but optionally also keep the original frequencies.
 
         for (epoch, measurement) in measurements.iter_mut() {
             // Apply corrections if any
@@ -275,10 +272,10 @@ impl TrackingDataArc {
                 }
             }
 
-            if drop_freq_data {
-                for freq in &freq_types {
-                    measurement.data.swap_remove(freq);
-                }
+            if has_freq_data && drop_freq_data {
+                measurement.data.swap_remove(&MeasurementType::ReceiveFrequency);
+                measurement.data.swap_remove(&MeasurementType::TransmitFrequency);
+                measurement.data.swap_remove(&MeasurementType::TransmitFrequencyRate);
                 continue;
             }
 
@@ -306,10 +303,6 @@ impl TrackingDataArc {
                 .contains_key(&MeasurementType::ReceiveFrequency)
             {
                 // If there's no receive frequency, we just continue (having updated the transmit freq rate)
-                // but we must remove the transmit freq rate from the measurement.
-                for freq in &freq_types {
-                    measurement.data.swap_remove(freq);
-                }
                 continue;
             }
 
@@ -318,9 +311,7 @@ impl TrackingDataArc {
                 warn!(
                     "receive frequency found at {epoch} but no transmit frequency was ever set, ignoring"
                 );
-                for freq in &freq_types {
-                    measurement.data.swap_remove(freq);
-                }
+                measurement.data.swap_remove(&MeasurementType::ReceiveFrequency);
                 continue;
             }
 
@@ -339,10 +330,7 @@ impl TrackingDataArc {
             let rho_dot_km_s = (doppler_shift_hz * SPEED_OF_LIGHT_KM_S)
                 / (2.0 * transmit_freq_hz * turnaround_ratio.unwrap());
 
-            // Finally, replace the frequency data with a Doppler measurement.
-            for freq in &freq_types {
-                measurement.data.swap_remove(freq);
-            }
+            // Finally, add the Doppler measurement.
             measurement
                 .data
                 .insert(MeasurementType::Doppler, rho_dot_km_s);
@@ -475,13 +463,29 @@ impl TrackingDataArc {
 
             let two_way_types = types
                 .iter()
-                .filter(|msr_type| msr_type.may_be_two_way())
+                .filter(|msr_type| {
+                    msr_type.may_be_two_way()
+                        || [
+                            MeasurementType::ReceiveFrequency,
+                            MeasurementType::TransmitFrequency,
+                            MeasurementType::TransmitFrequencyRate,
+                        ]
+                        .contains(msr_type)
+                })
                 .copied()
                 .collect::<Vec<_>>();
 
             let one_way_types = types
                 .iter()
-                .filter(|msr_type| !msr_type.may_be_two_way())
+                .filter(|msr_type| {
+                    !msr_type.may_be_two_way()
+                        && ![
+                            MeasurementType::ReceiveFrequency,
+                            MeasurementType::TransmitFrequency,
+                            MeasurementType::TransmitFrequencyRate,
+                        ]
+                        .contains(msr_type)
+                })
                 .copied()
                 .collect::<Vec<_>>();
 
@@ -565,12 +569,19 @@ impl TrackingDataArc {
                             continue;
                         }
 
+                        let this_multiplier = match mtype {
+                            MeasurementType::ReceiveFrequency
+                            | MeasurementType::TransmitFrequency
+                            | MeasurementType::TransmitFrequencyRate => 1.0,
+                            _ => multiplier,
+                        };
+
                         writeln!(
                             writer,
                             "\t{:<20} = {:<23}\t{:.12}",
                             mtype.ccsds_tdm_name(),
                             Formatter::new(*epoch, iso8601_no_ts),
-                            value * multiplier
+                            value * this_multiplier
                         )
                         .map_err(err_hdlr)?;
                     }

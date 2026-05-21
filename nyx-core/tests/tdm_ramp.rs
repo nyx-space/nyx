@@ -32,9 +32,13 @@ DATA_STOP
     let mut file = File::create(&path).unwrap();
     file.write_all(tdm_content.as_bytes()).unwrap();
 
-    let arc = TrackingDataArc::from_tdm(&path, None).unwrap();
+    let mut arc = TrackingDataArc::from_tdm(&path, None).unwrap();
 
     println!("{arc}");
+
+    // Filter to only have Doppler to match old test expectation if needed,
+    // or just check that we have the expected Doppler measurement at the right epoch.
+    arc = arc.filter_by_measurement_type(MeasurementType::Doppler);
 
     assert_eq!(arc.len(), 1);
     let (epoch, msr) = arc.measurements.iter().next().unwrap();
