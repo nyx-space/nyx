@@ -58,10 +58,69 @@ pub struct GroundStation {
     /// Noise on the timestamp of the measurement
     pub timestamp_noise_s: Option<StochasticNoise>,
     pub stochastic_noises: Option<IndexMap<MeasurementType, StochasticNoise>>,
+    /// Transmit frequency of the ground station in Hz
+    pub transmit_freq_hz: Option<f64>,
+    /// Turnaround ratio of the spacecraft (num / denom)
+    pub turnaround_ratio: Option<f64>,
 }
 
 #[cfg_attr(feature = "python", pymethods)]
 impl GroundStation {
+    #[cfg(feature = "python")]
+    #[new]
+    pub fn py_new(
+        name: String,
+        latitude_deg: f64,
+        longitude_deg: f64,
+        height_km: f64,
+        frame: Frame,
+        transmit_freq_hz: Option<f64>,
+        turnaround_ratio: Option<f64>,
+    ) -> Self {
+        Self {
+            name,
+            location: Location {
+                latitude_deg,
+                longitude_deg,
+                height_km,
+                frame: frame.into(),
+                terrain_mask: vec![],
+                terrain_mask_ignored: true,
+            },
+            measurement_types: IndexSet::new(),
+            integration_time: None,
+            light_time_correction: false,
+            timestamp_noise_s: None,
+            stochastic_noises: None,
+            transmit_freq_hz,
+            turnaround_ratio,
+        }
+    }
+
+    #[cfg(feature = "python")]
+    #[getter]
+    pub fn get_transmit_freq_hz(&self) -> Option<f64> {
+        self.transmit_freq_hz
+    }
+
+    #[cfg(feature = "python")]
+    #[setter]
+    pub fn set_transmit_freq_hz(&mut self, transmit_freq_hz: Option<f64>) {
+        self.transmit_freq_hz = transmit_freq_hz;
+    }
+
+    #[cfg(feature = "python")]
+    #[getter]
+    pub fn get_turnaround_ratio(&self) -> Option<f64> {
+        self.turnaround_ratio
+    }
+
+    #[cfg(feature = "python")]
+    #[setter]
+    pub fn set_turnaround_ratio(&mut self, turnaround_ratio: Option<f64>) {
+        self.turnaround_ratio = turnaround_ratio;
+    }
+
     /// Computes the azimuth and elevation of the provided object seen from this ground station, both in degrees.
     /// This is a shortcut to almanac.azimuth_elevation_range_sez.
     pub fn azimuth_elevation_of(
@@ -128,6 +187,8 @@ impl GroundStation {
             light_time_correction: false,
             timestamp_noise_s: None,
             stochastic_noises: None,
+            transmit_freq_hz: None,
+            turnaround_ratio: None,
         }
     }
 
@@ -236,6 +297,12 @@ impl GroundStation {
         if self.stochastic_noises.is_some() {
             bits |= 1 << 2;
         }
+        if self.transmit_freq_hz.is_some() {
+            bits |= 1 << 3;
+        }
+        if self.turnaround_ratio.is_some() {
+            bits |= 1 << 4;
+        }
         bits
     }
 }
@@ -280,6 +347,8 @@ impl Default for GroundStation {
             light_time_correction: false,
             timestamp_noise_s: None,
             stochastic_noises: None,
+            transmit_freq_hz: None,
+            turnaround_ratio: None,
         }
     }
 }
@@ -331,6 +400,18 @@ impl<'a> Decode<'a> for GroundStation {
             None
         };
 
+        let transmit_freq_hz = if flags & (1 << 3) != 0 {
+            Some(decoder.decode()?)
+        } else {
+            None
+        };
+
+        let turnaround_ratio = if flags & (1 << 4) != 0 {
+            Some(decoder.decode()?)
+        } else {
+            None
+        };
+
         Ok(GroundStation {
             name,
             location,
@@ -339,6 +420,8 @@ impl<'a> Decode<'a> for GroundStation {
             light_time_correction,
             timestamp_noise_s,
             stochastic_noises,
+            transmit_freq_hz,
+            turnaround_ratio,
         })
     }
 }
@@ -366,6 +449,8 @@ impl Encode for GroundStation {
             + integration_time_ns.encoded_len()?
             + self.timestamp_noise_s.encoded_len()?
             + stochastics_vec.encoded_len()?
+            + self.transmit_freq_hz.encoded_len()?
+            + self.turnaround_ratio.encoded_len()?
     }
 
     fn encode(&self, encoder: &mut impl der::Writer) -> der::Result<()> {
@@ -392,6 +477,9 @@ impl Encode for GroundStation {
                 .collect::<Vec<MsrNoisePair>>()
         });
         stochastics_vec.encode(encoder)?;
+
+        self.transmit_freq_hz.encode(encoder)?;
+        self.turnaround_ratio.encode(encoder)?;
 
         Ok(())
     }
@@ -473,6 +561,8 @@ mod gs_ut {
             light_time_correction: false,
             timestamp_noise_s: None,
             integration_time: Some(60 * Unit::Second),
+            transmit_freq_hz: None,
+            turnaround_ratio: None,
         };
 
         println!("{}", serde_yml::to_string(&expected_gs).unwrap());
@@ -536,6 +626,8 @@ mod gs_ut {
                 light_time_correction: false,
                 timestamp_noise_s: None,
                 integration_time: None,
+                transmit_freq_hz: None,
+                turnaround_ratio: None,
             },
             GroundStation {
                 name: "Canberra".to_string(),
@@ -552,6 +644,8 @@ mod gs_ut {
                 light_time_correction: false,
                 timestamp_noise_s: None,
                 integration_time: None,
+                transmit_freq_hz: None,
+                turnaround_ratio: None,
             },
         ];
 
