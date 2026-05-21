@@ -4,7 +4,7 @@
 
 Nyx is revolutionizing the field of flight dynamics engineering as a powerful, open-source tool for mission design and orbit determination. From trajectory optimization to orbit estimation, Nyx is built for speed, automation, and scalability.
 
-**Nyx has proven mission-critical reliability, already contributing to the success of several lunar missions including Firefly Blue Ghost 1 and NASA/Adanced Space CAPSTONE.**
+**Nyx has proven mission-critical reliability, already contributing to the success of several lunar missions including Firefly Blue Ghost 1 and NASA/Advanced Space CAPSTONE.**
 
 [![Nyx Space Badget][nyxspace-image]][website]
 [![Contact Form][contact-form-image]][contact]
