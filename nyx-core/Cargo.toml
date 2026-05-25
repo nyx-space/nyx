@@ -24,7 +24,7 @@ anise = {workspace = true}
 hifitime = {workspace = true}
 
 der = { version = "0.7", features = ["derive", "alloc", "real"] }
-nalgebra = "0.34"
+nalgebra = "0.35"
 log = "0.4"
 flate2 = { version = "1.0", features = [
     "rust_backend",
