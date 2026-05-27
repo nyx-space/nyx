@@ -45,9 +45,15 @@ pub mod gravity;
 
 use std::io;
 
-/// Configuration for exporting a trajectory to parquet.
-#[derive(Clone, Default, Serialize, Deserialize, TypedBuilder)]
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+#[cfg(feature = "python")]
+mod python;
+
+/// Configuration for exporting from Nyx to local disk.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, TypedBuilder, PartialEq)]
 #[builder(doc)]
+#[cfg_attr(feature = "python", pyclass(from_py_object, eq))]
 pub struct ExportCfg {
     /// Fields to export, if unset, defaults to all possible fields.
     #[builder(default, setter(strip_option))]

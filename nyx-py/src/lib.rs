@@ -1,15 +1,15 @@
-use anise::almanac::metaload::{MetaAlmanac, MetaFile};
 use anise::almanac::Almanac;
+use anise::almanac::metaload::{MetaAlmanac, MetaFile};
 use anise::analysis::prelude::{
-    find_arc_intersections, Condition, Event, EventArc, EventDetails, EventEdge, OrbitalElement,
-    Plane, VisibilityArc,
+    Condition, Event, EventArc, EventDetails, EventEdge, OrbitalElement, Plane, VisibilityArc,
+    find_arc_intersections,
 };
 use anise::analysis::python::{
     PyFrameSpec, PyOrthogonalFrame, PyScalarExpr, PyStateSpec, PyVectorExpr,
 };
 use anise::analysis::report::PyReportScalars;
-use anise::astro::orbit::Orbit;
 use anise::astro::Aberration;
+use anise::astro::orbit::Orbit;
 use anise::astro::{AzElRange, Location, Occultation, TerrainMask};
 use anise::ephemerides::ephemeris::{Covariance, Ephemeris, EphemerisRecord, LocalFrame};
 use anise::frames::Frame;
@@ -20,19 +20,21 @@ use anise::structure::dataset::location_dhall::{LocationDhallSet, LocationDhallS
 use anise::structure::instrument::{FovShape, Instrument};
 use anise::structure::planetocentric::ellipsoid::Ellipsoid;
 use anise::structure::spacecraft::{DragData, Mass, SRPData};
+
 use hifitime::leap_seconds::*;
 use hifitime::python::*;
 use hifitime::ut1::*;
 use hifitime::*;
+
 use nyx_space::dynamics::guidance::Thruster;
 use nyx_space::dynamics::sequence::SpacecraftSequence;
 use nyx_space::mc::{MvnSpacecraft, StateDispersion};
 use nyx_space::md::StateParameter;
-use nyx_space::{
-    cosmic::GuidanceMode,
-    od::msr::{Measurement, MeasurementType, TrackingDataArc},
-    Spacecraft,
-};
+use nyx_space::md::trajectory::ExportCfg;
+use nyx_space::od::msr::{Measurement, MeasurementType, TrackingDataArc};
+use nyx_space::od::simulator::{Handoff, PyCadence, Scheduler, Strand, TrkConfig};
+use nyx_space::od::{GroundStation, ODError};
+use nyx_space::{Spacecraft, cosmic::GuidanceMode};
 
 use pyo3::{prelude::*, wrap_pymodule};
 
@@ -67,6 +69,13 @@ fn orbit_determination(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
     sm.add_class::<TrackingDataArc>()?;
     sm.add_class::<MeasurementType>()?;
     sm.add_class::<Measurement>()?;
+    sm.add_class::<GroundStation>()?;
+    sm.add_class::<PyCadence>()?;
+    sm.add_class::<Handoff>()?;
+    sm.add_class::<Strand>()?;
+    sm.add_class::<TrkConfig>()?;
+    sm.add_class::<Scheduler>()?;
+    sm.add_class::<ExportCfg>()?;
 
     Ok(())
 }
