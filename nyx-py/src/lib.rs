@@ -69,6 +69,7 @@ fn orbit_determination(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
     sm.add_class::<TrackingDataArc>()?;
     sm.add_class::<MeasurementType>()?;
     sm.add_class::<Measurement>()?;
+    sm.add_class::<Location>()?;
     sm.add_class::<GroundStation>()?;
     sm.add_class::<PyCadence>()?;
     sm.add_class::<Handoff>()?;
@@ -76,6 +77,7 @@ fn orbit_determination(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
     sm.add_class::<TrkConfig>()?;
     sm.add_class::<Scheduler>()?;
     sm.add_class::<ExportCfg>()?;
+    sm.add_class::<FrameUid>()?;
 
     Ok(())
 }
