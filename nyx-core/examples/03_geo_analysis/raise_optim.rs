@@ -4,7 +4,7 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger as pel;
 
 use anise::{
-    almanac::{metaload::MetaFile, Almanac},
+    almanac::{Almanac, metaload::MetaFile},
     constants::{
         celestial_objects::{MOON, SUN},
         frames::{EARTH_J2000, IAU_EARTH_FRAME},
@@ -13,15 +13,15 @@ use anise::{
 use hifitime::{Epoch, TimeUnits, Unit};
 use log::info;
 use nyx::{
+    Spacecraft,
     cosmic::{GuidanceMode, Mass, MetaAlmanac, Orbit, SRPData},
     dynamics::{
-        guidance::{Ruggiero, Thruster},
         GravityField, OrbitalDynamics, SolarPressure, SpacecraftDynamics,
+        guidance::{Ruggiero, Thruster},
     },
     io::gravity::GravityFieldData,
     md::prelude::{Objective, OrbitalElement, StateParameter},
     propagators::{ErrorControl, IntegratorOptions, Propagator},
-    Spacecraft,
 };
 use radiate::*;
 use std::{error::Error, sync::Arc};
@@ -122,11 +122,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Optimization finished. Best weights: [{best_weights}] -> Best score: [{best_score}]");
 
     // Evaluate these weights.
-    let best_weights = final_generation
-        .value()
-        .iter()
-        .copied()
-        .collect::<Vec<f32>>();
+    let best_weights: Vec<f32> = final_generation.value().to_vec();
 
     let (prop_usage_kg, penalty) =
         evaluate_weights(&best_weights, 60.0, Arc::new(SharedState::new()?)).unwrap();

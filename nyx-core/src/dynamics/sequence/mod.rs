@@ -74,12 +74,12 @@ impl SpacecraftSequence {
             } = phase
             {
                 // Check that the propagator exists
-                if self.propagators.get(propagator).is_none() {
+                if !self.propagators.contains_key(propagator) {
                     return Err(format!("{epoch}: no propagator named `{propagator}`"));
                 }
                 if let Some(guidance) = guidance {
                     let thruster = &guidance.thruster_model;
-                    if self.thruster_sets.get(thruster).is_none() {
+                    if !self.thruster_sets.contains_key(thruster) {
                         return Err(format!("{epoch}: no thruster set named {thruster}"));
                     }
                 }

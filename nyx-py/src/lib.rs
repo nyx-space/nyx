@@ -31,9 +31,9 @@ use nyx_space::dynamics::sequence::SpacecraftSequence;
 use nyx_space::mc::{MvnSpacecraft, StateDispersion};
 use nyx_space::md::StateParameter;
 use nyx_space::md::trajectory::ExportCfg;
+use nyx_space::od::GroundStation;
 use nyx_space::od::msr::{Measurement, MeasurementType, TrackingDataArc};
 use nyx_space::od::simulator::{Handoff, PyCadence, Scheduler, Strand, TrkConfig};
-use nyx_space::od::{GroundStation, ODError};
 use nyx_space::{Spacecraft, cosmic::GuidanceMode};
 
 use pyo3::{prelude::*, wrap_pymodule};
