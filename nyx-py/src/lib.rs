@@ -1,3 +1,20 @@
+/*
+    Nyx, blazing fast astrodynamics
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
 use anise::almanac::Almanac;
 use anise::almanac::metaload::{MetaAlmanac, MetaFile};
 use anise::analysis::prelude::{
@@ -39,6 +56,8 @@ use nyx_space::{Spacecraft, cosmic::GuidanceMode};
 use pyo3::{prelude::*, wrap_pymodule};
 
 mod constants;
+mod py_md;
+mod py_od;
 mod utils;
 
 #[pymodule]
@@ -137,10 +156,6 @@ fn pyanise(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_class::<LocationDhallSet>()?;
     m.add_class::<LocationDhallSetEntry>()?;
     m.add_class::<PyLocationDataSet>()?;
-
-    m.add("__version__", env!("CARGO_PKG_VERSION"))?;
-    m.add("__doc__", env!("CARGO_PKG_DESCRIPTION"))?;
-    m.add("__author__", env!("CARGO_PKG_AUTHORS"))?;
 
     Ok(())
 }

@@ -19,7 +19,7 @@
 use super::traj_it::TrajIterator;
 use super::{ExportCfg, INTERPOLATION_SAMPLES, InterpolationSnafu};
 use super::{Interpolatable, TrajError};
-use crate::errors::NyxError;
+use crate::errors::{NyxError, StateError};
 use crate::io::InputOutputError;
 use crate::io::watermark::pq_writer;
 use crate::linalg::DefaultAllocator;
@@ -30,6 +30,7 @@ use crate::time::{Duration, Epoch, TimeSeries, TimeUnits};
 use anise::analysis::AnalysisError;
 use anise::analysis::specs::StateSpecTrait;
 use anise::astro::orbit::Orbit;
+use anise::errors::PhysicsError;
 use anise::prelude::{Aberration, Almanac};
 use arrow::array::{Array, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
@@ -412,7 +413,7 @@ where
         other: &Self,
         path: P,
         cfg: ExportCfg,
-    ) -> Result<PathBuf, Box<dyn Error>> {
+    ) -> Result<PathBuf, TrajError> {
         let tick = Epoch::now().unwrap();
         info!("Exporting trajectory to parquet file...");
 
@@ -509,7 +510,9 @@ where
             let self_orbit = self_state.orbit();
             let other_orbit = other_state.orbit();
 
-            let this_ric_diff = self_orbit.ric_difference(&other_orbit).map_err(Box::new)?;
+            let this_ric_diff = self_orbit
+                .ric_difference(&other_orbit)
+                .map_err(|source: PhysicsError| TrajError::TrajPhysics { source })?;
 
             ric_diff.push(this_ric_diff);
         }
@@ -538,9 +541,18 @@ where
         for field in fields {
             let mut data = Float64Builder::new();
             for (other_state, self_state) in other_states.iter().zip(self_states.iter()) {
-                let self_val = self_state.value(field).map_err(Box::new)?;
-                let other_val = other_state.value(field).map_err(Box::new)?;
-
+                let self_val =
+                    self_state
+                        .value(field)
+                        .map_err(|err: StateError| TrajError::TrajGeneric {
+                            err: err.to_string(),
+                        })?;
+                let other_val =
+                    other_state
+                        .value(field)
+                        .map_err(|err: StateError| TrajError::TrajGeneric {
+                            err: err.to_string(),
+                        })?;
                 data.append_value(self_val - other_val);
             }
 
@@ -563,12 +575,20 @@ where
 
         let props = pq_writer(Some(metadata));
 
-        let file = File::create(&path_buf)?;
+        let file = File::create(&path_buf).map_err(|err| TrajError::TrajGeneric {
+            err: format!("{err:?}"),
+        })?;
         let mut writer = ArrowWriter::try_new(file, schema.clone(), props).unwrap();
 
-        let batch = RecordBatch::try_new(schema, record)?;
-        writer.write(&batch)?;
-        writer.close()?;
+        let batch = RecordBatch::try_new(schema, record).map_err(|err| TrajError::TrajGeneric {
+            err: format!("{err:?}"),
+        })?;
+        writer.write(&batch).map_err(|err| TrajError::TrajGeneric {
+            err: format!("{err:?}"),
+        })?;
+        writer.close().map_err(|err| TrajError::TrajGeneric {
+            err: format!("{err:?}"),
+        })?;
 
         // Return the path this was written to
         let tock_time = Epoch::now().unwrap() - tick;
