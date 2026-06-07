@@ -16,17 +16,19 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::collections::BTreeMap;
-
 use super::py_md::PyTrajectory;
+use anise::analysis::AnalysisError;
+use anise::prelude::Almanac;
 use nyx_space::{
     Spacecraft,
     io::ConfigError,
     od::{
         GroundStation,
+        msr::TrackingDataArc,
         prelude::{TrackingArcSim, TrkConfig},
     },
 };
+use std::collections::BTreeMap;
 
 use pyo3::prelude::*;
 
@@ -50,6 +52,44 @@ impl GroundSpacecratTrackingArcSim {
             None => TrackingArcSim::new(devices, trajectory.inner, configs)?,
         };
         Ok(Self { inner })
+    }
+
+    /// Generates measurements for the tracking arc using the defined strands
+    ///
+    /// # Warning
+    /// This function will return an error if any of the devices defines as a scheduler.
+    /// You must create the schedule first using `build_schedule` first.
+    ///
+    /// # Notes
+    /// Although mutable, this function may be called several times to generate different measurements.
+    ///
+    /// # Algorithm
+    /// For each tracking device, and for each strand within that device, sample the trajectory at the sample
+    /// rate of the tracking device, adding a measurement whenever the spacecraft is visible.
+    /// Build the measurements as a vector, ordered chronologically.
+    ///
+    fn generate_measurements(&mut self, almanac: Almanac) -> Result<TrackingDataArc, ConfigError> {
+        self.inner.generate_measurements(almanac.into())
+    }
+
+    /// Builds the schedule provided the config. Requires the tracker to be a ground station.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. For each tracking device:
+    /// 2. Find when the vehicle trajectory has an elevation greater or equal to zero, and use that as the first start of the first tracking arc for this station
+    /// 3. Find when the vehicle trajectory has an elevation less than zero (i.e. disappears below the horizon), after that initial epoch
+    /// 4. Repeat 2, 3 until the end of the trajectory
+    /// 5. Build each of these as "tracking strands" for this tracking device.
+    /// 6. Organize all of the built tracking strands chronologically.
+    /// 7. Iterate through all of the strands:
+    ///    7.a. if that tracker is marked as `Greedy` and it ends after the start of the next strand, change the start date of the next strand.
+    ///    7.b. if that tracker is marked as `Eager` and it ends after the start of the next strand, change the end date of the current strand.
+    pub fn generate_schedule(
+        &self,
+        almanac: Almanac,
+    ) -> Result<BTreeMap<String, TrkConfig>, AnalysisError> {
+        self.inner.generate_schedule(almanac.into())
     }
 
     fn __str__(&self) -> String {
