@@ -25,7 +25,7 @@ use crate::linalg::{Const, Matrix3, Matrix6, OVector, Vector3, Vector6};
 use anise::almanac::Almanac;
 use anise::astro::Aberration;
 use hyperdual::linalg::norm;
-use hyperdual::{extract_jacobian_and_result, hyperspace_from_vector, Float, OHyperdual};
+use hyperdual::{Float, OHyperdual, extract_jacobian_and_result, hyperspace_from_vector};
 use serde::{Deserialize, Serialize};
 use serde_dhall::{SimpleType, StaticType};
 use snafu::ResultExt;
