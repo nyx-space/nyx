@@ -3,7 +3,7 @@
 #
 #    maturin generate-ci -o ../.github/workflows/python.yml github
 #
-name: Nyx Python
+name: Python
 
 on:
   push:

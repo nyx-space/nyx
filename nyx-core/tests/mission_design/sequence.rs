@@ -32,6 +32,7 @@ fn almanac() -> Arc<Almanac> {
 /// Its is useful for simulating different parts of the mission given some variation in the state WITHOUT retargeting.
 /// It will eventually support orbit determination thereby allowing a team to freeze the nominal design in a git-friendly
 /// format and then feed it tracking data for estimation.
+#[ignore = "sequence will be moved to premium soon"]
 #[rstest]
 fn spacecraft_sequence(almanac: Arc<Almanac>) {
     let _ = pel::try_init();
@@ -197,6 +198,7 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
     assert_eq!(trajectories.len(), sc_seq.seq.len() - 1);
 }
 
+#[ignore = "sequence will be moved to premium soon"]
 #[rstest]
 #[case(GuidanceConfig {
     thruster_model: "HET".to_string(),
