@@ -1,10 +1,10 @@
-from nyx_space import Spacecraft, Mass, SRPData, DragData
-from nyx_space.monte_carlo import MvnSpacecraft, StateDispersion, StateParameter
+from nyx_space import DragData, Mass, Spacecraft, SRPData
 from nyx_space.anise import MetaAlmanac
 from nyx_space.anise.analysis import OrbitalElement
 from nyx_space.anise.astro import Orbit
 from nyx_space.anise.constants import Frames
 from nyx_space.anise.time import Epoch
+from nyx_space.monte_carlo import MvnSpacecraft, StateDispersion, StateParameter
 
 
 def test_def_sc():
