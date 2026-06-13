@@ -327,7 +327,6 @@ where
 
     /// Propagates the provided Dynamics until the provided epoch and generate the trajectory of these dynamics on its own thread.
     /// Returns the end state and the trajectory.
-    /// Known bug #190: Cannot generate a valid trajectory when propagating backward
     pub fn until_epoch_with_traj(
         &mut self,
         end_time: Epoch,

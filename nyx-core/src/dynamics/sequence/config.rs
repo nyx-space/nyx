@@ -16,11 +16,16 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 use anise::frames::FrameUid;
+use anise::prelude::Almanac;
 use serde::{Deserialize, Serialize};
 use serde_dhall::{SimpleType, StaticType};
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::dynamics::SpacecraftDynamics;
+use crate::dynamics::{GravityField, OrbitalDynamics};
+use crate::io::gravity::GravityFieldData;
+use crate::propagators::Propagator;
 use crate::{
     dynamics::{
         Drag, PointMasses, SolarPressure,
@@ -89,10 +94,40 @@ impl StaticType for Phase {
 #[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
 #[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub struct PropagatorConfig {
-    pub method: IntegratorMethod,
-    pub options: IntegratorOptions,
     pub accel_models: AccelModels,
     pub force_models: ForceModels,
+    pub method: IntegratorMethod,
+    pub options: IntegratorOptions,
+}
+
+impl PropagatorConfig {
+    pub fn build(&self, almanac: Arc<Almanac>) -> Result<Propagator<SpacecraftDynamics>, String> {
+        // Build the orbital dynamics
+        let mut orbital_dyn = OrbitalDynamics::two_body();
+        if let Some(point_masses) = &self.accel_models.point_masses {
+            orbital_dyn.accel_models.push(point_masses.clone());
+        }
+        if let Some((gravity_cfg, frame_uid)) = &self.accel_models.gravity_field {
+            let grav_data =
+                GravityFieldData::from_config(gravity_cfg.clone()).map_err(|e| e.to_string())?;
+            let compute_frame = almanac.frame_info(*frame_uid).map_err(|e| e.to_string())?;
+            let gravity_field = GravityField::from_stor(compute_frame, grav_data);
+            orbital_dyn.accel_models.push(gravity_field);
+        }
+        // Build the spacecraft dynamics
+        let mut sc_dyn = SpacecraftDynamics::new(orbital_dyn);
+
+        if let Some(srp) = &self.force_models.solar_pressure {
+            sc_dyn.force_models.push(srp.clone());
+        }
+
+        if let Some(drag) = &self.force_models.drag {
+            sc_dyn.force_models.push(drag.clone());
+        }
+
+        // And set it all up!
+        Ok(Propagator::new(sc_dyn, self.method, self.options))
+    }
 }
 
 /// Acceleration models alter the orbital dynamics

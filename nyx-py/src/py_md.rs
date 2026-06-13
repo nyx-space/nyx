@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 /*
     Nyx, blazing fast astrodynamics
     Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
@@ -15,19 +17,147 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use anise::ephemerides::ephemeris::Ephemeris;
-use hifitime::Epoch;
+use anise::analysis::event::Event;
+use anise::frames::Frame;
+use anise::{ephemerides::ephemeris::Ephemeris, prelude::Almanac};
+use hifitime::{Duration, Epoch};
 use log::info;
 use nyx_space::{
     Spacecraft,
+    dynamics::sequence::PropagatorConfig,
     io::InputOutputError,
     md::{
         Trajectory,
         trajectory::{ExportCfg, TrajError},
     },
+    propagators::PropagationError,
 };
 
 use pyo3::prelude::*;
+
+#[pyclass(unsendable)]
+pub struct PropagationResult {
+    #[pyo3(get)]
+    pub state: Spacecraft,
+    #[pyo3(get)]
+    pub trajectory: Option<PyTrajectory>,
+}
+
+#[pyclass(from_py_object)]
+#[derive(Clone)]
+pub struct PropagatorInstance {
+    config: PropagatorConfig,
+    state: Spacecraft,
+    almanac: Arc<Almanac>,
+}
+
+#[pymethods]
+impl PropagatorInstance {
+    /// Propagates the initialization state until the desired epoch, optionally not building the trajectory
+    #[pyo3(signature = (epoch, trajectory=true))]
+    fn until_epoch(
+        &self,
+        epoch: Epoch,
+        trajectory: bool,
+    ) -> Result<PropagationResult, PropagationError> {
+        let setup = self
+            .config
+            .build(self.almanac.clone())
+            .map_err(|msg| PropagationError::PropGenericError { msg })?;
+
+        let mut prop = setup.with(self.state, self.almanac.clone());
+
+        let (state, trajectory) = if trajectory {
+            let (state, traj) = prop.until_epoch_with_traj(epoch)?;
+            (state, Some(PyTrajectory { inner: traj }))
+        } else {
+            let state = prop.until_epoch(epoch)?;
+            (state, None)
+        };
+
+        Ok(PropagationResult { state, trajectory })
+    }
+
+    /// Propagates the initialization state for the desired duration, optionally not building the trajectory
+    #[pyo3(signature = (duration, trajectory=true))]
+    fn for_duration(
+        &self,
+        duration: Duration,
+        trajectory: bool,
+    ) -> Result<PropagationResult, PropagationError> {
+        let setup = self
+            .config
+            .build(self.almanac.clone())
+            .map_err(|msg| PropagationError::PropGenericError { msg })?;
+
+        let mut prop = setup.with(self.state, self.almanac.clone());
+
+        let (state, trajectory) = if trajectory {
+            let (state, traj) = prop.for_duration_with_traj(duration)?;
+            (state, Some(PyTrajectory { inner: traj }))
+        } else {
+            let state = prop.for_duration(duration)?;
+            (state, None)
+        };
+
+        Ok(PropagationResult { state, trajectory })
+    }
+
+    /// Propagates the initialization state until the specified event has occurred `trigger` times, or until `max_duration` is reached.
+    ///
+    /// This method monitors the provided `event` during propagation. Once the event condition is met
+    /// `trigger` number of times (e.g., set `trigger` to 1 for the first occurrence), the propagation stops
+    /// at the end of that integration step.
+    ///
+    /// A root-finding algorithm (Brent's method) is then used to locate the exact time of the event
+    /// within the final integration step. The returned state corresponds to this precise event time,
+    /// interpolated from the trajectory.
+    ///
+    /// # Arguments
+    ///
+    /// * `max_duration` - The maximum duration to propagate if the event is not triggered the requested number of times.
+    /// * `event` - The event definition (scalar expression and condition) to monitor.
+    /// * `trigger` - The 1-based index of the event occurrence to stop at (e.g. 1 for the first crossing, 2 for the second).
+    ///
+    /// # Returns
+    ///
+    /// A tuple containing:
+    /// 1. The interpolated state exactly at the moment the $n$-th event occurred.
+    /// 2. The full trajectory recorded up to the end of the propagation step where the event occurred, unless explicitly ignored (but it is still built)
+    ///
+    /// # Errors
+    ///
+    /// * `PropagationError::NthEventError`: Returned if `max_duration` is reached before the event was triggered `trigger` times.
+    /// * `PropagationError::TrajectoryEvent`: Returned if the interpolation of the event state fails.
+    /// * `PropagationError::Analysis`: Returned if the event evaluation fails during the search.
+    #[pyo3(signature = (max_duration, event, trigger=1, event_frame=None, trajectory=true))]
+    fn until_event(
+        &self,
+        max_duration: Duration,
+        event: &Event,
+        trigger: usize,
+        event_frame: Option<Frame>,
+        trajectory: bool,
+    ) -> Result<PropagationResult, PropagationError> {
+        let setup = self
+            .config
+            .build(self.almanac.clone())
+            .map_err(|msg| PropagationError::PropGenericError { msg })?;
+
+        let mut prop = setup.with(self.state, self.almanac.clone());
+
+        let (state, traj) = prop.until_nth_event(max_duration, event, event_frame, trigger)?;
+
+        Ok(PropagationResult {
+            state,
+            trajectory: if trajectory {
+                Some(PyTrajectory { inner: traj })
+            } else {
+                None
+            },
+        })
+    }
+}
 
 #[pyclass(from_py_object, name = "Trajectory")]
 #[derive(Clone, Debug)]

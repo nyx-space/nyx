@@ -2,6 +2,7 @@ use crate::{
     NyxError,
     io::{ConfigError, InputOutputError},
     md::trajectory::TrajError,
+    propagators::PropagationError,
 };
 use pyo3::{exceptions::PyException, prelude::*};
 
@@ -22,6 +23,11 @@ impl From<TrajError> for PyErr {
 }
 impl From<NyxError> for PyErr {
     fn from(err: NyxError) -> PyErr {
+        PyException::new_err(err.to_string())
+    }
+}
+impl From<PropagationError> for PyErr {
+    fn from(err: PropagationError) -> PyErr {
         PyException::new_err(err.to_string())
     }
 }

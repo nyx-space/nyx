@@ -44,16 +44,21 @@ use hifitime::ut1::*;
 use hifitime::*;
 
 use nyx_space::dynamics::guidance::Thruster;
-use nyx_space::dynamics::sequence::SpacecraftSequence;
+use nyx_space::dynamics::sequence::{
+    AccelModels, ForceModels, PropagatorConfig, SpacecraftSequence,
+};
 use nyx_space::mc::{MvnSpacecraft, StateDispersion};
 use nyx_space::md::StateParameter;
 use nyx_space::md::trajectory::ExportCfg;
 use nyx_space::od::GroundStation;
 use nyx_space::od::msr::{Measurement, MeasurementType, TrackingDataArc};
 use nyx_space::od::simulator::{Handoff, PyCadence, Scheduler, Strand, TrkConfig};
+use nyx_space::propagators::{IntegratorMethod, IntegratorOptions};
 use nyx_space::{Spacecraft, cosmic::GuidanceMode};
 
 use pyo3::{prelude::*, wrap_pymodule};
+
+use crate::py_md::PropagatorInstance;
 
 mod constants;
 mod py_md;
@@ -65,6 +70,7 @@ mod utils;
 fn nyx(m: &Bound<'_, PyModule>) -> PyResult<()> {
     pyo3_log::init();
     m.add_wrapped(wrap_pymodule!(pyanise))?;
+    m.add_wrapped(wrap_pymodule!(mission_design))?;
     m.add_wrapped(wrap_pymodule!(orbit_determination))?;
     m.add_wrapped(wrap_pymodule!(monte_carlo))?;
     m.add_wrapped(wrap_pymodule!(time))?;
@@ -112,6 +118,12 @@ fn monte_carlo(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
 
 #[pymodule]
 fn mission_design(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
+    sm.add_class::<PropagatorConfig>()?;
+    sm.add_class::<PropagatorInstance>()?;
+    sm.add_class::<IntegratorMethod>()?;
+    sm.add_class::<IntegratorOptions>()?;
+    sm.add_class::<AccelModels>()?;
+    sm.add_class::<ForceModels>()?;
     sm.add_class::<SpacecraftSequence>()?;
 
     Ok(())

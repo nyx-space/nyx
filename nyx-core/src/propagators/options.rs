@@ -158,7 +158,7 @@ impl IntegratorOptions {
 impl fmt::Display for IntegratorOptions {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.fixed_step {
-            write!(f, "fixed step: {:e}", self.min_step,)
+            write!(f, "fixed step: {:e}", self.min_step)
         } else {
             write!(
                 f,

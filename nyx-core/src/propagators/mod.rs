@@ -68,15 +68,26 @@ impl fmt::Display for IntegrationDetails {
 #[derive(Debug, PartialEq, Snafu)]
 pub enum PropagationError {
     #[snafu(display("encountered a dynamics error {source}"))]
-    Dynamics { source: DynamicsError },
+    Dynamics {
+        source: DynamicsError,
+    },
     #[snafu(display("when propagating until an event: {source}"))]
-    TrajectoryEventError { source: TrajError },
+    TrajectoryEventError {
+        source: TrajError,
+    },
     #[snafu(display("requested propagation until event #{nth} but only {found} found"))]
-    NthEventError { nth: usize, found: usize },
+    NthEventError {
+        nth: usize,
+        found: usize,
+    },
     #[snafu(display("propagation failed because {source}"))]
-    PropConfigError { source: ConfigError },
+    PropConfigError {
+        source: ConfigError,
+    },
     #[snafu(display("propagation encountered a math error {source}"))]
-    PropMathError { source: MathError },
+    PropMathError {
+        source: MathError,
+    },
     #[snafu(display("propagation encountered an analysis error {source}"))]
     PropAnalysisError {
         #[snafu(source(from(AnalysisError, Box::new)))]
@@ -85,5 +96,8 @@ pub enum PropagationError {
     PropAlmanacError {
         #[snafu(source(from(AlmanacError, Box::new)))]
         source: Box<AlmanacError>,
+    },
+    PropGenericError {
+        msg: String,
     },
 }

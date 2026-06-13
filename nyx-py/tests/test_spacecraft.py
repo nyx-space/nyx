@@ -25,7 +25,7 @@ def test_def_sc():
     sc_mass2 = Spacecraft.from_asn1(sc_mass.to_asn1())
     assert sc_mass2.mass.dry_mass_kg == 123.0
     sc_mass_srp_drag2 = Spacecraft.from_asn1(sc_mass_srp_drag.to_asn1())
-    assert sc_mass_srp_drag2.drag.coeff_drag== 2.0
+    assert sc_mass_srp_drag2.drag.coeff_drag == 2.0
     assert sc_mass_srp_drag2.srp.area_m2 == 10.0
 
     # Multivariate Normal Spacecraft test
@@ -40,6 +40,7 @@ def test_def_sc():
 
     dispersed = mvn.sample(1000, 123)
     assert len(dispersed) == 1000
+
 
 if __name__ == "__main__":
     test_def_sc()

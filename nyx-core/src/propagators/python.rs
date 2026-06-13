@@ -1,22 +1,27 @@
 use super::IntegratorOptions;
-use hifitime::{Duration, Unit};
+use hifitime::Duration;
 use pyo3::prelude::*;
 
 #[pymethods]
 impl IntegratorOptions {
-    #[pyo3(signature=(min_step_s=None, max_step_s=None,tolerance=None))]
+    #[pyo3(signature=(min_step=None, max_step=None, tolerance=None))]
     #[new]
-    fn py_new(min_step_s: Option<f64>, max_step_s: Option<f64>, tolerance: Option<f64>) -> Self {
+    fn py_new(
+        min_step: Option<Duration>,
+        max_step: Option<Duration>,
+        tolerance: Option<f64>,
+    ) -> Self {
         let mut opts = Self::default();
-        if let Some(min_step_s) = min_step_s {
-            opts.min_step = Unit::Second * min_step_s;
+        if let Some(min_step) = min_step {
+            opts.min_step = min_step;
         }
-        if let Some(max_step_s) = max_step_s {
-            opts.max_step = Unit::Second * max_step_s;
+        if let Some(max_step) = max_step {
+            opts.max_step = max_step;
         }
         if let Some(tolerance) = tolerance {
             opts.tolerance = tolerance;
         }
+        opts.fixed_step = opts.min_step == opts.max_step;
         opts
     }
 
@@ -31,5 +36,11 @@ impl IntegratorOptions {
     #[getter]
     fn get_tolerance(&self) -> f64 {
         self.tolerance
+    }
+    fn __str__(&self) -> String {
+        format!("{self}")
+    }
+    fn __repr__(&self) -> String {
+        format!("{self} @ {self:p}")
     }
 }
