@@ -38,14 +38,37 @@ use pyo3::prelude::*;
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct GravityFieldConfig {
-    /// Path to the file, relative to the current working director
-    pub filepath: PathBuf,
-    /// Set to true if the data is gunzipped
-    pub gunzipped: bool,
     /// Desired degree
     pub degree: usize,
     /// Desired order
     pub order: usize,
+    /// Path to the file, relative to the current working director
+    pub filepath: PathBuf,
+    /// Set to true if the data is gunzipped
+    pub gunzipped: bool,
+}
+
+#[cfg(feature = "python")]
+#[cfg_attr(feature = "python", pymethods)]
+impl GravityFieldConfig {
+    #[pyo3(signature=(degree, order, filepath, gunzipped=true))]
+    #[new]
+    fn py_new(degree: usize, order: usize, filepath: PathBuf, gunzipped: bool) -> Self {
+        Self {
+            filepath,
+            gunzipped,
+            degree,
+            order,
+        }
+    }
+
+    fn __str__(&self) -> String {
+        format!("{self:?}")
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self:?} @ {self:p}")
+    }
 }
 
 /// `HarmonicsMem` loads the requested gravity potential files and stores them in memory (in a HashMap).

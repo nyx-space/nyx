@@ -43,10 +43,12 @@ use hifitime::python::*;
 use hifitime::ut1::*;
 use hifitime::*;
 
+use nyx_space::dynamics::PointMasses;
 use nyx_space::dynamics::guidance::Thruster;
 use nyx_space::dynamics::sequence::{
     AccelModels, ForceModels, PropagatorConfig, SpacecraftSequence,
 };
+use nyx_space::io::gravity::GravityFieldConfig;
 use nyx_space::mc::{MvnSpacecraft, StateDispersion};
 use nyx_space::md::StateParameter;
 use nyx_space::md::trajectory::ExportCfg;
@@ -125,6 +127,8 @@ fn mission_design(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
     sm.add_class::<AccelModels>()?;
     sm.add_class::<ForceModels>()?;
     sm.add_class::<SpacecraftSequence>()?;
+    sm.add_class::<GravityFieldConfig>()?;
+    sm.add_class::<PointMasses>()?;
 
     Ok(())
 }

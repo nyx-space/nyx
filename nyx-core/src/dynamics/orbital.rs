@@ -307,6 +307,7 @@ impl AccelModel for PointMasses {
         Ok((fx, grad))
     }
 }
+
 impl StaticType for PointMasses {
     fn static_type() -> SimpleType {
         let mut fields = HashMap::new();
@@ -329,5 +330,26 @@ impl StaticType for PointMasses {
         );
 
         SimpleType::Record(fields)
+    }
+}
+
+#[cfg(feature = "python")]
+#[cfg_attr(feature = "python", pymethods)]
+impl PointMasses {
+    #[pyo3(signature=(celestial_objects, correction=None))]
+    #[new]
+    fn py_new(celestial_objects: Vec<i32>, correction: Option<Aberration>) -> Self {
+        Self {
+            celestial_objects,
+            correction,
+        }
+    }
+
+    fn __str__(&self) -> String {
+        format!("{self:?}")
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self:?} @ {self:p}")
     }
 }

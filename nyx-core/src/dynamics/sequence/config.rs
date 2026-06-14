@@ -105,7 +105,9 @@ impl PropagatorConfig {
         // Build the orbital dynamics
         let mut orbital_dyn = OrbitalDynamics::two_body();
         if let Some(point_masses) = &self.accel_models.point_masses {
-            orbital_dyn.accel_models.push(point_masses.clone());
+            orbital_dyn
+                .accel_models
+                .push(Arc::new(point_masses.clone()));
         }
         if let Some((gravity_cfg, frame_uid)) = &self.accel_models.gravity_field {
             let grav_data =
@@ -132,9 +134,9 @@ impl PropagatorConfig {
 
 /// Acceleration models alter the orbital dynamics
 #[derive(Clone, Serialize, Deserialize, Debug)]
-#[cfg_attr(feature = "python", pyclass(from_py_object))]
+#[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct AccelModels {
-    pub point_masses: Option<Arc<PointMasses>>,
+    pub point_masses: Option<PointMasses>,
     pub gravity_field: Option<(GravityFieldConfig, FrameUid)>,
 }
 

@@ -53,6 +53,14 @@ pub struct PropagatorInstance {
 
 #[pymethods]
 impl PropagatorInstance {
+    #[new]
+    fn py_new(config: PropagatorConfig, state: Spacecraft, almanac: Almanac) -> Self {
+        Self {
+            config,
+            state,
+            almanac: Arc::new(almanac),
+        }
+    }
     /// Propagates the initialization state until the desired epoch, optionally not building the trajectory
     #[pyo3(signature = (epoch, trajectory=true))]
     fn until_epoch(
