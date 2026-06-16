@@ -8,7 +8,7 @@ use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use nyx::cosmic::{Orbit, Spacecraft};
 use nyx::dynamics::guidance::Thruster;
 use nyx::dynamics::sequence::*;
-use nyx::dynamics::{Drag, SolarPressure};
+use nyx::dynamics::{AtmDensity, Drag, SolarPressure};
 use nyx::propagators::{IntegratorMethod, IntegratorOptions};
 use nyx::time::{Epoch, Unit};
 use nyx_space::cosmic::{Mass, SRPData};
@@ -59,7 +59,13 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
             },
             force_models: ForceModels {
                 solar_pressure: None,
-                drag: Some(Drag::std_atm1976(almanac.clone()).unwrap()),
+                drag: Some(Drag {
+                    density: AtmDensity::StdAtm {
+                        max_alt_m: 1_000_000.0,
+                    },
+                    frame: almanac.frame_info(IAU_EARTH_FRAME).unwrap(),
+                    estimate: false,
+                }),
             },
         },
     );
@@ -81,11 +87,8 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
             },
             force_models: ForceModels {
                 solar_pressure: Some(
-                    SolarPressure::default_no_estimation(
-                        vec![EARTH_J2000, MOON_J2000],
-                        almanac.clone(),
-                    )
-                    .unwrap(),
+                    SolarPressure::default_flux_raw(vec![EARTH_J2000, MOON_J2000], &almanac)
+                        .unwrap(),
                 ),
                 drag: None,
             },
@@ -313,7 +316,13 @@ fn spacecraft_low_thrust_orbit_raise(
             },
             force_models: ForceModels {
                 solar_pressure: None,
-                drag: Some(Drag::std_atm1976(almanac.clone()).unwrap()),
+                drag: Some(Drag {
+                    density: AtmDensity::StdAtm {
+                        max_alt_m: 1_000_000.0,
+                    },
+                    frame: almanac.frame_info(IAU_EARTH_FRAME).unwrap(),
+                    estimate: false,
+                }),
             },
         },
     );

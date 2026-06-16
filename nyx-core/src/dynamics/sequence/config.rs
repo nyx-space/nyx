@@ -119,11 +119,11 @@ impl PropagatorConfig {
         let mut sc_dyn = SpacecraftDynamics::new(orbital_dyn);
 
         if let Some(srp) = &self.force_models.solar_pressure {
-            sc_dyn.force_models.push(srp.clone());
+            sc_dyn.force_models.push(Arc::new(srp.clone()));
         }
 
         if let Some(drag) = &self.force_models.drag {
-            sc_dyn.force_models.push(drag.clone());
+            sc_dyn.force_models.push(Arc::new(*drag));
         }
 
         // And set it all up!
@@ -141,10 +141,10 @@ pub struct AccelModels {
 
 /// Force models alter the spacecraft dynamics (they need a mass).
 #[derive(Clone, Serialize, Deserialize, Debug)]
-#[cfg_attr(feature = "python", pyclass(from_py_object))]
+#[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct ForceModels {
-    pub solar_pressure: Option<Arc<SolarPressure>>,
-    pub drag: Option<Arc<Drag>>,
+    pub solar_pressure: Option<SolarPressure>,
+    pub drag: Option<Drag>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, StaticType)]

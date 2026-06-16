@@ -28,6 +28,10 @@ pub use super::{Frame, Orbit, Spacecraft};
 use std::fmt;
 use std::sync::Arc;
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
+#[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 #[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
 pub struct ShadowModel {
     pub light_source: Frame,

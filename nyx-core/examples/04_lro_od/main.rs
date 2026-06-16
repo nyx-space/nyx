@@ -143,7 +143,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // We define the solar radiation pressure, using the default solar flux and accounting only
     // for the eclipsing caused by the Earth and Moon.
     // Note that by default, enabling the SolarPressure model will also enable the estimation of the coefficient of reflectivity.
-    let srp_dyn = SolarPressure::new(vec![EARTH_J2000, MOON_J2000], almanac.clone())?;
+    let srp_dyn = SolarPressure::new(vec![EARTH_J2000, MOON_J2000], &almanac)?;
 
     // Finalize setting up the dynamics, specifying the force models (orbital_dyn) separately from the
     // acceleration models (SRP in this case). Use `from_models` to specify multiple accel models.

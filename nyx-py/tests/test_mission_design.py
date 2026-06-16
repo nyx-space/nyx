@@ -3,8 +3,11 @@ from nyx_space.anise import Aberration, MetaAlmanac
 from nyx_space.anise.astro import FrameUid, Orbit
 from nyx_space.anise.constants import CelestialObjects, Frames
 from nyx_space.mission_design import (
+    AtmDensity,
     AccelModels,
     ForceModels,
+    SolarPressure,
+    Drag,
     GravityFieldConfig,
     IntegratorMethod,
     IntegratorOptions,
@@ -39,16 +42,25 @@ def test_prop_cfg():
         ),
     )
 
-    # TODO Export/config force models
+    almanac = MetaAlmanac.latest()
+
+    srp = SolarPressure(
+        [Frames.EARTH_J2000, Frames.MOON_J2000], almanac, estimate=False
+    )
+    drag = Drag(
+        AtmDensity.earth_exponential(),
+        almanac.frame_info(Frames.IAU_EARTH_FRAME),
+        estimate=False,
+    )
+    print(f"srp = {srp}\ndrag = {drag}")
 
     cfg = PropagatorConfig(
         accel_models,
-        ForceModels(),
+        ForceModels(srp, drag),
         IntegratorMethod.RungeKutta89,
         opts,
     )
 
-    almanac = MetaAlmanac.latest()
     eme2k = almanac.frame_info(Frames.EME2000)
     # Define an orbit
     orbit = Orbit.from_keplerian(

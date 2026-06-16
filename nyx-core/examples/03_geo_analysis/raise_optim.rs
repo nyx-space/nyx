@@ -50,7 +50,7 @@ impl SharedState {
             true,
             almanac.frame_info(IAU_EARTH_FRAME)?,
         )?);
-        let srp_dyn = SolarPressure::default_flux(EARTH_J2000, almanac.clone())?;
+        let srp_dyn = SolarPressure::default_flux(EARTH_J2000, &almanac)?;
 
         Ok(Self {
             almanac,

@@ -1,4 +1,6 @@
 use super::{AccelModels, ForceModels, PropagatorConfig, SpacecraftSequence, Thruster};
+#[cfg(feature = "python")]
+use crate::dynamics::{Drag, SolarPressure};
 use crate::propagators::{IntegratorMethod, IntegratorOptions};
 use crate::{dynamics::PointMasses, io::gravity::GravityFieldConfig};
 use pyo3::exceptions::PyException;
@@ -103,11 +105,10 @@ impl AccelModels {
 #[cfg_attr(feature = "python", pymethods)]
 impl ForceModels {
     #[new]
-    fn py_new() -> Self {
-        // TODO Support building ForceModels
+    fn py_new(solar_pressure: Option<SolarPressure>, drag: Option<Drag>) -> Self {
         Self {
-            solar_pressure: None,
-            drag: None,
+            solar_pressure,
+            drag,
         }
     }
 

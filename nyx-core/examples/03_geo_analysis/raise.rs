@@ -122,7 +122,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // We define the solar radiation pressure, using the default solar flux and accounting only
     // for the eclipsing caused by the Earth.
-    let srp_dyn = SolarPressure::default_flux(EARTH_J2000, almanac.clone())?;
+    let srp_dyn = SolarPressure::default_flux(EARTH_J2000, &almanac)?;
 
     // Finalize setting up the dynamics, specifying the force models (orbital_dyn) separately from the
     // acceleration models (SRP in this case). Use `from_models` to specify multiple accel models.

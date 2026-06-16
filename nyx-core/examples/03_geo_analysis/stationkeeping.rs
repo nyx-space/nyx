@@ -91,7 +91,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?);
     orbital_dyn.accel_models.push(harmonics);
 
-    let srp_dyn = SolarPressure::default_flux(EARTH_J2000, almanac.clone())?;
+    let srp_dyn = SolarPressure::default_flux(EARTH_J2000, &almanac)?;
     let sc_dynamics = SpacecraftDynamics::from_model(orbital_dyn, srp_dyn)
         .with_guidance_law(ruggiero_ctrl.clone());
 
