@@ -31,11 +31,11 @@ def test_prop_cfg():
             Aberration("LT"),
         ),
         # Define the location of the gravity field, and then the frame in which it applies
-        (
-            GravityFieldConfig(
-                20, 20, "../data/01_planetary/EGM2008_to2190_TideFree.gz"
-            ),
-            FrameUid(399, 399),
+        GravityFieldConfig(
+            20,
+            20,
+            "../data/01_planetary/EGM2008_to2190_TideFree.gz",
+            Frames.IAU_EARTH_FRAME.to_frameuid(),
         ),
     )
 

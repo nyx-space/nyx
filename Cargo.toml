@@ -31,7 +31,8 @@ exclude = [
 
 [workspace.dependencies]
 hifitime = "4.3.0"
-anise = { version = "0.10.1", features = ["analysis"] }
+# anise = { version = "0.10.1", features = ["analysis"] }
+anise = {path = "../anise/anise", package = "anise", features = ["analysis"]}
 log = "0.4"
 
 nyx-space = { path = "nyx-core" }

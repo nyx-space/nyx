@@ -136,7 +136,6 @@ impl PropagatorConfig {
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct AccelModels {
     pub point_masses: Option<PointMasses>,
-    // TODO Consider moving the frameUid to gravity field config
     pub gravity_field: Option<GravityFieldConfig>,
 }
 

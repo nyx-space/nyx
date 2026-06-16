@@ -1,5 +1,4 @@
 use super::{AccelModels, ForceModels, PropagatorConfig, SpacecraftSequence, Thruster};
-use crate::md::prelude::FrameUid;
 use crate::propagators::{IntegratorMethod, IntegratorOptions};
 use crate::{dynamics::PointMasses, io::gravity::GravityFieldConfig};
 use pyo3::exceptions::PyException;
