@@ -35,18 +35,32 @@ use nyx_space::{
 
 use pyo3::prelude::*;
 
-#[pyclass(unsendable)]
+#[pyclass(unsendable, get_all, dict)]
 pub struct PropagationResult {
-    #[pyo3(get)]
     pub state: Spacecraft,
-    #[pyo3(get)]
     pub trajectory: Option<PyTrajectory>,
+}
+
+impl PropagationResult {
+    fn __str__(&self) -> String {
+        format!(
+            "{} (includes trajectory: {})",
+            self.state,
+            self.trajectory.is_some()
+        )
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self:p}")
+    }
 }
 
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct PropagatorInstance {
+    #[pyo3(get)]
     config: PropagatorConfig,
+    #[pyo3(get)]
     state: Spacecraft,
     almanac: Arc<Almanac>,
 }
@@ -241,5 +255,9 @@ impl PyTrajectory {
 
     fn __str__(&self) -> String {
         format!("{}", self.inner)
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{} @ {self:p}", self.inner)
     }
 }

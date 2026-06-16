@@ -83,7 +83,7 @@ impl AccelModels {
     #[new]
     fn py_new(
         point_masses: Option<PointMasses>,
-        gravity_field: Option<(GravityFieldConfig, FrameUid)>,
+        gravity_field: Option<GravityFieldConfig>,
     ) -> Self {
         Self {
             point_masses,

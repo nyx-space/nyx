@@ -102,10 +102,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     // The harmonics must be computed in the body fixed frame.
     // We're using the long term prediction of the Moon principal axes frame.
     let moon_pa_frame = MOON_PA_FRAME.with_orient(31008);
-    let sph_harmonics = GravityField::from_stor(
+    let sph_harmonics = GravityField::new(GravityFieldData::from_shadr(
+        &jggrx_meta.uri,
+        80,
+        80,
+        true,
         almanac.frame_info(moon_pa_frame)?,
-        GravityFieldData::from_shadr(&jggrx_meta.uri, 80, 80, true)?,
-    );
+    )?);
 
     // Include the spherical harmonics into the orbital dynamics.
     orbital_dyn.accel_models.push(sph_harmonics);

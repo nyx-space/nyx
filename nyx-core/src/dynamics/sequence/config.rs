@@ -109,11 +109,10 @@ impl PropagatorConfig {
                 .accel_models
                 .push(Arc::new(point_masses.clone()));
         }
-        if let Some((gravity_cfg, frame_uid)) = &self.accel_models.gravity_field {
-            let grav_data =
-                GravityFieldData::from_config(gravity_cfg.clone()).map_err(|e| e.to_string())?;
-            let compute_frame = almanac.frame_info(*frame_uid).map_err(|e| e.to_string())?;
-            let gravity_field = GravityField::from_stor(compute_frame, grav_data);
+        if let Some(gravity_cfg) = &self.accel_models.gravity_field {
+            let grav_data = GravityFieldData::from_config(gravity_cfg.clone(), &almanac)
+                .map_err(|e| e.to_string())?;
+            let gravity_field = GravityField::new(grav_data);
             orbital_dyn.accel_models.push(gravity_field);
         }
         // Build the spacecraft dynamics
@@ -137,7 +136,8 @@ impl PropagatorConfig {
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct AccelModels {
     pub point_masses: Option<PointMasses>,
-    pub gravity_field: Option<(GravityFieldConfig, FrameUid)>,
+    // TODO Consider moving the frameUid to gravity field config
+    pub gravity_field: Option<GravityFieldConfig>,
 }
 
 /// Force models alter the spacecraft dynamics (they need a mass).

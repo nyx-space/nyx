@@ -18,6 +18,9 @@
 
 use crate::NyxError;
 use crate::linalg::DMatrix;
+use anise::errors::AlmanacError;
+use anise::frames::{Frame, FrameUid};
+use anise::prelude::Almanac;
 use flate2::read::GzDecoder;
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
@@ -42,23 +45,32 @@ pub struct GravityFieldConfig {
     pub degree: usize,
     /// Desired order
     pub order: usize,
-    /// Path to the file, relative to the current working director
+    /// Path to the file, relative to the current working directory
     pub filepath: PathBuf,
     /// Set to true if the data is gunzipped
     pub gunzipped: bool,
+    /// The frame in which to compute this gravity field
+    pub frame: FrameUid,
 }
 
 #[cfg(feature = "python")]
 #[cfg_attr(feature = "python", pymethods)]
 impl GravityFieldConfig {
-    #[pyo3(signature=(degree, order, filepath, gunzipped=true))]
+    #[pyo3(signature=(degree, order, filepath, frame, gunzipped=true))]
     #[new]
-    fn py_new(degree: usize, order: usize, filepath: PathBuf, gunzipped: bool) -> Self {
+    fn py_new(
+        degree: usize,
+        order: usize,
+        filepath: PathBuf,
+        frame: FrameUid,
+        gunzipped: bool,
+    ) -> Self {
         Self {
             filepath,
             gunzipped,
             degree,
             order,
+            frame,
         }
     }
 
@@ -71,7 +83,7 @@ impl GravityFieldConfig {
     }
 }
 
-/// `HarmonicsMem` loads the requested gravity potential files and stores them in memory (in a HashMap).
+/// `GravityFieldData` loads the requested gravity potential files and stores them in memory (in a HashMap).
 ///
 /// WARNING: This memory backend may require a lot of RAM (e.g. EMG2008 2190x2190 requires nearly 400 MB of RAM).
 #[derive(Clone)]
@@ -80,21 +92,29 @@ pub struct GravityFieldData {
     order: usize,
     c_nm: DMatrix<f64>,
     s_nm: DMatrix<f64>,
+    pub frame: Frame,
 }
 
 impl GravityFieldData {
-    pub fn from_config(cfg: GravityFieldConfig) -> Result<Self, NyxError> {
+    pub fn from_config(cfg: GravityFieldConfig, almanac: &Almanac) -> Result<Self, NyxError> {
+        let frame = almanac
+            .frame_info(cfg.frame)
+            .map_err(|e| NyxError::FromAlmanacError {
+                source: Box::new(AlmanacError::GenericError { err: e.to_string() }),
+                action: "fetching gravity field frame",
+            })?;
+
         if !cfg.gunzipped && cfg.filepath.ends_with(".cof")
             || cfg.gunzipped && cfg.filepath.ends_with(".cof.gz")
         {
-            Self::from_cof(cfg.filepath, cfg.degree, cfg.order, cfg.gunzipped)
+            Self::from_cof(cfg.filepath, cfg.degree, cfg.order, cfg.gunzipped, frame)
         } else {
-            Self::from_shadr(cfg.filepath, cfg.degree, cfg.order, cfg.gunzipped)
+            Self::from_shadr(cfg.filepath, cfg.degree, cfg.order, cfg.gunzipped, frame)
         }
     }
 
-    /// Initialize `HarmonicsMem` with a custom J2 value
-    pub fn from_j2(j2: f64) -> GravityFieldData {
+    /// Initialize `GravityFieldData` with a custom J2 value
+    pub fn from_j2(j2: f64, frame: Frame) -> GravityFieldData {
         let mut c_nm = DMatrix::from_element(3, 3, 0.0);
         c_nm[(2, 0)] = j2;
 
@@ -103,33 +123,11 @@ impl GravityFieldData {
             order: 0,
             c_nm,
             s_nm: DMatrix::from_element(3, 3, 0.0),
+            frame,
         }
     }
 
-    /// Initialize `HarmonicsMem` as an EARTH J<sub>2</sub> only using the JGM3 model (available in GMAT)
-    ///
-    /// Use the embedded Earth parameter. If others are needed, load from `from_shadr` or `from_egm`.
-    /// *WARNING:* This is an EARTH gravity model, and _should not_ be used around any other body.
-    pub fn j2_jgm3() -> GravityFieldData {
-        Self::from_j2(-4.841_653_748_864_70e-04)
-    }
-
-    /// Initialize `HarmonicsMem` as an EARTH J<sub>2</sub> only using the JGM2 model (available in GMAT)
-    ///
-    /// Use the embedded Earth parameter. If others are needed, load from `from_shadr` or `from_egm`.
-    /// *WARNING:* This is an EARTH gravity model, and _should not_ be used around any other body.
-    pub fn j2_jgm2() -> GravityFieldData {
-        Self::from_j2(-4.841_653_9e-04)
-    }
-
-    /// Initialize `HarmonicsMem` as J<sub>2</sub> only using the EGM2008 model (from the GRACE mission, best model as of 2018)
-    ///
-    /// *WARNING:* This is an EARTH gravity model, and _should not_ be used around any other body.
-    pub fn j2_egm2008() -> GravityFieldData {
-        Self::from_j2(-0.484_165_143_790_815e-03)
-    }
-
-    /// Initialize `HarmonicsMem` from the file path (must be a gunzipped file)
+    /// Initialize `GravityFieldData` from the file path (must be a gunzipped file)
     ///
     /// Gravity models provided by `nyx`:
     /// + EMG2008 to 2190 for Earth (tide free)
@@ -141,10 +139,11 @@ impl GravityFieldData {
         degree: usize,
         order: usize,
         gunzipped: bool,
+        frame: Frame,
     ) -> Result<GravityFieldData, NyxError> {
         Self::load(
             filepath, gunzipped, true, //SHADR has a header which we ignore
-            degree, order,
+            degree, order, frame,
         )
     }
 
@@ -153,6 +152,7 @@ impl GravityFieldData {
         degree: usize,
         order: usize,
         gunzipped: bool,
+        frame: Frame,
     ) -> Result<GravityFieldData, NyxError> {
         let mut f = File::open(&filepath).map_err(|_| NyxError::FileUnreadable {
             msg: format!("File not found: {filepath:?}"),
@@ -362,6 +362,7 @@ impl GravityFieldData {
             order: max_order,
             c_nm: c_nm_mat,
             s_nm: s_nm_mat,
+            frame,
         })
     }
 
@@ -372,6 +373,7 @@ impl GravityFieldData {
         skip_first_line: bool,
         degree: usize,
         order: usize,
+        frame: Frame,
     ) -> Result<GravityFieldData, NyxError> {
         let mut f = File::open(&filepath).map_err(|_| NyxError::FileUnreadable {
             msg: format!("File not found: {filepath:?}"),
@@ -494,6 +496,7 @@ impl GravityFieldData {
             degree: max_degree,
             c_nm: c_nm_mat,
             s_nm: s_nm_mat,
+            frame,
         })
     }
 
@@ -529,18 +532,27 @@ impl StaticType for GravityFieldConfig {
 #[cfg(test)]
 #[test]
 fn test_load_harmonic_files() {
+    use anise::constants::frames::IAU_EARTH_FRAME;
+
     let data_folder: PathBuf = [env!("CARGO_MANIFEST_DIR"), "../data/01_planetary"]
         .iter()
         .collect();
 
-    GravityFieldData::from_cof(data_folder.join("JGM3.cof.gz"), 50, 50, true)
-        .expect("could not load JGM3");
+    GravityFieldData::from_cof(
+        data_folder.join("JGM3.cof.gz"),
+        50,
+        50,
+        true,
+        IAU_EARTH_FRAME,
+    )
+    .expect("could not load JGM3");
 
     GravityFieldData::from_shadr(
         data_folder.join("EGM2008_to2190_TideFree.gz"),
         120,
         120,
         true,
+        IAU_EARTH_FRAME,
     )
     .expect("could not load EGM2008");
 
@@ -549,6 +561,7 @@ fn test_load_harmonic_files() {
         1500,
         1500,
         true,
+        IAU_EARTH_FRAME,
     )
     .expect("could not load jggrx");
 }

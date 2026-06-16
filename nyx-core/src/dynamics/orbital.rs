@@ -49,7 +49,7 @@ impl OrbitalDynamics {
     /// Initializes the point masses gravities with the provided list of bodies
     pub fn point_masses(celestial_objects: Vec<i32>) -> Self {
         // Create the point masses
-        Self::new(vec![PointMasses::new(celestial_objects)])
+        Self::new(vec![Arc::new(PointMasses::new(celestial_objects))])
     }
 
     /// Initializes a OrbitalDynamics which does not simulate the gravity pull of other celestial objects but the primary one.
@@ -183,11 +183,11 @@ pub struct PointMasses {
 
 impl PointMasses {
     /// Initializes the point masses gravities with the provided list of bodies
-    pub fn new(celestial_objects: Vec<i32>) -> Arc<Self> {
-        Arc::new(Self {
+    pub fn new(celestial_objects: Vec<i32>) -> Self {
+        Self {
             celestial_objects,
             correction: None,
-        })
+        }
     }
 
     /// Initializes the point masses gravities with the provided list of bodies, and accounting for some light time correction

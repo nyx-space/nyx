@@ -873,8 +873,8 @@ fn val_earth_sph_harmonics_j2(almanac: Arc<Almanac>) {
         .unwrap()
         .with_mu_km3_s2(monte_earth_gm);
 
-    let earth_sph_harm = GravityFieldData::from_j2(monte_earth_j2);
-    let harmonics = GravityField::from_stor(iau_earth, earth_sph_harm);
+    let earth_sph_harm = GravityFieldData::from_j2(monte_earth_j2, iau_earth);
+    let harmonics = GravityField::new(earth_sph_harm);
 
     let dt = Epoch::from_mjd_tai(MJD_J2000);
     let state = Orbit::cartesian(
@@ -940,8 +940,9 @@ fn val_earth_sph_harmonics_12x12(almanac_gmat: Arc<Almanac>) {
     let itrf93 = almanac.frame_info(EARTH_ITRF93).unwrap();
 
     let earth_sph_harm =
-        GravityFieldData::from_cof("../data/01_planetary/JGM3.cof.gz", 12, 12, true).unwrap();
-    let harmonics = GravityField::from_stor(itrf93, earth_sph_harm);
+        GravityFieldData::from_cof("../data/01_planetary/JGM3.cof.gz", 12, 12, true, itrf93)
+            .unwrap();
+    let harmonics = GravityField::new(earth_sph_harm);
 
     let dt = Epoch::from_mjd_tai(MJD_J2000);
     let state = Orbit::cartesian(
@@ -1026,8 +1027,9 @@ fn val_earth_sph_harmonics_70x70(almanac_gmat: Arc<Almanac>) {
     let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
 
     let earth_sph_harm =
-        GravityFieldData::from_cof("../data/01_planetary/JGM3.cof.gz", 70, 70, true).unwrap();
-    let harmonics = GravityField::from_stor(iau_earth, earth_sph_harm);
+        GravityFieldData::from_cof("../data/01_planetary/JGM3.cof.gz", 70, 70, true, iau_earth)
+            .unwrap();
+    let harmonics = GravityField::new(earth_sph_harm);
 
     let dt = Epoch::from_mjd_tai(MJD_J2000);
     let state = Orbit::cartesian(
@@ -1077,8 +1079,9 @@ fn val_earth_sph_harmonics_70x70_partials(almanac_gmat: Arc<Almanac>) {
     let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
 
     let earth_sph_harm =
-        GravityFieldData::from_cof("../data/01_planetary/JGM3.cof.gz", 70, 70, true).unwrap();
-    let harmonics = GravityField::from_stor(iau_earth, earth_sph_harm);
+        GravityFieldData::from_cof("../data/01_planetary/JGM3.cof.gz", 70, 70, true, iau_earth)
+            .unwrap();
+    let harmonics = GravityField::new(earth_sph_harm);
 
     let dt = Epoch::from_mjd_tai(MJD_J2000);
     let state = Orbit::cartesian(
@@ -1133,19 +1136,20 @@ fn val_ioastro_earth_egm2008_10x10(almanac: Arc<Almanac>) {
     );
 
     // Configure the EGM2008 model
-    let hh = GravityFieldData::from_config(GravityFieldConfig {
-        filepath: "../data/01_planetary/EGM2008_to2190_TideFree.gz".into(),
-        gunzipped: true,
-        degree: 10,
-        order: 10,
-    })
+    let hh = GravityFieldData::from_config(
+        GravityFieldConfig {
+            filepath: "../data/01_planetary/EGM2008_to2190_TideFree.gz".into(),
+            gunzipped: true,
+            degree: 10,
+            order: 10,
+            frame: EARTH_ITRF93.into(),
+        },
+        &almanac,
+    )
     .unwrap();
 
     let mut orbital_dyn = OrbitalDynamics::point_masses(vec![SUN, MOON]);
-    orbital_dyn.accel_models.push(GravityField::from_stor(
-        almanac.frame_info(EARTH_ITRF93).unwrap(),
-        hh,
-    ));
+    orbital_dyn.accel_models.push(GravityField::new(hh));
 
     let sc_dyn = SpacecraftDynamics::new(orbital_dyn);
 
@@ -1203,8 +1207,9 @@ fn hf_prop(almanac: Arc<Almanac>) {
     let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
 
     let earth_sph_harm =
-        GravityFieldData::from_cof("../data/01_planetary/JGM3.cof.gz", 21, 21, true).unwrap();
-    let harmonics = GravityField::from_stor(iau_earth, earth_sph_harm);
+        GravityFieldData::from_cof("../data/01_planetary/JGM3.cof.gz", 21, 21, true, iau_earth)
+            .unwrap();
+    let harmonics = GravityField::new(earth_sph_harm);
 
     let dt = Epoch::from_mjd_tai(MJD_J2000);
     let state = Orbit::cartesian(
@@ -1213,7 +1218,7 @@ fn hf_prop(almanac: Arc<Almanac>) {
 
     let bodies = vec![MOON, SUN, JUPITER_BARYCENTER];
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::new(vec![
-        PointMasses::new(bodies),
+        Arc::new(PointMasses::new(bodies)),
         harmonics,
     ]));
 

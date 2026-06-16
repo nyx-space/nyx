@@ -43,10 +43,13 @@ impl SharedState {
         };
         jgm3_meta.process(true)?;
 
-        let harmonics = GravityField::from_stor(
+        let harmonics = GravityField::new(GravityFieldData::from_cof(
+            &jgm3_meta.uri,
+            4,
+            4,
+            true,
             almanac.frame_info(IAU_EARTH_FRAME)?,
-            GravityFieldData::from_cof(&jgm3_meta.uri, 4, 4, true)?,
-        );
+        )?);
         let srp_dyn = SolarPressure::default_flux(EARTH_J2000, almanac.clone())?;
 
         Ok(Self {

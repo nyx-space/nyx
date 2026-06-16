@@ -40,14 +40,15 @@ fn multi_thread_monte_carlo_demo(almanac: Arc<Almanac>) {
     let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
 
     let earth_sph_harm =
-        GravityFieldData::from_cof("../data/01_planetary/JGM3.cof.gz", 70, 70, true).unwrap();
-    let harmonics = GravityField::from_stor(iau_earth, earth_sph_harm);
+        GravityFieldData::from_cof("../data/01_planetary/JGM3.cof.gz", 70, 70, true, iau_earth)
+            .unwrap();
+    let harmonics = GravityField::new(earth_sph_harm);
 
     let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);
     let state = Orbit::keplerian(8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k);
 
     let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::new(vec![
-        PointMasses::new(vec![SUN, MOON, JUPITER_BARYCENTER]),
+        Arc::new(PointMasses::new(vec![SUN, MOON, JUPITER_BARYCENTER])),
         harmonics,
     ]));
 

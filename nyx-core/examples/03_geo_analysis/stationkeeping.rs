@@ -82,10 +82,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     jgm3_meta.process(true)?;
 
-    let harmonics = GravityField::from_stor(
+    let harmonics = GravityField::new(GravityFieldData::from_cof(
+        &jgm3_meta.uri,
+        8,
+        8,
+        true,
         almanac.frame_info(IAU_EARTH_FRAME)?,
-        GravityFieldData::from_cof(&jgm3_meta.uri, 8, 8, true)?,
-    );
+    )?);
     orbital_dyn.accel_models.push(harmonics);
 
     let srp_dyn = SolarPressure::default_flux(EARTH_J2000, almanac.clone())?;

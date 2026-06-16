@@ -3,14 +3,15 @@ from nyx_space.anise import Aberration, MetaAlmanac
 from nyx_space.anise.astro import FrameUid, Orbit
 from nyx_space.anise.constants import CelestialObjects, Frames
 from nyx_space.mission_design import (
-    AccelModels, ForceModels,
+    AccelModels,
+    ForceModels,
     GravityFieldConfig,
     IntegratorMethod,
     IntegratorOptions,
     PointMasses,
     PropagatorConfig,
+    PropagatorInstance,
 )
-from nyx_space.mission_design import PropagatorInstance as Propagator
 from nyx_space.time import Duration, Epoch, Unit
 
 
@@ -30,7 +31,12 @@ def test_prop_cfg():
             Aberration("LT"),
         ),
         # Define the location of the gravity field, and then the frame in which it applies
-        (GravityFieldConfig(20, 20, "../data/01_planetary/EGM2008_to2190_TideFree.gz"), FrameUid(399, 399)),
+        (
+            GravityFieldConfig(
+                20, 20, "../data/01_planetary/EGM2008_to2190_TideFree.gz"
+            ),
+            FrameUid(399, 399),
+        ),
     )
 
     # TODO Export/config force models
@@ -51,13 +57,15 @@ def test_prop_cfg():
 
     my_sc = Spacecraft(orbit, Mass(123.0), SRPData(10.0, 1.2), DragData(10.0, 2.0))
 
-    inst = Propagator(cfg, my_sc, almanac)
+    inst = PropagatorInstance(cfg, my_sc, almanac)
 
     result = inst.until_epoch(Epoch("2031-01-01 01:02:03 UTC"), trajectory=True)
     traj = result.trajectory
     breakpoint()
 
+
 if __name__ == "__main__":
     import logging
+
     logging.basicConfig(level=logging.INFO)
     test_prop_cfg()

@@ -106,9 +106,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Build the spherical harmonics.
     // The harmonics must be computed in the body fixed frame.
     // We're using the long term prediction of the Earth centered Earth fixed frame, IAU Earth.
-    let harmonics = GravityField::from_stor(
-        almanac.frame_info(IAU_EARTH_FRAME)?,
-        GravityFieldData::from_cof(&jgm3_meta.uri, 8, 8, true).unwrap(),
+    let harmonics = GravityField::new(
+        GravityFieldData::from_cof(
+            &jgm3_meta.uri,
+            8,
+            8,
+            true,
+            almanac.frame_info(IAU_EARTH_FRAME)?,
+        )
+        .unwrap(),
     );
 
     // Include the spherical harmonics into the orbital dynamics.
