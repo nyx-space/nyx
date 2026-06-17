@@ -330,7 +330,7 @@ impl Spacecraft {
     /// NOTE: the in-plane and out-of-plane angles differ between the VNC and the RCN frames!
     pub fn thrust_angles_deg(&self, frame: LocalFrame) -> PhysicsResult<Option<(f64, f64)>> {
         if let Some(thrust_dir_inertial) = self.thrust_direction() {
-            let dcm_local_to_inertial = frame.dcm_to_inertial(self.orbit)?;
+            let dcm_local_to_inertial = self.orbit.dcm_to_inertial(frame)?;
             let thrust_dir_local = dcm_local_to_inertial.transpose() * thrust_dir_inertial;
             let (in_plane_rad, out_of_plane_rad) = plane_angles_from_unit_vector(thrust_dir_local);
 

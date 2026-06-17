@@ -19,9 +19,8 @@
 use crate::cosmic::{GuidanceMode, Orbit, STD_GRAVITY, Spacecraft};
 use crate::errors::{NyxError, StateError};
 use crate::linalg::Vector3;
-use anise::astro::PhysicsResult;
+pub use anise::ephemerides::ephemeris::LocalFrame;
 use anise::errors::PhysicsError;
-use anise::math::rotation::DCM;
 use anise::prelude::Almanac;
 use der::{Decode, Encode, Reader};
 use serde::{Deserialize, Serialize};
@@ -206,32 +205,6 @@ pub enum GuidanceError {
     InvalidControl { param: StateParameter },
     #[snafu(display("guidance encountered {source}"))]
     GuidState { source: StateError },
-}
-
-/// Local frame options, used notably for guidance laws.
-/// TODO: Replace with ANISE enum, which is identical, but needs Serialize/Deserialize implemented.
-/// https://github.com/nyx-space/anise/issues/725
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, StaticType)]
-#[cfg_attr(feature = "python", pyclass(from_py_object))]
-pub enum LocalFrame {
-    Inertial,
-    RIC,
-    VNC,
-    RCN,
-}
-
-impl LocalFrame {
-    pub fn dcm_to_inertial(&self, state: Orbit) -> PhysicsResult<DCM> {
-        match self {
-            LocalFrame::Inertial => Ok(DCM::identity(
-                state.frame.orientation_id,
-                state.frame.orientation_id,
-            )),
-            LocalFrame::RIC => state.dcm_from_ric_to_inertial(),
-            LocalFrame::VNC => state.dcm_from_vnc_to_inertial(),
-            LocalFrame::RCN => state.dcm_from_rcn_to_inertial(),
-        }
-    }
 }
 
 #[test]
