@@ -46,11 +46,9 @@ fn test_monte_carlo_epoch(almanac: Arc<Almanac>) {
     .unwrap();
 
     // Set up the dynamics
-    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::new(vec![PointMasses::new(vec![
-        SUN,
-        MOON,
-        JUPITER_BARYCENTER,
-    ])]));
+    let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::new(vec![Arc::new(
+        PointMasses::new(vec![SUN, MOON, JUPITER_BARYCENTER]),
+    )]));
 
     let prop = Propagator::default_dp78(orbital_dyn);
 

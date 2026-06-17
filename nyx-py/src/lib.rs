@@ -1,3 +1,20 @@
+/*
+    Nyx, blazing fast astrodynamics
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
 use anise::almanac::Almanac;
 use anise::almanac::metaload::{MetaAlmanac, MetaFile};
 use anise::analysis::prelude::{
@@ -26,19 +43,29 @@ use hifitime::python::*;
 use hifitime::ut1::*;
 use hifitime::*;
 
+use nyx_space::cosmic::eclipse::ShadowModel;
 use nyx_space::dynamics::guidance::Thruster;
-use nyx_space::dynamics::sequence::SpacecraftSequence;
+use nyx_space::dynamics::sequence::{
+    AccelModels, ForceModels, PropagatorConfig, SpacecraftSequence,
+};
+use nyx_space::dynamics::{AtmDensity, Drag, PointMasses, SolarPressure};
+use nyx_space::io::gravity::GravityFieldConfig;
 use nyx_space::mc::{MvnSpacecraft, StateDispersion};
 use nyx_space::md::StateParameter;
 use nyx_space::md::trajectory::ExportCfg;
+use nyx_space::od::GroundStation;
 use nyx_space::od::msr::{Measurement, MeasurementType, TrackingDataArc};
 use nyx_space::od::simulator::{Handoff, PyCadence, Scheduler, Strand, TrkConfig};
-use nyx_space::od::{GroundStation, ODError};
+use nyx_space::propagators::{IntegratorMethod, IntegratorOptions};
 use nyx_space::{Spacecraft, cosmic::GuidanceMode};
 
 use pyo3::{prelude::*, wrap_pymodule};
 
+use crate::py_md::PropagatorInstance;
+
 mod constants;
+mod py_md;
+mod py_od;
 mod utils;
 
 #[pymodule]
@@ -46,6 +73,7 @@ mod utils;
 fn nyx(m: &Bound<'_, PyModule>) -> PyResult<()> {
     pyo3_log::init();
     m.add_wrapped(wrap_pymodule!(pyanise))?;
+    m.add_wrapped(wrap_pymodule!(mission_design))?;
     m.add_wrapped(wrap_pymodule!(orbit_determination))?;
     m.add_wrapped(wrap_pymodule!(monte_carlo))?;
     m.add_wrapped(wrap_pymodule!(time))?;
@@ -69,6 +97,7 @@ fn orbit_determination(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
     sm.add_class::<TrackingDataArc>()?;
     sm.add_class::<MeasurementType>()?;
     sm.add_class::<Measurement>()?;
+    sm.add_class::<Location>()?;
     sm.add_class::<GroundStation>()?;
     sm.add_class::<PyCadence>()?;
     sm.add_class::<Handoff>()?;
@@ -76,6 +105,7 @@ fn orbit_determination(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
     sm.add_class::<TrkConfig>()?;
     sm.add_class::<Scheduler>()?;
     sm.add_class::<ExportCfg>()?;
+    sm.add_class::<FrameUid>()?;
 
     Ok(())
 }
@@ -91,7 +121,19 @@ fn monte_carlo(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
 
 #[pymodule]
 fn mission_design(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
+    sm.add_class::<PropagatorConfig>()?;
+    sm.add_class::<PropagatorInstance>()?;
+    sm.add_class::<IntegratorMethod>()?;
+    sm.add_class::<IntegratorOptions>()?;
+    sm.add_class::<AccelModels>()?;
+    sm.add_class::<ForceModels>()?;
     sm.add_class::<SpacecraftSequence>()?;
+    sm.add_class::<GravityFieldConfig>()?;
+    sm.add_class::<PointMasses>()?;
+    sm.add_class::<SolarPressure>()?;
+    sm.add_class::<Drag>()?;
+    sm.add_class::<AtmDensity>()?;
+    sm.add_class::<ShadowModel>()?;
 
     Ok(())
 }
@@ -135,10 +177,6 @@ fn pyanise(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_class::<LocationDhallSet>()?;
     m.add_class::<LocationDhallSetEntry>()?;
     m.add_class::<PyLocationDataSet>()?;
-
-    m.add("__version__", env!("CARGO_PKG_VERSION"))?;
-    m.add("__doc__", env!("CARGO_PKG_DESCRIPTION"))?;
-    m.add("__author__", env!("CARGO_PKG_AUTHORS"))?;
 
     Ok(())
 }

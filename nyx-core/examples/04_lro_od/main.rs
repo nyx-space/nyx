@@ -129,10 +129,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     // The harmonics must be computed in the body fixed frame.
     // We're using the long term prediction of the Moon principal axes frame.
     let moon_pa_frame = MOON_PA_FRAME.with_orient(31008);
-    let sph_harmonics = GravityField::from_stor(
+    let sph_harmonics = GravityField::new(GravityFieldData::from_shadr(
+        &jggrx_meta.uri,
+        80,
+        80,
+        true,
         almanac.frame_info(moon_pa_frame)?,
-        GravityFieldData::from_shadr(&jggrx_meta.uri, 80, 80, true)?,
-    );
+    )?);
 
     // Include the spherical harmonics into the orbital dynamics.
     orbital_dyn.accel_models.push(sph_harmonics);
@@ -140,7 +143,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // We define the solar radiation pressure, using the default solar flux and accounting only
     // for the eclipsing caused by the Earth and Moon.
     // Note that by default, enabling the SolarPressure model will also enable the estimation of the coefficient of reflectivity.
-    let srp_dyn = SolarPressure::new(vec![EARTH_J2000, MOON_J2000], almanac.clone())?;
+    let srp_dyn = SolarPressure::new(vec![EARTH_J2000, MOON_J2000], &almanac)?;
 
     // Finalize setting up the dynamics, specifying the force models (orbital_dyn) separately from the
     // acceleration models (SRP in this case). Use `from_models` to specify multiple accel models.

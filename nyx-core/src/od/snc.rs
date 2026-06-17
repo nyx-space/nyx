@@ -223,8 +223,8 @@ where
         if let Some(mut snc_matrix) = self.to_matrix(nominal_orbit.epoch) {
             if let Some(local_frame) = self.local_frame {
                 // Rotate the SNC from the definition frame into the state frame.
-                let dcm = local_frame
-                    .dcm_to_inertial(nominal_orbit)
+                let dcm = nominal_orbit
+                    .dcm_to_inertial(local_frame)
                     .context(AstroPhysicsSnafu)
                     .context(StateAstroSnafu {
                         param: StateParameter::Epoch(),

@@ -25,7 +25,7 @@ use crate::linalg::{Const, Matrix3, Matrix6, OVector, Vector3, Vector6};
 use anise::almanac::Almanac;
 use anise::astro::Aberration;
 use hyperdual::linalg::norm;
-use hyperdual::{extract_jacobian_and_result, hyperspace_from_vector, Float, OHyperdual};
+use hyperdual::{Float, OHyperdual, extract_jacobian_and_result, hyperspace_from_vector};
 use serde::{Deserialize, Serialize};
 use serde_dhall::{SimpleType, StaticType};
 use snafu::ResultExt;
@@ -49,7 +49,7 @@ impl OrbitalDynamics {
     /// Initializes the point masses gravities with the provided list of bodies
     pub fn point_masses(celestial_objects: Vec<i32>) -> Self {
         // Create the point masses
-        Self::new(vec![PointMasses::new(celestial_objects)])
+        Self::new(vec![Arc::new(PointMasses::new(celestial_objects))])
     }
 
     /// Initializes a OrbitalDynamics which does not simulate the gravity pull of other celestial objects but the primary one.
@@ -183,11 +183,11 @@ pub struct PointMasses {
 
 impl PointMasses {
     /// Initializes the point masses gravities with the provided list of bodies
-    pub fn new(celestial_objects: Vec<i32>) -> Arc<Self> {
-        Arc::new(Self {
+    pub fn new(celestial_objects: Vec<i32>) -> Self {
+        Self {
             celestial_objects,
             correction: None,
-        })
+        }
     }
 
     /// Initializes the point masses gravities with the provided list of bodies, and accounting for some light time correction
@@ -307,6 +307,7 @@ impl AccelModel for PointMasses {
         Ok((fx, grad))
     }
 }
+
 impl StaticType for PointMasses {
     fn static_type() -> SimpleType {
         let mut fields = HashMap::new();
@@ -329,5 +330,26 @@ impl StaticType for PointMasses {
         );
 
         SimpleType::Record(fields)
+    }
+}
+
+#[cfg(feature = "python")]
+#[cfg_attr(feature = "python", pymethods)]
+impl PointMasses {
+    #[pyo3(signature=(celestial_objects, correction=None))]
+    #[new]
+    fn py_new(celestial_objects: Vec<i32>, correction: Option<Aberration>) -> Self {
+        Self {
+            celestial_objects,
+            correction,
+        }
+    }
+
+    fn __str__(&self) -> String {
+        format!("{self:?}")
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self:?} @ {self:p}")
     }
 }

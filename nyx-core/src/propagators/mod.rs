@@ -82,8 +82,11 @@ pub enum PropagationError {
         #[snafu(source(from(AnalysisError, Box::new)))]
         source: Box<AnalysisError>,
     },
+    #[snafu(display("propagation encountered an almanac error {source}"))]
     PropAlmanacError {
         #[snafu(source(from(AlmanacError, Box::new)))]
         source: Box<AlmanacError>,
     },
+    #[snafu(display("propagation encountered an error: {msg}"))]
+    PropGenericError { msg: String },
 }

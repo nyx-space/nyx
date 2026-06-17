@@ -98,8 +98,8 @@ impl SpacecraftUncertainty {
 
         // Rotate into the correct frame.
         let dcm_local2inertial = match self.frame {
-            None => LocalFrame::Inertial.dcm_to_inertial(self.nominal.orbit)?,
-            Some(frame) => frame.dcm_to_inertial(self.nominal.orbit)?,
+            None => self.nominal.orbit.dcm_to_inertial(LocalFrame::Inertial)?,
+            Some(frame) => self.nominal.orbit.dcm_to_inertial(frame)?,
         };
 
         let mut init_covar =

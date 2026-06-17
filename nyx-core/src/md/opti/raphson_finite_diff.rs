@@ -180,8 +180,9 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
         // Apply the accumulated initial guess to xi (once, after the loop)
         if !finite_burn_target {
             if let Some(frame) = self.correction_frame {
-                let dcm_vnc2inertial = frame
-                    .dcm_to_inertial(xi.orbit)
+                let dcm_vnc2inertial = xi
+                    .orbit
+                    .dcm_to_inertial(frame)
                     .context(AstroPhysicsSnafu)
                     .context(AstroSnafu)?
                     .rot_mat;
@@ -429,8 +430,9 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                         // Now, let's apply the correction to the initial state
                         if let Some(frame) = self.correction_frame {
                             // The following will error if the frame is not local
-                            let dcm_vnc2inertial = frame
-                                .dcm_to_inertial(this_xi.orbit)
+                            let dcm_vnc2inertial = this_xi
+                                .orbit
+                                .dcm_to_inertial(frame)
                                 .context(AstroPhysicsSnafu)
                                 .context(AstroSnafu)
                                 .unwrap()
@@ -543,8 +545,9 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                 }
                 // Now, let's apply the correction to the initial state
                 if let Some(frame) = self.correction_frame {
-                    let dcm_vnc2inertial = frame
-                        .dcm_to_inertial(corrected_state.orbit)
+                    let dcm_vnc2inertial = corrected_state
+                        .orbit
+                        .dcm_to_inertial(frame)
                         .context(AstroPhysicsSnafu)
                         .context(AstroSnafu)?
                         .rot_mat;
@@ -718,8 +721,9 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
 
             // Now, let's apply the correction to the initial state
             if let Some(frame) = self.correction_frame {
-                let dcm_vnc2inertial = frame
-                    .dcm_to_inertial(xi.orbit)
+                let dcm_vnc2inertial = xi
+                    .orbit
+                    .dcm_to_inertial(frame)
                     .context(AstroPhysicsSnafu)
                     .context(AstroSnafu)?
                     .rot_mat;

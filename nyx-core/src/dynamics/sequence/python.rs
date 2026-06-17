@@ -1,6 +1,10 @@
+use super::{AccelModels, ForceModels, PropagatorConfig, SpacecraftSequence, Thruster};
+#[cfg(feature = "python")]
+use crate::dynamics::{Drag, SolarPressure};
+use crate::propagators::{IntegratorMethod, IntegratorOptions};
+use crate::{dynamics::PointMasses, io::gravity::GravityFieldConfig};
 use pyo3::exceptions::PyException;
 use {
-    super::{SpacecraftSequence, Thruster},
     crate::Spacecraft,
     anise::almanac::Almanac,
     pyo3::prelude::*,
@@ -71,5 +75,75 @@ impl SpacecraftSequence {
         } else {
             Ok(())
         }
+    }
+}
+
+#[cfg(feature = "python")]
+#[cfg_attr(feature = "python", pymethods)]
+impl AccelModels {
+    #[new]
+    fn py_new(
+        point_masses: Option<PointMasses>,
+        gravity_field: Option<GravityFieldConfig>,
+    ) -> Self {
+        Self {
+            point_masses,
+            gravity_field,
+        }
+    }
+
+    fn __str__(&self) -> String {
+        format!("{self:?}")
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self:?} @ {self:p}")
+    }
+}
+
+#[cfg(feature = "python")]
+#[cfg_attr(feature = "python", pymethods)]
+impl ForceModels {
+    #[new]
+    fn py_new(solar_pressure: Option<SolarPressure>, drag: Option<Drag>) -> Self {
+        Self {
+            solar_pressure,
+            drag,
+        }
+    }
+
+    fn __str__(&self) -> String {
+        format!("{self:?}")
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self:?} @ {self:p}")
+    }
+}
+
+#[cfg(feature = "python")]
+#[cfg_attr(feature = "python", pymethods)]
+impl PropagatorConfig {
+    #[new]
+    fn py_new(
+        accel_models: AccelModels,
+        force_models: ForceModels,
+        method: IntegratorMethod,
+        options: IntegratorOptions,
+    ) -> Self {
+        Self {
+            accel_models,
+            force_models,
+            method,
+            options,
+        }
+    }
+
+    fn __str__(&self) -> String {
+        format!("{self:?}")
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self:?} @ {self:p}")
     }
 }
