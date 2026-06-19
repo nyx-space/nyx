@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 /*
     Nyx, blazing fast astrodynamics
     Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
@@ -22,9 +20,10 @@ use anise::frames::Frame;
 use anise::{ephemerides::ephemeris::Ephemeris, prelude::Almanac};
 use hifitime::{Duration, Epoch};
 use log::info;
+use nyx_space::propagators::{IntegratorMethod, IntegratorOptions, Propagator as CorePropagator};
 use nyx_space::{
     Spacecraft,
-    dynamics::sequence::PropagatorConfig,
+    dynamics::sequence::Dynamics,
     io::InputOutputError,
     md::{
         Trajectory,
@@ -32,6 +31,8 @@ use nyx_space::{
     },
     propagators::PropagationError,
 };
+use rayon::prelude::*;
+use std::sync::Arc;
 
 use pyo3::prelude::*;
 
@@ -57,37 +58,51 @@ impl PropagationResult {
 
 #[pyclass(from_py_object)]
 #[derive(Clone)]
-pub struct PropagatorInstance {
-    #[pyo3(get)]
-    config: PropagatorConfig,
-    #[pyo3(get)]
-    state: Spacecraft,
+pub struct Propagator {
+    #[pyo3(get, set)]
+    dynamics: Dynamics,
+    #[pyo3(get, set)]
+    method: IntegratorMethod,
+    #[pyo3(get, set)]
+    options: IntegratorOptions,
     almanac: Arc<Almanac>,
 }
 
 #[pymethods]
-impl PropagatorInstance {
+impl Propagator {
+    #[pyo3(signature=(dynamics, almanac, method=IntegratorMethod::RungeKutta89, options=IntegratorOptions::default()))]
     #[new]
-    fn py_new(config: PropagatorConfig, state: Spacecraft, almanac: Almanac) -> Self {
+    fn py_new(
+        dynamics: Dynamics,
+        almanac: Almanac,
+        method: IntegratorMethod,
+        options: IntegratorOptions,
+    ) -> Self {
         Self {
-            config,
-            state,
+            dynamics,
             almanac: Arc::new(almanac),
+            method,
+            options,
         }
     }
+
     /// Propagates the initialization state until the desired epoch, optionally not building the trajectory
-    #[pyo3(signature = (epoch, trajectory=true))]
+    #[pyo3(signature = (spacecraft, epoch, trajectory=true))]
     fn until_epoch(
         &self,
+        spacecraft: Spacecraft,
         epoch: Epoch,
         trajectory: bool,
     ) -> Result<PropagationResult, PropagationError> {
-        let setup = self
-            .config
-            .build(self.almanac.clone())
-            .map_err(|msg| PropagationError::PropGenericError { msg })?;
+        let setup = CorePropagator::new(
+            self.dynamics
+                .build(self.almanac.clone())
+                .map_err(|msg| PropagationError::PropGenericError { msg })?,
+            self.method,
+            self.options,
+        );
 
-        let mut prop = setup.with(self.state, self.almanac.clone());
+        let mut prop = setup.with(spacecraft, self.almanac.clone());
 
         let (state, trajectory) = if trajectory {
             let (state, traj) = prop.until_epoch_with_traj(epoch)?;
@@ -101,18 +116,22 @@ impl PropagatorInstance {
     }
 
     /// Propagates the initialization state for the desired duration, optionally not building the trajectory
-    #[pyo3(signature = (duration, trajectory=true))]
+    #[pyo3(signature = (spacecraft, duration, trajectory=true))]
     fn for_duration(
         &self,
+        spacecraft: Spacecraft,
         duration: Duration,
         trajectory: bool,
     ) -> Result<PropagationResult, PropagationError> {
-        let setup = self
-            .config
-            .build(self.almanac.clone())
-            .map_err(|msg| PropagationError::PropGenericError { msg })?;
+        let setup = CorePropagator::new(
+            self.dynamics
+                .build(self.almanac.clone())
+                .map_err(|msg| PropagationError::PropGenericError { msg })?,
+            self.method,
+            self.options,
+        );
 
-        let mut prop = setup.with(self.state, self.almanac.clone());
+        let mut prop = setup.with(spacecraft, self.almanac.clone());
 
         let (state, trajectory) = if trajectory {
             let (state, traj) = prop.for_duration_with_traj(duration)?;
@@ -152,21 +171,25 @@ impl PropagatorInstance {
     /// * `PropagationError::NthEventError`: Returned if `max_duration` is reached before the event was triggered `trigger` times.
     /// * `PropagationError::TrajectoryEvent`: Returned if the interpolation of the event state fails.
     /// * `PropagationError::Analysis`: Returned if the event evaluation fails during the search.
-    #[pyo3(signature = (max_duration, event, trigger=1, event_frame=None, trajectory=true))]
+    #[pyo3(signature = (spacecraft, event, max_duration, trigger=1, event_frame=None, trajectory=true))]
     fn until_event(
         &self,
-        max_duration: Duration,
+        spacecraft: Spacecraft,
         event: &Event,
+        max_duration: Duration,
         trigger: usize,
         event_frame: Option<Frame>,
         trajectory: bool,
     ) -> Result<PropagationResult, PropagationError> {
-        let setup = self
-            .config
-            .build(self.almanac.clone())
-            .map_err(|msg| PropagationError::PropGenericError { msg })?;
+        let setup = CorePropagator::new(
+            self.dynamics
+                .build(self.almanac.clone())
+                .map_err(|msg| PropagationError::PropGenericError { msg })?,
+            self.method,
+            self.options,
+        );
 
-        let mut prop = setup.with(self.state, self.almanac.clone());
+        let mut prop = setup.with(spacecraft, self.almanac.clone());
 
         let (state, traj) = prop.until_nth_event(max_duration, event, event_frame, trigger)?;
 
@@ -178,6 +201,149 @@ impl PropagatorInstance {
                 None
             },
         })
+    }
+
+    /// Propagates the initialization state until the desired epoch, optionally not building the trajectory
+    #[pyo3(signature = (spacecraft, epoch, trajectory=true))]
+    fn many_until_epoch(
+        &self,
+        py: Python,
+        spacecraft: Vec<Spacecraft>,
+        epoch: Epoch,
+        trajectory: bool,
+    ) -> Result<Vec<PropagationResult>, PropagationError> {
+        let setup = Arc::new(CorePropagator::new(
+            self.dynamics
+                .build(self.almanac.clone())
+                .map_err(|msg| PropagationError::PropGenericError { msg })?,
+            self.method,
+            self.options,
+        ));
+
+        Ok(py.detach(|| {
+            spacecraft
+                .par_iter()
+                .filter_map(|sc| {
+                    let mut prop = setup.with(*sc, self.almanac.clone());
+                    if trajectory {
+                        match prop.until_epoch_with_traj(epoch) {
+                            Ok((state, traj)) => Some(PropagationResult {
+                                state,
+                                trajectory: Some(PyTrajectory { inner: traj }),
+                            }),
+                            Err(e) => {
+                                eprintln!("{e}");
+                                None
+                            }
+                        }
+                    } else {
+                        match prop.until_epoch(epoch) {
+                            Ok(state) => Some(PropagationResult {
+                                state,
+                                trajectory: None,
+                            }),
+                            Err(e) => {
+                                eprintln!("{e}");
+                                None
+                            }
+                        }
+                    }
+                })
+                .collect::<Vec<PropagationResult>>()
+        }))
+    }
+
+    /// Propagates the initialization state for the desired duration, optionally not building the trajectory
+    #[pyo3(signature = (spacecraft, duration, trajectory=true))]
+    fn many_for_duration(
+        &self,
+        py: Python,
+        spacecraft: Vec<Spacecraft>,
+        duration: Duration,
+        trajectory: bool,
+    ) -> Result<Vec<PropagationResult>, PropagationError> {
+        let setup = Arc::new(CorePropagator::new(
+            self.dynamics
+                .build(self.almanac.clone())
+                .map_err(|msg| PropagationError::PropGenericError { msg })?,
+            self.method,
+            self.options,
+        ));
+
+        Ok(py.detach(|| {
+            spacecraft
+                .par_iter()
+                .filter_map(|sc| {
+                    let mut prop = setup.with(*sc, self.almanac.clone());
+                    if trajectory {
+                        match prop.for_duration_with_traj(duration) {
+                            Ok((state, traj)) => Some(PropagationResult {
+                                state,
+                                trajectory: Some(PyTrajectory { inner: traj }),
+                            }),
+                            Err(e) => {
+                                eprintln!("{e}");
+                                None
+                            }
+                        }
+                    } else {
+                        match prop.for_duration(duration) {
+                            Ok(state) => Some(PropagationResult {
+                                state,
+                                trajectory: None,
+                            }),
+                            Err(e) => {
+                                eprintln!("{e}");
+                                None
+                            }
+                        }
+                    }
+                })
+                .collect::<Vec<PropagationResult>>()
+        }))
+    }
+
+    #[pyo3(signature = (spacecraft, event, max_duration, trigger=1, event_frame=None, trajectory=true))]
+    fn many_until_event(
+        &self,
+        py: Python,
+        spacecraft: Vec<Spacecraft>,
+        event: &Event,
+        max_duration: Duration,
+        trigger: usize,
+        event_frame: Option<Frame>,
+        trajectory: bool,
+    ) -> Result<Vec<PropagationResult>, PropagationError> {
+        let setup = Arc::new(CorePropagator::new(
+            self.dynamics
+                .build(self.almanac.clone())
+                .map_err(|msg| PropagationError::PropGenericError { msg })?,
+            self.method,
+            self.options,
+        ));
+
+        Ok(py.detach(|| {
+            spacecraft
+                .par_iter()
+                .filter_map(|sc| {
+                    let mut prop = setup.with(*sc, self.almanac.clone());
+                    match prop.until_nth_event(max_duration, event, event_frame, trigger) {
+                        Ok((state, traj)) => Some(PropagationResult {
+                            state,
+                            trajectory: if trajectory {
+                                Some(PyTrajectory { inner: traj })
+                            } else {
+                                None
+                            },
+                        }),
+                        Err(e) => {
+                            eprintln!("{e}");
+                            None
+                        }
+                    }
+                })
+                .collect::<Vec<PropagationResult>>()
+        }))
     }
 }
 

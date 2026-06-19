@@ -3,12 +3,13 @@ use pyo3::prelude::*;
 
 #[pymethods]
 impl ExportCfg {
+    #[pyo3(signature=(timestamped = false))]
     #[new]
-    fn py_new(timestamped: Option<bool>) -> Self {
-        if timestamped.unwrap_or_default() {
-            Self::default()
-        } else {
+    fn py_new(timestamped: bool) -> Self {
+        if timestamped {
             Self::timestamped()
+        } else {
+            Self::default()
         }
     }
 

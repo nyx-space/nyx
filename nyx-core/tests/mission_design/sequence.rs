@@ -47,25 +47,27 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
         PropagatorConfig {
             method: IntegratorMethod::RungeKutta89,
             options: IntegratorOptions::default(),
-            accel_models: AccelModels {
-                point_masses: Some(PointMasses::new(vec![EARTH, MOON])),
-                gravity_field: Some(GravityFieldConfig {
-                    filepath: "../data/01_planetary/EGM2008_to2190_TideFree.gz".into(),
-                    gunzipped: true,
-                    degree: 21,
-                    order: 21,
-                    frame: IAU_EARTH_FRAME.into(),
-                }),
-            },
-            force_models: ForceModels {
-                solar_pressure: None,
-                drag: Some(Drag {
-                    density: AtmDensity::StdAtm {
-                        max_alt_m: 1_000_000.0,
-                    },
-                    frame: almanac.frame_info(IAU_EARTH_FRAME).unwrap(),
-                    estimate: false,
-                }),
+            dynamics: Dynamics {
+                accel_models: AccelModels {
+                    point_masses: Some(PointMasses::new(vec![EARTH, MOON])),
+                    gravity_field: Some(GravityFieldConfig {
+                        filepath: "../data/01_planetary/EGM2008_to2190_TideFree.gz".into(),
+                        gunzipped: true,
+                        degree: 21,
+                        order: 21,
+                        frame: IAU_EARTH_FRAME.into(),
+                    }),
+                },
+                force_models: ForceModels {
+                    solar_pressure: None,
+                    drag: Some(Drag {
+                        density: AtmDensity::StdAtm {
+                            max_alt_m: 1_000_000.0,
+                        },
+                        frame: almanac.frame_info(IAU_EARTH_FRAME).unwrap(),
+                        estimate: false,
+                    }),
+                },
             },
         },
     );
@@ -75,22 +77,24 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
         PropagatorConfig {
             method: IntegratorMethod::RungeKutta89,
             options: IntegratorOptions::default(),
-            accel_models: AccelModels {
-                point_masses: Some(PointMasses::new(vec![EARTH, MOON])),
-                gravity_field: Some(GravityFieldConfig {
-                    filepath: "../data/01_planetary/EGM2008_to2190_TideFree.gz".into(),
-                    gunzipped: true,
-                    degree: 8,
-                    order: 8,
-                    frame: IAU_EARTH_FRAME.into(),
-                }),
-            },
-            force_models: ForceModels {
-                solar_pressure: Some(
-                    SolarPressure::default_flux_raw(vec![EARTH_J2000, MOON_J2000], &almanac)
-                        .unwrap(),
-                ),
-                drag: None,
+            dynamics: Dynamics {
+                accel_models: AccelModels {
+                    point_masses: Some(PointMasses::new(vec![EARTH, MOON])),
+                    gravity_field: Some(GravityFieldConfig {
+                        filepath: "../data/01_planetary/EGM2008_to2190_TideFree.gz".into(),
+                        gunzipped: true,
+                        degree: 8,
+                        order: 8,
+                        frame: IAU_EARTH_FRAME.into(),
+                    }),
+                },
+                force_models: ForceModels {
+                    solar_pressure: Some(
+                        SolarPressure::default_flux_raw(vec![EARTH_J2000, MOON_J2000], &almanac)
+                            .unwrap(),
+                    ),
+                    drag: None,
+                },
             },
         },
     );
@@ -304,25 +308,27 @@ fn spacecraft_low_thrust_orbit_raise(
             options: IntegratorOptions::builder()
                 .min_step(Unit::Second * 1)
                 .build(),
-            accel_models: AccelModels {
-                point_masses: Some(PointMasses::new(vec![EARTH, MOON])),
-                gravity_field: Some(GravityFieldConfig {
-                    filepath: "../data/01_planetary/EGM2008_to2190_TideFree.gz".into(),
-                    gunzipped: true,
-                    degree: 8,
-                    order: 8,
-                    frame: IAU_EARTH_FRAME.into(),
-                }),
-            },
-            force_models: ForceModels {
-                solar_pressure: None,
-                drag: Some(Drag {
-                    density: AtmDensity::StdAtm {
-                        max_alt_m: 1_000_000.0,
-                    },
-                    frame: almanac.frame_info(IAU_EARTH_FRAME).unwrap(),
-                    estimate: false,
-                }),
+            dynamics: Dynamics {
+                accel_models: AccelModels {
+                    point_masses: Some(PointMasses::new(vec![EARTH, MOON])),
+                    gravity_field: Some(GravityFieldConfig {
+                        filepath: "../data/01_planetary/EGM2008_to2190_TideFree.gz".into(),
+                        gunzipped: true,
+                        degree: 8,
+                        order: 8,
+                        frame: IAU_EARTH_FRAME.into(),
+                    }),
+                },
+                force_models: ForceModels {
+                    solar_pressure: None,
+                    drag: Some(Drag {
+                        density: AtmDensity::StdAtm {
+                            max_alt_m: 1_000_000.0,
+                        },
+                        frame: almanac.frame_info(IAU_EARTH_FRAME).unwrap(),
+                        estimate: false,
+                    }),
+                },
             },
         },
     );

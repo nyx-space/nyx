@@ -1,4 +1,4 @@
-use super::{AccelModels, ForceModels, PropagatorConfig, SpacecraftSequence, Thruster};
+use super::{AccelModels, Dynamics, ForceModels, PropagatorConfig, SpacecraftSequence, Thruster};
 #[cfg(feature = "python")]
 use crate::dynamics::{Drag, SolarPressure};
 use crate::propagators::{IntegratorMethod, IntegratorOptions};
@@ -81,6 +81,7 @@ impl SpacecraftSequence {
 #[cfg(feature = "python")]
 #[cfg_attr(feature = "python", pymethods)]
 impl AccelModels {
+    #[pyo3(signature=(point_masses=None, gravity_field=None))]
     #[new]
     fn py_new(
         point_masses: Option<PointMasses>,
@@ -104,6 +105,7 @@ impl AccelModels {
 #[cfg(feature = "python")]
 #[cfg_attr(feature = "python", pymethods)]
 impl ForceModels {
+    #[pyo3(signature=(solar_pressure=None, drag=None))]
     #[new]
     fn py_new(solar_pressure: Option<SolarPressure>, drag: Option<Drag>) -> Self {
         Self {
@@ -123,17 +125,32 @@ impl ForceModels {
 
 #[cfg(feature = "python")]
 #[cfg_attr(feature = "python", pymethods)]
-impl PropagatorConfig {
+impl Dynamics {
+    #[pyo3(signature=(accel_models=AccelModels::default(), force_models=ForceModels::default()))]
     #[new]
-    fn py_new(
-        accel_models: AccelModels,
-        force_models: ForceModels,
-        method: IntegratorMethod,
-        options: IntegratorOptions,
-    ) -> Self {
+    fn py_new(accel_models: AccelModels, force_models: ForceModels) -> Self {
         Self {
             accel_models,
             force_models,
+        }
+    }
+
+    fn __str__(&self) -> String {
+        format!("{self:?}")
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self:?} @ {self:p}")
+    }
+}
+
+#[cfg(feature = "python")]
+#[cfg_attr(feature = "python", pymethods)]
+impl PropagatorConfig {
+    #[new]
+    fn py_new(dynamics: Dynamics, method: IntegratorMethod, options: IntegratorOptions) -> Self {
+        Self {
+            dynamics,
             method,
             options,
         }

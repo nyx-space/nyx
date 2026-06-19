@@ -90,18 +90,16 @@ impl StaticType for Phase {
     }
 }
 
-/// Propagator config includes the method, options, and all dynamics
+/// Dynamics defines the dynamical environment with a set of acceleration and force models
 #[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
 #[cfg_attr(feature = "python", pyclass(from_py_object))]
-pub struct PropagatorConfig {
+pub struct Dynamics {
     pub accel_models: AccelModels,
     pub force_models: ForceModels,
-    pub method: IntegratorMethod,
-    pub options: IntegratorOptions,
 }
 
-impl PropagatorConfig {
-    pub fn build(&self, almanac: Arc<Almanac>) -> Result<Propagator<SpacecraftDynamics>, String> {
+impl Dynamics {
+    pub fn build(&self, almanac: Arc<Almanac>) -> Result<SpacecraftDynamics, String> {
         // Build the orbital dynamics
         let mut orbital_dyn = OrbitalDynamics::two_body();
         if let Some(point_masses) = &self.accel_models.point_masses {
@@ -127,12 +125,31 @@ impl PropagatorConfig {
         }
 
         // And set it all up!
-        Ok(Propagator::new(sc_dyn, self.method, self.options))
+        Ok(sc_dyn)
+    }
+}
+
+/// Propagator config includes the method, options, and all dynamics
+#[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
+#[cfg_attr(feature = "python", pyclass(from_py_object))]
+pub struct PropagatorConfig {
+    pub dynamics: Dynamics,
+    pub method: IntegratorMethod,
+    pub options: IntegratorOptions,
+}
+
+impl PropagatorConfig {
+    pub fn build(&self, almanac: Arc<Almanac>) -> Result<Propagator<SpacecraftDynamics>, String> {
+        Ok(Propagator::new(
+            self.dynamics.build(almanac)?,
+            self.method,
+            self.options,
+        ))
     }
 }
 
 /// Acceleration models alter the orbital dynamics
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Default, Serialize, Deserialize, Debug)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct AccelModels {
     pub point_masses: Option<PointMasses>,
@@ -140,7 +157,7 @@ pub struct AccelModels {
 }
 
 /// Force models alter the spacecraft dynamics (they need a mass).
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Default, Serialize, Deserialize, Debug)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct ForceModels {
     pub solar_pressure: Option<SolarPressure>,

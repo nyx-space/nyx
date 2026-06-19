@@ -46,7 +46,7 @@ use hifitime::*;
 use nyx_space::cosmic::eclipse::ShadowModel;
 use nyx_space::dynamics::guidance::Thruster;
 use nyx_space::dynamics::sequence::{
-    AccelModels, ForceModels, PropagatorConfig, SpacecraftSequence,
+    AccelModels, Dynamics, ForceModels, PropagatorConfig, SpacecraftSequence,
 };
 use nyx_space::dynamics::{AtmDensity, Drag, PointMasses, SolarPressure};
 use nyx_space::io::gravity::GravityFieldConfig;
@@ -61,7 +61,7 @@ use nyx_space::{Spacecraft, cosmic::GuidanceMode};
 
 use pyo3::{prelude::*, wrap_pymodule};
 
-use crate::py_md::PropagatorInstance;
+use crate::py_md::Propagator;
 
 mod constants;
 mod py_md;
@@ -89,6 +89,7 @@ fn nyx(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<SRPData>()?;
     m.add_class::<DragData>()?;
     m.add_class::<Thruster>()?;
+    m.add_class::<ExportCfg>()?;
     Ok(())
 }
 
@@ -122,7 +123,8 @@ fn monte_carlo(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
 #[pymodule]
 fn mission_design(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
     sm.add_class::<PropagatorConfig>()?;
-    sm.add_class::<PropagatorInstance>()?;
+    sm.add_class::<Propagator>()?;
+    sm.add_class::<Dynamics>()?;
     sm.add_class::<IntegratorMethod>()?;
     sm.add_class::<IntegratorOptions>()?;
     sm.add_class::<AccelModels>()?;
@@ -130,6 +132,7 @@ fn mission_design(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
     sm.add_class::<SpacecraftSequence>()?;
     sm.add_class::<GravityFieldConfig>()?;
     sm.add_class::<PointMasses>()?;
+    sm.add_class::<ExportCfg>()?;
     sm.add_class::<SolarPressure>()?;
     sm.add_class::<Drag>()?;
     sm.add_class::<AtmDensity>()?;
