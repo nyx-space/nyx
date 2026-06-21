@@ -36,12 +36,12 @@ def test_ground_station():
     gs = GroundStation(
         "Paris, FR",
         Location(2.3522, 48.8566, 0.4, Frames.IAU_EARTH_FRAME.to_frameuid(), [], True),
-        [
-            MeasurementType.Range,
-            MeasurementType.Doppler,
-            MeasurementType.Elevation,
-            MeasurementType.Azimuth,
-        ],
+        {
+            MeasurementType.Range: StochasticNoise(),
+            MeasurementType.Doppler: StochasticNoise(),
+            MeasurementType.Elevation: StochasticNoise(),
+            MeasurementType.Azimuth: StochasticNoise(),
+        },
     )
 
     # VERIFICATION: Ensure lossless round-trip serialization.

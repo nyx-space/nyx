@@ -1,3 +1,5 @@
+import logging
+
 import polars as pl
 
 from nyx_space import DragData, ExportCfg, Mass, Spacecraft, SRPData
@@ -333,8 +335,6 @@ def test_howto_execute_simple_monte_carlo():
 
 
 if __name__ == "__main__":
-    import logging
-
     logging.basicConfig(level=logging.INFO)
 
     test_howto_propagate_with_perturbations()
