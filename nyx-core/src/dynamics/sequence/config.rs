@@ -16,11 +16,16 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 use anise::frames::FrameUid;
+use anise::prelude::Almanac;
 use serde::{Deserialize, Serialize};
 use serde_dhall::{SimpleType, StaticType};
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::dynamics::SpacecraftDynamics;
+use crate::dynamics::{GravityField, OrbitalDynamics};
+use crate::io::gravity::GravityFieldData;
+use crate::propagators::Propagator;
 use crate::{
     dynamics::{
         Drag, PointMasses, SolarPressure,
@@ -31,6 +36,9 @@ use crate::{
 };
 
 use crate::dynamics::sequence::discrete_event::DiscreteEvent;
+
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Phase {
@@ -82,27 +90,78 @@ impl StaticType for Phase {
     }
 }
 
-/// Propagator config includes the method, options, and all dynamics
+/// Dynamics defines the dynamical environment with a set of acceleration and force models
 #[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
-pub struct PropagatorConfig {
-    pub method: IntegratorMethod,
-    pub options: IntegratorOptions,
+#[cfg_attr(feature = "python", pyclass(from_py_object))]
+pub struct Dynamics {
     pub accel_models: AccelModels,
     pub force_models: ForceModels,
 }
 
+impl Dynamics {
+    pub fn build(&self, almanac: Arc<Almanac>) -> Result<SpacecraftDynamics, String> {
+        // Build the orbital dynamics
+        let mut orbital_dyn = OrbitalDynamics::two_body();
+        if let Some(point_masses) = &self.accel_models.point_masses {
+            orbital_dyn
+                .accel_models
+                .push(Arc::new(point_masses.clone()));
+        }
+        if let Some(gravity_cfg) = &self.accel_models.gravity_field {
+            let grav_data = GravityFieldData::from_config(gravity_cfg.clone(), &almanac)
+                .map_err(|e| e.to_string())?;
+            let gravity_field = GravityField::new(grav_data);
+            orbital_dyn.accel_models.push(gravity_field);
+        }
+        // Build the spacecraft dynamics
+        let mut sc_dyn = SpacecraftDynamics::new(orbital_dyn);
+
+        if let Some(srp) = &self.force_models.solar_pressure {
+            sc_dyn.force_models.push(Arc::new(srp.clone()));
+        }
+
+        if let Some(drag) = &self.force_models.drag {
+            sc_dyn.force_models.push(Arc::new(*drag));
+        }
+
+        // And set it all up!
+        Ok(sc_dyn)
+    }
+}
+
+/// Propagator config includes the method, options, and all dynamics
+#[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
+#[cfg_attr(feature = "python", pyclass(from_py_object))]
+pub struct PropagatorConfig {
+    pub dynamics: Dynamics,
+    pub method: IntegratorMethod,
+    pub options: IntegratorOptions,
+}
+
+impl PropagatorConfig {
+    pub fn build(&self, almanac: Arc<Almanac>) -> Result<Propagator<SpacecraftDynamics>, String> {
+        Ok(Propagator::new(
+            self.dynamics.build(almanac)?,
+            self.method,
+            self.options,
+        ))
+    }
+}
+
 /// Acceleration models alter the orbital dynamics
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Default, Serialize, Deserialize, Debug)]
+#[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct AccelModels {
-    pub point_masses: Option<Arc<PointMasses>>,
-    pub gravity_field: Option<(GravityFieldConfig, FrameUid)>,
+    pub point_masses: Option<PointMasses>,
+    pub gravity_field: Option<GravityFieldConfig>,
 }
 
 /// Force models alter the spacecraft dynamics (they need a mass).
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Default, Serialize, Deserialize, Debug)]
+#[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct ForceModels {
-    pub solar_pressure: Option<Arc<SolarPressure>>,
-    pub drag: Option<Arc<Drag>>,
+    pub solar_pressure: Option<SolarPressure>,
+    pub drag: Option<Drag>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
@@ -112,6 +171,7 @@ pub struct GuidanceConfig {
     pub law: SteeringLaw,
 }
 
+// NOTE: Steering laws are not yet available in Python =(
 #[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
 pub enum SteeringLaw {
     FiniteBurn(Maneuver),

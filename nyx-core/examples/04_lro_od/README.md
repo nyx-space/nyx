@@ -52,7 +52,7 @@ Since the velocity is the time derivative of the position, and since the error i
 
 After model tuning, we reach a reasonable error with an average range error of 175 meters and an average velocity error of 0.116 m/s.
 
-```
+```text
 == Sim vs Flown (04_lro_sim_truth_error) ==
 RIC Range (km)
 shape: (9, 2)

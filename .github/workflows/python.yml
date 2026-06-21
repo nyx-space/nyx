@@ -3,7 +3,7 @@
 #
 #    maturin generate-ci -o ../.github/workflows/python.yml github
 #
-name: Nyx Python
+name: Python
 
 on:
   push:
@@ -26,6 +26,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+            lfs: true
       - name: Setup Python on ${{ matrix.target }}
         uses: actions/setup-python@v6
         with:
@@ -70,8 +72,9 @@ jobs:
           set -e
           pip debug --verbose
           pip install nyx_space --find-links nyx-py/dist --force-reinstall
-          pip install pytest numpy
-          pytest
+          pip install pytest
+          pip install -r nyx-py/tests/requirements.txt
+          cd nyx-py && pytest
 
   windows:
     runs-on: windows-latest

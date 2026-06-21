@@ -20,6 +20,9 @@ hifitime = {workspace = true, features = ["python"]}
 anise = {workspace = true, features=["python", "analysis"]}
 nyx-space = { workspace = true, features = ["python"] }
 
+log = {workspace = true}
+rayon = {workspace = true}
+
 pyo3 = { version = "0.28", features = ["multiple-pymethods"] }
 pyo3-log = "0.13.3"
 

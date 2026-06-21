@@ -583,8 +583,7 @@ mod tests {
         let almanac = Arc::new(almanac);
 
         let epoch = Epoch::from_str("2024-01-01T12:00:00 UTC").unwrap();
-        let frame = Frame::from(EARTH_J2000);
-        let sc_orbit = Orbit::cartesian(7000.0, 0.0, 0.0, 0.0, 7.5, 0.0, epoch, frame);
+        let sc_orbit = Orbit::cartesian(7000.0, 0.0, 0.0, 0.0, 7.5, 0.0, epoch, EARTH_J2000);
 
         let tides = SolidTides::earth_moon_system(IAU_EARTH_FRAME, IAU_MOON_FRAME, almanac.clone())
             .expect("could not init solid tides");

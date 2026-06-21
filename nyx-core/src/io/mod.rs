@@ -16,7 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::errors::NyxError;
 use crate::md::StateParameter;
 use crate::time::Epoch;
 use arrow::error::ArrowError;
@@ -29,13 +28,10 @@ use hifitime::prelude::{Format, Formatter};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer};
 use serde::{Serialize, Serializer};
-use serde_yml::Error as YamlError;
 use std::collections::{BTreeMap, HashMap};
-use std::convert::From;
 use std::fmt::Debug;
 use std::fs::File;
 use std::io::BufReader;
-use std::io::Error as IoError;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use typed_builder::TypedBuilder;
@@ -45,9 +41,15 @@ pub mod gravity;
 
 use std::io;
 
-/// Configuration for exporting a trajectory to parquet.
-#[derive(Clone, Default, Serialize, Deserialize, TypedBuilder)]
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+#[cfg(feature = "python")]
+mod python;
+
+/// Configuration for exporting from Nyx to local disk.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, TypedBuilder, PartialEq)]
 #[builder(doc)]
+#[cfg_attr(feature = "python", pyclass(from_py_object, eq))]
 pub struct ExportCfg {
     /// Fields to export, if unset, defaults to all possible fields.
     #[builder(default, setter(strip_option))]
@@ -284,33 +286,5 @@ where
         }
     } else {
         Ok(None)
-    }
-}
-
-#[allow(clippy::upper_case_acronyms)]
-#[derive(Debug)]
-pub enum ParsingError {
-    MD(String),
-    OD(String),
-    UseOdInstead,
-    UseMdInstead,
-    FileNotFound(String),
-    FileNotUTF8(String),
-    SequenceNotFound(String),
-    LoadingError(String),
-    PropagatorNotFound(String),
-    Duration(String),
-    Quantity(String),
-    Distance(String),
-    Velocity(String),
-    IllDefined(String),
-    ExecutionError(NyxError),
-    IoError(IoError),
-    Yaml(YamlError),
-}
-
-impl From<NyxError> for ParsingError {
-    fn from(error: NyxError) -> Self {
-        Self::ExecutionError(error)
     }
 }

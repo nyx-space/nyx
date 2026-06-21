@@ -20,7 +20,7 @@ use anise::errors::OrientationSnafu;
 use anise::prelude::Almanac;
 use snafu::ResultExt;
 
-use crate::cosmic::{AstroPhysicsSnafu, Frame, Orbit};
+use crate::cosmic::{AstroPhysicsSnafu, Orbit};
 use crate::dynamics::AccelModel;
 use crate::io::gravity::GravityFieldData;
 use crate::linalg::{DMatrix, Matrix3, U7, Vector3, Vector4};
@@ -34,9 +34,7 @@ use super::{DynamicsAlmanacSnafu, DynamicsAstroSnafu, DynamicsError};
 
 #[derive(Clone)]
 pub struct GravityField {
-    /// The frame in which the gravity field is defined.
-    frame: Frame,
-    stor: GravityFieldData,
+    grav_data: GravityFieldData,
     a_nm: DMatrix<f64>,
     b_nm: DMatrix<f64>,
     c_nm: DMatrix<f64>,
@@ -51,7 +49,7 @@ pub struct GravityField {
 
 impl GravityField {
     /// Create a new Harmonics dynamical model from the provided gravity potential storage instance.
-    pub fn from_stor(frame: Frame, stor: GravityFieldData) -> Arc<Self> {
+    pub fn new(stor: GravityFieldData) -> Arc<Self> {
         let degree_np2 = stor.max_degree_n() + 2;
         let mut a_nm = DMatrix::from_element(degree_np2 + 1, degree_np2 + 1, 0.0);
         let mut b_nm = DMatrix::from_element(degree_np2, degree_np2, 0.0);
@@ -119,8 +117,7 @@ impl GravityField {
         }
 
         Arc::new(Self {
-            frame,
-            stor,
+            grav_data: stor,
             a_nm,
             b_nm,
             c_nm,
@@ -140,9 +137,9 @@ impl fmt::Display for GravityField {
         write!(
             f,
             "{} gravity field {}x{} (order x degree)",
-            self.frame,
-            self.stor.max_order_m(),
-            self.stor.max_degree_n(),
+            self.grav_data.frame,
+            self.grav_data.max_order_m(),
+            self.grav_data.max_degree_n(),
         )
     }
 }
@@ -151,7 +148,7 @@ impl AccelModel for GravityField {
     fn eom(&self, osc: &Orbit, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
         // Convert the osculating orbit to the correct frame (needed for multiple harmonic fields)
         let state = almanac
-            .transform_to(*osc, self.frame, None)
+            .transform_to(*osc, self.grav_data.frame, None)
             .context(DynamicsAlmanacSnafu {
                 action: "transforming into gravity field frame",
             })?;
@@ -161,8 +158,8 @@ impl AccelModel for GravityField {
         let s_ = state.radius_km.x / r_;
         let t_ = state.radius_km.y / r_;
         let u_ = state.radius_km.z / r_;
-        let max_degree = self.stor.max_degree_n(); // In GMAT, the degree is NN
-        let max_order = self.stor.max_order_m(); // In GMAT, the order is MM
+        let max_degree = self.grav_data.max_degree_n(); // In GMAT, the degree is NN
+        let max_order = self.grav_data.max_order_m(); // In GMAT, the order is MM
 
         // Create the associated Legendre polynomials. Note that we add three items as per GMAT (this may be useful for the STM)
         let mut a_nm = self.a_nm.clone();
@@ -196,12 +193,14 @@ impl AccelModel for GravityField {
         }
 
         let eq_radius_km = self
+            .grav_data
             .frame
             .mean_equatorial_radius_km()
             .context(AstroPhysicsSnafu)
             .context(DynamicsAstroSnafu)?;
 
         let mu_km3_s2 = self
+            .grav_data
             .frame
             .mu_km3_s2()
             .context(AstroPhysicsSnafu)
@@ -216,7 +215,7 @@ impl AccelModel for GravityField {
             rho_np1 *= rho;
 
             for m in 0..=min(n, max_order) {
-                let (c_val, s_val) = self.stor.cs_nm(n, m);
+                let (c_val, s_val) = self.grav_data.cs_nm(n, m);
                 let d_ = unsafe {
                     (c_val * r_m.get_unchecked(m) + s_val * i_m.get_unchecked(m)) * 2.0.sqrt()
                 };
@@ -257,7 +256,7 @@ impl AccelModel for GravityField {
         // As discussed with Sai, if the Earth was spinning faster, would the acceleration due to the harmonics be any different?
         // No. Therefore, we do not need to account for the transport theorem here.
         let dcm = almanac
-            .rotate(self.frame, osc.frame, osc.epoch)
+            .rotate(self.grav_data.frame, osc.frame, osc.epoch)
             .context(OrientationSnafu {
                 action: "transform state dcm",
             })
@@ -278,7 +277,7 @@ impl AccelModel for GravityField {
     ) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
         // Convert the osculating orbit to the correct frame (needed for multiple harmonic fields)
         let state = almanac
-            .transform_to(*osc, self.frame, None)
+            .transform_to(*osc, self.grav_data.frame, None)
             .context(DynamicsAlmanacSnafu {
                 action: "transforming into gravity field frame",
             })?;
@@ -290,8 +289,8 @@ impl AccelModel for GravityField {
         let s_ = radius[0] / r_;
         let t_ = radius[1] / r_;
         let u_ = radius[2] / r_;
-        let max_degree = self.stor.max_degree_n(); // In GMAT, the order is NN
-        let max_order = self.stor.max_order_m(); // In GMAT, the order is MM
+        let max_degree = self.grav_data.max_degree_n(); // In GMAT, the order is NN
+        let max_order = self.grav_data.max_order_m(); // In GMAT, the order is MM
 
         // Create the associated Legendre polynomials. Note that we add three items as per GMAT (this may be useful for the STM)
         let mut a_nm = DMatrix::from_element(max_degree + 3, max_degree + 3, OHyperdual::from(0.0));
@@ -329,12 +328,14 @@ impl AccelModel for GravityField {
         }
 
         let real_eq_radius_km = self
+            .grav_data
             .frame
             .mean_equatorial_radius_km()
             .context(AstroPhysicsSnafu)
             .context(DynamicsAstroSnafu)?;
 
         let real_mu_km3_s2 = self
+            .grav_data
             .frame
             .mu_km3_s2()
             .context(AstroPhysicsSnafu)
@@ -358,7 +359,7 @@ impl AccelModel for GravityField {
             rho_np1 *= rho;
 
             for m in 0..=min(n, max_order) {
-                let (c_valf64, s_valf64) = self.stor.cs_nm(n, m);
+                let (c_valf64, s_valf64) = self.grav_data.cs_nm(n, m);
                 let c_val = OHyperdual::<f64, U7>::from(c_valf64);
                 let s_val = OHyperdual::<f64, U7>::from(s_valf64);
 
@@ -400,7 +401,7 @@ impl AccelModel for GravityField {
         }
 
         let dcm = almanac
-            .rotate(self.frame, osc.frame, osc.epoch)
+            .rotate(self.grav_data.frame, osc.frame, osc.epoch)
             .context(OrientationSnafu {
                 action: "transform state dcm",
             })

@@ -16,7 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use anise::math::{cartesian::CartesianState, interpolation::InterpolationError};
+use anise::{
+    errors::PhysicsError,
+    math::{cartesian::CartesianState, interpolation::InterpolationError},
+};
 use snafu::prelude::*;
 
 mod interpolatable;
@@ -42,9 +45,13 @@ pub enum TrajError {
         event: String,
     },
     #[snafu(display("No interpolation data at {epoch}"))]
-    NoInterpolationData { epoch: Epoch },
+    NoInterpolationData {
+        epoch: Epoch,
+    },
     #[snafu(display("Failed to create trajectory: {msg}"))]
-    CreationError { msg: String },
+    CreationError {
+        msg: String,
+    },
     #[snafu(display(
         "Probable bug: Requested epoch {req_epoch}, corresponding to an offset of {req_dur} in a spline of duration {spline_dur}"
     ))]
@@ -54,7 +61,15 @@ pub enum TrajError {
         spline_dur: Duration,
     },
     #[snafu(display("Interpolation failed: {source}"))]
-    Interpolation { source: InterpolationError },
+    Interpolation {
+        source: InterpolationError,
+    },
+    TrajPhysics {
+        source: PhysicsError,
+    },
+    TrajGeneric {
+        err: String,
+    },
 }
 
 /// Smooth the RIC differences using an in-line median filter.

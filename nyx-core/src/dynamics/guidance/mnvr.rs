@@ -365,7 +365,7 @@ impl GuidanceLaw for Maneuver {
         match osc.mode() {
             GuidanceMode::Thrust => match self.frame {
                 LocalFrame::Inertial => Ok(self.vector(osc.epoch())),
-                _ => Ok(self.frame.dcm_to_inertial(osc.orbit).context({
+                _ => Ok(osc.orbit.dcm_to_inertial(self.frame).context({
                     GuidancePhysicsSnafu {
                         action: "computing RCN frame",
                     }

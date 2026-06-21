@@ -1,0 +1,221 @@
+import os
+
+from nyx_space import Spacecraft
+from nyx_space.anise import MetaAlmanac
+from nyx_space.anise.astro import Orbit
+from nyx_space.anise.constants import CelestialObjects, Frames
+from nyx_space.mission_design import (
+    AccelModels,
+    Dynamics,
+    GravityFieldConfig,
+    PointMasses,
+    Propagator,
+)
+from nyx_space.orbit_determination import (
+    CN0,
+    CarrierFreq,
+    GroundStation,
+    GroundTrackingArcSim,
+    Handoff,
+    Location,
+    MeasurementType,
+    Scheduler,
+    StochasticNoise,
+    TrackingDataArc,
+    TrkConfig,
+)
+from nyx_space.time import Duration, Epoch, Unit
+
+
+def test_ground_station():
+    """
+    Demonstrate ground station config from a script, saving to a Yaml, and reloading
+    """
+    # Location requires latitude (deg), longitude (deg), and height above the geoid strictly in kilometers.
+    # The station must be anchored to a planetary body frame (e.g., Earth-fixed).
+    gs = GroundStation(
+        "Paris, FR",
+        Location(2.3522, 48.8566, 0.4, Frames.IAU_EARTH_FRAME.to_frameuid(), [], True),
+        {
+            MeasurementType.Range: StochasticNoise(),
+            MeasurementType.Doppler: StochasticNoise(),
+            MeasurementType.Elevation: StochasticNoise(),
+            MeasurementType.Azimuth: StochasticNoise(),
+        },
+    )
+
+    # VERIFICATION: Ensure lossless round-trip serialization.
+    # This guarantees that complex network definitions can be stored in version
+    # control (YAML) and loaded without mutating floating-point data.
+    as_yaml = gs.to_yaml()
+    gs_reloaded = GroundStation.from_yaml(as_yaml)
+    assert str(gs) == str(gs_reloaded)
+    assert gs == gs_reloaded
+    print(gs)
+    print(repr(gs))
+
+
+def test_howto_simulate_tracking_data():
+    """
+    Goal: Propagate a high-fidelity orbit and simulate synthetic radiometric
+    tracking data from a ground station network.
+    """
+    almanac = MetaAlmanac("../data/02_config/ci_almanac.dhall").process()
+    eme2k = almanac.frame_info(Frames.EME2000)
+
+    # Step 1: Build a reference trajectory
+    # Define a low-Earth orbit using Cartesian state vectors (kilometers and kilometers per second).
+    orbit = Orbit(
+        5442.1625926801835,
+        -4068.9498468206248,
+        -13.456851447751518,
+        2.8581975428173836,
+        3.8097859312745794,
+        6.002126693122689,
+        Epoch("2025-08-25 11:55:44 UTC"),
+        eme2k,
+    )
+    spacecraft = Spacecraft(orbit)
+
+    # The gravity field must be defined in an Earth-fixed frame so the
+    # spherical harmonics rotate correctly beneath the inertial orbit.
+    accel_models = AccelModels(
+        point_masses=PointMasses(
+            celestial_objects=[CelestialObjects.MOON, CelestialObjects.SUN]
+        ),
+        gravity_field=GravityFieldConfig(
+            degree=10,
+            order=10,
+            filepath="../data/01_planetary/EGM2008_to2190_TideFree.gz",
+            frame=Frames.IAU_EARTH_FRAME.to_frameuid(),
+        ),
+    )
+
+    # Propagate to generate the ground-truth trajectory.
+    dynamics = Dynamics(accel_models)
+    propagator = Propagator(dynamics, almanac)
+
+    traj = propagator.for_duration(spacecraft, Unit.Day * 1, trajectory=True).trajectory
+
+    # Step 2: Configure Stochastic Measurement Noise
+    # We define white noise and bias characteristics for each measurement type.
+    # NOTE only Nyx premium can estimate biases.
+
+    stochastic_noises = {
+        # Nyx provides defaults, with names: range, doppler, angles
+        MeasurementType.Range: StochasticNoise(name="Range"),
+        # Range and Doppler noise can be physically derived from carrier frequency and Carrier-to-Noise density.
+        MeasurementType.Doppler: StochasticNoise.from_hardware_doppler_km_s(
+            1e-15, Duration("1 min"), CarrierFreq.XBand(), CN0.Strong()
+        ),
+        # The defaults are usually good
+        MeasurementType.Elevation: StochasticNoise(name="Angles"),
+        MeasurementType.Azimuth: StochasticNoise(name="Angles"),
+    }
+
+    # VERIFICATION: Validate the noise distribution independently.
+    # Simulating the noise profile via Monte Carlo before simulate measurements.
+    range_sim_samples = stochastic_noises[MeasurementType.Range].simulate(
+        "range_noise_simlation.pq", 1000, "km"
+    )
+
+    assert len(range_sim_samples) == 1_082_000
+    last_sample = range_sim_samples[-1]
+    print(last_sample)
+    assert last_sample.run == 999
+    assert last_sample.dt_s == 86400.0
+
+    # Step 3: Build the ground station network
+    gs0 = GroundStation(
+        name="Paris, FR",
+        location=Location(
+            latitude_deg=48.8566,
+            longitude_deg=2.3522,
+            height_km=0.4,
+            frame=Frames.IAU_EARTH_FRAME.to_frameuid(),
+            terrain_mask=[],
+            terrain_mask_ignored=True,
+        ),
+        stochastic_noises=stochastic_noises,
+    )
+
+    gs1 = GroundStation(
+        "Denver, CO",
+        Location(
+            39.7420, -104.9915, 1.8, Frames.IAU_EARTH_FRAME.to_frameuid(), [], True
+        ),
+        stochastic_noises,
+    )
+
+    # Step 4: Define Tracking Schedules
+    # Schedulers dictate how conflicts are resolved when multiple stations have visibility.
+    # 'Eager' will hand off as soon as a new station acquires the signal.
+    # 'Greedy' will hold the track until loss of signal before allowing a handoff.
+    configs = {
+        "Paris, FR": TrkConfig(Scheduler(Handoff.Eager)),
+        "Denver, CO": TrkConfig(Scheduler(Handoff.Greedy)),
+    }
+
+    trk_sim = GroundTrackingArcSim({"Paris, FR": gs0, "Denver, CO": gs1}, traj, configs)
+
+    # Step 5: Build the strands if any of the ground stations are configured as a Scheduler.
+    trk_sim.build_schedule(almanac)
+
+    # Step 6: Generate synthetic measurements
+    trk_arc = trk_sim.generate_measurements(almanac)
+    assert not trk_arc.is_empty()
+
+    # Step 6: Verify the Generated Tracking Arc
+    # VERIFICATION: Ensure the arc is populated with the expected temporal constraints and volume.
+    assert not trk_arc.is_empty()
+    assert trk_arc.len() == 72
+    # The arc duration is measured from the timestamp of the first to the last measurement.
+    assert trk_arc.duration() > Unit.Hour * 18
+
+    # VERIFICATION: Ensure the scheduler used the full network topology.
+    expected_trackers = {"Denver, CO", "Paris, FR"}
+    assert set(trk_arc.unique_aliases()) == expected_trackers
+
+    # VERIFICATION: Ensure all defined measurement variants were simulated.
+    expected_types = {
+        MeasurementType.Range,
+        MeasurementType.Azimuth,
+        MeasurementType.Doppler,
+        MeasurementType.Elevation,
+    }
+    assert set(trk_arc.unique_types()) == expected_types
+
+    # VERIFICATION: Test filtering mechanisms critical for orbit determination ingestion.
+    denver_arc = trk_arc.filter_by_tracker("Denver, CO")
+    assert not denver_arc.is_empty()
+    assert denver_arc.len() < trk_arc.len()
+
+    range_arc = trk_arc.filter_by_measurement_type(MeasurementType.Range)
+    assert not range_arc.is_empty()
+
+    # VERIFICATION: Validate data export standards.
+    # The generated measurements must comply with the CCSDS TDM standard for interoperability.
+    tdm_filepath = "test_output.tdm"
+    # Define aliases to map our names to those used by another software.
+    aliases = {"Denver, CO": "RL CO"}
+    trk_arc.write_ccsds_tdm("MySpacecraft", aliases, tdm_filepath)
+    assert os.path.exists(tdm_filepath)
+
+    # We can rename the ground stations when loading the TDM file
+    reverse_aliases = {"RL CO": "Denver, CO"}
+    trk_reloaded = TrackingDataArc.from_ccsds_tdm(tdm_filepath, reverse_aliases)
+
+    assert not trk_reloaded.is_empty()
+    assert trk_reloaded.len() == 72
+    # The arc duration is measured from the timestamp of the first to the last measurement.
+    assert trk_reloaded.duration() > Unit.Hour * 18
+    # Check that the reverse aliases were applied
+    assert set(trk_reloaded.unique_aliases()) == expected_trackers
+
+
+if __name__ == "__main__":
+    import logging
+
+    logging.basicConfig(level=logging.INFO)
+
+    test_howto_simulate_tracking_data()

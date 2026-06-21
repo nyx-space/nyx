@@ -22,21 +22,21 @@ use crate::io::{ConfigError, duration_from_str, duration_to_str, epoch_from_str,
 use der::{Decode, Encode, Reader};
 use hifitime::TimeUnits;
 use hifitime::{Duration, Epoch, TimeScale};
-
-#[cfg(feature = "python")]
-use pyo3::{exceptions::PyValueError, prelude::*, types::PyBytes, types::PyType};
-
 use serde::Deserialize;
 use serde::Serialize;
+use std::fmt;
 use std::fmt::Debug;
 use std::str::FromStr;
 use typed_builder::TypedBuilder;
 
+#[cfg(feature = "python")]
+use pyo3::{exceptions::PyValueError, prelude::*, types::PyBytes, types::PyType};
+
 /// Stores a tracking configuration, there is one per tracking data simulator (e.g. one for ground station #1 and another for #2).
 /// By default, the tracking configuration is continuous and the tracking arc is from the beginning of the simulation to the end.
-/// In Python, any value that is set to None at initialization will use the default values.
+/// In Python, any value that is set to None at initialization will use the default values: no scheduler, no strands, sampling at 1 min.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypedBuilder)]
-#[cfg_attr(feature = "python", pyclass(from_py_object))]
+#[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 #[builder(doc)]
 pub struct TrkConfig {
     /// Set to automatically build a tracking schedule based on some criteria
@@ -124,36 +124,6 @@ impl TrkConfig {
             sampling,
             strands,
         }
-    }
-
-    #[getter]
-    fn get_scheduler(&self) -> Option<Scheduler> {
-        self.scheduler
-    }
-
-    #[setter]
-    fn set_scheduler(&mut self, scheduler: Option<Scheduler>) {
-        self.scheduler = scheduler;
-    }
-
-    #[getter]
-    fn get_sampling(&self) -> Duration {
-        self.sampling
-    }
-
-    #[setter]
-    fn set_sampling(&mut self, sampling: Duration) {
-        self.sampling = sampling;
-    }
-
-    #[getter]
-    fn get_strands(&self) -> Option<Vec<Strand>> {
-        self.strands.clone()
-    }
-
-    #[setter]
-    fn set_strands(&mut self, strands: Option<Vec<Strand>>) {
-        self.strands = strands;
     }
 
     fn __repr__(&self) -> String {
@@ -250,6 +220,31 @@ impl TrkConfig {
     }
 }
 
+impl fmt::Display for TrkConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Sampling rate: {}", self.sampling)?;
+
+        match (&self.scheduler, &self.strands) {
+            (Some(sched), None) => {
+                write!(f, " | Mode: Auto-scheduler active ({:?})", sched)
+            }
+            (None, Some(strands)) => {
+                write!(f, " | Mode: Executing {} explicit strand(s)", strands.len())
+            }
+            (Some(sched), Some(strands)) => write!(
+                f,
+                " | CONFIG ERROR: Conflicting state (Scheduler {:?} AND {} strands)",
+                sched,
+                strands.len()
+            ),
+            (None, None) => write!(
+                f,
+                " | CONFIG ERROR: Invalid state (Neither scheduler nor strands defined)"
+            ),
+        }
+    }
+}
+
 impl Default for TrkConfig {
     /// The default configuration is to generate a measurement every minute (continuously) while the vehicle is visible
     fn default() -> Self {
@@ -264,12 +259,24 @@ impl Default for TrkConfig {
 
 /// Stores a tracking strand with a start and end epoch
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
-#[cfg_attr(feature = "python", pyclass(from_py_object))]
+#[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct Strand {
     #[serde(serialize_with = "epoch_to_str", deserialize_with = "epoch_from_str")]
     pub start: Epoch,
     #[serde(serialize_with = "epoch_to_str", deserialize_with = "epoch_from_str")]
     pub end: Epoch,
+}
+
+impl fmt::Display for Strand {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "[{}, {}] (Δt: {})",
+            self.start,
+            self.end,
+            self.duration()
+        )
+    }
 }
 
 impl<'a> Decode<'a> for Strand {
@@ -328,26 +335,6 @@ impl Strand {
     #[new]
     fn py_new(start: Epoch, end: Epoch) -> Self {
         Self::new(start, end)
-    }
-
-    #[getter]
-    fn get_start(&self) -> Epoch {
-        self.start
-    }
-
-    #[setter]
-    fn set_start(&mut self, start: Epoch) {
-        self.start = start;
-    }
-
-    #[getter]
-    fn get_end(&self) -> Epoch {
-        self.end
-    }
-
-    #[setter]
-    fn set_end(&mut self, end: Epoch) {
-        self.end = end;
     }
 
     fn __repr__(&self) -> String {

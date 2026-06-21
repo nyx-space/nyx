@@ -1,7 +1,14 @@
+use super::{AccelModels, Dynamics, ForceModels, PropagatorConfig, SpacecraftSequence, Thruster};
 #[cfg(feature = "python")]
+use crate::dynamics::{Drag, SolarPressure};
+use crate::propagators::{IntegratorMethod, IntegratorOptions};
+use crate::{dynamics::PointMasses, io::gravity::GravityFieldConfig};
+use pyo3::exceptions::PyException;
 use {
-    super::SpacecraftSequence, crate::Spacecraft, anise::almanac::Almanac, pyo3::prelude::*,
-    std::sync::Arc,
+    crate::Spacecraft,
+    anise::almanac::Almanac,
+    pyo3::prelude::*,
+    std::{collections::HashMap, sync::Arc},
 };
 
 #[cfg(feature = "python")]
@@ -52,5 +59,108 @@ impl SpacecraftSequence {
             .map(|traj| (traj.name, traj.states))
             .collect();
         Ok(result)
+    }
+
+    #[getter]
+    fn get_thruster_sets(&self) -> HashMap<String, Thruster> {
+        self.thruster_sets.clone()
+    }
+
+    fn thruster_set_insert(&mut self, name: String, thruster: Thruster) {
+        self.thruster_sets.insert(name, thruster);
+    }
+    fn thruster_set_remove(&mut self, name: String) -> PyResult<()> {
+        if self.thruster_sets.remove(&name).is_none() {
+            Err(PyException::new_err(format!("{name} not in thruster set")))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+#[cfg(feature = "python")]
+#[cfg_attr(feature = "python", pymethods)]
+impl AccelModels {
+    #[pyo3(signature=(point_masses=None, gravity_field=None))]
+    #[new]
+    fn py_new(
+        point_masses: Option<PointMasses>,
+        gravity_field: Option<GravityFieldConfig>,
+    ) -> Self {
+        Self {
+            point_masses,
+            gravity_field,
+        }
+    }
+
+    fn __str__(&self) -> String {
+        format!("{self:?}")
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self:?} @ {self:p}")
+    }
+}
+
+#[cfg(feature = "python")]
+#[cfg_attr(feature = "python", pymethods)]
+impl ForceModels {
+    #[pyo3(signature=(solar_pressure=None, drag=None))]
+    #[new]
+    fn py_new(solar_pressure: Option<SolarPressure>, drag: Option<Drag>) -> Self {
+        Self {
+            solar_pressure,
+            drag,
+        }
+    }
+
+    fn __str__(&self) -> String {
+        format!("{self:?}")
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self:?} @ {self:p}")
+    }
+}
+
+#[cfg(feature = "python")]
+#[cfg_attr(feature = "python", pymethods)]
+impl Dynamics {
+    #[pyo3(signature=(accel_models=AccelModels::default(), force_models=ForceModels::default()))]
+    #[new]
+    fn py_new(accel_models: AccelModels, force_models: ForceModels) -> Self {
+        Self {
+            accel_models,
+            force_models,
+        }
+    }
+
+    fn __str__(&self) -> String {
+        format!("{self:?}")
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self:?} @ {self:p}")
+    }
+}
+
+#[cfg(feature = "python")]
+#[cfg_attr(feature = "python", pymethods)]
+impl PropagatorConfig {
+    #[new]
+    fn py_new(dynamics: Dynamics, method: IntegratorMethod, options: IntegratorOptions) -> Self {
+        Self {
+            dynamics,
+            method,
+            options,
+        }
+    }
+
+    fn __str__(&self) -> String {
+        format!("{self:?}")
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self:?} @ {self:p}")
     }
 }

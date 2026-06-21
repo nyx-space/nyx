@@ -43,8 +43,10 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 #[cfg(feature = "python")]
 use pyo3::types::{PyBytes, PyType};
+#[cfg(feature = "python")]
+mod python;
 
-/// GroundStation defines a two-way ranging and doppler station.
+/// GroundStation defines a one-way or two-way ranging and doppler station. Set the integration time for two-way.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub struct GroundStation {
@@ -400,7 +402,7 @@ impl Encode for GroundStation {
 impl fmt::Display for GroundStation {
     // Prints the Keplerian orbital elements with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} ({})", self.name, self.location,)
+        write!(f, "{} ({})", self.name, self.location)
     }
 }
 
