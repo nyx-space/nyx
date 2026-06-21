@@ -26,6 +26,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+            lfs: true
       - name: Setup Python on ${{ matrix.target }}
         uses: actions/setup-python@v6
         with:
