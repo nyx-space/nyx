@@ -21,7 +21,7 @@ use arrow::array::{ArrayRef, Float64Array, UInt32Array};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 use der::{Decode, Encode, Reader};
-use hifitime::{Duration, Epoch, TimeSeries, TimeUnits};
+use hifitime::{Epoch, TimeSeries, TimeUnits};
 use parquet::arrow::ArrowWriter;
 
 use rand::rngs::SysRng;
@@ -39,6 +39,8 @@ pub mod gauss_markov;
 pub mod link_specific;
 pub mod white;
 
+#[cfg(feature = "python")]
+use hifitime::Duration;
 #[cfg(feature = "python")]
 use pyo3::exceptions::PyValueError;
 #[cfg(feature = "python")]
