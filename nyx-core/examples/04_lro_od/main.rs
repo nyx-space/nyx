@@ -13,21 +13,21 @@ use anise::{
 };
 use hifitime::{Epoch, TimeSeries, TimeUnits, Unit};
 use nyx::{
-    Orbit, Spacecraft, State,
     cosmic::{Aberration, Frame, Mass, MetaAlmanac, SRPData},
     dynamics::{
-        GravityField, OrbitalDynamics, SolarPressure, SpacecraftDynamics, guidance::LocalFrame,
+        guidance::LocalFrame, GravityField, OrbitalDynamics, SolarPressure, SpacecraftDynamics,
     },
     io::{ConfigRepr, ExportCfg},
     md::prelude::{GravityFieldData, Traj},
     od::{
-        GroundStation, SpacecraftKalmanOD,
         msr::MeasurementType,
         prelude::{KalmanVariant, TrackingArcSim, TrkConfig},
         process::{Estimate, NavSolution, ResidRejectCrit, SpacecraftUncertainty},
         snc::ProcessNoise3D,
+        GroundStation, SpacecraftKalmanOD,
     },
     propagators::Propagator,
+    Orbit, Spacecraft, State,
 };
 
 use std::{collections::BTreeMap, error::Error, path::PathBuf, str::FromStr, sync::Arc};
@@ -41,6 +41,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Dynamics models require planetary constants and ephemerides to be defined.
     // Let's start by grabbing those by using ANISE's MetaAlmanac.
+
+    let output_folder: PathBuf = [env!("CARGO_MANIFEST_DIR"), "../data", "04_output"]
+        .iter()
+        .collect();
 
     let data_folder: PathBuf = [env!("CARGO_MANIFEST_DIR"), "examples", "04_lro_od"]
         .iter()
@@ -177,7 +181,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     traj_as_sim.ric_diff_to_parquet(
         &traj_as_flown,
-        "./data/04_output/04_lro_sim_truth_error.parquet",
+        output_folder.join("./04_lro_sim_truth_error.parquet"),
         ExportCfg::default(),
     )?;
 
@@ -243,7 +247,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     trk.build_schedule(almanac.clone())?;
     let arc = trk.generate_measurements(almanac.clone())?;
     // Save the simulated tracking data
-    arc.to_parquet_simple("./data/04_output/04_lro_simulated_tracking.parquet")?;
+    arc.to_parquet_simple(output_folder.join("04_lro_simulated_tracking.parquet"))?;
 
     // We'll note that in our case, we have continuous coverage of LRO when the vehicle is not behind the Moon.
     println!("{arc}");
@@ -316,7 +320,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Ratios normal? {}", od_sol.is_normal(None).unwrap());
 
     od_sol.to_parquet(
-        "./data/04_output/04_lro_od_results.parquet",
+        output_folder.join("04_lro_od_results.parquet"),
         ExportCfg::default(),
     )?;
 
@@ -336,10 +340,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     // Export as BSP!
     ephem
-        .write_spice_bsp(-85, "./data/04_output/04_lro_rebuilt.bsp", None)
+        .write_spice_bsp(
+            -85,
+            output_folder.join("04_lro_rebuilt.bsp").to_str().unwrap(),
+            None,
+        )
         .expect("could not built BSP");
     let new_almanac = Almanac::default()
-        .load("./data/04_output/04_lro_rebuilt.bsp")
+        .load(output_folder.join("04_lro_rebuilt.bsp").to_str().unwrap())
         .unwrap();
     new_almanac.describe(None, None, None, None, None, None, None, None);
     let (spk_start, spk_end) = new_almanac.spk_domain(-85).unwrap();
@@ -354,7 +362,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Build the RIC difference.
     od_trajectory.ric_diff_to_parquet(
         &traj_as_flown,
-        "./data/04_output/04_lro_od_truth_error.parquet",
+        output_folder.join("04_lro_od_truth_error.parquet"),
         ExportCfg::default(),
     )?;
 

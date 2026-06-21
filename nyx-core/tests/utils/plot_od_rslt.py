@@ -30,6 +30,7 @@ def convert_units(df):
         df = df.with_columns(exprs).rename(rename_dict)
     return df
 
+
 def autocorr(x: np.ndarray, max_lag: int) -> np.ndarray:
     x = np.asarray(x, dtype=float)
     x = x[np.isfinite(x)]
@@ -45,10 +46,13 @@ def autocorr(x: np.ndarray, max_lag: int) -> np.ndarray:
 
     max_lag = min(max_lag, len(x) - 1)
 
-    return np.array([
-        np.dot(x[:-lag], x[lag:]) / denom if lag > 0 else 1.0
-        for lag in range(max_lag + 1)
-    ])
+    return np.array(
+        [
+            np.dot(x[:-lag], x[lag:]) / denom if lag > 0 else 1.0
+            for lag in range(max_lag + 1)
+        ]
+    )
+
 
 @click.command
 @click.option("-p", "--path", type=str)
@@ -260,7 +264,9 @@ def main(path: str, wstats: bool, error_ric: str):
         sample = df_accepted[whitened_resid].drop_nulls().to_numpy()
 
         # QQ data
-        (osm, osr), (slope, intercept, r) = stats.probplot(sample, dist="norm", fit=True)
+        (osm, osr), (slope, intercept, r) = stats.probplot(
+            sample, dist="norm", fit=True
+        )
 
         x_line = np.linspace(np.min(osm), np.max(osm), 200)
 
@@ -304,10 +310,8 @@ def main(path: str, wstats: bool, error_ric: str):
         )
 
         for tracker in df_accepted["Tracker"].unique().to_list():
-            tracker_df = (
-                df_accepted
-                .filter(pl.col("Tracker") == tracker)
-                .sort("Epoch (UTC)")
+            tracker_df = df_accepted.filter(pl.col("Tracker") == tracker).sort(
+                "Epoch (UTC)"
             )
 
             x = tracker_df[whitened_resid].drop_nulls().to_numpy()

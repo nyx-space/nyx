@@ -6,8 +6,15 @@ from plotly.subplots import make_subplots
 
 TEMPLATE = "seaborn"
 
+
 @click.command
-@click.option("-p", "--path", type=str, required=True, help="Path to the parquet file containing OD results")
+@click.option(
+    "-p",
+    "--path",
+    type=str,
+    required=True,
+    help="Path to the parquet file containing OD results",
+)
 def main(path: str):
     df = pl.read_parquet(path)
 
@@ -19,8 +26,14 @@ def main(path: str):
     cr_col = "cr" if "cr" in cols else None
     cd_col = "cd" if "cd" in cols else None
 
-    sigma_cr_col = next((col for col in cols if col.startswith("Sigma Cr") and "(unitless)" in col), None)
-    sigma_cd_col = next((col for col in cols if col.startswith("Sigma Cd") and "(unitless)" in col), None)
+    sigma_cr_col = next(
+        (col for col in cols if col.startswith("Sigma Cr") and "(unitless)" in col),
+        None,
+    )
+    sigma_cd_col = next(
+        (col for col in cols if col.startswith("Sigma Cd") and "(unitless)" in col),
+        None,
+    )
 
     plots_to_make = []
     if cr_col:
@@ -59,10 +72,16 @@ def main(path: str):
 
         # Add 3-sigma bounds if available
         if sigma_col:
-            df = df.with_columns([
-                (pl.col(val_col) + 3.0 * pl.col(sigma_col)).alias(f"{title} +3-Sigma"),
-                (pl.col(val_col) - 3.0 * pl.col(sigma_col)).alias(f"{title} -3-Sigma"),
-            ])
+            df = df.with_columns(
+                [
+                    (pl.col(val_col) + 3.0 * pl.col(sigma_col)).alias(
+                        f"{title} +3-Sigma"
+                    ),
+                    (pl.col(val_col) - 3.0 * pl.col(sigma_col)).alias(
+                        f"{title} -3-Sigma"
+                    ),
+                ]
+            )
             for bound in [f"{title} +3-Sigma", f"{title} -3-Sigma"]:
                 show_this_legend = not legend_added
                 fig.add_trace(
@@ -86,6 +105,7 @@ def main(path: str):
     fig.update_layout(title_text="Cr and Cd Estimates", template=TEMPLATE)
     fig.update_xaxes(matches="x")
     fig.show()
+
 
 if __name__ == "__main__":
     main()
