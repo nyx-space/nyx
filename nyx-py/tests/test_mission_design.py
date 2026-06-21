@@ -1,9 +1,9 @@
 import polars as pl
 
 from nyx_space import DragData, ExportCfg, Mass, Spacecraft, SRPData
-from nyx_space.anise import Aberration, MetaAlmanac
+from nyx_space.anise import MetaAlmanac
 from nyx_space.anise.analysis import Condition, Event, OrbitalElement, ScalarExpr
-from nyx_space.anise.astro import FrameUid, Orbit
+from nyx_space.anise.astro import Orbit
 from nyx_space.anise.constants import CelestialObjects, Frames
 from nyx_space.mission_design import (
     AccelModels,
@@ -16,7 +16,6 @@ from nyx_space.mission_design import (
     IntegratorOptions,
     PointMasses,
     Propagator,
-    PropagatorConfig,
     SolarPressure,
 )
 from nyx_space.monte_carlo import MvnSpacecraft, StateDispersion, StateParameter
