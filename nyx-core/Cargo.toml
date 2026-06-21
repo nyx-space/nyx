@@ -114,7 +114,7 @@ doc-scrape-examples = true
 [[example]]
 name = "03_geo_raise_optim"
 path = "examples/03_geo_analysis/raise_optim.rs"
-doc-scrape-examples = true
+doc-scrape-examples = false  # cargo docs fails to build radiate
 
 [[example]]
 name = "04_lro_od"

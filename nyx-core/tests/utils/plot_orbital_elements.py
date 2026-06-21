@@ -6,9 +6,7 @@ from plotly.subplots import make_subplots
 
 @click.command
 @click.option("-p", "--path", type=str)
-def plot_orbit_elements(
-    path:str
-):
+def plot_orbit_elements(path: str):
     """
     Plots the orbital elements: SMA, ECC, INC, RAAN, AOP, TA, True Longitude, AOL
     """
