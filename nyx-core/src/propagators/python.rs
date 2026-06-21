@@ -13,10 +13,10 @@ impl IntegratorOptions {
     ) -> Self {
         let mut opts = Self::default();
         if let Some(min_step) = min_step {
-            opts.min_step = min_step;
+            opts.set_min_step(min_step);
         }
         if let Some(max_step) = max_step {
-            opts.max_step = max_step;
+            opts.set_max_step(max_step);
         }
         if let Some(tolerance) = tolerance {
             opts.tolerance = tolerance;
