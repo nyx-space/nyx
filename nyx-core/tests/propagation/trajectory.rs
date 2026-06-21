@@ -103,7 +103,7 @@ fn traj_ephem_forward(almanac: Arc<Almanac>) {
     let eval_state = ephem.at(start_dt).unwrap();
 
     let mut max_pos_err = (eval_state.orbit.radius_km - start_state.radius_km).norm();
-    let mut max_vel_err = (eval_state.orbit.velocity_km_s - start_state.orbit.velocity_km_s).norm();
+    let mut max_vel_err = (eval_state.orbit.velocity_km_s - start_state.velocity_km_s).norm();
 
     while let Ok(prop_state) = rx.recv() {
         let eval_state = ephem.at(prop_state.epoch()).unwrap();
@@ -358,7 +358,6 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
     let eval_state = traj.at(start_dt).unwrap();
 
     let mut max_pos_err = (eval_state.orbit.radius_km - start_state.orbit.radius_km).norm();
-    let mut max_vel_err = (eval_state.orbit.velocity_km_s - start_state.orbit.velocity_km_s).norm();
     let mut max_vel_err = (eval_state.orbit.velocity_km_s - start_state.orbit.velocity_km_s).norm();
     let mut max_prop_err = eval_state.mass.prop_mass_kg - start_state.mass.prop_mass_kg;
     let mut max_err = (eval_state.to_vector() - start_state.to_vector()).norm();
