@@ -42,6 +42,11 @@ use super::Stochastics;
 /// p_b(t) = exp((-2 / τ) * (t - t_0)) * p_b(t_0) + s(t - t_0)
 ///
 /// s(t - t_0) = ((q * τ) / 2) * (1 - exp((-2 / τ) * (t - t_0)))
+///
+/// ## JPL DESCANSO Deep Space Network (DSN) Defaults
+///
+/// - Range: 60 cm process noise over a 60 second average (tau, half life)
+/// - Doppler: 0.03 mm/s process noise over a 60 second average (tau, half life)
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct GaussMarkov {
@@ -217,6 +222,23 @@ impl<'a> Decode<'a> for GaussMarkov {
 }
 
 impl ConfigRepr for GaussMarkov {}
+
+#[cfg(feature = "python")]
+#[cfg_attr(feature = "python", pymethods)]
+impl GaussMarkov {
+    #[new]
+    fn py_new(tau: Duration, process_noise: f64) -> Result<Self, ConfigError> {
+        Self::new(tau, process_noise)
+    }
+
+    fn __str__(&self) -> String {
+        format!("{self}")
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self} @ {self:p}")
+    }
+}
 
 #[cfg(test)]
 mod ut_gm {

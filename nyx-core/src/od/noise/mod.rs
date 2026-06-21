@@ -21,25 +21,30 @@ use arrow::array::{ArrayRef, Float64Array, UInt32Array};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 use der::{Decode, Encode, Reader};
-use hifitime::{Epoch, TimeSeries, TimeUnits};
+use hifitime::{Duration, Epoch, TimeSeries, TimeUnits};
 use parquet::arrow::ArrowWriter;
+
 use rand::rngs::SysRng;
 use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg64Mcg;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
+use std::fmt::Display;
 use std::fs::File;
 use std::ops::{Mul, MulAssign};
 use std::path::Path;
 use std::sync::Arc;
 
 pub mod gauss_markov;
-#[cfg(feature = "premium")]
 pub mod link_specific;
 pub mod white;
 
 #[cfg(feature = "python")]
+use pyo3::exceptions::PyValueError;
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
+#[cfg(feature = "python")]
+use pyo3::types::PyType;
 
 pub use gauss_markov::GaussMarkov;
 pub use white::WhiteNoise;
@@ -132,24 +137,24 @@ impl StochasticNoise {
         sample
     }
 
-    /// Return the covariance of these stochastics at a given time.
-    pub fn covariance(&self, epoch: Epoch) -> f64 {
-        let mut variance = 0.0;
-        if let Some(wn) = &self.white_noise {
-            variance += wn.covariance(epoch);
-        }
-        if let Some(gm) = &self.bias {
-            variance += gm.covariance(epoch);
-        }
-        variance
-    }
-
-    /// Simulate the configured stochastic model and store the bias in a parquet file.
-    /// Python: call as `simulate(path, runs=25, unit=None)` where the path is the output Parquet file, runs is the number of runs, and unit is the unit of the bias, reflected only in the headers of the parquet file.
+    /// Executes a hardcoded 24-hour Monte Carlo simulation of the stochastic model, exporting the time history to a Parquet file.
     ///
-    /// The unit is only used in the headers of the parquet file.
+    /// # Warning: Hardcoded Time Series & Diagnostic Data Gaps
+    /// This method does *not* accept a user-defined tracking schedule or time series. It inherently evaluates the stochastic process
+    /// over a strict 24-hour period, beginning at the exact system clock moment of method execution, utilizing a 1-minute step size.
     ///
-    /// This will simulate the model with "runs" different seeds, sampling the process 500 times for a duration of 5 times the time constant.
+    /// Furthermore, users will observe exactly 1,082 samples per simulation run, rather than the 1,441 samples expected from a
+    /// continuous 24-hour 1-minute cadence. The simulation intentionally drops all epochs strictly greater than +6 hours and
+    /// strictly less than +12 hours from the start time. This hardcoded artifact is designed to demonstrate variance bounds
+    /// expansion in the absence of measurements (e.g., simulating a tracking dropout for a Gauss-Markov bias).
+    ///
+    /// # Algorithm
+    /// 1. Establish `start` as the system clock time at invocation.
+    /// 2. Construct an inclusive time series from `start` to `start + 24 hours` at 1-minute intervals.
+    /// 3. For each configured run, seed a PRNG (`Pcg64Mcg`) using system entropy.
+    /// 4. Evaluate the process covariance and sample the stochastic noise at each epoch.
+    /// 5. Discard all epochs inside the `(start + 6h, start + 12h)` open interval.
+    /// 6. Export the remaining 1,082 samples per run to an Apache Arrow RecordBatch and write to disk via Parquet.
     pub fn simulate<P: AsRef<Path>>(
         self,
         path: P,
@@ -241,6 +246,136 @@ impl StochasticNoise {
     }
 }
 
+#[cfg_attr(feature = "python", pymethods)]
+impl StochasticNoise {
+    #[cfg(feature = "python")]
+    #[pyo3(signature=(white_noise=None, bias=None, name=None))]
+    #[new]
+    fn py_new(
+        white_noise: Option<WhiteNoise>,
+        bias: Option<GaussMarkov>,
+        name: Option<String>,
+    ) -> PyResult<Self> {
+        if let Some(name) = name {
+            match name.to_ascii_lowercase().as_str() {
+                "range" => Ok(Self::default_range_km()),
+                "doppler" => Ok(Self::default_doppler_km_s()),
+                "angles" => Ok(Self::default_angle_deg()),
+                _ => Err(PyValueError::new_err(format!(
+                    "name must be `range`, `doppler`, or `angles` (received `{name}`)"
+                ))),
+            }
+        } else {
+            Ok(Self { white_noise, bias })
+        }
+    }
+
+    /// Return the covariance of these stochastics at a given time.
+    pub fn covariance(&self, epoch: Epoch) -> f64 {
+        let mut variance = 0.0;
+        if let Some(wn) = &self.white_noise {
+            variance += wn.covariance(epoch);
+        }
+        if let Some(gm) = &self.bias {
+            variance += gm.covariance(epoch);
+        }
+        variance
+    }
+
+    /// Executes a hardcoded 24-hour Monte Carlo simulation of the stochastic model, exporting the time history to a Parquet file.
+    ///
+    /// # Warning: Hardcoded Time Series & Diagnostic Data Gaps
+    /// This method does *not* accept a user-defined tracking schedule or time series. It inherently evaluates the stochastic process
+    /// over a strict 24-hour period, beginning at the exact system clock moment of method execution, utilizing a 1-minute step size.
+    ///
+    /// Furthermore, users will observe exactly 1,082 samples per simulation run, rather than the 1,441 samples expected from a
+    /// continuous 24-hour 1-minute cadence. The simulation intentionally drops all epochs strictly greater than +6 hours and
+    /// strictly less than +12 hours from the start time. This hardcoded artifact is designed to demonstrate variance bounds
+    /// expansion in the absence of measurements (e.g., simulating a tracking dropout for a Gauss-Markov bias).
+    ///
+    /// # Algorithm
+    /// 1. Establish `start` as the system clock time at invocation.
+    /// 2. Construct an inclusive time series from `start` to `start + 24 hours` at 1-minute intervals.
+    /// 3. For each configured run, seed a PRNG (`Pcg64Mcg`) using system entropy.
+    /// 4. Evaluate the process covariance and sample the stochastic noise at each epoch.
+    /// 5. Discard all epochs inside the `(start + 6h, start + 12h)` open interval.
+    /// 6. Export the remaining 1,082 samples per run to an Apache Arrow RecordBatch and write to disk via Parquet.
+    ///
+    /// :param path: The filesystem path for the output Parquet file.
+    /// :type path: str
+    /// :param runs: The number of Monte Carlo runs. Defaults to 25 if not provided.
+    /// :type runs: int | None
+    /// :param unit: An optional string appended to the Parquet column headers for plotting clarity.
+    /// :type unit: str | None
+    /// :rtype: list[StochasticState]
+    /// :raises Exception: If the underlying Apache Arrow RecordBatch fails to allocate or write to the specified filesystem path.
+    #[cfg(feature = "python")]
+    #[pyo3(name = "simulate")]
+    fn py_simulate(
+        &self,
+        path: &str,
+        runs: Option<u32>,
+        unit: Option<String>,
+    ) -> PyResult<Vec<StochasticState>> {
+        self.simulate(path, runs, unit)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
+    /// Constructs a high precision zero-mean range noise model (accounting for clock error and thermal error) from
+    /// the Allan deviation of the clock, integration time, chip rate (depends on the ranging code), and
+    /// signal-power-to-noise-density ratio (S/N₀).
+    ///
+    /// NOTE: The Allan Deviation should be provided given the integration time. For example, if the integration time
+    /// is one second, the Allan Deviation should be the deviation over one second.
+    ///
+    /// IMPORTANT: These do NOT include atmospheric noises, which add up to ~10 cm one-sigma.
+    #[cfg(feature = "python")]
+    #[pyo3(name = "from_hardware_range_km")]
+    #[classmethod]
+    fn py_from_hardware_range_km(
+        _cls: &Bound<'_, PyType>,
+
+        allan_deviation: f64,
+        integration_time: Duration,
+        chip_rate: link_specific::ChipRate,
+        s_n0: link_specific::SN0,
+    ) -> Self {
+        Self::from_hardware_range_km(allan_deviation, integration_time, chip_rate, s_n0)
+    }
+
+    #[cfg(feature = "python")]
+    #[pyo3(name = "from_hardware_doppler_km_s")]
+    #[classmethod]
+    fn py_from_hardware_doppler_km_s(
+        _cls: &Bound<'_, PyType>,
+        allan_deviation: f64,
+        integration_time: Duration,
+        carrier: link_specific::CarrierFreq,
+        c_n0: link_specific::CN0,
+    ) -> Self {
+        Self::from_hardware_doppler_km_s(allan_deviation, integration_time, carrier, c_n0)
+    }
+
+    fn __str__(&self) -> String {
+        format!("{self}")
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self} @ {self:p}")
+    }
+}
+
+impl Display for StochasticNoise {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match (self.white_noise, self.bias) {
+            (Some(wn), None) => write!(f, "Stochastics with {wn:?}"),
+            (None, Some(bias)) => write!(f, "Stochastics with bias {bias}"),
+            (None, None) => write!(f, "Noiseless stochastics"),
+            (Some(wn), Some(bias)) => write!(f, "Stochastics with {wn:?} and bias {bias}"),
+        }
+    }
+}
+
 impl Mul<f64> for StochasticNoise {
     type Output = Self;
 
@@ -297,11 +432,24 @@ impl<'a> Decode<'a> for StochasticNoise {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+#[cfg_attr(feature = "python", pyclass(from_py_object, get_all))]
 pub struct StochasticState {
     pub run: u32,
     pub dt_s: f64,
     pub sample: f64,
     pub variance: f64,
+}
+
+#[cfg(feature = "python")]
+#[cfg_attr(feature = "python", pymethods)]
+impl StochasticState {
+    fn __str__(&self) -> String {
+        format!("{self:?}")
+    }
+    fn __repr__(&self) -> String {
+        format!("{self:?} @ {self:p}")
+    }
 }
 
 #[cfg(test)]

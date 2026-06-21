@@ -11,24 +11,28 @@ use std::collections::HashMap;
 #[pymethods]
 impl GroundStation {
     #[new]
-    #[pyo3(signature = (name, location, measurement_types, integration_time=None, light_time_correction=false, timestamp_noise_s=None, stochastic_noises=None))]
+    #[pyo3(signature = (name, location, stochastic_noises, integration_time=None, light_time_correction=false, timestamp_noise_s=None))]
     fn py_new(
         name: String,
         location: Location,
-        measurement_types: Vec<MeasurementType>,
+        stochastic_noises: HashMap<MeasurementType, StochasticNoise>,
         integration_time: Option<Duration>,
         light_time_correction: Option<bool>,
         timestamp_noise_s: Option<StochasticNoise>,
-        stochastic_noises: Option<HashMap<MeasurementType, StochasticNoise>>,
     ) -> Self {
         Self {
             name,
             location,
-            measurement_types: IndexSet::from_iter(measurement_types),
+            measurement_types: IndexSet::from_iter(
+                stochastic_noises
+                    .keys()
+                    .copied()
+                    .collect::<Vec<MeasurementType>>(),
+            ),
             integration_time,
             light_time_correction: light_time_correction.unwrap_or(false),
             timestamp_noise_s,
-            stochastic_noises: stochastic_noises.map(|sn| sn.into_iter().collect()),
+            stochastic_noises: Some(stochastic_noises.into_iter().collect()),
         }
     }
 

@@ -1,26 +1,26 @@
+import polars as pl
+
 from nyx_space import DragData, ExportCfg, Mass, Spacecraft, SRPData
 from nyx_space.anise import Aberration, MetaAlmanac
 from nyx_space.anise.analysis import Condition, Event, OrbitalElement, ScalarExpr
 from nyx_space.anise.astro import FrameUid, Orbit
 from nyx_space.anise.constants import CelestialObjects, Frames
 from nyx_space.mission_design import (
-    AtmDensity,
     AccelModels,
+    AtmDensity,
+    Drag,
     Dynamics,
     ForceModels,
-    SolarPressure,
-    Drag,
     GravityFieldConfig,
     IntegratorMethod,
     IntegratorOptions,
     PointMasses,
-    PropagatorConfig,
     Propagator,
+    PropagatorConfig,
+    SolarPressure,
 )
 from nyx_space.monte_carlo import MvnSpacecraft, StateDispersion, StateParameter
 from nyx_space.time import Duration, Epoch, Unit
-
-import polars as pl
 
 
 def test_howto_propagate_with_perturbations():
@@ -337,6 +337,7 @@ if __name__ == "__main__":
     import logging
 
     logging.basicConfig(level=logging.INFO)
+
     test_howto_propagate_with_perturbations()
     test_howto_execute_simple_monte_carlo()
     test_howto_configure_spherical_harmonics()

@@ -250,7 +250,7 @@ impl TrackingDataArc {
     /// This is inspired by JPL MONTE's long arc setup to ensure BLSE convergence on manageable chunks.
     pub fn chunk(&self, max_duration: Duration) -> Vec<TrackingDataArc> {
         let mut chunks = Vec::new();
-        if self.is_empty() {
+        if self.is_empty() || max_duration <= Duration::ZERO {
             return chunks;
         }
 

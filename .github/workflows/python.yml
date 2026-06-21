@@ -70,7 +70,7 @@ jobs:
           set -e
           pip debug --verbose
           pip install nyx_space --find-links nyx-py/dist --force-reinstall
-          pip install pytest numpy
+          pip install -r nyx-py/tests/requirements.txt
           pytest
 
   windows:

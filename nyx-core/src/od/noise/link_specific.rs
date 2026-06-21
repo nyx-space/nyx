@@ -22,17 +22,28 @@ use hifitime::Duration;
 use serde::{Deserialize, Serialize};
 use std::f64::consts::TAU;
 
-/// Signal power to noise density for stochastic modeling, typical values.
-/// IMPORTANT: The S/N0 will always be lower or equal to the Carrier Power to noise density (C/N0)
-#[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
+/// Signal power to noise density (S/N0) for stochastic modeling of ranging observables.
+///
+/// IMPORTANT: S/N0 governs the thermal noise of delay-locked loops (DLL) tracking
+/// the modulated ranging code or tone. Deep space architectures rely on phase modulation
+/// with a residual carrier. The total transmitted power is allocated fractionally among the
+/// main carrier wave, the telemetry subcarrier, and the ranging code, dictated by the modulation index.
+///
+/// Because the power available for ranging is strictly a subset of the total carrier power,
+/// S/N0 <= C/N0. Applying C/N0 to ranging observables artificially suppresses the modeled thermal
+/// noise, yielding an overly optimistic covariance bound that ignores spacecraft power division.
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub enum SN0 {
     /// 65 dB-Hz
-    Strong,
+    Strong(),
     /// 50 dB-Hz
-    #[default]
-    Average,
+    Average(),
     /// 40 dB-Hz
-    Poor,
+    Poor(),
     /// Manual value provided in dB-Hz, converted to Hertz automatically
     ManualDbHz(f64),
 }
@@ -41,90 +52,116 @@ impl SN0 {
     /// Note that this returns the data in Hertz not dB-Hz
     pub(crate) fn value_hz(self) -> f64 {
         match self {
-            Self::Strong => 10.0_f64.powf(6.5),
-            Self::Average => 10.0_f64.powi(5),
-            Self::Poor => 10.0_f64.powi(4),
+            Self::Strong() => 10.0_f64.powf(6.5),
+            Self::Average() => 10.0_f64.powi(5),
+            Self::Poor() => 10.0_f64.powi(4),
             Self::ManualDbHz(value) => 10.0_f64.powf(value / 10.0),
         }
     }
 }
 
-/// Carrier power to noise density for stochastic modeling, typical values.
-/// IMPORTANT: The C/N0 will always be greater or equal to the Signal Power to noise density (C/N0) because the S/N0 for a ranging
-/// tone is the power dedicated to the ranging within the uplink (cf. "modulation index" in the DESCANSO monograph).
-#[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+impl Default for SN0 {
+    fn default() -> Self {
+        Self::Average()
+    }
+}
+
+/// Carrier power to noise density (C/N0) for stochastic modeling of Doppler observables.
+///
+/// IMPORTANT: C/N0 governs the thermal noise of phase-locked loops (PLL) tracking
+/// the primary unmodulated carrier wave to measure frequency shift (velocity). It represents
+/// the total power of the carrier signal over the noise spectral density.
+///
+/// Applying S/N0 to Doppler observables artificially inflates modeled velocity noise,
+/// as it fails to account for the unmodulated carrier power explicitly reserved for
+/// phase tracking.
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub enum CN0 {
     /// 70 dB-Hz
-    Strong,
+    Strong(),
     /// 55 dB-Hz
-    #[default]
-    Average,
+    Average(),
     /// 45 dB-Hz
-    Poor,
+    Poor(),
     /// Manual value provided in dB-Hz, converted to Hertz automatically
     ManualDbHz(f64),
+}
+
+impl Default for CN0 {
+    fn default() -> Self {
+        CN0::Average()
+    }
 }
 
 impl CN0 {
     /// Note that this returns the data in Hertz not dB-Hz
     pub(crate) fn value_hz(self) -> f64 {
         match self {
-            Self::Strong => 10.0_f64.powi(7),
-            Self::Average => 10.0_f64.powf(5.5),
-            Self::Poor => 10.0_f64.powf(4.5),
+            Self::Strong() => 10.0_f64.powi(7),
+            Self::Average() => 10.0_f64.powf(5.5),
+            Self::Poor() => 10.0_f64.powf(4.5),
             Self::ManualDbHz(value) => 10.0_f64.powf(value / 10.0),
         }
     }
 }
 
 /// Carrier frequency helper enum, typical values.
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub enum CarrierFreq {
     /// 2.2 GHz
-    SBand,
+    SBand(),
     /// 8.4 GHz
-    XBand,
+    XBand(),
     /// 32 Ghz
-    KaBand,
+    KaBand(),
     ManualHz(f64),
 }
 
 impl CarrierFreq {
     pub(crate) fn value_hz(self) -> f64 {
         match self {
-            Self::SBand => 2.2e9,
-            Self::XBand => 8.4e9,
-            Self::KaBand => 32e9,
+            Self::SBand() => 2.2e9,
+            Self::XBand() => 8.4e9,
+            Self::KaBand() => 32e9,
             Self::ManualHz(value) => value,
         }
     }
 }
 
 /// An enum helper with typical chip rates.
-#[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub enum ChipRate {
     /// 1 kchip/s -- basically emergency ranging
-    Lowest,
+    Lowest(),
     /// 100 kchip/s -- could be used for weaker links
-    Low,
+    Low(),
     /// 1 Mchip/s -- typical of xGEO/cislunar missions
-    #[default]
-    StandardT4B,
+    StandardT4B(),
     /// 10 Mchip/s -- high-precision scientific missions (e.g. gravity modeling)
-    High,
+    High(),
     /// 25 Mchip/s -- highly specialized missions
-    VeryHigh,
+    VeryHigh(),
     /// Provide your own chip rate depending on the ground station configuration
     ManualHz(f64),
+}
+
+impl Default for ChipRate {
+    fn default() -> Self {
+        Self::StandardT4B()
+    }
 }
 
 impl ChipRate {
     pub(crate) fn value_chip_s(self) -> f64 {
         match self {
-            Self::Lowest => 1e3,
-            Self::Low => 1e5,
-            Self::StandardT4B => 1e6,
-            Self::High => 1e7,
-            Self::VeryHigh => 2.5e7,
+            Self::Lowest() => 1e3,
+            Self::Low() => 1e5,
+            Self::StandardT4B() => 1e6,
+            Self::High() => 1e7,
+            Self::VeryHigh() => 2.5e7,
             Self::ManualHz(value) => value,
         }
     }
@@ -201,8 +238,8 @@ mod link_noise {
             let range_dsac_no_flicker = StochasticNoise::from_hardware_range_km(
                 allan_dev,
                 Unit::Minute * 1,
-                ChipRate::StandardT4B,
-                SN0::Average,
+                ChipRate::StandardT4B(),
+                SN0::Average(),
             );
 
             let range_sigma_m = range_dsac_no_flicker.white_noise.unwrap().sigma * 1e3;
@@ -214,8 +251,8 @@ mod link_noise {
             let doppler_dsac_no_flicker = StochasticNoise::from_hardware_doppler_km_s(
                 allan_dev,
                 Unit::Minute * 1,
-                CarrierFreq::XBand,
-                CN0::Average,
+                CarrierFreq::XBand(),
+                CN0::Average(),
             );
 
             let doppler_sigma_m_s = doppler_dsac_no_flicker.white_noise.unwrap().sigma * 1e3;

@@ -42,7 +42,7 @@ pub struct WhiteNoise {
 }
 
 impl WhiteNoise {
-    /// Initializes a new random walk stochastic noise model from the process noise and the integration time.
+    /// Initializes a new white noise stochastic noise model from the process noise and the integration time.
     /// This will compute the process noise per second automatically.
     pub fn new(process_noise: f64, integration_time: Duration) -> Result<Self, ConfigError> {
         if process_noise.is_sign_negative() {
@@ -82,6 +82,23 @@ impl WhiteNoise {
             sigma: SPEED_OF_LIGHT_KM_S / (2.0 * bandwidth_hz * (pr_n0).sqrt()),
             mean: 0.0,
         }
+    }
+}
+
+#[cfg(feature = "python")]
+#[cfg_attr(feature = "python", pymethods)]
+impl WhiteNoise {
+    #[new]
+    fn py_new(mean: f64, sigma: f64) -> Self {
+        Self { mean, sigma }
+    }
+
+    fn __str__(&self) -> String {
+        format!("{self:?}")
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self:?} @ {self:p}")
     }
 }
 

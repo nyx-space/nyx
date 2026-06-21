@@ -34,12 +34,30 @@ use pyo3::prelude::*;
 
 #[derive(Clone)]
 #[pyclass(from_py_object)]
-pub struct GroundSpacecratTrackingArcSim {
+pub struct GroundTrackingArcSim {
     inner: TrackingArcSim<Spacecraft, GroundStation>,
 }
 
 #[pymethods]
-impl GroundSpacecratTrackingArcSim {
+impl GroundTrackingArcSim {
+    /// Initializes a simulated tracking architecture for a spacecraft.
+    ///
+    /// Flight dynamics operations demand strict determinism for Monte Carlo covariance analysis.
+    /// When a seed is provided, the underlying pseudo-random number generator guarantees repeatable
+    /// measurement noise characteristics. Omission of the seed defaults to system entropy, mimicking
+    /// stochastic operational data streams.
+    ///
+    /// :param devices: Mapping of ground station identifiers to their respective physical definitions.
+    /// :type devices: dict[str, GroundStation]
+    /// :param trajectory: The deterministic ephemeris of the target spacecraft.
+    /// :type trajectory: PyTrajectory
+    /// :param configs: Tasking and measurement constraints per device (e.g., sample rates, cadences).
+    /// :type configs: dict[str, TrkConfig]
+    /// :param seed: Initialization seed for the underlying PRNG.
+    /// :type seed: int | None
+    /// :rtype: SpacecraftTrackingArcSim
+    /// :raises ConfigError: If initialization fails due to malformed configurations.
+    #[pyo3(signature=(devices, trajectory, configs, seed=None))]
     #[new]
     fn py_new(
         devices: BTreeMap<String, GroundStation>,
@@ -54,37 +72,38 @@ impl GroundSpacecratTrackingArcSim {
         Ok(Self { inner })
     }
 
-    /// Generates measurements for the tracking arc using the defined strands
+    /// Simulates operational tracking data across predefined tracking strands.
     ///
-    /// # Warning
-    /// This function will return an error if any of the devices defines as a scheduler.
-    /// You must create the schedule first using `build_schedule` first.
+    /// This function strictly demands that a schedule already exists (stored in the `config` field).
+    /// If a device is configured as a scheduler but lacks pre-computed
+    /// strands, this function will raise an error rather than implicitly hallucinating a tracking
+    /// pass. Call `generate_schedule` to build a schedule first.
+    /// For each tracking device, the trajectory is sampled at the specific hardware rate,
+    /// synthesizing measurements only when the spacecraft is visible.
     ///
-    /// # Notes
-    /// Although mutable, this function may be called several times to generate different measurements.
-    ///
-    /// # Algorithm
-    /// For each tracking device, and for each strand within that device, sample the trajectory at the sample
-    /// rate of the tracking device, adding a measurement whenever the spacecraft is visible.
-    /// Build the measurements as a vector, ordered chronologically.
-    ///
+    /// :type almanac: Almanac
+    /// :rtype: TrackingDataArc
+    /// :raises ConfigError: If a scheduling configuration is present but the schedule was not built prior to execution.
     fn generate_measurements(&mut self, almanac: Almanac) -> Result<TrackingDataArc, ConfigError> {
         self.inner.generate_measurements(almanac.into())
     }
 
-    /// Builds the schedule provided the config. Requires the tracker to be a ground station.
+    /// Builds the schedule provided the config.
     ///
     /// # Algorithm
     ///
     /// 1. For each tracking device:
-    /// 2. Find when the vehicle trajectory has an elevation greater or equal to zero, and use that as the first start of the first tracking arc for this station
-    /// 3. Find when the vehicle trajectory has an elevation less than zero (i.e. disappears below the horizon), after that initial epoch
+    /// 2. Find when the vehicle elevation above ground station mask is greater or equal to zero, and use that as the first start of the first tracking arc for this station
+    /// 3. Find when the vehicle drops below the mask, after that initial epoch
     /// 4. Repeat 2, 3 until the end of the trajectory
     /// 5. Build each of these as "tracking strands" for this tracking device.
     /// 6. Organize all of the built tracking strands chronologically.
-    /// 7. Iterate through all of the strands:
-    ///    7.a. if that tracker is marked as `Greedy` and it ends after the start of the next strand, change the start date of the next strand.
-    ///    7.b. if that tracker is marked as `Eager` and it ends after the start of the next strand, change the end date of the current strand.
+    /// 7. Iterate through all of the strands to adjust for tracker Greedy/Eager configuration.
+    /// `Greedy` trackers will delay the start of subsequent station contacts, whereas `Eager` trackers will terminate
+    /// current tracking strands prematurely to allow the next station to acquire.
+    /// :type almanac: Almanac
+    /// :rtype: dict[str, TrkConfig]
+    /// :raises AnalysisError: If underlying location dataset injection or visibility computation fails.
     pub fn generate_schedule(
         &self,
         almanac: Almanac,
@@ -92,7 +111,27 @@ impl GroundSpacecratTrackingArcSim {
         self.inner.generate_schedule(almanac.into())
     }
 
+    /// Builds a schedule using the generate_schedule function, and set that schedule in this instance's configuration.
+    /// :type almanac: Almanac
+    pub fn build_schedule(&mut self, almanac: Almanac) -> Result<(), AnalysisError> {
+        self.inner.build_schedule(almanac.into())
+    }
+
+    #[getter]
+    fn configs(&self) -> BTreeMap<String, TrkConfig> {
+        self.inner.configs.clone()
+    }
+
+    #[getter]
+    fn devices(&self) -> BTreeMap<String, GroundStation> {
+        self.inner.devices.clone()
+    }
+
     fn __str__(&self) -> String {
         format!("{}", self.inner)
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{} @ {self:p}", self.inner)
     }
 }
