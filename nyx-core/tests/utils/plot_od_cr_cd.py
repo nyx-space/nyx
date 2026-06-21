@@ -1,5 +1,4 @@
 import click
-import plotly.express as px
 import plotly.graph_objects as go
 import polars as pl
 from plotly.subplots import make_subplots
