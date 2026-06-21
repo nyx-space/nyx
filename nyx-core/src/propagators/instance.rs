@@ -106,7 +106,7 @@ where
         self.state = self
             .prop
             .dynamics
-            .finally(self.state, self.almanac.clone())
+            .finally(self.state, &self.almanac)
             .context(DynamicsSnafu)?;
 
         let backprop = duration.is_negative();
@@ -346,7 +346,7 @@ where
         self.state = self
             .prop
             .dynamics
-            .finally(self.state, self.almanac.clone())
+            .finally(self.state, &self.almanac)
             .context(DynamicsSnafu)?;
         Ok(())
     }
@@ -369,7 +369,7 @@ where
             let ki = self
                 .prop
                 .dynamics
-                .eom(0.0, state_vec, state_ctx, self.almanac.clone())
+                .eom(0.0, state_vec, state_ctx, &self.almanac)
                 .context(DynamicsSnafu)?;
             self.k[0] = ki;
             let mut a_idx: usize = 0;
@@ -393,7 +393,7 @@ where
                         ci * step_size_s,
                         &(state_vec + step_size_s * wi),
                         state_ctx,
-                        self.almanac.clone(),
+                        &self.almanac,
                     )
                     .context(DynamicsSnafu)?;
                 self.k[i + 1] = ki;

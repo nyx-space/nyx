@@ -110,7 +110,7 @@ impl GuidanceLaw for ThrustDirectionReplay {
         )
     }
 
-    fn next(&self, next_state: &mut Spacecraft, _almanac: Arc<Almanac>) {
+    fn next(&self, next_state: &mut Spacecraft, _almanac: &Almanac) {
         let thrust_direction = self
             .command_at_or_before(next_state)
             .and_then(|sample| sample.thrust_direction());

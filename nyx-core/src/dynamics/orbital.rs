@@ -80,7 +80,7 @@ impl OrbitalDynamics {
     pub(crate) fn eom(
         &self,
         osc: &Orbit,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<OVector<f64, Const<42>>, DynamicsError> {
         // Still return something of size 42, but the STM will be zeros.
         let body_acceleration = (-osc
@@ -100,7 +100,7 @@ impl OrbitalDynamics {
 
         // Apply the acceleration models
         for model in &self.accel_models {
-            let model_acc = model.eom(osc, almanac.clone())?;
+            let model_acc = model.eom(osc, almanac)?;
             for i in 0..3 {
                 d_x[i + 3] += model_acc[i];
             }
@@ -117,7 +117,7 @@ impl OrbitalDynamics {
         &self,
         _delta_t_s: f64,
         osc: &Orbit,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<(Vector6<f64>, Matrix6<f64>), DynamicsError> {
         // Extract data from hyperspace
         // Build full state vector with partials in the right position (hence building with all six components)
@@ -157,7 +157,7 @@ impl OrbitalDynamics {
 
         // Apply the acceleration models
         for model in &self.accel_models {
-            let (model_acc, model_grad) = model.gradient(osc, almanac.clone())?;
+            let (model_acc, model_grad) = model.gradient(osc, almanac)?;
             for i in 0..3 {
                 dx[i + 3] += model_acc[i];
                 for j in 1..4 {
@@ -211,7 +211,7 @@ impl fmt::Display for PointMasses {
 }
 
 impl AccelModel for PointMasses {
-    fn eom(&self, osc: &Orbit, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
+    fn eom(&self, osc: &Orbit, almanac: &Almanac) -> Result<Vector3<f64>, DynamicsError> {
         let mut d_x = Vector3::zeros();
         // Get all of the position vectors between the center body and the third bodies
         for third_body in self.celestial_objects.iter().copied() {
@@ -249,7 +249,7 @@ impl AccelModel for PointMasses {
     fn gradient(
         &self,
         osc: &Orbit,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
         // Build the hyperdual space of the radius vector
         let radius: Vector3<OHyperdual<f64, Const<7>>> = hyperspace_from_vector(&osc.radius_km);

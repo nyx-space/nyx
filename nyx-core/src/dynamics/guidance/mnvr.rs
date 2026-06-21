@@ -32,7 +32,6 @@ use serde_dhall::{SimpleType, StaticType};
 use snafu::ResultExt;
 use std::collections::HashMap;
 use std::fmt;
-use std::sync::Arc;
 
 /// Impulsive maneuver defines an instantaneous state change which causes a discontinuity in the trajectory.
 /// While useful for preliminary design, it is not typically relevant for spaceflight operations
@@ -386,7 +385,7 @@ impl GuidanceLaw for Maneuver {
         }
     }
 
-    fn next(&self, sc: &mut Spacecraft, _almanac: Arc<Almanac>) {
+    fn next(&self, sc: &mut Spacecraft, _almanac: &Almanac) {
         let next_mode = if sc.epoch() >= self.start && sc.epoch() <= self.end {
             GuidanceMode::Thrust
         } else {

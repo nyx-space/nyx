@@ -145,7 +145,7 @@ impl fmt::Display for GravityField {
 }
 
 impl AccelModel for GravityField {
-    fn eom(&self, osc: &Orbit, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
+    fn eom(&self, osc: &Orbit, almanac: &Almanac) -> Result<Vector3<f64>, DynamicsError> {
         // Convert the osculating orbit to the correct frame (needed for multiple harmonic fields)
         let state = almanac
             .transform_to(*osc, self.grav_data.frame, None)
@@ -273,7 +273,7 @@ impl AccelModel for GravityField {
     fn gradient(
         &self,
         osc: &Orbit,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
         // Convert the osculating orbit to the correct frame (needed for multiple harmonic fields)
         let state = almanac

@@ -103,7 +103,7 @@ fn traj_ephem_forward(almanac: Arc<Almanac>) {
     let eval_state = ephem.at(start_dt).unwrap();
 
     let mut max_pos_err = (eval_state.orbit.radius_km - start_state.radius_km).norm();
-    let mut max_vel_err = (eval_state.orbit.velocity_km_s - start_state.velocity_km_s).norm();
+    let mut max_vel_err = (eval_state.orbit.velocity_km_s - start_state.orbit.velocity_km_s).norm();
 
     while let Ok(prop_state) = rx.recv() {
         let eval_state = ephem.at(prop_state.epoch()).unwrap();
@@ -306,7 +306,7 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
 
     for mut sc_state in traj.every(1 * Unit::Day) {
         // We need to evaluate the mode of this state because the trajectory does not store discrete information
-        ruggiero_ctrl.next(&mut sc_state, almanac.clone());
+        ruggiero_ctrl.next(&mut sc_state, &almanac);
         if sc_state.mode() != prev_mode {
             println!(
                 "Mode changed from {:?} to {:?} @ {}",
@@ -321,7 +321,7 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
     for epoch in TimeSeries::inclusive(start_dt, start_dt + prop_time, 1 * Unit::Day) {
         // Note: the `evaluate` function will return a Result which prevents a panic if you request something out of the ephemeris
         let mut sc_state = traj.at(epoch).unwrap();
-        ruggiero_ctrl.next(&mut sc_state, almanac.clone());
+        ruggiero_ctrl.next(&mut sc_state, &almanac);
         if sc_state.mode() != prev_mode {
             println!(
                 "Mode changed from {:?} to {:?} @ {}",
@@ -358,6 +358,7 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
     let eval_state = traj.at(start_dt).unwrap();
 
     let mut max_pos_err = (eval_state.orbit.radius_km - start_state.orbit.radius_km).norm();
+    let mut max_vel_err = (eval_state.orbit.velocity_km_s - start_state.orbit.velocity_km_s).norm();
     let mut max_vel_err = (eval_state.orbit.velocity_km_s - start_state.orbit.velocity_km_s).norm();
     let mut max_prop_err = eval_state.mass.prop_mass_kg - start_state.mass.prop_mass_kg;
     let mut max_err = (eval_state.to_vector() - start_state.to_vector()).norm();

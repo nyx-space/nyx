@@ -56,7 +56,7 @@ fn leo_sun_earth_eclipses(almanac: Arc<Almanac>) {
     let mut prev_eclipse_state: Option<Occultation> = None;
     let mut cnt_changes = 0;
     while let Ok(rx_state) = truth_rx.recv() {
-        let new_eclipse_state = e_loc.compute(rx_state.orbit, almanac.clone()).unwrap();
+        let new_eclipse_state = e_loc.compute(rx_state.orbit, &almanac).unwrap();
         if let Some(prev_state) = prev_eclipse_state {
             if new_eclipse_state.percentage != prev_state.percentage {
                 println!("{:.6} now in {}", rx_state.orbit.epoch, new_eclipse_state);
@@ -108,7 +108,7 @@ fn geo_sun_earth_eclipses(almanac: Arc<Almanac>) {
     let mut prev_eclipse_state: Option<Occultation> = None;
     let mut cnt_changes = 0;
     while let Ok(rx_state) = truth_rx.recv() {
-        let new_eclipse_state = e_loc.compute(rx_state.orbit, almanac.clone()).unwrap();
+        let new_eclipse_state = e_loc.compute(rx_state.orbit, &almanac).unwrap();
         if let Some(prev_state) = prev_eclipse_state {
             if new_eclipse_state.percentage != prev_state.percentage {
                 println!("{:.6} now in {}", rx_state.orbit.epoch, new_eclipse_state);

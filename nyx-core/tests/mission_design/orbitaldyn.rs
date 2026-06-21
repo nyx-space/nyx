@@ -697,13 +697,13 @@ fn two_body_dual(almanac: Arc<Almanac>) {
 
     let init_sc = Spacecraft::from(init).with_stm();
     let fx_real = dynamics
-        .eom(0.0, &init_sc.to_vector(), &init_sc, almanac.clone())
+        .eom(0.0, &init_sc.to_vector(), &init_sc, &almanac)
         .unwrap();
 
     let fx_orbit_real = fx_real.fixed_rows::<6>(0).to_owned();
 
     let (fx, grad) = dynamics
-        .dual_eom(0.0, &Spacecraft::from(init).with_stm(), almanac.clone())
+        .dual_eom(0.0, &Spacecraft::from(init).with_stm(), &almanac)
         .unwrap();
 
     let fx = fx.fixed_rows::<6>(0).to_owned();

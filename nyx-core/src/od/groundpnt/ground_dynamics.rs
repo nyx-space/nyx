@@ -21,7 +21,6 @@ use crate::od::groundpnt::GroundAsset;
 use anise::prelude::Almanac;
 use nalgebra::allocator::Allocator;
 use nalgebra::{Const, DefaultAllocator, Matrix6, OMatrix, OVector, Vector6};
-use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct GroundDynamics {}
@@ -35,7 +34,7 @@ impl Dynamics for GroundDynamics {
         _delta_t: f64,
         _state_vec: &OVector<f64, <Self::StateType as crate::State>::VecLength>,
         state_ctx: &Self::StateType,
-        _almanac: Arc<Almanac>,
+        _almanac: &Almanac,
     ) -> Result<OVector<f64, <Self::StateType as crate::State>::VecLength>, DynamicsError>
     where
         DefaultAllocator: Allocator<<Self::StateType as crate::State>::VecLength>,
@@ -60,7 +59,7 @@ impl Dynamics for GroundDynamics {
         &self,
         _delta_t: f64,
         osc: &Self::StateType,
-        _almanac: Arc<Almanac>,
+        _almanac: &Almanac,
     ) -> Result<
         (
             OVector<f64, <Self::StateType as crate::State>::Size>,
