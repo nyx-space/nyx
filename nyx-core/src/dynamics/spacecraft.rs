@@ -320,9 +320,7 @@ impl Dynamics for SpacecraftDynamics {
         let mut d_x = OVector::<f64, Const<9>>::zeros();
         let mut grad = OMatrix::<f64, Const<9>, Const<9>>::zeros();
 
-        let (orb_state, orb_grad) =
-            self.orbital_dyn
-                .dual_eom(delta_t_s, &ctx.orbit, almanac)?;
+        let (orb_state, orb_grad) = self.orbital_dyn.dual_eom(delta_t_s, &ctx.orbit, almanac)?;
 
         // Copy the d orbit dt data
         for (i, val) in orb_state.iter().enumerate() {
