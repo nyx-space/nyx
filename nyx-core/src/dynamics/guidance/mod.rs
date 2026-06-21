@@ -40,7 +40,6 @@ pub use kluever::Kluever;
 use snafu::Snafu;
 
 use std::fmt;
-use std::sync::Arc;
 
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
@@ -118,7 +117,7 @@ pub trait GuidanceLaw: fmt::Display + Send + Sync {
     fn throttle(&self, osc_state: &Spacecraft) -> Result<f64, GuidanceError>;
 
     /// Updates the state of the BaseSpacecraft for the next maneuver, e.g. prepares the controller for the next maneuver
-    fn next(&self, next_state: &mut Spacecraft, almanac: Arc<Almanac>);
+    fn next(&self, next_state: &mut Spacecraft, almanac: &Almanac);
 
     /// Returns whether this thrust control has been achieved, if it has an objective
     fn achieved(&self, _osc_state: &Spacecraft) -> Result<bool, GuidanceError> {

@@ -132,7 +132,7 @@ impl ForceModel for SolarPressure {
         if self.estimate { Some(6) } else { None }
     }
 
-    fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
+    fn eom(&self, ctx: &Spacecraft, almanac: &Almanac) -> Result<Vector3<f64>, DynamicsError> {
         let osc = ctx.orbit;
         // Compute the position of the Sun as seen from the spacecraft
         let r_sun = almanac
@@ -167,7 +167,7 @@ impl ForceModel for SolarPressure {
     fn gradient(
         &self,
         ctx: &Spacecraft,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<(Vector3<f64>, Matrix4x3<f64>), DynamicsError> {
         let osc = ctx.orbit;
 
@@ -185,7 +185,7 @@ impl ForceModel for SolarPressure {
         // ANISE returns the occultation percentage (or factor), which is the opposite as the illumination factor.
         let occult = self
             .shadow_model
-            .compute(osc, almanac.clone())
+            .compute(osc, almanac)
             .context(DynamicsAlmanacSnafu {
                 action: "solar radiation pressure computation",
             })?

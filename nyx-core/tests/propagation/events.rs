@@ -99,7 +99,7 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
     let mut min_dt = dt;
     let mut max_dt = dt;
     for state in traj.every(10 * Unit::Second) {
-        let new_e_state = e_loc.compute(state.orbit, almanac.clone()).unwrap();
+        let new_e_state = e_loc.compute(state.orbit, &almanac).unwrap();
         if let Some(prev_state) = e_state {
             if prev_state.percentage != new_e_state.percentage {
                 println!("{state:x}\t{new_e_state}");

@@ -27,7 +27,6 @@ use hyperdual::Owned;
 use snafu::Snafu;
 
 use std::fmt;
-use std::sync::Arc;
 
 pub use crate::errors::NyxError;
 
@@ -97,7 +96,7 @@ where
         delta_t: f64,
         state_vec: &OVector<f64, <Self::StateType as State>::VecLength>,
         state_ctx: &Self::StateType,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<OVector<f64, <Self::StateType as State>::VecLength>, DynamicsError>
     where
         DefaultAllocator: Allocator<<Self::StateType as State>::VecLength>;
@@ -109,7 +108,7 @@ where
         &self,
         _delta_t: f64,
         _osculating_state: &Self::StateType,
-        _almanac: Arc<Almanac>,
+        _almanac: &Almanac,
     ) -> Result<
         (
             OVector<f64, <Self::StateType as State>::Size>,
@@ -132,7 +131,7 @@ where
     fn finally(
         &self,
         next_state: Self::StateType,
-        _almanac: Arc<Almanac>,
+        _almanac: &Almanac,
     ) -> Result<Self::StateType, DynamicsError> {
         Ok(next_state)
     }
@@ -146,7 +145,7 @@ pub trait ForceModel: Send + Sync + fmt::Display {
     fn estimation_index(&self) -> Option<usize>;
 
     /// Defines the equations of motion for this force model from the provided osculating state.
-    fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError>;
+    fn eom(&self, ctx: &Spacecraft, almanac: &Almanac) -> Result<Vector3<f64>, DynamicsError>;
 
     /// Force models must implement their partials, although those will only be called if the propagation requires the
     /// computation of the STM. The `osc_ctx` is the osculating context, i.e. it changes for each sub-step of the integrator.
@@ -154,7 +153,7 @@ pub trait ForceModel: Send + Sync + fmt::Display {
     fn gradient(
         &self,
         osc_ctx: &Spacecraft,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<(Vector3<f64>, Matrix4x3<f64>), DynamicsError>;
 }
 
@@ -163,14 +162,14 @@ pub trait ForceModel: Send + Sync + fmt::Display {
 /// Examples include spherical harmonics, i.e. accelerations which do not need to save the current state, only act on it.
 pub trait AccelModel: Send + Sync + fmt::Display {
     /// Defines the equations of motion for this force model from the provided osculating state in the integration frame.
-    fn eom(&self, osc: &Orbit, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError>;
+    fn eom(&self, osc: &Orbit, almanac: &Almanac) -> Result<Vector3<f64>, DynamicsError>;
 
     /// Acceleration models must implement their partials, although those will only be called if the propagation requires the
     /// computation of the STM.
     fn gradient(
         &self,
         osc_ctx: &Orbit,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError>;
 }
 

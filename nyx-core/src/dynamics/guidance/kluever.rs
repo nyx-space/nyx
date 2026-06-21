@@ -296,12 +296,12 @@ impl GuidanceLaw for Kluever {
     }
 
     /// Update the state for the next iteration
-    fn next(&self, sc: &mut Spacecraft, almanac: Arc<Almanac>) {
+    fn next(&self, sc: &mut Spacecraft, almanac: &Almanac) {
         if sc.mode() != GuidanceMode::Inhibit {
             if !self.achieved(sc).unwrap() {
                 // Check eclipse state if applicable.
                 if let Some(max_eclipse) = self.max_eclipse_prct {
-                    let locator = ShadowModel::cislunar(almanac.clone());
+                    let locator = ShadowModel::cislunar(almanac);
                     if locator
                         .compute(sc.orbit, almanac)
                         .expect("cannot compute eclipse")

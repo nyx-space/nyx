@@ -226,13 +226,13 @@ impl SolidTides {
     fn accumulate_deltas(
         &self,
         epoch: Epoch,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<([[f64; 4]; 4], [[f64; 4]; 4]), DynamicsError> {
         let mut delta_c = [[0.0f64; 4]; 4];
         let mut delta_s = [[0.0f64; 4]; 4];
 
         for pert in &self.perturbers {
-            pert.compute_pert(epoch, self, &almanac, &mut delta_c, &mut delta_s)?;
+            pert.compute_pert(epoch, self, almanac, &mut delta_c, &mut delta_s)?;
         }
 
         Ok((delta_c, delta_s))
@@ -241,8 +241,8 @@ impl SolidTides {
 
 #[allow(clippy::needless_range_loop)]
 impl AccelModel for SolidTides {
-    fn eom(&self, osc: &Orbit, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
-        let (delta_c, delta_s) = self.accumulate_deltas(osc.epoch, almanac.clone())?;
+    fn eom(&self, osc: &Orbit, almanac: &Almanac) -> Result<Vector3<f64>, DynamicsError> {
+        let (delta_c, delta_s) = self.accumulate_deltas(osc.epoch, almanac)?;
 
         // Convert the osculating orbit to the correct frame (needed for multiple harmonic fields)
         let state = almanac
@@ -385,9 +385,9 @@ impl AccelModel for SolidTides {
     fn gradient(
         &self,
         osc: &Orbit,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), DynamicsError> {
-        let (delta_c, delta_s) = self.accumulate_deltas(osc.epoch, almanac.clone())?;
+        let (delta_c, delta_s) = self.accumulate_deltas(osc.epoch, almanac)?;
 
         // Convert the osculating orbit to the correct frame (needed for multiple harmonic fields)
         let state = almanac
@@ -587,14 +587,14 @@ mod tests {
 
         let tides = SolidTides::earth_moon_system(IAU_EARTH_FRAME, IAU_MOON_FRAME, almanac.clone())
             .expect("could not init solid tides");
-        let acc = tides.eom(&sc_orbit, almanac.clone()).unwrap();
+        let acc = tides.eom(&sc_orbit, &almanac).unwrap();
 
         println!("Solid tides acceleration: {:?}", acc);
         // Typical solid tide acceleration for LEO is around 1e-9 to 1e-7 km/s^2
         assert!(acc.norm() > 0.0);
         assert!(acc.norm() < 1e-6);
 
-        let (acc_grad, grad) = tides.gradient(&sc_orbit, almanac).unwrap();
+        let (acc_grad, grad) = tides.gradient(&sc_orbit, &almanac).unwrap();
         assert!((acc - acc_grad).norm() < 1e-12);
         assert!(grad.norm() > 0.0);
     }

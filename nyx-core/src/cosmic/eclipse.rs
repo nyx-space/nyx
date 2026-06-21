@@ -26,7 +26,6 @@ use serde_dhall::StaticType;
 
 pub use super::{Frame, Orbit, Spacecraft};
 use std::fmt;
-use std::sync::Arc;
 
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
@@ -57,7 +56,7 @@ impl fmt::Display for ShadowModel {
 impl ShadowModel {
     /// Creates a new typical eclipse locator.
     /// The light source is the Sun, and the shadow bodies are the Earth and the Moon.
-    pub fn cislunar(almanac: Arc<Almanac>) -> Self {
+    pub fn cislunar(almanac: &Almanac) -> Self {
         let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
         let moon_j2k = almanac.frame_info(MOON_J2000).unwrap();
         Self {
@@ -67,7 +66,7 @@ impl ShadowModel {
     }
 
     /// Compute the visibility/eclipse between an observer and an observed state
-    pub fn compute(&self, observer: Orbit, almanac: Arc<Almanac>) -> AlmanacResult<Occultation> {
+    pub fn compute(&self, observer: Orbit, almanac: &Almanac) -> AlmanacResult<Occultation> {
         let mut state = Occultation {
             epoch: observer.epoch,
             back_frame: SUN_J2000,

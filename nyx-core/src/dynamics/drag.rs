@@ -87,7 +87,7 @@ impl ForceModel for ConstantDrag {
         if self.estimate { Some(7) } else { None }
     }
 
-    fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
+    fn eom(&self, ctx: &Spacecraft, almanac: &Almanac) -> Result<Vector3<f64>, DynamicsError> {
         let osc =
             almanac
                 .transform_to(ctx.orbit, self.frame, None)
@@ -109,7 +109,7 @@ impl ForceModel for ConstantDrag {
     fn gradient(
         &self,
         _osc_ctx: &Spacecraft,
-        _almanac: Arc<Almanac>,
+        _almanac: &Almanac,
     ) -> Result<(Vector3<f64>, Matrix4x3<f64>), DynamicsError> {
         Err(DynamicsError::DynamicsAstro {
             source: AstroError::PartialsUndefined,
@@ -178,7 +178,7 @@ impl ForceModel for Drag {
         if self.estimate { Some(7) } else { None }
     }
 
-    fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
+    fn eom(&self, ctx: &Spacecraft, almanac: &Almanac) -> Result<Vector3<f64>, DynamicsError> {
         let integration_frame = ctx.orbit.frame;
 
         let osc_drag_frame =
@@ -286,7 +286,7 @@ impl ForceModel for Drag {
     fn gradient(
         &self,
         _osc_ctx: &Spacecraft,
-        _almanac: Arc<Almanac>,
+        _almanac: &Almanac,
     ) -> Result<(Vector3<f64>, Matrix4x3<f64>), DynamicsError> {
         Err(DynamicsError::DynamicsAstro {
             source: AstroError::PartialsUndefined,

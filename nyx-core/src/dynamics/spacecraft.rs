@@ -158,7 +158,7 @@ impl Dynamics for SpacecraftDynamics {
     fn finally(
         &self,
         next_state: Self::StateType,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<Self::StateType, DynamicsError> {
         if next_state.mass.prop_mass_kg < 0.0 {
             error!("negative prop mass at {}", next_state.epoch());
@@ -179,7 +179,7 @@ impl Dynamics for SpacecraftDynamics {
 
             state.mut_thrust_direction(thrust_direction);
             // Update the control mode
-            guid_law.next(&mut state, almanac.clone());
+            guid_law.next(&mut state, almanac);
             Ok(state)
         } else {
             let mut state = next_state;
@@ -193,7 +193,7 @@ impl Dynamics for SpacecraftDynamics {
         delta_t_s: f64,
         state: &OVector<f64, Const<90>>,
         ctx: &Self::StateType,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<OVector<f64, Const<90>>, DynamicsError> {
         // Rebuild the osculating state for the EOM context.
         let osc_sc = ctx.set_with_delta_seconds(delta_t_s, state);
@@ -226,7 +226,7 @@ impl Dynamics for SpacecraftDynamics {
                 // Compute the orbital dynamics
                 for (i, val) in self
                     .orbital_dyn
-                    .eom(&osc_sc.orbit, almanac.clone())?
+                    .eom(&osc_sc.orbit, almanac)?
                     .iter()
                     .copied()
                     .enumerate()
@@ -236,7 +236,7 @@ impl Dynamics for SpacecraftDynamics {
 
                 // Apply the force models for non STM propagation
                 for model in &self.force_models {
-                    let model_frc = model.eom(&osc_sc, almanac.clone())? / osc_sc.mass_kg();
+                    let model_frc = model.eom(&osc_sc, almanac)? / osc_sc.mass_kg();
                     for i in 0..3 {
                         d_x[i + 3] += model_frc[i];
                     }
@@ -313,16 +313,14 @@ impl Dynamics for SpacecraftDynamics {
         &self,
         delta_t_s: f64,
         ctx: &Self::StateType,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<(OVector<f64, Const<9>>, OMatrix<f64, Const<9>, Const<9>>), DynamicsError> {
         // Rebuild the appropriately sized state and STM.
         // This is the orbital state followed by Cr and Cd
         let mut d_x = OVector::<f64, Const<9>>::zeros();
         let mut grad = OMatrix::<f64, Const<9>, Const<9>>::zeros();
 
-        let (orb_state, orb_grad) =
-            self.orbital_dyn
-                .dual_eom(delta_t_s, &ctx.orbit, almanac.clone())?;
+        let (orb_state, orb_grad) = self.orbital_dyn.dual_eom(delta_t_s, &ctx.orbit, almanac)?;
 
         // Copy the d orbit dt data
         for (i, val) in orb_state.iter().enumerate() {
@@ -344,7 +342,7 @@ impl Dynamics for SpacecraftDynamics {
         // Call the EOMs
         let total_mass = ctx.mass_kg();
         for model in &self.force_models {
-            let (model_frc, model_grad) = model.gradient(ctx, almanac.clone())?;
+            let (model_frc, model_grad) = model.gradient(ctx, almanac)?;
             for i in 0..3 {
                 // Add the velocity changes
                 d_x[i + 3] += model_frc[i] / total_mass;
