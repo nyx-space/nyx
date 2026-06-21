@@ -34,6 +34,9 @@ use std::f64;
 use std::fmt;
 use std::sync::Arc;
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
 pub use super::gravity_field::GravityField;
 
 /// `OrbitalDynamics` provides the equations of motion for any celestial dynamic, without state transition matrix computation.
@@ -46,7 +49,7 @@ impl OrbitalDynamics {
     /// Initializes the point masses gravities with the provided list of bodies
     pub fn point_masses(celestial_objects: Vec<i32>) -> Self {
         // Create the point masses
-        Self::new(vec![PointMasses::new(celestial_objects)])
+        Self::new(vec![Arc::new(PointMasses::new(celestial_objects))])
     }
 
     /// Initializes a OrbitalDynamics which does not simulate the gravity pull of other celestial objects but the primary one.
@@ -171,6 +174,7 @@ impl OrbitalDynamics {
 
 /// PointMasses model
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct PointMasses {
     pub celestial_objects: Vec<i32>,
     /// Light-time correction computation if extra point masses are needed
@@ -179,11 +183,11 @@ pub struct PointMasses {
 
 impl PointMasses {
     /// Initializes the point masses gravities with the provided list of bodies
-    pub fn new(celestial_objects: Vec<i32>) -> Arc<Self> {
-        Arc::new(Self {
+    pub fn new(celestial_objects: Vec<i32>) -> Self {
+        Self {
             celestial_objects,
             correction: None,
-        })
+        }
     }
 
     /// Initializes the point masses gravities with the provided list of bodies, and accounting for some light time correction
@@ -303,6 +307,7 @@ impl AccelModel for PointMasses {
         Ok((fx, grad))
     }
 }
+
 impl StaticType for PointMasses {
     fn static_type() -> SimpleType {
         let mut fields = HashMap::new();
@@ -325,5 +330,26 @@ impl StaticType for PointMasses {
         );
 
         SimpleType::Record(fields)
+    }
+}
+
+#[cfg(feature = "python")]
+#[cfg_attr(feature = "python", pymethods)]
+impl PointMasses {
+    #[pyo3(signature=(celestial_objects, correction=None))]
+    #[new]
+    fn py_new(celestial_objects: Vec<i32>, correction: Option<Aberration>) -> Self {
+        Self {
+            celestial_objects,
+            correction,
+        }
+    }
+
+    fn __str__(&self) -> String {
+        format!("{self:?}")
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self:?} @ {self:p}")
     }
 }

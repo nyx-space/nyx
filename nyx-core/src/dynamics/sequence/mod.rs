@@ -31,10 +31,8 @@ use snafu::ResultExt;
 use std::collections::HashMap;
 
 use crate::dynamics::guidance::{Kluever, Ruggiero};
-use crate::dynamics::{GravityField, OrbitalDynamics};
 use crate::dynamics::{SpacecraftDynamics, guidance::Thruster};
 use crate::errors::{FromAlmanacSnafu, FromPropSnafu};
-use crate::io::gravity::GravityFieldData;
 use crate::md::Trajectory;
 use crate::propagators::Propagator;
 use crate::{NyxError, Spacecraft, State};
@@ -50,10 +48,8 @@ pub use discrete_event::*;
 pub struct SpacecraftSequence {
     #[serde(serialize_with = "map_as_pairs", deserialize_with = "pairs_as_map")]
     pub seq: BTreeMap<Epoch, Phase>,
-    #[serde(with = "indexmap::map::serde_seq")]
-    pub thruster_sets: IndexMap<String, Thruster>,
-    #[serde(with = "indexmap::map::serde_seq")]
-    pub propagators: IndexMap<String, PropagatorConfig>,
+    pub thruster_sets: HashMap<String, Thruster>,
+    pub propagators: HashMap<String, PropagatorConfig>,
     #[serde(skip)]
     prop_setups: IndexMap<String, Propagator<SpacecraftDynamics>>,
 }
@@ -76,12 +72,12 @@ impl SpacecraftSequence {
             } = phase
             {
                 // Check that the propagator exists
-                if self.propagators.get(propagator).is_none() {
+                if !self.propagators.contains_key(propagator) {
                     return Err(format!("{epoch}: no propagator named `{propagator}`"));
                 }
                 if let Some(guidance) = guidance {
                     let thruster = &guidance.thruster_model;
-                    if self.thruster_sets.get(thruster).is_none() {
+                    if !self.thruster_sets.contains_key(thruster) {
                         return Err(format!("{epoch}: no thruster set named {thruster}"));
                     }
                 }
@@ -110,32 +106,7 @@ impl SpacecraftSequence {
                 // Set up the propagator -- fetch the config first
                 // We know the config exists because validate would catch missing names.
                 let cfg = &self.propagators[propagator];
-                // Build the orbital dynamics
-                let mut orbital_dyn = OrbitalDynamics::two_body();
-                if let Some(point_masses) = &cfg.accel_models.point_masses {
-                    orbital_dyn.accel_models.push(point_masses.clone());
-                }
-                if let Some((gravity_cfg, frame_uid)) = &cfg.accel_models.gravity_field {
-                    let grav_data = GravityFieldData::from_config(gravity_cfg.clone())
-                        .map_err(|e| e.to_string())?;
-                    let compute_frame =
-                        almanac.frame_info(*frame_uid).map_err(|e| e.to_string())?;
-                    let gravity_field = GravityField::from_stor(compute_frame, grav_data);
-                    orbital_dyn.accel_models.push(gravity_field);
-                }
-                // Build the spacecraft dynamics
-                let mut sc_dyn = SpacecraftDynamics::new(orbital_dyn);
-
-                if let Some(srp) = &cfg.force_models.solar_pressure {
-                    sc_dyn.force_models.push(srp.clone());
-                }
-
-                if let Some(drag) = &cfg.force_models.drag {
-                    sc_dyn.force_models.push(drag.clone());
-                }
-
-                // And set it all up!
-                let setup = Propagator::new(sc_dyn, cfg.method, cfg.options);
+                let setup = cfg.build(almanac.clone())?;
 
                 self.prop_setups.insert(propagator.clone(), setup);
                 debug!("built `{propagator}`");

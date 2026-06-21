@@ -100,13 +100,6 @@ pub enum Cadence {
     },
 }
 
-#[cfg(feature = "python")]
-#[pyclass(from_py_object, name = "Cadence")]
-#[derive(Clone, Debug)]
-pub struct PyCadence {
-    pub inner: Cadence,
-}
-
 impl<'a> Decode<'a> for Cadence {
     fn decode<R: Reader<'a>>(decoder: &mut R) -> der::Result<Self> {
         let tag = decoder.decode::<u8>()?;
@@ -153,17 +146,24 @@ impl Encode for Cadence {
 }
 
 #[cfg(feature = "python")]
+#[pyclass(from_py_object, name = "Cadence")]
+#[derive(Clone, Debug)]
+pub struct PyCadence {
+    pub inner: Cadence,
+}
+
+#[cfg(feature = "python")]
 #[pymethods]
 impl PyCadence {
-    #[staticmethod]
-    fn continuous() -> Self {
+    #[classmethod]
+    fn continuous(_cls: &Bound<'_, PyType>) -> Self {
         Self {
             inner: Cadence::Continuous,
         }
     }
 
-    #[staticmethod]
-    fn intermittent(on: Duration, off: Duration) -> Self {
+    #[classmethod]
+    fn intermittent(_cls: &Bound<'_, PyType>, on: Duration, off: Duration) -> Self {
         Self {
             inner: Cadence::Intermittent { on, off },
         }

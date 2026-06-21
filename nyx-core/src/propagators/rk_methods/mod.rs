@@ -30,6 +30,9 @@ use self::dormand::*;
 mod verner;
 use self::verner::*;
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
 use super::PropagationError;
 
 /// The `RK` trait defines a Runge Kutta integrator.
@@ -58,6 +61,7 @@ where
 /// Enum of supported integration methods, all of which are part of the Runge Kutta family of ordinary differential equation (ODE) solvers.
 /// Nomenclature: X-Y means that this is an X order solver with a Y order error correction step.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default, StaticType)]
+#[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub enum IntegratorMethod {
     /// Runge Kutta 8-9 is the recommended integrator for most application.
     #[default]

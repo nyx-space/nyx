@@ -5,7 +5,7 @@ use hifitime::TimeUnits;
 use nyx::dynamics::PointMasses;
 use nyx::dynamics::guidance::{LocalFrame, Maneuver, Thruster};
 use nyx::dynamics::sequence::{
-    AccelModels, ForceModels, GuidanceConfig, Phase, PropagatorConfig, SpacecraftSequence,
+    AccelModels, Dynamics, ForceModels, GuidanceConfig, Phase, PropagatorConfig, SpacecraftSequence,
 };
 use nyx::linalg::Vector3;
 use nyx::md::prelude::*;
@@ -238,13 +238,15 @@ fn val_tgt_finite_burn(almanac: Arc<Almanac>) {
         PropagatorConfig {
             method: IntegratorMethod::RungeKutta89,
             options: IntegratorOptions::default(),
-            accel_models: AccelModels {
-                point_masses: Some(PointMasses::new(bodies)),
-                gravity_field: None,
-            },
-            force_models: ForceModels {
-                solar_pressure: None,
-                drag: None,
+            dynamics: Dynamics {
+                accel_models: AccelModels {
+                    point_masses: Some(PointMasses::new(bodies)),
+                    gravity_field: None,
+                },
+                force_models: ForceModels {
+                    solar_pressure: None,
+                    drag: None,
+                },
             },
         },
     );

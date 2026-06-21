@@ -97,7 +97,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // We'll also enable solar radiation pressure since the James Webb has a huge and highly reflective sun shield.
 
     let orbital_dyn = OrbitalDynamics::point_masses(vec![MOON, SUN, JUPITER_BARYCENTER]);
-    let srp_dyn = SolarPressure::new(vec![EARTH_J2000, MOON_J2000], almanac.clone())?;
+    let srp_dyn = SolarPressure::new(vec![EARTH_J2000, MOON_J2000], &almanac)?;
 
     // Finalize setting up the dynamics.
     let dynamics = SpacecraftDynamics::from_model(orbital_dyn, srp_dyn);

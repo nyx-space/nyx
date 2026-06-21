@@ -145,7 +145,7 @@ fn blse_robust_large_disp(
             } else {
                 initial_state
             },
-            &this_arc,
+            this_arc,
         )
         .unwrap();
 
@@ -197,7 +197,7 @@ fn blse_robust_large_disp(
     let kf_est: KfEstimate<Spacecraft> = blse_solution.into();
     println!("{kf_est}");
 
-    let final_rms = blse.evaluate(kf_est.state(), &this_arc).unwrap();
+    let final_rms = blse.evaluate(kf_est.state(), this_arc).unwrap();
     println!(
         "[disp={disperse}] Final RMS = {final_rms}\tInitial RMS = {initial_rms}\tBetter? {}",
         final_rms <= initial_rms

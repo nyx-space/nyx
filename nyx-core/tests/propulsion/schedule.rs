@@ -2,7 +2,7 @@ extern crate nyx_space as nyx;
 use self::nyx::cosmic::{GuidanceMode, Orbit, Spacecraft};
 use self::nyx::dynamics::guidance::{Maneuver, Thruster};
 use self::nyx::dynamics::sequence::{
-    AccelModels, ForceModels, GuidanceConfig, Phase, PropagatorConfig, SpacecraftSequence,
+    AccelModels, Dynamics, ForceModels, GuidanceConfig, Phase, PropagatorConfig, SpacecraftSequence,
 };
 use self::nyx::dynamics::{OrbitalDynamics, PointMasses, SpacecraftDynamics};
 use self::nyx::linalg::Vector3;
@@ -67,13 +67,15 @@ fn val_transfer_schedule_no_depl(almanac: Arc<Almanac>) {
         PropagatorConfig {
             method: nyx::propagators::IntegratorMethod::RungeKutta89,
             options: IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
-            accel_models: AccelModels {
-                point_masses: Some(PointMasses::new(vec![MOON, SUN, JUPITER_BARYCENTER])),
-                gravity_field: None,
-            },
-            force_models: ForceModels {
-                solar_pressure: None,
-                drag: None,
+            dynamics: Dynamics {
+                accel_models: AccelModels {
+                    point_masses: Some(PointMasses::new(vec![MOON, SUN, JUPITER_BARYCENTER])),
+                    gravity_field: None,
+                },
+                force_models: ForceModels {
+                    solar_pressure: None,
+                    drag: None,
+                },
             },
         },
     );
@@ -188,13 +190,15 @@ fn val_transfer_schedule_depl(almanac: Arc<Almanac>) {
         PropagatorConfig {
             method: nyx::propagators::IntegratorMethod::RungeKutta89,
             options: IntegratorOptions::with_fixed_step(10.0 * Unit::Second),
-            accel_models: AccelModels {
-                point_masses: Some(PointMasses::new(bodies)),
-                gravity_field: None,
-            },
-            force_models: ForceModels {
-                solar_pressure: None,
-                drag: None,
+            dynamics: Dynamics {
+                accel_models: AccelModels {
+                    point_masses: Some(PointMasses::new(bodies)),
+                    gravity_field: None,
+                },
+                force_models: ForceModels {
+                    solar_pressure: None,
+                    drag: None,
+                },
             },
         },
     );
@@ -471,13 +475,15 @@ fn finite_burns_respects_gaps_between_maneuvers(almanac: Arc<Almanac>) {
         PropagatorConfig {
             method: nyx::propagators::IntegratorMethod::RungeKutta89,
             options: IntegratorOptions::with_fixed_step(1.0 * Unit::Second),
-            accel_models: AccelModels {
-                point_masses: Some(PointMasses::new(vec![MOON, SUN, JUPITER_BARYCENTER])),
-                gravity_field: None,
-            },
-            force_models: ForceModels {
-                solar_pressure: None,
-                drag: None,
+            dynamics: Dynamics {
+                accel_models: AccelModels {
+                    point_masses: Some(PointMasses::new(vec![MOON, SUN, JUPITER_BARYCENTER])),
+                    gravity_field: None,
+                },
+                force_models: ForceModels {
+                    solar_pressure: None,
+                    drag: None,
+                },
             },
         },
     );

@@ -17,3 +17,4 @@ dist/
 *.profraw
 lcov.txt
 .DS_Store
+.tdm

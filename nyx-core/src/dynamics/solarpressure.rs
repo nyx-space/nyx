@@ -34,8 +34,12 @@ use std::sync::Arc;
 #[allow(non_upper_case_globals)]
 pub const SOLAR_FLUX_W_m2: f64 = 1367.0;
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
 /// Computation of solar radiation pressure is based on STK: <http://help.agi.com/stk/index.htm#gator/eq-solar.htm> .
 #[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
+#[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct SolarPressure {
     /// solar flux at 1 AU, in W/m^2
     pub phi: f64,
@@ -60,11 +64,11 @@ impl Default for SolarPressure {
 
 impl SolarPressure {
     /// Will set the solar flux at 1 AU to: Phi = 1367.0
-    fn default_flux_raw(
+    pub fn default_flux_raw(
         shadow_bodies: Vec<Frame>,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<Self, DynamicsError> {
-        let e_loc = ShadowModel {
+        let shadow_model = ShadowModel {
             light_source: almanac.frame_info(SUN_J2000).context({
                 DynamicsPlanetarySnafu {
                     action: "planetary data from third body not loaded",
@@ -83,16 +87,13 @@ impl SolarPressure {
         };
         Ok(Self {
             phi: SOLAR_FLUX_W_m2,
-            shadow_model: e_loc,
+            shadow_model,
             estimate: true,
         })
     }
 
     /// Accounts for the shadowing of only one body and will set the solar flux at 1 AU to: Phi = 1367.0
-    pub fn default_flux(
-        shadow_body: Frame,
-        almanac: Arc<Almanac>,
-    ) -> Result<Arc<Self>, DynamicsError> {
+    pub fn default_flux(shadow_body: Frame, almanac: &Almanac) -> Result<Arc<Self>, DynamicsError> {
         Ok(Arc::new(Self::default_flux_raw(
             vec![shadow_body],
             almanac,
@@ -102,7 +103,7 @@ impl SolarPressure {
     /// Accounts for the shadowing of only one body and will set the solar flux at 1 AU to: Phi = 1367.0
     pub fn default_no_estimation(
         shadow_bodies: Vec<Frame>,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<Arc<Self>, DynamicsError> {
         let mut srp = Self::default_flux_raw(shadow_bodies, almanac)?;
         srp.estimate = false;
@@ -113,7 +114,7 @@ impl SolarPressure {
     pub fn with_flux(
         flux_w_m2: f64,
         shadow_bodies: Vec<Frame>,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<Arc<Self>, DynamicsError> {
         let mut me = Self::default_flux_raw(shadow_bodies, almanac)?;
         me.phi = flux_w_m2;
@@ -121,10 +122,7 @@ impl SolarPressure {
     }
 
     /// Solar radiation pressure force model accounting for the provided shadow bodies.
-    pub fn new(
-        shadow_bodies: Vec<Frame>,
-        almanac: Arc<Almanac>,
-    ) -> Result<Arc<Self>, DynamicsError> {
+    pub fn new(shadow_bodies: Vec<Frame>, almanac: &Almanac) -> Result<Arc<Self>, DynamicsError> {
         Ok(Arc::new(Self::default_flux_raw(shadow_bodies, almanac)?))
     }
 }
@@ -241,5 +239,32 @@ impl fmt::Display for SolarPressure {
             "SRP with φ = {} W/m^2 and eclipse {}",
             self.phi, self.shadow_model
         )
+    }
+}
+
+#[cfg(feature = "python")]
+#[cfg_attr(feature = "python", pymethods)]
+impl SolarPressure {
+    #[pyo3(signature = (shadow_bodies, almanac, flux_w_m2=SOLAR_FLUX_W_m2, estimate=true))]
+    #[new]
+    fn py_new(
+        shadow_bodies: Vec<Frame>,
+        almanac: &Almanac,
+        flux_w_m2: f64,
+        estimate: bool,
+    ) -> Result<Self, DynamicsError> {
+        let mut me = Self::default_flux_raw(shadow_bodies, almanac)?;
+        me.phi = flux_w_m2;
+        me.estimate = estimate;
+
+        Ok(me)
+    }
+
+    fn __str__(&self) -> String {
+        format!("{self}")
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self} @ {self:p}")
     }
 }

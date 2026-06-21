@@ -129,8 +129,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         StochasticNoise::from_hardware_range_km(
             sa45_csac_allan_dev,
             10.0.seconds(),
-            link_specific::ChipRate::StandardT4B,
-            link_specific::SN0::Average,
+            link_specific::ChipRate::StandardT4B(),
+            link_specific::SN0::Average(),
         ),
     );
 
@@ -139,8 +139,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         StochasticNoise::from_hardware_doppler_km_s(
             sa45_csac_allan_dev,
             10.0.seconds(),
-            link_specific::CarrierFreq::SBand,
-            link_specific::CN0::Average,
+            link_specific::CarrierFreq::SBand(),
+            link_specific::CN0::Average(),
         ),
     );
 

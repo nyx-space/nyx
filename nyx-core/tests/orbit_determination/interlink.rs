@@ -108,8 +108,8 @@ fn interlink_nrho_llo(#[case] disperse: bool, almanac: Arc<Almanac>) {
         StochasticNoise::from_hardware_range_km(
             sa45_csac_allan_dev,
             10.0.seconds(),
-            noise::link_specific::ChipRate::StandardT4B,
-            noise::link_specific::SN0::Average,
+            noise::link_specific::ChipRate::StandardT4B(),
+            noise::link_specific::SN0::Average(),
         ),
     );
 
@@ -118,8 +118,8 @@ fn interlink_nrho_llo(#[case] disperse: bool, almanac: Arc<Almanac>) {
         StochasticNoise::from_hardware_doppler_km_s(
             sa45_csac_allan_dev,
             10.0.seconds(),
-            noise::link_specific::CarrierFreq::SBand,
-            noise::link_specific::CN0::Average,
+            noise::link_specific::CarrierFreq::SBand(),
+            noise::link_specific::CN0::Average(),
         ),
     );
 

@@ -75,7 +75,12 @@ where
         + Allocator<<MsrIn as State>::Size, <MsrIn as State>::Size>
         + Allocator<<MsrIn as State>::VecLength>,
 {
-    /// Build a new tracking arc simulator using the provided seeded random number generator.
+    /// Constructs a deterministic tracking simulator initialized with a specific random number generator.
+    ///
+    /// Evaluates the configuration of all provided devices, filtering out invalid definitions via sanity checks.
+    /// Computes the greatest common denominator (GCD) of all configured sampling rates to construct a unified,
+    /// high-fidelity time series encompassing the entire trajectory span. This ensures that interpolation artifacts
+    /// are minimized when extracting state vectors at non-uniform station sampling intervals.
     pub fn with_rng(
         devices: BTreeMap<String, D>,
         trajectory: Traj<MsrIn>,
@@ -315,9 +320,7 @@ impl TrackingArcSim<Spacecraft, GroundStation> {
             {
                 info!("Building schedule for {name}");
                 if scheduler.handoff == Handoff::Overlap {
-                    warn!(
-                        "Overlapping measurements on {name} is no longer supported on identical epochs."
-                    );
+                    warn!("Overlap unsupported for {name} on identical epochs.");
                 }
                 built_cfg.get_mut(name).unwrap().scheduler = None;
                 built_cfg.get_mut(name).unwrap().strands = Some(Vec::new());
@@ -336,8 +339,9 @@ impl TrackingArcSim<Spacecraft, GroundStation> {
                     let strand_end = arc.fall.orbit.epoch;
 
                     if strand_end - strand_start < cfg.sampling * i64::from(scheduler.min_samples) {
-                        info!(
-                            "Too few samples from {name} opportunity from {strand_start} to {strand_end}, discarding strand",
+                        warn!(
+                            "Dropped [{strand_start}, {strand_end}]: < {} samples @ {}",
+                            scheduler.min_samples, cfg.sampling
                         );
                         continue;
                     }
@@ -363,8 +367,8 @@ impl TrackingArcSim<Spacecraft, GroundStation> {
                             // Check that we didn't eat into the whole tracking opportunity
                             if strand_range.start > strand_end {
                                 // Lost this whole opportunity.
-                                info!(
-                                    "Discarding {name} opportunity from {strand_start} to {strand_end} due to cadence {:?}",
+                                warn!(
+                                    "Dropped {name} [{strand_start}, {strand_end}]: cadence {:?}",
                                     scheduler.cadence
                                 );
                                 continue;
@@ -415,20 +419,14 @@ impl TrackingArcSim<Spacecraft, GroundStation> {
                         let next_config = built_cfg.get_mut(next_name).unwrap();
                         let new_start = this_strand.end + next_config.sampling;
                         next_config.strands.as_mut().unwrap()[*next_pos].start = new_start;
-                        info!(
-                            "{this_name} configured as {:?}, so {next_name} now starts on {new_start}",
-                            config.handoff
-                        );
+                        info!("Greedy handoff for {this_name}: {next_name} delayed to {new_start}");
                     } else if config.handoff == Handoff::Eager
                         && this_strand.end >= next_strand.start
                     {
                         let this_config = built_cfg.get_mut(this_name).unwrap();
                         let new_end = next_strand.start - this_config.sampling;
                         this_config.strands.as_mut().unwrap()[*this_pos].end = new_end;
-                        info!(
-                            "{this_name} now hands off to {next_name} on {new_end} because it's configured as {:?}",
-                            config.handoff
-                        );
+                        info!("Eager handoff for {this_name}: {this_name} terminated at {new_end}");
                     }
                 } else {
                     // Reached the end

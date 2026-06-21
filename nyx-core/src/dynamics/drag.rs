@@ -30,12 +30,31 @@ use serde_dhall::StaticType;
 use std::fmt;
 use std::sync::Arc;
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+#[cfg(feature = "python")]
+use pyo3::types::PyType;
+
 /// Density in kg/m^3 and altitudes in meters, not kilometers!
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, StaticType)]
+#[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub enum AtmDensity {
     Constant(f64),
     Exponential { rho0: f64, r0: f64, ref_alt_m: f64 },
     StdAtm { max_alt_m: f64 },
+}
+
+#[cfg(feature = "python")]
+#[cfg_attr(feature = "python", pymethods)]
+impl AtmDensity {
+    #[classmethod]
+    fn earth_exponential(_cls: &Bound<'_, PyType>) -> Self {
+        AtmDensity::Exponential {
+            rho0: 3.614e-13,
+            r0: 700_000.0,
+            ref_alt_m: 88_667.0,
+        }
+    }
 }
 
 /// `ConstantDrag` implements a constant drag model as defined in Vallado, 4th ed., page 551, with an important caveat.
@@ -48,7 +67,7 @@ pub struct ConstantDrag {
     /// atmospheric density in kg/m^3
     pub rho: f64,
     /// Frame causing the drag
-    pub drag_frame: Frame,
+    pub frame: Frame,
     /// Set to true to estimate the coefficient of drag
     pub estimate: bool,
 }
@@ -58,7 +77,7 @@ impl fmt::Display for ConstantDrag {
         write!(
             f,
             "\tConstant Drag rho = {} kg/m^3 in frame {}",
-            self.rho, self.drag_frame
+            self.rho, self.frame
         )
     }
 }
@@ -69,11 +88,12 @@ impl ForceModel for ConstantDrag {
     }
 
     fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
-        let osc = almanac
-            .transform_to(ctx.orbit, self.drag_frame, None)
-            .context(DynamicsAlmanacSnafu {
-                action: "transforming into drag frame",
-            })?;
+        let osc =
+            almanac
+                .transform_to(ctx.orbit, self.frame, None)
+                .context(DynamicsAlmanacSnafu {
+                    action: "transforming into drag frame",
+                })?;
 
         let velocity = osc.velocity_km_s;
         // Note the 1e3 factor to convert drag units from ((kg * km^2 * s^-2) / m^1) to (kg * km * s^-2)
@@ -99,25 +119,26 @@ impl ForceModel for ConstantDrag {
 
 /// `Drag` implements all three drag models.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, StaticType)]
+#[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct Drag {
     /// Density computation method
     pub density: AtmDensity,
     /// Frame to compute the drag in
-    pub drag_frame: Frame,
+    pub frame: Frame,
     /// Set to true to estimate the coefficient of drag
     pub estimate: bool,
 }
 
 impl Drag {
     /// Common exponential drag model for the Earth
-    pub fn earth_exp(almanac: Arc<Almanac>) -> Result<Arc<Self>, DynamicsError> {
+    pub fn earth_exp(almanac: &Almanac) -> Result<Arc<Self>, DynamicsError> {
         Ok(Arc::new(Self {
             density: AtmDensity::Exponential {
                 rho0: 3.614e-13,
                 r0: 700_000.0,
                 ref_alt_m: 88_667.0,
             },
-            drag_frame: almanac.frame_info(IAU_EARTH_FRAME).context({
+            frame: almanac.frame_info(IAU_EARTH_FRAME).context({
                 DynamicsPlanetarySnafu {
                     action: "planetary data from third body not loaded",
                 }
@@ -127,12 +148,12 @@ impl Drag {
     }
 
     /// Drag model which uses the standard atmosphere 1976 model for atmospheric density
-    pub fn std_atm1976(almanac: Arc<Almanac>) -> Result<Arc<Self>, DynamicsError> {
+    pub fn std_atm1976(almanac: &Almanac) -> Result<Arc<Self>, DynamicsError> {
         Ok(Arc::new(Self {
             density: AtmDensity::StdAtm {
                 max_alt_m: 1_000_000.0,
             },
-            drag_frame: almanac.frame_info(IAU_EARTH_FRAME).context({
+            frame: almanac.frame_info(IAU_EARTH_FRAME).context({
                 DynamicsPlanetarySnafu {
                     action: "planetary data from third body not loaded",
                 }
@@ -147,7 +168,7 @@ impl fmt::Display for Drag {
         write!(
             f,
             "\tDrag density {:?} in frame {}",
-            self.density, self.drag_frame
+            self.density, self.frame
         )
     }
 }
@@ -160,11 +181,12 @@ impl ForceModel for Drag {
     fn eom(&self, ctx: &Spacecraft, almanac: Arc<Almanac>) -> Result<Vector3<f64>, DynamicsError> {
         let integration_frame = ctx.orbit.frame;
 
-        let osc_drag_frame = almanac
-            .transform_to(ctx.orbit, self.drag_frame, None)
-            .context(DynamicsAlmanacSnafu {
-                action: "transforming into drag frame",
-            })?;
+        let osc_drag_frame =
+            almanac
+                .transform_to(ctx.orbit, self.frame, None)
+                .context(DynamicsAlmanacSnafu {
+                    action: "transforming into drag frame",
+                })?;
 
         match self.density {
             AtmDensity::Constant(rho) => {
@@ -189,7 +211,7 @@ impl ForceModel for Drag {
                     * (-(osc_drag_frame.rmag_km()
                         - (r0
                             + self
-                                .drag_frame
+                                .frame
                                 .mean_equatorial_radius_km()
                                 .context(AstroPhysicsSnafu)
                                 .context(DynamicsAstroSnafu)?))
@@ -219,7 +241,7 @@ impl ForceModel for Drag {
             AtmDensity::StdAtm { max_alt_m } => {
                 let altitude_km = osc_drag_frame.rmag_km()
                     - self
-                        .drag_frame
+                        .frame
                         .mean_equatorial_radius_km()
                         .context(AstroPhysicsSnafu)
                         .context(DynamicsAstroSnafu)?;
@@ -269,5 +291,27 @@ impl ForceModel for Drag {
         Err(DynamicsError::DynamicsAstro {
             source: AstroError::PartialsUndefined,
         })
+    }
+}
+
+#[cfg(feature = "python")]
+#[cfg_attr(feature = "python", pymethods)]
+impl Drag {
+    #[pyo3(signature = (density, frame, estimate=true))]
+    #[new]
+    fn py_new(density: AtmDensity, frame: Frame, estimate: bool) -> Self {
+        Self {
+            density,
+            frame,
+            estimate,
+        }
+    }
+
+    fn __str__(&self) -> String {
+        format!("{self}")
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self} @ {self:p}")
     }
 }
