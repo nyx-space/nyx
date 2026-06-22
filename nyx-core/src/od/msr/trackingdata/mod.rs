@@ -15,7 +15,7 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use super::{measurement::Measurement, MeasurementType};
+use super::{MeasurementType, measurement::Measurement};
 use core::fmt;
 use hifitime::prelude::{Duration, Epoch};
 use indexmap::{IndexMap, IndexSet};
@@ -88,7 +88,11 @@ pub struct TrackingDataArc {
 impl TrackingDataArc {
     /// Sort these measurements by epoch
     pub fn sort(&mut self) {
-        self.measurements.sort_unstable_by_key(|m| m.epoch);
+        self.measurements.sort_unstable_by(|a, b| {
+            a.epoch
+                .cmp(&b.epoch)
+                .then_with(|| a.tracker.cmp(&b.tracker))
+        });
     }
     /// Returns the start epoch of this tracking arc
     pub fn start_epoch(&self) -> Option<Epoch> {
@@ -527,6 +531,28 @@ impl Add for TrackingDataArc {
         self.measurements.extend(rhs.measurements);
         self.sort();
 
+        // Coalesce adjacent duplicate elements in exactly O(K) time.
+        // dedup_by passes pointers to `(next_element, kept_element)`.
+        // If the closure returns true, `next_element` is physically dropped.
+        self.measurements.dedup_by(|next, kept| {
+            if next.epoch == kept.epoch && next.tracker == kept.tracker {
+                // The tracker and epoch are identical. Drain the sub-observables
+                // from the redundant 'next' measurement and merge them into the 'kept' one.
+                kept.data.extend(next.data.drain(..));
+
+                // If either partial record was manually flagged as rejected,
+                // the combined radiometric record must retain that suspicion.
+                kept.rejected |= next.rejected;
+
+                // Return true to destroy the redundant parent struct.
+                true
+            } else {
+                // Elements differ structurally. Keep both.
+                false
+            }
+        });
+
+        self.force_reject = false;
         self
     }
 }
