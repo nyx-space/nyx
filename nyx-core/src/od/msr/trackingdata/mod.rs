@@ -88,8 +88,7 @@ pub struct TrackingDataArc {
 impl TrackingDataArc {
     /// Sort these measurements by epoch
     pub fn sort(&mut self) {
-        self.measurements
-            .sort_unstable_by(|m0, m1| m0.epoch.cmp(&m1.epoch));
+        self.measurements.sort_unstable_by_key(|m| m.epoch);
     }
     /// Returns the start epoch of this tracking arc
     pub fn start_epoch(&self) -> Option<Epoch> {

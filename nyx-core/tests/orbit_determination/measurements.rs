@@ -12,8 +12,8 @@ use nyx::od::prelude::*;
 use nyx::time::Epoch;
 use nyx::{dynamics::OrbitalDynamics, propagators::Propagator};
 use nyx_space::propagators::IntegratorMethod;
-use rand::rngs::SysRng;
 use rand::SeedableRng;
+use rand::rngs::SysRng;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::str::FromStr;
@@ -70,10 +70,12 @@ fn nil_measurement(almanac: Arc<Almanac>) {
         .for_duration_with_traj(1.seconds())
         .unwrap();
 
-    assert!(station
-        .measure(epoch, &traj, None, almanac)
-        .unwrap()
-        .is_none());
+    assert!(
+        station
+            .measure(epoch, &traj, None, almanac)
+            .unwrap()
+            .is_none()
+    );
 
     // ASN.1 round trip test
     let mut buf = vec![];

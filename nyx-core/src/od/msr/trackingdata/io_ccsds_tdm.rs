@@ -26,7 +26,7 @@ use hifitime::{Duration, Epoch, TimeScale};
 use indexmap::{IndexMap, IndexSet};
 use log::{error, info, warn};
 use snafu::ResultExt;
-use std::collections::{HashMap};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::io::{BufRead, BufReader, BufWriter};
@@ -169,7 +169,9 @@ impl TrackingDataArc {
                     MeasurementType::ReceiveFrequency,
                     MeasurementType::TransmitFrequency,
                     MeasurementType::TransmitFrequencyRate,
-                ].contains(&mtype) {
+                ]
+                .contains(&mtype)
+                {
                     has_freq_data = true;
                     1.0
                 } else {
@@ -180,7 +182,7 @@ impl TrackingDataArc {
 
                 // If the last inserted measurement belongs to the exact same tracker
                 // and epoch, we append the sub-observable to its IndexMap.
-                let is_concurrent = measurements.last().map_or(false, |last: &Measurement| {
+                let is_concurrent = measurements.last().is_some_and(|last: &Measurement| {
                     last.epoch == epoch && last.tracker == current_tracker
                 });
 
@@ -393,12 +395,15 @@ impl TrackingDataArc {
         // Remove measurements that have no data left after our processing.
         measurements.retain(|m| !m.data.is_empty());
 
-        let trk = Self {
+        let mut trk = Self {
             measurements,
             source: Some(source),
             moduli,
             force_reject: false,
         };
+
+        // Ensure data is sorted (TDM spec requires that, but you never know).
+        trk.sort();
 
         if trk.unique_types().is_empty() {
             Err(InputOutputError::EmptyDataset {

@@ -30,9 +30,9 @@ use arrow::{
 use hifitime::{Epoch, TimeScale};
 use indexmap::IndexMap;
 use log::{info, warn};
-use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::arrow::ArrowWriter;
-use snafu::{ensure, ResultExt};
+use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+use snafu::{ResultExt, ensure};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
