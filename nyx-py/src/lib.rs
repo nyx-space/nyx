@@ -117,6 +117,10 @@ fn orbit_determination(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
     sm.add_class::<ChipRate>()?;
     sm.add_class::<CarrierFreq>()?;
     sm.add_class::<py_od::GroundTrackingArcSim>()?;
+    sm.add_class::<py_od::PySpacecraftODProcess>()?;
+    sm.add_class::<py_od::PySpacecraftODSolution>()?;
+    sm.add_class::<py_od::PyKfEstimate>()?;
+    sm.add_class::<py_od::PyResidual>()?;
 
     Ok(())
 }

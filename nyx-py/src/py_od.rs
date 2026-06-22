@@ -31,6 +31,111 @@ use nyx_space::{
 use std::collections::BTreeMap;
 
 use pyo3::prelude::*;
+use nyx_space::od::estimate::KfEstimate;
+use nyx_space::od::SpacecraftKalmanOD;
+use nyx_space::od::prelude::ODError;
+
+#[derive(Clone)]
+#[pyclass(from_py_object, name = "SpacecraftODProcess")]
+pub struct PySpacecraftODProcess {
+    pub(crate) inner: SpacecraftKalmanOD,
+}
+
+#[pymethods]
+impl PySpacecraftODProcess {
+    #[pyo3(name = "process_arc")]
+    fn py_process_arc(&self, initial_estimate: PyKfEstimate, arc: &TrackingDataArc) -> Result<PySpacecraftODSolution, PyErr> {
+        let inner_res = self.inner.process_arc(initial_estimate.inner, arc).map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("{}", e)))?;
+        Ok(PySpacecraftODSolution {
+            inner: inner_res
+        })
+    }
+
+    #[pyo3(name = "predict_until")]
+    fn py_predict_until(&self, initial_estimate: PyKfEstimate, end_epoch: hifitime::Epoch) -> Result<PySpacecraftODSolution, PyErr> {
+        let inner_res = self.inner.predict_until(initial_estimate.inner, end_epoch).map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("{}", e)))?;
+        Ok(PySpacecraftODSolution {
+            inner: inner_res
+        })
+    }
+
+    #[pyo3(name = "predict_for")]
+    fn py_predict_for(&self, initial_estimate: PyKfEstimate, duration: hifitime::Duration) -> Result<PySpacecraftODSolution, PyErr> {
+        let inner_res = self.inner.predict_for(initial_estimate.inner, duration).map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("{}", e)))?;
+        Ok(PySpacecraftODSolution {
+            inner: inner_res
+        })
+    }
+}
+
+#[derive(Clone)]
+#[pyclass(from_py_object, name = "KfEstimate")]
+pub struct PyKfEstimate {
+    pub(crate) inner: KfEstimate<Spacecraft>,
+}
+
+#[derive(Clone)]
+#[pyclass(from_py_object, name = "Residual")]
+pub struct PyResidual {
+    pub(crate) inner: nyx_space::od::estimate::residual::Residual<nyx_space::linalg::Const<2>>,
+}
+
+#[pymethods]
+impl PyResidual {
+    fn __str__(&self) -> String {
+        format!("{}", self.inner)
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{} @ {self:p}", self.inner)
+    }
+}
+
+#[derive(Clone)]
+#[pyclass(from_py_object, name = "SpacecraftODSolution")]
+pub struct PySpacecraftODSolution {
+    pub(crate) inner: nyx_space::od::prelude::ODSolution<Spacecraft, KfEstimate<Spacecraft>, nyx_space::linalg::Const<2>, GroundStation>,
+}
+
+#[pymethods]
+impl PySpacecraftODSolution {
+    #[pyo3(name = "is_filter_run")]
+    fn py_is_filter_run(&self) -> bool {
+        self.inner.is_filter_run()
+    }
+
+    #[pyo3(name = "is_smoother_run")]
+    fn py_is_smoother_run(&self) -> bool {
+        self.inner.is_smoother_run()
+    }
+
+    #[pyo3(name = "to_traj")]
+    fn py_to_traj(&self) -> Result<PyTrajectory, PyErr> {
+        let traj = self.inner.to_traj().map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("{}", e)))?;
+        Ok(PyTrajectory { inner: traj })
+    }
+
+    #[pyo3(name = "accepted_residuals")]
+    fn py_accepted_residuals(&self) -> Vec<PyResidual> {
+        self.inner.accepted_residuals().into_iter().map(|r| PyResidual { inner: r }).collect()
+    }
+
+    #[pyo3(name = "rejected_residuals")]
+    fn py_rejected_residuals(&self) -> Vec<PyResidual> {
+        self.inner.rejected_residuals().into_iter().map(|r| PyResidual { inner: r }).collect()
+    }
+}
+
+#[pymethods]
+impl PyKfEstimate {
+    fn __str__(&self) -> String {
+        format!("{}", self.inner)
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{} @ {self:p}", self.inner)
+    }
+}
 
 #[derive(Clone)]
 #[pyclass(from_py_object)]
