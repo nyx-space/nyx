@@ -37,10 +37,10 @@ DATA_STOP
     println!("{arc}");
 
     assert_eq!(arc.len(), 1);
-    let (epoch, msr) = arc.measurements.iter().next().unwrap();
+    let msr = arc.measurements.iter().next().unwrap();
 
     assert_eq!(
-        *epoch,
+        msr.epoch,
         Epoch::from_gregorian_utc(2023, 2, 22, 19, 18, 27, 160_000_000)
     );
 

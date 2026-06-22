@@ -15,13 +15,11 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use super::{MeasurementType, measurement::Measurement};
+use super::{measurement::Measurement, MeasurementType};
 use core::fmt;
 use hifitime::prelude::{Duration, Epoch};
 use indexmap::{IndexMap, IndexSet};
-use log::{error, info, warn};
-use std::collections::BTreeMap;
-use std::collections::btree_map::Entry;
+use log::{info, warn};
 use std::ops::Bound::{self, Excluded, Included, Unbounded};
 use std::ops::{Add, AddAssign, RangeBounds};
 
@@ -77,7 +75,7 @@ mod python;
 #[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub struct TrackingDataArc {
     /// All measurements in this data arc
-    pub measurements: BTreeMap<Epoch, Measurement>, // BUG: Consider a map of tracking to epoch!
+    pub measurements: Vec<Measurement>,
     /// Source file if loaded from a file or saved to a file.
     pub source: Option<String>,
     /// Optionally provide a map of modulos (e.g. the RANGE_MODULO of CCSDS TDM).
@@ -88,14 +86,19 @@ pub struct TrackingDataArc {
 
 #[cfg_attr(feature = "python", pymethods)]
 impl TrackingDataArc {
+    /// Sort these measurements by epoch
+    pub fn sort(&mut self) {
+        self.measurements
+            .sort_unstable_by(|m0, m1| m0.epoch.cmp(&m1.epoch));
+    }
     /// Returns the start epoch of this tracking arc
     pub fn start_epoch(&self) -> Option<Epoch> {
-        self.measurements.first_key_value().map(|(k, _)| *k)
+        self.measurements.first().map(|msr| msr.epoch)
     }
 
     /// Returns the end epoch of this tracking arc
     pub fn end_epoch(&self) -> Option<Epoch> {
-        self.measurements.last_key_value().map(|(k, _)| *k)
+        self.measurements.last().map(|msr| msr.epoch)
     }
 
     /// Returns the duration this tracking arc
@@ -123,10 +126,11 @@ impl TrackingDataArc {
         } else {
             let mut min_sep = Duration::MAX;
             let mut prev_epoch = self.start_epoch().unwrap();
-            for (epoch, _) in self.measurements.iter().skip(1) {
-                let this_sep = *epoch - prev_epoch;
+            for msr in self.measurements.iter().skip(1) {
+                let epoch = msr.epoch;
+                let this_sep = epoch - prev_epoch;
                 min_sep = min_sep.min(this_sep);
-                prev_epoch = *epoch;
+                prev_epoch = epoch;
             }
             Some(min_sep)
         }
@@ -147,7 +151,7 @@ impl TrackingDataArc {
     /// Applies the moduli to each measurement, if defined.
     pub fn apply_moduli(&mut self) {
         if let Some(moduli) = &self.moduli {
-            for msr in self.measurements.values_mut() {
+            for msr in &mut self.measurements {
                 for (msr_type, modulus) in moduli {
                     if let Some(msr_value) = msr.data.get_mut(msr_type) {
                         *msr_value %= *modulus;
@@ -216,24 +220,25 @@ impl TrackingDataArc {
 
         let measurements: Vec<_> = self.measurements.iter().collect();
 
-        for (i, (epoch, _)) in measurements.iter().enumerate().step_by(window_size) {
+        for (i, msr) in measurements.iter().enumerate().step_by(window_size) {
+            let epoch = msr.epoch;
             let start = i.saturating_sub(window_size / 2);
             let end = (i + window_size / 2 + 1).min(measurements.len());
             let window = &measurements[start..end];
 
             let mut filtered_measurement = Measurement {
-                tracker: window[0].1.tracker.clone(),
-                epoch: **epoch,
+                tracker: window[0].tracker.clone(),
+                epoch,
                 data: IndexMap::new(),
                 rejected: false,
             };
 
             // Apply moving average filter for each measurement type
             for mtype in self.unique_types() {
-                let sum: f64 = window.iter().filter_map(|(_, m)| m.data.get(&mtype)).sum();
+                let sum: f64 = window.iter().filter_map(|m| m.data.get(&mtype)).sum();
                 let count = window
                     .iter()
-                    .filter(|(_, m)| m.data.contains_key(&mtype))
+                    .filter(|m| m.data.contains_key(&mtype))
                     .count();
 
                 if count > 0 {
@@ -241,40 +246,48 @@ impl TrackingDataArc {
                 }
             }
 
-            result.measurements.insert(**epoch, filtered_measurement);
+            result.measurements.push(filtered_measurement);
         }
+        result.sort();
         result
     }
 
     /// Splits a long tracking data arc into smaller chunks, each up to `max_duration` long.
-    /// This is inspired by JPL MONTE's long arc setup to ensure BLSE convergence on manageable chunks.
     pub fn chunk(&self, max_duration: Duration) -> Vec<TrackingDataArc> {
         let mut chunks = Vec::new();
         if self.is_empty() || max_duration <= Duration::ZERO {
             return chunks;
         }
 
-        let end_epoch = self.end_epoch().unwrap();
-        let mut chunk_start = self.start_epoch().unwrap();
+        let mut start_idx = 0;
+        let total_measurements = self.measurements.len();
 
-        while chunk_start <= end_epoch {
-            let chunk_end = chunk_start + max_duration;
-            let sub_arc = self.clone().filter_by_epoch(chunk_start..chunk_end);
-            if !sub_arc.is_empty() {
-                chunks.push(sub_arc);
-            }
-            // Move start to the next measurement's epoch after chunk_end
-            let mut found_next = false;
-            for (epoch, _) in self.measurements.range(chunk_end..) {
-                if *epoch >= chunk_end {
-                    chunk_start = *epoch;
-                    found_next = true;
-                    break;
-                }
-            }
-            if !found_next {
-                break;
-            }
+        while start_idx < total_measurements {
+            let chunk_start_epoch = self.measurements[start_idx].epoch;
+            let chunk_end_time = chunk_start_epoch + max_duration;
+
+            // Isolate the remaining, unprocessed portion of the vector
+            let remaining = &self.measurements[start_idx..];
+
+            // Perform a binary search on the remaining slice to find the first
+            // index that strictly exceeds the chunk_end_time.
+            let offset = remaining.partition_point(|msr| msr.epoch <= chunk_end_time);
+
+            let end_idx = start_idx + offset;
+
+            // Extract and clone ONLY the measurements belonging to this chunk.
+            // This drops the memory complexity from O(K * N) to strictly O(N).
+            let chunk_measurements = self.measurements[start_idx..end_idx].to_vec();
+
+            chunks.push(TrackingDataArc {
+                measurements: chunk_measurements,
+                source: self.source.clone(),
+                moduli: self.moduli.clone(),
+                force_reject: self.force_reject,
+            });
+
+            // Advance the window to the exact start of the next chunk
+            start_idx = end_idx;
         }
 
         chunks
@@ -282,6 +295,25 @@ impl TrackingDataArc {
 }
 
 impl TrackingDataArc {
+    /// Helper method to resolve bounds into slice indices via binary search.
+    fn resolve_bounds<R: RangeBounds<Epoch>>(&self, bound: R) -> (usize, usize) {
+        // Find the lower bound index via O(log N) binary search
+        let start_idx = match bound.start_bound() {
+            Bound::Included(&epoch) => self.measurements.partition_point(|m| m.epoch < epoch),
+            Bound::Excluded(&epoch) => self.measurements.partition_point(|m| m.epoch <= epoch),
+            Bound::Unbounded => 0,
+        };
+
+        // Find the upper bound index via O(log N) binary search
+        let end_idx = match bound.end_bound() {
+            Bound::Included(&epoch) => self.measurements.partition_point(|m| m.epoch <= epoch),
+            Bound::Excluded(&epoch) => self.measurements.partition_point(|m| m.epoch < epoch),
+            Bound::Unbounded => self.measurements.len(),
+        };
+
+        (start_idx, end_idx)
+    }
+
     /// Returns the unique list of aliases in this tracking data arc
     pub fn unique_aliases(&self) -> IndexSet<String> {
         self.unique().0
@@ -296,7 +328,7 @@ impl TrackingDataArc {
     pub fn unique(&self) -> (IndexSet<String>, IndexSet<MeasurementType>) {
         let mut aliases = IndexSet::new();
         let mut types = IndexSet::new();
-        for msr in self.measurements.values() {
+        for msr in &self.measurements {
             aliases.insert(msr.tracker.clone());
             for k in msr.data.keys() {
                 types.insert(*k);
@@ -306,12 +338,30 @@ impl TrackingDataArc {
     }
 
     /// Returns a new tracking arc that only contains measurements that fall within the given epoch range.
+    ///
+    /// Executes in O(N) time strictly due to memory shifting, requiring zero new allocations.
     pub fn filter_by_epoch<R: RangeBounds<Epoch>>(mut self, bound: R) -> Self {
-        self.measurements = self
-            .measurements
-            .range(bound)
-            .map(|(epoch, msr)| (*epoch, msr.clone()))
-            .collect::<BTreeMap<Epoch, Measurement>>();
+        let (start_idx, end_idx) = self.resolve_bounds(bound);
+
+        // Handle disjoint bounds or out-of-range queries
+        if start_idx >= end_idx || start_idx >= self.measurements.len() {
+            self.measurements.clear();
+            return self;
+        }
+
+        // In-place memory reduction
+        // Truncate the tail first. This drops trailing measurements without shifting.
+        self.measurements.truncate(end_idx);
+
+        // Drain the head. This removes preceding measurements and shifts the
+        // remaining valid data leftward to index 0 in a single memory move.
+        self.measurements.drain(0..start_idx);
+
+        // Note that the order is preserved, so we don't need to sort again.
+
+        // Clear unused memory
+        self.measurements.shrink_to_fit();
+
         self
     }
 
@@ -340,20 +390,20 @@ impl TrackingDataArc {
         self.measurements = self
             .measurements
             .iter()
-            .filter_map(|(epoch, msr)| {
+            .filter_map(|msr| {
                 if msr.tracker == tracker {
-                    Some((*epoch, msr.clone()))
+                    Some(msr.clone())
                 } else {
                     None
                 }
             })
-            .collect::<BTreeMap<Epoch, Measurement>>();
+            .collect::<Vec<Measurement>>();
         self
     }
 
     /// Returns a new tracking arc that only contains measurements of the provided type.
     pub fn filter_by_measurement_type(mut self, included_type: MeasurementType) -> Self {
-        self.measurements.retain(|_epoch, msr| {
+        self.measurements.retain_mut(|msr| {
             msr.data.retain(|msr_type, _| *msr_type == included_type);
             !msr.data.is_empty()
         });
@@ -365,42 +415,29 @@ impl TrackingDataArc {
         self.measurements = self
             .measurements
             .iter()
-            .filter_map(|(epoch, msr)| {
+            .filter_map(|msr| {
                 if msr.tracker != excluded_tracker {
-                    Some((*epoch, msr.clone()))
+                    Some(msr.clone())
                 } else {
                     None
                 }
             })
-            .collect::<BTreeMap<Epoch, Measurement>>();
+            .collect::<Vec<Measurement>>();
         self
     }
 
     /// Returns a new tracking arc that excludes measurements within the given epoch range.
+    ///
+    /// Executes an in-place O(N) memory shift with zero heap allocations.
     pub fn exclude_by_epoch<R: RangeBounds<Epoch>>(mut self, bound: R) -> Self {
-        info!(
-            "Excluding measurements from {:?} to {:?}",
-            bound.start_bound(),
-            bound.end_bound()
-        );
+        let (start_idx, end_idx) = self.resolve_bounds(bound);
 
-        let mut new_measurements = BTreeMap::new();
+        if start_idx < end_idx && start_idx < self.measurements.len() {
+            // Drain removes the specified range and shifts all subsequent elements
+            // leftward to fill the gap. The extracted elements are immediately dropped.
+            self.measurements.drain(start_idx..end_idx);
+        }
 
-        // Include entries before the excluded range
-        new_measurements.extend(
-            self.measurements
-                .range((Bound::Unbounded, bound.start_bound()))
-                .map(|(epoch, msr)| (*epoch, msr.clone())),
-        );
-
-        // Include entries after the excluded range
-        new_measurements.extend(
-            self.measurements
-                .range((bound.end_bound(), Bound::Unbounded))
-                .map(|(epoch, msr)| (*epoch, msr.clone())),
-        );
-
-        self.measurements = new_measurements;
         self
     }
 
@@ -409,26 +446,32 @@ impl TrackingDataArc {
         self.measurements = self
             .measurements
             .iter_mut()
-            .map(|(epoch, msr)| {
+            .map(|msr| {
                 msr.data.retain(|msr_type, _| *msr_type != excluded_type);
-
-                (*epoch, msr.clone())
+                msr.clone()
             })
-            .collect::<BTreeMap<Epoch, Measurement>>();
+            .collect::<Vec<Measurement>>();
         self
     }
 
     /// Marks measurements within the given epoch range as rejected.
+    ///
+    /// Operates in O(log N) for bound resolution and O(K) for iteration, where K is the slice length.
     pub fn reject_by_epoch<R: RangeBounds<Epoch>>(mut self, bound: R) -> Self {
-        for (_epoch, msr) in self.measurements.range_mut(bound) {
-            msr.rejected = true;
+        let (start_idx, end_idx) = self.resolve_bounds(bound);
+
+        if start_idx < end_idx && start_idx < self.measurements.len() {
+            for msr in &mut self.measurements[start_idx..end_idx] {
+                msr.rejected = true;
+            }
         }
         self
     }
 
     /// Marks measurements from the provided tracker as rejected.
-    pub fn reject_by_tracker(mut self, tracker: String) -> Self {
-        for msr in self.measurements.values_mut() {
+    /// Requires an O(N) scan. The parameter is downgraded to &str to prevent heap allocations.
+    pub fn reject_by_tracker(mut self, tracker: &str) -> Self {
+        for msr in &mut self.measurements {
             if msr.tracker == tracker {
                 msr.rejected = true;
             }
@@ -482,13 +525,8 @@ impl Add for TrackingDataArc {
 
     fn add(mut self, rhs: Self) -> Self::Output {
         self.force_reject = false;
-        for (epoch, msr) in rhs.measurements {
-            if let Entry::Vacant(e) = self.measurements.entry(epoch) {
-                e.insert(msr);
-            } else {
-                error!("merging tracking data with overlapping epoch is not supported");
-            }
-        }
+        self.measurements.extend(rhs.measurements);
+        self.sort();
 
         self
     }

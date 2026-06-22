@@ -27,14 +27,13 @@ use arrow::{
     datatypes,
     record_batch::RecordBatchReader,
 };
-use hifitime::TimeScale;
-use hifitime::prelude::Epoch;
+use hifitime::{Epoch, TimeScale};
 use indexmap::IndexMap;
 use log::{info, warn};
-use parquet::arrow::ArrowWriter;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
-use snafu::{ResultExt, ensure};
-use std::collections::{BTreeMap, HashMap};
+use parquet::arrow::ArrowWriter;
+use snafu::{ensure, ResultExt};
+use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -96,7 +95,7 @@ impl TrackingDataArc {
             }
         );
 
-        let mut measurements = BTreeMap::new();
+        let mut measurements = Vec::new();
 
         // We can safely unwrap the columns since we've checked for their existance just before.
         for maybe_batch in reader {
@@ -209,7 +208,7 @@ impl TrackingDataArc {
                         .insert(MeasurementType::Elevation, elevation_data.unwrap().value(i));
                 }
 
-                measurements.insert(epoch, measurement);
+                measurements.push(measurement);
             }
         }
 
@@ -277,10 +276,7 @@ impl TrackingDataArc {
 
                 info!("Exporting measurements from {start} to {end}.");
 
-                self.measurements
-                    .range(start..end)
-                    .map(|(k, v)| (*k, v.clone()))
-                    .collect()
+                self.clone().filter_by_epoch(start..end).measurements
             } else {
                 self.measurements.clone()
             };
@@ -289,14 +285,15 @@ impl TrackingDataArc {
 
         // Epochs
         let mut utc_epoch = StringBuilder::new();
-        for epoch in measurements.keys() {
+        for msr in &measurements {
+            let epoch = msr.epoch;
             utc_epoch.append_value(epoch.to_time_scale(TimeScale::UTC).to_isoformat());
         }
         record.push(Arc::new(utc_epoch.finish()));
 
         // Device names
         let mut device_names = StringBuilder::new();
-        for m in measurements.values() {
+        for m in &measurements {
             device_names.append_value(m.tracker.clone());
         }
         record.push(Arc::new(device_names.finish()));
@@ -305,7 +302,7 @@ impl TrackingDataArc {
         for msr_type in msr_types {
             let mut data_builder = Float64Builder::new();
 
-            for m in measurements.values() {
+            for m in &measurements {
                 match m.data.get(&msr_type) {
                     Some(value) => data_builder.append_value(*value),
                     None => data_builder.append_null(),
