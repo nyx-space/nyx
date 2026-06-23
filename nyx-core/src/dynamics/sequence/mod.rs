@@ -37,7 +37,7 @@ use crate::md::Trajectory;
 use crate::propagators::Propagator;
 use crate::{NyxError, Spacecraft, State};
 
-mod config;
+pub mod config;
 mod discrete_event;
 
 pub use config::*;
