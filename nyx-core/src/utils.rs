@@ -39,25 +39,6 @@ pub fn tilde_matrix(v: &Vector3<f64>) -> Matrix3<f64> {
     Matrix3::new(0.0, -v.z, v.y, v.z, 0.0, -v.x, -v.y, v.x, 0.0)
 }
 
-#[test]
-fn test_tilde_matrix() {
-    let vec = Vector3::new(1.0, 2.0, 3.0);
-    let rslt = Matrix3::new(0.0, -3.0, 2.0, 3.0, 0.0, -1.0, -2.0, 1.0, 0.0);
-    assert_eq!(tilde_matrix(&vec), rslt);
-
-    let v = Vector3::new(1.0, 2.0, 3.0);
-    let m = tilde_matrix(&v);
-
-    assert_eq!(m[(0, 0)], 0.0);
-    assert_eq!(m[(0, 1)], -v.z);
-    assert_eq!(m[(0, 2)], v.y);
-    assert_eq!(m[(1, 0)], v.z);
-    assert_eq!(m[(1, 1)], 0.0);
-    assert_eq!(m[(1, 2)], -v.x);
-    assert_eq!(m[(2, 0)], -v.y);
-    assert_eq!(m[(2, 1)], v.x);
-    assert_eq!(m[(2, 2)], 0.0);
-}
 
 /// Checks if the provided 3x3 matrix is diagonal.
 ///
@@ -130,52 +111,13 @@ pub fn is_diagonal(m: &Matrix3<f64>) -> bool {
 /// # Source
 ///
 /// [Chemical Process Dynamics and Controls (Woolf)](https://eng.libretexts.org/Bookshelves/Industrial_and_Systems_Engineering/Book%3A_Chemical_Process_Dynamics_and_Controls_(Woolf)/10%3A_Dynamical_Systems_Analysis/10.04%3A_Using_eigenvalues_and_eigenvectors_to_find_stability_and_solve_ODEs#Summary_of_Eigenvalue_Graphs)
-pub fn are_eigenvalues_stable<N: DimName>(eigenvalues: OVector<Complex<f64>, N>) -> bool
+pub fn are_eigenvalues_stable<N: DimName>(eigenvalues: &OVector<Complex<f64>, N>) -> bool
 where
     DefaultAllocator: Allocator<N>,
 {
     eigenvalues.iter().all(|ev| ev.re <= 0.0)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use nalgebra::{Complex, OVector};
-
-    #[test]
-    fn test_stable_eigenvalues() {
-        let eigenvalues = OVector::<Complex<f64>, nalgebra::U2>::from_column_slice(&[
-            Complex::new(-1.0, 0.0),
-            Complex::new(0.0, 0.0),
-        ]);
-        assert!(are_eigenvalues_stable(eigenvalues));
-    }
-
-    #[test]
-    fn test_unstable_eigenvalues() {
-        let eigenvalues = OVector::<Complex<f64>, nalgebra::U2>::from_column_slice(&[
-            Complex::new(1.0, 0.0),
-            Complex::new(0.0, 0.0),
-        ]);
-        assert!(!are_eigenvalues_stable(eigenvalues));
-    }
-
-    #[test]
-    fn test_oscillatory_eigenvalues() {
-        let eigenvalues = OVector::<Complex<f64>, nalgebra::U2>::from_column_slice(&[
-            Complex::new(0.0, 1.0),
-            Complex::new(0.0, -1.0),
-        ]);
-        assert!(are_eigenvalues_stable(eigenvalues));
-    }
-
-    #[test]
-    fn test_invariant_eigenvalues() {
-        let eigenvalues =
-            OVector::<Complex<f64>, nalgebra::U1>::from_column_slice(&[Complex::new(0.0, 0.0)]);
-        assert!(are_eigenvalues_stable(eigenvalues));
-    }
-}
 
 /// Returns the provided angle bounded between 0.0 and 360.0.
 ///
@@ -259,22 +201,6 @@ pub fn r1(angle_rad: f64) -> Matrix3<f64> {
     Matrix3::new(1.0, 0.0, 0.0, 0.0, c, s, 0.0, -s, c)
 }
 
-#[test]
-fn test_r1() {
-    let angle = 0.0;
-    let rotation_matrix = r1(angle);
-    assert!((rotation_matrix - Matrix3::identity()).abs().max() <= f64::EPSILON);
-
-    let angle = std::f64::consts::PI / 2.0;
-    let rotation_matrix = r1(angle);
-    let expected_matrix = Matrix3::new(1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0);
-    assert!((rotation_matrix - expected_matrix).abs().max() <= f64::EPSILON);
-
-    let v = Vector3::new(1.0, 0.0, 0.0);
-    let rotated_v = rotation_matrix * v;
-    assert!((rotated_v - v).norm() <= f64::EPSILON);
-}
-
 /// Returns a rotation matrix for a rotation about the Y axis.
 ///
 /// # Arguments
@@ -302,22 +228,6 @@ fn test_r1() {
 pub fn r2(angle_rad: f64) -> Matrix3<f64> {
     let (s, c) = angle_rad.sin_cos();
     Matrix3::new(c, 0.0, -s, 0.0, 1.0, 0.0, s, 0.0, c)
-}
-
-#[test]
-fn test_r2() {
-    let angle = 0.0;
-    let rotation_matrix = r2(angle);
-    assert!((rotation_matrix - Matrix3::identity()).abs().max() <= f64::EPSILON);
-
-    let angle = std::f64::consts::PI / 2.0;
-    let rotation_matrix = r2(angle);
-    let expected_matrix = Matrix3::new(0.0, 0.0, -1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0);
-    assert!((rotation_matrix - expected_matrix).abs().max() <= f64::EPSILON);
-
-    let v = Vector3::new(0.0, 1.0, 0.0);
-    let rotated_v = rotation_matrix * v;
-    assert!((rotated_v - v).norm() <= f64::EPSILON);
 }
 
 /// Returns a rotation matrix for a rotation about the Z axis.
@@ -349,22 +259,6 @@ pub fn r3(angle_rad: f64) -> Matrix3<f64> {
     Matrix3::new(c, s, 0.0, -s, c, 0.0, 0.0, 0.0, 1.0)
 }
 
-#[test]
-fn test_r3() {
-    let angle = 0.0;
-    let rotation_matrix = r3(angle);
-    assert!((rotation_matrix - Matrix3::identity()).abs().max() <= f64::EPSILON);
-
-    let angle = std::f64::consts::PI / 2.0;
-    let rotation_matrix = r3(angle);
-    let expected_matrix = Matrix3::new(0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0);
-    assert!((rotation_matrix - expected_matrix).abs().max() <= f64::EPSILON);
-
-    let v = Vector3::new(0.0, 0.0, 1.0);
-    let rotated_v = rotation_matrix * v;
-    assert!((rotated_v - v).norm() <= f64::EPSILON);
-}
-
 /// Rotate a vector about a given axis
 ///
 /// # Arguments
@@ -383,15 +277,6 @@ pub fn rotv(v: &Vector3<f64>, axis: &Vector3<f64>, theta: f64) -> Vector3<f64> {
         + k_hat.scale(k_hat.dot(v) * (1.0 - theta.cos()))
 }
 
-#[test]
-fn test_rotv() {
-    use approx::assert_abs_diff_eq;
-    let v = Vector3::new(1.0, 0.0, 0.0);
-    let axis = Vector3::new(0.0, 0.0, 1.0);
-    let theta = std::f64::consts::PI / 2.0;
-    let result = rotv(&v, &axis, theta);
-    assert_abs_diff_eq!(result, Vector3::new(0.0, 1.0, 0.0), epsilon = 1e-7);
-}
 
 /// Returns the components of vector a orthogonal to b
 ///
@@ -418,30 +303,6 @@ pub fn perpv(a: &Vector3<f64>, b: &Vector3<f64>) -> Vector3<f64> {
     }
 }
 
-#[test]
-fn test_perpv() {
-    assert_eq!(
-        perpv(&Vector3::new(6.0, 6.0, 6.0), &Vector3::new(2.0, 0.0, 0.0)),
-        Vector3::new(0.0, 6.0, 6.0)
-    );
-    assert_eq!(
-        perpv(&Vector3::new(6.0, 6.0, 6.0), &Vector3::new(-3.0, 0.0, 0.0)),
-        Vector3::new(0.0, 6.0, 6.0)
-    );
-    assert_eq!(
-        perpv(&Vector3::new(6.0, 6.0, 0.0), &Vector3::new(0.0, 7.0, 0.0)),
-        Vector3::new(6.0, 0.0, 0.0)
-    );
-    assert_eq!(
-        perpv(&Vector3::new(6.0, 0.0, 0.0), &Vector3::new(0.0, 0.0, 9.0)),
-        Vector3::new(6.0, 0.0, 0.0)
-    );
-    use approx::assert_abs_diff_eq;
-    let a = Vector3::new(1.0, 1.0, 0.0);
-    let b = Vector3::new(1.0, 0.0, 0.0);
-    let result = perpv(&a, &b);
-    assert_abs_diff_eq!(result, Vector3::new(0.0, 1.0, 0.0), epsilon = 1e-7);
-}
 
 /// Returns the projection of a onto b
 ///
@@ -462,31 +323,6 @@ pub fn projv(a: &Vector3<f64>, b: &Vector3<f64>) -> Vector3<f64> {
     }
 }
 
-#[test]
-fn test_projv() {
-    assert_eq!(
-        projv(&Vector3::new(6.0, 6.0, 6.0), &Vector3::new(2.0, 0.0, 0.0)),
-        Vector3::new(6.0, 0.0, 0.0)
-    );
-    assert_eq!(
-        projv(&Vector3::new(6.0, 6.0, 6.0), &Vector3::new(-3.0, 0.0, 0.0)),
-        Vector3::new(6.0, 0.0, 0.0)
-    );
-    assert_eq!(
-        projv(&Vector3::new(6.0, 6.0, 0.0), &Vector3::new(0.0, 7.0, 0.0)),
-        Vector3::new(0.0, 6.0, 0.0)
-    );
-    assert_eq!(
-        projv(&Vector3::new(6.0, 0.0, 0.0), &Vector3::new(0.0, 0.0, 9.0)),
-        Vector3::new(0.0, 0.0, 0.0)
-    );
-
-    use approx::assert_abs_diff_eq;
-    let a = Vector3::new(1.0, 1.0, 0.0);
-    let b = Vector3::new(1.0, 0.0, 0.0);
-    let result = projv(&a, &b);
-    assert_abs_diff_eq!(result, Vector3::new(1.0, 0.0, 0.0), epsilon = 1e-7);
-}
 
 /// Computes the Root Sum Squared (RSS) state errors between two provided vectors.
 ///
@@ -508,18 +344,6 @@ where
         .map(|(&x, &y)| (x - y).powi(2))
         .sum::<f64>()
         .sqrt()
-}
-
-#[test]
-fn test_rss_errors() {
-    use nalgebra::U3;
-    let prop_err = OVector::<f64, U3>::from_iterator([1.0, 2.0, 3.0]);
-    let cur_state = OVector::<f64, U3>::from_iterator([1.0, 2.0, 3.0]);
-    assert_eq!(rss_errors(&prop_err, &cur_state), 0.0);
-
-    let prop_err = OVector::<f64, U3>::from_iterator([1.0, 2.0, 3.0]);
-    let cur_state = OVector::<f64, U3>::from_iterator([4.0, 5.0, 6.0]);
-    assert_eq!(rss_errors(&prop_err, &cur_state), 5.196152422706632);
 }
 
 /// Computes the Root Sum Squared (RSS) orbit errors in kilometers and kilometers per second.
@@ -570,15 +394,6 @@ pub fn normalize(x: f64, min_x: f64, max_x: f64) -> f64 {
     2.0 * (x - min_x) / (max_x - min_x) - 1.0
 }
 
-#[test]
-fn test_normalize() {
-    let x = 5.0;
-    let min_x = 0.0;
-    let max_x = 10.0;
-    let result = normalize(x, min_x, max_x);
-    assert_eq!(result, 0.0);
-}
-
 /// Denormalize a value between -1.0 and 1.0
 ///
 /// # Arguments
@@ -594,15 +409,6 @@ pub fn denormalize(xp: f64, min_x: f64, max_x: f64) -> f64 {
     (max_x - min_x) * (xp + 1.0) / 2.0 + min_x
 }
 
-#[test]
-fn test_denormalize() {
-    let xp = 0.0;
-    let min_x = 0.0;
-    let max_x = 10.0;
-    let result = denormalize(xp, min_x, max_x);
-    assert_eq!(result, 5.0);
-}
-
 /// Capitalize the first letter of a string
 ///
 /// # Arguments
@@ -615,7 +421,7 @@ fn test_denormalize() {
 ///
 /// # Source
 ///
-/// https://stackoverflow.com/questions/38406793/why-is-capitalizing-the-first-letter-of-a-string-so-convoluted-in-rust
+/// <https://stackoverflow.com/questions/38406793/why-is-capitalizing-the-first-letter-of-a-string-so-convoluted-in-rust>
 pub fn capitalize(s: &str) -> String {
     let mut c = s.chars();
     match c.next() {
@@ -624,12 +430,6 @@ pub fn capitalize(s: &str) -> String {
     }
 }
 
-#[test]
-fn test_capitalize() {
-    let s = "hello";
-    let result = capitalize(s);
-    assert_eq!(result, "Hello");
-}
 
 #[macro_export]
 macro_rules! pseudo_inverse {
@@ -685,6 +485,7 @@ pub fn cartesian_to_spherical(v: &Vector3<f64>) -> (f64, f64, f64) {
 
 /// Converts the input vector V from Cartesian coordinates to spherical coordinates
 /// Returns ρ, θ, φ where the range ρ is in the units of the input vector and the angles are in radians
+#[allow(clippy::many_single_char_names)]
 pub fn spherical_to_cartesian(range_ρ: f64, θ: f64, φ: f64) -> Vector3<f64> {
     if range_ρ < f64::EPSILON {
         // Treat a negative range as a zero vector
@@ -697,116 +498,12 @@ pub fn spherical_to_cartesian(range_ρ: f64, θ: f64, φ: f64) -> Vector3<f64> {
     }
 }
 
-#[rustfmt::skip]
-#[test]
-fn test_diagonality() {
-    assert!(!is_diagonal(&Matrix3::new(10.0, 0.0, 0.0,
-                                       1.0, 5.0, 0.0,
-                                       0.0, 0.0, 2.0)),
-        "lower triangular"
-    );
-    assert!(!is_diagonal(&Matrix3::new(10.0, 1.0, 0.0,
-                                       1.0, 5.0, 0.0,
-                                       0.0, 0.0, 2.0)),
-        "symmetric but not diag"
-    );
-    assert!(!is_diagonal(&Matrix3::new(10.0, 1.0, 0.0,
-                                       0.0, 5.0, 0.0,
-                                       0.0, 0.0, 2.0)),
-        "upper triangular"
-    );
-    assert!(is_diagonal(&Matrix3::new(10.0, 0.0, 0.0,
-                                       0.0, 0.0, 0.0,
-                                       0.0, 0.0, 2.0)),
-        "diagonal with zero diagonal element"
-    );
-    assert!(is_diagonal(&Matrix3::new(10.0, 0.0, 0.0,
-                                      0.0, 5.0, 0.0,
-                                      0.0, 0.0, 2.0)),
-        "diagonal"
-    );
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use approx::assert_abs_diff_eq;
+    use nalgebra::{Complex, OVector};
 
-#[test]
-fn test_angle_bounds() {
-    assert!((between_pm_180(181.0) - -179.0).abs() < f64::EPSILON);
-    assert!((between_0_360(-179.0) - 181.0).abs() < f64::EPSILON);
-}
-
-#[test]
-fn test_positive_angle() {
-    assert_eq!(between_0_360(450.0), 90.0);
-    assert_eq!(between_pm_x(270.0, 180.0), -90.0);
-}
-
-#[test]
-fn test_negative_angle() {
-    assert_eq!(between_0_360(-90.0), 270.0);
-    assert_eq!(between_pm_x(-270.0, 180.0), 90.0);
-}
-
-#[test]
-fn test_angle_in_range() {
-    assert_eq!(between_0_360(180.0), 180.0);
-    assert_eq!(between_pm_x(90.0, 180.0), 90.0);
-}
-
-#[test]
-fn test_zero_angle() {
-    assert_eq!(between_0_360(0.0), 0.0);
-    assert_eq!(between_pm_x(0.0, 180.0), 0.0);
-}
-
-#[test]
-fn test_full_circle_angle() {
-    assert_eq!(between_0_360(360.0), 0.0);
-    assert_eq!(between_pm_x(360.0, 180.0), 0.0);
-}
-
-#[test]
-fn test_pseudo_inv() {
-    use crate::linalg::{DMatrix, SMatrix};
-    let mut mat = DMatrix::from_element(1, 3, 0.0);
-    mat[(0, 0)] = -1407.273208782421;
-    mat[(0, 1)] = -2146.3100013104886;
-    mat[(0, 2)] = 84.05022886527551;
-
-    println!("{}", pseudo_inverse!(&mat).unwrap());
-
-    let mut mat = SMatrix::<f64, 1, 3>::zeros();
-    mat[(0, 0)] = -1407.273208782421;
-    mat[(0, 1)] = -2146.3100013104886;
-    mat[(0, 2)] = 84.05022886527551;
-
-    println!("{}", pseudo_inverse!(&mat).unwrap());
-
-    let mut mat = SMatrix::<f64, 3, 1>::zeros();
-    mat[(0, 0)] = -1407.273208782421;
-    mat[(1, 0)] = -2146.3100013104886;
-    mat[(2, 0)] = 84.05022886527551;
-
-    println!("{}", pseudo_inverse!(&mat).unwrap());
-
-    // Compare a pseudo inverse with a true inverse
-    let mat = SMatrix::<f64, 2, 2>::new(3.0, 4.0, -2.0, 1.0);
-    println!("{}", mat.try_inverse().unwrap());
-
-    println!("{}", pseudo_inverse!(&mat).unwrap());
-}
-
-#[test]
-fn spherical() {
-    for v in &[
-        Vector3::<f64>::x(),
-        Vector3::<f64>::y(),
-        Vector3::<f64>::z(),
-        Vector3::<f64>::zeros(),
-        Vector3::<f64>::new(159.1, 561.2, 756.3),
-    ] {
-        let (range_ρ, θ, φ) = cartesian_to_spherical(v);
-        let v_prime = spherical_to_cartesian(range_ρ, θ, φ);
-
-        assert!(rss_errors(v, &v_prime) < 1e-12, "{} != {}", v, &v_prime);
     trait FailureTolerance {
         fn within_tolerance(&self, other: Self) -> bool;
     }
@@ -816,6 +513,41 @@ fn spherical() {
             (self - other).abs() < f64::EPSILON
         }
     }
+
+    #[test]
+    fn test_stable_eigenvalues() {
+        let eigenvalues = OVector::<Complex<f64>, nalgebra::U2>::from_column_slice(&[
+            Complex::new(-1.0, 0.0),
+            Complex::new(0.0, 0.0),
+        ]);
+        assert!(are_eigenvalues_stable(&eigenvalues));
+    }
+
+    #[test]
+    fn test_unstable_eigenvalues() {
+        let eigenvalues = OVector::<Complex<f64>, nalgebra::U2>::from_column_slice(&[
+            Complex::new(1.0, 0.0),
+            Complex::new(0.0, 0.0),
+        ]);
+        assert!(!are_eigenvalues_stable(&eigenvalues));
+    }
+
+    #[test]
+    fn test_oscillatory_eigenvalues() {
+        let eigenvalues = OVector::<Complex<f64>, nalgebra::U2>::from_column_slice(&[
+            Complex::new(0.0, 1.0),
+            Complex::new(0.0, -1.0),
+        ]);
+        assert!(are_eigenvalues_stable(&eigenvalues));
+    }
+
+    #[test]
+    fn test_invariant_eigenvalues() {
+        let eigenvalues =
+            OVector::<Complex<f64>, nalgebra::U1>::from_column_slice(&[Complex::new(0.0, 0.0)]);
+        assert!(are_eigenvalues_stable(&eigenvalues));
+    }
+
     #[test]
     fn test_angle_bounds() {
         assert!(between_pm_180(181.0).within_tolerance(-179.0));
@@ -853,6 +585,108 @@ fn spherical() {
     }
 
     #[test]
+    fn test_pseudo_inv() {
+        use crate::linalg::{DMatrix, SMatrix};
+        let mut mat = DMatrix::from_element(1, 3, 0.0);
+        mat[(0, 0)] = -1407.273208782421;
+        mat[(0, 1)] = -2146.3100013104886;
+        mat[(0, 2)] = 84.05022886527551;
+
+        println!("{}", pseudo_inverse!(&mat).unwrap());
+
+        let mut mat = SMatrix::<f64, 1, 3>::zeros();
+        mat[(0, 0)] = -1407.273208782421;
+        mat[(0, 1)] = -2146.3100013104886;
+        mat[(0, 2)] = 84.05022886527551;
+
+        println!("{}", pseudo_inverse!(&mat).unwrap());
+
+        let mut mat = SMatrix::<f64, 3, 1>::zeros();
+        mat[(0, 0)] = -1407.273208782421;
+        mat[(1, 0)] = -2146.3100013104886;
+        mat[(2, 0)] = 84.05022886527551;
+
+        println!("{}", pseudo_inverse!(&mat).unwrap());
+
+        // Compare a pseudo inverse with a true inverse
+        let mat = SMatrix::<f64, 2, 2>::new(3.0, 4.0, -2.0, 1.0);
+        println!("{}", mat.try_inverse().unwrap());
+
+        println!("{}", pseudo_inverse!(&mat).unwrap());
+    }
+
+    #[test]
+    fn spherical() {
+        for v in &[
+            Vector3::<f64>::x(),
+            Vector3::<f64>::y(),
+            Vector3::<f64>::z(),
+            Vector3::<f64>::zeros(),
+            Vector3::<f64>::new(159.1, 561.2, 756.3),
+        ] {
+            let (range_ρ, θ, φ) = cartesian_to_spherical(v);
+            let v_prime = spherical_to_cartesian(range_ρ, θ, φ);
+
+            assert!(rss_errors(v, &v_prime) < 1e-12, "{} != {}", v, &v_prime);
+        }
+    }
+
+    #[rustfmt::skip]
+    #[test]
+    fn test_diagonality() {
+        assert!(!is_diagonal(&Matrix3::new(10.0, 0.0, 0.0,
+                                           1.0, 5.0, 0.0,
+                                           0.0, 0.0, 2.0)),
+            "lower triangular"
+        );
+        assert!(!is_diagonal(&Matrix3::new(10.0, 1.0, 0.0,
+                                           1.0, 5.0, 0.0,
+                                           0.0, 0.0, 2.0)),
+            "symmetric but not diag"
+        );
+        assert!(!is_diagonal(&Matrix3::new(10.0, 1.0, 0.0,
+                                           0.0, 5.0, 0.0,
+                                           0.0, 0.0, 2.0)),
+            "upper triangular"
+        );
+        assert!(is_diagonal(&Matrix3::new(10.0, 0.0, 0.0,
+                                           0.0, 0.0, 0.0,
+                                           0.0, 0.0, 2.0)),
+            "diagonal with zero diagonal element"
+        );
+        assert!(is_diagonal(&Matrix3::new(10.0, 0.0, 0.0,
+                                          0.0, 5.0, 0.0,
+                                          0.0, 0.0, 2.0)),
+            "diagonal"
+        );
+    }
+
+    #[test]
+    fn test_projv() {
+        assert_eq!(
+            projv(&Vector3::new(6.0, 6.0, 6.0), &Vector3::new(2.0, 0.0, 0.0)),
+            Vector3::new(6.0, 0.0, 0.0)
+        );
+        assert_eq!(
+            projv(&Vector3::new(6.0, 6.0, 6.0), &Vector3::new(-3.0, 0.0, 0.0)),
+            Vector3::new(6.0, 0.0, 0.0)
+        );
+        assert_eq!(
+            projv(&Vector3::new(6.0, 6.0, 0.0), &Vector3::new(0.0, 7.0, 0.0)),
+            Vector3::new(0.0, 6.0, 0.0)
+        );
+        assert_eq!(
+            projv(&Vector3::new(6.0, 0.0, 0.0), &Vector3::new(0.0, 0.0, 9.0)),
+            Vector3::new(0.0, 0.0, 0.0)
+        );
+
+        let a = Vector3::new(1.0, 1.0, 0.0);
+        let b = Vector3::new(1.0, 0.0, 0.0);
+        let result = projv(&a, &b);
+        assert_abs_diff_eq!(result, Vector3::new(1.0, 0.0, 0.0), epsilon = 1e-7);
+    }
+
+    #[test]
     fn test_rss_errors() {
         use nalgebra::U3;
         let prop_err = OVector::<f64, U3>::from_iterator([1.0, 2.0, 3.0]);
@@ -883,6 +717,45 @@ fn spherical() {
     }
 
     #[test]
+    fn test_capitalize() {
+        let s = "hello";
+        let result = capitalize(s);
+        assert_eq!(result, "Hello");
+    }
+
+    #[test]
+    fn test_r2() {
+        let angle = 0.0;
+        let rotation_matrix = r2(angle);
+        assert!((rotation_matrix - Matrix3::identity()).abs().max() <= f64::EPSILON);
+
+        let angle = std::f64::consts::PI / 2.0;
+        let rotation_matrix = r2(angle);
+        let expected_matrix = Matrix3::new(0.0, 0.0, -1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0);
+        assert!((rotation_matrix - expected_matrix).abs().max() <= f64::EPSILON);
+
+        let v = Vector3::new(0.0, 1.0, 0.0);
+        let rotated_v = rotation_matrix * v;
+        assert!((rotated_v - v).norm() <= f64::EPSILON);
+    }
+
+    #[test]
+    fn test_r1() {
+        let angle = 0.0;
+        let rotation_matrix = r1(angle);
+        assert!((rotation_matrix - Matrix3::identity()).abs().max() <= f64::EPSILON);
+
+        let angle = std::f64::consts::PI / 2.0;
+        let rotation_matrix = r1(angle);
+        let expected_matrix = Matrix3::new(1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0);
+        assert!((rotation_matrix - expected_matrix).abs().max() <= f64::EPSILON);
+
+        let v = Vector3::new(1.0, 0.0, 0.0);
+        let rotated_v = rotation_matrix * v;
+        assert!((rotated_v - v).norm() <= f64::EPSILON);
+    }
+
+    #[test]
     fn test_tilde_matrix() {
         let vec = Vector3::new(1.0, 2.0, 3.0);
         let rslt = Matrix3::new(0.0, -3.0, 2.0, 3.0, 0.0, -1.0, -2.0, 1.0, 0.0);
@@ -902,5 +775,53 @@ fn spherical() {
         assert!(m[(2, 2)].within_tolerance(0.0));
     }
 
+    #[test]
+    fn test_perpv() {
+        assert_eq!(
+            perpv(&Vector3::new(6.0, 6.0, 6.0), &Vector3::new(2.0, 0.0, 0.0)),
+            Vector3::new(0.0, 6.0, 6.0)
+        );
+        assert_eq!(
+            perpv(&Vector3::new(6.0, 6.0, 6.0), &Vector3::new(-3.0, 0.0, 0.0)),
+            Vector3::new(0.0, 6.0, 6.0)
+        );
+        assert_eq!(
+            perpv(&Vector3::new(6.0, 6.0, 0.0), &Vector3::new(0.0, 7.0, 0.0)),
+            Vector3::new(6.0, 0.0, 0.0)
+        );
+        assert_eq!(
+            perpv(&Vector3::new(6.0, 0.0, 0.0), &Vector3::new(0.0, 0.0, 9.0)),
+            Vector3::new(6.0, 0.0, 0.0)
+        );
+        let a = Vector3::new(1.0, 1.0, 0.0);
+        let b = Vector3::new(1.0, 0.0, 0.0);
+        let result = perpv(&a, &b);
+        assert_abs_diff_eq!(result, Vector3::new(0.0, 1.0, 0.0), epsilon = 1e-7);
+    }
+
+    #[test]
+    fn test_r3() {
+        let angle = 0.0;
+        let rotation_matrix = r3(angle);
+        assert!((rotation_matrix - Matrix3::identity()).abs().max() <= f64::EPSILON);
+
+        let angle = std::f64::consts::PI / 2.0;
+        let rotation_matrix = r3(angle);
+        let expected_matrix = Matrix3::new(0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0);
+        assert!((rotation_matrix - expected_matrix).abs().max() <= f64::EPSILON);
+
+        let v = Vector3::new(0.0, 0.0, 1.0);
+        let rotated_v = rotation_matrix * v;
+        assert!((rotated_v - v).norm() <= f64::EPSILON);
+    }
+
+    #[test]
+    fn test_rotv() {
+        use approx::assert_abs_diff_eq;
+        let v = Vector3::new(1.0, 0.0, 0.0);
+        let axis = Vector3::new(0.0, 0.0, 1.0);
+        let theta = std::f64::consts::PI / 2.0;
+        let result = rotv(&v, &axis, theta);
+        assert_abs_diff_eq!(result, Vector3::new(0.0, 1.0, 0.0), epsilon = 1e-7);
     }
 }
