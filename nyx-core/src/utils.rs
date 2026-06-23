@@ -807,5 +807,100 @@ fn spherical() {
         let v_prime = spherical_to_cartesian(range_ρ, θ, φ);
 
         assert!(rss_errors(v, &v_prime) < 1e-12, "{} != {}", v, &v_prime);
+    trait FailureTolerance {
+        fn within_tolerance(&self, other: Self) -> bool;
+    }
+
+    impl FailureTolerance for f64 {
+        fn within_tolerance(&self, other: Self) -> bool {
+            (self - other).abs() < f64::EPSILON
+        }
+    }
+    #[test]
+    fn test_angle_bounds() {
+        assert!(between_pm_180(181.0).within_tolerance(-179.0));
+        assert!(between_0_360(-179.0).within_tolerance(181.0));
+    }
+
+    #[test]
+    fn test_positive_angle() {
+        assert!(between_0_360(450.0).within_tolerance(90.0));
+        assert!(between_pm_x(270.0, 180.0).within_tolerance(-90.0));
+    }
+
+    #[test]
+    fn test_negative_angle() {
+        assert!(between_0_360(-90.0).within_tolerance(270.0));
+        assert!(between_pm_x(-270.0, 180.0).within_tolerance(90.0));
+    }
+
+    #[test]
+    fn test_angle_in_range() {
+        assert!(between_0_360(180.0).within_tolerance(180.0));
+        assert!(between_pm_x(90.0, 180.0).within_tolerance(90.0));
+    }
+
+    #[test]
+    fn test_zero_angle() {
+        assert!(between_0_360(0.0).within_tolerance(0.0));
+        assert!(between_pm_x(0.0, 180.0).within_tolerance(0.0));
+    }
+
+    #[test]
+    fn test_full_circle_angle() {
+        assert!(between_0_360(360.0).within_tolerance(0.0));
+        assert!(between_pm_x(360.0, 180.0).within_tolerance(0.0));
+    }
+
+    #[test]
+    fn test_rss_errors() {
+        use nalgebra::U3;
+        let prop_err = OVector::<f64, U3>::from_iterator([1.0, 2.0, 3.0]);
+        let cur_state = OVector::<f64, U3>::from_iterator([1.0, 2.0, 3.0]);
+        assert!(rss_errors(&prop_err, &cur_state).within_tolerance(0.0));
+
+        let prop_err = OVector::<f64, U3>::from_iterator([1.0, 2.0, 3.0]);
+        let cur_state = OVector::<f64, U3>::from_iterator([4.0, 5.0, 6.0]);
+        assert!(rss_errors(&prop_err, &cur_state).within_tolerance(5.196152422706632));
+    }
+
+    #[test]
+    fn test_normalize() {
+        let x = 5.0;
+        let min_x = 0.0;
+        let max_x = 10.0;
+        let result = normalize(x, min_x, max_x);
+        assert!(result.within_tolerance(0.0));
+    }
+
+    #[test]
+    fn test_denormalize() {
+        let xp = 0.0;
+        let min_x = 0.0;
+        let max_x = 10.0;
+        let result = denormalize(xp, min_x, max_x);
+        assert!(result.within_tolerance(5.0));
+    }
+
+    #[test]
+    fn test_tilde_matrix() {
+        let vec = Vector3::new(1.0, 2.0, 3.0);
+        let rslt = Matrix3::new(0.0, -3.0, 2.0, 3.0, 0.0, -1.0, -2.0, 1.0, 0.0);
+        assert_eq!(tilde_matrix(&vec), rslt);
+
+        let v = Vector3::new(1.0, 2.0, 3.0);
+        let m = tilde_matrix(&v);
+
+        assert!(m[(0, 0)].within_tolerance(0.0));
+        assert!(m[(0, 1)].within_tolerance(-v.z));
+        assert!(m[(0, 2)].within_tolerance(v.y));
+        assert!(m[(1, 0)].within_tolerance(v.z));
+        assert!(m[(1, 1)].within_tolerance(0.0));
+        assert!(m[(1, 2)].within_tolerance(-v.x));
+        assert!(m[(2, 0)].within_tolerance(-v.y));
+        assert!(m[(2, 1)].within_tolerance(v.x));
+        assert!(m[(2, 2)].within_tolerance(0.0));
+    }
+
     }
 }
