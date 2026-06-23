@@ -77,7 +77,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Set up the genetic algorithm optimization
     let codec = FloatCodec::vector(3, 0.1_f32..1.0_f32); // 3 weights for SMA, Ecc, Inc
-    let problem = EngineProblem {
+    let problem = radiate::problem::EngineProblem {
         objective: radiate::Objective::Multi(vec![Optimize::Minimize, Optimize::Minimize]), // NSGA2 Multi Objective
         codec: Arc::new(codec),
         fitness_fn: Some(Arc::new(move |weights: Vec<f32>| {

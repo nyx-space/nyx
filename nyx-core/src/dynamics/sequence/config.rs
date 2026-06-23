@@ -113,6 +113,24 @@ impl Dynamics {
             let gravity_field = GravityField::new(grav_data);
             orbital_dyn.accel_models.push(gravity_field);
         }
+        let mut perturbers = Vec::new();
+        for tb in self.accel_models.solid_tides.iter().flatten() {
+            let frame = almanac.frame_info(tb.frame).map_err(|e| e.to_string())?;
+            perturbers.push(crate::dynamics::solid_tides::TidalPerturber {
+                frame,
+                compute_degree_3: tb.compute_degree_3,
+            });
+        }
+        if !perturbers.is_empty() {
+            let central_frame = almanac.frame_info(self.accel_models.gravity_field.as_ref().map(|g| g.frame).unwrap_or(anise::constants::frames::IAU_EARTH_FRAME.into())).map_err(|e| e.to_string())?;
+            let solid_tides = crate::dynamics::solid_tides::SolidTides {
+                frame: central_frame,
+                k2: 0.3019,
+                k3: 0.093,
+                perturbers,
+            };
+            orbital_dyn.accel_models.push(std::sync::Arc::new(solid_tides));
+        }
         // Build the spacecraft dynamics
         let mut sc_dyn = SpacecraftDynamics::new(orbital_dyn);
 
@@ -154,6 +172,15 @@ impl PropagatorConfig {
 pub struct AccelModels {
     pub point_masses: Option<PointMasses>,
     pub gravity_field: Option<GravityFieldConfig>,
+    pub solid_tides: [Option<TidalBody>; 2],
+}
+
+
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, StaticType)]
+#[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
+pub struct TidalBody {
+    pub frame: FrameUid,
+    pub compute_degree_3: bool,
 }
 
 /// Force models alter the spacecraft dynamics (they need a mass).
@@ -205,6 +232,11 @@ impl StaticType for AccelModels {
         fields.insert(
             "gravity_field".to_string(),
             SimpleType::Optional(Box::new(GravityFieldDhall::static_type())),
+        );
+
+        fields.insert(
+            "solid_tides".to_string(),
+            SimpleType::List(Box::new(SimpleType::Optional(Box::new(TidalBody::static_type())))),
         );
 
         SimpleType::Record(fields)

@@ -70,7 +70,7 @@ fn val_transfer_schedule_no_depl(almanac: Arc<Almanac>) {
             dynamics: Dynamics {
                 accel_models: AccelModels {
                     point_masses: Some(PointMasses::new(vec![MOON, SUN, JUPITER_BARYCENTER])),
-                    gravity_field: None,
+                    gravity_field: None, solid_tides: [None, None],
                 },
                 force_models: ForceModels {
                     solar_pressure: None,
@@ -193,7 +193,7 @@ fn val_transfer_schedule_depl(almanac: Arc<Almanac>) {
             dynamics: Dynamics {
                 accel_models: AccelModels {
                     point_masses: Some(PointMasses::new(bodies)),
-                    gravity_field: None,
+                    gravity_field: None, solid_tides: [None, None],
                 },
                 force_models: ForceModels {
                     solar_pressure: None,
@@ -478,7 +478,7 @@ fn finite_burns_respects_gaps_between_maneuvers(almanac: Arc<Almanac>) {
             dynamics: Dynamics {
                 accel_models: AccelModels {
                     point_masses: Some(PointMasses::new(vec![MOON, SUN, JUPITER_BARYCENTER])),
-                    gravity_field: None,
+                    gravity_field: None, solid_tides: [None, None],
                 },
                 force_models: ForceModels {
                     solar_pressure: None,

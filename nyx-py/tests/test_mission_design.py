@@ -8,6 +8,7 @@ from nyx_space.anise.analysis import Condition, Event, OrbitalElement, ScalarExp
 from nyx_space.anise.astro import Orbit
 from nyx_space.anise.constants import CelestialObjects, Frames
 from nyx_space.mission_design import (
+    TidalBody,
     AccelModels,
     AtmDensity,
     Drag,
@@ -340,3 +341,63 @@ if __name__ == "__main__":
     test_howto_propagate_with_perturbations()
     test_howto_execute_simple_monte_carlo()
     test_howto_configure_spherical_harmonics()
+
+def test_solid_tides_cislunar():
+    from nyx_space.mission_design import TidalBody
+    almanac = MetaAlmanac("../data/02_config/ci_almanac.dhall").process()
+
+    # Define tidal bodies for the Earth-Moon system
+    # We want to model the solid tides of the Earth, caused by the Moon and the Sun.
+    # We create TidalBodies for the Moon and the Sun.
+    tidal_body_moon = TidalBody(
+        frame=Frames.IAU_MOON_FRAME.to_frameuid(),
+        compute_degree_3=True
+    )
+    tidal_body_sun = TidalBody(
+        frame=Frames.SUN_J2000.to_frameuid(),
+        compute_degree_3=True
+    )
+
+    # Configure gravity field for the central body (Earth)
+    gravity_cfg = GravityFieldConfig(
+        degree=2,
+        order=0,
+        filepath="../data/01_planetary/EGM2008_to2190_TideFree.gz",
+        frame=Frames.IAU_EARTH_FRAME.to_frameuid()
+    )
+
+    accel_models = AccelModels(
+        gravity_field=gravity_cfg,
+        solid_tides=[tidal_body_moon, tidal_body_sun]
+    )
+
+    # Combine accelerations into a unified Dynamics model
+    dynamics = Dynamics(accel_models)
+
+    # Set up the propagator
+    propagator = Propagator(dynamics, almanac, IntegratorMethod.DormandPrince78)
+
+    epoch = Epoch.from_gregorian_utc(2023, 1, 1, 12, 0, 0, 0)
+    orbit = Orbit.from_keplerian(
+        sma_km=40000.0,
+        ecc=0.1,
+        inc_deg=10.0,
+        raan_deg=0.0,
+        aop_deg=0.0,
+        ta_deg=0.0,
+        epoch=epoch,
+        frame=almanac.frame_info(Frames.EARTH_J2000),
+    )
+
+    spacecraft = Spacecraft(orbit=orbit, mass=Mass(1500.0))
+
+    final_state = propagator.for_duration(spacecraft, Unit.Day * 1)
+    logging.info(
+        f"Final position magnitude after 1 day with solid tides: {final_state.state.orbit.rmag_km():.3f} km"
+    )
+
+    # TEST Verify the propagation ran successfully
+    assert final_state.state.orbit.rmag_km() > 0.0
+
+if __name__ == "__main__":
+    test_solid_tides_cislunar()

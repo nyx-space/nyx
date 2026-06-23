@@ -241,7 +241,7 @@ fn val_tgt_finite_burn(almanac: Arc<Almanac>) {
             dynamics: Dynamics {
                 accel_models: AccelModels {
                     point_masses: Some(PointMasses::new(bodies)),
-                    gravity_field: None,
+                    gravity_field: None, solid_tides: [None, None],
                 },
                 force_models: ForceModels {
                     solar_pressure: None,

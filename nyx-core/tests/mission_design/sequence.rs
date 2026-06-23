@@ -57,6 +57,7 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
                         order: 21,
                         frame: IAU_EARTH_FRAME.into(),
                     }),
+                    solid_tides: [None, None],
                 },
                 force_models: ForceModels {
                     solar_pressure: None,
@@ -87,6 +88,7 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
                         order: 8,
                         frame: IAU_EARTH_FRAME.into(),
                     }),
+                    solid_tides: [None, None],
                 },
                 force_models: ForceModels {
                     solar_pressure: Some(
@@ -318,6 +320,7 @@ fn spacecraft_low_thrust_orbit_raise(
                         order: 8,
                         frame: IAU_EARTH_FRAME.into(),
                     }),
+                    solid_tides: [None, None],
                 },
                 force_models: ForceModels {
                     solar_pressure: None,
