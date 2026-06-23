@@ -19,52 +19,69 @@
 use super::py_md::PyTrajectory;
 use anise::analysis::AnalysisError;
 use anise::prelude::Almanac;
+use hifitime::{Duration, Epoch};
+use nyx_space::linalg::Const;
+use nyx_space::od::estimate::KfEstimate;
+use nyx_space::od::prelude::{
+    ODError, ODSolution, Residual, SpacecraftKalmanScalarOD, TrackingArcSim, TrkConfig,
+};
 use nyx_space::{
     Spacecraft,
     io::ConfigError,
     od::{
         GroundStation,
-        msr::TrackingDataArc,
-        prelude::{TrackingArcSim, TrkConfig},
+        msr::{MeasurementType, TrackingDataArc},
     },
 };
-use std::collections::BTreeMap;
-
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use nyx_space::od::estimate::KfEstimate;
-use nyx_space::od::SpacecraftKalmanOD;
-use nyx_space::od::prelude::ODError;
+use std::collections::BTreeMap;
 
 #[derive(Clone)]
 #[pyclass(from_py_object, name = "SpacecraftODProcess")]
 pub struct PySpacecraftODProcess {
-    pub(crate) inner: SpacecraftKalmanOD,
+    pub(crate) inner: SpacecraftKalmanScalarOD,
 }
 
 #[pymethods]
 impl PySpacecraftODProcess {
     #[pyo3(name = "process_arc")]
-    fn py_process_arc(&self, initial_estimate: PyKfEstimate, arc: &TrackingDataArc) -> Result<PySpacecraftODSolution, PyErr> {
-        let inner_res = self.inner.process_arc(initial_estimate.inner, arc).map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("{}", e)))?;
-        Ok(PySpacecraftODSolution {
-            inner: inner_res
-        })
+    fn py_process_arc(
+        &self,
+        initial_estimate: PyKfEstimate,
+        arc: &TrackingDataArc,
+    ) -> Result<PySpacecraftODSolution, PyErr> {
+        let inner_res = self
+            .inner
+            .process_arc(initial_estimate.inner, arc)
+            .map_err(|e| PyValueError::new_err(format!("{}", e)))?;
+        Ok(PySpacecraftODSolution { inner: inner_res })
     }
 
     #[pyo3(name = "predict_until")]
-    fn py_predict_until(&self, initial_estimate: PyKfEstimate, end_epoch: hifitime::Epoch) -> Result<PySpacecraftODSolution, PyErr> {
-        let inner_res = self.inner.predict_until(initial_estimate.inner, end_epoch).map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("{}", e)))?;
-        Ok(PySpacecraftODSolution {
-            inner: inner_res
-        })
+    fn py_predict_until(
+        &self,
+        initial_estimate: PyKfEstimate,
+        end_epoch: Epoch,
+    ) -> Result<PySpacecraftODSolution, PyErr> {
+        let inner_res = self
+            .inner
+            .predict_until(initial_estimate.inner, end_epoch)
+            .map_err(|e| PyValueError::new_err(format!("{}", e)))?;
+        Ok(PySpacecraftODSolution { inner: inner_res })
     }
 
     #[pyo3(name = "predict_for")]
-    fn py_predict_for(&self, initial_estimate: PyKfEstimate, duration: hifitime::Duration) -> Result<PySpacecraftODSolution, PyErr> {
-        let inner_res = self.inner.predict_for(initial_estimate.inner, duration).map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("{}", e)))?;
-        Ok(PySpacecraftODSolution {
-            inner: inner_res
-        })
+    fn py_predict_for(
+        &self,
+        initial_estimate: PyKfEstimate,
+        duration: Duration,
+    ) -> Result<PySpacecraftODSolution, PyErr> {
+        let inner_res = self
+            .inner
+            .predict_for(initial_estimate.inner, duration)
+            .map_err(|e| PyValueError::new_err(format!("{}", e)))?;
+        Ok(PySpacecraftODSolution { inner: inner_res })
     }
 }
 
@@ -77,11 +94,58 @@ pub struct PyKfEstimate {
 #[derive(Clone)]
 #[pyclass(from_py_object, name = "Residual")]
 pub struct PyResidual {
-    pub(crate) inner: nyx_space::od::estimate::residual::Residual<nyx_space::linalg::Const<2>>,
+    pub(crate) inner: Residual<Const<1>>,
 }
 
 #[pymethods]
 impl PyResidual {
+    #[getter]
+    fn epoch(&self) -> Epoch {
+        self.inner.epoch
+    }
+
+    #[getter]
+    fn prefit(&self) -> Vec<f64> {
+        self.inner.prefit.as_slice().to_vec()
+    }
+
+    #[getter]
+    fn postfit(&self) -> Vec<f64> {
+        self.inner.postfit.as_slice().to_vec()
+    }
+
+    #[getter]
+    fn ratio(&self) -> f64 {
+        self.inner.ratio
+    }
+
+    #[getter]
+    fn rejected(&self) -> bool {
+        self.inner.rejected
+    }
+
+    #[getter]
+    fn tracker(&self) -> Option<String> {
+        self.inner.tracker.clone()
+    }
+
+    #[getter]
+    fn nis(&self) -> f64 {
+        self.inner.nis()
+    }
+
+    fn whitened_residual(&self, msr_type: MeasurementType) -> Option<f64> {
+        self.inner.whitened_resid(msr_type)
+    }
+
+    fn real_obs(&self, msr_type: MeasurementType) -> Option<f64> {
+        self.inner.real_obs(msr_type)
+    }
+
+    fn computed_obs(&self, msr_type: MeasurementType) -> Option<f64> {
+        self.inner.computed_obs(msr_type)
+    }
+
     fn __str__(&self) -> String {
         format!("{}", self.inner)
     }
@@ -94,35 +158,127 @@ impl PyResidual {
 #[derive(Clone)]
 #[pyclass(from_py_object, name = "SpacecraftODSolution")]
 pub struct PySpacecraftODSolution {
-    pub(crate) inner: nyx_space::od::prelude::ODSolution<Spacecraft, KfEstimate<Spacecraft>, nyx_space::linalg::Const<2>, GroundStation>,
+    pub(crate) inner: ODSolution<Spacecraft, KfEstimate<Spacecraft>, Const<1>, GroundStation>,
 }
 
 #[pymethods]
 impl PySpacecraftODSolution {
-    #[pyo3(name = "is_filter_run")]
-    fn py_is_filter_run(&self) -> bool {
+    fn is_filter_run(&self) -> bool {
         self.inner.is_filter_run()
     }
 
-    #[pyo3(name = "is_smoother_run")]
-    fn py_is_smoother_run(&self) -> bool {
+    fn is_smoother_run(&self) -> bool {
         self.inner.is_smoother_run()
     }
 
-    #[pyo3(name = "to_traj")]
-    fn py_to_traj(&self) -> Result<PyTrajectory, PyErr> {
-        let traj = self.inner.to_traj().map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("{}", e)))?;
+    fn to_traj(&self) -> Result<PyTrajectory, PyErr> {
+        let traj = self
+            .inner
+            .to_traj()
+            .map_err(|e| PyValueError::new_err(format!("{}", e)))?;
         Ok(PyTrajectory { inner: traj })
     }
 
-    #[pyo3(name = "accepted_residuals")]
-    fn py_accepted_residuals(&self) -> Vec<PyResidual> {
-        self.inner.accepted_residuals().into_iter().map(|r| PyResidual { inner: r }).collect()
+    fn accepted_residuals(&self) -> Vec<PyResidual> {
+        self.inner
+            .accepted_residuals()
+            .into_iter()
+            .map(|r| PyResidual { inner: r })
+            .collect()
     }
 
-    #[pyo3(name = "rejected_residuals")]
-    fn py_rejected_residuals(&self) -> Vec<PyResidual> {
-        self.inner.rejected_residuals().into_iter().map(|r| PyResidual { inner: r }).collect()
+    fn rejected_residuals(&self) -> Vec<PyResidual> {
+        self.inner
+            .rejected_residuals()
+            .into_iter()
+            .map(|r| PyResidual { inner: r })
+            .collect()
+    }
+    /// Returns the root mean square of the prefit residuals
+    pub fn rms_prefit_residuals(&self) -> f64 {
+        self.inner.rms_prefit_residuals()
+    }
+
+    /// Returns the root mean square of the postfit residuals
+    pub fn rms_postfit_residuals(&self) -> f64 {
+        self.inner.rms_postfit_residuals()
+    }
+
+    /// Returns the root mean square of the prefit residual ratios
+    pub fn rms_residual_ratios(&self) -> f64 {
+        self.inner.rms_residual_ratios()
+    }
+
+    /// Computes the fraction of residual ratios that lie within ±threshold.
+    pub fn residual_ratio_within_threshold(&self, threshold: f64) -> Result<f64, ODError> {
+        self.inner.residual_ratio_within_threshold(threshold)
+    }
+
+    /// Computes the Kolmogorov–Smirnov statistic for the aggregated residual ratios of the accepted residuals.
+    ///
+    /// Returns Ok(ks_statistic) if residuals are available.
+    pub fn ks_test_normality(&self) -> Result<f64, ODError> {
+        self.inner.ks_test_normality()
+    }
+
+    /// Checks whether the whitened residuals of the accepted residuals pass a normality test at a given significance level `alpha`, default to 0.05.
+    ///
+    /// This uses a simplified KS-test threshold: D_alpha = c(α) / √n.
+    /// For example, for α = 0.05, c(α) is approximately 1.36.
+    /// α=0.05 means a 5% probability of Type I error (incorrectly rejecting the null hypothesis when it is true).
+    /// This threshold is standard in many statistical tests to balance sensitivity and false positives
+    ///
+    /// The computation of the c(alpha) is from https://en.wikipedia.org/w/index.php?title=Kolmogorov%E2%80%93Smirnov_test&oldid=1280260701#Two-sample_Kolmogorov%E2%80%93Smirnov_test
+    ///
+    /// Returns Ok(true) if the residuals are consistent with a normal distribution,
+    /// Ok(false) if not, or None if no residuals are available.
+    #[pyo3(signature=(alpha=None))]
+    pub fn is_normal(&self, alpha: Option<f64>) -> Result<bool, ODError> {
+        self.inner.is_normal(alpha)
+    }
+
+    /// Checks whether the filter innovations are statistically consistent
+    /// by performing a Chi-squared test on the Normalized Innovation Squared (NIS).
+    ///
+    /// For each accepted residual, NIS is computed as:
+    /// ```text
+    ///     prefit^T * S_k^-1 * prefit
+    /// ```
+    ///
+    /// The sum of NIS values should fall within the confidence interval of a
+    /// Chi-squared distribution with degrees of freedom `k = n * m`, where `n`
+    /// is the number of residuals and `m` is the measurement dimension.
+    ///
+    /// Returns Ok(true) if the filter is consistent, Ok(false) if the filter
+    /// is over-confident or under-confident, or an error if no residuals are available.
+    #[pyo3(signature=(alpha=None))]
+    pub fn is_nis_consistent(&self, alpha: Option<f64>) -> Result<bool, ODError> {
+        self.inner.is_nis_consistent(alpha)
+    }
+
+    /// Checks whether the filter estimates are statistically consistent
+    /// by performing a Chi-squared test on the Normalized Estimation Error Squared (NEES).
+    ///
+    /// For each estimate, NEES is computed as:
+    /// ```text
+    ///     error^T * P^-1 * error
+    /// ```
+    /// where `error` is the difference between the estimated state and the true state,
+    /// and `P` is the estimated state covariance matrix.
+    ///
+    /// The sum of NEES values should fall within the confidence interval of a
+    /// Chi-squared distribution with degrees of freedom `k = n * dim`, where `n`
+    /// is the number of estimates and `dim` is the state dimension.
+    ///
+    /// Returns Ok(true) if the filter is consistent, Ok(false) if the filter
+    /// is over-confident or under-confident, or an error if no estimates are available.
+    #[pyo3(signature=(truth_traj, alpha=None))]
+    pub fn is_nees_consistent(
+        &self,
+        truth_traj: &PyTrajectory,
+        alpha: Option<f64>,
+    ) -> Result<bool, ODError> {
+        self.inner.is_nees_consistent(&truth_traj.inner, alpha)
     }
 }
 

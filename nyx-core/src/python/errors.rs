@@ -3,6 +3,7 @@ use crate::{
     dynamics::DynamicsError,
     io::{ConfigError, InputOutputError},
     md::trajectory::TrajError,
+    od::ODError,
     propagators::PropagationError,
 };
 use pyo3::{exceptions::PyException, prelude::*};
@@ -34,6 +35,11 @@ impl From<PropagationError> for PyErr {
 }
 impl From<DynamicsError> for PyErr {
     fn from(err: DynamicsError) -> PyErr {
+        PyException::new_err(err.to_string())
+    }
+}
+impl From<ODError> for PyErr {
+    fn from(err: ODError) -> PyErr {
         PyException::new_err(err.to_string())
     }
 }
