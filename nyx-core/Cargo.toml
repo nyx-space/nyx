@@ -54,7 +54,7 @@ indexmap = { version = "2.6.0", features = ["serde"] }
 statrs = "0.18.0"
 num-traits = "=0.2.19"
 # Optional dependencies
-pyo3 = { version = "0.28", features = ["multiple-pymethods"], optional = true }
+pyo3 = {workspace = true, optional = true}
 
 
 [features]

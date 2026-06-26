@@ -16,15 +16,23 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::py_md::PyTrajectory;
+use super::py_md::{Propagator, PyTrajectory};
 use anise::analysis::AnalysisError;
 use anise::prelude::Almanac;
 use hifitime::{Duration, Epoch};
-use nyx_space::linalg::Const;
+use ndarray::Array2;
+use numpy::{PyArray2, PyReadonlyArray1};
+use nyx_space::NyxError;
+use nyx_space::io::InputOutputError;
+use nyx_space::linalg::{Const, OVector};
+use nyx_space::mc::{MvnSpacecraft, StateDispersion};
+use nyx_space::od::blse::Estimate;
 use nyx_space::od::estimate::KfEstimate;
 use nyx_space::od::prelude::{
-    ODError, ODSolution, Residual, SpacecraftKalmanScalarOD, TrackingArcSim, TrkConfig,
+    KalmanVariant, ODError, ODSolution, Residual, SigmaRejection, SpacecraftKalmanScalarOD,
+    TrackingArcSim, TrkConfig,
 };
+use nyx_space::propagators::PropagationError;
 use nyx_space::{
     Spacecraft,
     io::ConfigError,
@@ -35,6 +43,7 @@ use nyx_space::{
 };
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::PyType;
 use std::collections::BTreeMap;
 
 #[derive(Clone)]
@@ -45,50 +54,175 @@ pub struct PySpacecraftODProcess {
 
 #[pymethods]
 impl PySpacecraftODProcess {
-    #[pyo3(name = "process_arc")]
-    fn py_process_arc(
+    #[new]
+    #[pyo3(signature=(prop, kf_variant, devices, sigma_reject=Some(SigmaRejection::default())))]
+    fn py_new(
+        prop: Propagator,
+        kf_variant: KalmanVariant,
+        devices: BTreeMap<String, GroundStation>,
+        sigma_reject: Option<SigmaRejection>,
+    ) -> Result<Self, PropagationError> {
+        let almanac = prop.almanac.clone();
+        let inner = SpacecraftKalmanScalarOD::new(
+            prop.build()?,
+            kf_variant,
+            sigma_reject,
+            devices,
+            almanac,
+        );
+
+        Ok(Self { inner })
+    }
+    /// Process the provided tracking arc for this orbit determination process.
+    fn process_arc(
         &self,
-        initial_estimate: PyKfEstimate,
+        initial_estimate: PySpacecraftEstimate,
         arc: &TrackingDataArc,
     ) -> Result<PySpacecraftODSolution, PyErr> {
         let inner_res = self
             .inner
             .process_arc(initial_estimate.inner, arc)
-            .map_err(|e| PyValueError::new_err(format!("{}", e)))?;
+            .map_err(|e| PyValueError::new_err(format!("{e}")))?;
         Ok(PySpacecraftODSolution { inner: inner_res })
     }
 
-    #[pyo3(name = "predict_until")]
-    fn py_predict_until(
+    /// Perform a time update. Continuously predicts the trajectory until the provided end epoch, with covariance mapping at each step.
+    fn predict_until(
         &self,
-        initial_estimate: PyKfEstimate,
+        initial_estimate: PySpacecraftEstimate,
         end_epoch: Epoch,
     ) -> Result<PySpacecraftODSolution, PyErr> {
         let inner_res = self
             .inner
             .predict_until(initial_estimate.inner, end_epoch)
-            .map_err(|e| PyValueError::new_err(format!("{}", e)))?;
+            .map_err(|e| PyValueError::new_err(format!("{e}")))?;
         Ok(PySpacecraftODSolution { inner: inner_res })
     }
 
-    #[pyo3(name = "predict_for")]
-    fn py_predict_for(
+    /// Perform a time update. Continuously predicts the trajectory for the provided duration, with covariance mapping at each step.
+    fn predict_for(
         &self,
-        initial_estimate: PyKfEstimate,
+        initial_estimate: PySpacecraftEstimate,
         duration: Duration,
     ) -> Result<PySpacecraftODSolution, PyErr> {
         let inner_res = self
             .inner
             .predict_for(initial_estimate.inner, duration)
-            .map_err(|e| PyValueError::new_err(format!("{}", e)))?;
+            .map_err(|e| PyValueError::new_err(format!("{e}")))?;
         Ok(PySpacecraftODSolution { inner: inner_res })
     }
 }
 
 #[derive(Clone)]
-#[pyclass(from_py_object, name = "KfEstimate")]
-pub struct PyKfEstimate {
+#[pyclass(from_py_object, name = "SpacecraftEstimate")]
+pub struct PySpacecraftEstimate {
     pub(crate) inner: KfEstimate<Spacecraft>,
+}
+
+#[pymethods]
+impl PySpacecraftEstimate {
+    /// Initializes a new filter estimate from the nominal state (not dispersed) and the diagonal of the covariance
+    #[classmethod]
+    fn from_diag(
+        _cls: &Bound<'_, PyType>,
+        nominal: Spacecraft,
+        diag: PyReadonlyArray1<f64>,
+    ) -> PyResult<Self> {
+        if diag.len()? != 9 {
+            return Err(PyValueError::new_err(format!(
+                "Expected a numpy array of size 9, got {}",
+                diag.len()?
+            )));
+        }
+
+        let diag_vec = OVector::<f64, Const<9>>::from_iterator(diag.as_slice()?.iter().copied());
+
+        let inner = KfEstimate::from_diag(nominal, diag_vec);
+
+        Ok(Self { inner })
+    }
+
+    /// Generates an initial Kalman filter state estimate dispersed from the nominal state using the provided standard deviation parameters.
+    ///
+    /// The resulting estimate will have a diagonal covariance matrix constructed from the variances of each parameter.
+    #[pyo3(signature=(nominal_state, dispersions, seed=None))]
+    #[classmethod]
+    fn from_dispersions(
+        _cls: &Bound<'_, PyType>,
+        nominal_state: Spacecraft,
+        dispersions: Vec<StateDispersion>,
+        seed: Option<u128>,
+    ) -> Result<Self, NyxError> {
+        let inner = KfEstimate::from_dispersions(nominal_state, dispersions, seed)
+            .map_err(|e| NyxError::GenericError { msg: e.to_string() })?;
+
+        Ok(Self { inner })
+    }
+
+    /// Builds a multivariate random variable spacecraft from this estimate's nominal state and covariance, zero mean.
+    fn to_random_variable(&self) -> Result<MvnSpacecraft, NyxError> {
+        self.inner.to_random_variable().map_err(|e| *e)
+    }
+
+    #[getter]
+    fn predicted(&self) -> bool {
+        self.inner.predicted
+    }
+
+    #[getter]
+    fn nominal_state(&self) -> Spacecraft {
+        self.inner.nominal_state
+    }
+
+    #[getter]
+    fn state(&self) -> Spacecraft {
+        self.inner.state()
+    }
+
+    #[getter]
+    fn state_deviations(&self) -> Vec<f64> {
+        self.inner
+            .state_deviation
+            .iter()
+            .copied()
+            .collect::<Vec<f64>>()
+    }
+
+    /// Returns the 6x6 DCM to rotate a state. If the time derivative of this DCM is defined, this 6x6 accounts for the transport theorem.
+    /// Warning: you MUST manually install numpy to call this function.
+    /// :rtype: numpy.ndarray
+    #[getter]
+    fn covariance<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray2<f64>>> {
+        // Extract data from SMatrix (column-major order, hence the transpose)
+        let data: Vec<f64> = self.inner.covar.transpose().iter().copied().collect();
+
+        // Create an ndarray Array2 (row-major order)
+        let state_dcm =
+            Array2::from_shape_vec((9, 9), data).expect("9x9 matrix always has 81 elements");
+
+        let pt_state_dcm = PyArray2::<f64>::from_owned_array(py, state_dcm);
+
+        Ok(pt_state_dcm)
+    }
+
+    /// Returns whether this estimate is within some bound
+    /// The 68-95-99.7 rule is a good way to assess whether the filter is operating normally
+    fn within_sigma(&self, sigma: f64) -> bool {
+        self.inner.within_sigma(sigma)
+    }
+
+    /// Returns whether this estimate is within three sigmas
+    fn within_3sigma(&self) -> bool {
+        self.inner.within_3sigma()
+    }
+
+    fn __str__(&self) -> String {
+        format!("{}", self.inner)
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{} @ {self:p}", self.inner)
+    }
 }
 
 #[derive(Clone)]
@@ -129,19 +263,22 @@ impl PyResidual {
         self.inner.tracker.clone()
     }
 
-    #[getter]
+    /// Returns the normalized innovation squared (NIS) as the norm squares of the whitened residual
     fn nis(&self) -> f64 {
         self.inner.nis()
     }
 
+    /// Returns the whitened residual for this measurement type, if available
     fn whitened_residual(&self, msr_type: MeasurementType) -> Option<f64> {
         self.inner.whitened_resid(msr_type)
     }
 
+    /// Returns the real observation for this measurement type, if available
     fn real_obs(&self, msr_type: MeasurementType) -> Option<f64> {
         self.inner.real_obs(msr_type)
     }
 
+    /// Returns the computed/expected observation for this measurement type, if available
     fn computed_obs(&self, msr_type: MeasurementType) -> Option<f64> {
         self.inner.computed_obs(msr_type)
     }
@@ -175,7 +312,7 @@ impl PySpacecraftODSolution {
         let traj = self
             .inner
             .to_traj()
-            .map_err(|e| PyValueError::new_err(format!("{}", e)))?;
+            .map_err(|e| PyValueError::new_err(format!("{e}")))?;
         Ok(PyTrajectory { inner: traj })
     }
 
@@ -280,10 +417,79 @@ impl PySpacecraftODSolution {
     ) -> Result<bool, ODError> {
         self.inner.is_nees_consistent(&truth_traj.inner, alpha)
     }
-}
 
-#[pymethods]
-impl PyKfEstimate {
+    /// Smoothes this OD solution, returning a new OD solution and the filter-smoother consistency ratios, with updated **postfit** residuals, and where the ratio now represents the filter-smoother consistency ratio.
+    ///
+    /// Notes:
+    ///  1. Gains will be scrubbed because the smoother process does not recompute the gain.
+    ///  2. Prefit residuals, ratios, and measurement covariances are not updated, as these depend on the filtering process.
+    ///  3. Note: this function consumes the current OD solution to prevent reusing the wrong one.
+    ///
+    ///
+    /// To assess whether the smoothing process improved the solution, compare the RMS of the postfit residuals from the filter and the smoother process.
+    ///
+    /// # Filter-Smoother consistency ratio
+    ///
+    /// The **filter-smoother consistency ratio** is used to evaluate the consistency between the state estimates produced by a filter (e.g., Kalman filter) and a smoother.
+    /// This ratio is called "filter smoother consistency test" in the ODTK MathSpec.
+    ///
+    /// It is computed as follows:
+    ///
+    /// #### 1. Define the State Estimates
+    /// **Filter state estimate**:
+    /// $ \hat{X}_{f,k} $
+    /// This is the state estimate at time step $ k $ from the filter.
+    ///
+    /// **Smoother state estimate**:
+    /// $ \hat{X}_{s,k} $
+    /// This is the state estimate at time step $ k $ from the smoother.
+    ///
+    /// #### 2. Define the Covariances
+    ///
+    /// **Filter covariance**:
+    /// $ P_{f,k} $
+    /// This is the covariance of the state estimate at time step $ k $ from the filter.
+    ///
+    /// **Smoother covariance**:
+    /// $ P_{s,k} $
+    /// This is the covariance of the state estimate at time step $ k $ from the smoother.
+    ///
+    /// #### 3. Compute the Differences
+    ///
+    /// **State difference**:
+    /// $ \Delta X_k = \hat{X}_{s,k} - \hat{X}_{f,k} $
+    ///
+    /// **Covariance difference**:
+    /// $ \Delta P_k = P_{s,k} - P_{f,k} $
+    ///
+    /// #### 4. Calculate the Consistency Ratio
+    /// For each element $ i $ of the state vector, compute the ratio:
+    ///
+    /// $$
+    /// R_{i,k} = \frac{\Delta X_{i,k}}{\sqrt{\Delta P_{i,k}}}
+    /// $$
+    ///
+    /// #### 5. Evaluate Consistency
+    /// - If $ |R_{i,k}| \leq 3 $ for all $ i $ and $ k $, the filter-smoother consistency test is satisfied, indicating good consistency.
+    /// - If $ |R_{i,k}| > 3 $ for any $ i $ or $ k $, the test fails, suggesting potential modeling inconsistencies or issues with the estimation process.
+    ///
+    fn smooth(&self, almanac: &Almanac) -> Result<Self, ODError> {
+        let inner = self.clone().inner.smooth(almanac)?;
+
+        Ok(Self { inner })
+    }
+
+    #[classmethod]
+    fn from_parquet(
+        _cls: &Bound<'_, PyType>,
+        path: &str,
+        devices: BTreeMap<String, GroundStation>,
+    ) -> Result<Self, InputOutputError> {
+        let inner = ODSolution::from_parquet(path, devices)?;
+
+        Ok(Self { inner })
+    }
+
     fn __str__(&self) -> String {
         format!("{}", self.inner)
     }
@@ -345,8 +551,8 @@ impl GroundTrackingArcSim {
     /// :type almanac: Almanac
     /// :rtype: TrackingDataArc
     /// :raises ConfigError: If a scheduling configuration is present but the schedule was not built prior to execution.
-    fn generate_measurements(&mut self, almanac: Almanac) -> Result<TrackingDataArc, ConfigError> {
-        self.inner.generate_measurements(almanac.into())
+    fn generate_measurements(&mut self, almanac: &Almanac) -> Result<TrackingDataArc, ConfigError> {
+        self.inner.generate_measurements(almanac)
     }
 
     /// Builds the schedule provided the config.
@@ -367,15 +573,15 @@ impl GroundTrackingArcSim {
     /// :raises AnalysisError: If underlying location dataset injection or visibility computation fails.
     pub fn generate_schedule(
         &self,
-        almanac: Almanac,
+        almanac: &Almanac,
     ) -> Result<BTreeMap<String, TrkConfig>, AnalysisError> {
-        self.inner.generate_schedule(almanac.into())
+        self.inner.generate_schedule(almanac)
     }
 
     /// Builds a schedule using the generate_schedule function, and set that schedule in this instance's configuration.
     /// :type almanac: Almanac
-    pub fn build_schedule(&mut self, almanac: Almanac) -> Result<(), AnalysisError> {
-        self.inner.build_schedule(almanac.into())
+    pub fn build_schedule(&mut self, almanac: &Almanac) -> Result<(), AnalysisError> {
+        self.inner.build_schedule(almanac)
     }
 
     #[getter]

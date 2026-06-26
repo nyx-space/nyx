@@ -39,7 +39,7 @@ use typed_builder::TypedBuilder;
 mod rejectcrit;
 use self::kalman::KalmanFilter;
 use self::msr::TrackingDataArc;
-pub use self::rejectcrit::ResidRejectCrit;
+pub use self::rejectcrit::SigmaRejection;
 mod solution;
 pub use solution::ODSolution;
 mod initializers;
@@ -78,7 +78,7 @@ pub struct KalmanODProcess<
     pub kf_variant: KalmanVariant,
     /// Residual rejection criteria allows preventing bad measurements from affecting the estimation.
     #[builder(default, setter(strip_option))]
-    pub resid_crit: Option<ResidRejectCrit>,
+    pub sigma_reject: Option<SigmaRejection>,
     /// Tracking devices
     #[builder(default_code = "BTreeMap::new()")]
     pub devices: BTreeMap<String, Trk>,
@@ -174,9 +174,9 @@ where
 
         let resid_crit = if arc.force_reject {
             warn!("Rejecting all measurements from {arc} as requested");
-            Some(ResidRejectCrit { num_sigmas: 0.0 })
+            Some(SigmaRejection { num_sigmas: 0.0 })
         } else {
-            self.resid_crit
+            self.sigma_reject
         };
 
         let mut epoch = prop_instance.state.epoch();
@@ -320,14 +320,14 @@ where
                                         msr,
                                         &cur_msr_types,
                                         &nominal_state,
-                                        self.almanac.clone(),
+                                        &self.almanac,
                                     )?;
 
                                     let measurement_covar = device
                                         .measurement_covar_matrix(&cur_msr_types, epoch)?;
 
                                     if let Some(computed_meas) =
-                                        device.measure(epoch, &traj, None, self.almanac.clone())?
+                                        device.measure(epoch, &traj, None, &self.almanac)?
                                     {
                                         // Apply any biases on the computed observation
                                         let computed_obs = computed_meas
@@ -498,7 +498,7 @@ where
         Ok(od_sol)
     }
 
-    /// Perform a time update. Continuously predicts the trajectory for the provided duration, with covariance mapping at each step. In other words, this performs a time update.
+    /// Perform a time update. Continuously predicts the trajectory for the provided duration, with covariance mapping at each step.
     pub fn predict_for(
         &self,
         initial_estimate: KfEstimate<D::StateType>,

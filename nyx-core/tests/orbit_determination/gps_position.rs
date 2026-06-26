@@ -59,7 +59,7 @@ fn test_gps_od_position_filtering() {
     let mut arc_sim =
         TrackingArcSim::with_seed(devices.clone(), sim_traj.clone(), configs, 12345).unwrap();
 
-    let msr_arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    let msr_arc = arc_sim.generate_measurements(&almanac).unwrap();
 
     let mut est_sc = sim_sc;
     est_sc.orbit.radius_km.x += 1.0;

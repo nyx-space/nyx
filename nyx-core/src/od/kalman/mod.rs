@@ -27,6 +27,9 @@ pub use crate::time::{Epoch, Unit};
 pub mod filtering;
 pub mod initializers;
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
 /// Defines both a Classical and an Extended Kalman filter (CKF and EKF)
 /// T: Type of state
 /// A: Acceleration size (for SNC)
@@ -57,6 +60,7 @@ where
 }
 
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
+#[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub enum KalmanVariant {
     /// Configures the filter as a standard Extended Kalman Filter (EKF) update,
     /// updating the full reference state in the process' propagator at each measurement update.

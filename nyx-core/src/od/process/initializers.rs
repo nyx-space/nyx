@@ -30,7 +30,7 @@ use std::collections::BTreeMap;
 use std::marker::PhantomData;
 use std::ops::Add;
 
-use super::{KalmanODProcess, ResidRejectCrit};
+use super::{KalmanODProcess, SigmaRejection};
 
 impl<
         D: Dynamics,
@@ -62,7 +62,7 @@ where
     pub fn new(
         prop: Propagator<D>,
         kf_variant: KalmanVariant,
-        resid_crit: Option<ResidRejectCrit>,
+        sigma_reject: Option<SigmaRejection>,
         devices: BTreeMap<String, Trk>,
         almanac: Arc<Almanac>,
     ) -> Self {
@@ -70,7 +70,7 @@ where
             prop,
             kf_variant,
             devices,
-            resid_crit,
+            sigma_reject,
             process_noise: vec![],
             max_step: Unit::Minute * 1,
             epoch_precision: Unit::Microsecond * 1,
@@ -84,7 +84,7 @@ where
         prop: Propagator<D>,
         kf_variant: KalmanVariant,
         devices: BTreeMap<String, Trk>,
-        resid_crit: Option<ResidRejectCrit>,
+        resid_crit: Option<SigmaRejection>,
         process_noise: ProcessNoise<Accel>,
         almanac: Arc<Almanac>,
     ) -> Self {

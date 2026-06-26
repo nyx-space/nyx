@@ -72,7 +72,7 @@ fn nil_measurement(almanac: Arc<Almanac>) {
 
     assert!(
         station
-            .measure(epoch, &traj, None, almanac)
+            .measure(epoch, &traj, None, &almanac)
             .unwrap()
             .is_none()
     );
@@ -201,7 +201,7 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
     let mut traj1_msr_cnt = 0;
     for state in traj1.every(1 * Unit::Minute) {
         if dss65_madrid
-            .measure(state.epoch(), &traj1, Some(&mut rng), almanac.clone())
+            .measure(state.epoch(), &traj1, Some(&mut rng), &almanac)
             .unwrap()
             .is_some()
         {
@@ -220,7 +220,7 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
         let state = traj1.at(epoch).unwrap();
         // Will panic if the measurement is not visible
         let meas = dss65_madrid
-            .measure(state.epoch(), &traj1, Some(&mut rng), almanac.clone())
+            .measure(state.epoch(), &traj1, Some(&mut rng), &almanac)
             .unwrap()
             .unwrap();
 
@@ -282,7 +282,7 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
     // Now iterate the trajectory to count the measurements.
     for state in traj2.every(1 * Unit::Minute) {
         if let Some(msr) = dss65_madrid
-            .measure(state.epoch(), &traj2, Some(&mut rng), almanac.clone())
+            .measure(state.epoch(), &traj2, Some(&mut rng), &almanac)
             .unwrap()
         {
             if traj2_msr_cnt == 0 {
@@ -303,7 +303,7 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
         let state = traj2.at(epoch).unwrap();
         // Will panic if the measurement is not visible
         let meas = dss65_madrid
-            .measure(state.epoch(), &traj2, Some(&mut rng), almanac.clone())
+            .measure(state.epoch(), &traj2, Some(&mut rng), &almanac)
             .unwrap()
             .unwrap();
         let obs = meas.observation::<U2>(&msr_types);
@@ -359,12 +359,12 @@ fn verif_sensitivity_mat(almanac: Arc<Almanac>) {
     cislunar_sc_pert.orbit.velocity_km_s.z += 1.0e-3;
 
     let truth_meas = dss65_madrid
-        .measure_instantaneous(cislunar_sc, None, almanac.clone())
+        .measure_instantaneous(cislunar_sc, None, &almanac)
         .expect("successful measurement")
         .expect("a measurement");
 
     let pert_meas = dss65_madrid
-        .measure_instantaneous(cislunar_sc_pert, None, almanac.clone())
+        .measure_instantaneous(cislunar_sc_pert, None, &almanac)
         .expect("successful measurement")
         .expect("a measurement");
 
@@ -384,7 +384,7 @@ fn verif_sensitivity_mat(almanac: Arc<Almanac>) {
         // Given this observation, feed it to the sensitivity matrix, and we should find the original state.
 
         let h_tilde = dss65_madrid
-            .h_tilde::<Const<1>>(&truth_meas, &msr_types, &cislunar_sc, almanac.clone())
+            .h_tilde::<Const<1>>(&truth_meas, &msr_types, &cislunar_sc, &almanac)
             .expect("sensitivity should not fail");
 
         let delta_state = cislunar_sc.to_vector().fixed_rows::<9>(0)
@@ -476,10 +476,8 @@ fn val_measurement_noise(almanac: Arc<Almanac>) {
 
     let mut noisy_trk_sim =
         TrackingArcSim::new(noisy_devices, traj.clone(), configs.clone()).unwrap();
-    noisy_trk_sim.build_schedule(almanac.clone()).unwrap();
-    let noisy_trk_data = noisy_trk_sim
-        .generate_measurements(almanac.clone())
-        .unwrap();
+    noisy_trk_sim.build_schedule(&almanac).unwrap();
+    let noisy_trk_data = noisy_trk_sim.generate_measurements(&almanac).unwrap();
 
     let perfect_ground_station =
         GroundStation::dss13_goldstone(10.0, StochasticNoise::ZERO, StochasticNoise::ZERO)
@@ -491,10 +489,8 @@ fn val_measurement_noise(almanac: Arc<Almanac>) {
 
     let mut perfect_trk_sim =
         TrackingArcSim::new(noisy_devices, traj.clone(), configs.clone()).unwrap();
-    perfect_trk_sim.build_schedule(almanac.clone()).unwrap();
-    let perfect_trk_data = perfect_trk_sim
-        .generate_measurements(almanac.clone())
-        .unwrap();
+    perfect_trk_sim.build_schedule(&almanac).unwrap();
+    let perfect_trk_data = perfect_trk_sim.generate_measurements(&almanac).unwrap();
 
     assert_eq!(perfect_trk_data.len(), noisy_trk_data.len());
 

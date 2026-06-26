@@ -39,7 +39,6 @@ use crate::{linalg::allocator::Allocator, od::TrackingDevice};
 use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::marker::PhantomData;
-use std::sync::Arc;
 
 use super::{Handoff, TrkConfig};
 
@@ -174,7 +173,7 @@ where
     ///
     pub fn generate_measurements(
         &mut self,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<TrackingDataArc, ConfigError> {
         let mut measurements = BTreeMap::new();
 
@@ -209,7 +208,7 @@ where
                                     epoch,
                                     &self.trajectory,
                                     Some(&mut self.rng),
-                                    almanac.clone(),
+                                    &almanac,
                                 ) {
                                     Ok(msr_opt) => {
                                         if let Some(msr) = msr_opt {
@@ -291,7 +290,7 @@ impl TrackingArcSim<Spacecraft, GroundStation> {
     ///    7.b. if that tracker is marked as `Eager` and it ends after the start of the next strand, change the end date of the current strand.
     pub fn generate_schedule(
         &self,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<BTreeMap<String, TrkConfig>, AnalysisError> {
         // Build a Location Dataset so we can use ANISE's visibility finder.
         let mut loc_dataset = LocationDataSet::default();
@@ -439,7 +438,7 @@ impl TrackingArcSim<Spacecraft, GroundStation> {
     }
 
     /// Sets the schedule to that built in `build_schedule`
-    pub fn build_schedule(&mut self, almanac: Arc<Almanac>) -> Result<(), AnalysisError> {
+    pub fn build_schedule(&mut self, almanac: &Almanac) -> Result<(), AnalysisError> {
         self.configs = self.generate_schedule(almanac)?;
 
         Ok(())

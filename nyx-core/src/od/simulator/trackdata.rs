@@ -16,8 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::sync::Arc;
-
 use anise::almanac::Almanac;
 use anise::errors::AlmanacResult;
 use hifitime::Epoch;
@@ -63,18 +61,18 @@ where
         epoch: Epoch,
         traj: &Traj<MsrIn>,
         rng: Option<&mut Pcg64Mcg>,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<Option<NewMeasurement>, ODError>;
 
     /// Returns the device location at the given epoch and in the given frame.
-    fn location(&self, epoch: Epoch, frame: Frame, almanac: Arc<Almanac>) -> AlmanacResult<Orbit>;
+    fn location(&self, epoch: Epoch, frame: Frame, almanac: &Almanac) -> AlmanacResult<Orbit>;
 
     // Perform an instantaneous measurement (without integration times, i.e. one-way). Returns None if the object is not visible, else returns the measurement.
     fn measure_instantaneous(
         &mut self,
         rx: MsrIn,
         rng: Option<&mut Pcg64Mcg>,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<Option<NewMeasurement>, ODError>;
 
     // Return the noise statistics of this tracking device for the provided measurement type at the requested epoch.

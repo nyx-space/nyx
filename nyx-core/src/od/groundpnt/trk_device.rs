@@ -34,8 +34,6 @@ use crate::od::msr::MeasurementType;
 use crate::od::prelude::{Measurement, ODError};
 use crate::od::{ODAlmanacSnafu, ODTrajSnafu};
 
-use std::sync::Arc;
-
 impl TrackingDevice<GroundAsset> for InterlinkTxSpacecraft {
     fn name(&self) -> String {
         self.traj.name.clone().unwrap_or("unnamed".to_string())
@@ -45,7 +43,7 @@ impl TrackingDevice<GroundAsset> for InterlinkTxSpacecraft {
         &self.measurement_types
     }
 
-    fn location(&self, epoch: Epoch, frame: Frame, almanac: Arc<Almanac>) -> AlmanacResult<Orbit> {
+    fn location(&self, epoch: Epoch, frame: Frame, almanac: &Almanac) -> AlmanacResult<Orbit> {
         match self.traj.at(epoch) {
             Ok(state) => almanac.transform_to(state.orbit, frame, self.ab_corr),
             Err(_) => Err(AlmanacError::Ephemeris {
@@ -62,7 +60,7 @@ impl TrackingDevice<GroundAsset> for InterlinkTxSpacecraft {
         epoch: Epoch,
         traj: &Traj<GroundAsset>,
         rng: Option<&mut Pcg64Mcg>,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<Option<Measurement>, ODError> {
         match self.integration_time {
             Some(integration_time) => {
@@ -87,10 +85,10 @@ impl TrackingDevice<GroundAsset> for InterlinkTxSpacecraft {
                 };
 
                 // Start of integration time
-                let msr_t0_opt = self.measure_instantaneous(rx_0, None, almanac.clone())?;
+                let msr_t0_opt = self.measure_instantaneous(rx_0, None, &almanac)?;
 
                 // End of integration time
-                let msr_t1_opt = self.measure_instantaneous(rx_1, None, almanac.clone())?;
+                let msr_t1_opt = self.measure_instantaneous(rx_1, None, &almanac)?;
 
                 if let Some(msr_t0) = msr_t0_opt {
                     if let Some(msr_t1) = msr_t1_opt {
@@ -136,7 +134,7 @@ impl TrackingDevice<GroundAsset> for InterlinkTxSpacecraft {
         &mut self,
         rx: GroundAsset,
         rng: Option<&mut Pcg64Mcg>,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<Option<Measurement>, ODError> {
         let pnt_veh = self.traj.at(rx.epoch()).context(ODTrajSnafu {
             details: format!("fetching state {} for interlink", rx.epoch()),

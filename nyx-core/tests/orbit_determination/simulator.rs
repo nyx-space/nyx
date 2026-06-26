@@ -122,8 +122,8 @@ fn tracking_data(
         TrackingArcSim::<Spacecraft, GroundStation>::with_seed(devices, trajectory, configs, 12345)
             .unwrap();
 
-    trk.build_schedule(almanac.clone()).unwrap();
-    trk.generate_measurements(almanac).unwrap()
+    trk.build_schedule(&almanac).unwrap();
+    trk.generate_measurements(&almanac).unwrap()
 }
 
 #[rstest]

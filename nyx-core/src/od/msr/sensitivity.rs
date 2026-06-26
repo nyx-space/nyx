@@ -26,7 +26,6 @@ use indexmap::IndexSet;
 use nalgebra::{DimName, OMatrix, U1};
 use snafu::ResultExt;
 use std::marker::PhantomData;
-use std::sync::Arc;
 
 use super::MeasurementType;
 use super::measurement::Measurement;
@@ -43,7 +42,7 @@ where
         msr: &Measurement,
         rx: &Rx,
         tx: &Tx,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<Self, ODError>;
 }
 
@@ -62,7 +61,7 @@ where
         msr: &Measurement,
         msr_types: &IndexSet<MeasurementType>, // Consider switching to array
         rx: &Rx,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<OMatrix<f64, M, SolveState::Size>, ODError>
     where
         DefaultAllocator: Allocator<M> + Allocator<M, SolveState::Size>;
@@ -91,7 +90,7 @@ where
         msr: &Measurement,
         msr_types: &IndexSet<MeasurementType>,
         rx: &Spacecraft,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<OMatrix<f64, M, <Spacecraft as State>::Size>, ODError>
     where
         DefaultAllocator: Allocator<M> + Allocator<M, <Spacecraft as State>::Size>,
@@ -108,7 +107,7 @@ where
                     Spacecraft,
                     Spacecraft,
                     GroundStation,
-                >>::new(*msr_type, msr, rx, self, almanac.clone())?;
+                >>::new(*msr_type, msr, rx, self, &almanac)?;
 
             mat.set_row(ith_row, &scalar_h.sensitivity_row);
         }
@@ -124,7 +123,7 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
         msr: &Measurement,
         rx: &Spacecraft,
         tx: &GroundStation,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<Self, ODError> {
         let receiver = rx.orbit;
 
@@ -132,7 +131,7 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
         // This frame is required because the scalar measurements are frame independent, but the sensitivity
         // must be in the estimation frame.
         let transmitter = tx
-            .location(rx.orbit.epoch, rx.orbit.frame, almanac.clone())
+            .location(rx.orbit.epoch, rx.orbit.frame, &almanac)
             .context(ODAlmanacSnafu {
                 action: "computing transmitter location when computing sensitivity matrix",
             })?;

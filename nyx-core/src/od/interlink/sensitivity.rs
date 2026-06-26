@@ -28,7 +28,6 @@ use indexmap::IndexSet;
 use nalgebra::{DimName, OMatrix, U1};
 use snafu::ResultExt;
 use std::marker::PhantomData;
-use std::sync::Arc;
 
 struct ScalarSensitivity<SolveState: State, Rx, Tx>
 where
@@ -53,7 +52,7 @@ where
         msr: &Measurement,
         msr_types: &IndexSet<MeasurementType>,
         rx: &Spacecraft,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<OMatrix<f64, M, <Spacecraft as State>::Size>, ODError>
     where
         DefaultAllocator: Allocator<M> + Allocator<M, <Spacecraft as State>::Size>,
@@ -70,7 +69,7 @@ where
                     Spacecraft,
                     Spacecraft,
                     InterlinkTxSpacecraft,
-                >>::new(*msr_type, msr, rx, self, almanac.clone())?;
+                >>::new(*msr_type, msr, rx, self, &almanac)?;
 
             mat.set_row(ith_row, &scalar_h.sensitivity_row);
         }
@@ -86,7 +85,7 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, InterlinkTxSpacecraft>
         msr: &Measurement,
         rx: &Spacecraft,
         tx: &InterlinkTxSpacecraft,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<Self, ODError> {
         let receiver = rx.orbit;
 
@@ -97,7 +96,7 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, InterlinkTxSpacecraft>
             tx,
             rx.orbit.epoch,
             rx.orbit.frame,
-            almanac.clone(),
+            &almanac,
         )
         .context(ODAlmanacSnafu {
             action: "computing transmitter location when computing sensitivity matrix",

@@ -23,6 +23,8 @@ nyx-space = { workspace = true, features = ["python"] }
 log = {workspace = true}
 rayon = {workspace = true}
 
-pyo3 = { version = "0.28", features = ["multiple-pymethods"] }
+pyo3 = {workspace = true, optional = false}
 pyo3-log = "0.13.3"
+ndarray = ">= 0.17, < 0.18"
+numpy = {workspace = true}
 

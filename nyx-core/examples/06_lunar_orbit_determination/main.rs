@@ -22,7 +22,7 @@ use nyx::{
     od::{
         GroundStation, SpacecraftKalmanScalarOD,
         prelude::{KalmanVariant, TrackingArcSim, TrkConfig},
-        process::{Estimate, NavSolution, ResidRejectCrit, SpacecraftUncertainty},
+        process::{Estimate, NavSolution, SigmaRejection, SpacecraftUncertainty},
         snc::ProcessNoise3D,
     },
     propagators::{IntegratorOptions, Propagator},
@@ -155,8 +155,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         123, // Set a seed for reproducibility
     )?;
 
-    trk.build_schedule(almanac.clone())?;
-    let arc = trk.generate_measurements(almanac.clone())?;
+    trk.build_schedule(&almanac)?;
+    let arc = trk.generate_measurements(&almanac)?;
     // Save the simulated tracking data
     arc.to_parquet_simple("./data/04_output/06_lunar_simulated_tracking.parquet")?;
 
@@ -199,7 +199,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let odp = SpacecraftKalmanScalarOD::new(
         setup,
         KalmanVariant::ReferenceUpdate,
-        Some(ResidRejectCrit::default()),
+        Some(SigmaRejection::default()),
         proc_devices,
         almanac.clone(),
     )

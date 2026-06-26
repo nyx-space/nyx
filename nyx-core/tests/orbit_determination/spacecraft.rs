@@ -157,9 +157,9 @@ fn od_val_sc_mb_srp_reals_duals_models(
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(sim_devices, traj, configs.clone(), 0).unwrap();
-    arc_sim.build_schedule(almanac.clone()).unwrap();
+    arc_sim.build_schedule(&almanac).unwrap();
 
-    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(&almanac).unwrap();
 
     arc.to_parquet_simple(path.with_file_name("sc_msr_arc.parquet"))
         .unwrap();
@@ -342,9 +342,9 @@ fn od_val_sc_srp_estimation(
     // Simulate tracking data
     let mut arc_sim =
         TrackingArcSim::with_seed(all_stations, traj.clone(), configs.clone(), 120).unwrap();
-    arc_sim.build_schedule(almanac.clone()).unwrap();
+    arc_sim.build_schedule(&almanac).unwrap();
 
-    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(&almanac).unwrap();
 
     arc.to_parquet_simple(path.with_file_name("sc_srp_msr_arc.parquet"))
         .unwrap();
@@ -486,7 +486,7 @@ fn od_val_sc_srp_estimation(
         "residuals should not be normally distributed"
     );
 
-    let od_smoothed_sol = od_sol.smooth(almanac).unwrap();
+    let od_smoothed_sol = od_sol.smooth(&almanac).unwrap();
 
     od_smoothed_sol
         .to_parquet("./od_srp_val_smoothed.parquet", ExportCfg::default())

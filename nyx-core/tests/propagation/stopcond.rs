@@ -207,7 +207,7 @@ fn stop_cond_nrho_apo(almanac: Arc<Almanac>) {
     );
 
     // Convert this trajectory into the Luna frame
-    let traj_luna = traj.to_frame(MOON_J2000, almanac.clone()).unwrap();
+    let traj_luna = traj.to_frame(MOON_J2000, &almanac).unwrap();
     let end_conv = Instant::now();
     println!(
         "Converted EME2000 trajectory into Moon J2000 in {} ms\nFrom: {}\nTo  : {}",
@@ -375,7 +375,7 @@ fn event_and_combination(almanac: Arc<Almanac>) {
     }
 
     // Convert the trajectory to the Moon frame
-    let traj_moon = traj.to_frame(MOON_J2000, almanac.clone()).unwrap();
+    let traj_moon = traj.to_frame(MOON_J2000, &almanac).unwrap();
 
     let sc_moon_apo = traj_moon.at(sc_apo.epoch()).unwrap();
 

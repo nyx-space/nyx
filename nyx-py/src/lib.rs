@@ -54,9 +54,11 @@ use nyx_space::mc::{MvnSpacecraft, StateDispersion};
 use nyx_space::md::StateParameter;
 use nyx_space::md::trajectory::ExportCfg;
 use nyx_space::od::GroundStation;
+use nyx_space::od::kalman::KalmanVariant;
 use nyx_space::od::msr::{Measurement, MeasurementType, TrackingDataArc};
 use nyx_space::od::noise::link_specific::{CN0, CarrierFreq, ChipRate, SN0};
 use nyx_space::od::noise::{GaussMarkov, StochasticNoise, WhiteNoise};
+use nyx_space::od::process::SigmaRejection;
 use nyx_space::od::simulator::{Handoff, PyCadence, Scheduler, Strand, TrkConfig};
 use nyx_space::propagators::{IntegratorMethod, IntegratorOptions};
 use nyx_space::{Spacecraft, cosmic::GuidanceMode};
@@ -116,10 +118,12 @@ fn orbit_determination(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
     sm.add_class::<CN0>()?;
     sm.add_class::<ChipRate>()?;
     sm.add_class::<CarrierFreq>()?;
+    sm.add_class::<KalmanVariant>()?;
+    sm.add_class::<SigmaRejection>()?;
     sm.add_class::<py_od::GroundTrackingArcSim>()?;
     sm.add_class::<py_od::PySpacecraftODProcess>()?;
     sm.add_class::<py_od::PySpacecraftODSolution>()?;
-    sm.add_class::<py_od::PyKfEstimate>()?;
+    sm.add_class::<py_od::PySpacecraftEstimate>()?;
     sm.add_class::<py_od::PyResidual>()?;
 
     Ok(())

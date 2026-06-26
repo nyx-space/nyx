@@ -100,9 +100,9 @@ fn od_val_multi_body_ckf_perfect_stations(
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(sim_devices, traj, configs.clone(), 0).unwrap();
-    arc_sim.build_schedule(almanac.clone()).unwrap();
+    arc_sim.build_schedule(&almanac).unwrap();
 
-    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(&almanac).unwrap();
     arc.to_parquet_simple("multi_body.parquet").unwrap();
 
     // Now that we have the truth data, let's start an OD and compute the estimates. We expect the
@@ -234,9 +234,9 @@ fn multi_body_ckf_covar_map(
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(sim_devices, traj, configs.clone(), 0).unwrap();
-    arc_sim.build_schedule(almanac.clone()).unwrap();
+    arc_sim.build_schedule(&almanac).unwrap();
 
-    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(&almanac).unwrap();
 
     // Now that we have the truth data, let's start an OD. We expect the estimated orbit to be
     // perfect on measurement updates since we're using strictly the same dynamics and have no

@@ -190,7 +190,7 @@ fn traj_ephem_forward(almanac: Arc<Almanac>) {
     }
 
     // And let's convert into another frame and back to check the error
-    let ephem_luna = ephem.to_frame(MOON_J2000, almanac.clone()).unwrap();
+    let ephem_luna = ephem.to_frame(MOON_J2000, &almanac).unwrap();
     println!("ephem_luna {ephem_luna}");
     assert!(
         (ephem.first().epoch() - ephem_luna.first().epoch()).abs() < 1.microseconds(),
@@ -201,7 +201,7 @@ fn traj_ephem_forward(almanac: Arc<Almanac>) {
         "End time differ!"
     );
     // And convert back, to see the error this leads to
-    let ephem_back_to_earth = ephem_luna.to_frame(eme2k, almanac.clone()).unwrap();
+    let ephem_back_to_earth = ephem_luna.to_frame(eme2k, &almanac).unwrap();
     println!("Ephem back: {ephem_back_to_earth}");
     assert!(
         (ephem.first().epoch() - ephem_back_to_earth.first().epoch()).abs() < 1.microseconds(),
@@ -421,9 +421,9 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
     );
 
     // And let's convert into another frame and back to check the error
-    let ephem_luna = traj.to_frame(MOON_J2000, almanac.clone()).unwrap();
+    let ephem_luna = traj.to_frame(MOON_J2000, &almanac).unwrap();
     // And convert back, to see the error this leads to
-    let ephem_back_to_earth = ephem_luna.to_frame(eme2k, almanac.clone()).unwrap();
+    let ephem_back_to_earth = ephem_luna.to_frame(eme2k, &almanac).unwrap();
 
     assert_eq!(
         traj, ephem_back_to_earth,

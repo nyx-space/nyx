@@ -30,7 +30,6 @@ use indexmap::IndexSet;
 use nalgebra::{DimName, OMatrix, U1};
 use snafu::ResultExt;
 use std::marker::PhantomData;
-use std::sync::Arc;
 
 impl TrackerSensitivity<GroundAsset, GroundAsset> for InterlinkTxSpacecraft
 where
@@ -43,7 +42,7 @@ where
         msr: &Measurement,
         msr_types: &IndexSet<MeasurementType>,
         rx: &GroundAsset,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<OMatrix<f64, M, <GroundAsset as State>::Size>, ODError>
     where
         DefaultAllocator: Allocator<M> + Allocator<M, <GroundAsset as State>::Size>,
@@ -60,7 +59,7 @@ where
                     GroundAsset,
                     GroundAsset,
                     InterlinkTxSpacecraft,
-                >>::new(*msr_type, msr, rx, self, almanac.clone())?;
+                >>::new(*msr_type, msr, rx, self, &almanac)?;
 
             mat.set_row(ith_row, &scalar_h.sensitivity_row);
         }
@@ -78,7 +77,7 @@ impl ScalarSensitivityT<GroundAsset, GroundAsset, InterlinkTxSpacecraft>
         msr: &Measurement,
         rx: &GroundAsset,
         tx: &InterlinkTxSpacecraft,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<Self, ODError> {
         let receiver = rx.orbit();
         let loc = rx.to_location();

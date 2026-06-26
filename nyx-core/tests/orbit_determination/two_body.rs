@@ -116,9 +116,9 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 0).unwrap();
-    arc_sim.build_schedule(almanac.clone()).unwrap();
+    arc_sim.build_schedule(&almanac).unwrap();
 
-    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(&almanac).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -258,9 +258,9 @@ fn od_tb_val_with_arc(
 
     // Simulate tracking data of range and range rate
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 1).unwrap();
-    arc_sim.build_schedule(almanac.clone()).unwrap();
+    arc_sim.build_schedule(&almanac).unwrap();
 
-    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(&almanac).unwrap();
 
     // And serialize to disk
     let path: PathBuf = [
@@ -299,7 +299,7 @@ fn od_tb_val_with_arc(
     let odp = SpacecraftKalmanOD::new(
         setup,
         KalmanVariant::ReferenceUpdate,
-        Some(ResidRejectCrit::default()),
+        Some(SigmaRejection::default()),
         proc_devices,
         almanac,
     );
@@ -413,9 +413,9 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 0).unwrap();
-    arc_sim.build_schedule(almanac.clone()).unwrap();
+    arc_sim.build_schedule(&almanac).unwrap();
 
-    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(&almanac).unwrap();
 
     // And serialize to disk
     let path: PathBuf = [
@@ -553,7 +553,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
     );
 
     // Smooth
-    let od_sol = od_sol.smooth(almanac).unwrap();
+    let od_sol = od_sol.smooth(&almanac).unwrap();
 
     println!(
         "N-1 one iteration: \n{}",
@@ -674,9 +674,9 @@ fn od_tb_val_az_el_ckf_fixed_step_perfect_stations(
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 0).unwrap();
-    arc_sim.build_schedule(almanac.clone()).unwrap();
+    arc_sim.build_schedule(&almanac).unwrap();
 
-    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(&almanac).unwrap();
 
     // And serialize to disk
     let path: PathBuf = [
@@ -814,7 +814,7 @@ fn od_tb_val_az_el_ckf_fixed_step_perfect_stations(
     );
 
     // Smooth
-    let od_sol = od_sol.smooth(almanac).unwrap();
+    let od_sol = od_sol.smooth(&almanac).unwrap();
 
     println!(
         "N-1 one iteration: \n{}",
@@ -896,9 +896,9 @@ fn od_tb_fixed_step_smooth_test(
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 0).unwrap();
-    arc_sim.build_schedule(almanac.clone()).unwrap();
+    arc_sim.build_schedule(&almanac).unwrap();
 
-    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(&almanac).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -952,7 +952,7 @@ fn od_tb_fixed_step_smooth_test(
     );
 
     // Smooth
-    let od_sol = od_sol.smooth(almanac).unwrap();
+    let od_sol = od_sol.smooth(&almanac).unwrap();
 
     let dstate_no_iteration = (initial_state - initial_state2).unwrap();
     let dstate_iteration = (initial_state - od_sol.estimates[0].state().orbit).unwrap();
@@ -1029,9 +1029,9 @@ fn od_tb_fixed_step_perfect_stations_snc_covar_map(
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 0).unwrap();
-    arc_sim.build_schedule(almanac.clone()).unwrap();
+    arc_sim.build_schedule(&almanac).unwrap();
 
-    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(&almanac).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -1227,9 +1227,9 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect(
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 0).unwrap();
-    arc_sim.build_schedule(almanac.clone()).unwrap();
+    arc_sim.build_schedule(&almanac).unwrap();
 
-    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(&almanac).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -1338,9 +1338,9 @@ fn od_tb_fixed_step_perfect_stations_several_snc_covar_map(
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 0).unwrap();
-    arc_sim.build_schedule(almanac.clone()).unwrap();
+    arc_sim.build_schedule(&almanac).unwrap();
 
-    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(&almanac).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on

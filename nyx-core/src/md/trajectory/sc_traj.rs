@@ -56,7 +56,7 @@ impl Traj<Spacecraft> {
     pub fn from_bsp(
         target_frame: Frame,
         observer_frame: Frame,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
         sc_template: Spacecraft,
         step: Duration,
         start_epoch: Option<Epoch>,
@@ -87,7 +87,7 @@ impl Traj<Spacecraft> {
     }
     /// Allows converting the source trajectory into the (almost) equivalent trajectory in another frame
     #[allow(clippy::map_clone)]
-    pub fn to_frame(&self, new_frame: Frame, almanac: Arc<Almanac>) -> Result<Self, NyxError> {
+    pub fn to_frame(&self, new_frame: Frame, almanac: &Almanac) -> Result<Self, NyxError> {
         if self.states.is_empty() {
             return Err(NyxError::Trajectory {
                 source: TrajError::CreationError {
@@ -136,7 +136,7 @@ impl Traj<Spacecraft> {
         path: P,
         body_fixed_frame: Frame,
         metadata: Option<HashMap<String, String>>,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<PathBuf, Box<dyn Error>> {
         let traj = self.to_frame(body_fixed_frame, almanac)?;
 

@@ -86,7 +86,7 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
     devices.insert("Madrid".to_string(), dss65_madrid);
     devices.insert("Canberra".to_string(), dss34_canberra);
 
-    let initial_estimate = KfEstimate::disperse_from_diag(
+    let initial_estimate = KfEstimate::from_dispersions(
         initial_state,
         vec![
             StateDispersion::zero_mean(
@@ -129,9 +129,9 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(devices.clone(), traj.clone(), configs, 0).unwrap();
-    arc_sim.build_schedule(almanac.clone()).unwrap();
+    arc_sim.build_schedule(&almanac).unwrap();
 
-    let arc = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    let arc = arc_sim.generate_measurements(&almanac).unwrap();
 
     // And serialize to disk
     let path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "../data", "04_output"]

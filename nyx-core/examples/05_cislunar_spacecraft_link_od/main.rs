@@ -172,7 +172,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         TrackingArcSim::with_seed(devices.clone(), llo_traj.clone(), configs, 0).unwrap();
     println!("{trk_sim}");
 
-    let trk_data = trk_sim.generate_measurements(almanac.clone()).unwrap();
+    let trk_data = trk_sim.generate_measurements(&almanac).unwrap();
     println!("{trk_data}");
 
     trk_data
@@ -216,7 +216,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let odp = InterlinkKalmanOD::new(
         setup.clone(),
         KalmanVariant::ReferenceUpdate,
-        Some(ResidRejectCrit::default()),
+        Some(SigmaRejection::default()),
         proc_devices,
         almanac.clone(),
     );
