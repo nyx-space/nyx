@@ -369,7 +369,7 @@ fn od_with_modulus_as_bias(
 
     let sigma_q = 1e-8_f64.powi(2);
     let process_noise =
-        ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
+        ProcessNoise3D::from_diagonal(&[sigma_q, sigma_q, sigma_q], 2 * Unit::Minute, None);
 
     let setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
 

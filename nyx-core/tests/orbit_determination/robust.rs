@@ -3,16 +3,16 @@ extern crate pretty_env_logger;
 
 use anise::analysis::prelude::OrbitalElement;
 use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SATURN_BARYCENTER, SUN};
-use nyx::Spacecraft;
 use nyx::cosmic::Orbit;
-use nyx::dynamics::SpacecraftDynamics;
 use nyx::dynamics::orbital::OrbitalDynamics;
+use nyx::dynamics::SpacecraftDynamics;
 use nyx::io::ExportCfg;
 use nyx::md::StateParameter;
 use nyx::od::prelude::*;
 use nyx::propagators::Propagator;
 use nyx::time::{Epoch, TimeUnits, Unit};
 use nyx::utils::rss_orbit_errors;
+use nyx::Spacecraft;
 use nyx_space::mc::StateDispersion;
 use polars::prelude::*;
 use std::collections::BTreeMap;
@@ -162,7 +162,7 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
     // Define the process noise to assume an unmodeled acceleration on X, Y and Z in the ECI frame
     let sigma_q = 1e-7_f64.powi(2);
     let process_noise =
-        ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
+        ProcessNoise3D::from_diagonal(&[sigma_q, sigma_q, sigma_q], 2 * Unit::Minute, None);
 
     println!("{process_noise}");
 
@@ -277,8 +277,8 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
         .unwrap();
 
     // Check that the position and velocity estimates are present, along with the epochs
-    assert!(
-        df.columns([
+    assert!(df
+        .columns([
             "Epoch (UTC)",
             "X (km)",
             "Y (km)",
@@ -287,12 +287,11 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
             "VY (km/s)",
             "VZ (km/s)",
         ])
-        .is_ok()
-    );
+        .is_ok());
 
     // Check that the covariance in the integration frame is present
-    assert!(
-        df.columns([
+    assert!(df
+        .columns([
             "Covariance X*X (Earth J2000) (km^2)",
             "Covariance X*Y (Earth J2000) (km^2)",
             "Covariance X*Z (Earth J2000) (km^2)",
@@ -354,6 +353,5 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
             "Sigma Vy (RIC) (km/s)",
             "Sigma Vz (RIC) (km/s)",
         ])
-        .is_ok()
-    );
+        .is_ok());
 }

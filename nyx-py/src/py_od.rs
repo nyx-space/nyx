@@ -18,11 +18,11 @@
 
 use super::py_md::{Propagator, PyTrajectory};
 use anise::analysis::AnalysisError;
+use anise::ephemerides::ephemeris::{Ephemeris, LocalFrame};
 use anise::prelude::Almanac;
 use hifitime::{Duration, Epoch};
 use ndarray::Array2;
 use numpy::{PyArray2, PyReadonlyArray1};
-use nyx_space::NyxError;
 use nyx_space::io::InputOutputError;
 use nyx_space::linalg::{Const, OVector};
 use nyx_space::mc::{MvnSpacecraft, StateDispersion};
@@ -32,19 +32,89 @@ use nyx_space::od::prelude::{
     KalmanVariant, ODError, ODSolution, Residual, SigmaRejection, SpacecraftKalmanScalarOD,
     TrackingArcSim, TrkConfig,
 };
+use nyx_space::od::snc::ProcessNoise3D;
 use nyx_space::propagators::PropagationError;
+use nyx_space::NyxError;
 use nyx_space::{
-    Spacecraft,
     io::ConfigError,
     od::{
-        GroundStation,
         msr::{MeasurementType, TrackingDataArc},
+        GroundStation,
     },
+    Spacecraft,
 };
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 use std::collections::BTreeMap;
+
+#[derive(Clone)]
+#[pyclass(from_py_object, name = "ProcessNoise")]
+pub struct PyProcessNoise {
+    pub(crate) inner: ProcessNoise3D,
+}
+
+#[pymethods]
+impl PyProcessNoise {
+    #[classmethod]
+    fn from_velocity_m_s(
+        _cls: &Bound<'_, PyType>,
+        vx_m_s: f64,
+        vy_m_s: f64,
+        vz_m_s: f64,
+        noise_duration: Duration,
+        disable_time: Duration,
+        local_frame: Option<LocalFrame>,
+    ) -> Self {
+        let inner = ProcessNoise3D::from_velocity_km_s(
+            &[vx_m_s * 1e-3, vy_m_s * 1e-3, vz_m_s * 1e-3],
+            noise_duration,
+            disable_time,
+            local_frame,
+        );
+        Self { inner }
+    }
+
+    #[classmethod]
+    fn from_accel_m_s2(
+        _cls: &Bound<'_, PyType>,
+        ax_m_s2: f64,
+        ay_m_s2: f64,
+        az_m_s2: f64,
+        disable_time: Duration,
+        local_frame: Option<LocalFrame>,
+        x_decay_s: Option<f64>,
+        y_decay_s: Option<f64>,
+        z_decay_s: Option<f64>,
+    ) -> Self {
+        let mut inner = ProcessNoise3D::from_diagonal(
+            &[ax_m_s2 * 1e-3, ay_m_s2 * 1e-3, az_m_s2 * 1e-3],
+            disable_time,
+            local_frame,
+        );
+        if x_decay_s.is_some() || y_decay_s.is_some() || z_decay_s.is_some() {
+            inner.decay_diag = Some(vec![
+                x_decay_s.unwrap_or_default(),
+                y_decay_s.unwrap_or_default(),
+                z_decay_s.unwrap_or_default(),
+            ]);
+        }
+
+        Self { inner }
+    }
+
+    fn __str__(&self) -> String {
+        format!("{}", self.inner)
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{} @ {self:p}", self.inner)
+    }
+
+    fn __eq__(&self, other: Self) -> bool {
+        self.inner == other.inner
+    }
+}
 
 #[derive(Clone)]
 #[pyclass(from_py_object, name = "SpacecraftODProcess")]
@@ -55,21 +125,26 @@ pub struct PySpacecraftODProcess {
 #[pymethods]
 impl PySpacecraftODProcess {
     #[new]
-    #[pyo3(signature=(prop, kf_variant, devices, sigma_reject=Some(SigmaRejection::default())))]
+    #[pyo3(signature=(prop, kf_variant, devices, sigma_reject=Some(SigmaRejection::default()), process_noise=None))]
     fn py_new(
         prop: Propagator,
         kf_variant: KalmanVariant,
         devices: BTreeMap<String, GroundStation>,
         sigma_reject: Option<SigmaRejection>,
+        process_noise: Option<PyProcessNoise>,
     ) -> Result<Self, PropagationError> {
         let almanac = prop.almanac.clone();
-        let inner = SpacecraftKalmanScalarOD::new(
+        let mut inner = SpacecraftKalmanScalarOD::new(
             prop.build()?,
             kf_variant,
             sigma_reject,
             devices,
             almanac,
         );
+
+        if let Some(pn) = process_noise {
+            inner = inner.with_process_noise(pn.inner);
+        }
 
         Ok(Self { inner })
     }
@@ -188,8 +263,7 @@ impl PySpacecraftEstimate {
             .collect::<Vec<f64>>()
     }
 
-    /// Returns the 6x6 DCM to rotate a state. If the time derivative of this DCM is defined, this 6x6 accounts for the transport theorem.
-    /// Warning: you MUST manually install numpy to call this function.
+    /// Returns the 9x9 covariance of this estimate.
     /// :rtype: numpy.ndarray
     #[getter]
     fn covariance<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray2<f64>>> {
@@ -314,6 +388,11 @@ impl PySpacecraftODSolution {
             .to_traj()
             .map_err(|e| PyValueError::new_err(format!("{e}")))?;
         Ok(PyTrajectory { inner: traj })
+    }
+
+    /// Export to an ANISE ephemeris, which can be converted to a CCSDS OEM
+    fn to_ephemeris(&self, object_id: String) -> Ephemeris {
+        self.inner.to_ephemeris(object_id)
     }
 
     fn accepted_residuals(&self) -> Vec<PyResidual> {

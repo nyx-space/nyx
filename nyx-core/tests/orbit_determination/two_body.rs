@@ -2,16 +2,16 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
 use anise::constants::frames::IAU_EARTH_FRAME;
-use nyx::Spacecraft;
 use nyx::cosmic::Orbit;
-use nyx::dynamics::SpacecraftDynamics;
 use nyx::dynamics::gravity_field::GravityField;
 use nyx::dynamics::orbital::OrbitalDynamics;
+use nyx::dynamics::SpacecraftDynamics;
 use nyx::io::ConfigRepr;
-use nyx::io::{ExportCfg, gravity::*};
+use nyx::io::{gravity::*, ExportCfg};
 use nyx::linalg::{SMatrix, SVector};
 use nyx::od::prelude::*;
 use nyx::propagators::{IntegratorOptions, Propagator};
+use nyx::Spacecraft;
 use nyx_space::propagators::IntegratorMethod;
 use std::collections::BTreeMap;
 use std::env;
@@ -1058,7 +1058,7 @@ fn od_tb_fixed_step_perfect_stations_snc_covar_map(
     // Define the process noise to assume an unmodeled acceleration on X, Y and Z in the ECI frame.
     let sigma_q = 1e-8_f64.powi(2);
     let process_noise =
-        ProcessNoise3D::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
+        ProcessNoise3D::from_diagonal(&[sigma_q, sigma_q, sigma_q], 2 * Unit::Minute, None);
 
     let odp = SpacecraftKalmanOD::new(
         setup,
@@ -1367,14 +1367,15 @@ fn od_tb_fixed_step_perfect_stations_several_snc_covar_map(
     // Define the process noise to assume an unmodeled acceleration on X, Y and Z in the ECI frame.
     let sigma_q1 = 1e-7_f64.powi(2);
     let process_noise1 =
-        ProcessNoise3D::from_diagonal(2 * Unit::Day, &[sigma_q1, sigma_q1, sigma_q1]);
+        ProcessNoise3D::from_diagonal(&[sigma_q1, sigma_q1, sigma_q1], 2 * Unit::Day, None);
 
     let sigma_q2 = 1e-8_f64.powi(2);
     let sigma_q2_d = 3600.0;
     let mut process_noise2 = ProcessNoise3D::with_decay(
-        2 * Unit::Day,
         &[sigma_q2, sigma_q2, sigma_q2],
+        2 * Unit::Day,
         &[sigma_q2_d, sigma_q2_d, sigma_q2_d],
+        None,
     );
     process_noise2.start_time = Some(dt + 36_000.0); // Start the second process noise 10 hours into the tracking pass
 

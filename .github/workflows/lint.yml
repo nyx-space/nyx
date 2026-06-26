@@ -12,6 +12,6 @@ jobs:
 
       - name: Run Ruff
         uses: astral-sh/ruff-action@v3
-        run: |
-          cd nyx-py
-          ruff check .
+        with:
+          args: check .
+          src: nyx-py
