@@ -208,7 +208,7 @@ where
                                     epoch,
                                     &self.trajectory,
                                     Some(&mut self.rng),
-                                    &almanac,
+                                    almanac,
                                 ) {
                                     Ok(msr_opt) => {
                                         if let Some(msr) = msr_opt {

@@ -59,7 +59,7 @@ where
                     GroundAsset,
                     GroundAsset,
                     InterlinkTxSpacecraft,
-                >>::new(*msr_type, msr, rx, self, &almanac)?;
+                >>::new(*msr_type, msr, rx, self, almanac)?;
 
             mat.set_row(ith_row, &scalar_h.sensitivity_row);
         }

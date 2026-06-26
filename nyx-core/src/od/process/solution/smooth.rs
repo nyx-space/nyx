@@ -182,7 +182,7 @@ where
                 let epoch = new_state_est.epoch();
 
                 if let Some(computed_meas) =
-                    device.measure_instantaneous(new_state_est, None, &almanac)?
+                    device.measure_instantaneous(new_state_est, None, almanac)?
                 {
                     // Only recompute the computed observation from the update state estimate.
                     residual.computed_obs = computed_meas

@@ -85,10 +85,10 @@ impl TrackingDevice<GroundAsset> for InterlinkTxSpacecraft {
                 };
 
                 // Start of integration time
-                let msr_t0_opt = self.measure_instantaneous(rx_0, None, &almanac)?;
+                let msr_t0_opt = self.measure_instantaneous(rx_0, None, almanac)?;
 
                 // End of integration time
-                let msr_t1_opt = self.measure_instantaneous(rx_1, None, &almanac)?;
+                let msr_t1_opt = self.measure_instantaneous(rx_1, None, almanac)?;
 
                 if let Some(msr_t0) = msr_t0_opt {
                     if let Some(msr_t1) = msr_t1_opt {

@@ -107,7 +107,7 @@ where
                     Spacecraft,
                     Spacecraft,
                     GroundStation,
-                >>::new(*msr_type, msr, rx, self, &almanac)?;
+                >>::new(*msr_type, msr, rx, self, almanac)?;
 
             mat.set_row(ith_row, &scalar_h.sensitivity_row);
         }
@@ -131,7 +131,7 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
         // This frame is required because the scalar measurements are frame independent, but the sensitivity
         // must be in the estimation frame.
         let transmitter = tx
-            .location(rx.orbit.epoch, rx.orbit.frame, &almanac)
+            .location(rx.orbit.epoch, rx.orbit.frame, almanac)
             .context(ODAlmanacSnafu {
                 action: "computing transmitter location when computing sensitivity matrix",
             })?;
@@ -143,7 +143,7 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
             MeasurementType::Doppler => {
                 // Always recompute the expected to range, a better model for scalar OD processing.
                 let ρ_km = tx
-                    .azimuth_elevation_of(receiver, None, &almanac)
+                    .azimuth_elevation_of(receiver, None, almanac)
                     .context(ODAlmanacSnafu {
                         action: "computing range for Doppler measurement",
                     })?

@@ -69,7 +69,7 @@ where
                     Spacecraft,
                     Spacecraft,
                     InterlinkTxSpacecraft,
-                >>::new(*msr_type, msr, rx, self, &almanac)?;
+                >>::new(*msr_type, msr, rx, self, almanac)?;
 
             mat.set_row(ith_row, &scalar_h.sensitivity_row);
         }
@@ -96,7 +96,7 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, InterlinkTxSpacecraft>
             tx,
             rx.orbit.epoch,
             rx.orbit.frame,
-            &almanac,
+            almanac,
         )
         .context(ODAlmanacSnafu {
             action: "computing transmitter location when computing sensitivity matrix",
