@@ -3,8 +3,11 @@ use pyo3::prelude::*;
 
 #[pymethods]
 impl ExportCfg {
-    #[pyo3(signature=(timestamped = false))]
+    /// Creates a new export configuration.
+    ///
+    /// :type timestamped: bool
     #[new]
+    #[pyo3(signature=(timestamped = false), text_signature = "(timestamped=False)")]
     fn py_new(timestamped: bool) -> Self {
         if timestamped {
             Self::timestamped()

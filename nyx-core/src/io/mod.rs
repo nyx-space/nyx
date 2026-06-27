@@ -47,6 +47,12 @@ use pyo3::prelude::*;
 mod python;
 
 /// Configuration for exporting from Nyx to local disk.
+///
+/// `ExportCfg` allows flight dynamics engineers to configure exactly what
+/// information is extracted from a trajectory and how it is formatted. You
+/// can specify the fields to export, the time range, and the sampling step size.
+///
+/// :type timestamped: bool
 #[derive(Clone, Debug, Default, Serialize, Deserialize, TypedBuilder, PartialEq)]
 #[builder(doc)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, eq))]

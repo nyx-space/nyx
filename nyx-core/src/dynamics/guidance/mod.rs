@@ -45,6 +45,12 @@ use std::fmt;
 use pyo3::prelude::*;
 
 /// Defines a thruster with a maximum isp and a maximum thrust.
+///
+/// `Thruster` represents a spacecraft's engine configuration. It is used
+/// by guidance laws to determine the available delta-v and mass flow rate.
+///
+/// :type thrust_N: float
+/// :type isp_s: float
 #[allow(non_snake_case)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize, StaticType)]
@@ -68,6 +74,11 @@ impl Thruster {
 impl Thruster {
     #[allow(non_snake_case)]
     #[new]
+    #[pyo3(signature = (thrust_N, isp_s), text_signature = "(thrust_N, isp_s)")]
+    /// Creates a new `Thruster`.
+    ///
+    /// :type thrust_N: float
+    /// :type isp_s: float
     fn py_new(thrust_N: f64, isp_s: f64) -> Self {
         Self { thrust_N, isp_s }
     }

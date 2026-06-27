@@ -28,8 +28,14 @@ use pyo3::types::{PyBytes, PyType};
 
 #[pymethods]
 impl Spacecraft {
-    #[pyo3(signature=(orbit, mass=None, srp=None, drag=None, thruster=None, mode=None))]
+    #[pyo3(signature=(orbit, mass=None, srp=None, drag=None, thruster=None, mode=None), text_signature = "(orbit, mass=None, srp=None, drag=None, thruster=None, mode=None)")]
     #[new]
+    /// :type orbit: anise.astro.Orbit
+    /// :type mass: Mass, optional
+    /// :type srp: SRPData, optional
+    /// :type drag: DragData, optional
+    /// :type thruster: Thruster, optional
+    /// :type mode: GuidanceMode, optional
     fn py_new(
         orbit: Orbit,
         mass: Option<Mass>,

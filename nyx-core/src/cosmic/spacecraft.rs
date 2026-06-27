@@ -59,6 +59,17 @@ pub enum GuidanceMode {
     Inhibit = 2,
 }
 
+#[cfg(feature = "python")]
+#[cfg_attr(feature = "python", pymethods)]
+impl GuidanceMode {
+    #[new]
+    #[pyo3(signature = (), text_signature = "()")]
+    /// Creates a new `GuidanceMode` initialized to `Coast`.
+    fn py_new() -> Self {
+        Self::Coast
+    }
+}
+
 impl From<f64> for GuidanceMode {
     fn from(value: f64) -> Self {
         if value >= 1.0 {
@@ -110,6 +121,13 @@ impl From<ThrustDirection> for Vector3<f64> {
 /// A spacecraft state, composed of its orbit, its masses (dry, prop, extra, all in kg), its SRP configuration, its drag configuration, its thruster configuration, and its guidance mode.
 ///
 /// Optionally, the spacecraft state can also store the state transition matrix from the start of the propagation until the current time (i.e. trajectory STM, not step-size STM).
+///
+/// :type orbit: anise.astro.Orbit
+/// :type mass: Mass, optional
+/// :type srp: SRPData, optional
+/// :type drag: DragData, optional
+/// :type thruster: Thruster, optional
+/// :type mode: GuidanceMode, optional
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, TypedBuilder)]
 #[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub struct Spacecraft {
@@ -347,6 +365,8 @@ impl Spacecraft {
 #[cfg_attr(feature = "python", pymethods)]
 impl Spacecraft {
     /// Returns the root sum square error between this spacecraft and the other, in kilometers for the position, kilometers per second in velocity, and kilograms in prop
+    ///
+    /// :type other: Spacecraft
     pub fn rss(&self, other: &Self) -> PhysicsResult<(f64, f64, f64)> {
         let rss_p_km = self.orbit.rss_radius_km(&other.orbit)?;
         let rss_v_km_s = self.orbit.rss_velocity_km_s(&other.orbit)?;
