@@ -40,6 +40,10 @@ jobs:
               fi
             fi
           done
+
+      - name: Inject build metadata
+        run: echo "$(date +%s)" > target/doc/build_timestamp.txt
+
       - uses: FirebaseExtended/action-hosting-deploy@v0.11.0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'

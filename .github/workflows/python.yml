@@ -35,14 +35,14 @@ jobs:
 
       - name: Build wheels
         uses: PyO3/maturin-action@v1
+        env:
+          RUSTFLAGS: "-C target-cpu=x86-64"
         with:
           target: ${{ matrix.target }}
           args: --release --out dist --find-interpreter
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           manylinux: 2_28
           working-directory: nyx-py
-          env:
-            RUSTFLAGS: "-C target-cpu=x86-64"
           before-script-linux: |
             # Source: https://github.com/sfackler/rust-openssl/issues/2036#issuecomment-1724324145
             # If we're running on rhel centos, install needed packages.
