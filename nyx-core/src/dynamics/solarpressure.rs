@@ -59,6 +59,17 @@ impl Default for SolarPressure {
 }
 
 impl SolarPressure {
+    /// Compute the SRP force in km/s^2
+    pub fn compute_force(
+        flux_pressure: f64,
+        area_m2: f64,
+        cr: f64,
+        sun_unit_vector: Vector3<f64>,
+    ) -> Vector3<f64> {
+        // Note the 1e-3 is to convert the SRP from m/s^2 to km/s^2
+        1e-3 * cr * area_m2 * flux_pressure * sun_unit_vector
+    }
+
     /// Will set the solar flux at 1 AU to: Phi = 1367.0
     fn default_flux_raw(
         shadow_bodies: Vec<Frame>,
@@ -162,8 +173,12 @@ impl ForceModel for SolarPressure {
         // in N/(m^2)
         let flux_pressure = (k * self.phi / SPEED_OF_LIGHT_M_S) * (1.0 / r_sun_au).powi(2);
 
-        // Note the 1e-3 is to convert the SRP from m/s^2 to km/s^2
-        Ok(1e-3 * ctx.srp.coeff_reflectivity * ctx.srp.area_m2 * flux_pressure * r_sun_unit)
+        Ok(Self::compute_force(
+            flux_pressure,
+            ctx.srp.area_m2,
+            ctx.srp.coeff_reflectivity,
+            r_sun_unit,
+        ))
     }
 
     fn gradient(

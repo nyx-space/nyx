@@ -53,6 +53,12 @@ pub mod deltavctrl;
 pub mod solarpressure;
 pub use self::solarpressure::*;
 
+/// Defines albedo radiation pressure models
+#[cfg(feature = "premium")]
+pub mod albedo;
+#[cfg(feature = "premium")]
+pub use self::albedo::*;
+
 /// The drag module handles drag in a very basic fashion. Do not use for high fidelity dynamics.
 pub mod drag;
 pub use self::drag::*;
@@ -176,7 +182,7 @@ pub trait AccelModel: Send + Sync + fmt::Display {
 
 /// Stores dynamical model errors
 #[derive(Debug, PartialEq, Snafu)]
-#[snafu(visibility(pub(crate)))]
+#[snafu(visibility(pub))]
 pub enum DynamicsError {
     #[snafu(display("spacecraft total mass is zero, cannot compute any force model"))]
     MasslessSpacecraft,
