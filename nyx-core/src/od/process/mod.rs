@@ -272,7 +272,6 @@ where
 
                                 // Perform several measurement updates to ensure the desired dimensionality.
                                 let windows = msr_types.len() / MsrSize::DIM;
-                                let mut msr_rejected = false;
                                 for wno in 0..=windows {
                                     // Update the nominal state in case we're ingesting several measurements
                                     // sequentially for the same epoch.
@@ -369,10 +368,6 @@ where
                                         residual.tracker = Some(device.name());
                                         residual.msr_types = cur_msr_types;
 
-                                        if residual.rejected {
-                                            msr_rejected = true;
-                                        }
-
                                         if kf.replace_state() && !residual.rejected {
                                             // Only update the state of the EKF if the residual was not rejected.
                                             prop_instance.state = estimate.state();
@@ -382,12 +377,12 @@ where
 
                                         prop_instance.state.reset_stm();
 
-                                        od_sol.push_measurement_update(estimate, residual, gain);
-                                        if msr_rejected {
+                                        if residual.rejected {
                                             msr_rejected_cnt += 1;
                                         } else {
                                             msr_accepted_cnt += 1;
                                         }
+                                        od_sol.push_measurement_update(estimate, residual, gain);
                                     } else {
                                         debug!(
                                             "Device {} does not expect measurement at {epoch}, skipping",

@@ -186,6 +186,26 @@ impl PySpacecraftODProcess {
             .map_err(|e| PyValueError::new_err(format!("{e}")))?;
         Ok(PySpacecraftODSolution { inner: inner_res })
     }
+
+    #[getter]
+    fn sigma_rejection(&self) -> Option<SigmaRejection> {
+        self.inner.sigma_reject
+    }
+
+    #[setter]
+    fn set_sigma_rejection(&mut self, sigma_reject: Option<SigmaRejection>) {
+        self.inner.sigma_reject = sigma_reject;
+    }
+
+    #[getter]
+    fn variant(&self) -> KalmanVariant {
+        self.inner.kf_variant
+    }
+
+    #[setter]
+    fn set_variant(&mut self, kf_variant: KalmanVariant) {
+        self.inner.kf_variant = kf_variant
+    }
 }
 
 #[derive(Clone)]

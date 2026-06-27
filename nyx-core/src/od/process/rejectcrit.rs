@@ -52,4 +52,12 @@ impl SigmaRejection {
     fn py_new(num_sigmas: f64) -> Self {
         Self { num_sigmas }
     }
+
+    fn __str__(&self) -> String {
+        format!("{self:?}")
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self:?} @ {self:p}")
+    }
 }

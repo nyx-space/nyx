@@ -389,6 +389,15 @@ def test_howto_exec_orbit_determination_filter():
     definitive_ephem = od_sol.to_ephemeris("Test OD Spacecraft")
     definitive_ephem.write_ccsds_oem("definitive_ephem.oem")
 
+    # Finally, one can also set the sigma rejection criteria, which defaults to 3 sigmas.
+    print(od_proc.sigma_rejection)
+    print(od_proc.variant)
+
+    # Let re-run with a very high number for sigma rejections (unrealistic)
+    od_proc.sigma_rejection = SigmaRejection(5.0)
+    od_sol_5sigma = od_proc.process_arc(estimate, trk_arc)
+    print(od_sol_5sigma.is_nis_consistent())
+    print(od_sol_5sigma.is_nees_consistent(traj))
 
 if __name__ == "__main__":
     import logging
