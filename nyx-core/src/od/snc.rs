@@ -324,7 +324,7 @@ fn test_snc_init() {
         &[1e-6, 1e-6, 1e-6],
         2 * Unit::Minute,
         &[3600.0, 3600.0, 3600.0],
-        None
+        None,
     );
     println!("{snc_expo}");
 

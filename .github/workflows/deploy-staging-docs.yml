@@ -19,10 +19,10 @@ jobs:
           declare -A example_map
           example_map["01_orbit_prop"]="01_orbit_prop"
           example_map["02_jwst"]="02_jwst_covar_monte_carlo"
-          
+
           declare -A special_cases
           special_cases["03_geo_analysis"]="03_geo_raise 03_geo_drift 03_geo_sk"
-          
+
           for example_dir in examples/*; do
             example_name=$(basename $example_dir)
             if [ -d "$example_dir/plots" ]; then
@@ -40,7 +40,7 @@ jobs:
               fi
             fi
           done
-      - uses: FirebaseExtended/action-hosting-deploy@v0
+      - uses: FirebaseExtended/action-hosting-deploy@v0.11
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_NYX_SPACE }}'

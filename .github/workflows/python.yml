@@ -41,6 +41,8 @@ jobs:
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           manylinux: 2_28
           working-directory: nyx-py
+          env: # Force strict x86 generic instructions
+            RUSTFLAGS: "-C target-cpu=x86-64"
           before-script-linux: |
             # Source: https://github.com/sfackler/rust-openssl/issues/2036#issuecomment-1724324145
             # If we're running on rhel centos, install needed packages.
