@@ -36,7 +36,7 @@ jobs:
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         env:
-          RUSTFLAGS: "-C target-cpu=x86-64 -C target-feature=+crt-static"
+          RUSTFLAGS: "-C target-cpu=x86-64"
         with:
           target: ${{ matrix.target }}
           args: --release --out dist --find-interpreter
@@ -82,19 +82,6 @@ jobs:
           pip install -r nyx-py/tests/requirements.txt
           python -c "import nyx_space; print('Module initialized successfully.')"
           cd nyx-py && pytest
-
-      - name: Extract Core Dump
-        if: failure()
-        run: |
-          # Package the systemd core dump for analysis
-          coredumpctl dump -o core.dump
-
-      - name: Upload Core Dump
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: coredump
-          path: core.dump
 
   windows:
     runs-on: windows-latest
