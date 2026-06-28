@@ -25,7 +25,7 @@ use pyo3::prelude::*;
 
 /// A dispersions configuration, allows specifying min/max bounds (by default, they are not set)
 #[derive(Copy, Clone, Debug, TypedBuilder, Serialize, Deserialize)]
-#[cfg_attr(feature = "python", pyclass(from_py_object))]
+#[cfg_attr(feature = "python", pyclass(from_py_object, get_all))]
 pub struct StateDispersion {
     pub param: StateParameter,
     #[builder(default, setter(strip_option))]

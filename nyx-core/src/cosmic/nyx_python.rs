@@ -66,6 +66,11 @@ impl Spacecraft {
     fn drag(&self) -> DragData {
         self.drag
     }
+
+    fn __eq__(&self, other: &Self) -> bool {
+        self == other
+    }
+
     fn __str__(&self) -> String {
         format!("{self}")
     }

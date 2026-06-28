@@ -21,7 +21,7 @@ use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
 pub use crate::od::estimate::{Estimate, KfEstimate, Residual};
 use crate::od::prelude::KalmanVariant;
-use crate::od::process::ResidRejectCrit;
+use crate::od::process::SigmaRejection;
 pub use crate::od::snc::ProcessNoise;
 use crate::od::{ODDynamicsSnafu, ODError, State};
 pub use crate::time::{Epoch, Unit};
@@ -108,7 +108,7 @@ where
         computed_obs: OVector<f64, M>,
         r_k: OMatrix<f64, M, M>,
         h_tilde: OMatrix<f64, M, <T as State>::Size>,
-        resid_rejection: Option<ResidRejectCrit>,
+        resid_rejection: Option<SigmaRejection>,
     ) -> Result<
         (
             KfEstimate<T>,

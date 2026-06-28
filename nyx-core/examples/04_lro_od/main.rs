@@ -13,21 +13,21 @@ use anise::{
 };
 use hifitime::{Epoch, TimeSeries, TimeUnits, Unit};
 use nyx::{
+    Orbit, Spacecraft, State,
     cosmic::{Aberration, Frame, Mass, MetaAlmanac, SRPData},
     dynamics::{
-        guidance::LocalFrame, GravityField, OrbitalDynamics, SolarPressure, SpacecraftDynamics,
+        GravityField, OrbitalDynamics, SolarPressure, SpacecraftDynamics, guidance::LocalFrame,
     },
     io::{ConfigRepr, ExportCfg},
     md::prelude::{GravityFieldData, Traj},
     od::{
+        GroundStation, SpacecraftKalmanOD,
         msr::MeasurementType,
         prelude::{KalmanVariant, TrackingArcSim, TrkConfig},
-        process::{Estimate, NavSolution, ResidRejectCrit, SpacecraftUncertainty},
+        process::{Estimate, NavSolution, SigmaRejection, SpacecraftUncertainty},
         snc::ProcessNoise3D,
-        GroundStation, SpacecraftKalmanOD,
     },
     propagators::Propagator,
-    Orbit, Spacecraft, State,
 };
 
 use std::{collections::BTreeMap, error::Error, path::PathBuf, str::FromStr, sync::Arc};
@@ -99,7 +99,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let traj_as_flown = Traj::from_bsp(
         lro_frame,
         MOON_J2000,
-        almanac.clone(),
+        &almanac,
         sc_template,
         5.seconds(),
         Some(Epoch::from_str("2024-01-01 00:00:00 UTC")?),
@@ -244,8 +244,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         123, // Set a seed for reproducibility
     )?;
 
-    trk.build_schedule(almanac.clone())?;
-    let arc = trk.generate_measurements(almanac.clone())?;
+    trk.build_schedule(&almanac)?;
+    let arc = trk.generate_measurements(&almanac)?;
     // Save the simulated tracking data
     arc.to_parquet_simple(output_folder.join("04_lro_simulated_tracking.parquet"))?;
 
@@ -289,7 +289,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let odp = SpacecraftKalmanOD::new(
         setup,
         KalmanVariant::ReferenceUpdate,
-        Some(ResidRejectCrit::default()),
+        Some(SigmaRejection::default()),
         proc_devices,
         almanac.clone(),
     )

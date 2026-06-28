@@ -11,7 +11,6 @@ use anise::prelude::{Almanac, Orbit};
 use indexmap::{IndexMap, IndexSet};
 use rand_pcg::Pcg64Mcg;
 use snafu::{ResultExt, ensure};
-use std::sync::Arc;
 
 use super::PositionDevice;
 
@@ -25,7 +24,7 @@ impl TrackingDevice<Spacecraft> for PositionDevice {
         epoch: Epoch,
         traj: &Traj<Spacecraft>,
         rng: Option<&mut Pcg64Mcg>,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<Option<Measurement>, ODError> {
         let rx = traj.at(epoch).context(ODTrajSnafu {
             details: "fetching state for instantaneous measurement".to_string(),
@@ -37,12 +36,7 @@ impl TrackingDevice<Spacecraft> for PositionDevice {
         self.name.clone()
     }
 
-    fn location(
-        &self,
-        _epoch: Epoch,
-        _frame: Frame,
-        _almanac: Arc<Almanac>,
-    ) -> AlmanacResult<Orbit> {
+    fn location(&self, _epoch: Epoch, _frame: Frame, _almanac: &Almanac) -> AlmanacResult<Orbit> {
         // XyzDevice does not have a location
         unimplemented!("XyzDevice does not have a location")
     }
@@ -51,7 +45,7 @@ impl TrackingDevice<Spacecraft> for PositionDevice {
         &mut self,
         rx: Spacecraft,
         rng: Option<&mut Pcg64Mcg>,
-        _almanac: Arc<Almanac>,
+        _almanac: &Almanac,
     ) -> Result<Option<Measurement>, ODError> {
         let mut msr = Measurement::new(self.name.clone(), rx.orbit.epoch);
         let mut noises = IndexMap::with_capacity(self.measurement_types.len());

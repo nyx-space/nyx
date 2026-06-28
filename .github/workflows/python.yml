@@ -35,6 +35,8 @@ jobs:
 
       - name: Build wheels
         uses: PyO3/maturin-action@v1
+        env:
+          RUSTFLAGS: "-C target-cpu=x86-64"
         with:
           target: ${{ matrix.target }}
           args: --release --out dist --find-interpreter
@@ -68,12 +70,17 @@ jobs:
       - name: pytest
         if: ${{ startsWith(matrix.target, 'x86_64') }}
         shell: bash
+        env:
+          PYTHONFAULTHANDLER: "1"
+          RUST_BACKTRACE: "full"
         run: |
-          set -e
+          ulimit -c unlimited
+          set +e
           pip debug --verbose
           pip install nyx_space --find-links nyx-py/dist --force-reinstall
           pip install pytest
           pip install -r nyx-py/tests/requirements.txt
+          python -c "import nyx_space; print('Module initialized successfully.')"
           cd nyx-py && pytest
 
   windows:

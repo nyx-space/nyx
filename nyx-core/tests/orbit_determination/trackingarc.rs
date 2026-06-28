@@ -87,7 +87,7 @@ fn trk_simple(
         path.with_file_name("tracking_truth_ephem_groundtrack.parquet"),
         almanac.frame_info(IAU_EARTH_FRAME).unwrap(),
         None,
-        almanac.clone(),
+        &almanac,
     )
     .unwrap();
 
@@ -114,18 +114,18 @@ fn trk_simple(
             .unwrap();
 
     // Test that building the schedule is deterministic
-    let orig_sched = trk.generate_schedule(almanac.clone()).unwrap();
+    let orig_sched = trk.generate_schedule(&almanac).unwrap();
     for ii in 0..5 {
-        let sched = trk.generate_schedule(almanac.clone()).unwrap();
+        let sched = trk.generate_schedule(&almanac).unwrap();
         assert_eq!(
             sched, orig_sched,
             "{ii} was different:\n orig {orig_sched:?}\n sched {sched:?}"
         );
     }
 
-    trk.build_schedule(almanac.clone()).unwrap();
+    trk.build_schedule(&almanac).unwrap();
 
-    let arc = trk.generate_measurements(almanac).unwrap();
+    let arc = trk.generate_measurements(&almanac).unwrap();
 
     // Regression
     assert_eq!(arc.measurements.len(), 14909);
@@ -174,9 +174,9 @@ fn trkconfig_zero_inclusion(
 
     let mut trk = TrackingArcSim::<Spacecraft, GroundStation>::new(devices, traj, configs).unwrap();
 
-    trk.build_schedule(almanac.clone()).unwrap();
+    trk.build_schedule(&almanac).unwrap();
 
-    let arc = trk.generate_measurements(almanac).unwrap();
+    let arc = trk.generate_measurements(&almanac).unwrap();
 
     // Regression
     assert_eq!(arc.measurements.len(), 113);
@@ -231,9 +231,9 @@ fn trkconfig_delayed_start(
 
     let mut trk = TrackingArcSim::<Spacecraft, GroundStation>::new(devices, traj, configs).unwrap();
 
-    trk.build_schedule(almanac.clone()).unwrap();
+    trk.build_schedule(&almanac).unwrap();
 
-    let arc = trk.generate_measurements(almanac).unwrap();
+    let arc = trk.generate_measurements(&almanac).unwrap();
 
     // Check the sampling of the arc.
     assert_eq!(
@@ -280,9 +280,9 @@ fn trkconfig_cadence(
 
     let mut trk = TrackingArcSim::<Spacecraft, GroundStation>::new(devices, traj, configs).unwrap();
 
-    trk.build_schedule(almanac.clone()).unwrap();
+    trk.build_schedule(&almanac).unwrap();
 
-    let arc = trk.generate_measurements(almanac).unwrap();
+    let arc = trk.generate_measurements(&almanac).unwrap();
 
     // The minimum separation should be driven by the Canberra station's sampling rate.
     assert_eq!(

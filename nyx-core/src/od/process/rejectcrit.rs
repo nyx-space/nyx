@@ -19,6 +19,9 @@
 use crate::io::ConfigRepr;
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
 /// Reject measurements if the prefit is greater than the provided sigmas deviation from the measurement noise.
 ///
 /// # Important
@@ -26,12 +29,13 @@ use serde::{Deserialize, Serialize};
 /// As such, if the prefit on range is bad, then the Doppler measurement with the same time stamp will also be rejected.
 /// This can lead to better convergence of the filter, and more appropriate results.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct ResidRejectCrit {
+#[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
+pub struct SigmaRejection {
     /// Number of sigmas for a measurement to be considered an outlier.
     pub num_sigmas: f64,
 }
 
-impl Default for ResidRejectCrit {
+impl Default for SigmaRejection {
     /// By default, a measurement is rejected if its prefit residual is greater the 3-sigma value of the measurement noise at that time step.
     /// This corresponds to [1 chance in in 370](https://en.wikipedia.org/wiki/68%E2%80%9395%E2%80%9399.7_rule).
     fn default() -> Self {
@@ -39,4 +43,21 @@ impl Default for ResidRejectCrit {
     }
 }
 
-impl ConfigRepr for ResidRejectCrit {}
+impl ConfigRepr for SigmaRejection {}
+
+#[cfg(feature = "python")]
+#[cfg_attr(feature = "python", pymethods)]
+impl SigmaRejection {
+    #[new]
+    fn py_new(num_sigmas: f64) -> Self {
+        Self { num_sigmas }
+    }
+
+    fn __str__(&self) -> String {
+        format!("{self:?}")
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self:?} @ {self:p}")
+    }
+}

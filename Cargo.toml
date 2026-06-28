@@ -34,6 +34,8 @@ hifitime = "4.3.0"
 anise = { version = "0.10.2", features = ["analysis"] }
 log = "0.4"
 rayon = "1.6"
+pyo3 = { version = "0.28", features = ["multiple-pymethods"] }
+numpy = "0.28"
 
 nyx-space = { path = "nyx-core" }
 

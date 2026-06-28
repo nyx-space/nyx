@@ -6,7 +6,6 @@ use anise::prelude::Almanac;
 use indexmap::IndexSet;
 use nalgebra::{DimName, OMatrix, U1};
 use std::marker::PhantomData;
-use std::sync::Arc;
 
 use super::PositionDevice;
 use crate::od::msr::MeasurementType;
@@ -24,7 +23,7 @@ where
         msr: &Measurement,
         msr_types: &IndexSet<MeasurementType>,
         rx: &Spacecraft,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<OMatrix<f64, M, <Spacecraft as State>::Size>, ODError>
     where
         DefaultAllocator: Allocator<M> + Allocator<M, <Spacecraft as State>::Size>,
@@ -41,7 +40,7 @@ where
                     Spacecraft,
                     Spacecraft,
                     PositionDevice,
-                >>::new(*msr_type, msr, rx, self, almanac.clone())?;
+                >>::new(*msr_type, msr, rx, self, almanac)?;
 
             mat.set_row(ith_row, &scalar_h.sensitivity_row);
         }
@@ -57,7 +56,7 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, PositionDevice>
         _msr: &Measurement,
         _rx: &Spacecraft,
         _tx: &PositionDevice,
-        _almanac: Arc<Almanac>,
+        _almanac: &Almanac,
     ) -> Result<Self, ODError> {
         let idx = match msr_type {
             MeasurementType::X => 0,

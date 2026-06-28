@@ -184,7 +184,7 @@ fn ground_pnt_lunar(almanac: Arc<Almanac>) {
         TrackingArcSim::with_seed(devices.clone(), rover_traj.clone(), configs, 0).unwrap();
     println!("{trk_sim}");
 
-    let trk_data = trk_sim.generate_measurements(almanac.clone()).unwrap();
+    let trk_data = trk_sim.generate_measurements(&almanac).unwrap();
     println!("{trk_data}");
 
     let out = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../data/04_output/");
