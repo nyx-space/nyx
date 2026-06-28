@@ -23,8 +23,7 @@ use anise::prelude::Almanac;
 use hifitime::{Duration, Epoch};
 use ndarray::Array2;
 use numpy::{PyArray2, PyReadonlyArray1};
-use nyx_space::NyxError;
-use nyx_space::io::InputOutputError;
+use nyx_space::io::{ExportCfg, InputOutputError};
 use nyx_space::linalg::{Const, OVector};
 use nyx_space::mc::{MvnSpacecraft, StateDispersion};
 use nyx_space::od::blse::Estimate;
@@ -35,13 +34,14 @@ use nyx_space::od::prelude::{
 };
 use nyx_space::od::snc::ProcessNoise3D;
 use nyx_space::propagators::PropagationError;
+use nyx_space::NyxError;
 use nyx_space::{
-    Spacecraft,
     io::ConfigError,
     od::{
-        GroundStation,
         msr::{MeasurementType, TrackingDataArc},
+        GroundStation,
     },
+    Spacecraft,
 };
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -408,6 +408,13 @@ impl PySpacecraftODSolution {
             .to_traj()
             .map_err(|e| PyValueError::new_err(format!("{e}")))?;
         Ok(PyTrajectory { inner: traj })
+    }
+
+    /// Export OD solutions, gains, ratios, residuals, sigmas, etc. to parquet
+    fn to_parquet(&self, path: &str, cfg: ExportCfg) -> Result<String, ODError> {
+        self.inner
+            .to_parquet(path, cfg)
+            .map(|path| path.to_string_lossy().to_string())
     }
 
     /// Export to an ANISE ephemeris, which can be converted to a CCSDS OEM

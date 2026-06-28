@@ -184,7 +184,7 @@ where
         let mut reported = [false; 11];
         reported[0] = true; // Prevent showing "0% done"
         info!(
-            "Processing {num_msrs} measurements from {:?}",
+            "Processing {num_msrs} measurement epochs from {:?}",
             arc.unique_aliases()
         );
 
@@ -388,6 +388,7 @@ where
                                             "Device {} does not expect measurement at {epoch}, skipping",
                                             msr.tracker
                                         );
+                                        msr_rejected_cnt += 1;
                                     }
                                 }
                             }

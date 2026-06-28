@@ -76,6 +76,7 @@ jobs:
           pip install nyx_space --find-links nyx-py/dist --force-reinstall
           pip install pytest
           pip install -r nyx-py/tests/requirements.txt
+          python -c "import nyx_space; print('Module initialized successfully.')"
           cd nyx-py && pytest
 
   windows:
