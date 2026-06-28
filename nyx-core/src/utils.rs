@@ -39,7 +39,6 @@ pub fn tilde_matrix(v: &Vector3<f64>) -> Matrix3<f64> {
     Matrix3::new(0.0, -v.z, v.y, v.z, 0.0, -v.x, -v.y, v.x, 0.0)
 }
 
-
 /// Checks if the provided 3x3 matrix is diagonal.
 ///
 /// A square matrix is considered diagonal if all its off-diagonal elements are zero.
@@ -106,7 +105,7 @@ pub fn is_diagonal(m: &Matrix3<f64>) -> bool {
 /// use nalgebra::Complex;
 ///
 /// let eigenvalues = Vector2::new(Complex::new(-1.0, 0.0), Complex::new(0.0, 1.0));
-/// assert_eq!(are_eigenvalues_stable(eigenvalues), true);
+/// assert_eq!(are_eigenvalues_stable(&eigenvalues), true);
 /// ```
 /// # Source
 ///
@@ -117,7 +116,6 @@ where
 {
     eigenvalues.iter().all(|ev| ev.re <= 0.0)
 }
-
 
 /// Returns the provided angle bounded between 0.0 and 360.0.
 ///
@@ -277,7 +275,6 @@ pub fn rotv(v: &Vector3<f64>, axis: &Vector3<f64>, theta: f64) -> Vector3<f64> {
         + k_hat.scale(k_hat.dot(v) * (1.0 - theta.cos()))
 }
 
-
 /// Returns the components of vector a orthogonal to b
 ///
 /// # Arguments
@@ -303,7 +300,6 @@ pub fn perpv(a: &Vector3<f64>, b: &Vector3<f64>) -> Vector3<f64> {
     }
 }
 
-
 /// Returns the projection of a onto b
 ///
 /// # Arguments
@@ -322,7 +318,6 @@ pub fn projv(a: &Vector3<f64>, b: &Vector3<f64>) -> Vector3<f64> {
         b.scale(a.dot(b) / b_norm_squared)
     }
 }
-
 
 /// Computes the Root Sum Squared (RSS) state errors between two provided vectors.
 ///
@@ -430,7 +425,6 @@ pub fn capitalize(s: &str) -> String {
     }
 }
 
-
 #[macro_export]
 macro_rules! pseudo_inverse {
     ($mat:expr) => {{
@@ -504,16 +498,6 @@ mod tests {
     use approx::assert_abs_diff_eq;
     use nalgebra::{Complex, OVector};
 
-    trait FailureTolerance {
-        fn within_tolerance(&self, other: Self) -> bool;
-    }
-
-    impl FailureTolerance for f64 {
-        fn within_tolerance(&self, other: Self) -> bool {
-            (self - other).abs() < f64::EPSILON
-        }
-    }
-
     #[test]
     fn test_stable_eigenvalues() {
         let eigenvalues = OVector::<Complex<f64>, nalgebra::U2>::from_column_slice(&[
@@ -550,38 +534,38 @@ mod tests {
 
     #[test]
     fn test_angle_bounds() {
-        assert!(between_pm_180(181.0).within_tolerance(-179.0));
-        assert!(between_0_360(-179.0).within_tolerance(181.0));
+        approx::assert_relative_eq!(between_pm_180(181.0), -179.0);
+        approx::assert_relative_eq!(between_0_360(-179.0), 181.0);
     }
 
     #[test]
     fn test_positive_angle() {
-        assert!(between_0_360(450.0).within_tolerance(90.0));
-        assert!(between_pm_x(270.0, 180.0).within_tolerance(-90.0));
+        approx::assert_relative_eq!(between_0_360(450.0), 90.0);
+        approx::assert_relative_eq!(between_pm_x(270.0, 180.0), -90.0);
     }
 
     #[test]
     fn test_negative_angle() {
-        assert!(between_0_360(-90.0).within_tolerance(270.0));
-        assert!(between_pm_x(-270.0, 180.0).within_tolerance(90.0));
+        approx::assert_relative_eq!(between_0_360(-90.0), 270.0);
+        approx::assert_relative_eq!(between_pm_x(-270.0, 180.0), 90.0);
     }
 
     #[test]
     fn test_angle_in_range() {
-        assert!(between_0_360(180.0).within_tolerance(180.0));
-        assert!(between_pm_x(90.0, 180.0).within_tolerance(90.0));
+        approx::assert_relative_eq!(between_0_360(180.0), 180.0);
+        approx::assert_relative_eq!(between_pm_x(90.0, 180.0), 90.0);
     }
 
     #[test]
     fn test_zero_angle() {
-        assert!(between_0_360(0.0).within_tolerance(0.0));
-        assert!(between_pm_x(0.0, 180.0).within_tolerance(0.0));
+        approx::assert_relative_eq!(between_0_360(0.0), 0.0);
+        approx::assert_relative_eq!(between_pm_x(0.0, 180.0), 0.0);
     }
 
     #[test]
     fn test_full_circle_angle() {
-        assert!(between_0_360(360.0).within_tolerance(0.0));
-        assert!(between_pm_x(360.0, 180.0).within_tolerance(0.0));
+        approx::assert_relative_eq!(between_0_360(360.0), 0.0);
+        approx::assert_relative_eq!(between_pm_x(360.0, 180.0), 0.0);
     }
 
     #[test]
@@ -691,11 +675,11 @@ mod tests {
         use nalgebra::U3;
         let prop_err = OVector::<f64, U3>::from_iterator([1.0, 2.0, 3.0]);
         let cur_state = OVector::<f64, U3>::from_iterator([1.0, 2.0, 3.0]);
-        assert!(rss_errors(&prop_err, &cur_state).within_tolerance(0.0));
+        approx::assert_relative_eq!(rss_errors(&prop_err, &cur_state), 0.0);
 
         let prop_err = OVector::<f64, U3>::from_iterator([1.0, 2.0, 3.0]);
         let cur_state = OVector::<f64, U3>::from_iterator([4.0, 5.0, 6.0]);
-        assert!(rss_errors(&prop_err, &cur_state).within_tolerance(5.196152422706632));
+        approx::assert_relative_eq!(rss_errors(&prop_err, &cur_state), 5.196152422706632);
     }
 
     #[test]
@@ -704,7 +688,7 @@ mod tests {
         let min_x = 0.0;
         let max_x = 10.0;
         let result = normalize(x, min_x, max_x);
-        assert!(result.within_tolerance(0.0));
+        approx::assert_relative_eq!(result, 0.0);
     }
 
     #[test]
@@ -713,7 +697,7 @@ mod tests {
         let min_x = 0.0;
         let max_x = 10.0;
         let result = denormalize(xp, min_x, max_x);
-        assert!(result.within_tolerance(5.0));
+        approx::assert_relative_eq!(result, 5.0);
     }
 
     #[test]
@@ -764,15 +748,15 @@ mod tests {
         let v = Vector3::new(1.0, 2.0, 3.0);
         let m = tilde_matrix(&v);
 
-        assert!(m[(0, 0)].within_tolerance(0.0));
-        assert!(m[(0, 1)].within_tolerance(-v.z));
-        assert!(m[(0, 2)].within_tolerance(v.y));
-        assert!(m[(1, 0)].within_tolerance(v.z));
-        assert!(m[(1, 1)].within_tolerance(0.0));
-        assert!(m[(1, 2)].within_tolerance(-v.x));
-        assert!(m[(2, 0)].within_tolerance(-v.y));
-        assert!(m[(2, 1)].within_tolerance(v.x));
-        assert!(m[(2, 2)].within_tolerance(0.0));
+        approx::assert_relative_eq!(m[(0, 0)], 0.0);
+        approx::assert_relative_eq!(m[(0, 1)], -v.z);
+        approx::assert_relative_eq!(m[(0, 2)], v.y);
+        approx::assert_relative_eq!(m[(1, 0)], v.z);
+        approx::assert_relative_eq!(m[(1, 1)], 0.0);
+        approx::assert_relative_eq!(m[(1, 2)], -v.x);
+        approx::assert_relative_eq!(m[(2, 0)], -v.y);
+        approx::assert_relative_eq!(m[(2, 1)], v.x);
+        approx::assert_relative_eq!(m[(2, 2)], 0.0);
     }
 
     #[test]
