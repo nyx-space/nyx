@@ -39,7 +39,8 @@ jobs:
           RUSTFLAGS: "-C target-cpu=x86-64"
         with:
           target: ${{ matrix.target }}
-          args: --release --out dist --find-interpreter
+          args: --out dist --find-interpreter
+          # args: --release --out dist --find-interpreter
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           manylinux: 2_28
           working-directory: nyx-py
@@ -70,14 +71,31 @@ jobs:
       - name: pytest
         if: ${{ startsWith(matrix.target, 'x86_64') }}
         shell: bash
+        env:
+          PYTHONFAULTHANDLER: "1"
+          RUST_BACKTRACE: "full"
         run: |
-          set -e
+          ulimit -c unlimited
+          set +e
           pip debug --verbose
           pip install nyx_space --find-links nyx-py/dist --force-reinstall
           pip install pytest
           pip install -r nyx-py/tests/requirements.txt
           python -c "import nyx_space; print('Module initialized successfully.')"
           cd nyx-py && pytest
+
+      - name: Extract Core Dump
+        if: failure()
+        run: |
+          # Package the systemd core dump for analysis
+          coredumpctl dump -o core.dump
+
+      - name: Upload Core Dump
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coredump
+          path: core.dump
 
   windows:
     runs-on: windows-latest

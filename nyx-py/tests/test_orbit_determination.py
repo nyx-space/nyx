@@ -388,7 +388,6 @@ def test_howto_exec_orbit_determination_filter():
     assert smoothed.is_smoother_run()
     assert not smoothed.is_filter_run()
 
-
     # Nyx also supports reference update (better once the filter has converged on a good solution).
     # Reference update algorithms require minor process noise to compensate for integrator
     # step size disparities between the truth trajectory and the filter's internal propagation.
@@ -403,7 +402,9 @@ def test_howto_exec_orbit_determination_filter():
         disable_time=Unit.Hour * 2,  # Disable after that duration without measurements
         local_frame=LocalFrame.Inertial,  # Default is Inertial, but RIC/VNC can also be used
     )
-    od_proc = SpacecraftODProcess(propagator, KalmanVariant.ReferenceUpdate, network, process_noise=process_noise)
+    od_proc = SpacecraftODProcess(
+        propagator, KalmanVariant.ReferenceUpdate, network, process_noise=process_noise
+    )
     od_sol = od_proc.process_arc(estimate, trk_arc)
     # Export the whole orbit determination solution into a single Parquet file.
     # This includes estimated states, prefits, postfits, covariance, sigmas on orbital elements, Kalman gains, etc.
@@ -430,6 +431,7 @@ def test_howto_exec_orbit_determination_filter():
 
     print(od_sol_5sigma.is_nis_consistent())
     print(od_sol_5sigma.is_nees_consistent(traj))
+
 
 if __name__ == "__main__":
     import logging
