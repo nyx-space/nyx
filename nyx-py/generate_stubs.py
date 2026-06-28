@@ -777,7 +777,7 @@ def parse_type_to_ast(
         actual_sequence = args[0]
         or_groups: List[List[Any]] = [[]]
         for e in actual_sequence:
-            if e == "or":
+            if e == "or" or e == "|":
                 or_groups.append([])
             else:
                 or_groups[-1].append(e)
