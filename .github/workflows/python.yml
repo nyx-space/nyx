@@ -36,11 +36,10 @@ jobs:
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         env:
-          RUSTFLAGS: "-C target-cpu=x86-64"
+          RUSTFLAGS: "-C target-cpu=x86-64 -C target-feature=+crt-static"
         with:
           target: ${{ matrix.target }}
-          args: --out dist --find-interpreter
-          # args: --release --out dist --find-interpreter
+          args: --release --out dist --find-interpreter
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           manylinux: 2_28
           working-directory: nyx-py
