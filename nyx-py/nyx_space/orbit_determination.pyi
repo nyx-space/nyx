@@ -18,6 +18,30 @@ class CN0:
     as it fails to account for the unmodulated carrier power explicitly reserved for
     phase tracking."""
 
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        Carrier power to noise density (C/N0) for stochastic modeling of Doppler observables.
+
+        IMPORTANT: C/N0 governs the thermal noise of phase-locked loops (PLL) tracking
+        the primary unmodulated carrier wave to measure frequency shift (velocity). It represents
+        the total power of the carrier signal over the noise spectral density.
+
+        Applying S/N0 to Doppler observables artificially inflates modeled velocity noise,
+        as it fails to account for the unmodulated carrier power explicitly reserved for
+        phase tracking."""
+
+    def __new__(cls) -> CN0:
+        """Carrier power to noise density (C/N0) for stochastic modeling of Doppler observables.
+
+        IMPORTANT: C/N0 governs the thermal noise of phase-locked loops (PLL) tracking
+        the primary unmodulated carrier wave to measure frequency shift (velocity). It represents
+        the total power of the carrier signal over the noise spectral density.
+
+        Applying S/N0 to Doppler observables artificially inflates modeled velocity noise,
+        as it fails to account for the unmodulated carrier power explicitly reserved for
+        phase tracking."""
     Average: type = ...
     ManualDbHz: type = ...
     Poor: type = ...
@@ -25,6 +49,12 @@ class CN0:
 
 @typing.final
 class Cadence:
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature."""
+
+    def __new__(cls) -> Cadence: ...
     @staticmethod
     def continuous() -> typing.Any: ...
     @staticmethod
@@ -46,6 +76,14 @@ class Cadence:
 class CarrierFreq:
     """Carrier frequency helper enum, typical values."""
 
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        Carrier frequency helper enum, typical values."""
+
+    def __new__(cls) -> CarrierFreq:
+        """Carrier frequency helper enum, typical values."""
     KaBand: type = ...
     ManualHz: type = ...
     SBand: type = ...
@@ -55,6 +93,14 @@ class CarrierFreq:
 class ChipRate:
     """An enum helper with typical chip rates."""
 
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        An enum helper with typical chip rates."""
+
+    def __new__(cls) -> ChipRate:
+        """An enum helper with typical chip rates."""
     High: type = ...
     Low: type = ...
     Lowest: type = ...
@@ -65,6 +111,15 @@ class ChipRate:
 @typing.final
 class ExportCfg:
     """Configuration for exporting from Nyx to local disk."""
+
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        Configuration for exporting from Nyx to local disk."""
+
+    def __new__(cls, timestamped: typing.Any = False) -> ExportCfg:
+        """Configuration for exporting from Nyx to local disk."""
 
     def __eq__(self, value: typing.Any) -> bool:
         """Return self==value."""
@@ -97,6 +152,21 @@ class FrameUid:
 
     force_inertial: typing.Any
     frozen_epoch: time.Epoch
+
+    def __init__(
+        self,
+        ephemeris_id: int,
+        orientation_id: int,
+        *args: typing.Optional[typing.Any],
+        **kwargs: typing.Optional[typing.Any],
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        A unique frame reference that only contains enough information to build the actual Frame object.
+        It cannot be used for any computations, is it be used in any structure apart from error structures."""
+
+    def __new__(cls, ephemeris_id: int, orientation_id: int) -> FrameUid:
+        """A unique frame reference that only contains enough information to build the actual Frame object.
+        It cannot be used for any computations, is it be used in any structure apart from error structures."""
 
     @staticmethod
     def from_frame(frame: astro.Frame) -> astro.FrameUid:
@@ -154,6 +224,45 @@ class GaussMarkov:
     process_noise: typing.Any
     tau: typing.Any
 
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        A first order Gauss-Markov process for modeling biases as described in section 5.2.4 of the NASA Best Practices for Navigation Filters (D'Souza et al.).
+
+        The process is defined by the following stochastic differential equation:
+
+        \\dot{b(t)} = -1/τ * b(t) + w(t)
+
+        Programmatically, it's calculated by sampling from b(t) ~ 𝓝(0, p_b(t)), where
+
+        p_b(t) = exp((-2 / τ) * (t - t_0)) * p_b(t_0) + s(t - t_0)
+
+        s(t - t_0) = ((q * τ) / 2) * (1 - exp((-2 / τ) * (t - t_0)))
+
+        ## JPL DESCANSO Deep Space Network (DSN) Defaults
+
+        - Range: 60 cm process noise over a 60 second average (tau, half life)
+        - Doppler: 0.03 mm/s process noise over a 60 second average (tau, half life)"""
+
+    def __new__(cls, tau: typing.Any, process_noise: typing.Any) -> GaussMarkov:
+        """A first order Gauss-Markov process for modeling biases as described in section 5.2.4 of the NASA Best Practices for Navigation Filters (D'Souza et al.).
+
+        The process is defined by the following stochastic differential equation:
+
+        \\dot{b(t)} = -1/τ * b(t) + w(t)
+
+        Programmatically, it's calculated by sampling from b(t) ~ 𝓝(0, p_b(t)), where
+
+        p_b(t) = exp((-2 / τ) * (t - t_0)) * p_b(t_0) + s(t - t_0)
+
+        s(t - t_0) = ((q * τ) / 2) * (1 - exp((-2 / τ) * (t - t_0)))
+
+        ## JPL DESCANSO Deep Space Network (DSN) Defaults
+
+        - Range: 60 cm process noise over a 60 second average (tau, half life)
+        - Doppler: 0.03 mm/s process noise over a 60 second average (tau, half life)"""
+
     def __repr__(self) -> str:
         """Return repr(self)."""
 
@@ -163,6 +272,23 @@ class GaussMarkov:
 @typing.final
 class GroundStation:
     """GroundStation defines a one-way or two-way ranging and doppler station. Set the integration time for two-way."""
+
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        GroundStation defines a one-way or two-way ranging and doppler station. Set the integration time for two-way."""
+
+    def __new__(
+        cls,
+        name: typing.Any,
+        location: typing.Any,
+        stochastic_noises: typing.Any,
+        integration_time: typing.Any = None,
+        light_time_correction: typing.Any = False,
+        timestamp_noise_s: typing.Any = None,
+    ) -> GroundStation:
+        """GroundStation defines a one-way or two-way ranging and doppler station. Set the integration time for two-way."""
 
     def azimuth_elevation_of(
         self, rx: typing.Any, obstructing_body: typing.Any, almanac: typing.Any
@@ -220,6 +346,18 @@ class GroundTrackingArcSim:
     configs: typing.Any
     devices: typing.Any
 
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature."""
+
+    def __new__(
+        cls,
+        devices: typing.Any,
+        trajectory: typing.Any,
+        configs: typing.Any,
+        seed: typing.Any = None,
+    ) -> GroundTrackingArcSim: ...
     def build_schedule(self, almanac: Almanac) -> typing.Any:
         """Builds a schedule using the generate_schedule function, and set that schedule in this instance's configuration."""
 
@@ -261,6 +399,15 @@ class GroundTrackingArcSim:
 class Handoff:
     """Defines the handoff from a current ground station to the next one that is visible to prevent overlapping of measurements"""
 
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        Defines the handoff from a current ground station to the next one that is visible to prevent overlapping of measurements"""
+
+    def __new__(cls) -> Handoff:
+        """Defines the handoff from a current ground station to the next one that is visible to prevent overlapping of measurements"""
+
     def __eq__(self, value: typing.Any) -> bool:
         """Return self==value."""
 
@@ -293,6 +440,12 @@ class Handoff:
 
 @typing.final
 class KalmanVariant:
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature."""
+
+    def __new__(cls) -> KalmanVariant: ...
     def __int__(self) -> None:
         """int(self)"""
 
@@ -312,6 +465,35 @@ class Location:
     longitude_deg: float
     terrain_mask: list
     terrain_mask_ignored: bool
+
+    def __init__(
+        self,
+        latitude_deg: float,
+        longitude_deg: float,
+        height_km: float,
+        frame: astro.FrameUid,
+        terrain_mask: list,
+        terrain_mask_ignored: bool,
+        *args: typing.Optional[typing.Any],
+        **kwargs: typing.Optional[typing.Any],
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        Location is defined by its latitude, longitude, height above the geoid, mean angular rotation of the geoid, and a frame UID.
+        If the location includes a terrain mask, it will be used for obstruction checks when computing azimuth and elevation.
+        **Note:** The mean Earth angular velocity is `0.004178079012116429` deg/s."""
+
+    def __new__(
+        cls,
+        latitude_deg: float,
+        longitude_deg: float,
+        height_km: float,
+        frame: astro.FrameUid,
+        terrain_mask: list,
+        terrain_mask_ignored: bool,
+    ) -> Location:
+        """Location is defined by its latitude, longitude, height above the geoid, mean angular rotation of the geoid, and a frame UID.
+        If the location includes a terrain mask, it will be used for obstruction checks when computing azimuth and elevation.
+        **Note:** The mean Earth angular velocity is `0.004178079012116429` deg/s."""
 
     def elevation_mask_at_azimuth_deg(self, azimuth_deg: float) -> float:
         """Returns the elevation mask at the provided azimuth, does NOT account for whether the mask is ignored or not."""
@@ -354,6 +536,21 @@ class Measurement:
     Note that two measurements are considered equal if the tracker and epoch match exactly, and if both have the same measurement types,
     and those measurements are equal to within 1e-10 (this allows for some leeway in TDM producers)."""
 
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        A type-agnostic simultaneous measurement storage structure. Allows storing any number of simultaneous measurement of a given taker.
+
+        Note that two measurements are considered equal if the tracker and epoch match exactly, and if both have the same measurement types,
+        and those measurements are equal to within 1e-10 (this allows for some leeway in TDM producers)."""
+
+    def __new__(cls, tracker: typing.Any, epoch: typing.Any) -> Measurement:
+        """A type-agnostic simultaneous measurement storage structure. Allows storing any number of simultaneous measurement of a given taker.
+
+        Note that two measurements are considered equal if the tracker and epoch match exactly, and if both have the same measurement types,
+        and those measurements are equal to within 1e-10 (this allows for some leeway in TDM producers)."""
+
     def correct(self, msr_type: typing.Any, correction: typing.Any) -> typing.Any:
         """Correct the provided measurement type with the provided correction, if that measurement type is available"""
 
@@ -369,6 +566,12 @@ class Measurement:
 
 @typing.final
 class MeasurementType:
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature."""
+
+    def __new__(cls) -> MeasurementType: ...
     def __int__(self) -> None:
         """int(self)"""
 
@@ -387,6 +590,12 @@ class MeasurementType:
 
 @typing.final
 class ProcessNoise:
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature."""
+
+    def __new__(cls) -> ProcessNoise: ...
     @staticmethod
     def from_accel_m_s2(
         ax_m_s2: typing.Any,
@@ -440,6 +649,12 @@ class Residual:
     rejected: typing.Any
     tracker: typing.Any
 
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature."""
+
+    def __new__(cls) -> Residual: ...
     def computed_obs(self, msr_type: typing.Any) -> typing.Any:
         """Returns the computed/expected observation for this measurement type, if available"""
 
@@ -471,6 +686,32 @@ class SN0:
     S/N0 <= C/N0. Applying C/N0 to ranging observables artificially suppresses the modeled thermal
     noise, yielding an overly optimistic covariance bound that ignores spacecraft power division."""
 
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        Signal power to noise density (S/N0) for stochastic modeling of ranging observables.
+
+        IMPORTANT: S/N0 governs the thermal noise of delay-locked loops (DLL) tracking
+        the modulated ranging code or tone. Deep space architectures rely on phase modulation
+        with a residual carrier. The total transmitted power is allocated fractionally among the
+        main carrier wave, the telemetry subcarrier, and the ranging code, dictated by the modulation index.
+
+        Because the power available for ranging is strictly a subset of the total carrier power,
+        S/N0 <= C/N0. Applying C/N0 to ranging observables artificially suppresses the modeled thermal
+        noise, yielding an overly optimistic covariance bound that ignores spacecraft power division."""
+
+    def __new__(cls) -> SN0:
+        """Signal power to noise density (S/N0) for stochastic modeling of ranging observables.
+
+        IMPORTANT: S/N0 governs the thermal noise of delay-locked loops (DLL) tracking
+        the modulated ranging code or tone. Deep space architectures rely on phase modulation
+        with a residual carrier. The total transmitted power is allocated fractionally among the
+        main carrier wave, the telemetry subcarrier, and the ranging code, dictated by the modulation index.
+
+        Because the power available for ranging is strictly a subset of the total carrier power,
+        S/N0 <= C/N0. Applying C/N0 to ranging observables artificially suppresses the modeled thermal
+        noise, yielding an overly optimistic covariance bound that ignores spacecraft power division."""
     Average: type = ...
     ManualDbHz: type = ...
     Poor: type = ...
@@ -484,6 +725,21 @@ class Scheduler:
     handoff: typing.Any
     min_samples: typing.Any
     sample_alignment: typing.Any
+
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        A scheduler allows building a scheduling of spaceraft tracking for a set of ground stations."""
+
+    def __new__(
+        cls,
+        handoff: typing.Any = ...,
+        cadence: typing.Any = None,
+        min_samples: typing.Any = 10,
+        sample_alignment: typing.Any = None,
+    ) -> Scheduler:
+        """A scheduler allows building a scheduling of spaceraft tracking for a set of ground stations."""
 
     @staticmethod
     def from_asn1(data: bytes) -> Scheduler:
@@ -509,6 +765,25 @@ class SigmaRejection:
 
     num_sigmas: typing.Any
 
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        Reject measurements if the prefit is greater than the provided sigmas deviation from the measurement noise.
+
+        # Important
+        Some software, like ODTK, processes each measurement as a scalar. Nyx can process the measurements together.
+        As such, if the prefit on range is bad, then the Doppler measurement with the same time stamp will also be rejected.
+        This can lead to better convergence of the filter, and more appropriate results."""
+
+    def __new__(cls, num_sigmas: typing.Any) -> SigmaRejection:
+        """Reject measurements if the prefit is greater than the provided sigmas deviation from the measurement noise.
+
+        # Important
+        Some software, like ODTK, processes each measurement as a scalar. Nyx can process the measurements together.
+        As such, if the prefit on range is bad, then the Doppler measurement with the same time stamp will also be rejected.
+        This can lead to better convergence of the filter, and more appropriate results."""
+
     def __repr__(self) -> str:
         """Return repr(self)."""
 
@@ -523,6 +798,12 @@ class SpacecraftEstimate:
     state: typing.Any
     state_deviations: typing.Any
 
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature."""
+
+    def __new__(cls) -> SpacecraftEstimate: ...
     @staticmethod
     def from_diag(nominal: typing.Any, diag: typing.Any) -> typing.Any:
         """Initializes a new filter estimate from the nominal state (not dispersed) and the diagonal of the covariance"""
@@ -556,6 +837,19 @@ class SpacecraftODProcess:
     sigma_rejection: typing.Any
     variant: typing.Any
 
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature."""
+
+    def __new__(
+        cls,
+        prop: typing.Any,
+        kf_variant: typing.Any,
+        devices: typing.Any,
+        sigma_reject: typing.Any = ...,
+        process_noise: typing.Any = None,
+    ) -> SpacecraftODProcess: ...
     def predict_for(
         self, initial_estimate: typing.Any, duration: typing.Any
     ) -> typing.Any:
@@ -571,6 +865,12 @@ class SpacecraftODProcess:
 
 @typing.final
 class SpacecraftODSolution:
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature."""
+
+    def __new__(cls) -> SpacecraftODSolution: ...
     def accepted_residuals(self) -> typing.Any: ...
     @staticmethod
     def from_parquet(path: typing.Any, devices: typing.Any) -> typing.Any: ...
@@ -721,6 +1021,24 @@ class StochasticNoise:
     bias: typing.Any
     white_noise: typing.Any
 
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        Stochastic noise modeling used primarily for synthetic orbit determination measurements.
+
+        This implementation distinguishes between the white noise model and the bias model. It also includes a constant offset."""
+
+    def __new__(
+        cls,
+        white_noise: typing.Any = None,
+        bias: typing.Any = None,
+        name: typing.Any = None,
+    ) -> StochasticNoise:
+        """Stochastic noise modeling used primarily for synthetic orbit determination measurements.
+
+        This implementation distinguishes between the white noise model and the bias model. It also includes a constant offset."""
+
     def covariance(self, epoch: typing.Any) -> typing.Any:
         """Return the covariance of these stochastics at a given time."""
 
@@ -781,11 +1099,39 @@ class StochasticNoise:
         """Return str(self)."""
 
 @typing.final
+class StochasticState:
+    dt_s: typing.Any
+    run: typing.Any
+    sample: typing.Any
+    variance: typing.Any
+
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature."""
+
+    def __new__(cls) -> StochasticState: ...
+    def __repr__(self) -> str:
+        """Return repr(self)."""
+
+    def __str__(self) -> str:
+        """Return str(self)."""
+
+@typing.final
 class Strand:
     """Stores a tracking strand with a start and end epoch"""
 
     end: typing.Any
     start: typing.Any
+
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        Stores a tracking strand with a start and end epoch"""
+
+    def __new__(cls, start: typing.Any, end: typing.Any) -> Strand:
+        """Stores a tracking strand with a start and end epoch"""
 
     @staticmethod
     def from_asn1(data: bytes) -> Strand:
@@ -844,14 +1190,98 @@ class TrackingDataArc:
 
     force_reject: typing.Any
 
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        Tracking data storing all of measurements as a B-Tree.
+        It inherently does NOT support multiple concurrent measurements from several trackers.
+
+        # Measurement Moduli, e.g. range modulus
+
+        In the case of ranging, and possibly other data types, a code is used to measure the range to the spacecraft. The length of this code
+        determines the ambiguity resolution, as per equation 9 in section 2.2.2.2 of the JPL DESCANSO, document 214, _Pseudo-Noise and Regenerative Ranging_.
+        For example, using the JPL Range Code and a frequency range clock of 1 MHz, the range ambiguity is 75,660 km. In other words,
+        as soon as the spacecraft is at a range of 75,660 + 1 km the JPL Range Code will report the vehicle to be at a range of 1 km.
+        This is simply because the range code overlaps with itself, effectively loosing track of its own reference:
+        it's due to the phase shift of the signal "lapping" the original signal length.
+
+        ```text
+        (Spacecraft)
+        ^
+        |    Actual Distance = 75,661 km
+        |
+        0 km                                         75,660 km (Wrap-Around)
+        |-----------------------------------------------|
+        When the "code length" is exceeded,
+        measurements wrap back to 0.
+
+        So effectively:
+        Observed code range = Actual range (mod 75,660 km)
+        75,661 km → 1 km
+
+        ```
+
+        Nyx can only resolve the range ambiguity if the tracking data specifies a modulus for this specific measurement type.
+        For example, in the case of the JPL Range Code and a 1 MHz range clock, the ambiguity interval is 75,660 km.
+
+        The measurement used in the Orbit Determination Process then becomes the following, where `//` represents the [Euclidian division](https://doc.rust-lang.org/std/primitive.f64.html#method.div_euclid).
+
+        ```text
+        k = computed_obs // ambiguity_interval
+        real_obs = measured_obs + k * modulus
+        ```
+
+        Reference: JPL DESCANSO, document 214, _Pseudo-Noise and Regenerative Ranging_."""
+
+    def __new__(cls, measurements: typing.Any) -> TrackingDataArc:
+        """Tracking data storing all of measurements as a B-Tree.
+        It inherently does NOT support multiple concurrent measurements from several trackers.
+
+        # Measurement Moduli, e.g. range modulus
+
+        In the case of ranging, and possibly other data types, a code is used to measure the range to the spacecraft. The length of this code
+        determines the ambiguity resolution, as per equation 9 in section 2.2.2.2 of the JPL DESCANSO, document 214, _Pseudo-Noise and Regenerative Ranging_.
+        For example, using the JPL Range Code and a frequency range clock of 1 MHz, the range ambiguity is 75,660 km. In other words,
+        as soon as the spacecraft is at a range of 75,660 + 1 km the JPL Range Code will report the vehicle to be at a range of 1 km.
+        This is simply because the range code overlaps with itself, effectively loosing track of its own reference:
+        it's due to the phase shift of the signal "lapping" the original signal length.
+
+        ```text
+        (Spacecraft)
+        ^
+        |    Actual Distance = 75,661 km
+        |
+        0 km                                         75,660 km (Wrap-Around)
+        |-----------------------------------------------|
+        When the "code length" is exceeded,
+        measurements wrap back to 0.
+
+        So effectively:
+        Observed code range = Actual range (mod 75,660 km)
+        75,661 km → 1 km
+
+        ```
+
+        Nyx can only resolve the range ambiguity if the tracking data specifies a modulus for this specific measurement type.
+        For example, in the case of the JPL Range Code and a 1 MHz range clock, the ambiguity interval is 75,660 km.
+
+        The measurement used in the Orbit Determination Process then becomes the following, where `//` represents the [Euclidian division](https://doc.rust-lang.org/std/primitive.f64.html#method.div_euclid).
+
+        ```text
+        k = computed_obs // ambiguity_interval
+        real_obs = measured_obs + k * modulus
+        ```
+
+        Reference: JPL DESCANSO, document 214, _Pseudo-Noise and Regenerative Ranging_."""
+
     def apply_moduli(self) -> typing.Any:
         """Applies the moduli to each measurement, if defined."""
 
-    def chunk(self, max_duration: typing.Any) -> typing.Any:
-        """Splits a long tracking data arc into smaller chunks, each up to `max_duration` long.
-        This is inspired by JPL MONTE's long arc setup to ensure BLSE convergence on manageable chunks."""
+    def chunk(self, max_duration: typing.Any) -> TrackingDataArc:
+        """Splits a long tracking data arc into smaller chunks, each up to `max_duration` long."""
 
-    def downsample(self, target_step: time.Duration) -> Self:
+    def downsample(self, target_step: time.Duration) -> TrackingDataArc:
         """Downsamples the tracking data to a lower frequency using a simple moving average low-pass filter followed by decimation,
         returning new `TrackingDataArc` with downsampled measurements.
 
@@ -885,15 +1315,15 @@ class TrackingDataArc:
     def end_epoch(self) -> typing.Any:
         """Returns the end epoch of this tracking arc"""
 
-    def exclude_by_epoch(self, start: typing.Any, end: typing.Any) -> typing.Any: ...
-    def exclude_measurement_type(self, msr_type: typing.Any) -> typing.Any: ...
-    def exclude_tracker(self, tracker: typing.Any) -> typing.Any: ...
-    def filter_by_epoch(self, start: typing.Any, end: typing.Any) -> typing.Any: ...
-    def filter_by_measurement_type(self, msr_type: typing.Any) -> typing.Any: ...
-    def filter_by_offset(self, start: typing.Any, end: typing.Any) -> typing.Any: ...
-    def filter_by_tracker(self, tracker: typing.Any) -> typing.Any: ...
+    def exclude_by_epoch(self, start: typing.Any, end: typing.Any) -> nyx_space.orbit_determination.TrackingDataArc: ...
+    def exclude_measurement_type(self, msr_type: typing.Any) -> nyx_space.orbit_determination.TrackingDataArc: ...
+    def exclude_tracker(self, tracker: typing.Any) -> nyx_space.orbit_determination.TrackingDataArc: ...
+    def filter_by_epoch(self, start: typing.Any, end: typing.Any) -> nyx_space.orbit_determination.TrackingDataArc: ...
+    def filter_by_measurement_type(self, msr_type: typing.Any) -> nyx_space.orbit_determination.TrackingDataArc: ...
+    def filter_by_offset(self, start: typing.Any, end: typing.Any) -> nyx_space.orbit_determination.TrackingDataArc: ...
+    def filter_by_tracker(self, tracker: typing.Any) -> nyx_space.orbit_determination.TrackingDataArc: ...
     @staticmethod
-    def from_ccsds_tdm(path: str, aliases: dict) -> nyx_space.od.TrackingDataArc:
+    def from_ccsds_tdm(path: str, aliases: dict) -> nyx_space.orbit_determination.TrackingDataArc:
         """Initializes a new Almanac from a file path to CCSDS OEM file, after converting to to SPICE SPK/BSP"""
 
     def is_empty(self) -> typing.Any:
@@ -908,6 +1338,9 @@ class TrackingDataArc:
     def resid_vs_ref_check(self) -> typing.Any: ...
     def set_moduli(self, msr_type: typing.Any, modulus: typing.Any) -> typing.Any:
         """Set (or overwrites) the modulus of the provided measurement type."""
+
+    def sort(self) -> typing.Any:
+        """Sort these measurements by epoch"""
 
     def start_epoch(self) -> typing.Any:
         """Returns the start epoch of this tracking arc"""
@@ -933,6 +1366,24 @@ class TrkConfig:
     scheduler: typing.Any
     strands: typing.Any
 
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        Stores a tracking configuration, there is one per tracking data simulator (e.g. one for ground station #1 and another for #2).
+        By default, the tracking configuration is continuous and the tracking arc is from the beginning of the simulation to the end.
+        In Python, any value that is set to None at initialization will use the default values: no scheduler, no strands, sampling at 1 min."""
+
+    def __new__(
+        cls,
+        scheduler: typing.Any = None,
+        sampling: typing.Any = ...,
+        strands: typing.Any = None,
+    ) -> TrkConfig:
+        """Stores a tracking configuration, there is one per tracking data simulator (e.g. one for ground station #1 and another for #2).
+        By default, the tracking configuration is continuous and the tracking arc is from the beginning of the simulation to the end.
+        In Python, any value that is set to None at initialization will use the default values: no scheduler, no strands, sampling at 1 min."""
+
     @staticmethod
     def from_asn1(data: bytes) -> TrkConfig:
         """Decodes an ASN.1 DER encoded byte array into a TrkConfig object."""
@@ -952,6 +1403,15 @@ class WhiteNoise:
 
     mean: typing.Any
     sigma: typing.Any
+
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        White noise is an uncorrelated random variable."""
+
+    def __new__(cls, mean: typing.Any, sigma: typing.Any) -> WhiteNoise:
+        """White noise is an uncorrelated random variable."""
 
     def __repr__(self) -> str:
         """Return repr(self)."""

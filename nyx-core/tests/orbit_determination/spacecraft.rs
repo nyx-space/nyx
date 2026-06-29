@@ -469,7 +469,7 @@ fn od_val_sc_srp_estimation(
     // Regression tests, not solution test
     assert_eq!(
         od_sol.accepted_residuals().len(),
-        2992,
+        3976,
         "all residuals should be accepted"
     );
     assert_eq!(

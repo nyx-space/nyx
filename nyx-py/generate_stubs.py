@@ -145,6 +145,7 @@ TYPE_MAPPING = {
     "tuples": "typing.Tuple",
 }
 
+
 def module_stubs(module: Any) -> ast.Module:
     types_to_import = {"typing"}
     classes = []
@@ -183,7 +184,9 @@ def module_stubs(module: Any) -> ast.Module:
 
     # Resolve all types to import
     imports = [
-        ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0)
+        ast.ImportFrom(
+            module="__future__", names=[ast.alias(name="annotations")], level=0
+        )
     ]
     for t in sorted(types_to_import):
         if t == "typing":
@@ -191,21 +194,25 @@ def module_stubs(module: Any) -> ast.Module:
             continue
 
         if t == "numpy":
-             imports.append(ast.Import(names=[ast.alias(name="numpy")]))
-             continue
+            imports.append(ast.Import(names=[ast.alias(name="numpy")]))
+            continue
 
         if t.startswith("anise."):
             current_module = module.__name__
             if current_module == t:
-                 continue
+                continue
 
             parts = t.split(".")
             # e.g. from anise import time
-            imports.append(ast.ImportFrom(module=parts[0], names=[ast.alias(name=parts[1])], level=0))
+            imports.append(
+                ast.ImportFrom(
+                    module=parts[0], names=[ast.alias(name=parts[1])], level=0
+                )
+            )
         elif t == "anise":
-             # Avoid self-import
-             if module.__name__ != "anise":
-                  imports.append(ast.Import(names=[ast.alias(name="anise")]))
+            # Avoid self-import
+            if module.__name__ != "anise":
+                imports.append(ast.Import(names=[ast.alias(name="anise")]))
         else:
             imports.append(ast.Import(names=[ast.alias(name=t)]))
 
@@ -236,7 +243,7 @@ def class_stubs(
                         current_element_path,
                         types_to_import,
                         in_class=True,
-                        cls_def=cls_def
+                        cls_def=cls_def,
                     )
                 )
             except Exception:
@@ -260,7 +267,7 @@ def class_stubs(
                     current_element_path,
                     types_to_import,
                     in_class=True,
-                    cls_def=cls_def
+                    cls_def=cls_def,
                 )
             )
         elif member_name == "__match_args__":
@@ -281,8 +288,8 @@ def class_stubs(
         elif member_value is not None and not member_name.startswith("_"):
             try:
                 annotation = concatenated_path_to_type(
-                        member_value.__class__.__name__, element_path, types_to_import
-                    )
+                    member_value.__class__.__name__, element_path, types_to_import
+                )
                 constants.append(
                     ast.AnnAssign(
                         target=ast.Name(id=member_name, ctx=ast.Store()),
@@ -326,7 +333,9 @@ def data_descriptor_stub(
     doc = inspect.getdoc(data_desc_def)
     if doc is not None:
         try:
-            annotation = returns_stub(data_desc_name, doc, element_path, types_to_import)
+            annotation = returns_stub(
+                data_desc_name, doc, element_path, types_to_import
+            )
         except Exception:
             pass
         m = re.findall(r"^ *:return: *(.*) *$", doc, re.MULTILINE)
@@ -353,25 +362,25 @@ def function_stub(
     types_to_import: Set[str],
     *,
     in_class: bool,
-    cls_def: Any = None
+    cls_def: Any = None,
 ) -> ast.FunctionDef:
     body: List[ast.AST] = []
     doc = getattr(fn_def, "__doc__", None) or inspect.getdoc(fn_def)
-    if type(doc) != str:
+    if not isinstance(doc, str):
         if doc is not None:
-             doc = doc.__doc__
+            doc = doc.__doc__
 
     if doc == "Create and return a new object.  See help(type) for accurate signature.":
-         doc = None
+        doc = None
 
     if fn_name in ("__new__", "__init__") and in_class and cls_def is not None:
-         cls_doc = getattr(cls_def, "__doc__", None) or inspect.getdoc(cls_def)
-         if cls_doc:
-             if doc:
-                 if cls_doc not in doc:
-                     doc = doc + "\n" + cls_doc
-             else:
-                 doc = cls_doc
+        cls_doc = getattr(cls_def, "__doc__", None) or inspect.getdoc(cls_def)
+        if cls_doc:
+            if doc:
+                if cls_doc not in doc:
+                    doc = doc + "\n" + cls_doc
+            else:
+                doc = cls_doc
 
     if doc is not None:
         doc_comment = build_doc_comment(doc)
@@ -387,17 +396,19 @@ def function_stub(
             # Check if it's explicitly classmethod or staticmethod
             actual_fn = getattr(cls_def, fn_name, None)
             if isinstance(actual_fn, classmethod):
-                 decorator_list.append(ast.Name(id="classmethod", ctx=ast.Load()))
-                 is_class = True
+                decorator_list.append(ast.Name(id="classmethod", ctx=ast.Load()))
+                is_class = True
             elif isinstance(actual_fn, staticmethod):
-                 decorator_list.append(ast.Name(id="staticmethod", ctx=ast.Load()))
-                 is_static = True
+                decorator_list.append(ast.Name(id="staticmethod", ctx=ast.Load()))
+                is_static = True
             else:
                 try:
                     sig = inspect.signature(fn_def)
                     params = list(sig.parameters.values())
                     if params and params[0].name == "cls":
-                        decorator_list.append(ast.Name(id="classmethod", ctx=ast.Load()))
+                        decorator_list.append(
+                            ast.Name(id="classmethod", ctx=ast.Load())
+                        )
                         is_class = True
                     elif (
                         in_class
@@ -407,12 +418,14 @@ def function_stub(
                         # Standard instance method bound
                         pass
                     elif in_class and hasattr(fn_def, "__self__"):
-                        decorator_list.append(ast.Name(id="staticmethod", ctx=ast.Load()))
+                        decorator_list.append(
+                            ast.Name(id="staticmethod", ctx=ast.Load())
+                        )
                         is_static = True
                 except ValueError:
                     # Fallback for builtins in exception classes
                     if "Error" in element_path[-2]:
-                         pass # default to instance method
+                        pass  # default to instance method
         except Exception:
             pass
 
@@ -420,7 +433,16 @@ def function_stub(
 
     return ast.FunctionDef(
         fn_name,
-        arguments_stub(fn_name, fn_def, doc or "", element_path, types_to_import, in_class, is_static, is_class),
+        arguments_stub(
+            fn_name,
+            fn_def,
+            doc or "",
+            element_path,
+            types_to_import,
+            in_class,
+            is_static,
+            is_class,
+        ),
         body or [ast.Ellipsis()],
         decorator_list=decorator_list,
         returns=(
@@ -453,7 +475,7 @@ def arguments_stub(
         args_list = []
         if in_class:
             if is_static:
-                 pass
+                pass
             elif callable_name == "__new__" or is_class:
                 args_list.append(ast.arg(arg="cls", annotation=None))
             else:
@@ -461,19 +483,24 @@ def arguments_stub(
 
         # Parse docstring params
         import re as re_mod
+
         doc_params = []
 
         # Also try to extract from __text_signature__ if doc parsing yields nothing
         text_sig = getattr(callable_def, "__text_signature__", None)
         if text_sig and text_sig.startswith("($type, "):
-             # Extract from signature
-             text_sig = text_sig[len("($type, "):-1]
-             # poor man's parse
-             doc_params = [p.strip().split('=')[0] for p in text_sig.split(',')]
-             # Remove empty
-             doc_params = [p for p in doc_params if p and p not in ("*args", "**kwargs")]
+            # Extract from signature
+            text_sig = text_sig[len("($type, ") : -1]
+            # poor man's parse
+            doc_params = [p.strip().split("=")[0] for p in text_sig.split(",")]
+            # Remove empty
+            doc_params = [p for p in doc_params if p and p not in ("*args", "**kwargs")]
 
-        for match in re_mod.findall(r"^ *:(?:type|param) *([a-zA-Z0-9_]+): ([^\n]*) *$", doc if doc else "", re_mod.MULTILINE):
+        for match in re_mod.findall(
+            r"^ *:(?:type|param) *([a-zA-Z0-9_]+): ([^\n]*) *$",
+            doc if doc else "",
+            re_mod.MULTILINE,
+        ):
             if match[0] not in doc_params:
                 doc_params.append(match[0])
 
@@ -483,11 +510,22 @@ def arguments_stub(
                 doc_params.remove("args")
             if "kwargs" in doc_params:
                 doc_params.remove("kwargs")
-            real_parameters = {p: inspect.Parameter(p, inspect.Parameter.POSITIONAL_OR_KEYWORD) for p in doc_params}
+            real_parameters = {
+                p: inspect.Parameter(p, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+                for p in doc_params
+            }
             if callable_name == "__new__":
-                 real_parameters = {"cls": inspect.Parameter("cls", inspect.Parameter.POSITIONAL_ONLY), **real_parameters}
+                real_parameters = {
+                    "cls": inspect.Parameter("cls", inspect.Parameter.POSITIONAL_ONLY),
+                    **real_parameters,
+                }
             elif callable_name == "__init__":
-                 real_parameters = {"self": inspect.Parameter("self", inspect.Parameter.POSITIONAL_ONLY), **real_parameters}
+                real_parameters = {
+                    "self": inspect.Parameter(
+                        "self", inspect.Parameter.POSITIONAL_ONLY
+                    ),
+                    **real_parameters,
+                }
         elif callable_name in ("__new__", "__init__") and in_class:
             # We don't have doc params and there's no inspect signature.
             # We'll just generate *args, **kwargs to be safe, because pyo3 might hide the text_signature
@@ -503,9 +541,11 @@ def arguments_stub(
         else:
             # If we have a BUILTIN entry, use it for arguments too
             if isinstance(builtin, tuple):
-                 for i, t in enumerate(builtin[0]):
-                      args_list.append(ast.arg(arg=f"arg{i}", annotation=t))
-                 return ast.arguments(posonlyargs=[], args=args_list, defaults=[], kwonlyargs=[])
+                for i, t in enumerate(builtin[0]):
+                    args_list.append(ast.arg(arg=f"arg{i}", annotation=t))
+                return ast.arguments(
+                    posonlyargs=[], args=args_list, defaults=[], kwonlyargs=[]
+                )
 
             return ast.arguments(
                 posonlyargs=[],
@@ -525,7 +565,9 @@ def arguments_stub(
         if callable_name == "__init__":
             if "self" not in modified_parameters:
                 modified_parameters = {
-                    "self": inspect.Parameter("self", inspect.Parameter.POSITIONAL_ONLY),
+                    "self": inspect.Parameter(
+                        "self", inspect.Parameter.POSITIONAL_ONLY
+                    ),
                     **modified_parameters,
                 }
         elif callable_name == "__new__":
@@ -534,15 +576,19 @@ def arguments_stub(
                     "cls": inspect.Parameter("cls", inspect.Parameter.POSITIONAL_ONLY),
                     **modified_parameters,
                 }
-        elif not is_static and not any(p.name in ("self", "cls") for p in modified_parameters.values()):
-             if is_class:
-                  modified_parameters = {
+        elif not is_static and not any(
+            p.name in ("self", "cls") for p in modified_parameters.values()
+        ):
+            if is_class:
+                modified_parameters = {
                     "cls": inspect.Parameter("cls", inspect.Parameter.POSITIONAL_ONLY),
                     **modified_parameters,
                 }
-             else:
-                  modified_parameters = {
-                    "self": inspect.Parameter("self", inspect.Parameter.POSITIONAL_ONLY),
+            else:
+                modified_parameters = {
+                    "self": inspect.Parameter(
+                        "self", inspect.Parameter.POSITIONAL_ONLY
+                    ),
                     **modified_parameters,
                 }
 
@@ -570,9 +616,9 @@ def arguments_stub(
         return ast.arguments(posonlyargs=[], args=[], defaults=[], kwonlyargs=[])
 
     # Types from comment
-    doc_str = doc if type(doc) == str else ""
+    doc_str = doc if isinstance(doc, str) else ""
     if in_class and callable_name in ("__new__", "__init__"):
-        cls_doc = getattr(cls_def, "__doc__", "") or ""
+        cls_doc = getattr(callable_def, "__doc__", "") or ""
         doc_str += "\n" + cls_doc
 
     for match in re.findall(
@@ -584,13 +630,15 @@ def arguments_stub(
             # Maybe it is actually defined in the function signature but pyo3 hides it!
             # If so, let's inject it into modified_parameters
             if in_class and callable_name in ("__new__", "__init__"):
-                 modified_parameters[match[0]] = inspect.Parameter(match[0], inspect.Parameter.POSITIONAL_OR_KEYWORD)
+                modified_parameters[match[0]] = inspect.Parameter(
+                    match[0], inspect.Parameter.POSITIONAL_OR_KEYWORD
+                )
             else:
-                 logging.warning(
-                     f"The parameter {match[0]} of {'.'.join(element_path)} "
-                     "is defined in the documentation but not in the function signature"
-                 )
-                 continue
+                logging.warning(
+                    f"The parameter {match[0]} of {'.'.join(element_path)} "
+                    "is defined in the documentation but not in the function signature"
+                )
+                continue
         type_str = match[1]
         if type_str.endswith(", optional"):
             optional_params.add(match[0])
@@ -618,20 +666,22 @@ def arguments_stub(
         elif param.name not in parsed_param_types:
             if param.name not in ("args", "kwargs"):
                 if element_path[1] in ("DragData", "Mass", "SRPData"):
-                    pass # ignore anise types based on user guidance
+                    pass  # ignore anise types based on user guidance
                 else:
                     logging.warning(
                         f"The parameter {param.name} of {'.'.join(element_path)} "
                         "has no type definition in the function documentation"
                     )
-            param_ast = ast.arg(arg=param.name, annotation=path_to_type("typing", "Any"))
+            param_ast = ast.arg(
+                arg=param.name, annotation=path_to_type("typing", "Any")
+            )
         else:
             annotation = parsed_param_types.get(param.name)
             if param.name in optional_params or param.default != param.empty:
                 annotation = ast.Subscript(
                     value=path_to_type("typing", "Optional"),
                     slice=annotation,
-                    ctx=ast.Load()
+                    ctx=ast.Load(),
                 )
                 types_to_import.add("typing")
             param_ast = ast.arg(arg=param.name, annotation=annotation)
@@ -665,7 +715,11 @@ def arguments_stub(
 
 
 def returns_stub(
-    callable_name: str, doc: str, element_path: List[str], types_to_import: Set[str], in_class: bool = False
+    callable_name: str,
+    doc: str,
+    element_path: List[str],
+    types_to_import: Set[str],
+    in_class: bool = False,
 ) -> Optional[ast.AST]:
     if "Error" in element_path[1]:
         # Don't document errors
@@ -684,10 +738,10 @@ def returns_stub(
         return
 
     if callable_name == "__new__":
-         # Returns the class itself
-         if len(element_path) >= 2:
-              return path_to_type(element_path[-2])
-         return path_to_type("typing", "Any")
+        # Returns the class itself
+        if len(element_path) >= 2:
+            return path_to_type(element_path[-2])
+        return path_to_type("typing", "Any")
 
     m = re.findall(r"^ *:rtype: *([^\n]*) *$", doc, re.MULTILINE)
     if len(m) == 0:
@@ -719,9 +773,9 @@ def parse_type_to_ast(
     # If it's a type in the current module, we can strip the module name
     current_module = element_path[0]
     if type_str.startswith(current_module + "."):
-        remainder = type_str[len(current_module)+1:]
+        remainder = type_str[len(current_module) + 1 :]
         if "." not in remainder:
-             type_str = remainder
+            type_str = remainder
 
     # let's tokenize
     tokens = []
@@ -828,34 +882,34 @@ def concatenated_path_to_type(
         path = TYPE_MAPPING[path]
 
     if path == "numpy.ndarray":
-         types_to_import.add("numpy")
-         return path_to_type("numpy", "ndarray")
+        types_to_import.add("numpy")
+        return path_to_type("numpy", "ndarray")
 
     parts = path.split(".")
 
     current_module = element_path[0]
 
     if path.startswith("anise."):
-         # Check if it's in our module
-         if path.startswith(current_module + "."):
-              remainder = path[len(current_module)+1:]
-              if "." not in remainder:
-                   # Local type
-                   return path_to_type(remainder)
+        # Check if it's in our module
+        if path.startswith(current_module + "."):
+            remainder = path[len(current_module) + 1 :]
+            if "." not in remainder:
+                # Local type
+                return path_to_type(remainder)
 
-         subparts = path.split(".")
-         if len(subparts) >= 2:
-              # from anise import time -> time.Epoch
-              types_to_import.add(".".join(subparts[:2]))
-              return path_to_type(*subparts[1:])
+        subparts = path.split(".")
+        if len(subparts) >= 2:
+            # from anise import time -> time.Epoch
+            types_to_import.add(".".join(subparts[:2]))
+            return path_to_type(*subparts[1:])
 
     # If it's a type in the current module, we can strip the module name
     if len(parts) > 1:
         current_module_parts = current_module.split(".")
-        if parts[:len(current_module_parts)] == current_module_parts:
-            parts = parts[len(current_module_parts):]
+        if parts[: len(current_module_parts)] == current_module_parts:
+            parts = parts[len(current_module_parts) :]
             if len(parts) == 1:
-                 return path_to_type(*parts)
+                return path_to_type(*parts)
         else:
             types_to_import.add(".".join(parts[:-1]))
 
