@@ -20,6 +20,7 @@ use anise::frames::Frame;
 use anise::{ephemerides::ephemeris::Ephemeris, prelude::Almanac};
 use hifitime::{Duration, Epoch};
 use log::info;
+use nyx_space::dynamics::SpacecraftDynamics;
 use nyx_space::propagators::{IntegratorMethod, IntegratorOptions, Propagator as CorePropagator};
 use nyx_space::{
     Spacecraft,
@@ -60,12 +61,24 @@ impl PropagationResult {
 #[derive(Clone)]
 pub struct Propagator {
     #[pyo3(get, set)]
-    dynamics: Dynamics,
+    pub dynamics: Dynamics,
     #[pyo3(get, set)]
-    method: IntegratorMethod,
+    pub method: IntegratorMethod,
     #[pyo3(get, set)]
-    options: IntegratorOptions,
-    almanac: Arc<Almanac>,
+    pub options: IntegratorOptions,
+    pub almanac: Arc<Almanac>,
+}
+
+impl Propagator {
+    pub(crate) fn build(&self) -> Result<CorePropagator<SpacecraftDynamics>, PropagationError> {
+        Ok(CorePropagator::new(
+            self.dynamics
+                .build(self.almanac.clone())
+                .map_err(|msg| PropagationError::PropGenericError { msg })?,
+            self.method,
+            self.options,
+        ))
+    }
 }
 
 #[pymethods]
@@ -94,13 +107,7 @@ impl Propagator {
         epoch: Epoch,
         trajectory: bool,
     ) -> Result<PropagationResult, PropagationError> {
-        let setup = CorePropagator::new(
-            self.dynamics
-                .build(self.almanac.clone())
-                .map_err(|msg| PropagationError::PropGenericError { msg })?,
-            self.method,
-            self.options,
-        );
+        let setup = self.build()?;
 
         let mut prop = setup.with(spacecraft, self.almanac.clone());
 
@@ -123,13 +130,7 @@ impl Propagator {
         duration: Duration,
         trajectory: bool,
     ) -> Result<PropagationResult, PropagationError> {
-        let setup = CorePropagator::new(
-            self.dynamics
-                .build(self.almanac.clone())
-                .map_err(|msg| PropagationError::PropGenericError { msg })?,
-            self.method,
-            self.options,
-        );
+        let setup = self.build()?;
 
         let mut prop = setup.with(spacecraft, self.almanac.clone());
 
@@ -181,13 +182,7 @@ impl Propagator {
         event_frame: Option<Frame>,
         trajectory: bool,
     ) -> Result<PropagationResult, PropagationError> {
-        let setup = CorePropagator::new(
-            self.dynamics
-                .build(self.almanac.clone())
-                .map_err(|msg| PropagationError::PropGenericError { msg })?,
-            self.method,
-            self.options,
-        );
+        let setup = self.build()?;
 
         let mut prop = setup.with(spacecraft, self.almanac.clone());
 

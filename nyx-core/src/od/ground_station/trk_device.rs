@@ -30,7 +30,6 @@ use indexmap::IndexSet;
 use log::debug;
 use rand_pcg::Pcg64Mcg;
 use snafu::ResultExt;
-use std::sync::Arc;
 
 use super::GroundStation;
 
@@ -45,7 +44,7 @@ impl TrackingDevice<Spacecraft> for GroundStation {
         epoch: Epoch,
         traj: &Traj<Spacecraft>,
         rng: Option<&mut Pcg64Mcg>,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<Option<Measurement>, ODError> {
         match self.integration_time {
             Some(integration_time) => {
@@ -152,15 +151,15 @@ impl TrackingDevice<Spacecraft> for GroundStation {
         self.name.clone()
     }
 
-    fn location(&self, epoch: Epoch, frame: Frame, almanac: Arc<Almanac>) -> AlmanacResult<Orbit> {
-        almanac.transform_to(self.to_orbit(epoch, &almanac).unwrap(), frame, None)
+    fn location(&self, epoch: Epoch, frame: Frame, almanac: &Almanac) -> AlmanacResult<Orbit> {
+        almanac.transform_to(self.to_orbit(epoch, almanac).unwrap(), frame, None)
     }
 
     fn measure_instantaneous(
         &mut self,
         rx: Spacecraft,
         rng: Option<&mut Pcg64Mcg>,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<Option<Measurement>, ODError> {
         let obstructing_body = if self.location.frame.ephemeris_id != rx.frame().ephemeris_id {
             Some(rx.frame())

@@ -356,7 +356,23 @@ def function_stub(
     cls_def: Any = None
 ) -> ast.FunctionDef:
     body: List[ast.AST] = []
-    doc = inspect.getdoc(fn_def)
+    doc = getattr(fn_def, "__doc__", None) or inspect.getdoc(fn_def)
+    if type(doc) != str:
+        if doc is not None:
+             doc = doc.__doc__
+
+    if doc == "Create and return a new object.  See help(type) for accurate signature.":
+         doc = None
+
+    if fn_name in ("__new__", "__init__") and in_class and cls_def is not None:
+         cls_doc = getattr(cls_def, "__doc__", None) or inspect.getdoc(cls_def)
+         if cls_doc:
+             if doc:
+                 if cls_doc not in doc:
+                     doc = doc + "\n" + cls_doc
+             else:
+                 doc = cls_doc
+
     if doc is not None:
         doc_comment = build_doc_comment(doc)
         if doc_comment is not None:
@@ -434,32 +450,77 @@ def arguments_stub(
         real_parameters: Mapping[str, inspect.Parameter] = sig.parameters
     except Exception:
         # Fallback for builtins without signatures
-        args = []
+        args_list = []
         if in_class:
             if is_static:
                  pass
             elif callable_name == "__new__" or is_class:
-                args.append(ast.arg(arg="cls", annotation=None))
+                args_list.append(ast.arg(arg="cls", annotation=None))
             else:
-                args.append(ast.arg(arg="self", annotation=None))
+                args_list.append(ast.arg(arg="self", annotation=None))
 
-        # If we have a BUILTIN entry, use it for arguments too
-        if isinstance(builtin, tuple):
-             for i, t in enumerate(builtin[0]):
-                  args.append(ast.arg(arg=f"arg{i}", annotation=t))
-             return ast.arguments(posonlyargs=[], args=args, defaults=[], kwonlyargs=[])
+        # Parse docstring params
+        import re as re_mod
+        doc_params = []
 
-        return ast.arguments(
-            posonlyargs=[],
-            args=args,
-            vararg=ast.arg(arg="args", annotation=path_to_type("typing", "Any")),
-            kwonlyargs=[],
-            kw_defaults=[],
-            defaults=[],
-            kwarg=ast.arg(arg="kwargs", annotation=path_to_type("typing", "Any")),
-        )
+        # Also try to extract from __text_signature__ if doc parsing yields nothing
+        text_sig = getattr(callable_def, "__text_signature__", None)
+        if text_sig and text_sig.startswith("($type, "):
+             # Extract from signature
+             text_sig = text_sig[len("($type, "):-1]
+             # poor man's parse
+             doc_params = [p.strip().split('=')[0] for p in text_sig.split(',')]
+             # Remove empty
+             doc_params = [p for p in doc_params if p and p not in ("*args", "**kwargs")]
 
-    modified_parameters = dict(real_parameters)
+        for match in re_mod.findall(r"^ *:(?:type|param) *([a-zA-Z0-9_]+): ([^\n]*) *$", doc if doc else "", re_mod.MULTILINE):
+            if match[0] not in doc_params:
+                doc_params.append(match[0])
+
+        if doc_params and callable_name in ("__new__", "__init__"):
+            # Avoid overwriting args/kwargs if we already have them handled safely earlier
+            if "args" in doc_params:
+                doc_params.remove("args")
+            if "kwargs" in doc_params:
+                doc_params.remove("kwargs")
+            real_parameters = {p: inspect.Parameter(p, inspect.Parameter.POSITIONAL_OR_KEYWORD) for p in doc_params}
+            if callable_name == "__new__":
+                 real_parameters = {"cls": inspect.Parameter("cls", inspect.Parameter.POSITIONAL_ONLY), **real_parameters}
+            elif callable_name == "__init__":
+                 real_parameters = {"self": inspect.Parameter("self", inspect.Parameter.POSITIONAL_ONLY), **real_parameters}
+        elif callable_name in ("__new__", "__init__") and in_class:
+            # We don't have doc params and there's no inspect signature.
+            # We'll just generate *args, **kwargs to be safe, because pyo3 might hide the text_signature
+            return ast.arguments(
+                posonlyargs=[],
+                args=args_list,
+                vararg=ast.arg(arg="args", annotation=path_to_type("typing", "Any")),
+                kwonlyargs=[],
+                kw_defaults=[],
+                defaults=[],
+                kwarg=ast.arg(arg="kwargs", annotation=path_to_type("typing", "Any")),
+            )
+        else:
+            # If we have a BUILTIN entry, use it for arguments too
+            if isinstance(builtin, tuple):
+                 for i, t in enumerate(builtin[0]):
+                      args_list.append(ast.arg(arg=f"arg{i}", annotation=t))
+                 return ast.arguments(posonlyargs=[], args=args_list, defaults=[], kwonlyargs=[])
+
+            return ast.arguments(
+                posonlyargs=[],
+                args=args_list,
+                vararg=ast.arg(arg="args", annotation=path_to_type("typing", "Any")),
+                kwonlyargs=[],
+                kw_defaults=[],
+                defaults=[],
+                kwarg=ast.arg(arg="kwargs", annotation=path_to_type("typing", "Any")),
+            )
+
+    try:
+        modified_parameters = dict(real_parameters)
+    except UnboundLocalError:
+        modified_parameters = {}
     if in_class:
         if callable_name == "__init__":
             if "self" not in modified_parameters:
@@ -473,7 +534,7 @@ def arguments_stub(
                     "cls": inspect.Parameter("cls", inspect.Parameter.POSITIONAL_ONLY),
                     **modified_parameters,
                 }
-        elif not is_static and not any(p.name in ("self", "cls") for p in real_parameters.values()):
+        elif not is_static and not any(p.name in ("self", "cls") for p in modified_parameters.values()):
              if is_class:
                   modified_parameters = {
                     "cls": inspect.Parameter("cls", inspect.Parameter.POSITIONAL_ONLY),
@@ -509,15 +570,27 @@ def arguments_stub(
         return ast.arguments(posonlyargs=[], args=[], defaults=[], kwonlyargs=[])
 
     # Types from comment
+    doc_str = doc if type(doc) == str else ""
+    if in_class and callable_name in ("__new__", "__init__"):
+        cls_doc = getattr(cls_def, "__doc__", "") or ""
+        doc_str += "\n" + cls_doc
+
     for match in re.findall(
-        r"^ *:type *([a-zA-Z0-9_]+): ([^\n]*) *$", doc, re.MULTILINE
+        r"^ *:(?:type|param) *([a-zA-Z0-9_]+): ([^\n]*) *$", doc_str, re.MULTILINE
     ):
-        if match[0] not in modified_parameters:
-            logging.warning(
-                f"The parameter {match[0]} of {'.'.join(element_path)} "
-                "is defined in the documentation but not in the function signature"
-            )
+        if len(match[1].split()) > 3:
             continue
+        if match[0] not in modified_parameters:
+            # Maybe it is actually defined in the function signature but pyo3 hides it!
+            # If so, let's inject it into modified_parameters
+            if in_class and callable_name in ("__new__", "__init__"):
+                 modified_parameters[match[0]] = inspect.Parameter(match[0], inspect.Parameter.POSITIONAL_OR_KEYWORD)
+            else:
+                 logging.warning(
+                     f"The parameter {match[0]} of {'.'.join(element_path)} "
+                     "is defined in the documentation but not in the function signature"
+                 )
+                 continue
         type_str = match[1]
         if type_str.endswith(", optional"):
             optional_params.add(match[0])
@@ -527,6 +600,11 @@ def arguments_stub(
         )
 
     # we parse the parameters
+    optional_params.add("args")
+    optional_params.add("kwargs")
+    parsed_param_types["args"] = path_to_type("typing", "Any")
+    parsed_param_types["kwargs"] = path_to_type("typing", "Any")
+
     posonlyargs = []
     args = []
     vararg = None
@@ -538,10 +616,14 @@ def arguments_stub(
         if param.name in ("self", "cls"):
             param_ast = ast.arg(arg=param.name, annotation=None)
         elif param.name not in parsed_param_types:
-            logging.warning(
-                f"The parameter {param.name} of {'.'.join(element_path)} "
-                "has no type definition in the function documentation"
-            )
+            if param.name not in ("args", "kwargs"):
+                if element_path[1] in ("DragData", "Mass", "SRPData"):
+                    pass # ignore anise types based on user guidance
+                else:
+                    logging.warning(
+                        f"The parameter {param.name} of {'.'.join(element_path)} "
+                        "has no type definition in the function documentation"
+                    )
             param_ast = ast.arg(arg=param.name, annotation=path_to_type("typing", "Any"))
         else:
             annotation = parsed_param_types.get(param.name)
@@ -695,7 +777,7 @@ def parse_type_to_ast(
         actual_sequence = args[0]
         or_groups: List[List[Any]] = [[]]
         for e in actual_sequence:
-            if e == "or":
+            if e == "or" or e == "|":
                 or_groups.append([])
             else:
                 or_groups[-1].append(e)

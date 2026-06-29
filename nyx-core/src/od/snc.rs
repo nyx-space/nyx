@@ -35,17 +35,7 @@ pub type ProcessNoise3D = ProcessNoise<U3>;
 #[allow(clippy::upper_case_acronyms)]
 pub type ProcessNoise6D = ProcessNoise<U6>;
 
-#[deprecated = "SNC has been renamed to ProcessNoise"]
-#[allow(clippy::upper_case_acronyms)]
-pub type SNC<A> = ProcessNoise<A>;
-#[deprecated = "SNC has been renamed to ProcessNoise"]
-#[allow(clippy::upper_case_acronyms)]
-pub type SNC3 = ProcessNoise<U3>;
-#[deprecated = "SNC has been renamed to ProcessNoise"]
-#[allow(clippy::upper_case_acronyms)]
-pub type SNC6 = ProcessNoise<U6>;
-
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 #[allow(clippy::upper_case_acronyms)]
 pub struct ProcessNoise<A: DimName>
 where
@@ -60,7 +50,7 @@ where
     // Stores the initial epoch when the SNC is requested, needed for decay. Kalman filter will edit this automatically.
     pub init_epoch: Option<Epoch>,
     diag: OVector<f64, A>,
-    decay_diag: Option<Vec<f64>>,
+    pub decay_diag: Option<Vec<f64>>,
     // Stores the previous epoch of the SNC request, needed for disable time
     pub prev_epoch: Option<Epoch>,
 }
@@ -87,7 +77,7 @@ where
         }
         write!(
             f,
-            "SNC: diag({}) mm/s^2 {} {}",
+            "Process noise: diag({}) mm/s^2 {} {}",
             fmt_cov.join(", "),
             if let Some(lf) = self.local_frame {
                 format!("in {lf:?}")
@@ -118,7 +108,11 @@ where
     DefaultAllocator: Allocator<A> + Allocator<A, A>,
 {
     /// Initialize a state noise compensation structure from the diagonal values
-    pub fn from_diagonal(disable_time: Duration, values: &[f64]) -> Self {
+    pub fn from_diagonal(
+        values: &[f64],
+        disable_time: Duration,
+        local_frame: Option<LocalFrame>,
+    ) -> Self {
         assert_eq!(
             values.len(),
             A::dim(),
@@ -134,7 +128,7 @@ where
             diag,
             disable_time,
             start_time: None,
-            local_frame: None,
+            local_frame,
             decay_diag: None,
             init_epoch: None,
             prev_epoch: None,
@@ -143,7 +137,7 @@ where
 
     /// Initialize an SNC with a time at which it should start
     pub fn with_start_time(disable_time: Duration, values: &[f64], start_time: Epoch) -> Self {
-        let mut me = Self::from_diagonal(disable_time, values);
+        let mut me = Self::from_diagonal(values, disable_time, None);
         me.start_time = Some(start_time);
         me
     }
@@ -151,9 +145,10 @@ where
     /// Initialize an exponentially decaying SNC with initial SNC and decay constants.
     /// Decay constants in seconds since start of the tracking pass.
     pub fn with_decay(
+        values: &[f64],
         disable_time: Duration,
-        initial_snc: &[f64],
         decay_constants_s: &[f64],
+        local_frame: Option<LocalFrame>,
     ) -> Self {
         assert_eq!(
             decay_constants_s.len(),
@@ -161,7 +156,7 @@ where
             "Not enough decay constants for the size of the SNC matrix"
         );
 
-        let mut me = Self::from_diagonal(disable_time, initial_snc);
+        let mut me = Self::from_diagonal(values, disable_time, local_frame);
         me.decay_diag = Some(decay_constants_s.to_vec());
         me
     }
@@ -326,9 +321,10 @@ impl ProcessNoise3D {
 fn test_snc_init() {
     use crate::time::Unit;
     let snc_expo = ProcessNoise3D::with_decay(
-        2 * Unit::Minute,
         &[1e-6, 1e-6, 1e-6],
+        2 * Unit::Minute,
         &[3600.0, 3600.0, 3600.0],
+        None,
     );
     println!("{snc_expo}");
 

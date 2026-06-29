@@ -98,7 +98,7 @@ where
     /// - If $ |R_{i,k}| \leq 3 $ for all $ i $ and $ k $, the filter-smoother consistency test is satisfied, indicating good consistency.
     /// - If $ |R_{i,k}| > 3 $ for any $ i $ or $ k $, the test fails, suggesting potential modeling inconsistencies or issues with the estimation process.
     ///
-    pub fn smooth(self, almanac: Arc<Almanac>) -> Result<Self, ODError> {
+    pub fn smooth(self, almanac: &Almanac) -> Result<Self, ODError> {
         let l = self.estimates.len() - 1;
 
         let mut smoothed = Self {
@@ -182,7 +182,7 @@ where
                 let epoch = new_state_est.epoch();
 
                 if let Some(computed_meas) =
-                    device.measure_instantaneous(new_state_est, None, almanac.clone())?
+                    device.measure_instantaneous(new_state_est, None, almanac)?
                 {
                     // Only recompute the computed observation from the update state estimate.
                     residual.computed_obs = computed_meas

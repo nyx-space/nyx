@@ -174,7 +174,7 @@ impl SolidTides {
     pub fn earth_moon_system(
         mut earth_frame: Frame,
         mut moon_frame: Frame,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<Arc<Self>, DynamicsError> {
         let mut sun_j2k = almanac
             .frame_info(SUN_J2000)
@@ -580,13 +580,13 @@ mod tests {
         almanac = almanac
             .load(data_folder.join("pck08.pca").to_str().unwrap())
             .unwrap();
-        let almanac = Arc::new(almanac);
 
         let epoch = Epoch::from_str("2024-01-01T12:00:00 UTC").unwrap();
         let sc_orbit = Orbit::cartesian(7000.0, 0.0, 0.0, 0.0, 7.5, 0.0, epoch, EARTH_J2000);
 
-        let tides = SolidTides::earth_moon_system(IAU_EARTH_FRAME, IAU_MOON_FRAME, almanac.clone())
-            .expect("could not init solid tides");
+        let tides =
+            SolidTides::earth_moon_system(IAU_EARTH_FRAME, IAU_MOON_FRAME, &almanac.clone())
+                .expect("could not init solid tides");
         let acc = tides.eom(&sc_orbit, &almanac).unwrap();
 
         println!("Solid tides acceleration: {:?}", acc);

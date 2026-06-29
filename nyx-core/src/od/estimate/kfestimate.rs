@@ -17,11 +17,11 @@
 */
 
 use super::{Estimate, State};
-use crate::Spacecraft;
 use crate::cosmic::{AstroError, AstroPhysicsSnafu};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, Matrix, OMatrix, OVector};
 use crate::mc::{MvnSpacecraft, StateDispersion};
+use crate::{NyxError, Spacecraft};
 use anise::analysis::prelude::OrbitalElement;
 use anise::astro::orbit_gradient::OrbitGrad;
 use nalgebra::Const;
@@ -101,11 +101,11 @@ where
 
 impl KfEstimate<Spacecraft> {
     /// Generates an initial Kalman filter state estimate dispersed from the nominal state using the provided standard deviation parameters.
-    ///
     /// The resulting estimate will have a diagonal covariance matrix constructed from the variances of each parameter.
-    /// *Limitation:* This method may not work correctly for all Keplerian orbital elements, refer to
-    /// <https://github.com/nyx-space/nyx/issues/339> for details.
-    pub fn disperse_from_diag(
+    /// The state of this estimate includes dispersions; the nominal state is left unchanged;
+    /// the dispersions are set in the state_deviation field.
+    /// XXX: Will this cause the filters in the tests to converge more quickly?!
+    pub fn from_dispersions(
         nominal_state: Spacecraft,
         dispersions: Vec<StateDispersion>,
         seed: Option<u128>,
@@ -121,25 +121,23 @@ impl KfEstimate<Spacecraft> {
         // Compute the difference between both states
         let delta_orbit = (nominal_state.orbit - dispersed_state.state.orbit).unwrap();
 
-        // Build the covariance as three times the absolute value of the error, squared.
-
-        let diag_data = [
-            (3.0 * delta_orbit.radius_km.x.abs()).powi(2),
-            (3.0 * delta_orbit.radius_km.y.abs()).powi(2),
-            (3.0 * delta_orbit.radius_km.z.abs()).powi(2),
-            (3.0 * delta_orbit.velocity_km_s.x.abs()).powi(2),
-            (3.0 * delta_orbit.velocity_km_s.y.abs()).powi(2),
-            (3.0 * delta_orbit.velocity_km_s.z.abs()).powi(2),
-            (3.0 * (nominal_state.srp.coeff_reflectivity
-                - dispersed_state.state.srp.coeff_reflectivity)
-                .abs())
-            .powi(2),
-            (3.0 * (nominal_state.drag.coeff_drag - dispersed_state.state.drag.coeff_drag).abs())
-                .powi(2),
-            (3.0 * (nominal_state.mass.prop_mass_kg - dispersed_state.state.mass.prop_mass_kg)
-                .abs())
-            .powi(2),
+        let state_deviation = [
+            delta_orbit.radius_km.x,
+            delta_orbit.radius_km.y,
+            delta_orbit.radius_km.z,
+            delta_orbit.velocity_km_s.x,
+            delta_orbit.velocity_km_s.y,
+            delta_orbit.velocity_km_s.z,
+            (nominal_state.srp.coeff_reflectivity - dispersed_state.state.srp.coeff_reflectivity),
+            (nominal_state.drag.coeff_drag - dispersed_state.state.drag.coeff_drag),
+            (nominal_state.mass.prop_mass_kg - dispersed_state.state.mass.prop_mass_kg),
         ];
+
+        // Build the covariance as three times the absolute value of the error, squared.
+        let diag_data = state_deviation
+            .iter()
+            .map(|v| (3.0 * v.abs()).powi(2))
+            .collect::<Vec<f64>>();
 
         let diag = OVector::<f64, Const<9>>::from_iterator(diag_data);
 
@@ -147,8 +145,8 @@ impl KfEstimate<Spacecraft> {
         let covar = Matrix::from_diagonal(&diag);
 
         Ok(Self {
-            nominal_state: dispersed_state.state,
-            state_deviation: OVector::<f64, Const<9>>::zeros(),
+            nominal_state, //: dispersed_state.state,
+            state_deviation: OVector::<f64, Const<9>>::from_iterator(state_deviation),
             covar,
             covar_bar: covar,
             predicted: true,
@@ -156,8 +154,8 @@ impl KfEstimate<Spacecraft> {
         })
     }
 
-    /// Builds a multivariate random variable from this estimate's nominal state and covariance, zero mean.
-    pub fn to_random_variable(&self) -> Result<MvnSpacecraft, Box<dyn Error>> {
+    /// Builds a multivariate random variable spacecraft from this estimate's nominal state and covariance, zero mean.
+    pub fn to_random_variable(&self) -> Result<MvnSpacecraft, Box<NyxError>> {
         MvnSpacecraft::from_spacecraft_cov(self.nominal_state, self.covar, self.state_deviation)
     }
 
@@ -296,18 +294,23 @@ where
         let mut fmt_cov = Vec::with_capacity(dim);
         for i in 0..dim {
             let unit = if i < 3 {
-                "km"
+                "m"
             } else if i < 6 {
-                "km/s"
+                "m/s"
             } else {
                 ""
             };
-            fmt_cov.push(format!("{:.6} {unit}", &self.covar[(i, i)]));
+            // Convert from km to meter
+            let val = &self.covar[(i, i)] * 1e3;
+            if val.abs() < 1e-3 {
+                fmt_cov.push(format!("{val:.6e} {unit}"));
+            } else {
+                fmt_cov.push(format!("{val:.6} {unit}"));
+            }
         }
         write!(
             f,
-            "=== {} @ {} -- within 3 sigma: {} ===\nstate {}\nsigmas [{}]\n",
-            word,
+            "=== {word} @ {} -- within 3 sigma: {} ===\nstate {}\nsigmas [{}]\n",
             &self.epoch(),
             self.within_3sigma(),
             &self.state(),
@@ -392,7 +395,7 @@ mod ut_kfest {
             ))
             .build();
 
-        let initial_estimate = KfEstimate::disperse_from_diag(
+        let initial_estimate = KfEstimate::from_dispersions(
             initial_state,
             vec![
                 StateDispersion::builder()

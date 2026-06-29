@@ -221,7 +221,7 @@ impl MvnSpacecraft {
         template: Spacecraft,
         cov: SMatrix<f64, 9, 9>,
         mean: SVector<f64, 9>,
-    ) -> Result<Self, Box<dyn Error>> {
+    ) -> Result<Self, Box<NyxError>> {
         // Check that covariance is PSD by ensuring that all the eigenvalues are positive or nil
         match cov.eigenvalues() {
             None => return Err(Box::new(NyxError::CovarianceMatrixNotPsd)),

@@ -36,8 +36,6 @@ use crate::od::noise::StochasticNoise;
 use crate::od::prelude::{Measurement, NoiseNotConfiguredSnafu, ODError};
 use crate::od::{ODAlmanacSnafu, ODTrajSnafu};
 
-use std::sync::Arc;
-
 // Defines a (transmitter) spacecraft capable of inter-satellite links.
 // NOTE: There is _no_ `InterlinkRxSpacecraft`, instead you must independently build their trajectories and provide them to the InterlinkArcSim.
 #[derive(Clone, Debug)]
@@ -101,7 +99,7 @@ impl TrackingDevice<Spacecraft> for InterlinkTxSpacecraft {
         &self.measurement_types
     }
 
-    fn location(&self, epoch: Epoch, frame: Frame, almanac: Arc<Almanac>) -> AlmanacResult<Orbit> {
+    fn location(&self, epoch: Epoch, frame: Frame, almanac: &Almanac) -> AlmanacResult<Orbit> {
         almanac.transform_to(self.traj.at(epoch).unwrap().orbit, frame, self.ab_corr)
     }
 
@@ -110,7 +108,7 @@ impl TrackingDevice<Spacecraft> for InterlinkTxSpacecraft {
         epoch: Epoch,
         traj: &Traj<Spacecraft>,
         rng: Option<&mut Pcg64Mcg>,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<Option<Measurement>, ODError> {
         match self.integration_time {
             Some(integration_time) => {
@@ -135,10 +133,10 @@ impl TrackingDevice<Spacecraft> for InterlinkTxSpacecraft {
                 };
 
                 // Start of integration time
-                let msr_t0_opt = self.measure_instantaneous(rx_0, None, almanac.clone())?;
+                let msr_t0_opt = self.measure_instantaneous(rx_0, None, almanac)?;
 
                 // End of integration time
-                let msr_t1_opt = self.measure_instantaneous(rx_1, None, almanac.clone())?;
+                let msr_t1_opt = self.measure_instantaneous(rx_1, None, almanac)?;
 
                 if let Some(msr_t0) = msr_t0_opt {
                     if let Some(msr_t1) = msr_t1_opt {
@@ -183,7 +181,7 @@ impl TrackingDevice<Spacecraft> for InterlinkTxSpacecraft {
         &mut self,
         rx: Spacecraft,
         rng: Option<&mut Pcg64Mcg>,
-        almanac: Arc<Almanac>,
+        almanac: &Almanac,
     ) -> Result<Option<Measurement>, ODError> {
         let observer = self.traj.at(rx.epoch()).context(ODTrajSnafu {
             details: format!("fetching state {} for interlink", rx.epoch()),

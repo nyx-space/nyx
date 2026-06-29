@@ -111,9 +111,9 @@ fn od_rejection_test(
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs.clone(), 0).unwrap();
-    arc_sim.build_schedule(almanac.clone()).unwrap();
+    arc_sim.build_schedule(&almanac).unwrap();
 
-    let arc_full = arc_sim.generate_measurements(almanac.clone()).unwrap();
+    let arc_full = arc_sim.generate_measurements(&almanac).unwrap();
     let initial_count = arc_full.len();
     println!("Full arc has {} measurements", initial_count);
 

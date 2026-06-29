@@ -91,6 +91,11 @@ impl MvnSpacecraft {
         }
         samples
     }
+
+    #[getter]
+    fn dispersions(&self) -> Vec<StateDispersion> {
+        self.dispersions.clone()
+    }
 }
 
 #[pymethods]

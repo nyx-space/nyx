@@ -190,7 +190,7 @@ where
             let mut sum_sq_weighted_residuals = 0.0;
 
             // Set up a single propagator for the whole iteration.
-            let mut prop_inst = self.prop.with(current_estimate.with_stm(), self.almanac.clone()).quiet();
+            let mut prop_inst = self.prop.with(current_estimate.with_stm(), (self.almanac).clone()).quiet();
             let mut epoch = current_estimate.epoch();
 
             // Store the STM to the start of the batch.
@@ -242,11 +242,11 @@ where
                             msr_types.insert(msr_type);
 
                             let h_tilde = device
-                            .h_tilde::<U1>(msr, &msr_types, &this_state, self.almanac.clone())?;
+                            .h_tilde::<U1>(msr, &msr_types, &this_state, &self.almanac)?;
 
                             // Compute expected measurement H(X(t_i))
                             let computed_meas_opt = device
-                                .measure_instantaneous(this_state, None, self.almanac.clone())?;
+                                .measure_instantaneous(this_state, None, &self.almanac)?;
 
                             let computed_meas = match computed_meas_opt {
                                 Some(cm) => cm,
@@ -506,7 +506,7 @@ where
                         msr_types.insert(msr_type);
 
                         let computed_meas_opt = device
-                            .measure_instantaneous(this_state, None, self.almanac.clone())?;
+                            .measure_instantaneous(this_state, None, &self.almanac)?;
 
                         let computed_meas = match computed_meas_opt {
                             Some(cm) => cm,

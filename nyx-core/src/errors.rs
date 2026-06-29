@@ -58,6 +58,8 @@ pub enum NyxError {
         #[snafu(source(from(PropagationError, Box::new)))]
         source: Box<PropagationError>,
     },
+    #[snafu(display("{msg}"))]
+    GenericError { msg: String },
 }
 
 impl From<TrajError> for NyxError {
