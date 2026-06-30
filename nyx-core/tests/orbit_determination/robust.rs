@@ -269,7 +269,7 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
 
     // Note: this also checks that the columns that match the given measurement kind exist.
     let _df_residuals = df
-        .columns([
+        .select([
             "Prefit residual: Range (km)",
             "Postfit residual: Range (km)",
             "Residual ratio",
@@ -278,7 +278,7 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
 
     // Check that the position and velocity estimates are present, along with the epochs
     assert!(
-        df.columns([
+        df.select([
             "Epoch (UTC)",
             "X (km)",
             "Y (km)",
@@ -292,7 +292,7 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
 
     // Check that the covariance in the integration frame is present
     assert!(
-        df.columns([
+        df.select([
             "Covariance X*X (Earth J2000) (km^2)",
             "Covariance X*Y (Earth J2000) (km^2)",
             "Covariance X*Z (Earth J2000) (km^2)",

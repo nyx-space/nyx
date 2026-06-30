@@ -23,6 +23,7 @@ use nyx::{
     md::prelude::{Objective, OrbitalElement, StateParameter},
     propagators::{ErrorControl, IntegratorOptions, Propagator},
 };
+use radiate::problem::EngineProblem;
 use radiate::*;
 use std::{error::Error, sync::Arc};
 
