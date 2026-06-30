@@ -135,20 +135,20 @@ impl TrackingDevice<Spacecraft> for GroundStation {
                 for (ii, msr_type) in self.measurement_types.iter().enumerate() {
                     match msr_type {
                         MeasurementType::ReceiveFrequency => {
-                            if let (Some(f_tx), Some(k)) =
-                                (self.transmit_freq_hz, self.turnaround_ratio)
-                            {
+                            if let Some(rc) = self.radio_config {
                                 let rho_dot =
                                     MeasurementType::Doppler.compute_two_way(aer_t0, aer_t1, 0.0)?;
                                 // f_rx = f_tx * k * (1 - 2 * rho_dot / c)
-                                let f_rx = f_tx * k * (1.0 - 2.0 * rho_dot / SPEED_OF_LIGHT_KM_S);
+                                let f_rx = rc.transmit_freq_hz
+                                    * rc.turnaround_ratio
+                                    * (1.0 - 2.0 * rho_dot / SPEED_OF_LIGHT_KM_S);
                                 // Add noise
                                 msr.push(*msr_type, f_rx + noises[ii + 1]);
                             }
                         }
                         MeasurementType::TransmitFrequency => {
-                            if let Some(f_tx) = self.transmit_freq_hz {
-                                msr.push(*msr_type, f_tx + noises[ii + 1]);
+                            if let Some(rc) = self.radio_config {
+                                msr.push(*msr_type, rc.transmit_freq_hz + noises[ii + 1]);
                             }
                         }
                         MeasurementType::TransmitFrequencyRate => {
@@ -220,18 +220,19 @@ impl TrackingDevice<Spacecraft> for GroundStation {
             for (ii, msr_type) in self.measurement_types.iter().enumerate() {
                 match msr_type {
                     MeasurementType::ReceiveFrequency => {
-                        if let (Some(f_tx), Some(k)) = (self.transmit_freq_hz, self.turnaround_ratio)
-                        {
+                        if let Some(rc) = self.radio_config {
                             let rho_dot = MeasurementType::Doppler.compute_one_way(aer, 0.0)?;
                             // One way: f_rx = f_tx * k * (1 - rho_dot / c)
-                            let f_rx = f_tx * k * (1.0 - rho_dot / SPEED_OF_LIGHT_KM_S);
+                            let f_rx = rc.transmit_freq_hz
+                                * rc.turnaround_ratio
+                                * (1.0 - rho_dot / SPEED_OF_LIGHT_KM_S);
                             // Add noise
                             msr.push(*msr_type, f_rx + noises[ii + 1]);
                         }
                     }
                     MeasurementType::TransmitFrequency => {
-                        if let Some(f_tx) = self.transmit_freq_hz {
-                            msr.push(*msr_type, f_tx + noises[ii + 1]);
+                        if let Some(rc) = self.radio_config {
+                            msr.push(*msr_type, rc.transmit_freq_hz + noises[ii + 1]);
                         }
                     }
                     MeasurementType::TransmitFrequencyRate => {

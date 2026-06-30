@@ -44,6 +44,95 @@ use pyo3::prelude::*;
 #[cfg(feature = "python")]
 use pyo3::types::{PyBytes, PyType};
 
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(
+    feature = "python",
+    pyclass(from_py_object),
+    pyo3(module = "nyx_space.od")
+)]
+pub struct RadioConfig {
+    pub transmit_freq_hz: f64,
+    pub turnaround_ratio: f64,
+    pub turnaround_delay: Duration,
+}
+
+impl RadioConfig {
+    pub fn new(transmit_freq_hz: f64, turnaround_ratio: f64, turnaround_delay: Duration) -> Self {
+        Self {
+            transmit_freq_hz,
+            turnaround_ratio,
+            turnaround_delay,
+        }
+    }
+}
+
+#[cfg(feature = "python")]
+#[pymethods]
+impl RadioConfig {
+    #[new]
+    pub fn py_new(transmit_freq_hz: f64, turnaround_ratio: f64, turnaround_delay: Duration) -> Self {
+        Self::new(transmit_freq_hz, turnaround_ratio, turnaround_delay)
+    }
+
+    #[getter]
+    pub fn get_transmit_freq_hz(&self) -> f64 {
+        self.transmit_freq_hz
+    }
+
+    #[setter]
+    pub fn set_transmit_freq_hz(&mut self, val: f64) {
+        self.transmit_freq_hz = val;
+    }
+
+    #[getter]
+    pub fn get_turnaround_ratio(&self) -> f64 {
+        self.turnaround_ratio
+    }
+
+    #[setter]
+    pub fn set_turnaround_ratio(&mut self, val: f64) {
+        self.turnaround_ratio = val;
+    }
+
+    #[getter]
+    pub fn get_turnaround_delay(&self) -> Duration {
+        self.turnaround_delay
+    }
+
+    #[setter]
+    pub fn set_turnaround_delay(&mut self, val: Duration) {
+        self.turnaround_delay = val;
+    }
+}
+
+impl<'a> Decode<'a> for RadioConfig {
+    fn decode<R: Reader<'a>>(decoder: &mut R) -> der::Result<Self> {
+        let transmit_freq_hz = decoder.decode()?;
+        let turnaround_ratio = decoder.decode()?;
+        let turnaround_delay_ns: i128 = decoder.decode()?;
+        Ok(Self {
+            transmit_freq_hz,
+            turnaround_ratio,
+            turnaround_delay: Duration::from_total_nanoseconds(turnaround_delay_ns),
+        })
+    }
+}
+
+impl Encode for RadioConfig {
+    fn encoded_len(&self) -> der::Result<der::Length> {
+        self.transmit_freq_hz.encoded_len()?
+            + self.turnaround_ratio.encoded_len()?
+            + self.turnaround_delay.total_nanoseconds().encoded_len()?
+    }
+
+    fn encode(&self, encoder: &mut impl der::Writer) -> der::Result<()> {
+        self.transmit_freq_hz.encode(encoder)?;
+        self.turnaround_ratio.encode(encoder)?;
+        self.turnaround_delay.total_nanoseconds().encode(encoder)?;
+        Ok(())
+    }
+}
+
 /// GroundStation defines a two-way ranging and doppler station.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass(from_py_object))]
@@ -58,10 +147,7 @@ pub struct GroundStation {
     /// Noise on the timestamp of the measurement
     pub timestamp_noise_s: Option<StochasticNoise>,
     pub stochastic_noises: Option<IndexMap<MeasurementType, StochasticNoise>>,
-    /// Transmit frequency of the ground station in Hz
-    pub transmit_freq_hz: Option<f64>,
-    /// Turnaround ratio of the spacecraft (num / denom)
-    pub turnaround_ratio: Option<f64>,
+    pub radio_config: Option<RadioConfig>,
 }
 
 #[cfg_attr(feature = "python", pymethods)]
@@ -74,8 +160,7 @@ impl GroundStation {
         longitude_deg: f64,
         height_km: f64,
         frame: Frame,
-        transmit_freq_hz: Option<f64>,
-        turnaround_ratio: Option<f64>,
+        radio_config: Option<RadioConfig>,
     ) -> Self {
         Self {
             name,
@@ -92,33 +177,20 @@ impl GroundStation {
             light_time_correction: false,
             timestamp_noise_s: None,
             stochastic_noises: None,
-            transmit_freq_hz,
-            turnaround_ratio,
+            radio_config,
         }
     }
 
     #[cfg(feature = "python")]
     #[getter]
-    pub fn get_transmit_freq_hz(&self) -> Option<f64> {
-        self.transmit_freq_hz
+    pub fn get_radio_config(&self) -> Option<RadioConfig> {
+        self.radio_config
     }
 
     #[cfg(feature = "python")]
     #[setter]
-    pub fn set_transmit_freq_hz(&mut self, transmit_freq_hz: Option<f64>) {
-        self.transmit_freq_hz = transmit_freq_hz;
-    }
-
-    #[cfg(feature = "python")]
-    #[getter]
-    pub fn get_turnaround_ratio(&self) -> Option<f64> {
-        self.turnaround_ratio
-    }
-
-    #[cfg(feature = "python")]
-    #[setter]
-    pub fn set_turnaround_ratio(&mut self, turnaround_ratio: Option<f64>) {
-        self.turnaround_ratio = turnaround_ratio;
+    pub fn set_radio_config(&mut self, radio_config: Option<RadioConfig>) {
+        self.radio_config = radio_config;
     }
 
     /// Computes the azimuth and elevation of the provided object seen from this ground station, both in degrees.
@@ -187,8 +259,7 @@ impl GroundStation {
             light_time_correction: false,
             timestamp_noise_s: None,
             stochastic_noises: None,
-            transmit_freq_hz: None,
-            turnaround_ratio: None,
+            radio_config: None,
         }
     }
 
@@ -297,11 +368,8 @@ impl GroundStation {
         if self.stochastic_noises.is_some() {
             bits |= 1 << 2;
         }
-        if self.transmit_freq_hz.is_some() {
+        if self.radio_config.is_some() {
             bits |= 1 << 3;
-        }
-        if self.turnaround_ratio.is_some() {
-            bits |= 1 << 4;
         }
         bits
     }
@@ -347,8 +415,7 @@ impl Default for GroundStation {
             light_time_correction: false,
             timestamp_noise_s: None,
             stochastic_noises: None,
-            transmit_freq_hz: None,
-            turnaround_ratio: None,
+            radio_config: None,
         }
     }
 }
@@ -400,13 +467,7 @@ impl<'a> Decode<'a> for GroundStation {
             None
         };
 
-        let transmit_freq_hz = if flags & (1 << 3) != 0 {
-            Some(decoder.decode()?)
-        } else {
-            None
-        };
-
-        let turnaround_ratio = if flags & (1 << 4) != 0 {
+        let radio_config = if flags & (1 << 3) != 0 {
             Some(decoder.decode()?)
         } else {
             None
@@ -420,8 +481,7 @@ impl<'a> Decode<'a> for GroundStation {
             light_time_correction,
             timestamp_noise_s,
             stochastic_noises,
-            transmit_freq_hz,
-            turnaround_ratio,
+            radio_config,
         })
     }
 }
@@ -449,8 +509,7 @@ impl Encode for GroundStation {
             + integration_time_ns.encoded_len()?
             + self.timestamp_noise_s.encoded_len()?
             + stochastics_vec.encoded_len()?
-            + self.transmit_freq_hz.encoded_len()?
-            + self.turnaround_ratio.encoded_len()?
+            + self.radio_config.encoded_len()?
     }
 
     fn encode(&self, encoder: &mut impl der::Writer) -> der::Result<()> {
@@ -478,8 +537,7 @@ impl Encode for GroundStation {
         });
         stochastics_vec.encode(encoder)?;
 
-        self.transmit_freq_hz.encode(encoder)?;
-        self.turnaround_ratio.encode(encoder)?;
+        self.radio_config.encode(encoder)?;
 
         Ok(())
     }
@@ -561,8 +619,7 @@ mod gs_ut {
             light_time_correction: false,
             timestamp_noise_s: None,
             integration_time: Some(60 * Unit::Second),
-            transmit_freq_hz: None,
-            turnaround_ratio: None,
+            radio_config: None,
         };
 
         println!("{}", serde_yml::to_string(&expected_gs).unwrap());
@@ -626,8 +683,7 @@ mod gs_ut {
                 light_time_correction: false,
                 timestamp_noise_s: None,
                 integration_time: None,
-                transmit_freq_hz: None,
-                turnaround_ratio: None,
+                radio_config: None,
             },
             GroundStation {
                 name: "Canberra".to_string(),
@@ -644,8 +700,7 @@ mod gs_ut {
                 light_time_correction: false,
                 timestamp_noise_s: None,
                 integration_time: None,
-                transmit_freq_hz: None,
-                turnaround_ratio: None,
+                radio_config: None,
             },
         ];
 

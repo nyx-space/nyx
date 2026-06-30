@@ -233,7 +233,9 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
                 // So f_rx = f_tx * k - (2 * f_tx * k / c) * rho_dot
                 // d(f_rx) / d(state) = - (2 * f_tx * k / c) * d(rho_dot) / d(state)
 
-                if let (Some(f_tx), Some(k)) = (tx.transmit_freq_hz, tx.turnaround_ratio) {
+                if let Some(rc) = tx.radio_config {
+                    let f_tx = rc.transmit_freq_hz;
+                    let k = rc.turnaround_ratio;
                     // Compute Doppler sensitivity row.
                     // We need to temporarily add Doppler to the measurement data so the Doppler sensitivity logic works.
                     // Actually, let's just copy the Doppler logic and multiply by the factor.

@@ -334,6 +334,7 @@ impl TrackingDataArc {
             measurement
                 .data
                 .insert(MeasurementType::Doppler, rho_dot_km_s);
+
         }
 
         if !all_applied_corrections.is_empty() {

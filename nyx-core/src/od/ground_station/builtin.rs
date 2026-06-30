@@ -50,8 +50,7 @@ impl GroundStation {
             light_time_correction: false,
             timestamp_noise_s: None,
             stochastic_noises: Some(stochastics),
-            transmit_freq_hz: None,
-            turnaround_ratio: None,
+            radio_config: None,
         }
     }
 
@@ -83,8 +82,7 @@ impl GroundStation {
             light_time_correction: false,
             timestamp_noise_s: None,
             stochastic_noises: Some(stochastics),
-            transmit_freq_hz: None,
-            turnaround_ratio: None,
+            radio_config: None,
         }
     }
 
@@ -116,8 +114,7 @@ impl GroundStation {
             light_time_correction: false,
             timestamp_noise_s: None,
             stochastic_noises: Some(stochastics),
-            transmit_freq_hz: None,
-            turnaround_ratio: None,
+            radio_config: None,
         }
     }
 }

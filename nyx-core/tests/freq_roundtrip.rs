@@ -12,8 +12,8 @@ use std::sync::Arc;
 fn test_frequency_roundtrip() {
     let mut gs = GroundStation::default();
     gs.name = "DSS14".to_string();
-    gs.transmit_freq_hz = Some(2.1e9);
-    gs.turnaround_ratio = Some(240.0 / 221.0);
+    let rc = nyx_space::od::RadioConfig::new(2.1e9, 240.0 / 221.0, Duration::ZERO);
+    gs.radio_config = Some(rc);
 
     // Create a fake Doppler measurement
     let epoch = Epoch::from_gregorian_utc_at_midnight(2023, 2, 22);
@@ -23,7 +23,7 @@ fn test_frequency_roundtrip() {
     arc.measurements.insert(epoch, msr);
 
     // Convert to frequency data
-    let arc_freq = arc.clone().to_frequency_data(gs.transmit_freq_hz.unwrap(), gs.turnaround_ratio.unwrap());
+    let arc_freq = arc.clone().to_frequency_data(rc);
 
     assert!(arc_freq.unique_types().contains(&MeasurementType::ReceiveFrequency));
     assert!(arc_freq.unique_types().contains(&MeasurementType::TransmitFrequency));

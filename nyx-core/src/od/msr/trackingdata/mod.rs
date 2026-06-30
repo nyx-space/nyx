@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 use super::{MeasurementType, measurement::Measurement};
+use crate::od::RadioConfig;
 use anise::constants::SPEED_OF_LIGHT_KM_S;
 use core::fmt;
 use hifitime::prelude::{Duration, Epoch};
@@ -407,16 +408,18 @@ impl TrackingDataArc {
         self
     }
 
-    /// Converts Doppler data in velocity units (km/s) to ReceiveFrequency (Hz) using the provided transmit frequency and turnaround ratio.
+    /// Converts Doppler data in velocity units (km/s) to ReceiveFrequency (Hz) using the provided radio configuration.
     /// If Doppler is not present in a measurement, that measurement is skipped.
-    pub fn to_frequency_data(mut self, transmit_freq_hz: f64, turnaround_ratio: f64) -> Self {
+    /// Note: This assumes two-way Doppler.
+    pub fn to_frequency_data(mut self, config: RadioConfig) -> Self {
         for msr in self.measurements.values_mut() {
             if let Some(rho_dot) = msr.data.get(&MeasurementType::Doppler) {
                 // Two-way formula: f_rx = f_tx * k * (1 - 2 * rho_dot / c)
-                let f_rx = transmit_freq_hz * turnaround_ratio * (1.0 - 2.0 * rho_dot / SPEED_OF_LIGHT_KM_S);
+                let f_rx = config.transmit_freq_hz
+                    * config.turnaround_ratio
+                    * (1.0 - 2.0 * rho_dot / SPEED_OF_LIGHT_KM_S);
                 msr.push(MeasurementType::ReceiveFrequency, f_rx);
-                msr.push(MeasurementType::TransmitFrequency, transmit_freq_hz);
-                // We keep the Doppler as well, but TDM export will prioritize frequencies if present (or we'll adjust it).
+                msr.push(MeasurementType::TransmitFrequency, config.transmit_freq_hz);
             }
         }
         self
@@ -424,13 +427,14 @@ impl TrackingDataArc {
 
     /// Converts ReceiveFrequency (Hz) to Doppler (km/s) using the provided turnaround ratio.
     /// This is essentially a batch version of what `from_tdm` does.
+    /// Note: This assumes two-way Doppler.
     pub fn to_doppler_data(mut self, turnaround_ratio: f64) -> Self {
         for msr in self.measurements.values_mut() {
             if let Some(f_rx) = msr.data.get(&MeasurementType::ReceiveFrequency) {
                 if let Some(f_tx) = msr.data.get(&MeasurementType::TransmitFrequency) {
                     let doppler_shift_hz = f_tx * turnaround_ratio - f_rx;
-                    let rho_dot_km_s = (doppler_shift_hz * SPEED_OF_LIGHT_KM_S)
-                        / (2.0 * f_tx * turnaround_ratio);
+                    let rho_dot_km_s =
+                        (doppler_shift_hz * SPEED_OF_LIGHT_KM_S) / (2.0 * f_tx * turnaround_ratio);
                     msr.push(MeasurementType::Doppler, rho_dot_km_s);
                 }
             }

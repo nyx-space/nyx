@@ -36,7 +36,7 @@ pub mod kalman;
 
 /// Provides a range and range rate measuring models.
 mod ground_station;
-pub use ground_station::GroundStation;
+pub use ground_station::{GroundStation, RadioConfig};
 
 /// Provides Estimate handling functionalities.
 pub mod estimate;
