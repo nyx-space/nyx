@@ -26,7 +26,7 @@ use hifitime::{Duration, Epoch, TimeScale};
 use indexmap::{IndexMap, IndexSet};
 use log::{error, info, warn};
 use snafu::ResultExt;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::io::{BufRead, BufReader, BufWriter};
@@ -94,7 +94,7 @@ impl TrackingDataArc {
         let source = path.as_ref().to_path_buf().display().to_string();
         info!("parsing CCSDS TDM {source}");
 
-        let mut measurements = BTreeMap::new();
+        let mut measurements = Vec::new();
         let mut metadata = HashMap::new();
 
         let reader = BufReader::new(file);
@@ -163,7 +163,9 @@ impl TrackingDataArc {
             }
 
             if let Some((mtype, epoch, value)) = parse_measurement_line(line, time_system)? {
-                if [
+                // 1. Calculate the effective divider for this specific line.
+                // (See the critique below regarding why mutating msr_divider here was a bug).
+                let effective_divider = if [
                     MeasurementType::ReceiveFrequency,
                     MeasurementType::TransmitFrequency,
                     MeasurementType::TransmitFrequencyRate,
@@ -171,19 +173,37 @@ impl TrackingDataArc {
                 .contains(&mtype)
                 {
                     has_freq_data = true;
-                    // Don't modify the values.
-                    msr_divider = 1.0;
-                }
-                measurements
-                    .entry(epoch)
-                    .or_insert_with(|| Measurement {
+                    1.0
+                } else {
+                    msr_divider
+                };
+
+                let scaled_value = value / effective_divider;
+
+                // If the last inserted measurement belongs to the exact same tracker
+                // and epoch, we append the sub-observable to its IndexMap.
+                let is_concurrent = measurements.last().is_some_and(|last: &Measurement| {
+                    last.epoch == epoch && last.tracker == current_tracker
+                });
+
+                if is_concurrent {
+                    measurements
+                        .last_mut()
+                        .unwrap() // Safe due to the is_concurrent check yielding true
+                        .data
+                        .insert(mtype, scaled_value);
+                } else {
+                    //  Otherwise, instantiate a new state record and push it.
+                    let mut data = IndexMap::new();
+                    data.insert(mtype, scaled_value);
+
+                    measurements.push(Measurement {
                         tracker: current_tracker.clone(),
                         epoch,
-                        data: IndexMap::new(),
+                        data,
                         rejected: false,
-                    })
-                    .data
-                    .insert(mtype, value / msr_divider);
+                    });
+                }
             }
         }
 
@@ -251,7 +271,8 @@ impl TrackingDataArc {
 
         let mut all_applied_corrections = IndexSet::new();
 
-        for (epoch, measurement) in measurements.iter_mut() {
+        for measurement in &mut measurements {
+            let epoch = measurement.epoch;
             // Apply corrections if any
             if !corrections_applied {
                 for msr_type in [
@@ -289,16 +310,16 @@ impl TrackingDataArc {
             {
                 if let (Some(last_f), Some(last_e)) = (latest_transmit_freq, latest_transmit_epoch)
                 {
-                    let dt: Duration = *epoch - last_e;
+                    let dt: Duration = epoch - last_e;
                     latest_transmit_freq = Some(last_f + latest_transmit_rate * dt.to_seconds());
                 }
-                latest_transmit_epoch = Some(*epoch);
+                latest_transmit_epoch = Some(epoch);
                 latest_transmit_rate = *rate;
             }
 
             if let Some(freq) = measurement.data.get(&MeasurementType::TransmitFrequency) {
                 latest_transmit_freq = Some(*freq);
-                latest_transmit_epoch = Some(*epoch);
+                latest_transmit_epoch = Some(epoch);
             }
 
             if !measurement
@@ -324,7 +345,7 @@ impl TrackingDataArc {
                 continue;
             }
 
-            let dt: Duration = *epoch - latest_transmit_epoch.unwrap();
+            let dt: Duration = epoch - latest_transmit_epoch.unwrap();
             let transmit_freq_hz =
                 latest_transmit_freq.unwrap() + latest_transmit_rate * dt.to_seconds();
 
@@ -372,14 +393,17 @@ impl TrackingDataArc {
         };
 
         // Remove measurements that have no data left after our processing.
-        measurements.retain(|_, m| !m.data.is_empty());
+        measurements.retain(|m| !m.data.is_empty());
 
-        let trk = Self {
+        let mut trk = Self {
             measurements,
             source: Some(source),
             moduli,
             force_reject: false,
         };
+
+        // Ensure data is sorted (TDM spec requires that, but you never know).
+        trk.sort();
 
         if trk.unique_types().is_empty() {
             Err(InputOutputError::EmptyDataset {
@@ -559,8 +583,8 @@ impl TrackingDataArc {
                 writeln!(writer, "DATA_START").map_err(err_hdlr)?;
 
                 // Process measurements for this tracker
-                for (epoch, measurement) in &tracker_data.measurements {
-                    for (mtype, value) in &measurement.data {
+                for m in &tracker_data.measurements {
+                    for (mtype, value) in &m.data {
                         if !types.contains(mtype) {
                             continue;
                         }
@@ -569,7 +593,7 @@ impl TrackingDataArc {
                             writer,
                             "\t{:<20} = {:<23}\t{:.12}",
                             mtype.ccsds_tdm_name(),
-                            Formatter::new(*epoch, iso8601_no_ts),
+                            Formatter::new(m.epoch, iso8601_no_ts),
                             value * multiplier
                         )
                         .map_err(err_hdlr)?;

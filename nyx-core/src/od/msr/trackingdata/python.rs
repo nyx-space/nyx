@@ -21,24 +21,23 @@ use crate::io::{ExportCfg, InputOutputError};
 use hifitime::{Duration, Epoch};
 use pyo3::prelude::*;
 use pyo3::types::PyType;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::ops::Bound::{Excluded, Included, Unbounded};
 
 #[pymethods]
 impl TrackingDataArc {
     #[new]
-    fn py_new(msrs: HashMap<Epoch, Measurement>) -> Self {
-        let mut measurements = BTreeMap::new();
-        for (epoch, msr) in msrs.iter() {
-            measurements.insert(*epoch, msr.clone());
-        }
-
-        Self {
+    fn py_new(measurements: Vec<Measurement>) -> Self {
+        let mut trk_data = Self {
             measurements,
             source: None,
             moduli: None,
             force_reject: false,
-        }
+        };
+
+        trk_data.sort();
+
+        trk_data
     }
 
     /// Initializes a new Almanac from a file path to CCSDS OEM file, after converting to to SPICE SPK/BSP

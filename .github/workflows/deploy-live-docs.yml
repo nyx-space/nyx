@@ -42,6 +42,11 @@ jobs:
               fi
             fi
           done
+      - name: Pin Node for Firebase deploy
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.18.0"
+
       - uses: FirebaseExtended/action-hosting-deploy@v0.11.0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'

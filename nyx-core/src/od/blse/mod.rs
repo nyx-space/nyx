@@ -149,7 +149,7 @@ where
         arc: &TrackingDataArc,
     ) -> Result<BLSSolution<D::StateType>, ODError> {
         let measurements = &arc.measurements;
-        let num_measurements = measurements.values().filter(|m| !m.rejected).count();
+        let num_measurements = measurements.iter().filter(|m| !m.rejected).count();
         let mut devices = self.devices.clone();
 
         ensure!(
@@ -196,11 +196,11 @@ where
             // Store the STM to the start of the batch.
             let mut stm = StateMatrix::<D>::identity();
 
-            for (epoch_ref, msr) in measurements.iter() {
+            for msr in measurements {
                 if msr.rejected {
                     continue;
                 }
-                let msr_epoch = *epoch_ref;
+                let msr_epoch = msr.epoch;
 
                 loop {
                     let delta_t = msr_epoch - epoch;
@@ -453,7 +453,7 @@ where
         arc: &TrackingDataArc,
     ) -> Result<f64, ODError> {
         let measurements = &arc.measurements;
-        let num_measurements = measurements.values().filter(|m| !m.rejected).count();
+        let num_measurements = measurements.iter().filter(|m| !m.rejected).count();
         let mut devices = self.devices.clone();
 
         ensure!(
@@ -470,11 +470,11 @@ where
         let mut prop_inst = self.prop.with(state.with_stm(), self.almanac.clone()).quiet();
         let mut epoch = state.epoch();
 
-        for (epoch_ref, msr) in measurements.iter() {
+        for msr in measurements {
             if msr.rejected {
                 continue;
             }
-            let msr_epoch = *epoch_ref;
+            let msr_epoch = msr.epoch;
 
             loop {
                 let delta_t = msr_epoch - epoch;

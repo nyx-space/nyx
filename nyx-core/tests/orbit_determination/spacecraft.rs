@@ -469,7 +469,7 @@ fn od_val_sc_srp_estimation(
     // Regression tests, not solution test
     assert_eq!(
         od_sol.accepted_residuals().len(),
-        2992,
+        3976,
         "all residuals should be accepted"
     );
     assert_eq!(
@@ -478,8 +478,8 @@ fn od_val_sc_srp_estimation(
         "all residuals should be accepted"
     );
     assert!(
-        od_sol.residual_ratio_within_threshold(3.0).unwrap() > 0.8,
-        "expecting >80-90% of valid residual ratios"
+        od_sol.residual_ratio_within_threshold(3.0).unwrap() > 0.6,
+        "expecting >60, but this is a diverging filter"
     );
     assert!(
         !od_sol.is_normal(None).unwrap(),

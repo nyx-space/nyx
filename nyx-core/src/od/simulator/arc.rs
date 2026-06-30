@@ -175,7 +175,7 @@ where
         &mut self,
         almanac: &Almanac,
     ) -> Result<TrackingDataArc, ConfigError> {
-        let mut measurements = BTreeMap::new();
+        let mut measurements = Vec::new();
 
         for (name, device) in self.devices.iter_mut() {
             if let Some(cfg) = self.configs.get(name) {
@@ -212,7 +212,7 @@ where
                                 ) {
                                     Ok(msr_opt) => {
                                         if let Some(msr) = msr_opt {
-                                            measurements.insert(epoch, msr);
+                                            measurements.push(msr);
                                         }
                                     }
                                     Err(e) => {
@@ -243,12 +243,14 @@ where
         }
 
         // Build the tracking arc.
-        let trk_data = TrackingDataArc {
+        let mut trk_data = TrackingDataArc {
             measurements,
             source: None,
             moduli: None,
             force_reject: false,
         };
+
+        trk_data.sort();
 
         Ok(trk_data)
     }

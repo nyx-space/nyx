@@ -520,8 +520,8 @@ fn val_measurement_noise(almanac: Arc<Almanac>) {
 
         for (noisy_msr, perfect_msr) in noisy_subset
             .measurements
-            .values()
-            .zip(perfect_subset.measurements.values())
+            .iter()
+            .zip(perfect_subset.measurements.iter())
         {
             // First, test that the filter by measurement type works
             assert_eq!(noisy_msr.data.len(), 1);

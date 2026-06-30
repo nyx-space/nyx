@@ -41,8 +41,10 @@ jobs:
             fi
           done
 
-      - name: Inject build metadata
-        run: echo "$(date +%s)" > target/doc/build_timestamp.txt
+      - name: Pin Node for Firebase deploy
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.18.0"
 
       - uses: FirebaseExtended/action-hosting-deploy@v0.11.0
         with:

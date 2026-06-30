@@ -151,7 +151,7 @@ fn od_rejection_test(
     drop(od_sol_full);
 
     // Reject Madrid measurements in place to save memory
-    let arc_rejected = arc_full.reject_by_tracker("Madrid".to_string());
+    let arc_rejected = arc_full.reject_by_tracker("Madrid");
     // The number of measurements in the arc structure remains the same, but they are marked as rejected.
     assert_eq!(arc_rejected.len(), initial_count);
 

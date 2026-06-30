@@ -208,8 +208,8 @@ where
         let mut unknown_trackers = IndexSet::new();
         let tick = Epoch::now().unwrap();
 
-        for (msr_cnt, (epoch_ref, msr)) in measurements.iter().enumerate() {
-            let next_msr_epoch = *epoch_ref;
+        for (msr_cnt, msr) in measurements.iter().enumerate() {
+            let next_msr_epoch = msr.epoch;
 
             // Advance the propagator
             loop {
@@ -308,7 +308,7 @@ where
                                         ensure!(
                                             val.is_finite(),
                                             InvalidMeasurementSnafu {
-                                                epoch: *epoch_ref,
+                                                epoch: next_msr_epoch,
                                                 val
                                             }
                                         );
