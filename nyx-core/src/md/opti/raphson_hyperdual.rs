@@ -135,7 +135,7 @@ impl<const V: usize, const O: usize> Targeter<'_, V, O> {
                 .context(PropSnafu)?;
 
             // Check linearization
-            if !are_eigenvalues_stable(xf.stm().unwrap().complex_eigenvalues()) {
+            if !are_eigenvalues_stable(&xf.stm().unwrap().complex_eigenvalues()) {
                 warn!(
                     "STM linearization assumption is wrong for a time step of {}",
                     achievement_epoch - correction_epoch

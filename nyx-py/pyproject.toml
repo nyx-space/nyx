@@ -12,8 +12,6 @@ classifiers = [
 ]
 readme = "README.md"
 dynamic = ["version", "urls", "description", "authors", "license", "description_content_type", "summary"]
-# [project.scripts]
-# anise-gui = "anise:exec_gui"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]

@@ -42,10 +42,6 @@ jobs:
               fi
             fi
           done
-
-      # Pin Node to avoid the keep-alive socket regression in Node 22.23.0 /
-      # 24.17.0 (nodejs/node#63989), which makes firebase-tools fail channel
-      # deploys with "premature close" -> retried release -> FAILED_PRECONDITION.
       - name: Pin Node for Firebase deploy
         uses: actions/setup-node@v4
         with:
