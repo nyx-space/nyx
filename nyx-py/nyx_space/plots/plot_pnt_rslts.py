@@ -5,6 +5,8 @@ import plotly.graph_objects as go
 import polars as pl
 from plotly.colors import sample_colorscale
 
+from nyx_space.plots import TEMPLATE, watermark
+
 color_scale = "phase"
 
 
@@ -80,11 +82,10 @@ def main(path: str):
         title="Trajectory with Uncertainty Ellipses (3σ)",
         xaxis_title="Longitude (deg)",
         yaxis_title="Latitude (deg)",
-        width=1200,
-        height=1200,
+        template=TEMPLATE
     )
 
-    fig.show()
+    watermark(fig, path).show()
 
     all_msr_types = ["Range (km)", "Doppler (km/s)", "Azimuth (deg)", "Elevation (deg)"]
     msr_type_count = 0
@@ -132,8 +133,8 @@ def main(path: str):
             line=dict(dash="dash", color="black"),
         )
         unit = msr.split()[-1][1:-1]
-        fig.update_layout(yaxis_title=unit)
-        fig.show()
+        fig.update_layout(yaxis_title=unit, template=TEMPLATE)
+        watermark(fig, path).show()
 
         y_msr_cols = [
             f"{col}: {msr}"

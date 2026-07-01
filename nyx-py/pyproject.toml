@@ -19,8 +19,6 @@ features = ["pyo3/extension-module"]
 module-name = "nyx_space._nyx"
 
 [project.scripts]
-nyx_plot_od_rslt = "nyx_space.plots.plot_od_rslt:main"
-nyx_plot_od_cr_cd = "nyx_space.plots.plot_od_cr_cd:main"
-nyx_plot_od_orb_elems = "nyx_space.plots.plot_od_orbital_elements:plot_orbit_elements"
-nyx_plot_orb_elems = "nyx_space.plots.plot_orbital_elements:plot_orbit_elements"
+nyx_plot_od = "nyx_space.plots.plot_od_rslt:main"
+nyx_plot_elements = "nyx_space.plots.plot_orbital_elements:plot_orbit_elements"
 nyx_plot_pnt_rslts = "nyx_space.plots.plot_pnt_rslts:main"
