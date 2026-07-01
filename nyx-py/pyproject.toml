@@ -12,8 +12,13 @@ classifiers = [
 ]
 readme = "README.md"
 dynamic = ["version", "urls", "description", "authors", "license", "description_content_type", "summary"]
+dependencies = ["click>=8.1.0,<9.0.0", "numpy>=2.4.0,<3.0.0", "polars>=1.41.0,<2.0.0", "plotly>=6.0.0,<7.0.0", "scipy>=1.17.0,<2.0.0"]
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
 module-name = "nyx_space._nyx"
 
+[project.scripts]
+nyx_plot_od = "nyx_space.plots.plot_od_rslt:main"
+nyx_plot_elements = "nyx_space.plots.plot_orbital_elements:plot_orbit_elements"
+nyx_plot_pnt_rslts = "nyx_space.plots.plot_pnt_rslts:main"

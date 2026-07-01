@@ -6,29 +6,9 @@ import polars as pl
 from plotly.subplots import make_subplots
 from scipy import stats
 
-TEMPLATE = "seaborn"
+from nyx_space.plots import TEMPLATE, convert_units, watermark
 
-
-def convert_units(df):
-    rename_dict = {}
-    exprs = []
-    for col in df.columns:
-        if "(km/s)" in col:
-            new_col = col.replace("(km/s)", "(m/s)")
-            rename_dict[col] = new_col
-            exprs.append(pl.col(col) * 1000)
-        elif "(km^2)" in col:
-            new_col = col.replace("(km^2)", "(m^2)")
-            rename_dict[col] = new_col
-            exprs.append(pl.col(col) * 1_000_000)
-        elif "(km)" in col:
-            new_col = col.replace("(km)", "(m)")
-            rename_dict[col] = new_col
-            exprs.append(pl.col(col) * 1000)
-
-    if exprs:
-        df = df.with_columns(exprs).rename(rename_dict)
-    return df
+optional_est_params = ["cr", "cd"]
 
 
 def autocorr(x: np.ndarray, max_lag: int) -> np.ndarray:
@@ -83,7 +63,7 @@ def main(path: str, wstats: bool, error_ric: str):
             ricdf,
             x="Epoch (UTC)",
             y=["Delta X (RIC) (m)", "Delta Y (RIC) (m)", "Delta Z (RIC) (m)"],
-            template="seaborn",
+            template=TEMPLATE,
         )
         for trace in this_ric_fig.data:
             ric_fig.add_trace(trace, row=1, col=1)
@@ -96,11 +76,11 @@ def main(path: str, wstats: bool, error_ric: str):
                 "Delta Vy (RIC) (m/s)",
                 "Delta Vz (RIC) (m/s)",
             ],
-            template="seaborn",
+            template=TEMPLATE,
         )
         for trace in this_ric_fig.data:
             ric_fig.add_trace(trace, row=2, col=1)
-        ric_fig.show()
+        watermark(ric_fig, path).show()
 
     all_msr_types = ["Range (m)", "Doppler (m/s)", "Azimuth (deg)", "Elevation (deg)"]
     msr_type_count = 0
@@ -178,9 +158,9 @@ def main(path: str, wstats: bool, error_ric: str):
             legend_added.add(trace_type)
 
         fig.update_yaxes(title_text=unit, row=idx, col=1)
-    fig.update_layout(title_text="Measurement Residuals", template="seaborn")
+    fig.update_layout(title_text="Measurement Residuals", template=TEMPLATE)
     fig.update_xaxes(matches="x")
-    fig.show()
+    watermark(fig, path).show()
 
     # Plot the RIC uncertainty for position and velocity
     sigma_fig = make_subplots(
@@ -209,13 +189,18 @@ def main(path: str, wstats: bool, error_ric: str):
     )
     for trace in this_fig.data:
         sigma_fig.add_trace(trace, row=2, col=1)
-    sigma_fig.show()
+    watermark(sigma_fig, path).show()
 
     # Create one QQ plot per whitened residual (there is only one if scalar processing of measurements)
     whitened_resids = [c for c in df.columns if "Whitened residual" in c]
+    if len(whitened_resids) == len(msr_types):
+        # Vectorized filter, so the whitened residuals map directly the measurement types, in that order
+        resid_titles = msr_types
+    else:
+        resid_titles = whitened_resids
 
     # Plot the residual ratios
-    for whitened_resid in whitened_resids:
+    for resid_title, whitened_resid in zip(resid_titles, whitened_resids):
         # 1. Create the subplot figure: 2 rows, 1 column
         # shared_xaxes=True links zooming/panning across both rows
         fig = make_subplots(
@@ -366,8 +351,8 @@ def main(path: str, wstats: bool, error_ric: str):
 
         # Global Layout Updates
         fig.update_layout(
-            title_text=f"Comprehensive Residual Analysis: {whitened_resid}",
-            template="seaborn",
+            title_text=f"Residual Analysis: {resid_title}",
+            template=TEMPLATE,
         )
         # Update axes titles for clarity
         fig.update_yaxes(title_text=whitened_resid, row=1, col=1)
@@ -376,7 +361,77 @@ def main(path: str, wstats: bool, error_ric: str):
         fig.update_xaxes(title_text="Theoretical N(0,1) Quantiles", row=3, col=2)
         fig.update_yaxes(title_text="Sample Quantiles", row=3, col=2)
 
-        fig.show()
+        watermark(fig, path).show()
+
+    # Plot the optional parameters that were estimated.
+    plots_to_make = []
+    for col in optional_est_params:
+        if df[col].max() != df[col].min():
+            plots_to_make += [col]
+
+    if not plots_to_make:
+        print(f"Neither of {optional_est_params} were estimated in this run, skipping plots")
+    else:
+        fig = make_subplots(
+            rows=len(plots_to_make),
+            cols=1,
+            subplot_titles=[p[0] for p in plots_to_make],
+            vertical_spacing=0.1,
+        )
+
+        legend_added = False
+
+        for idx, (title, val_col, sigma_col) in enumerate(plots_to_make, start=1):
+            # Add the estimate trace
+            fig.add_trace(
+                go.Scatter(
+                    x=df["Epoch (UTC)"],
+                    y=df[val_col],
+                    mode="lines+markers",
+                    name=title,
+                    legendgroup=title,
+                    marker=dict(color="blue" if "Cr" in title else "green"),
+                    showlegend=True,
+                ),
+                row=idx,
+                col=1,
+            )
+
+            # Add 3-sigma bounds if available
+            if sigma_col:
+                df = df.with_columns(
+                    [
+                        (pl.col(val_col) + 3.0 * pl.col(sigma_col)).alias(
+                            f"{title} +3-Sigma"
+                        ),
+                        (pl.col(val_col) - 3.0 * pl.col(sigma_col)).alias(
+                            f"{title} -3-Sigma"
+                        ),
+                    ]
+                )
+                for bound in [f"{title} +3-Sigma", f"{title} -3-Sigma"]:
+                    show_this_legend = not legend_added
+                    fig.add_trace(
+                        go.Scatter(
+                            x=df["Epoch (UTC)"],
+                            y=df[bound],
+                            mode="lines",
+                            name="3-Sigma bounds",
+                            line=dict(color="black", dash="dash"),
+                            legendgroup="3-Sigma bounds",
+                            connectgaps=True,
+                            showlegend=show_this_legend,
+                        ),
+                        row=idx,
+                        col=1,
+                    )
+                    legend_added = True
+
+            fig.update_yaxes(title_text="Value (unitless)", row=idx, col=1)
+
+        fig.update_layout(title_text=" ".join(plots_to_make), template=TEMPLATE)
+        fig.update_xaxes(matches="x")
+        watermark(fig, path).show()
 
     if wstats:
         for msr in msr_types:
@@ -392,9 +447,11 @@ def main(path: str, wstats: bool, error_ric: str):
 
         # Plot the filter gains or filter-smoother ratios
         if is_filter_run:
-            px.scatter(df, x="Epoch (UTC)", y=gain_columns).show()
+            fig = px.scatter(df, x="Epoch (UTC)", y=gain_columns)
+            watermark(fig, path).show()
         else:
-            px.scatter(df, x="Epoch (UTC)", y=fs_ratio_columns).show()
+            fig = px.scatter(df, x="Epoch (UTC)", y=fs_ratio_columns)
+            watermark(fig, path).show()
 
 
 if __name__ == "__main__":
