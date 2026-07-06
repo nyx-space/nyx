@@ -106,7 +106,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: wheels-windows-${{ matrix.target }}
-          path: dist
+          path: nyx-py/dist
 
   macos:
     runs-on: ${{ matrix.platform.runner }}
@@ -135,7 +135,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: wheels-macos-${{ matrix.platform.target }}
-          path: dist
+          path: nyx-py/dist
 
   # Nyx does NOT provide the source for manual compilation on unavailable platforms on purpose.
   # sdist:
