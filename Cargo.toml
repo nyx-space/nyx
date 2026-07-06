@@ -3,7 +3,7 @@ resolver = "2"
 members = ["nyx-core", "nyx-py"]
 
 [workspace.package]
-version = "2.4.0"
+version = "2.4.1"
 edition = "2024"
 authors = ["Christopher Rabotin <christopher.rabotin@gmail.com>"]
 description = "Flight-proven, blazing fast astrodynamics from preliminary design to operations"
