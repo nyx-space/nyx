@@ -179,3 +179,10 @@ pub enum ODError {
     #[snafu(display("Nyx orbit determination limitation: {action}"))]
     ODLimitation { action: &'static str },
 }
+
+pub type SpacecraftPositionKalmanOD = self::process::KalmanODProcess<
+    SpacecraftDynamics,
+    nalgebra::Const<3>,
+    nalgebra::Const<3>,
+    position::PositionDevice,
+>;

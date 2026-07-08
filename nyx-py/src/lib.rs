@@ -53,7 +53,7 @@ use nyx_space::io::gravity::GravityFieldConfig;
 use nyx_space::mc::{MvnSpacecraft, StateDispersion};
 use nyx_space::md::StateParameter;
 use nyx_space::md::trajectory::ExportCfg;
-use nyx_space::od::GroundStation;
+use nyx_space::od::{GroundStation, position::PositionDevice};
 use nyx_space::od::kalman::KalmanVariant;
 use nyx_space::od::msr::{Measurement, MeasurementType, TrackingDataArc};
 use nyx_space::od::noise::link_specific::{CN0, CarrierFreq, ChipRate, SN0};
@@ -104,6 +104,7 @@ fn orbit_determination(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
     sm.add_class::<Measurement>()?;
     sm.add_class::<Location>()?;
     sm.add_class::<GroundStation>()?;
+    sm.add_class::<PositionDevice>()?;
     sm.add_class::<PyCadence>()?;
     sm.add_class::<Handoff>()?;
     sm.add_class::<Strand>()?;
@@ -122,6 +123,9 @@ fn orbit_determination(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
     sm.add_class::<KalmanVariant>()?;
     sm.add_class::<SigmaRejection>()?;
     sm.add_class::<py_od::GroundTrackingArcSim>()?;
+    sm.add_class::<py_od::PositionTrackingArcSim>()?;
+    sm.add_class::<py_od::PySpacecraftPositionODProcess>()?;
+    sm.add_class::<py_od::PySpacecraftPositionODSolution>()?;
     sm.add_class::<py_od::PySpacecraftODProcess>()?;
     sm.add_class::<py_od::PySpacecraftODSolution>()?;
     sm.add_class::<py_od::PySpacecraftEstimate>()?;
