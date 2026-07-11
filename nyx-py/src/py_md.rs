@@ -23,14 +23,14 @@ use log::info;
 use nyx_space::dynamics::SpacecraftDynamics;
 use nyx_space::propagators::{IntegratorMethod, IntegratorOptions, Propagator as CorePropagator};
 use nyx_space::{
-    Spacecraft,
     dynamics::sequence::Dynamics,
     io::InputOutputError,
     md::{
-        Trajectory,
         trajectory::{ExportCfg, TrajError},
+        Trajectory,
     },
     propagators::PropagationError,
+    Spacecraft,
 };
 use rayon::prelude::*;
 use std::sync::Arc;
@@ -381,6 +381,20 @@ impl PyTrajectory {
             let inner = Trajectory::from_parquet(path)?;
             Ok(Self { inner })
         }
+    }
+
+    /// Add another state to this trajectory.
+    fn push(&mut self, spacecraft: Spacecraft) {
+        self.inner.states.push(spacecraft);
+        self.inner.finalize();
+    }
+
+    /// Append many spacecraft to this trajectory.
+    fn append(&mut self, many_spacecraft: Vec<Spacecraft>) {
+        for sc in many_spacecraft {
+            self.inner.states.push(sc);
+        }
+        self.inner.finalize();
     }
 
     /// Export the difference in RIC from of this trajectory compare to the "other" trajectory in parquet format.

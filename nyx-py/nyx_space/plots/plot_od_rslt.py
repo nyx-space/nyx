@@ -367,10 +367,16 @@ def main(path: str, wstats: bool, error_ric: str):
     plots_to_make = []
     for col in optional_est_params:
         if df[col].max() != df[col].min():
-            plots_to_make += [col]
+            # We should plot this!
+            sigma_col = [
+                c for c in df.columns if "cr" in c.lower() and "sigma" in c.lower()
+            ]
+            plots_to_make += [(col.capitalize(), col, sigma_col)]
 
     if not plots_to_make:
-        print(f"Neither of {optional_est_params} were estimated in this run, skipping plots")
+        print(
+            f"Neither of {optional_est_params} were estimated in this run, skipping plots"
+        )
     else:
         fig = make_subplots(
             rows=len(plots_to_make),
@@ -390,46 +396,47 @@ def main(path: str, wstats: bool, error_ric: str):
                     mode="lines+markers",
                     name=title,
                     legendgroup=title,
-                    marker=dict(color="blue" if "Cr" in title else "green"),
+                    marker=dict(color="blue" if "cr" in title else "green"),
                     showlegend=True,
                 ),
                 row=idx,
                 col=1,
             )
 
-            # Add 3-sigma bounds if available
-            if sigma_col:
-                df = df.with_columns(
-                    [
-                        (pl.col(val_col) + 3.0 * pl.col(sigma_col)).alias(
-                            f"{title} +3-Sigma"
-                        ),
-                        (pl.col(val_col) - 3.0 * pl.col(sigma_col)).alias(
-                            f"{title} -3-Sigma"
-                        ),
-                    ]
+            # Add 3-sigma bounds
+            df = df.with_columns(
+                [
+                    (pl.col(val_col) + 3.0 * pl.col(sigma_col)).alias(
+                        f"{title} +3-Sigma"
+                    ),
+                    (pl.col(val_col) - 3.0 * pl.col(sigma_col)).alias(
+                        f"{title} -3-Sigma"
+                    ),
+                ]
+            )
+            for bound in [f"{title} +3-Sigma", f"{title} -3-Sigma"]:
+                show_this_legend = not legend_added
+                fig.add_trace(
+                    go.Scatter(
+                        x=df["Epoch (UTC)"],
+                        y=df[bound],
+                        mode="lines",
+                        name="3-Sigma bounds",
+                        line=dict(color="black", dash="dash"),
+                        legendgroup="3-Sigma bounds",
+                        connectgaps=True,
+                        showlegend=show_this_legend,
+                    ),
+                    row=idx,
+                    col=1,
                 )
-                for bound in [f"{title} +3-Sigma", f"{title} -3-Sigma"]:
-                    show_this_legend = not legend_added
-                    fig.add_trace(
-                        go.Scatter(
-                            x=df["Epoch (UTC)"],
-                            y=df[bound],
-                            mode="lines",
-                            name="3-Sigma bounds",
-                            line=dict(color="black", dash="dash"),
-                            legendgroup="3-Sigma bounds",
-                            connectgaps=True,
-                            showlegend=show_this_legend,
-                        ),
-                        row=idx,
-                        col=1,
-                    )
-                    legend_added = True
+                legend_added = True
 
             fig.update_yaxes(title_text="Value (unitless)", row=idx, col=1)
 
-        fig.update_layout(title_text=" ".join(plots_to_make), template=TEMPLATE)
+        fig.update_layout(
+            title_text=" ".join([x[0] for x in plots_to_make]), template=TEMPLATE
+        )
         fig.update_xaxes(matches="x")
         watermark(fig, path).show()
 
