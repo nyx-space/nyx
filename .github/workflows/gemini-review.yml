@@ -1,0 +1,34 @@
+name: "Gemini Code Review"
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+
+# This is required for the action to be able to post comments on the PR.
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run AI Code Review
+        uses: petarzarkov/gemini-code-review-action@latest
+        with:
+          exclude: '*.md,*.json,data/,*.lock,*.pyi,*.pq,*.parquet,*.bsp,*.bpc,*.dhall'
+
+          # Optional: Choose your preferred model
+          model: gemini-3.5-flash
+
+          # Optional: Enable/disable conversation continuity (default: true)
+          enable_conversation_context: true
+
+          # Optional: Skip code review for draft pull requests (default: true)
+          skip_draft_prs: true
+
+          # Optional: Set the language for AI responses (e.g., English, Spanish, French)
+          language: English
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

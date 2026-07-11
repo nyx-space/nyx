@@ -45,7 +45,7 @@ arrow = "59.0.0"
 serde_yml = "0.0.12"
 num = "0.4.0"
 typed-builder = "0.23.0"
-snafu = { version = "0.9.0", features = ["backtrace"] }
+snafu = { workspace = true }
 serde_dhall = { version = "0.13", default-features = false }
 indexmap = { version = "2.6.0", features = ["serde"] }
 statrs = "0.18.0"

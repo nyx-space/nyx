@@ -36,6 +36,7 @@ log = "0.4"
 rayon = "1.6"
 pyo3 = { version = "0.28", features = ["multiple-pymethods"] }
 numpy = "0.28"
+snafu = { version = "0.9.0", features = ["backtrace"] }
 
 nyx-space = { path = "nyx-core" }
 

@@ -20,8 +20,10 @@ use anise::frames::Frame;
 use anise::{ephemerides::ephemeris::Ephemeris, prelude::Almanac};
 use hifitime::{Duration, Epoch};
 use log::info;
+use nyx_space::dynamics::Dynamics as CoreDynamics;
 use nyx_space::dynamics::SpacecraftDynamics;
 use nyx_space::propagators::{IntegratorMethod, IntegratorOptions, Propagator as CorePropagator};
+use nyx_space::State;
 use nyx_space::{
     dynamics::sequence::Dynamics,
     io::InputOutputError,
@@ -33,6 +35,7 @@ use nyx_space::{
     Spacecraft,
 };
 use rayon::prelude::*;
+use snafu::ResultExt;
 use std::sync::Arc;
 
 use pyo3::prelude::*;
@@ -97,6 +100,23 @@ impl Propagator {
             method,
             options,
         }
+    }
+
+    /// Compute the instantaneous equations of motion for this spacecraft
+    fn eom_eval(&self, spacecraft: Spacecraft) -> Result<Spacecraft, PropagationError> {
+        let dynamics = self
+            .dynamics
+            .build(self.almanac.clone())
+            .map_err(|msg| PropagationError::PropGenericError { msg })?;
+
+        let vector = dynamics
+            .eom(0.0, &spacecraft.to_vector(), &spacecraft, &self.almanac)
+            .map_err(|source| PropagationError::Dynamics { source })?;
+
+        let mut rslt = spacecraft; // Copy the input
+        rslt.set(spacecraft.epoch(), &vector);
+
+        Ok(rslt)
     }
 
     /// Propagates the initialization state until the desired epoch, optionally not building the trajectory
