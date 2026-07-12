@@ -369,7 +369,7 @@ def main(path: str, wstats: bool, error_ric: str):
         if df[col].max() != df[col].min():
             # We should plot this!
             sigma_col = [
-                c for c in df.columns if "cr" in c.lower() and "sigma" in c.lower()
+                c for c in df.columns if col in c.lower() and "sigma" in c.lower()
             ]
             plots_to_make += [(col.capitalize(), col, sigma_col)]
 

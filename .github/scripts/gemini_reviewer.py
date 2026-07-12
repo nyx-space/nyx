@@ -32,12 +32,7 @@ def get_pr_metadata():
 
 
 def get_pr_diff():
-    url = f"https://api.github.com/repos/{REPO}/pulls/{PR_NUMBER}"
-    headers = {
-        "Authorization": f"token {GITHUB_TOKEN}",
-        "Accept": "application.vnd.github.v3.diff",
-    }
-    response = requests.get(url, headers=headers)
+    response = requests.get(f"https://patch-diff.githubusercontent.com/raw/nyx-space/nyx/pull/{PR_NUMBER}.patch")
     response.raise_for_status()
     return response.text
 
