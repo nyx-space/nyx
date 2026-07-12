@@ -20,6 +20,8 @@ use anise::frames::Frame;
 use anise::{ephemerides::ephemeris::Ephemeris, prelude::Almanac};
 use hifitime::{Duration, Epoch};
 use log::info;
+use nyx_space::State;
+use nyx_space::dynamics::Dynamics as CoreDynamics;
 use nyx_space::dynamics::SpacecraftDynamics;
 use nyx_space::propagators::{IntegratorMethod, IntegratorOptions, Propagator as CorePropagator};
 use nyx_space::{
@@ -97,6 +99,26 @@ impl Propagator {
             method,
             options,
         }
+    }
+
+    /// Compute the instantaneous equations of motion for this spacecraft
+    fn accel_km_s2(&self, spacecraft: Spacecraft) -> Result<Vec<f64>, PropagationError> {
+        let dynamics = self
+            .dynamics
+            .build(self.almanac.clone())
+            .map_err(|msg| PropagationError::PropGenericError { msg })?;
+
+        let vector = dynamics
+            .eom(0.0, &spacecraft.to_vector(), &spacecraft, &self.almanac)
+            .map_err(|source| PropagationError::Dynamics { source })?;
+
+        let accel = vector
+            .fixed_rows::<3>(3)
+            .iter()
+            .copied()
+            .collect::<Vec<f64>>();
+
+        Ok(accel)
     }
 
     /// Propagates the initialization state until the desired epoch, optionally not building the trajectory
@@ -381,6 +403,20 @@ impl PyTrajectory {
             let inner = Trajectory::from_parquet(path)?;
             Ok(Self { inner })
         }
+    }
+
+    /// Add another state to this trajectory.
+    fn push(&mut self, spacecraft: Spacecraft) {
+        self.inner.states.push(spacecraft);
+        self.inner.finalize();
+    }
+
+    /// Append many spacecraft to this trajectory.
+    fn append(&mut self, many_spacecraft: Vec<Spacecraft>) {
+        for sc in many_spacecraft {
+            self.inner.states.push(sc);
+        }
+        self.inner.finalize();
     }
 
     /// Export the difference in RIC from of this trajectory compare to the "other" trajectory in parquet format.

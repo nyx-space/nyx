@@ -82,7 +82,7 @@ def main(path: str):
         title="Trajectory with Uncertainty Ellipses (3σ)",
         xaxis_title="Longitude (deg)",
         yaxis_title="Latitude (deg)",
-        template=TEMPLATE
+        template=TEMPLATE,
     )
 
     watermark(fig, path).show()

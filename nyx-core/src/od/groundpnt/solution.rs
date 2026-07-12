@@ -151,14 +151,7 @@ where
         }
 
         // Don't export the lat/long/alt rate because we don't have the associated state parameters.
-        let state_items = [
-            "Latitude",
-            "Longitude",
-            "Altitude",
-            // "Latitude rate",
-            // "Longitude rate",
-            // "Altitude rate",
-        ];
+        let state_items = ["Latitude", "Longitude", "Altitude"];
 
         let state_units = ["deg", "deg", "km"];
         let mut cov_units = vec![];

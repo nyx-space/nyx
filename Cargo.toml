@@ -3,7 +3,7 @@ resolver = "2"
 members = ["nyx-core", "nyx-py"]
 
 [workspace.package]
-version = "2.4.1"
+version = "2.4.2"
 edition = "2024"
 authors = ["Christopher Rabotin <christopher.rabotin@gmail.com>"]
 description = "Flight-proven, blazing fast astrodynamics from preliminary design to operations"
@@ -36,6 +36,7 @@ log = "0.4"
 rayon = "1.6"
 pyo3 = { version = "0.28", features = ["multiple-pymethods"] }
 numpy = "0.28"
+snafu = { version = "0.9.0", features = ["backtrace"] }
 
 nyx-space = { path = "nyx-core" }
 

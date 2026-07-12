@@ -55,6 +55,12 @@ impl TrackingDataArc {
         TrackingDataArc::from_tdm(path, aliases)
     }
 
+    #[classmethod]
+    #[pyo3(name = "from_parquet")]
+    fn py_from_parquet(_cls: Bound<'_, PyType>, path: &str) -> Result<Self, InputOutputError> {
+        Self::from_parquet(path)
+    }
+
     #[pyo3(name = "write_ccsds_tdm")]
     fn py_write_ccsds_tdm(
         &self,
@@ -153,5 +159,11 @@ impl TrackingDataArc {
     #[pyo3(name = "resid_vs_ref_check")]
     fn py_resid_vs_ref_check(&self) -> Self {
         self.clone().resid_vs_ref_check()
+    }
+
+    #[pyo3(name = "to_parquet")]
+    fn py_to_parquet(&self, path: String, cfg: ExportCfg) -> Result<String, InputOutputError> {
+        self.to_parquet(path, cfg)
+            .map(|pathbuf| pathbuf.to_string_lossy().to_string())
     }
 }

@@ -105,6 +105,14 @@ def test_howto_propagate_with_perturbations():
         DragData(area_m2=10.0, coeff_drag=2.0),
     )
 
+    # Compute the acceleration imparted on a spacecraft provided the dynamics, in the reference frame
+    # of spacecraft's orbit
+    accel_km_s2 = propagator.accel_km_s2(my_sc)
+    expect_m_s2 = 3.4576  # Purely a concidental number!
+    assert abs(sum(accel_km_s2) * 1e3 / 3 - expect_m_s2) < 1e-3, (
+        "wrong computed acceleration"
+    )
+
     # Step 6: Execute Propagations
     # Scenario A: Propagate until a specific temporal epoch.
     target_epoch = Epoch("2030-12-30 01:02:03 UTC")
@@ -264,6 +272,8 @@ def test_howto_execute_simple_monte_carlo():
     # Generate a requested number of dispersed spacecraft variants based on the defined distributions.
     mvn = MvnSpacecraft(spacecraft, disp)
     dispersed_spacecraft = mvn.sample(100, seed=123)
+    dispersed_spacecraft_chk_seed = mvn.sample(100, seed=123)
+    assert dispersed_spacecraft_chk_seed == dispersed_spacecraft, "seed not applied"
 
     # TEST Verify that the AoP is now a bimodal distribution
     dispersion_df = pl.DataFrame(

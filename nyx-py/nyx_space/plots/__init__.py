@@ -6,6 +6,8 @@ from nyx_space.time import Epoch
 
 TEMPLATE = "seaborn"
 
+__all__ = ["od", "md"]
+
 
 def convert_units(df):
     rename_dict = {}
@@ -35,7 +37,10 @@ def watermark(fig, filepath: str):
     'Nyx Space', the filename, and the current datetime.
     """
     now_str = Epoch.system_now().strftime("%Y-%m-%d %H:%M:%S %T")
-    text = f"{basename(filepath)} | {now_str} | Nyx Space"
+    if filepath is None:
+        text = f"{now_str} | Nyx Space"
+    else:
+        text = f"{basename(filepath)} | {now_str} | Nyx Space"
 
     fig.add_annotation(
         text=text,

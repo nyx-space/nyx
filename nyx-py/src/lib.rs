@@ -136,6 +136,7 @@ fn monte_carlo(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
     sm.add_class::<MvnSpacecraft>()?;
     sm.add_class::<StateParameter>()?;
     sm.add_class::<StateDispersion>()?;
+    sm.add_class::<OrbitalElement>()?;
 
     Ok(())
 }
@@ -157,6 +158,7 @@ fn mission_design(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
     sm.add_class::<Drag>()?;
     sm.add_class::<AtmDensity>()?;
     sm.add_class::<ShadowModel>()?;
+    sm.add_class::<py_md::PyTrajectory>()?;
 
     Ok(())
 }

@@ -1,0 +1,33 @@
+name: "Nyx Space Intelligent Code Review"
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - '**.rs' # Restrict execution exclusively to Rust changes to conserve tokens
+
+jobs:
+  gemini-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
+      - name: Setup Python Runtime
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install Runtime Dependencies
+        run: pip install google-genai requests
+
+      - name: Execute Custom Review Engine
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: python .github/scripts/gemini_reviewer.py

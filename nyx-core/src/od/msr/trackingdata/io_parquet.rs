@@ -34,7 +34,6 @@ use parquet::arrow::ArrowWriter;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use snafu::{ResultExt, ensure};
 use std::collections::HashMap;
-use std::error::Error;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -220,7 +219,7 @@ impl TrackingDataArc {
         })
     }
     /// Store this tracking arc to a parquet file.
-    pub fn to_parquet_simple<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf, Box<dyn Error>> {
+    pub fn to_parquet_simple<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf, InputOutputError> {
         self.to_parquet(path, ExportCfg::default())
     }
 
@@ -229,7 +228,7 @@ impl TrackingDataArc {
         &self,
         path: P,
         cfg: ExportCfg,
-    ) -> Result<PathBuf, Box<dyn Error>> {
+    ) -> Result<PathBuf, InputOutputError> {
         ensure!(
             !self.is_empty(),
             EmptyDatasetSnafu {
@@ -328,13 +327,24 @@ impl TrackingDataArc {
 
         let props = pq_writer(Some(metadata));
 
-        let file = File::create(&path_buf)?;
+        let file = File::create(&path_buf).context(StdIOSnafu {
+            action: "creating tracking data arc file",
+        })?;
 
-        let mut writer = ArrowWriter::try_new(file, schema.clone(), props).unwrap();
+        let mut writer =
+            ArrowWriter::try_new(file, schema.clone(), props).context(ParquetSnafu {
+                action: "creating tracking data arc writer",
+            })?;
 
-        let batch = RecordBatch::try_new(schema, record)?;
-        writer.write(&batch)?;
-        writer.close()?;
+        let batch = RecordBatch::try_new(schema, record).context(ArrowSnafu {
+            action: "creating tracking data arc batch record",
+        })?;
+        writer.write(&batch).context(ParquetSnafu {
+            action: "writing tracking data arc batch",
+        })?;
+        writer.close().context(ParquetSnafu {
+            action: "closing tracking data arc file",
+        })?;
 
         info!("Serialized {self} to {}", path_buf.display());
 

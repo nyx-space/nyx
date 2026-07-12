@@ -317,6 +317,10 @@ impl PySpacecraftEstimate {
     fn __repr__(&self) -> String {
         format!("{} @ {self:p}", self.inner)
     }
+
+    fn __eq__(&self, other: &Self) -> bool {
+        self.inner == other.inner
+    }
 }
 
 #[derive(Clone)]
