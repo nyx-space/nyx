@@ -1,6 +1,6 @@
 from nyx_space import _nyx as __mod
 
-__all__ = []
+__all__ = ["plots"]
 
 for __item__ in dir(__mod):
     if __item__ and __item__[0] != "_":
