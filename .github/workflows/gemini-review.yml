@@ -1,34 +1,33 @@
-name: "Gemini Code Review"
+name: "Nyx Space Intelligent Code Review"
 
 on:
   pull_request:
-    types: [opened, synchronize, ready_for_review]
-
-# This is required for the action to be able to post comments on the PR.
-permissions:
-  contents: read
-  pull-requests: write
+    types: [opened, synchronize]
+    paths:
+      - '**.rs' # Restrict execution exclusively to Rust changes to conserve tokens
 
 jobs:
-  review:
+  gemini-review:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
     steps:
-      - name: Run AI Code Review
-        uses: petarzarkov/gemini-code-review-action@latest
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python Runtime
+        uses: actions/setup-python@v5
         with:
-          exclude: '*.md,*.json,data/,*.lock,*.pyi,*.pq,*.parquet,*.bsp,*.bpc,*.dhall'
+          python-python-version: '3.11'
 
-          # Optional: Choose your preferred model
-          model: gemini-3.5-flash
+      - name: Install Runtime Dependencies
+        run: pip install google-genai requests
 
-          # Optional: Enable/disable conversation continuity (default: true)
-          enable_conversation_context: true
-
-          # Optional: Skip code review for draft pull requests (default: true)
-          skip_draft_prs: true
-
-          # Optional: Set the language for AI responses (e.g., English, Spanish, French)
-          language: English
+      - name: Execute Custom Review Engine
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: python .github/scripts/gemini_reviewer.py

@@ -35,7 +35,6 @@ use nyx_space::{
     Spacecraft,
 };
 use rayon::prelude::*;
-use snafu::ResultExt;
 use std::sync::Arc;
 
 use pyo3::prelude::*;
@@ -103,7 +102,7 @@ impl Propagator {
     }
 
     /// Compute the instantaneous equations of motion for this spacecraft
-    fn eom_eval(&self, spacecraft: Spacecraft) -> Result<Spacecraft, PropagationError> {
+    fn accel_km_s2(&self, spacecraft: Spacecraft) -> Result<Vec<f64>, PropagationError> {
         let dynamics = self
             .dynamics
             .build(self.almanac.clone())
@@ -113,10 +112,13 @@ impl Propagator {
             .eom(0.0, &spacecraft.to_vector(), &spacecraft, &self.almanac)
             .map_err(|source| PropagationError::Dynamics { source })?;
 
-        let mut rslt = spacecraft; // Copy the input
-        rslt.set(spacecraft.epoch(), &vector);
+        let accel = vector
+            .fixed_rows::<3>(3)
+            .iter()
+            .copied()
+            .collect::<Vec<f64>>();
 
-        Ok(rslt)
+        Ok(accel)
     }
 
     /// Propagates the initialization state until the desired epoch, optionally not building the trajectory
