@@ -20,19 +20,19 @@ use anise::frames::Frame;
 use anise::{ephemerides::ephemeris::Ephemeris, prelude::Almanac};
 use hifitime::{Duration, Epoch};
 use log::info;
+use nyx_space::State;
 use nyx_space::dynamics::Dynamics as CoreDynamics;
 use nyx_space::dynamics::SpacecraftDynamics;
 use nyx_space::propagators::{IntegratorMethod, IntegratorOptions, Propagator as CorePropagator};
-use nyx_space::State;
 use nyx_space::{
+    Spacecraft,
     dynamics::sequence::Dynamics,
     io::InputOutputError,
     md::{
-        trajectory::{ExportCfg, TrajError},
         Trajectory,
+        trajectory::{ExportCfg, TrajError},
     },
     propagators::PropagationError,
-    Spacecraft,
 };
 use rayon::prelude::*;
 use std::sync::Arc;

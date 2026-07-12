@@ -12,7 +12,7 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 REPO = os.getenv("GITHUB_REPOSITORY")
 PR_NUMBER = os.getenv("PR_NUMBER")
-MODEL_NAME = "gemini-3.5-flash"  # Upgrade to gemini-2.5-pro for deep reasoning tasks
+MODEL_NAME = "gemini-3.1-pro-preview"
 
 if not all([GITHUB_TOKEN, GEMINI_API_KEY, REPO, PR_NUMBER]):
     raise ValueError("Missing required environment variables.")
@@ -78,9 +78,11 @@ def post_review_comments(comments):
 
 # Define standard Pydantic models for structured output
 class ReviewComment(BaseModel):
-    path: str = Field(description="Relative file path from repo root")
+    path: str = Field(
+        description="Relative file path from repo root. Must match the exact file header in the diff."
+    )
     line: int = Field(
-        description="The target line number in the NEW version of the file where the change applies"
+        description="The exact target line number in the NEW version of the file where the modification occurs. Crucial: Must be a line present within the provided diff hunk lines."
     )
     explanation: str = Field(
         description="Concise architectural rationale for the change."
@@ -114,6 +116,11 @@ Strict Domain Constraints:
 3. Actionable Suggestions: For every critique, attempt provide a precise code replacement block that fixes the issue exactly. Ensure your suggestion aligns perfectly with the target line context.
 
 You must output valid JSON matching the schema precisely. Do not hallucinate line numbers. If a file requires no changes, omit it from the array.
+You will be evaluated based on the absolute structural accuracy of your line targets.
+
+CRITICAL LINE-NUMBER DIRECTIVE:
+- For every review comment you generate, the `line` property MUST correspond strictly to a valid line number added or modified in the NEW file context as presented in the unified diff headers (`@@ -... +... @@`).
+- Do not estimate or guess line numbers outside the immediate range of the explicit diff blocks. If you reference a line that is not modified or contextualized directly within the diff hunk, GitHub will reject the payload with a 422 validation failure.
 """
 
 

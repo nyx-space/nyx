@@ -23,6 +23,7 @@ use anise::prelude::Almanac;
 use hifitime::{Duration, Epoch};
 use ndarray::Array2;
 use numpy::{PyArray2, PyReadonlyArray1};
+use nyx_space::NyxError;
 use nyx_space::io::{ExportCfg, InputOutputError};
 use nyx_space::linalg::{Const, OVector};
 use nyx_space::mc::{MvnSpacecraft, StateDispersion};
@@ -34,14 +35,13 @@ use nyx_space::od::prelude::{
 };
 use nyx_space::od::snc::ProcessNoise3D;
 use nyx_space::propagators::PropagationError;
-use nyx_space::NyxError;
 use nyx_space::{
+    Spacecraft,
     io::ConfigError,
     od::{
-        msr::{MeasurementType, TrackingDataArc},
         GroundStation,
+        msr::{MeasurementType, TrackingDataArc},
     },
-    Spacecraft,
 };
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -316,6 +316,10 @@ impl PySpacecraftEstimate {
 
     fn __repr__(&self) -> String {
         format!("{} @ {self:p}", self.inner)
+    }
+
+    fn __eq__(&self, other: &Self) -> bool {
+        self.inner == other.inner
     }
 }
 

@@ -272,6 +272,8 @@ def test_howto_execute_simple_monte_carlo():
     # Generate a requested number of dispersed spacecraft variants based on the defined distributions.
     mvn = MvnSpacecraft(spacecraft, disp)
     dispersed_spacecraft = mvn.sample(100, seed=123)
+    dispersed_spacecraft_chk_seed = mvn.sample(100, seed=123)
+    assert dispersed_spacecraft_chk_seed == dispersed_spacecraft, "seed not applied"
 
     # TEST Verify that the AoP is now a bimodal distribution
     dispersion_df = pl.DataFrame(

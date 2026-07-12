@@ -267,6 +267,10 @@ def test_howto_exec_orbit_determination_filter():
     estimate = SpacecraftEstimate.from_dispersions(
         nominal_state=spacecraft, dispersions=disp, seed=123
     )
+    estimate_chk_seed = SpacecraftEstimate.from_dispersions(
+        nominal_state=spacecraft, dispersions=disp, seed=123
+    )
+    assert estimate_chk_seed == estimate
 
     # VERIFICATION: State is dispersed
     assert spacecraft == spacecraft, "tautology check failed"
@@ -334,7 +338,7 @@ def test_howto_exec_orbit_determination_filter():
 
     network = {"Paris, FR": gs0, "Denver, CO": gs1}
 
-    trk_sim = GroundTrackingArcSim(network, traj, configs)
+    trk_sim = GroundTrackingArcSim(network, traj, configs, seed=159)
 
     # Build the strands if any of the ground stations are configured as a Scheduler.
     trk_sim.build_schedule(almanac)
