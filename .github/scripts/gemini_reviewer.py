@@ -4,6 +4,7 @@ import sys
 import json
 import requests
 from google import genai
+from google.genai import types
 from pydantic import BaseModel, Field
 
 # Configurations from environment
