@@ -4,7 +4,7 @@ import sys
 import json
 import requests
 from google import genai
-from google.genai import types
+from pydantic import BaseModel, Field
 
 # Configurations from environment
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
@@ -16,20 +16,19 @@ MODEL_NAME = "gemini-3.5-flash"  # Upgrade to gemini-2.5-pro for deep reasoning 
 if not all([GITHUB_TOKEN, GEMINI_API_KEY, REPO, PR_NUMBER]):
     raise ValueError("Missing required environment variables.")
 
+
 def get_pr_metadata():
     """Fetches the PR title and description body."""
     url = f"https://api.github.com/repos/{REPO}/pulls/{PR_NUMBER}"
     headers = {
         "Authorization": f"token {GITHUB_TOKEN}",
-        "Accept": "application.vnd.github.v3+json"
+        "Accept": "application.vnd.github.v3+json",
     }
     response = requests.get(url, headers=headers)
     response.raise_for_status()
     data = response.json()
-    return {
-        "title": data.get("title", ""),
-        "body": data.get("body", "")
-    }
+    return {"title": data.get("title", ""), "body": data.get("body", "")}
+
 
 def get_pr_diff():
     url = f"https://api.github.com/repos/{REPO}/pulls/{PR_NUMBER}"
@@ -76,39 +75,22 @@ def post_review_comments(comments):
     print(f"Successfully posted {len(github_comments)} review comments.")
 
 
-# Define the structured output schema to prevent parsing failures
-class ReviewCommentSchema(types.Schema):
-    type = types.Type.OBJECT
-    properties = {
-        "path": types.Schema(
-            type=types.Type.STRING, description="Relative file path from repo root"
-        ),
-        "line": types.Schema(
-            type=types.Type.INTEGER,
-            description="The target line number in the NEW version of the file where the change applies",
-        ),
-        "explanation": types.Schema(
-            type=types.Type.STRING,
-            description="Concise architectural rationale for the change.",
-        ),
-        "suggestion": types.Schema(
-            type=types.Type.STRING,
-            description="The exact code replacement block. Do not include markdown wrappers here.",
-        ),
-    }
-    required = ["path", "line", "explanation", "suggestion"]
+# Define standard Pydantic models for structured output
+class ReviewComment(BaseModel):
+    path: str = Field(description="Relative file path from repo root")
+    line: int = Field(
+        description="The target line number in the NEW version of the file where the change applies"
+    )
+    explanation: str = Field(
+        description="Concise architectural rationale for the change."
+    )
+    suggestion: str = Field(
+        description="The exact code replacement block. Do not include markdown wrappers here."
+    )
 
 
-class ReviewPayloadSchema(types.Schema):
-    type = types.Type.OBJECT
-    properties = {
-        "comments": types.Schema(
-            type=types.Type.ARRAY,
-            items=ReviewCommentSchema,
-            description="List of inline code suggestions",
-        )
-    }
-    required = ["comments"]
+class ReviewPayload(BaseModel):
+    comments: list[ReviewComment] = Field(description="List of inline code suggestions")
 
 
 SYSTEM_INSTRUCTION = """
@@ -141,9 +123,9 @@ def main():
     # Bundle description intent with the code changes
     prompt_content = f"""
 === PULL REQUEST METADATA ===
-Title: {metadata['title']}
+Title: {metadata["title"]}
 Description:
-{metadata['body']}
+{metadata["body"]}
 
 === UNIFIED CODE DIFF ===
 {diff_data}
@@ -157,7 +139,7 @@ Description:
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_INSTRUCTION,
             response_mime_type="application/json",
-            response_schema=ReviewPayloadSchema,
+            response_schema=ReviewPayload,
             temperature=0.1,  # Low temperature minimizes creative hallucination of lines
         ),
     )
