@@ -164,6 +164,6 @@ impl TrackingDataArc {
     #[pyo3(name = "to_parquet")]
     fn py_to_parquet(&self, path: String, cfg: ExportCfg) -> Result<String, InputOutputError> {
         self.to_parquet(path, cfg)
-            .map(|pathbuf| pathbuf.to_string_lossy().to_string())
+            .map(|pathbuf| pathbuf.to_string_lossy().into_owned())
     }
 }
