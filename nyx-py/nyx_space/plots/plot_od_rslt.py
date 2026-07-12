@@ -370,7 +370,7 @@ def main(path: str, wstats: bool, error_ric: str):
             # We should plot this!
             sigma_col = [
                 c for c in df.columns if col in c.lower() and "sigma" in c.lower()
-            ]
+            ][0]
             plots_to_make += [(col.capitalize(), col, sigma_col)]
 
     if not plots_to_make:
@@ -396,7 +396,7 @@ def main(path: str, wstats: bool, error_ric: str):
                     mode="lines+markers",
                     name=title,
                     legendgroup=title,
-                    marker=dict(color="blue" if "cr" in title else "green"),
+                    marker=dict(color="blue" if "cr" in title.lower() else "green"),
                     showlegend=True,
                 ),
                 row=idx,
