@@ -15,12 +15,12 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Python Runtime
         uses: actions/setup-python@v5
         with:
-          python-python-version: '3.11'
+          python-version: '3.13'
 
       - name: Install Runtime Dependencies
         run: pip install google-genai requests
