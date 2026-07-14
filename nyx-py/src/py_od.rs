@@ -30,7 +30,7 @@ use nyx_space::mc::{MvnSpacecraft, StateDispersion};
 use nyx_space::od::blse::Estimate;
 use nyx_space::od::estimate::KfEstimate;
 use nyx_space::od::prelude::{
-    KalmanVariant, ODError, ODSolution, Residual, SigmaRejection, SpacecraftKalmanScalarOD,
+    KalmanVariant, ODError, ODSolution, Residual, SigmaRejection, SpacecraftKalmanOD,
     TrackingArcSim, TrkConfig,
 };
 use nyx_space::od::snc::ProcessNoise3D;
@@ -119,7 +119,7 @@ impl PyProcessNoise {
 #[derive(Clone)]
 #[pyclass(from_py_object, name = "SpacecraftODProcess")]
 pub struct PySpacecraftODProcess {
-    pub(crate) inner: SpacecraftKalmanScalarOD,
+    pub(crate) inner: SpacecraftKalmanOD,
 }
 
 #[pymethods]
@@ -134,7 +134,7 @@ impl PySpacecraftODProcess {
         process_noise: Option<PyProcessNoise>,
     ) -> Result<Self, PropagationError> {
         let almanac = prop.almanac.clone();
-        let mut inner = SpacecraftKalmanScalarOD::new(
+        let mut inner = SpacecraftKalmanOD::new(
             prop.build()?,
             kf_variant,
             sigma_reject,
@@ -326,7 +326,7 @@ impl PySpacecraftEstimate {
 #[derive(Clone)]
 #[pyclass(from_py_object, name = "Residual")]
 pub struct PyResidual {
-    pub(crate) inner: Residual<Const<1>>,
+    pub(crate) inner: Residual<Const<2>>,
 }
 
 #[pymethods]
@@ -393,7 +393,7 @@ impl PyResidual {
 #[derive(Clone)]
 #[pyclass(from_py_object, name = "SpacecraftODSolution")]
 pub struct PySpacecraftODSolution {
-    pub(crate) inner: ODSolution<Spacecraft, KfEstimate<Spacecraft>, Const<1>, GroundStation>,
+    pub(crate) inner: ODSolution<Spacecraft, KfEstimate<Spacecraft>, Const<2>, GroundStation>,
 }
 
 #[pymethods]
@@ -420,6 +420,8 @@ impl PySpacecraftODSolution {
             .to_parquet(path, cfg)
             .map(|path| path.to_string_lossy().to_string())
     }
+
+
 
     /// Export to an ANISE ephemeris, which can be converted to a CCSDS OEM
     fn to_ephemeris(&self, object_id: String) -> Ephemeris {
@@ -701,6 +703,263 @@ impl GroundTrackingArcSim {
 
     #[getter]
     fn devices(&self) -> BTreeMap<String, GroundStation> {
+        self.inner.devices.clone()
+    }
+
+    fn __str__(&self) -> String {
+        format!("{}", self.inner)
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{} @ {self:p}", self.inner)
+    }
+}
+
+#[derive(Clone)]
+#[pyclass(from_py_object, name = "SpacecraftPositionODProcess")]
+pub struct PySpacecraftPositionODProcess {
+    pub(crate) inner: nyx_space::od::SpacecraftPositionKalmanOD,
+}
+
+#[pymethods]
+impl PySpacecraftPositionODProcess {
+    #[new]
+    #[pyo3(signature=(prop, kf_variant, devices, sigma_reject=Some(SigmaRejection::default()), process_noise=None))]
+    fn py_new(
+        prop: Propagator,
+        kf_variant: KalmanVariant,
+        devices: BTreeMap<String, nyx_space::od::position::PositionDevice>,
+        sigma_reject: Option<SigmaRejection>,
+        process_noise: Option<PyProcessNoise>,
+    ) -> Result<Self, PropagationError> {
+        let almanac = prop.almanac.clone();
+        let mut inner = nyx_space::od::SpacecraftPositionKalmanOD::new(
+            prop.build()?,
+            kf_variant,
+            sigma_reject,
+            devices,
+            almanac,
+        );
+
+        if let Some(pn) = process_noise {
+            inner = inner.with_process_noise(pn.inner);
+        }
+
+        Ok(Self { inner })
+    }
+    /// Process the provided tracking arc for this orbit determination process.
+    fn process_arc(
+        &self,
+        initial_estimate: PySpacecraftEstimate,
+        arc: &TrackingDataArc,
+    ) -> Result<PySpacecraftPositionODSolution, PyErr> {
+        let inner_res = self
+            .inner
+            .process_arc(initial_estimate.inner, arc)
+            .map_err(|e| PyValueError::new_err(format!("{e}")))?;
+        Ok(PySpacecraftPositionODSolution { inner: inner_res })
+    }
+
+    /// Perform a time update. Continuously predicts the trajectory until the provided end epoch, with covariance mapping at each step.
+    fn predict_until(
+        &self,
+        initial_estimate: PySpacecraftEstimate,
+        end_epoch: Epoch,
+    ) -> Result<PySpacecraftPositionODSolution, PyErr> {
+        let inner_res = self
+            .inner
+            .predict_until(initial_estimate.inner, end_epoch)
+            .map_err(|e| PyValueError::new_err(format!("{e}")))?;
+        Ok(PySpacecraftPositionODSolution { inner: inner_res })
+    }
+
+    /// Perform a time update. Continuously predicts the trajectory for the provided duration, with covariance mapping at each step.
+    fn predict_for(
+        &self,
+        initial_estimate: PySpacecraftEstimate,
+        duration: Duration,
+    ) -> Result<PySpacecraftPositionODSolution, PyErr> {
+        let inner_res = self
+            .inner
+            .predict_for(initial_estimate.inner, duration)
+            .map_err(|e| PyValueError::new_err(format!("{e}")))?;
+        Ok(PySpacecraftPositionODSolution { inner: inner_res })
+    }
+}
+
+#[derive(Clone)]
+#[pyclass(from_py_object, name = "SpacecraftPositionODSolution")]
+pub struct PySpacecraftPositionODSolution {
+    pub(crate) inner: ODSolution<Spacecraft, KfEstimate<Spacecraft>, Const<3>, nyx_space::od::position::PositionDevice>,
+}
+
+#[pymethods]
+impl PySpacecraftPositionODSolution {
+    fn is_filter_run(&self) -> bool {
+        self.inner.is_filter_run()
+    }
+
+    fn is_smoother_run(&self) -> bool {
+        self.inner.is_smoother_run()
+    }
+
+    fn to_traj(&self) -> Result<PyTrajectory, PyErr> {
+        let traj = self
+            .inner
+            .to_traj()
+            .map_err(|e| PyValueError::new_err(format!("{e}")))?;
+        Ok(PyTrajectory { inner: traj })
+    }
+
+    /// Export OD solutions, gains, ratios, residuals, sigmas, etc. to parquet
+    fn to_parquet(&self, path: &str, cfg: ExportCfg) -> Result<String, ODError> {
+        self.inner
+            .to_parquet(path, cfg)
+            .map(|path| path.to_string_lossy().to_string())
+    }
+
+
+
+    /// Perform sequential smoothing of the OD Solution.
+    ///
+    /// It operates by recursively applying the Fraser-Potter equations backwards in time, commencing from the
+    /// terminal filter state.
+    ///
+    /// The process leverages the forward filter's persisted sufficient statistics (a priori and a posteriori state estimates,
+    /// corresponding error covariance matrices, and the state transition matrices map).
+    ///
+    /// Smoothing generally yields reduced uncertainty and attenuated state discontinuities relative to the causal filter output.
+    ///
+    /// The mathematical formulation guarantees that the smoothed covariance $ P_{k|N} $ is never "less certain" than the
+    /// filter covariance $ P_{k|k} $, specifically, $ P_{k|N} - P_{k|k} \leq 0 $ in a positive semi-definite sense.
+    ///
+    ///
+    /// # Important Warnings
+    /// The backward recursion is numerically sensitive to the properties of the State Transition Matrix and the
+    /// conditioning of the covariance matrices. It incorporates a sanity check to verify that the smoothed covariance
+    /// matrix is bounded by the forward filter's covariance.
+    ///
+    /// If the constraint check fails, a standard `log::warn!` message is generated. However, this violation strongly implies
+    /// underlying issues such as misconfigured system dynamics, excessively large process noise, or ill-conditioned
+    /// tracking data.
+    ///
+    /// In addition to the covariance bound check, the implementation computes the Ratio of Formal Errors (RFE), defined as
+    /// the magnitude of the smoothed state uncertainty divided by the filter's formal error mapping:
+    ///
+    /// $ R_{i,k} = \sqrt{ \frac{P_{i,i,k|N}}{P_{i,i,k|k}} } $
+    ///
+    /// Where:
+    /// - $ P_{i,i,k|N} $ is the $ i $-th diagonal element of the smoothed covariance matrix at time index $ k $.
+    /// - $ P_{i,i,k|k} $ is the $ i $-th diagonal element of the forward filter covariance matrix at time index $ k $.
+    ///
+    /// The RFE provides a quantitative measure of the smoothing efficacy for each state component $ i $ at epoch $ k $.
+    ///
+    /// - If $ R_{i,k} \leq 1 $, the smoothing step improved or maintained the state certainty, which is the expected behavior.
+    /// - If $ 1 < R_{i,k} \leq 3 $, the smoothing process yielded a slight degradation in certainty for that component. While suboptimal, this may occur due to localized numerical artifacts or localized discrepancies in the dynamic model.
+    /// - If $ |R_{i,k}| > 3 $ for any $ i $ or $ k $, the test fails, suggesting potential modeling inconsistencies or issues with the estimation process.
+    ///
+    fn smooth(&self, almanac: &Almanac) -> Result<Self, ODError> {
+        let inner = self.clone().inner.smooth(almanac)?;
+
+        Ok(Self { inner })
+    }
+
+    #[classmethod]
+    fn from_parquet(
+        _cls: &Bound<'_, PyType>,
+        path: &str,
+        devices: BTreeMap<String, nyx_space::od::position::PositionDevice>,
+    ) -> Result<Self, InputOutputError> {
+        let inner = ODSolution::from_parquet(path, devices)?;
+
+        Ok(Self { inner })
+    }
+
+    fn __str__(&self) -> String {
+        format!("{}", self.inner)
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{} @ {self:p}", self.inner)
+    }
+}
+
+#[derive(Clone)]
+#[pyclass(from_py_object, name = "PositionTrackingArcSim")]
+pub struct PositionTrackingArcSim {
+    inner: TrackingArcSim<Spacecraft, nyx_space::od::position::PositionDevice>,
+}
+
+#[pymethods]
+impl PositionTrackingArcSim {
+    /// Initializes a simulated tracking architecture for a spacecraft.
+    ///
+    /// Flight dynamics operations demand strict determinism for Monte Carlo covariance analysis.
+    /// When a seed is provided, the underlying pseudo-random number generator guarantees repeatable
+    /// measurement noise characteristics. Omission of the seed defaults to system entropy, mimicking
+    /// stochastic operational data streams.
+    ///
+    /// :param devices: Mapping of ground station identifiers to their respective physical definitions.
+    /// :type devices: dict[str, PositionDevice]
+    /// :param trajectory: The deterministic ephemeris of the target spacecraft.
+    /// :type trajectory: PyTrajectory
+    /// :param configs: Tasking and measurement constraints per device (e.g., sample rates, cadences).
+    /// :type configs: dict[str, TrkConfig]
+    /// :param seed: Initialization seed for the underlying PRNG.
+    /// :type seed: int | None
+    /// :rtype: PositionTrackingArcSim
+    /// :raises ConfigError: If initialization fails due to malformed configurations.
+    #[pyo3(signature=(devices, trajectory, configs, seed=None))]
+    #[new]
+    fn py_new(
+        devices: BTreeMap<String, nyx_space::od::position::PositionDevice>,
+        trajectory: PyTrajectory,
+        configs: BTreeMap<String, TrkConfig>,
+        seed: Option<u64>,
+    ) -> Result<Self, ConfigError> {
+        let inner = match seed {
+            Some(seed) => TrackingArcSim::with_seed(devices, trajectory.inner, configs, seed)?,
+            None => TrackingArcSim::new(devices, trajectory.inner, configs)?,
+        };
+        Ok(Self { inner })
+    }
+
+    /// Simulates operational tracking data across predefined tracking strands.
+    ///
+    /// This function strictly demands that a schedule already exists (stored in the `config` field).
+    /// If a device is configured as a scheduler but lacks pre-computed
+    /// strands, this function will raise an error rather than implicitly hallucinating a tracking
+    /// pass. Call `generate_schedule` to build a schedule first.
+    /// For each tracking device, the trajectory is sampled at the specific hardware rate,
+    /// synthesizing measurements only when the spacecraft is visible.
+    ///
+    /// :type almanac: Almanac
+    /// :rtype: TrackingDataArc
+    /// :raises ConfigError: If a scheduling configuration is present but the schedule was not built prior to execution.
+    fn generate_measurements(&mut self, almanac: &Almanac) -> Result<TrackingDataArc, ConfigError> {
+        self.inner.generate_measurements(almanac)
+    }
+
+    /// Builds the schedule provided the config.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. For each tracking device:
+    /// 2. Find when the vehicle elevation above ground station mask is greater or equal to zero, and use that as the first start of the first tracking arc for this station
+    /// 3. Find when the vehicle drops below the mask, after that initial epoch
+    /// 4. Repeat 2, 3 until the end of the trajectory
+    /// 5. Build each of these as "tracking strands" for this tracking device.
+    /// 6. Organize all of the built tracking strands chronologically.
+    /// 7. Iterate through all of the strands to adjust for tracker Greedy/Eager configuration.
+    /// `Greedy` trackers will delay the start of subsequent station contacts, whereas `Eager` trackers will terminate
+
+    #[getter]
+    fn configs(&self) -> BTreeMap<String, TrkConfig> {
+        self.inner.configs.clone()
+    }
+
+    #[getter]
+    fn devices(&self) -> BTreeMap<String, nyx_space::od::position::PositionDevice> {
         self.inner.devices.clone()
     }
 

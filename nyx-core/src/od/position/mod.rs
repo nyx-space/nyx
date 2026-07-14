@@ -11,6 +11,7 @@ use std::fmt::Display;
 
 /// Position device can be used to post-filter position measurements from GNSS/GPS devices.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass(from_py_object))]
 pub struct PositionDevice {
     pub name: String,
     pub stochastic_noises: Option<IndexMap<MeasurementType, StochasticNoise>>,
@@ -46,3 +47,5 @@ impl Display for PositionDevice {
         write!(f, "PositionDevice({})", self.name)
     }
 }
+#[cfg(feature = "python")]
+pub mod python;
