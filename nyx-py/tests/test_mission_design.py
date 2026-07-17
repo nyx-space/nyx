@@ -357,7 +357,7 @@ def test_howto_configure_solid_tides():
     iau_earth = almanac.frame_info(Frames.IAU_EARTH_FRAME)
     iau_moon = almanac.frame_info(Frames.IAU_MOON_FRAME)
 
-    # Define a highly elliptical Earth rbiter at its apoapse
+    # Define a highly elliptical Earth orbiter at its apoapse
     orbit = Orbit.from_keplerian(
         sma_km=10_000.0,
         ecc=0.7,

@@ -28,8 +28,8 @@ use crate::io::gravity::GravityFieldData;
 use crate::propagators::Propagator;
 use crate::{
     dynamics::{
-        Drag, PointMasses, SolarPressure,
         guidance::{Maneuver, ObjectiveEfficiency, ObjectiveWeight},
+        Drag, PointMasses, SolarPressure,
     },
     io::gravity::GravityFieldConfig,
     propagators::{IntegratorMethod, IntegratorOptions},
@@ -209,6 +209,11 @@ impl StaticType for AccelModels {
         fields.insert(
             "gravity_field".to_string(),
             SimpleType::Optional(Box::new(GravityFieldDhall::static_type())),
+        );
+
+        fields.insert(
+            "solid_tides".to_string(),
+            SimpleType::Optional(Box::new(SolidTides::static_type())),
         );
 
         SimpleType::Record(fields)
