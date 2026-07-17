@@ -1,7 +1,6 @@
 use super::{AccelModels, Dynamics, ForceModels, PropagatorConfig, SpacecraftSequence, Thruster};
 #[cfg(feature = "python")]
 use crate::dynamics::{Drag, SolarPressure};
-use crate::dynamics::sequence::config::TidalBody;
 use crate::propagators::{IntegratorMethod, IntegratorOptions};
 use crate::{dynamics::PointMasses, io::gravity::GravityFieldConfig};
 use pyo3::exceptions::PyException;
@@ -82,30 +81,16 @@ impl SpacecraftSequence {
 #[cfg(feature = "python")]
 #[cfg_attr(feature = "python", pymethods)]
 impl AccelModels {
-    #[pyo3(signature=(point_masses=None, gravity_field=None, solid_tides=None))]
+    #[pyo3(signature=(point_masses=None, gravity_field=None))]
     #[new]
     fn py_new(
         point_masses: Option<PointMasses>,
         gravity_field: Option<GravityFieldConfig>,
-        solid_tides: Option<Vec<TidalBody>>,
-    ) -> PyResult<Self> {
-        let mut st = [None, None];
-        if let Some(tides) = solid_tides {
-            if tides.len() > 2 {
-                return Err(pyo3::exceptions::PyValueError::new_err(
-                    "A maximum of 2 tidal bodies is supported.",
-                ));
-            }
-            for (i, body) in tides.into_iter().enumerate() {
-                st[i] = Some(body);
-            }
-        }
-        Ok(Self {
+    ) -> Self {
+        Self {
             point_masses,
             gravity_field,
-            solid_tides: st,
-        })
-
+        }
     }
 
     fn __str__(&self) -> String {
@@ -177,14 +162,5 @@ impl PropagatorConfig {
 
     fn __repr__(&self) -> String {
         format!("{self:?} @ {self:p}")
-    }
-}
-
-#[cfg(feature = "python")]
-#[cfg_attr(feature = "python", pymethods)]
-impl TidalBody {
-    #[new]
-    fn py_new(frame: anise::frames::FrameUid, compute_degree_3: bool) -> Self {
-        Self { frame, compute_degree_3 }
     }
 }

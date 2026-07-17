@@ -48,7 +48,6 @@ use nyx_space::dynamics::guidance::Thruster;
 use nyx_space::dynamics::sequence::{
     AccelModels, Dynamics, ForceModels, PropagatorConfig, SpacecraftSequence,
 };
-use nyx_space::dynamics::sequence::config::TidalBody;
 use nyx_space::dynamics::{AtmDensity, Drag, PointMasses, SolarPressure};
 use nyx_space::io::gravity::GravityFieldConfig;
 use nyx_space::mc::{MvnSpacecraft, StateDispersion};
@@ -139,7 +138,6 @@ fn mission_design(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
     sm.add_class::<IntegratorMethod>()?;
     sm.add_class::<IntegratorOptions>()?;
     sm.add_class::<AccelModels>()?;
-    sm.add_class::<TidalBody>()?;
     sm.add_class::<ForceModels>()?;
     sm.add_class::<SpacecraftSequence>()?;
     sm.add_class::<GravityFieldConfig>()?;
