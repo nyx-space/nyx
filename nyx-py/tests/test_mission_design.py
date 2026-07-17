@@ -19,6 +19,8 @@ from nyx_space.mission_design import (
     PointMasses,
     Propagator,
     SolarPressure,
+    SolidTides,
+    TidalPerturber,
 )
 from nyx_space.monte_carlo import MvnSpacecraft, StateDispersion, StateParameter
 from nyx_space.time import Duration, Epoch, Unit
@@ -344,9 +346,100 @@ def test_howto_execute_simple_monte_carlo():
     assert 60.0 < df["LTAN (deg)"].quantile(0.9) < 60.1
 
 
+def test_howto_configure_solid_tides():
+    """
+    Goal: Configure the high-fidelity solid tides model for the Cislunar system.
+    """
+
+    almanac = MetaAlmanac("../data/02_config/ci_almanac.dhall").process()
+
+    iau_earth = almanac.frame_info(Frames.IAU_EARTH_FRAME)
+    iau_moon = almanac.frame_info(Frames.IAU_MOON_FRAME)
+
+    # Define a highly elliptical Earth orbiter at its apoapse
+    orbit = Orbit.from_keplerian(
+        sma_km=10_000.0,
+        ecc=0.7,
+        inc_deg=35.0,
+        raan_deg=45.0,
+        aop_deg=65.0,
+        ta_deg=180.0,
+        epoch=Epoch("2025-08-25 11:55:44 UTC"),
+        frame=almanac.frame_info(Frames.EARTH_J2000),
+    )
+    spacecraft = Spacecraft(orbit)
+
+    # Step 1: Define the solid tides.
+    # IMPORTANT: Solid tides are defined in the body fixed frame, so we must initialize the model with these frames.
+    solid_tides = SolidTides.earth_moon_system(
+        Frames.IAU_EARTH_FRAME, moon_frame=Frames.IAU_MOON_FRAME, almanac=almanac
+    )
+    print(solid_tides)
+
+    # NOTE Nyx's Solid Tides modeling is fully configurable, allowing for its use in gas giant systems (e.g. Jupiter).
+    # The following is a demonstration of configuring the solid tides model of the Earth/Moon system using
+    # the exact tidal perturbers. Importantly, this does not initialize the frame data for the user, so the frames
+    # MUST be apriori loaded with their gravitational parameters.
+    iau_earth = almanac.frame_info(Frames.IAU_EARTH_FRAME)
+    iau_moon = almanac.frame_info(Frames.IAU_MOON_FRAME)
+    sun = almanac.frame_info(Frames.SUN_J2000)
+    solid_tides_detailed = SolidTides(
+        frame=iau_earth,
+        k2=0.3019,
+        k3=0.093,
+        perturbers=[
+            TidalPerturber(iau_moon, compute_degree_3=True),
+            TidalPerturber(sun, False),
+        ],
+    )
+
+    assert solid_tides_detailed == solid_tides
+
+    # Define the acceleration mode and finalize the dynamics
+    accel_models = AccelModels(
+        point_masses=PointMasses(
+            celestial_objects=[CelestialObjects.MOON, CelestialObjects.SUN]
+        ),
+        solid_tides=solid_tides,
+    )
+    dynamics = Dynamics(accel_models)
+
+    # Step 2: Propagate
+    # For high-precision gravity fields, Dormand-Prince 7-8 is a robust choice.
+    propagator = Propagator(dynamics, almanac, IntegratorMethod.DormandPrince78)
+
+    final_state = propagator.for_duration(spacecraft, Unit.Day * 1, trajectory=False)
+    logging.info(
+        f"Final position magnitude: {final_state.state.orbit.rmag_km():.3f} km"
+    )
+
+    # TEST Propagate without the solid tides, ceteris paribus.
+    # Simply copy the previous accels and unset the solid tides
+    third_body_accels = accel_models
+    third_body_accels.solid_tides = None
+
+    dynamics = Dynamics(third_body_accels)
+    final_state_no_st = Propagator(
+        dynamics, almanac, IntegratorMethod.DormandPrince78
+    ).for_duration(spacecraft, Unit.Day * 1, trajectory=False)
+
+    ric_diff = final_state.state.orbit.ric_difference(final_state_no_st.state.orbit)
+
+    pos_err_m = ric_diff.rmag_km() * 1e3
+    vel_err_m_s = ric_diff.vmag_km_s() * 1e3
+
+    print(
+        f"== RIC diff with/without cislunar solid tides ==\nPosition: {pos_err_m:.1f} m\nVelocity: {vel_err_m_s:.1e} m/s"
+    )
+
+    assert pos_err_m > 0.0
+    assert vel_err_m_s > 0.0
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     test_howto_propagate_with_perturbations()
     test_howto_execute_simple_monte_carlo()
     test_howto_configure_spherical_harmonics()
+    test_howto_configure_solid_tides()

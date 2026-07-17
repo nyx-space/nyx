@@ -48,7 +48,9 @@ use nyx_space::dynamics::guidance::Thruster;
 use nyx_space::dynamics::sequence::{
     AccelModels, Dynamics, ForceModels, PropagatorConfig, SpacecraftSequence,
 };
-use nyx_space::dynamics::{AtmDensity, Drag, PointMasses, SolarPressure};
+use nyx_space::dynamics::{
+    AtmDensity, Drag, PointMasses, SolarPressure, SolidTides, TidalPerturber,
+};
 use nyx_space::io::gravity::GravityFieldConfig;
 use nyx_space::mc::{MvnSpacecraft, StateDispersion};
 use nyx_space::md::StateParameter;
@@ -94,6 +96,8 @@ fn nyx(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<DragData>()?;
     m.add_class::<Thruster>()?;
     m.add_class::<ExportCfg>()?;
+    m.add_class::<Orbit>()?;
+    m.add_class::<Frame>()?;
     Ok(())
 }
 
@@ -158,6 +162,8 @@ fn mission_design(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
     sm.add_class::<Drag>()?;
     sm.add_class::<AtmDensity>()?;
     sm.add_class::<ShadowModel>()?;
+    sm.add_class::<SolidTides>()?;
+    sm.add_class::<TidalPerturber>()?;
     sm.add_class::<py_md::PyTrajectory>()?;
 
     Ok(())
