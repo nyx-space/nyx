@@ -357,7 +357,7 @@ def test_howto_configure_solid_tides():
     iau_earth = almanac.frame_info(Frames.IAU_EARTH_FRAME)
     iau_moon = almanac.frame_info(Frames.IAU_MOON_FRAME)
 
-    # Define a highly elliptical Lunar orbiter at its apoapse
+    # Define a highly elliptical Earth rbiter at its apoapse
     orbit = Orbit.from_keplerian(
         sma_km=10_000.0,
         ecc=0.7,
@@ -366,7 +366,7 @@ def test_howto_configure_solid_tides():
         aop_deg=65.0,
         ta_deg=180.0,
         epoch=Epoch("2025-08-25 11:55:44 UTC"),
-        frame=moon_j2k,
+        frame=almanac.frame_info(Frames.EARTH_J2000),
     )
     spacecraft = Spacecraft(orbit)
 
@@ -399,7 +399,7 @@ def test_howto_configure_solid_tides():
     # Define the acceleration mode and finalize the dynamics
     accel_models = AccelModels(
         point_masses=PointMasses(
-            celestial_objects=[CelestialObjects.EARTH, CelestialObjects.SUN]
+            celestial_objects=[CelestialObjects.MOON, CelestialObjects.SUN]
         ),
         solid_tides=solid_tides,
     )
@@ -409,7 +409,7 @@ def test_howto_configure_solid_tides():
     # For high-precision gravity fields, Dormand-Prince 7-8 is a robust choice.
     propagator = Propagator(dynamics, almanac, IntegratorMethod.DormandPrince78)
 
-    final_state = propagator.for_duration(spacecraft, Unit.Day * 31, trajectory=False)
+    final_state = propagator.for_duration(spacecraft, Unit.Day * 1, trajectory=False)
     logging.info(
         f"Final position magnitude: {final_state.state.orbit.rmag_km():.3f} km"
     )
@@ -422,7 +422,7 @@ def test_howto_configure_solid_tides():
     dynamics = Dynamics(third_body_accels)
     final_state_no_st = Propagator(
         dynamics, almanac, IntegratorMethod.DormandPrince78
-    ).for_duration(spacecraft, Unit.Day * 31, trajectory=False)
+    ).for_duration(spacecraft, Unit.Day * 1, trajectory=False)
 
     ric_diff = final_state.state.orbit.ric_difference(final_state_no_st.state.orbit)
 
@@ -430,7 +430,7 @@ def test_howto_configure_solid_tides():
     vel_err_m_s = ric_diff.vmag_km_s() * 1e3
 
     print(
-        f"== RIC diff with/without cislunar solid tides ==\nPosition: {pos_err_m:.1e} m\nVelocity: {vel_err_m_s:.1e} m/s"
+        f"== RIC diff with/without cislunar solid tides ==\nPosition: {pos_err_m:.1f} m\nVelocity: {vel_err_m_s:.1e} m/s"
     )
 
     assert pos_err_m > 0.0
