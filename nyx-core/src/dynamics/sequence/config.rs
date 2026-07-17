@@ -22,14 +22,14 @@ use serde_dhall::{SimpleType, StaticType};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::dynamics::SpacecraftDynamics;
 use crate::dynamics::{GravityField, OrbitalDynamics};
+use crate::dynamics::{SolidTides, SpacecraftDynamics};
 use crate::io::gravity::GravityFieldData;
 use crate::propagators::Propagator;
 use crate::{
     dynamics::{
-        Drag, PointMasses, SolarPressure,
         guidance::{Maneuver, ObjectiveEfficiency, ObjectiveWeight},
+        Drag, PointMasses, SolarPressure,
     },
     io::gravity::GravityFieldConfig,
     propagators::{IntegratorMethod, IntegratorOptions},
@@ -113,6 +113,9 @@ impl Dynamics {
             let gravity_field = GravityField::new(grav_data);
             orbital_dyn.accel_models.push(gravity_field);
         }
+        if let Some(solid_tides) = &self.accel_models.solid_tides {
+            orbital_dyn.accel_models.push(Arc::new(solid_tides.clone()));
+        }
         // Build the spacecraft dynamics
         let mut sc_dyn = SpacecraftDynamics::new(orbital_dyn);
 
@@ -154,6 +157,7 @@ impl PropagatorConfig {
 pub struct AccelModels {
     pub point_masses: Option<PointMasses>,
     pub gravity_field: Option<GravityFieldConfig>,
+    pub solid_tides: Option<SolidTides>,
 }
 
 /// Force models alter the spacecraft dynamics (they need a mass).

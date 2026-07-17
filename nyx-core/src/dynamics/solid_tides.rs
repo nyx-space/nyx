@@ -28,16 +28,21 @@ use crate::cosmic::{AstroPhysicsSnafu, Epoch, Frame, Orbit};
 use crate::dynamics::{
     AccelModel, DynamicsAlmanacSnafu, DynamicsAstroSnafu, DynamicsError, DynamicsPlanetarySnafu,
 };
-use crate::linalg::{Matrix3, U7, Vector3, Vector4};
+use crate::linalg::{Matrix3, Vector3, Vector4, U7};
 use hyperdual::linalg::norm;
-use hyperdual::{OHyperdual, hyperspace_from_vector};
+use hyperdual::{hyperspace_from_vector, OHyperdual};
 use std::fmt;
-use std::sync::Arc;
+
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+#[cfg(feature = "python")]
+use pyo3::types::PyType;
 
 /// `SolidTides` implements the solid tide acceleration model.
-/// It accounts for the crust deformation due to the Moon and the Sun.
+/// It accounts for the crust deformation due to the configured tidal perturbers.
 /// Formulas are based on IERS 2010 Conventions.
-#[derive(Clone, Debug, Serialize, Deserialize, StaticType, TypedBuilder)]
+#[derive(Clone, Debug, Serialize, Deserialize, StaticType, TypedBuilder, PartialEq)]
+#[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct SolidTides {
     /// The body-fixed frame of the central body being deformed.
     pub frame: Frame,
@@ -49,7 +54,8 @@ pub struct SolidTides {
     pub perturbers: Vec<TidalPerturber>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, StaticType, TypedBuilder)]
+#[derive(Clone, Debug, Serialize, Deserialize, StaticType, TypedBuilder, PartialEq)]
+#[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct TidalPerturber {
     /// The frame used to resolve the state of the perturber relative to central_frame.
     pub frame: Frame,
@@ -175,7 +181,7 @@ impl SolidTides {
         mut earth_frame: Frame,
         mut moon_frame: Frame,
         almanac: &Almanac,
-    ) -> Result<Arc<Self>, DynamicsError> {
+    ) -> Result<Self, DynamicsError> {
         let mut sun_j2k = almanac
             .frame_info(SUN_J2000)
             .context(DynamicsPlanetarySnafu {
@@ -214,12 +220,12 @@ impl SolidTides {
                     .build(),
                 TidalPerturber::builder()
                     .frame(sun_j2k)
-                    .compute_degree_3(true)
+                    .compute_degree_3(false)
                     .build(),
             ])
             .build();
 
-        Ok(Arc::new(me))
+        Ok(me)
     }
 
     /// Internal helper to compute tidal delta coefficients
@@ -555,7 +561,89 @@ impl AccelModel for SolidTides {
 
 impl fmt::Display for SolidTides {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Solid tides for {}", self.frame)
+        write!(
+            f,
+            "Solid tides for {} with {} (k2={:.6}, k3={:.6})",
+            self.frame,
+            self.perturbers
+                .iter()
+                .map(|pert| pert.to_string())
+                .collect::<Vec<String>>()
+                .join(", "),
+            self.k2,
+            self.k3
+        )
+    }
+}
+
+impl fmt::Display for TidalPerturber {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "TidalPerturber of {} (3rd deg= {})",
+            self.frame, self.compute_degree_3
+        )
+    }
+}
+
+#[cfg(feature = "python")]
+#[cfg_attr(feature = "python", pymethods)]
+impl SolidTides {
+    #[new]
+    fn py_new(frame: Frame, k2: f64, k3: f64, perturbers: Vec<TidalPerturber>) -> Self {
+        Self {
+            frame,
+            k2,
+            k3,
+            perturbers,
+        }
+    }
+
+    #[classmethod]
+    #[pyo3(name = "earth_moon_system")]
+    fn py_earth_moon_system(
+        _cls: &Bound<'_, PyType>,
+        earth_frame: Frame,
+        moon_frame: Frame,
+        almanac: &Almanac,
+    ) -> Result<Self, DynamicsError> {
+        Self::earth_moon_system(earth_frame, moon_frame, almanac)
+    }
+
+    fn __str__(&self) -> String {
+        format!("{self}")
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self} @ {self:p}")
+    }
+
+    fn __eq__(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+#[cfg(feature = "python")]
+#[cfg_attr(feature = "python", pymethods)]
+impl TidalPerturber {
+    #[new]
+    fn py_new(frame: Frame, compute_degree_3: bool) -> Self {
+        Self {
+            frame,
+            compute_degree_3,
+        }
+    }
+
+    fn __str__(&self) -> String {
+        format!("{self}")
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self} @ {self:p}")
+    }
+
+    fn __eq__(&self, other: &Self) -> bool {
+        self == other
     }
 }
 

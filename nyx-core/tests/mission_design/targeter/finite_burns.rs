@@ -2,11 +2,11 @@ extern crate nyx_space as nyx;
 
 use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SUN};
 use hifitime::TimeUnits;
-use nyx::dynamics::PointMasses;
 use nyx::dynamics::guidance::{LocalFrame, Maneuver, Thruster};
 use nyx::dynamics::sequence::{
     AccelModels, Dynamics, ForceModels, GuidanceConfig, Phase, PropagatorConfig, SpacecraftSequence,
 };
+use nyx::dynamics::PointMasses;
 use nyx::linalg::Vector3;
 use nyx::md::prelude::*;
 use nyx::propagators::{IntegratorMethod, IntegratorOptions};
@@ -242,6 +242,7 @@ fn val_tgt_finite_burn(almanac: Arc<Almanac>) {
                 accel_models: AccelModels {
                     point_masses: Some(PointMasses::new(bodies)),
                     gravity_field: None,
+                    solid_tides: None,
                 },
                 force_models: ForceModels {
                     solar_pressure: None,

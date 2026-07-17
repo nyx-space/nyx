@@ -15,18 +15,18 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use anise::almanac::Almanac;
 use anise::almanac::metaload::{MetaAlmanac, MetaFile};
+use anise::almanac::Almanac;
 use anise::analysis::prelude::{
-    Condition, Event, EventArc, EventDetails, EventEdge, OrbitalElement, Plane, VisibilityArc,
-    find_arc_intersections,
+    find_arc_intersections, Condition, Event, EventArc, EventDetails, EventEdge, OrbitalElement,
+    Plane, VisibilityArc,
 };
 use anise::analysis::python::{
     PyFrameSpec, PyOrthogonalFrame, PyScalarExpr, PyStateSpec, PyVectorExpr,
 };
 use anise::analysis::report::PyReportScalars;
-use anise::astro::Aberration;
 use anise::astro::orbit::Orbit;
+use anise::astro::Aberration;
 use anise::astro::{AzElRange, Location, Occultation, TerrainMask};
 use anise::ephemerides::ephemeris::{Covariance, Ephemeris, EphemerisRecord, LocalFrame};
 use anise::frames::Frame;
@@ -48,20 +48,22 @@ use nyx_space::dynamics::guidance::Thruster;
 use nyx_space::dynamics::sequence::{
     AccelModels, Dynamics, ForceModels, PropagatorConfig, SpacecraftSequence,
 };
-use nyx_space::dynamics::{AtmDensity, Drag, PointMasses, SolarPressure};
+use nyx_space::dynamics::{
+    AtmDensity, Drag, PointMasses, SolarPressure, SolidTides, TidalPerturber,
+};
 use nyx_space::io::gravity::GravityFieldConfig;
 use nyx_space::mc::{MvnSpacecraft, StateDispersion};
-use nyx_space::md::StateParameter;
 use nyx_space::md::trajectory::ExportCfg;
-use nyx_space::od::GroundStation;
+use nyx_space::md::StateParameter;
 use nyx_space::od::kalman::KalmanVariant;
 use nyx_space::od::msr::{Measurement, MeasurementType, TrackingDataArc};
-use nyx_space::od::noise::link_specific::{CN0, CarrierFreq, ChipRate, SN0};
+use nyx_space::od::noise::link_specific::{CarrierFreq, ChipRate, CN0, SN0};
 use nyx_space::od::noise::{GaussMarkov, StochasticNoise, StochasticState, WhiteNoise};
 use nyx_space::od::process::SigmaRejection;
 use nyx_space::od::simulator::{Handoff, PyCadence, Scheduler, Strand, TrkConfig};
+use nyx_space::od::GroundStation;
 use nyx_space::propagators::{IntegratorMethod, IntegratorOptions};
-use nyx_space::{Spacecraft, cosmic::GuidanceMode};
+use nyx_space::{cosmic::GuidanceMode, Spacecraft};
 
 use pyo3::{prelude::*, wrap_pymodule};
 
@@ -94,6 +96,8 @@ fn nyx(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<DragData>()?;
     m.add_class::<Thruster>()?;
     m.add_class::<ExportCfg>()?;
+    m.add_class::<Orbit>()?;
+    m.add_class::<Frame>()?;
     Ok(())
 }
 
@@ -158,6 +162,8 @@ fn mission_design(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
     sm.add_class::<Drag>()?;
     sm.add_class::<AtmDensity>()?;
     sm.add_class::<ShadowModel>()?;
+    sm.add_class::<SolidTides>()?;
+    sm.add_class::<TidalPerturber>()?;
     sm.add_class::<py_md::PyTrajectory>()?;
 
     Ok(())
