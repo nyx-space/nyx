@@ -352,7 +352,6 @@ def test_howto_configure_solid_tides():
     """
 
     almanac = MetaAlmanac("../data/02_config/ci_almanac.dhall").process()
-    moon_j2k = almanac.frame_info(Frames.MOON_J2000)
 
     iau_earth = almanac.frame_info(Frames.IAU_EARTH_FRAME)
     iau_moon = almanac.frame_info(Frames.IAU_MOON_FRAME)
