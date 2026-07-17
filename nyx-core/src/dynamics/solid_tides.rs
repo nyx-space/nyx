@@ -28,9 +28,9 @@ use crate::cosmic::{AstroPhysicsSnafu, Epoch, Frame, Orbit};
 use crate::dynamics::{
     AccelModel, DynamicsAlmanacSnafu, DynamicsAstroSnafu, DynamicsError, DynamicsPlanetarySnafu,
 };
-use crate::linalg::{Matrix3, Vector3, Vector4, U7};
+use crate::linalg::{Matrix3, U7, Vector3, Vector4};
 use hyperdual::linalg::norm;
-use hyperdual::{hyperspace_from_vector, OHyperdual};
+use hyperdual::{OHyperdual, hyperspace_from_vector};
 use std::fmt;
 
 #[cfg(feature = "python")]
