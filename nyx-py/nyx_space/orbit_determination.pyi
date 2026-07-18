@@ -826,6 +826,24 @@ class SpacecraftEstimate:
         """Returns whether this estimate is within some bound
         The 68-95-99.7 rule is a good way to assess whether the filter is operating normally"""
 
+    def __eq__(self, value: typing.Any) -> bool:
+        """Return self==value."""
+
+    def __ge__(self, value: typing.Any) -> bool:
+        """Return self>=value."""
+
+    def __gt__(self, value: typing.Any) -> bool:
+        """Return self>value."""
+
+    def __le__(self, value: typing.Any) -> bool:
+        """Return self<=value."""
+
+    def __lt__(self, value: typing.Any) -> bool:
+        """Return self<value."""
+
+    def __ne__(self, value: typing.Any) -> bool:
+        """Return self!=value."""
+
     def __repr__(self) -> str:
         """Return repr(self)."""
 
@@ -875,7 +893,26 @@ class SpacecraftODSolution:
     @staticmethod
     def from_parquet(path: typing.Any, devices: typing.Any) -> typing.Any: ...
     def is_filter_run(self) -> typing.Any: ...
-    def is_nees_consistent(
+    def is_normal(self, alpha: typing.Any = None) -> typing.Any:
+        """Checks whether the whitened residuals of the accepted residuals pass a normality test at a given significance level `alpha`, default to 0.05.
+
+        This uses a simplified KS-test threshold: D_alpha = c(α) / √n.
+        For example, for α = 0.05, c(α) is approximately 1.36.
+        α=0.05 means a 5% probability of Type I error (incorrectly rejecting the null hypothesis when it is true).
+        This threshold is standard in many statistical tests to balance sensitivity and false positives
+
+        The computation of the c(alpha) is from https://en.wikipedia.org/w/index.php?title=Kolmogorov%E2%80%93Smirnov_test&oldid=1280260701#Two-sample_Kolmogorov%E2%80%93Smirnov_test
+
+        Returns Ok(true) if the residuals are consistent with a normal distribution,
+        Ok(false) if not, or None if no residuals are available."""
+
+    def is_smoother_run(self) -> typing.Any: ...
+    def ks_test_normality(self) -> typing.Any:
+        """Computes the Kolmogorov–Smirnov statistic for the aggregated residual ratios of the accepted residuals.
+
+        Returns Ok(ks_statistic) if residuals are available."""
+
+    def nees_consistency(
         self, truth_traj: typing.Any, alpha: typing.Any = None
     ) -> typing.Any:
         """Checks whether the filter estimates are statistically consistent
@@ -895,7 +932,7 @@ class SpacecraftODSolution:
         Returns Ok(true) if the filter is consistent, Ok(false) if the filter
         is over-confident or under-confident, or an error if no estimates are available."""
 
-    def is_nis_consistent(self, alpha: typing.Any = None) -> typing.Any:
+    def nis_consistency(self, alpha: typing.Any = None) -> typing.Any:
         """Checks whether the filter innovations are statistically consistent
         by performing a Chi-squared test on the Normalized Innovation Squared (NIS).
 
@@ -910,25 +947,6 @@ class SpacecraftODSolution:
 
         Returns Ok(true) if the filter is consistent, Ok(false) if the filter
         is over-confident or under-confident, or an error if no residuals are available."""
-
-    def is_normal(self, alpha: typing.Any = None) -> typing.Any:
-        """Checks whether the whitened residuals of the accepted residuals pass a normality test at a given significance level `alpha`, default to 0.05.
-
-        This uses a simplified KS-test threshold: D_alpha = c(α) / √n.
-        For example, for α = 0.05, c(α) is approximately 1.36.
-        α=0.05 means a 5% probability of Type I error (incorrectly rejecting the null hypothesis when it is true).
-        This threshold is standard in many statistical tests to balance sensitivity and false positives
-
-        The computation of the c(alpha) is from https://en.wikipedia.org/w/index.php?title=Kolmogorov%E2%80%93Smirnov_test&oldid=1280260701#Two-sample_Kolmogorov%E2%80%93Smirnov_test
-
-        Returns Ok(true) if the residuals are consistent with a normal distribution,
-        Ok(false) if not, or None if no residuals are available."""
-
-    def is_smoother_run(self) -> typing.Any: ...
-    def ks_test_normality(self) -> typing.Any:
-        """Computes the Kolmogorov–Smirnov statistic for the aggregated residual ratios of the accepted residuals.
-
-        Returns Ok(ks_statistic) if residuals are available."""
 
     def rejected_residuals(self) -> typing.Any: ...
     def residual_ratio_within_threshold(self, threshold: typing.Any) -> typing.Any:
@@ -1278,10 +1296,10 @@ class TrackingDataArc:
     def apply_moduli(self) -> typing.Any:
         """Applies the moduli to each measurement, if defined."""
 
-    def chunk(self, max_duration: typing.Any) -> TrackingDataArc:
+    def chunk(self, max_duration: typing.Any) -> typing.Any:
         """Splits a long tracking data arc into smaller chunks, each up to `max_duration` long."""
 
-    def downsample(self, target_step: time.Duration) -> TrackingDataArc:
+    def downsample(self, target_step: time.Duration) -> Self:
         """Downsamples the tracking data to a lower frequency using a simple moving average low-pass filter followed by decimation,
         returning new `TrackingDataArc` with downsampled measurements.
 
@@ -1315,17 +1333,19 @@ class TrackingDataArc:
     def end_epoch(self) -> typing.Any:
         """Returns the end epoch of this tracking arc"""
 
-    def exclude_by_epoch(self, start: typing.Any, end: typing.Any) -> nyx_space.orbit_determination.TrackingDataArc: ...
-    def exclude_measurement_type(self, msr_type: typing.Any) -> nyx_space.orbit_determination.TrackingDataArc: ...
-    def exclude_tracker(self, tracker: typing.Any) -> nyx_space.orbit_determination.TrackingDataArc: ...
-    def filter_by_epoch(self, start: typing.Any, end: typing.Any) -> nyx_space.orbit_determination.TrackingDataArc: ...
-    def filter_by_measurement_type(self, msr_type: typing.Any) -> nyx_space.orbit_determination.TrackingDataArc: ...
-    def filter_by_offset(self, start: typing.Any, end: typing.Any) -> nyx_space.orbit_determination.TrackingDataArc: ...
-    def filter_by_tracker(self, tracker: typing.Any) -> nyx_space.orbit_determination.TrackingDataArc: ...
+    def exclude_by_epoch(self, start: typing.Any, end: typing.Any) -> typing.Any: ...
+    def exclude_measurement_type(self, msr_type: typing.Any) -> typing.Any: ...
+    def exclude_tracker(self, tracker: typing.Any) -> typing.Any: ...
+    def filter_by_epoch(self, start: typing.Any, end: typing.Any) -> typing.Any: ...
+    def filter_by_measurement_type(self, msr_type: typing.Any) -> typing.Any: ...
+    def filter_by_offset(self, start: typing.Any, end: typing.Any) -> typing.Any: ...
+    def filter_by_tracker(self, tracker: typing.Any) -> typing.Any: ...
     @staticmethod
-    def from_ccsds_tdm(path: str, aliases: dict) -> nyx_space.orbit_determination.TrackingDataArc:
+    def from_ccsds_tdm(path: str, aliases: dict) -> nyx_space.od.TrackingDataArc:
         """Initializes a new Almanac from a file path to CCSDS OEM file, after converting to to SPICE SPK/BSP"""
 
+    @staticmethod
+    def from_parquet(path: typing.Any) -> typing.Any: ...
     def is_empty(self) -> typing.Any:
         """Returns whether this arc has no measurements."""
 
@@ -1345,6 +1365,7 @@ class TrackingDataArc:
     def start_epoch(self) -> typing.Any:
         """Returns the start epoch of this tracking arc"""
 
+    def to_parquet(self, path: typing.Any, cfg: typing.Any) -> typing.Any: ...
     def unique_aliases(self) -> typing.Any: ...
     def unique_types(self) -> typing.Any: ...
     def write_ccsds_tdm(

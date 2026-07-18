@@ -356,13 +356,26 @@ def test_howto_exec_orbit_determination_filter():
     )
     od_dev_sol = od_proc_deviation.process_arc(estimate, trk_arc)
     # The OD solution provides statistical tests.
+    nis_consistency = od_dev_sol.nis_consistency()
+    print(f"{nis_consistency}")
+    # Print the information to the log
+    nis_consistency.log()
     try:
-        assert od_dev_sol.is_nis_consistent()
+        assert nis_consistency.is_consistent()
     except AssertionError:
         print("deviation tracking on small dispersions are typically underconfident")
 
+    nees = od_dev_sol.nees_consistency(traj)
+    nees.log()
+    print(f"{nees}")
+    assert nees.is_underconfident() == nis_consistency.is_underconfident(), (
+        "NIS and NEES should agree"
+    )
+    assert nees.is_overconfident() == nis_consistency.is_overconfident(), (
+        "NIS and NEES should agree"
+    )
     try:
-        assert od_dev_sol.is_nees_consistent(traj)
+        assert nees.is_consistent()
     except AssertionError:
         print("and this is confirmed in the NEES metric")
 
@@ -414,8 +427,8 @@ def test_howto_exec_orbit_determination_filter():
     # This includes estimated states, prefits, postfits, covariance, sigmas on orbital elements, Kalman gains, etc.
     od_sol.to_parquet("od_ref_update.pq", ExportCfg(False))
 
-    print(od_sol.is_nis_consistent())
-    print(od_sol.is_nees_consistent(traj))
+    print(od_sol.nis_consistency())
+    print(od_sol.nees_consistency(traj))
     # We can export this solution to an OEM
     definitive_ephem = od_sol.to_ephemeris("Test OD Spacecraft")
     oem_filepath = "definitive_ephem.oem"
@@ -433,8 +446,8 @@ def test_howto_exec_orbit_determination_filter():
     od_sol_5sigma = od_proc.process_arc(estimate, trk_arc)
     assert od_sol_5sigma.is_filter_run(), "5-Sigma threshold run failed to execute."
 
-    print(od_sol_5sigma.is_nis_consistent())
-    print(od_sol_5sigma.is_nees_consistent(traj))
+    print(od_sol_5sigma.nis_consistency())
+    print(od_sol_5sigma.nees_consistency(traj))
 
 
 if __name__ == "__main__":

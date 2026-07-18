@@ -38,6 +38,8 @@ mod import;
 mod smooth;
 mod stats;
 
+pub use stats::NormalizedConsistency;
+
 /// The `ODSolution` structure is designed to manage and analyze the results of an OD process, including
 /// smoothing. It provides various functionalities such as splitting solutions by tracker or measurement type,
 /// joining solutions, and performing statistical analyses.

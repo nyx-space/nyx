@@ -17,18 +17,121 @@
 */
 
 use crate::linalg::allocator::Allocator;
-use crate::linalg::{DefaultAllocator, DimMin, DimName, DimSub};
+use crate::linalg::{Const, DMatrix, DefaultAllocator, DimMin, DimName, DimSub, OVector};
 use crate::md::trajectory::{Interpolatable, Traj};
 pub use crate::od::estimate::*;
 pub use crate::od::*;
-use log::warn;
+use log::{info, warn};
 use msr::sensitivity::TrackerSensitivity;
-use nalgebra::Const;
 use snafu::ResultExt;
 use statrs::distribution::{ContinuousCDF, Normal};
+use std::fmt;
 use std::ops::Add;
 
 use super::ODSolution;
+
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
+#[cfg_attr(feature = "python", pyclass(from_py_object, get_all))]
+#[derive(Copy, Clone, Debug)]
+pub struct NormalizedConsistency {
+    pub normalized_sum: f64,
+    pub k: f64,
+    pub lower_bound: f64,
+    pub upper_bound: f64,
+    pub is_nees: bool,
+}
+
+#[cfg_attr(feature = "python", pymethods)]
+impl NormalizedConsistency {
+    pub fn name(&self) -> &'static str {
+        if self.is_nees {
+            "NEES"
+        } else {
+            "NIS"
+        }
+    }
+
+    /// Returns true if there are more than 35 degrees of freedom
+    pub fn has_statistical_power(&self) -> bool {
+        self.k > 35.0
+    }
+
+    /// Returns true if the sum metric is within the lower and upper bounds
+    pub fn is_consistent(&self) -> bool {
+        self.normalized_sum < self.upper_bound && self.normalized_sum > self.lower_bound
+    }
+
+    /// Returns true if the normalized sum is less than the lower bound
+    pub fn is_underconfident(&self) -> bool {
+        self.normalized_sum < self.lower_bound
+    }
+
+    /// Returns true if the normalized sum is greater than the upper bound
+    pub fn is_overconfident(&self) -> bool {
+        self.normalized_sum > self.upper_bound
+    }
+
+    /// Log the status to the logger
+    pub fn log(&self) {
+        let name = self.name();
+        let sum = self.normalized_sum;
+        let upper_bound = self.upper_bound;
+        let lower_bound = self.lower_bound;
+        if sum > upper_bound {
+            warn!(
+                "{name} consistency test failed high: {name} sum {sum:.3} > upper bound {upper_bound:.3}."
+            );
+            if self.is_nees {
+                warn!("Estimation errors are larger than the covariance suggests.");
+            } else {
+                warn!("Innovations are larger than expected");
+            }
+            warn!(
+                "Filter is overconfident: P, R, or Q may be too small, or the dynamics/measurement model may be biased."
+            );
+        } else if sum < lower_bound {
+            warn!(
+                "{name} consistency test failed low: {name} sum {sum:.3} < lower bound {lower_bound:.3}."
+            );
+            if self.is_nees {
+                warn!("Estimation errors are smaller than expected.");
+            } else {
+                warn!("Innovations are smaller than expected.")
+            }
+            warn!("Filter is underconfident: P, R, or Q may be too large.");
+        } else {
+            info!("{name} passed")
+        }
+    }
+
+    #[cfg(feature = "python")]
+    fn __str__(&self) -> String {
+        format!("{self}")
+    }
+
+    #[cfg(feature = "python")]
+    fn __repr__(&self) -> String {
+        format!("{self} @ {self:p}")
+    }
+}
+
+impl fmt::Display for NormalizedConsistency {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let is_ok = self.is_consistent();
+        write!(
+            f,
+            "{} consistency {} (k={}; bounds: {:.3} < {:.3} < {:.3})",
+            self.name(),
+            if is_ok { "PASSED" } else { "FAILED" },
+            self.k,
+            self.lower_bound,
+            self.normalized_sum,
+            self.upper_bound
+        )
+    }
+}
 
 impl<StateType, EstType, MsrSize, Trk> ODSolution<StateType, EstType, MsrSize, Trk>
 where
@@ -144,7 +247,7 @@ where
     /// Returns Ok(true) if the residuals are consistent with a normal distribution,
     /// Ok(false) if not, or None if no residuals are available.
     pub fn is_normal(&self, alpha: Option<f64>) -> Result<bool, ODError> {
-        let n = self.residuals.iter().flatten().count();
+        let n = self.accepted_residuals().len();
         if n == 0 {
             return Err(ODError::ODNoResiduals {
                 action: "evaluating residual normality",
@@ -152,6 +255,7 @@ where
         } else if n < 35 {
             warn!("KS normality test unreliable for n={n} < 35; skipping");
         }
+
         let ks_stat = self.ks_test_normality()?;
 
         // Default to 5% probability
@@ -179,7 +283,7 @@ where
     ///
     /// Returns Ok(true) if the filter is consistent, Ok(false) if the filter
     /// is over-confident or under-confident, or an error if no residuals are available.
-    pub fn is_nis_consistent(&self, alpha: Option<f64>) -> Result<bool, ODError> {
+    pub fn nis_consistency(&self, alpha: Option<f64>) -> Result<NormalizedConsistency, ODError> {
         let n = self.accepted_residuals().len();
 
         if n == 0 {
@@ -214,23 +318,13 @@ where
         let lower_bound = k * (1.0 - factor - z_critical * factor.sqrt()).powi(3);
         let upper_bound = k * (1.0 - factor + z_critical * factor.sqrt()).powi(3);
 
-        if nis_sum > upper_bound {
-            warn!(
-                "NIS consistency test failed high: NIS sum {nis_sum:.6} > upper bound {upper_bound:.6}. Innovations are larger than expected."
-            );
-            warn!(
-                "Filter may be overconfident: P, R, or Q may be too small, or the dynamics/measurement model may be biased."
-            );
-            Ok(false)
-        } else if nis_sum < lower_bound {
-            warn!(
-                "NIS consistency test failed low: NIS sum {nis_sum:.6} < lower bound {lower_bound:.6}. Innovations are smaller than expected."
-            );
-            warn!("Filter may be underconfident: P, R, or Q may be too large.");
-            Ok(false)
-        } else {
-            Ok(true)
-        }
+        Ok(NormalizedConsistency {
+            normalized_sum: nis_sum,
+            lower_bound,
+            upper_bound,
+            k,
+            is_nees: false,
+        })
     }
 
     /// Checks whether the filter estimates are statistically consistent
@@ -245,15 +339,12 @@ where
     ///
     /// The sum of NEES values should fall within the confidence interval of a
     /// Chi-squared distribution with degrees of freedom `k = n * dim`, where `n`
-    /// is the number of estimates and `dim` is the state dimension.
-    ///
-    /// Returns Ok(true) if the filter is consistent, Ok(false) if the filter
-    /// is over-confident or under-confident, or an error if no estimates are available.
-    pub fn is_nees_consistent(
+    /// is the number of estimates and `dim` is the actively estimated state dimension.
+    pub fn nees_consistency(
         &self,
         truth_traj: &Traj<StateType>,
         alpha: Option<f64>,
-    ) -> Result<bool, ODError>
+    ) -> Result<NormalizedConsistency, ODError>
     where
         StateType::Size: DimMin<StateType::Size>,
         <StateType::Size as DimMin<StateType::Size>>::Output: DimSub<Const<1>>,
@@ -268,18 +359,22 @@ where
                 <<StateType::Size as DimMin<StateType::Size>>::Output as DimSub<Const<1>>>::Output,
             >,
     {
-        let n = self.estimates.len();
+        let n_total = self.estimates.len();
 
-        if n == 0 {
+        // We will skip the apriori estimate.
+        if n_total <= 1 {
             return Err(ODError::ODNoResiduals {
                 action: "evaluating NEES consistency",
             });
         }
 
-        let mut nees_sum = 0.0;
-        let mut state_dim_f64 = 0.0_f64;
+        // The exact number of epochs evaluated in the NEES sum
+        let n = n_total - 1;
 
-        for est in &self.estimates {
+        let mut nees_sum = 0.0;
+        let mut est_size = None;
+
+        for est in self.estimates.iter().skip(1) {
             let epoch = est.epoch();
 
             let truth_state = truth_traj.at(epoch).context(ODTrajSnafu {
@@ -290,43 +385,72 @@ where
             let x_est = est.state().to_state_vector();
             let x_true = truth_state.to_state_vector();
             let error = x_est - x_true;
+            let cov = est.covar();
+            let cov = 0.5 * (&cov + cov.transpose());
 
-            // Extract the covariance and compute its inverse
-            // Extract the covariance
-            let p_mat = est.covar();
-
-            // Compute the Singular Value Decomposition (SVD) instead of ivnerting as-is.
-            // This enables support for non-estimated parameters.
-            let svd = p_mat.svd(true, true);
-
-            // Define a small tolerance for zero-variance detection
-            let epsilon = 1e-12;
-
-            // Compute the Moore-Penrose pseudo-inverse
-            let p_inv = svd
-                .clone()
-                .pseudo_inverse(epsilon)
-                .map_err(|_| ODError::SingularInformationMatrix)?;
-
-            // Dynamically determine the rank (number of actively estimated parameters)
-            // nalgebra's SVD provides a built-in rank evaluation
-            let active_dim = svd.rank(epsilon) as f64;
-
-            // Update the computed degree of freedom, it's fixed but the SVD might cause weird rounding
-            state_dim_f64 = state_dim_f64.max(active_dim);
-
-            // Compute NEES for this epoch: error^T * P^+ * error
-            let nees_matrix = error.transpose() * p_inv * &error;
-            nees_sum += nees_matrix[(0, 0)];
-
-            // Capture the state dimension for the degrees of freedom calculation
-            if state_dim_f64 == 0.0 {
-                state_dim_f64 = error.nrows() as f64;
+            if est_size.is_none() {
+                // Deduce est_size by physically inspecting the diagonal variances.
+                // Unestimated deterministic parameters will have zero variance.
+                let mut active_count = 0;
+                for i in 0..StateType::Size::dim() {
+                    // Check if variance is strictly positive
+                    if cov[(i, i)] > 0.0 {
+                        active_count += 1;
+                    } else {
+                        // Estimated parameters are contiguous from index 0
+                        break;
+                    }
+                }
+                if active_count < 6 {
+                    warn!("Detected est_size of {active_count} < 6; forcing bound to 6");
+                    active_count = 6;
+                }
+                est_size = Some(active_count);
             }
+
+            // At this point, est_size is set and is valid
+            let true_est_size = est_size.unwrap();
+
+            // Dynamically slice the actively estimated block
+            let cov_e = cov
+                .view((0, 0), (true_est_size, true_est_size))
+                .into_owned();
+            let err_e = error.rows(0, true_est_size).into_owned();
+
+            // Execute Symmetric Eigendecomposition.
+            // This is mathematically safe because cov was forced to be symmetric via 0.5 * (P + P^T)
+            let eigen = cov_e.symmetric_eigen();
+
+            // Define the numerical noise floor relative to the largest valid physical variance
+            let max_lambda = eigen.eigenvalues.max();
+            let epsilon = max_lambda * (true_est_size as f64) * f64::EPSILON;
+
+            // Construct the inverted eigenvalue spectrum
+            let mut inv_eigenvalues = eigen.eigenvalues.clone();
+            for i in 0..true_est_size {
+                // By strictly checking > epsilon, we explicitly trap BOTH:
+                // 1. Positive numerical noise (e.g., +1e-19)
+                // 2. Severe negative numerical drift (e.g., -1e-5)
+                if inv_eigenvalues[i] > epsilon {
+                    inv_eigenvalues[i] = 1.0 / inv_eigenvalues[i];
+                } else {
+                    // Clamp corrupted non-PSD subspaces exactly to zero
+                    inv_eigenvalues[i] = 0.0;
+                }
+            }
+
+            // Reconstruct the symmetric positive semi-definite pseudo-inverse: P^+ = Q * Lambda^+ * Q^T
+            let p_inv = &eigen.eigenvectors
+                * DMatrix::from_diagonal(&inv_eigenvalues)
+                * eigen.eigenvectors.transpose();
+
+            // Compute quadratic form: e^T * P^+ * e
+            let nees_matrix = err_e.transpose() * p_inv * err_e;
+            nees_sum += nees_matrix[(0, 0)];
         }
 
-        // Total degrees of freedom: number of estimates * state dimension
-        let k = (n as f64) * state_dim_f64;
+        // Total degrees of freedom: N evaluated epochs * actively estimated dimension
+        let k = (n * est_size.unwrap()) as f64;
 
         if k < 35.0 {
             warn!("NEES consistency test lacks statistical power for n*StateDim={k} < 35");
@@ -340,30 +464,17 @@ where
             .unwrap()
             .inverse_cdf(1.0 - alpha / 2.0);
 
-        // Use the Wilson-Hilferty transformation to approximate the Chi-squared
-        // lower and upper critical bounds.
+        // Use the Wilson-Hilferty transformation to approximate the Chi-squared lower and upper critical bounds.
         let factor = 2.0 / (9.0 * k);
         let lower_bound = k * (1.0 - factor - z_critical * factor.sqrt()).powi(3);
         let upper_bound = k * (1.0 - factor + z_critical * factor.sqrt()).powi(3);
 
-        if nees_sum > upper_bound {
-            warn!(
-                "NEES consistency test failed high: NEES sum {nees_sum:.6} > upper bound {upper_bound:.6}. Estimation errors are larger than the covariance suggests."
-            );
-            warn!(
-                "Filter is overconfident: P is too small. Process noise Q may be too low, or there are unmodeled dynamic biases."
-            );
-            Ok(false)
-        } else if nees_sum < lower_bound {
-            warn!(
-                "NEES consistency test failed low: NEES sum {nees_sum:.6} < lower bound {lower_bound:.6}. Estimation errors are smaller than expected."
-            );
-            warn!(
-                "Filter is underconfident: P is too large. Process noise Q may be too high, or measurement noise R is overestimated."
-            );
-            Ok(false)
-        } else {
-            Ok(true)
-        }
+        Ok(NormalizedConsistency {
+            normalized_sum: nees_sum,
+            lower_bound,
+            upper_bound,
+            k,
+            is_nees: true,
+        })
     }
 }
