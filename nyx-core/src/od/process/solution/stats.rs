@@ -423,7 +423,7 @@ where
 
             // Define the numerical noise floor relative to the largest valid physical variance
             let max_lambda = eigen.eigenvalues.max();
-            let epsilon = max_lambda * (true_est_size as f64) * std::f64::EPSILON;
+            let epsilon = max_lambda * (true_est_size as f64) * f64::EPSILON;
 
             // Construct the inverted eigenvalue spectrum
             let mut inv_eigenvalues = eigen.eigenvalues.clone();
