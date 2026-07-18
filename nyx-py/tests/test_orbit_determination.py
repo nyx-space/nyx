@@ -368,8 +368,12 @@ def test_howto_exec_orbit_determination_filter():
     nees = od_dev_sol.nees_consistency(traj)
     nees.log()
     print(f"{nees}")
-    assert nees.is_underconfident() == nis_consistency.is_underconfident(), "NIS and NEES should agree"
-    assert nees.is_overconfident() == nis_consistency.is_overconfident(), "NIS and NEES should agree"
+    assert nees.is_underconfident() == nis_consistency.is_underconfident(), (
+        "NIS and NEES should agree"
+    )
+    assert nees.is_overconfident() == nis_consistency.is_overconfident(), (
+        "NIS and NEES should agree"
+    )
     try:
         assert nees.is_consistent()
     except AssertionError:
