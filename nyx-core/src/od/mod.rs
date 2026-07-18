@@ -111,6 +111,7 @@ pub mod prelude {
     pub use super::simulator::*;
     pub use super::snc::*;
     pub use super::*;
+    pub use crate::od::process::NormalizedConsistency;
 
     pub use crate::time::{Duration, Epoch, TimeUnits, Unit};
 }

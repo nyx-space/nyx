@@ -228,7 +228,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         od_sol.residual_ratio_within_threshold(3.0).unwrap()
     );
     println!("Whitened residuals normal? {}", od_sol.is_normal(None)?);
-    println!("NIS test success? {}", od_sol.is_nis_consistent(None)?);
+    println!("NIS consistency: {}", od_sol.nis_consistency(None)?);
 
     od_sol.to_parquet(
         "./data/04_output/06_lunar_od_results.parquet",

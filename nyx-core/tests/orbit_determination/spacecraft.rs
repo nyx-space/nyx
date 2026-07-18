@@ -456,15 +456,9 @@ fn od_val_sc_srp_estimation(
         od_sol.residual_ratio_within_threshold(3.0).unwrap()
     );
     println!("Ratios normal? {}", od_sol.is_normal(None).unwrap());
-    println!(
-        "NIS test passed? {}",
-        od_sol.is_nis_consistent(None).unwrap()
-    );
+    println!("NIS: {}", od_sol.nis_consistency(None).unwrap());
     // NEES test, using the truth trajectory
-    println!(
-        "NEES test passed? {}",
-        od_sol.is_nees_consistent(&traj, None).unwrap()
-    );
+    println!("NEES {}", od_sol.nees_consistency(&traj, None).unwrap());
 
     // Regression tests, not solution test
     assert_eq!(

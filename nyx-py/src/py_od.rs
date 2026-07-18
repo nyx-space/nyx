@@ -30,8 +30,8 @@ use nyx_space::mc::{MvnSpacecraft, StateDispersion};
 use nyx_space::od::blse::Estimate;
 use nyx_space::od::estimate::KfEstimate;
 use nyx_space::od::prelude::{
-    KalmanVariant, ODError, ODSolution, Residual, SigmaRejection, SpacecraftKalmanScalarOD,
-    TrackingArcSim, TrkConfig,
+    KalmanVariant, NormalizedConsistency, ODError, ODSolution, Residual, SigmaRejection,
+    SpacecraftKalmanScalarOD, TrackingArcSim, TrkConfig,
 };
 use nyx_space::od::snc::ProcessNoise3D;
 use nyx_space::propagators::PropagationError;
@@ -499,8 +499,8 @@ impl PySpacecraftODSolution {
     /// Returns Ok(true) if the filter is consistent, Ok(false) if the filter
     /// is over-confident or under-confident, or an error if no residuals are available.
     #[pyo3(signature=(alpha=None))]
-    pub fn is_nis_consistent(&self, alpha: Option<f64>) -> Result<bool, ODError> {
-        self.inner.is_nis_consistent(alpha)
+    pub fn nis_consistency(&self, alpha: Option<f64>) -> Result<NormalizedConsistency, ODError> {
+        self.inner.nis_consistency(alpha)
     }
 
     /// Checks whether the filter estimates are statistically consistent
@@ -520,12 +520,12 @@ impl PySpacecraftODSolution {
     /// Returns Ok(true) if the filter is consistent, Ok(false) if the filter
     /// is over-confident or under-confident, or an error if no estimates are available.
     #[pyo3(signature=(truth_traj, alpha=None))]
-    pub fn is_nees_consistent(
+    pub fn nees_consistency(
         &self,
         truth_traj: &PyTrajectory,
         alpha: Option<f64>,
-    ) -> Result<bool, ODError> {
-        self.inner.is_nees_consistent(&truth_traj.inner, alpha)
+    ) -> Result<NormalizedConsistency, ODError> {
+        self.inner.nees_consistency(&truth_traj.inner, alpha)
     }
 
     /// Smoothes this OD solution, returning a new OD solution and the filter-smoother consistency ratios, with updated **postfit** residuals, and where the ratio now represents the filter-smoother consistency ratio.

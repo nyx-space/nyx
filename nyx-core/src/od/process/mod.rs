@@ -41,7 +41,7 @@ use self::kalman::KalmanFilter;
 use self::msr::TrackingDataArc;
 pub use self::rejectcrit::SigmaRejection;
 mod solution;
-pub use solution::ODSolution;
+pub use solution::{NormalizedConsistency, ODSolution};
 mod initializers;
 
 /// An orbit determination process (ODP) which filters OD measurements through a Kalman filter.
