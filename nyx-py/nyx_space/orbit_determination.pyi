@@ -273,6 +273,14 @@ class GaussMarkov:
 class GroundStation:
     """GroundStation defines a one-way or two-way ranging and doppler station. Set the integration time for two-way."""
 
+    integration_time: typing.Any
+    light_time_correction: typing.Any
+    location: typing.Any
+    measurement_types: typing.Any
+    name: typing.Any
+    stochastic_noises: typing.Any
+    timestamp_noise_s: typing.Any
+
     def __init__(
         self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
     ) -> None:
@@ -290,12 +298,17 @@ class GroundStation:
     ) -> GroundStation:
         """GroundStation defines a one-way or two-way ranging and doppler station. Set the integration time for two-way."""
 
+    def add_measurement_type(
+        self, msr_type: typing.Any, noise: typing.Any
+    ) -> typing.Any: ...
     def azimuth_elevation_of(
         self, rx: typing.Any, obstructing_body: typing.Any, almanac: typing.Any
     ) -> typing.Any:
         """Computes the azimuth and elevation of the provided object seen from this ground station, both in degrees.
         This is a shortcut to almanac.azimuth_elevation_range_sez."""
 
+    def clear_measurement_types(self) -> typing.Any: ...
+    def clear_stochastic_noises(self) -> typing.Any: ...
     @staticmethod
     def dump_many_yaml(stations: typing.Any, path: typing.Any) -> typing.Any: ...
     @staticmethod
@@ -306,10 +319,16 @@ class GroundStation:
 
     @staticmethod
     def from_yaml(yaml_str: typing.Any) -> typing.Any: ...
+    def get_stochastic_noise(self, m_type: typing.Any) -> typing.Any: ...
     @staticmethod
     def load_many_yaml(path: typing.Any) -> typing.Any: ...
     @staticmethod
     def loads_many_yaml(yaml_str: typing.Any) -> typing.Any: ...
+    def remove_measurement_type(self, msr_type: typing.Any) -> typing.Any: ...
+    def remove_stochastic_noise(self, m_type: typing.Any) -> typing.Any: ...
+    def set_stochastic_noise(
+        self, m_type: typing.Any, noise: typing.Any
+    ) -> typing.Any: ...
     def to_asn1(self) -> bytes:
         """Encodes this GroundStation object into an ASN.1 DER encoded byte array."""
 
@@ -893,6 +912,42 @@ class SpacecraftODSolution:
     @staticmethod
     def from_parquet(path: typing.Any, devices: typing.Any) -> typing.Any: ...
     def is_filter_run(self) -> typing.Any: ...
+    def is_nees_consistent(
+        self, truth_traj: typing.Any, alpha: typing.Any = None
+    ) -> typing.Any:
+        """Checks whether the filter estimates are statistically consistent
+        by performing a Chi-squared test on the Normalized Estimation Error Squared (NEES).
+
+        For each estimate, NEES is computed as:
+        ```text
+        error^T * P^-1 * error
+        ```
+        where `error` is the difference between the estimated state and the true state,
+        and `P` is the estimated state covariance matrix.
+
+        The sum of NEES values should fall within the confidence interval of a
+        Chi-squared distribution with degrees of freedom `k = n * dim`, where `n`
+        is the number of estimates and `dim` is the state dimension.
+
+        Returns Ok(true) if the filter is consistent, Ok(false) if the filter
+        is over-confident or under-confident, or an error if no estimates are available."""
+
+    def is_nis_consistent(self, alpha: typing.Any = None) -> typing.Any:
+        """Checks whether the filter innovations are statistically consistent
+        by performing a Chi-squared test on the Normalized Innovation Squared (NIS).
+
+        For each accepted residual, NIS is computed as:
+        ```text
+        prefit^T * S_k^-1 * prefit
+        ```
+
+        The sum of NIS values should fall within the confidence interval of a
+        Chi-squared distribution with degrees of freedom `k = n * m`, where `n`
+        is the number of residuals and `m` is the measurement dimension.
+
+        Returns Ok(true) if the filter is consistent, Ok(false) if the filter
+        is over-confident or under-confident, or an error if no residuals are available."""
+
     def is_normal(self, alpha: typing.Any = None) -> typing.Any:
         """Checks whether the whitened residuals of the accepted residuals pass a normality test at a given significance level `alpha`, default to 0.05.
 
@@ -1299,7 +1354,7 @@ class TrackingDataArc:
     def chunk(self, max_duration: typing.Any) -> typing.Any:
         """Splits a long tracking data arc into smaller chunks, each up to `max_duration` long."""
 
-    def downsample(self, target_step: time.Duration) -> Self:
+    def downsample(self, target_step: time.Duration) -> TrackingDataArc:
         """Downsamples the tracking data to a lower frequency using a simple moving average low-pass filter followed by decimation,
         returning new `TrackingDataArc` with downsampled measurements.
 

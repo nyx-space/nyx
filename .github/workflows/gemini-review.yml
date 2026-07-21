@@ -2,16 +2,21 @@ name: "Nyx Space Intelligent Code Review"
 
 on:
   pull_request:
-    types: [opened, synchronize]
-    paths:
-      - '**.rs' # Restrict execution exclusively to Rust changes to conserve tokens
+    types: [opened]
+  issue_comment:
+    types: [created]
 
 jobs:
   gemini-review:
+    # Execute ONLY if a PR is opened, OR if a comment containing '/review' is posted on a PR.
+    if: >
+      (github.event_name == 'pull_request' && github.event.action == 'opened') ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '/review'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
+      issues: write # Required to read the issue_comment payload
 
     steps:
       - name: Checkout Repository
@@ -23,11 +28,21 @@ jobs:
           python-version: '3.13'
 
       - name: Install Runtime Dependencies
-        run: pip install google-genai requests
+        run: pip install google-genai requests pydantic
+
+      - name: Resolve PR Number Context
+        # The payload structure shifts depending on the trigger event.
+        # This step guarantees the Python script receives the correct integer.
+        id: pr_context
+        run: |
+          if [[ "${{ github.event_name }}" == "issue_comment" ]]; then
+            echo "PR_NUMBER=${{ github.event.issue.number }}" >> $GITHUB_ENV
+          else
+            echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
+          fi
 
       - name: Execute Custom Review Engine
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: python .github/scripts/gemini_reviewer.py

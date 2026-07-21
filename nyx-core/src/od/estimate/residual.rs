@@ -190,8 +190,8 @@ where
             self.tracker.as_ref().unwrap_or(&"Unknown".to_string()),
             self.epoch,
             self.ratio,
-            &self.prefit,
-            &self.postfit
+            self.prefit,
+            self.postfit
         )
     }
 }

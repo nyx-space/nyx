@@ -21,6 +21,7 @@ use anise::analysis::AnalysisError;
 use anise::ephemerides::ephemeris::{Ephemeris, LocalFrame};
 use anise::prelude::Almanac;
 use hifitime::{Duration, Epoch};
+use log::warn;
 use ndarray::Array2;
 use numpy::{PyArray2, PyReadonlyArray1};
 use nyx_space::NyxError;
@@ -526,6 +527,58 @@ impl PySpacecraftODSolution {
         alpha: Option<f64>,
     ) -> Result<NormalizedConsistency, ODError> {
         self.inner.nees_consistency(&truth_traj.inner, alpha)
+    }
+
+    /// Checks whether the filter innovations are statistically consistent
+    /// by performing a Chi-squared test on the Normalized Innovation Squared (NIS).
+    ///
+    /// For each accepted residual, NIS is computed as:
+    /// ```text
+    ///     prefit^T * S_k^-1 * prefit
+    /// ```
+    ///
+    /// The sum of NIS values should fall within the confidence interval of a
+    /// Chi-squared distribution with degrees of freedom `k = n * m`, where `n`
+    /// is the number of residuals and `m` is the measurement dimension.
+    ///
+    /// Returns Ok(true) if the filter is consistent, Ok(false) if the filter
+    /// is over-confident or under-confident, or an error if no residuals are available.
+    #[pyo3(signature=(alpha=None))]
+    #[allow(deprecated)]
+    pub fn is_nis_consistent(&self, alpha: Option<f64>) -> Result<bool, ODError> {
+        warn!(
+            "`is_nis_consistent` will be removed in a future version use `nis_consistency` instead"
+        );
+        self.inner.is_nis_consistent(alpha)
+    }
+
+    /// Checks whether the filter estimates are statistically consistent
+    /// by performing a Chi-squared test on the Normalized Estimation Error Squared (NEES).
+    ///
+    /// For each estimate, NEES is computed as:
+    /// ```text
+    ///     error^T * P^-1 * error
+    /// ```
+    /// where `error` is the difference between the estimated state and the true state,
+    /// and `P` is the estimated state covariance matrix.
+    ///
+    /// The sum of NEES values should fall within the confidence interval of a
+    /// Chi-squared distribution with degrees of freedom `k = n * dim`, where `n`
+    /// is the number of estimates and `dim` is the state dimension.
+    ///
+    /// Returns Ok(true) if the filter is consistent, Ok(false) if the filter
+    /// is over-confident or under-confident, or an error if no estimates are available.
+    #[pyo3(signature=(truth_traj, alpha=None))]
+    #[allow(deprecated)]
+    pub fn is_nees_consistent(
+        &self,
+        truth_traj: &PyTrajectory,
+        alpha: Option<f64>,
+    ) -> Result<bool, ODError> {
+        warn!(
+            "`is_nees_consistent` will be removed in a future version use `nees_consistency` instead"
+        );
+        self.inner.is_nees_consistent(&truth_traj.inner, alpha)
     }
 
     /// Smoothes this OD solution, returning a new OD solution and the filter-smoother consistency ratios, with updated **postfit** residuals, and where the ratio now represents the filter-smoother consistency ratio.

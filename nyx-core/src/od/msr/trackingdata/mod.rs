@@ -213,7 +213,7 @@ impl TrackingDataArc {
     /// - For high-precision applications (e.g., interplanetary navigation), consider using more advanced filtering techniques.
     ///
     /// :type target_step: Duration
-    /// :rtype: Self
+    /// :rtype: TrackingDataArc
     pub fn downsample(&self, target_step: Duration) -> Self {
         if self.is_empty() {
             return self.clone();

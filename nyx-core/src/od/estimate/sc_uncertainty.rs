@@ -224,9 +224,9 @@ impl fmt::LowerHex for KfEstimate<Spacecraft> {
             f,
             "=== {} @ {} -- within 3 sigma: {} ===\nstate {:x}\nsigmas [{}]\n",
             word,
-            &self.epoch(),
+            self.epoch(),
             self.within_3sigma(),
-            &self.state(),
+            self.state(),
             fmt_cov.join(", ")
         )
     }

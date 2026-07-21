@@ -311,9 +311,9 @@ where
         write!(
             f,
             "=== {word} @ {} -- within 3 sigma: {} ===\nstate {}\nsigmas [{}]\n",
-            &self.epoch(),
+            self.epoch(),
             self.within_3sigma(),
-            &self.state(),
+            self.state(),
             fmt_cov.join(", ")
         )
     }
@@ -350,9 +350,9 @@ where
             f,
             "=== {} @ {} -- within 3 sigma: {} ===\nstate {}\nsigmas [{}]\n",
             word,
-            &self.epoch(),
+            self.epoch(),
             self.within_3sigma(),
-            &self.state(),
+            self.state(),
             fmt_cov.join(", ")
         )
     }
