@@ -46,11 +46,7 @@ pub struct NormalizedConsistency {
 #[cfg_attr(feature = "python", pymethods)]
 impl NormalizedConsistency {
     pub fn name(&self) -> &'static str {
-        if self.is_nees {
-            "NEES"
-        } else {
-            "NIS"
-        }
+        if self.is_nees { "NEES" } else { "NIS" }
     }
 
     /// Returns true if there are more than 35 degrees of freedom
@@ -327,6 +323,25 @@ where
         })
     }
 
+    /// Checks whether the filter innovations are statistically consistent
+    /// by performing a Chi-squared test on the Normalized Innovation Squared (NIS).
+    ///
+    /// For each accepted residual, NIS is computed as:
+    /// ```text
+    ///     prefit^T * S_k^-1 * prefit
+    /// ```
+    ///
+    /// The sum of NIS values should fall within the confidence interval of a
+    /// Chi-squared distribution with degrees of freedom `k = n * m`, where `n`
+    /// is the number of residuals and `m` is the measurement dimension.
+    ///
+    /// Returns Ok(true) if the filter is consistent, Ok(false) if the filter
+    /// is over-confident or under-confident, or an error if no residuals are available.
+    #[deprecated(since = "2.4.2", note = "use `nis_consistency` instead")]
+    pub fn is_nis_consistent(&self, alpha: Option<f64>) -> Result<bool, ODError> {
+        self.nis_consistency(alpha).map(|ok| ok.is_consistent())
+    }
+
     /// Checks whether the filter estimates are statistically consistent
     /// by performing a Chi-squared test on the Normalized Estimation Error Squared (NEES).
     ///
@@ -476,5 +491,42 @@ where
             k,
             is_nees: true,
         })
+    }
+
+    /// Checks whether the filter estimates are statistically consistent
+    /// by performing a Chi-squared test on the Normalized Estimation Error Squared (NEES).
+    ///
+    /// For each estimate, NEES is computed as:
+    /// ```text
+    ///     error^T * P^-1 * error
+    /// ```
+    /// where `error` is the difference between the estimated state and the true state,
+    /// and `P` is the estimated state covariance matrix.
+    ///
+    /// The sum of NEES values should fall within the confidence interval of a
+    /// Chi-squared distribution with degrees of freedom `k = n * dim`, where `n`
+    /// is the number of estimates and `dim` is the actively estimated state dimension.
+    #[deprecated(since = "2.4.2", note = "use `nees_consistency` instead")]
+    pub fn is_nees_consistent(
+        &self,
+        truth_traj: &Traj<StateType>,
+        alpha: Option<f64>,
+    ) -> Result<bool, ODError>
+    where
+        StateType::Size: DimMin<StateType::Size>,
+        <StateType::Size as DimMin<StateType::Size>>::Output: DimSub<Const<1>>,
+        <<StateType as State>::Size as DimMin<<StateType as State>::Size>>::Output:
+            DimSub<Const<1>>,
+        DefaultAllocator: Allocator<StateType::Size, Const<1>>
+            + Allocator<Const<1>, <StateType as State>::Size>
+            + Allocator<<StateType::Size as DimMin<StateType::Size>>::Output, StateType::Size>
+            + Allocator<StateType::Size, <StateType::Size as DimMin<StateType::Size>>::Output>
+            + Allocator<<StateType::Size as DimMin<StateType::Size>>::Output>
+            + Allocator<
+                <<StateType::Size as DimMin<StateType::Size>>::Output as DimSub<Const<1>>>::Output,
+            >,
+    {
+        self.nees_consistency(truth_traj, alpha)
+            .map(|ok| ok.is_consistent())
     }
 }

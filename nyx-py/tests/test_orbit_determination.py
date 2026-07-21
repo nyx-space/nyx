@@ -62,6 +62,17 @@ def test_ground_station():
     print(gs)
     print(repr(gs))
 
+    assert isinstance(gs.measurement_types, list)
+    assert isinstance(gs.location, Location)
+
+    # Modify the supported measurement types
+    gs.remove_measurement_type(MeasurementType.Azimuth)
+    assert MeasurementType.Azimuth not in gs.measurement_types
+    gs.add_measurement_type(MeasurementType.Azimuth, StochasticNoise(name="angles"))
+    assert MeasurementType.Azimuth in gs.measurement_types
+    gs.clear_measurement_types()
+    assert len(gs.measurement_types) == 0
+
 
 def test_howto_simulate_tracking_data():
     """
@@ -378,6 +389,9 @@ def test_howto_exec_orbit_determination_filter():
         assert nees.is_consistent()
     except AssertionError:
         print("and this is confirmed in the NEES metric")
+
+    assert "is_nees_consistent" in dir(od_dev_sol)
+    assert "is_nis_consistent" in dir(od_dev_sol)
 
     assert od_dev_sol.is_normal(), "residuals should follow a normal distribution"
     assert od_dev_sol.is_filter_run(), "this is a filter run"
