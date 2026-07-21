@@ -35,7 +35,7 @@ anise = { version = "0.10.2", features = ["analysis"] }
 log = { version = "0.4", features = ["max_level_info"] }
 rayon = "1.6"
 pyo3 = { version = "0.28", features = ["multiple-pymethods"] }
-numpy = "0.28"
+numpy = "0.29"
 snafu = { version = "0.9.0", features = ["backtrace"] }
 
 nyx-space = { path = "nyx-core" }
