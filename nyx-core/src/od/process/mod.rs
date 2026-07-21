@@ -256,12 +256,8 @@ where
 
                     if msr.rejected {
                         debug!("Skipping manually rejected measurement at {}", epoch);
-                        match kf.time_update(nominal_state) {
-                            Ok(est) => {
-                                od_sol.push_time_update(est);
-                            }
-                            Err(e) => return Err(e),
-                        }
+                        let est = kf.time_update(nominal_state)?;
+                        od_sol.push_time_update(est);
                         prop_instance.state.reset_stm();
                         msr_rejected_cnt += 1;
                     } else {
@@ -421,14 +417,9 @@ where
                     break;
                 } else {
                     // No measurement can be used here, let's just do a time update and continue advancing the propagator.
-                    debug!("time update {epoch:?}, next msr {next_msr_epoch:?}");
-                    match kf.time_update(nominal_state) {
-                        Ok(est) => {
-                            // State deviation is always zero for an EKF time update so we don't do anything different than for a CKF.
-                            od_sol.push_time_update(est);
-                        }
-                        Err(e) => return Err(e),
-                    }
+                    // State deviation is always zero for an EKF time update so we don't do anything different than for a CKF.
+                    let est = kf.time_update(nominal_state)?;
+                    od_sol.push_time_update(est);
                     prop_instance.state.reset_stm();
                 }
             }
