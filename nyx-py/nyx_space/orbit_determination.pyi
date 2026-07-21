@@ -1354,7 +1354,7 @@ class TrackingDataArc:
     def chunk(self, max_duration: typing.Any) -> typing.Any:
         """Splits a long tracking data arc into smaller chunks, each up to `max_duration` long."""
 
-    def downsample(self, target_step: time.Duration) -> Self:
+    def downsample(self, target_step: time.Duration) -> TrackingDataArc:
         """Downsamples the tracking data to a lower frequency using a simple moving average low-pass filter followed by decimation,
         returning new `TrackingDataArc` with downsampled measurements.
 
