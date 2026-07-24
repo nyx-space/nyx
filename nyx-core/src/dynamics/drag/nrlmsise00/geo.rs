@@ -45,29 +45,6 @@ use hifitime::Epoch;
 /// `arika::earth::eop::NullEop` is rejected at compile time — see
 /// `arika/tests/trybuild/null_eop_in_iau2006_full_from_utc.rs`.
 
-/// Convert epoch to (day_of_year, ut_seconds).
-pub fn epoch_to_day_of_year_and_ut(epoch: &Epoch) -> (u32, f64) {
-    let (year, month, day, hour, min, sec, _) = epoch.to_gregorian_utc();
-    let doy = day_of_year(year, month as u32, day as u32);
-    let ut_sec = hour as f64 * 3600.0 + min as f64 * 60.0 + sec as f64;
-    (doy, ut_sec)
-}
-
-/// Compute day of year from (year, month, day).
-fn day_of_year(year: i32, month: u32, day: u32) -> u32 {
-    let is_leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
-    let days_in_month = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-
-    let mut doy = 0u32;
-    for m in 1..month {
-        doy += days_in_month[m as usize];
-        if m == 2 && is_leap {
-            doy += 1;
-        }
-    }
-    doy + day
-}
-
 /// Compute local apparent solar time [hours].
 ///
 /// Applies the Equation of Time correction to convert from mean to apparent

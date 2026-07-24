@@ -41,9 +41,9 @@ use crate::dynamics::{DynamicsAlmanacSnafu, DynamicsAstroSnafu, DynamicsError, F
 pub use crate::io::space_weather::Msise00DailyWeather;
 use crate::linalg::{Matrix4x3, Vector3};
 use anise::almanac::Almanac;
-use anise::constants::frames::IAU_EARTH_FRAME;
+use anise::frames::Frame;
 use core::fmt;
-use hifitime::Epoch;
+use hifitime::{Epoch, Unit};
 use snafu::ResultExt;
 use std::collections::BTreeMap;
 
@@ -57,27 +57,27 @@ mod model;
 #[derive(Debug, Clone)]
 pub struct Nrlmsise00Output {
     /// Exospheric temperature [K].
-    pub temp_exo: f64,
+    pub temp_exo_k: f64,
     /// Temperature at altitude [K].
-    pub temp_alt: f64,
+    pub temp_alt_k: f64,
     /// He number density [cm⁻³].
-    pub density_he: f64,
+    pub density_he_per_cm3: f64,
     /// O number density [cm⁻³].
-    pub density_o: f64,
+    pub density_o_per_cm3: f64,
     /// N₂ number density [cm⁻³].
-    pub density_n2: f64,
+    pub density_n2_per_cm3: f64,
     /// O₂ number density [cm⁻³].
-    pub density_o2: f64,
+    pub density_o2_per_cm3: f64,
     /// Ar number density [cm⁻³].
-    pub density_ar: f64,
+    pub density_ar_per_cm3: f64,
     /// H number density [cm⁻³].
-    pub density_h: f64,
+    pub density_h_per_cm3: f64,
     /// N number density [cm⁻³].
-    pub density_n: f64,
+    pub density_n_per_cm3: f64,
     /// Anomalous oxygen number density [cm⁻³].
-    pub density_anomalous_o: f64,
+    pub density_anomalous_o_per_cm3: f64,
     /// Total mass density [kg/m³].
-    pub total_mass_density: f64,
+    pub total_mass_density_kg_m3: f64,
 }
 
 /// Input parameters for a single NRLMSISE-00 evaluation.
@@ -116,13 +116,15 @@ pub struct Nrlmsise00Input {
 
 #[derive(Clone, Debug)]
 pub struct Nrlmsise00 {
+    /// Frame causing the drag
+    pub frame: Frame,
     pub weather: BTreeMap<Epoch, Msise00DailyWeather>,
 }
 
 impl Nrlmsise00 {
     /// Create a new NRLMSISE-00 model with the given space weather provider.
-    pub fn new(weather: BTreeMap<Epoch, Msise00DailyWeather>) -> Self {
-        Self { weather }
+    pub fn new(weather: BTreeMap<Epoch, Msise00DailyWeather>, frame: Frame) -> Self {
+        Self { weather, frame }
     }
 
     fn get_weather(&self, epoch: Epoch) -> Msise00DailyWeather {
@@ -147,17 +149,17 @@ impl Nrlmsise00 {
         // d[0..8]: He, O, N2, O2, Ar, total_mass(g/cm³), H, N, anomO
         // Total mass density: d[5] is in g/cm³, convert to kg/m³ (* 1000)
         Nrlmsise00Output {
-            temp_exo,
-            temp_alt,
-            density_he: d[0],
-            density_o: d[1],
-            density_n2: d[2],
-            density_o2: d[3],
-            density_ar: d[4],
-            density_h: d[6],
-            density_n: d[7],
-            density_anomalous_o: d[8],
-            total_mass_density: d[5] * 1000.0,
+            temp_exo_k: temp_exo,
+            temp_alt_k: temp_alt,
+            density_he_per_cm3: d[0],
+            density_o_per_cm3: d[1],
+            density_n2_per_cm3: d[2],
+            density_o2_per_cm3: d[3],
+            density_ar_per_cm3: d[4],
+            density_h_per_cm3: d[6],
+            density_n_per_cm3: d[7],
+            density_anomalous_o_per_cm3: d[8],
+            total_mass_density_kg_m3: d[5] * 1000.0,
         }
     }
 
@@ -173,29 +175,31 @@ impl Nrlmsise00 {
     /// use [`Nrlmsise00::calculate()`].
     pub fn density_with_composition(
         &self,
+        lst_h: f64,
         latitude_deg: f64,
         longitude_deg: f64,
         altitude_km: f64,
         epoch: Epoch,
-    ) -> Nrlmsise00Output {
-        let (doy, ut_seconds) = geo::epoch_to_day_of_year_and_ut(&epoch);
-        let lst = geo::local_solar_time(ut_seconds, longitude_deg, &epoch);
+    ) -> Result<Nrlmsise00Output, DynamicsError> {
         let sw = self.get_weather(epoch);
 
+        let at_midnight = epoch.with_hms(0, 0, 0);
+        let ut_seconds = (epoch - at_midnight).to_seconds();
+
         let input = Nrlmsise00Input {
-            day_of_year: doy,
+            day_of_year: at_midnight.day_of_year() as u32,
             ut_seconds,
             altitude_km,
             latitude_deg,
             longitude_deg,
-            local_solar_time_hours: lst,
-            f107_daily: sw.f107_daily,
-            f107_avg: sw.f107_avg,
+            local_solar_time_hours: lst_h,
+            f107_daily: sw.f107_daily_sfu,
+            f107_avg: sw.f107_avg_sfu,
             ap_daily: sw.ap_daily,
             ap_array: sw.ap_3hour_history,
         };
 
-        self.calculate(&input)
+        Ok(self.calculate(&input))
     }
 }
 
@@ -212,7 +216,7 @@ impl ForceModel for Nrlmsise00 {
 
     fn eom(&self, ctx: &Spacecraft, almanac: &Almanac) -> Result<Vector3<f64>, DynamicsError> {
         let integration_frame = ctx.orbit.frame;
-        let earth_frame = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
+        let earth_frame = almanac.frame_info(self.frame).unwrap();
 
         let osc_drag_frame =
             almanac
@@ -223,14 +227,27 @@ impl ForceModel for Nrlmsise00 {
 
         let lat_deg = osc_drag_frame.latitude_deg().unwrap();
         let lon_deg = osc_drag_frame.longitude_deg();
-        let r0 = earth_frame
-            .mean_equatorial_radius_km()
+
+        let alt_km = osc_drag_frame
+            .altitude_km()
             .context(AstroPhysicsSnafu)
             .context(DynamicsAstroSnafu)?;
-        let alt_km = osc_drag_frame.rmag_km() - r0;
 
-        let out = self.density_with_composition(lat_deg, lon_deg, alt_km, ctx.orbit.epoch);
-        let rho = out.total_mass_density;
+        let lst_h =
+            almanac
+                .local_solar_time(osc_drag_frame, None)
+                .context(DynamicsAlmanacSnafu {
+                    action: "computing local solar time",
+                })?;
+
+        let out = self.density_with_composition(
+            lst_h.to_unit(Unit::Hour),
+            lat_deg,
+            lon_deg,
+            alt_km,
+            ctx.orbit.epoch,
+        )?;
+        let rho = out.total_mass_density_kg_m3;
 
         let velocity_integr_frame = almanac
             .transform_to(osc_drag_frame, integration_frame, None)

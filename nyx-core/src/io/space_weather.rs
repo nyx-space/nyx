@@ -203,8 +203,8 @@ impl SpaceWeatherData {
         let ap_history = self.build_ap_history(target_midnight, bin_idx)?;
 
         Some(Msise00DailyWeather {
-            f107_daily: current_day.f107_obs,
-            f107_avg: current_day.f107_obs_center81,
+            f107_daily_sfu: current_day.f107_obs,
+            f107_avg_sfu: current_day.f107_obs_center81,
             ap_daily: current_day.ap_avg,
             ap_3hour_history: ap_history,
         })
@@ -266,10 +266,10 @@ impl SpaceWeatherData {
 /// Target weather payload required by the NRLMSISE-00 density model.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Msise00DailyWeather {
-    /// Daily F10.7 solar radio flux [SFU].
-    pub f107_daily: f64,
+    /// Daily F10.7 solar radio flux: $\text{ SFU} = 10^{-22} \text{ W}\cdot\text{m}^{-2}\cdot\text{Hz}^{-1}$.
+    pub f107_daily_sfu: f64,
     /// 81-day centered average F10.7 solar radio flux [SFU].
-    pub f107_avg: f64,
+    pub f107_avg_sfu: f64,
     /// Daily mean planetary Ap index.
     pub ap_daily: f64,
     /// 7-element Ap historical array covering the 57-hour lookback window.

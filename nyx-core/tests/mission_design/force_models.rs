@@ -1,6 +1,6 @@
 extern crate nyx_space as nyx;
 
-use anise::constants::frames::MOON_J2000;
+use anise::constants::frames::{IAU_EARTH_FRAME, MOON_J2000};
 use nyx::cosmic::{Orbit, Spacecraft};
 use nyx::dynamics::{Drag, OrbitalDynamics, SolarPressure, SpacecraftDynamics};
 use nyx::linalg::Vector6;
@@ -401,14 +401,14 @@ fn test_prop_nrlmsise00(almanac: Arc<Almanac>) {
     weather.insert(
         epoch,
         Msise00DailyWeather {
-            f107_daily: 150.0,
-            f107_avg: 150.0,
+            f107_daily_sfu: 150.0,
+            f107_avg_sfu: 150.0,
             ap_daily: 15.0,
             ap_3hour_history: [15.0; 7],
         },
     );
 
-    let nrlmsise00 = Nrlmsise00::new(weather);
+    let nrlmsise00 = Nrlmsise00::new(weather, IAU_EARTH_FRAME);
     let dynamics = SpacecraftDynamics::from_models(
         nyx_space::dynamics::OrbitalDynamics::two_body(),
         vec![Arc::new(nrlmsise00)],
