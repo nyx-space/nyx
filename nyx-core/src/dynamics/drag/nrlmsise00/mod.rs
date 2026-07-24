@@ -48,7 +48,6 @@ use snafu::ResultExt;
 use std::collections::BTreeMap;
 
 pub mod coefficients;
-pub mod geo;
 mod model;
 
 /// Full output of the NRLMSISE-00 model.
@@ -127,20 +126,6 @@ impl Nrlmsise00 {
         Self { weather, frame }
     }
 
-    fn get_weather(&self, epoch: Epoch) -> Msise00DailyWeather {
-        if self.weather.is_empty() {
-            return Msise00DailyWeather::default();
-        }
-        let mut prev = self.weather.keys().next().unwrap();
-        for k in self.weather.keys() {
-            if *k > epoch {
-                break;
-            }
-            prev = k;
-        }
-        self.weather[prev]
-    }
-
     /// Compute full NRLMSISE-00 output for the given input parameters.
     ///
     /// Returns temperatures and all species number densities.
@@ -181,7 +166,15 @@ impl Nrlmsise00 {
         altitude_km: f64,
         epoch: Epoch,
     ) -> Result<Nrlmsise00Output, DynamicsError> {
-        let sw = self.get_weather(epoch);
+        // THis is an O(log N) look up
+        let sw = self
+            .weather
+            .range(..=epoch)
+            .next_back()
+            .map(|(_, v)| v)
+            .or_else(|| self.weather.values().next())
+            .copied()
+            .unwrap_or_default();
 
         let at_midnight = epoch.with_hms(0, 0, 0);
         let ut_seconds = (epoch - at_midnight).to_seconds();
