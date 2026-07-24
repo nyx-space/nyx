@@ -19,11 +19,11 @@ use crate::io::watermark::pq_writer;
 use crate::io::{ArrowSnafu, InputOutputError, MissingDataSnafu, ParquetSnafu, StdIOSnafu};
 use crate::io::{EmptyDatasetSnafu, ExportCfg};
 use crate::od::msr::{Measurement, MeasurementType};
-use arrow::array::{Array, Float64Builder, StringBuilder};
+use arrow::array::{Array, BooleanBuilder, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 use arrow::{
-    array::{Float64Array, PrimitiveArray, StringArray},
+    array::{BooleanArray, Float64Array, PrimitiveArray, StringArray},
     datatypes,
     record_batch::RecordBatchReader,
 };
@@ -61,6 +61,7 @@ impl TrackingDataArc {
         let mut doppler_avail = false;
         let mut az_avail = false;
         let mut el_avail = false;
+        let mut rejected_avail = false;
         for field in &reader.schema().fields {
             match field.name().as_str() {
                 "Epoch (UTC)" => has_epoch = true,
@@ -69,6 +70,7 @@ impl TrackingDataArc {
                 "Doppler (km/s)" => doppler_avail = true,
                 "Azimuth (deg)" => az_avail = true,
                 "Elevation (deg)" => el_avail = true,
+                "Rejected" => rejected_avail = true,
                 _ => {}
             }
         }
@@ -168,6 +170,19 @@ impl TrackingDataArc {
                 None
             };
 
+            let rejected_data: Option<&BooleanArray> = if rejected_avail {
+                Some(
+                    batch
+                        .column_by_name("Rejected")
+                        .unwrap()
+                        .as_any()
+                        .downcast_ref::<BooleanArray>()
+                        .unwrap(),
+                )
+            } else {
+                None
+            };
+
             // Set the measurements in the tracking arc
             for i in 0..batch.num_rows() {
                 let epoch = Epoch::from_gregorian_str(epochs.value(i)).map_err(|e| {
@@ -176,11 +191,17 @@ impl TrackingDataArc {
                     }
                 })?;
 
+                let rejected = if let Some(rej_data) = rejected_data {
+                    rej_data.value(i)
+                } else {
+                    false
+                };
+
                 let mut measurement = Measurement {
                     epoch,
                     tracker: tracking_device.value(i).to_string(),
                     data: IndexMap::new(),
-                    rejected: false,
+                    rejected,
                 };
 
                 if range_avail {
@@ -260,6 +281,8 @@ impl TrackingDataArc {
 
         hdrs.append(&mut msr_fields);
 
+        hdrs.push(Field::new("Rejected", DataType::Boolean, false));
+
         // Build the schema
         let schema = Arc::new(Schema::new(hdrs));
         let mut record: Vec<Arc<dyn Array>> = Vec::new();
@@ -309,6 +332,13 @@ impl TrackingDataArc {
             }
             record.push(Arc::new(data_builder.finish()));
         }
+
+        // Rejected flag
+        let mut rejected_builder = BooleanBuilder::new();
+        for m in &measurements {
+            rejected_builder.append_value(m.rejected);
+        }
+        record.push(Arc::new(rejected_builder.finish()));
 
         // Serialize all of the devices and add that to the parquet file too.
         let mut metadata = HashMap::new();
