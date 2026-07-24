@@ -35,6 +35,8 @@ use pyo3::prelude::*;
 #[cfg(feature = "python")]
 use pyo3::types::PyType;
 
+pub mod nrlmsise00;
+
 /// Density in kg/m^3 and altitudes in meters, not kilometers!
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, StaticType)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
@@ -84,7 +86,11 @@ impl fmt::Display for ConstantDrag {
 
 impl ForceModel for ConstantDrag {
     fn estimation_index(&self) -> Option<usize> {
-        if self.estimate { Some(7) } else { None }
+        if self.estimate {
+            Some(7)
+        } else {
+            None
+        }
     }
 
     fn eom(&self, ctx: &Spacecraft, almanac: &Almanac) -> Result<Vector3<f64>, DynamicsError> {
@@ -175,7 +181,11 @@ impl fmt::Display for Drag {
 
 impl ForceModel for Drag {
     fn estimation_index(&self) -> Option<usize> {
-        if self.estimate { Some(7) } else { None }
+        if self.estimate {
+            Some(7)
+        } else {
+            None
+        }
     }
 
     fn eom(&self, ctx: &Spacecraft, almanac: &Almanac) -> Result<Vector3<f64>, DynamicsError> {
@@ -315,5 +325,3 @@ impl Drag {
         format!("{self} @ {self:p}")
     }
 }
-
-pub mod nrlmsise00;

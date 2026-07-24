@@ -386,7 +386,7 @@ fn std_atm_drag_earth_low(almanac: Arc<Almanac>) {
 
 #[rstest]
 fn test_prop_nrlmsise00(almanac: Arc<Almanac>) {
-    use nyx_space::dynamics::drag::nrlmsise00::{DailySpaceWeather, Nrlmsise00};
+    use nyx_space::dynamics::drag::nrlmsise00::{Msise00DailyWeather, Nrlmsise00};
     use nyx_space::dynamics::SpacecraftDynamics;
     use std::collections::BTreeMap;
     use std::sync::Arc;
@@ -400,7 +400,7 @@ fn test_prop_nrlmsise00(almanac: Arc<Almanac>) {
     let mut weather = BTreeMap::new();
     weather.insert(
         epoch,
-        DailySpaceWeather {
+        Msise00DailyWeather {
             f107_daily: 150.0,
             f107_avg: 150.0,
             ap_daily: 15.0,

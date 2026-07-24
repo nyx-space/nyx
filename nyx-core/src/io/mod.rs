@@ -36,8 +36,8 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use typed_builder::TypedBuilder;
 
-/// Handles loading of gravity models using files of NASA PDS and GMAT COF. Several gunzipped files are provided with nyx.
 pub mod gravity;
+pub mod space_weather;
 
 use std::io;
 
@@ -171,6 +171,8 @@ pub enum InputOutputError {
     SerializeDhall { what: String, err: String },
     #[snafu(display("empty dataset error when (de)serializing {action}"))]
     EmptyDataset { action: &'static str },
+    #[snafu(display("CSV reading errors when {action}: {source}"))]
+    CsvData {source: csv::Error, action: &'static str}
 }
 
 impl PartialEq for InputOutputError {

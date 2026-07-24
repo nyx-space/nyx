@@ -1,3 +1,21 @@
+/*
+    Nyx, blazing fast astrodynamics
+    Copyright (C) 2018-onwards Christopher Rabotin <christopher.rabotin@gmail.com>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
 //! NRLMSISE-00 empirical atmosphere model.
 //!
 //! Clean-room implementation based on the following references:
@@ -18,13 +36,20 @@
 //!
 //! Validated against `pymsis` (official NRL Fortran wrapper, `version=0`).
 
-pub mod coefficients;
-pub mod geo;
-mod model;
-
+use crate::cosmic::{AstroError, AstroPhysicsSnafu, Spacecraft};
+use crate::dynamics::{DynamicsAlmanacSnafu, DynamicsAstroSnafu, DynamicsError, ForceModel};
+pub use crate::io::space_weather::Msise00DailyWeather;
+use crate::linalg::{Matrix4x3, Vector3};
+use anise::almanac::Almanac;
+use anise::constants::frames::IAU_EARTH_FRAME;
+use core::fmt;
 use hifitime::Epoch;
 use snafu::ResultExt;
 use std::collections::BTreeMap;
+
+pub mod coefficients;
+pub mod geo;
+mod model;
 
 /// Full output of the NRLMSISE-00 model.
 ///
@@ -89,33 +114,20 @@ pub struct Nrlmsise00Input {
 /// Generic over the space weather provider `P`. Use [`ConstantWeather`] for
 /// fixed conditions, or [`CssiSpaceWeather`] for time-varying data.
 
-/// Daily space weather data.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct DailySpaceWeather {
-    /// Daily F10.7 [SFU].
-    pub f107_daily: f64,
-    /// 81-day centered average F10.7 [SFU].
-    pub f107_avg: f64,
-    /// Daily Ap index.
-    pub ap_daily: f64,
-    /// 7-element Ap array for magnetic activity variations.
-    pub ap_3hour_history: [f64; 7],
-}
-
 #[derive(Clone, Debug)]
 pub struct Nrlmsise00 {
-    pub weather: BTreeMap<Epoch, DailySpaceWeather>,
+    pub weather: BTreeMap<Epoch, Msise00DailyWeather>,
 }
 
 impl Nrlmsise00 {
     /// Create a new NRLMSISE-00 model with the given space weather provider.
-    pub fn new(weather: BTreeMap<Epoch, DailySpaceWeather>) -> Self {
+    pub fn new(weather: BTreeMap<Epoch, Msise00DailyWeather>) -> Self {
         Self { weather }
     }
 
-    fn get_weather(&self, epoch: Epoch) -> DailySpaceWeather {
+    fn get_weather(&self, epoch: Epoch) -> Msise00DailyWeather {
         if self.weather.is_empty() {
-            return DailySpaceWeather::default();
+            return Msise00DailyWeather::default();
         }
         let mut prev = self.weather.keys().next().unwrap();
         for k in self.weather.keys() {
@@ -186,15 +198,6 @@ impl Nrlmsise00 {
         self.calculate(&input)
     }
 }
-
-use crate::cosmic::AstroError;
-use crate::cosmic::AstroPhysicsSnafu;
-use crate::cosmic::Spacecraft;
-use crate::dynamics::{DynamicsAlmanacSnafu, DynamicsAstroSnafu, DynamicsError, ForceModel};
-use crate::linalg::{Matrix4x3, Vector3};
-use anise::almanac::Almanac;
-use anise::constants::frames::IAU_EARTH_FRAME;
-use core::fmt;
 
 impl fmt::Display for Nrlmsise00 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

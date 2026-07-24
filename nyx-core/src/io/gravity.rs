@@ -16,8 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::NyxError;
 use crate::linalg::DMatrix;
+use crate::NyxError;
 use anise::errors::AlmanacError;
 use anise::frames::{Frame, FrameUid};
 use anise::prelude::Almanac;
@@ -28,7 +28,7 @@ use serde_dhall::{SimpleType, StaticType};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fs::File;
-use std::io::prelude::*;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
