@@ -383,3 +383,44 @@ fn std_atm_drag_earth_low(almanac: Arc<Almanac>) {
 
     */
 }
+
+#[rstest]
+fn test_prop_nrlmsise00(almanac: Arc<Almanac>) {
+    use nyx_space::dynamics::drag::nrlmsise00::{DailySpaceWeather, Nrlmsise00};
+    use nyx_space::dynamics::SpacecraftDynamics;
+    use std::collections::BTreeMap;
+    use std::sync::Arc;
+    let eme2k = almanac
+        .frame_info(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
+
+    let epoch = Epoch::from_gregorian_utc(2024, 3, 20, 12, 0, 0, 0);
+
+    let mut weather = BTreeMap::new();
+    weather.insert(
+        epoch,
+        DailySpaceWeather {
+            f107_daily: 150.0,
+            f107_avg: 150.0,
+            ap_daily: 15.0,
+            ap_3hour_history: [15.0; 7],
+        },
+    );
+
+    let nrlmsise00 = Nrlmsise00::new(weather);
+    let dynamics = SpacecraftDynamics::from_models(
+        nyx_space::dynamics::OrbitalDynamics::two_body(),
+        vec![Arc::new(nrlmsise00)],
+    );
+
+    let orbit = Orbit::keplerian(6778.137, 0.001, 51.6, 0.0, 0.0, 0.0, epoch, eme2k);
+    let spacecraft = Spacecraft::from_drag_defaults(orbit, 100.0, 1.0);
+
+    let propagator = Propagator::default(dynamics);
+
+    let _end_state = propagator
+        .with(spacecraft, almanac.clone())
+        .for_duration(1.0 * Unit::Hour)
+        .unwrap();
+}
