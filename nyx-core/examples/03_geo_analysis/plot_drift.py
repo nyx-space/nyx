@@ -25,7 +25,7 @@ if __name__ == "__main__":
             y=df_lla["Latitude N-S (deg)"],
             mode="markers+lines",
             name="Latitude",
-            marker=dict(color="blue"),
+            marker={"color": "blue"},
         ),
         row=1,
         col=1,
@@ -38,7 +38,7 @@ if __name__ == "__main__":
             y=df_lla["Longitude E-W (deg)"],
             mode="markers+lines",
             name="Longitude",
-            marker=dict(color="blue"),
+            marker={"color": "blue"},
         ),
         row=2,
         col=1,
@@ -55,7 +55,7 @@ if __name__ == "__main__":
         col=1,
         annotation_text=f"{lower_lat_deg:.3} - 0.05 deg",
         annotation_position="top right",
-        line=dict(color="Red", width=1, dash="dash"),
+        line={"color": "Red", "width": 1, "dash": "dash"},
     )
     fig.add_hline(
         higher_lat_deg,
@@ -63,7 +63,7 @@ if __name__ == "__main__":
         col=1,
         annotation_text=f"{lower_lat_deg:.3} + 0.05 deg",
         annotation_position="top right",
-        line=dict(color="Red", width=1, dash="dash"),
+        line={"color": "Red", "width": 1, "dash": "dash"},
     )
 
     # Add vertical line to the longitude plot
@@ -77,7 +77,7 @@ if __name__ == "__main__":
         col=1,
         annotation_text=f"{lower_long_deg:.3} - 0.1 deg",
         annotation_position="top right",
-        line=dict(color="Red", width=1, dash="dash"),
+        line={"color": "Red", "width": 1, "dash": "dash"},
     )
     fig.add_hline(
         higher_long_deg,
@@ -85,7 +85,7 @@ if __name__ == "__main__":
         col=1,
         annotation_text=f"{lower_lat_deg:.3} + 0.1 deg",
         annotation_position="top right",
-        line=dict(color="Red", width=1, dash="dash"),
+        line={"color": "Red", "width": 1, "dash": "dash"},
     )
 
     # Update layout

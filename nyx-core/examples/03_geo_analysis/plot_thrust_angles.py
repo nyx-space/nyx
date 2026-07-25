@@ -32,7 +32,7 @@ if __name__ == "__main__":
             nbinsx=72,  # 5-degree bins for AoL
             nbinsy=100,  # Granularity of the SMA progression
             colorscale="Viridis",
-            colorbar=dict(title="In-Plane (deg)", len=0.45, y=0.75),
+            colorbar={"title": "In-Plane (deg)", "len": 0.45, "y": 0.75},
         ),
         row=1,
         col=1,
@@ -48,7 +48,7 @@ if __name__ == "__main__":
             nbinsx=72,
             nbinsy=100,
             colorscale="RdBu",  # Diverging scale often better for out-of-plane
-            colorbar=dict(title="Out-of-Plane (deg)", len=0.45, y=0.25),
+            colorbar={"title": "Out-of-Plane (deg)", "len": 0.45, "y": 0.25},
         ),
         row=2,
         col=1,
