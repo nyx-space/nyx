@@ -470,10 +470,8 @@ where
             let epoch = nominal_state.epoch();
             // No measurement can be used here, let's just do a time update
             debug!("time update {epoch}");
-            {
-                let est = kf.time_update(nominal_state)?;
-                od_sol.push_time_update(est);
-            }
+            let est = kf.time_update(nominal_state)?;
+            od_sol.push_time_update(est);
             prop_instance.state.reset_stm();
             if epoch >= end_epoch {
                 break;

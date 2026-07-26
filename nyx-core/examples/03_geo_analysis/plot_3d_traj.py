@@ -75,11 +75,11 @@ def plot_traj(
                 y=traj_df["y (km)"],
                 z=traj_df["z (km)"],
                 mode="lines",
-                line=dict(
-                    color=traj_df[colored_by] * scale,
-                    colorscale="Viridis",
-                    colorbar=dict(title=color_descr),
-                ),
+                line={
+                    "color": traj_df[colored_by] * scale,
+                    "colorscale": "Viridis",
+                    "colorbar": {"title": color_descr},
+                },
                 name="GEO",
             )
         ]

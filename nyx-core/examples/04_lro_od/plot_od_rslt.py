@@ -52,13 +52,13 @@ def main(path: str, full: bool):
     # Add scatter points
     fig_qq.add_trace(
         go.Scatter(
-            x=qq[0][0], y=qq[0][1], mode="markers", name="Residuals ratios (QQ)", marker=dict(color="blue")
+            x=qq[0][0], y=qq[0][1], mode="markers", name="Residuals ratios (QQ)", marker={"color": "blue"}
         )
     )
 
     # Add the theoretical line
     fig_qq.add_trace(
-        go.Scatter(x=x_qq, y=y_qq, mode="lines", name="Theoretical Normal", line=dict(color="red"))
+        go.Scatter(x=x_qq, y=y_qq, mode="lines", name="Theoretical Normal", line={"color": "red"})
     )
 
     # Update layout
@@ -98,15 +98,15 @@ def main(path: str, full: bool):
         fig = px.scatter(df_resid_ok, x="Epoch (UTC)", y=y_cols)
         fig.update_traces(
             mode="lines",
-            selector=dict(name=f"Measurement noise 3-Sigma: {msr}"),
+            selector={"name": f"Measurement noise 3-Sigma: {msr}"},
             connectgaps=True,
-            line=dict(dash="dash", color="black"),
+            line={"dash": "dash", "color": "black"},
         )
         fig.update_traces(
             mode="lines",
-            selector=dict(name=f"Measurement noise -3-Sigma: {msr}"),
+            selector={"name": f"Measurement noise -3-Sigma: {msr}"},
             connectgaps=True,
-            line=dict(dash="dash", color="black"),
+            line={"dash": "dash", "color": "black"},
         )
         unit = msr.split()[-1][1:-1]
         fig.update_layout(yaxis_title=unit)

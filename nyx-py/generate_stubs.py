@@ -6,7 +6,8 @@ import logging
 import re
 import subprocess
 from functools import reduce
-from typing import Any, Dict, List, Mapping, Optional, Set, Tuple, Union
+from typing import Any, Optional, Union
+from collections.abc import Mapping
 
 
 def path_to_type(*elements: str) -> ast.AST:
@@ -17,7 +18,7 @@ def path_to_type(*elements: str) -> ast.AST:
 
 
 OBJECT_MEMBERS = dict(inspect.getmembers(object))
-BUILTINS: Dict[str, Union[None, Tuple[List[ast.AST], ast.AST]]] = {
+BUILTINS: dict[str, Union[None, tuple[list[ast.AST], ast.AST]]] = {
     "__annotations__": None,
     "__bool__": ([], path_to_type("bool")),
     "__bytes__": ([], path_to_type("bytes")),
@@ -223,12 +224,12 @@ def module_stubs(module: Any) -> ast.Module:
 
 
 def class_stubs(
-    cls_name: str, cls_def: Any, element_path: List[str], types_to_import: Set[str]
+    cls_name: str, cls_def: Any, element_path: list[str], types_to_import: set[str]
 ) -> ast.ClassDef:
-    attributes: List[ast.AST] = []
-    methods: List[ast.AST] = []
-    magic_methods: List[ast.AST] = []
-    constants: List[ast.AST] = []
+    attributes: list[ast.AST] = []
+    methods: list[ast.AST] = []
+    magic_methods: list[ast.AST] = []
+    constants: list[ast.AST] = []
 
     for member_name, member_value in inspect.getmembers(cls_def):
         current_element_path = [*element_path, member_name]
@@ -324,9 +325,9 @@ def class_stubs(
 def data_descriptor_stub(
     data_desc_name: str,
     data_desc_def: Any,
-    element_path: List[str],
-    types_to_import: Set[str],
-) -> Union[Tuple[ast.AnnAssign, ast.Expr], Tuple[ast.AnnAssign]]:
+    element_path: list[str],
+    types_to_import: set[str],
+) -> Union[tuple[ast.AnnAssign, ast.Expr], tuple[ast.AnnAssign]]:
     annotation = None
     doc_comment = None
 
@@ -358,13 +359,13 @@ def data_descriptor_stub(
 def function_stub(
     fn_name: str,
     fn_def: Any,
-    element_path: List[str],
-    types_to_import: Set[str],
+    element_path: list[str],
+    types_to_import: set[str],
     *,
     in_class: bool,
     cls_def: Any = None,
 ) -> ast.FunctionDef:
-    body: List[ast.AST] = []
+    body: list[ast.AST] = []
     doc = getattr(fn_def, "__doc__", None) or inspect.getdoc(fn_def)
     if not isinstance(doc, str):
         if doc is not None:
@@ -456,8 +457,8 @@ def arguments_stub(
     callable_name: str,
     callable_def: Any,
     doc: str,
-    element_path: List[str],
-    types_to_import: Set[str],
+    element_path: list[str],
+    types_to_import: set[str],
     in_class: bool,
     is_static: bool,
     is_class: bool,
@@ -717,8 +718,8 @@ def arguments_stub(
 def returns_stub(
     callable_name: str,
     doc: str,
-    element_path: List[str],
-    types_to_import: Set[str],
+    element_path: list[str],
+    types_to_import: set[str],
     in_class: bool = False,
 ) -> Optional[ast.AST]:
     if "Error" in element_path[1]:
@@ -757,14 +758,14 @@ def returns_stub(
 
 
 def convert_type_from_doc(
-    type_str: str, element_path: List[str], types_to_import: Set[str]
+    type_str: str, element_path: list[str], types_to_import: set[str]
 ) -> ast.AST:
     type_str = type_str.strip()
     return parse_type_to_ast(type_str, element_path, types_to_import)
 
 
 def parse_type_to_ast(
-    type_str: str, element_path: List[str], types_to_import: Set[str]
+    type_str: str, element_path: list[str], types_to_import: set[str]
 ) -> ast.AST:
     # Resolve known types
     if type_str in TYPE_MAPPING:
@@ -799,10 +800,10 @@ def parse_type_to_ast(
         tokens.append(current_token)
 
     # let's first parse nested parenthesis
-    stack: List[List[Any]] = [[]]
+    stack: list[list[Any]] = [[]]
     for token in tokens:
         if token == "[":
-            children: List[str] = []
+            children: list[str] = []
             stack[-1].append(children)
             stack.append(children)
         elif token == "]":
@@ -810,9 +811,9 @@ def parse_type_to_ast(
         else:
             stack[-1].append(token)
 
-    def parse_sequence(sequence: List[Any]) -> ast.AST:
+    def parse_sequence(sequence: list[Any]) -> ast.AST:
         # 1. Handle commas first: split the sequence into distinct arguments
-        args: List[List[Any]] = [[]]
+        args: list[list[Any]] = [[]]
         for e in sequence:
             if e == ",":
                 args.append([])
@@ -829,14 +830,14 @@ def parse_type_to_ast(
 
         # 3. Existing logic for "or" (Union types) within a single argument
         actual_sequence = args[0]
-        or_groups: List[List[Any]] = [[]]
+        or_groups: list[list[Any]] = [[]]
         for e in actual_sequence:
             if e == "or" or e == "|":
                 or_groups.append([])
             else:
                 or_groups[-1].append(e)
 
-        new_elements: List[ast.AST] = []
+        new_elements: list[ast.AST] = []
         for group in or_groups:
             if len(group) == 1 and isinstance(group[0], str):
                 # Standard type: int
@@ -875,7 +876,7 @@ def parse_type_to_ast(
 
 
 def concatenated_path_to_type(
-    path: str, element_path: List[str], types_to_import: Set[str]
+    path: str, element_path: list[str], types_to_import: set[str]
 ) -> ast.AST:
     # Resolve known types
     if path in TYPE_MAPPING:
