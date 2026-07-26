@@ -37,10 +37,13 @@
 //! Validated against `pymsis` (official NRL Fortran wrapper, `version=0`).
 
 use crate::cosmic::{AstroError, AstroPhysicsSnafu, Spacecraft};
-use crate::dynamics::{DynamicsAlmanacSnafu, DynamicsAstroSnafu, DynamicsError, ForceModel};
+use crate::dynamics::{
+    DynamicsAlmanacSnafu, DynamicsAstroSnafu, DynamicsError, DynamicsPlanetarySnafu, ForceModel,
+};
 pub use crate::io::space_weather::Msise00DailyWeather;
 use crate::linalg::{Matrix4x3, Vector3};
 use anise::almanac::Almanac;
+use anise::errors::OrientationSnafu;
 use anise::frames::Frame;
 use core::fmt;
 use hifitime::{Epoch, Unit};
@@ -210,20 +213,21 @@ impl ForceModel for Nrlmsise00 {
 
     fn eom(&self, ctx: &Spacecraft, almanac: &Almanac) -> Result<Vector3<f64>, DynamicsError> {
         let integration_frame = ctx.orbit.frame;
-        let earth_frame = almanac.frame_info(self.frame).unwrap();
+        let drag_frame = almanac
+            .frame_info(self.frame)
+            .context(DynamicsPlanetarySnafu {
+                action: "fetching drag frame information",
+            })?;
 
         let osc_drag_frame =
             almanac
-                .transform_to(ctx.orbit, earth_frame, None)
+                .transform_to(ctx.orbit, drag_frame, None)
                 .context(DynamicsAlmanacSnafu {
                     action: "transforming into drag frame",
                 })?;
 
-        let lat_deg = osc_drag_frame.latitude_deg().unwrap();
-        let lon_deg = osc_drag_frame.longitude_deg();
-
-        let alt_km = osc_drag_frame
-            .altitude_km()
+        let (lat_deg, long_deg, alt_km) = osc_drag_frame
+            .latlongalt()
             .context(AstroPhysicsSnafu)
             .context(DynamicsAstroSnafu)?;
 
@@ -234,34 +238,39 @@ impl ForceModel for Nrlmsise00 {
                     action: "computing local solar time",
                 })?;
 
-        let out = self.density_with_composition(
-            lst_h.to_unit(Unit::Hour),
-            lat_deg,
-            lon_deg,
-            alt_km,
-            ctx.orbit.epoch,
-        )?;
+        let rho_kg_m3 = self
+            .density_with_composition(
+                lst_h.to_unit(Unit::Hour),
+                lat_deg,
+                long_deg,
+                alt_km,
+                ctx.orbit.epoch,
+            )?
+            .total_mass_density_kg_m3;
 
-        let rho_kg_m3 = out.total_mass_density_kg_m3;
+        let v_km_s = osc_drag_frame.velocity_km_s;
 
-        let velocity_integr_frame = almanac
-            .transform_to(osc_drag_frame, integration_frame, None)
+        // Note this is in kg*km/s^2 (or kN) because the vehicle mass has not yet been divided.
+        let accel_drag_frame_kg_km_s2 = -0.5
+            * 1e3
+            * rho_kg_m3
+            * ctx.drag.coeff_drag
+            * ctx.drag.area_m2
+            * v_km_s.norm()
+            * v_km_s;
+
+        let accel_integr_frame = almanac
+            .rotate(drag_frame, integration_frame, ctx.orbit.epoch)
+            .context(OrientationSnafu {
+                action: "rotating drafg force into integration frame",
+            })
             .context(DynamicsAlmanacSnafu {
-                action: "rotating into the integration frame",
+                action: "rotating drag force into integration frame",
             })?
-            .velocity_km_s;
-
-        let v_km_s = velocity_integr_frame - osc_drag_frame.velocity_km_s;
+            * accel_drag_frame_kg_km_s2;
 
         // Finally, apply the drag model.
-        Ok(
-            -0.5 * 1e3
-                * rho_kg_m3
-                * ctx.drag.coeff_drag
-                * ctx.drag.area_m2
-                * v_km_s.norm()
-                * v_km_s,
-        )
+        Ok(accel_integr_frame)
     }
 
     fn gradient(

@@ -151,7 +151,7 @@ pub trait ForceModel: Send + Sync + fmt::Display {
     /// actively estimated in the filter state, this returns its corresponding index in the state vector.
     fn estimation_index(&self) -> Option<usize>;
 
-    /// Evaluates the force vector $\mathbf{F}$ at the provided state and epoch.
+    /// Evaluates the force vector $\mathbf{F}$ at the provided state and epoch. Must be in kg*km/s^2 (or kN).
     fn eom(&self, ctx: &Spacecraft, almanac: &Almanac) -> Result<Vector3<f64>, DynamicsError>;
 
     /// Evaluates the nominal force vector $\mathbf{F}$ and its partial derivatives for State Transition Matrix (STM) propagation.
