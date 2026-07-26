@@ -16,12 +16,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::State;
 use crate::cosmic::{AstroError, Orbit};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, Matrix3, Matrix4x3, OMatrix, OVector, Vector3};
-use anise::almanac::Almanac;
+use crate::State;
 use anise::almanac::planetary::PlanetaryDataError;
+use anise::almanac::Almanac;
 use anise::errors::AlmanacError;
 use hyperdual::Owned;
 use snafu::Snafu;
@@ -137,19 +137,29 @@ where
     }
 }
 
-/// The `ForceModel` trait handles immutable dynamics which return a force. Those will be divided by the mass of the spacecraft to compute the acceleration (F = ma).
+/// Evaluates mass-dependent forces acting on a spacecraft.
 ///
-/// Examples include Solar Radiation Pressure, drag, etc., i.e. forces which do not need to save the current state, only act on it.
+/// Implementations of `ForceModel` operate on a full [`Spacecraft`] context to account for
+/// physical properties such as mass, cross-sectional area, and surface coefficients (e.g.,
+/// aerodynamic drag, solar radiation pressure). The evaluated force vector $\mathbf{F}$ is
+/// scaled by the inverse spacecraft mass ($1/m$) and unit conversions during numerical
+/// integration to yield acceleration in $\text{km/s}^2$.
 pub trait ForceModel: Send + Sync + fmt::Display {
-    /// If a parameter of this force model is stored in the spacecraft state, then this function should return the index where this parameter is being affected
+    /// Returns the state-vector index of an estimable parameter associated with this model, if configured.
+    ///
+    /// For example, if a drag coefficient ($C_D$) or radiation pressure coefficient ($C_R$) is
+    /// actively estimated in the filter state, this returns its corresponding index in the state vector.
     fn estimation_index(&self) -> Option<usize>;
 
-    /// Defines the equations of motion for this force model from the provided osculating state.
+    /// Evaluates the force vector $\mathbf{F}$ at the provided state and epoch.
     fn eom(&self, ctx: &Spacecraft, almanac: &Almanac) -> Result<Vector3<f64>, DynamicsError>;
 
-    /// Force models must implement their partials, although those will only be called if the propagation requires the
-    /// computation of the STM. The `osc_ctx` is the osculating context, i.e. it changes for each sub-step of the integrator.
-    /// The last row corresponds to the partials of the parameter of this force model wrt the position, i.e. this only applies to conservative forces.
+    /// Evaluates the nominal force vector $\mathbf{F}$ and its partial derivatives for State Transition Matrix (STM) propagation.
+    ///
+    /// Returns a tuple containing:
+    /// 1. The nominal force vector $\mathbf{F}$.
+    /// 2. The $4 \times 3$ Jacobian matrix containing spatial partial derivatives ($\partial \mathbf{F}/\partial \mathbf{r}$)
+    ///    in the first three rows, and parameter partial derivatives ($\partial \mathbf{F}/\partial p$) in the fourth row.
     fn gradient(
         &self,
         osc_ctx: &Spacecraft,
@@ -157,15 +167,20 @@ pub trait ForceModel: Send + Sync + fmt::Display {
     ) -> Result<(Vector3<f64>, Matrix4x3<f64>), DynamicsError>;
 }
 
-/// The `AccelModel` trait handles immutable dynamics which return an acceleration. Those can be added directly to Orbital Dynamics for example.
+/// Evaluates mass-independent accelerations acting directly on an orbit.
 ///
-/// Examples include spherical harmonics, i.e. accelerations which do not need to save the current state, only act on it.
+/// Unlike [`ForceModel`], implementations of `AccelModel` operate strictly on an [`Orbit`]
+/// state because the evaluated acceleration vector $\mathbf{a}$ is independent of spacecraft mass
+/// or surface geometry (e.g., central-body spherical harmonics, point-mass third-body gravity).
 pub trait AccelModel: Send + Sync + fmt::Display {
-    /// Defines the equations of motion for this force model from the provided osculating state in the integration frame.
+    /// Evaluates the acceleration vector $\mathbf{a}$ ($\text{km/s}^2$) in the integration frame at the provided orbital state and epoch.
     fn eom(&self, osc: &Orbit, almanac: &Almanac) -> Result<Vector3<f64>, DynamicsError>;
 
-    /// Acceleration models must implement their partials, although those will only be called if the propagation requires the
-    /// computation of the STM.
+    /// Evaluates the nominal acceleration vector $\mathbf{a}$ and its spatial partial derivatives for State Transition Matrix (STM) propagation.
+    ///
+    /// Returns a tuple containing:
+    /// 1. The nominal acceleration vector $\mathbf{a}$ ($\text{km/s}^2$).
+    /// 2. The $3 \times 3$ Jacobian matrix of spatial partial derivatives ($\partial \mathbf{a}/\partial \mathbf{r}$, in $\text{s}^{-2}$).
     fn gradient(
         &self,
         osc_ctx: &Orbit,

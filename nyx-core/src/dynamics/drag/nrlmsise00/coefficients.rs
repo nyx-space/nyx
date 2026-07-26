@@ -37,7 +37,7 @@
 /// Used in `geographic_variation()` to compute the fractional perturbation
 /// of exospheric temperature as a function of latitude, season, solar
 /// activity, and geomagnetic activity.
-pub const TEMP_COEFFICIENTS: [f64; 150] = [
+pub const TEMP_COEFFICIENTS_K: [f64; 150] = [
     9.86573E-01,
     1.62228E-02,
     1.55270E-02,
@@ -3550,7 +3550,7 @@ mod tests {
 
     #[test]
     fn array_sizes() {
-        assert_eq!(TEMP_COEFFICIENTS.len(), 150);
+        assert_eq!(TEMP_COEFFICIENTS_K.len(), 150);
         assert_eq!(DENSITY_COEFFICIENTS.len(), 9);
         assert_eq!(DENSITY_COEFFICIENTS[0].len(), 150);
         assert_eq!(GRADIENT_COEFFICIENTS.len(), 150);
@@ -3570,11 +3570,11 @@ mod tests {
     #[test]
     fn spot_check_temp_coefficients() {
         // First value
-        assert!((TEMP_COEFFICIENTS[0] - 9.86573E-01).abs() < 1e-10);
+        assert!((TEMP_COEFFICIENTS_K[0] - 9.86573E-01).abs() < 1e-10);
         // Known non-zero interior value (index 13)
-        assert!((TEMP_COEFFICIENTS[13] - (-8.61650E+00)).abs() < 1e-5);
+        assert!((TEMP_COEFFICIENTS_K[13] - (-8.61650E+00)).abs() < 1e-5);
         // Large value (index 71)
-        assert!((TEMP_COEFFICIENTS[71] - 2.98618E+04).abs() < 1e-1);
+        assert!((TEMP_COEFFICIENTS_K[71] - 2.98618E+04).abs() < 1e-1);
     }
 
     #[test]
@@ -3621,7 +3621,7 @@ mod tests {
 
     #[test]
     fn total_coefficient_count() {
-        let total = TEMP_COEFFICIENTS.len()
+        let total = TEMP_COEFFICIENTS_K.len()
             + DENSITY_COEFFICIENTS.len() * DENSITY_COEFFICIENTS[0].len()
             + GRADIENT_COEFFICIENTS.len()
             + CORRECTION_PARAMS.len() * CORRECTION_PARAMS[0].len()

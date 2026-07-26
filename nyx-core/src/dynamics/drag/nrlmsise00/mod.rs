@@ -144,7 +144,8 @@ impl Nrlmsise00 {
             density_h_per_cm3: d[6],
             density_n_per_cm3: d[7],
             density_anomalous_o_per_cm3: d[8],
-            total_mass_density_kg_m3: d[5] * 1000.0,
+            // Convert g/cm^3 to kg/m^3: g->kg <=> 1e-3; cm^3 -> m^3 <-> 1e6 => 1e3
+            total_mass_density_kg_m3: d[5] * 1e3,
         }
     }
 
@@ -240,7 +241,8 @@ impl ForceModel for Nrlmsise00 {
             alt_km,
             ctx.orbit.epoch,
         )?;
-        let rho = out.total_mass_density_kg_m3;
+
+        let rho_kg_m3 = out.total_mass_density_kg_m3;
 
         let velocity_integr_frame = almanac
             .transform_to(osc_drag_frame, integration_frame, None)
@@ -249,9 +251,17 @@ impl ForceModel for Nrlmsise00 {
             })?
             .velocity_km_s;
 
-        let velocity = velocity_integr_frame - osc_drag_frame.velocity_km_s;
+        let v_km_s = velocity_integr_frame - osc_drag_frame.velocity_km_s;
 
-        Ok(-0.5 * 1e3 * rho * ctx.drag.coeff_drag * ctx.drag.area_m2 * velocity.norm() * velocity)
+        // Finally, apply the drag model.
+        Ok(
+            -0.5 * 1e3
+                * rho_kg_m3
+                * ctx.drag.coeff_drag
+                * ctx.drag.area_m2
+                * v_km_s.norm()
+                * v_km_s,
+        )
     }
 
     fn gradient(
