@@ -203,7 +203,7 @@ impl ForceModel for Drag {
             } => {
                 // Compute rho in the drag frame.
                 rho0 * (-(osc_drag_frame.rmag_km()
-                    - (scale_height_m
+                    - (scale_height_m * 1e-3
                         + self
                             .frame
                             .mean_equatorial_radius_km()
