@@ -20,10 +20,14 @@ use super::{
     DynamicsAlmanacSnafu, DynamicsAstroSnafu, DynamicsError, DynamicsPlanetarySnafu, ForceModel,
 };
 use crate::cosmic::{AstroError, AstroPhysicsSnafu, Frame, Spacecraft};
+use crate::dynamics::nrlmsise00::Nrlmsise00;
+use crate::io::space_weather::SpaceWeatherData;
 use crate::linalg::{Matrix4x3, Vector3};
 use anise::almanac::Almanac;
 use anise::constants::frames::IAU_EARTH_FRAME;
 use anise::errors::OrientationSnafu;
+use hifitime::Unit;
+use log::warn;
 use serde::{Deserialize, Serialize};
 use serde_dhall::StaticType;
 use snafu::ResultExt;
@@ -38,7 +42,7 @@ use pyo3::types::PyType;
 pub mod nrlmsise00;
 
 /// Density in kg/m^3 and altitudes in meters, not kilometers!
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, StaticType)]
+#[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub enum AtmDensity {
     /// Homogeneous, static atmospheric mass density ($\text{kg/m}^3$).
@@ -77,6 +81,10 @@ pub enum AtmDensity {
         /// Maximum operational altitude [m]. Above this threshold, density returns 0.0 kg/m³.
         max_alt_m: f64,
     },
+
+    NRLMSISE00 {
+        weather: SpaceWeatherData,
+    },
 }
 
 #[cfg(feature = "python")]
@@ -98,7 +106,7 @@ impl AtmDensity {
 }
 
 /// `Drag` implements all three drag models.
-#[derive(Copy, Clone, Debug, Serialize, Deserialize, StaticType)]
+#[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct Drag {
     /// Density computation method
@@ -185,8 +193,8 @@ impl ForceModel for Drag {
                     action: "transforming into drag frame",
                 })?;
 
-        let rho_kg_m3 = match self.density {
-            AtmDensity::Constant(rho) => rho,
+        let rho_kg_m3 = match &self.density {
+            AtmDensity::Constant(rho) => *rho,
 
             AtmDensity::Exponential {
                 rho0,
@@ -227,6 +235,39 @@ impl ForceModel for Drag {
 
                     // Calculating density by raising 10 to the log of density
                     10.0_f64.powf(logdensity)
+                }
+            }
+
+            AtmDensity::NRLMSISE00 { weather } => {
+                let (lat_deg, long_deg, alt_km) = osc_drag_frame
+                    .latlongalt()
+                    .context(AstroPhysicsSnafu)
+                    .context(DynamicsAstroSnafu)?;
+
+                let lst_h = almanac.local_solar_time(osc_drag_frame, None).context(
+                    DynamicsAlmanacSnafu {
+                        action: "computing local solar time",
+                    },
+                )?;
+
+                let epoch = ctx.orbit.epoch;
+
+                match weather.msise_weather(epoch) {
+                    None => {
+                        warn!("[NRLMSISE-00] no space weather loaded at {epoch}");
+                        0.0
+                    }
+                    Some(sw) => {
+                        Nrlmsise00::density_with_composition_for_weather(
+                            sw,
+                            lst_h.to_unit(Unit::Hour),
+                            lat_deg,
+                            long_deg,
+                            alt_km,
+                            ctx.orbit.epoch,
+                        )?
+                        .total_mass_density_kg_m3
+                    }
                 }
             }
         };

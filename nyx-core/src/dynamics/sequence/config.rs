@@ -28,8 +28,8 @@ use crate::io::gravity::GravityFieldData;
 use crate::propagators::Propagator;
 use crate::{
     dynamics::{
-        Drag, PointMasses, SolarPressure,
         guidance::{Maneuver, ObjectiveEfficiency, ObjectiveWeight},
+        Drag, PointMasses, SolarPressure,
     },
     io::gravity::GravityFieldConfig,
     propagators::{IntegratorMethod, IntegratorOptions},
@@ -124,7 +124,7 @@ impl Dynamics {
         }
 
         if let Some(drag) = &self.force_models.drag {
-            sc_dyn.force_models.push(Arc::new(*drag));
+            sc_dyn.force_models.push(Arc::new(drag.clone()));
         }
 
         // And set it all up!

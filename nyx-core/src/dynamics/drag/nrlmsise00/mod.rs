@@ -132,7 +132,7 @@ impl Nrlmsise00 {
     /// Compute full NRLMSISE-00 output for the given input parameters.
     ///
     /// Returns temperatures and all species number densities.
-    pub fn calculate(&self, input: &Nrlmsise00Input) -> Nrlmsise00Output {
+    pub fn calculate(input: &Nrlmsise00Input) -> Nrlmsise00Output {
         let (d, temp_exo, temp_alt) = model::compute(input);
         // d[0..8]: He, O, N2, O2, Ar, total_mass(g/cm³), H, N, anomO
         // Total mass density: d[5] is in g/cm³, convert to kg/m³ (* 1000)
@@ -162,24 +162,14 @@ impl Nrlmsise00 {
     /// This is the high-level API that takes pre-computed geodetic coordinates.
     /// For direct low-level access with explicit NRLMSISE-00 input parameters,
     /// use [`Nrlmsise00::calculate()`].
-    pub fn density_with_composition(
-        &self,
+    pub fn density_with_composition_for_weather(
+        sw: Msise00DailyWeather,
         lst_h: f64,
         latitude_deg: f64,
         longitude_deg: f64,
         altitude_km: f64,
         epoch: Epoch,
     ) -> Result<Nrlmsise00Output, DynamicsError> {
-        // THis is an O(log N) look up
-        let sw = self
-            .weather
-            .range(..=epoch)
-            .next_back()
-            .map(|(_, v)| v)
-            .or_else(|| self.weather.values().next())
-            .copied()
-            .unwrap_or_default();
-
         let at_midnight = epoch.with_hms(0, 0, 0);
         let ut_seconds = (epoch - at_midnight).to_seconds();
 
@@ -196,7 +186,45 @@ impl Nrlmsise00 {
             ap_array: sw.ap_3hour_history,
         };
 
-        Ok(self.calculate(&input))
+        Ok(Nrlmsise00::calculate(&input))
+    }
+
+    /// Compute full atmospheric composition from geodetic coordinates and epoch.
+    ///
+    /// Returns the complete NRLMSISE-00 output including:
+    /// - Total mass density \[kg/m³\]
+    /// - Number densities \[cm⁻³\] for 9 species: He, O, N₂, O₂, Ar, H, N, anomalous O
+    /// - Exospheric and local temperatures \[K\]
+    ///
+    /// This is the high-level API that takes pre-computed geodetic coordinates.
+    /// For direct low-level access with explicit NRLMSISE-00 input parameters,
+    /// use [`Nrlmsise00::calculate()`].
+    pub fn density_with_composition(
+        &self,
+        lst_h: f64,
+        latitude_deg: f64,
+        longitude_deg: f64,
+        altitude_km: f64,
+        epoch: Epoch,
+    ) -> Result<Nrlmsise00Output, DynamicsError> {
+        // This is an O(log N) look up
+        let sw = self
+            .weather
+            .range(..=epoch)
+            .next_back()
+            .map(|(_, v)| v)
+            .or_else(|| self.weather.values().next())
+            .copied()
+            .unwrap_or_default();
+
+        Self::density_with_composition_for_weather(
+            sw,
+            lst_h,
+            latitude_deg,
+            longitude_deg,
+            altitude_km,
+            epoch,
+        )
     }
 }
 

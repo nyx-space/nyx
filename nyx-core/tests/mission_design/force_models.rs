@@ -1,15 +1,16 @@
 extern crate nyx_space as nyx;
 
 use anise::constants::frames::{IAU_EARTH_FRAME, MOON_J2000};
+use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use nyx::cosmic::{Orbit, Spacecraft};
 use nyx::dynamics::{Drag, OrbitalDynamics, SolarPressure, SpacecraftDynamics};
 use nyx::linalg::Vector6;
+use nyx::md::prelude::{Interpolatable, State};
 use nyx::propagators::Propagator;
 use nyx::time::{Epoch, Unit};
 use nyx::utils::rss_orbit_vec_errors;
-
-use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
-use nyx_space::md::prelude::{Interpolatable, State};
+use nyx_space::dynamics::AtmDensity;
+use nyx_space::io::space_weather::SpaceWeatherData;
 use rstest::*;
 use std::sync::Arc;
 
@@ -386,32 +387,30 @@ fn std_atm_drag_earth_low(almanac: Arc<Almanac>) {
 
 #[rstest]
 fn test_prop_nrlmsise00(almanac: Arc<Almanac>) {
-    use nyx_space::dynamics::drag::nrlmsise00::{Msise00DailyWeather, Nrlmsise00};
-    use nyx_space::dynamics::SpacecraftDynamics;
-    use std::collections::BTreeMap;
-    use std::sync::Arc;
+    use std::path::PathBuf;
+
+    let manifest_dir: PathBuf = [env!("CARGO_MANIFEST_DIR"), "../data/01_planetary"]
+        .iter()
+        .collect();
+
+    let weather = SpaceWeatherData::from_csv_file(
+        manifest_dir.join("SpaceWeather-2021-01-01_2026-09-06.csv.gz"),
+    )
+    .unwrap();
+
     let eme2k = almanac
         .frame_info(EARTH_J2000)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
 
     let epoch = Epoch::from_gregorian_utc(2024, 3, 20, 12, 0, 0, 0);
-
-    let mut weather = BTreeMap::new();
-    weather.insert(
-        epoch,
-        Msise00DailyWeather {
-            f107_daily_sfu: 150.0,
-            f107_avg_sfu: 150.0,
-            ap_daily: 15.0,
-            ap_3hour_history: [15.0; 7],
-        },
-    );
-
-    let nrlmsise00 = Nrlmsise00::new(weather, IAU_EARTH_FRAME);
     let dynamics = SpacecraftDynamics::from_models(
         nyx_space::dynamics::OrbitalDynamics::two_body(),
-        vec![Arc::new(nrlmsise00)],
+        vec![Arc::new(Drag {
+            density: AtmDensity::NRLMSISE00 { weather },
+            frame: IAU_EARTH_FRAME,
+            estimate: false,
+        })],
     );
 
     let orbit = Orbit::keplerian(6778.137, 0.001, 51.6, 0.0, 0.0, 0.0, epoch, eme2k);

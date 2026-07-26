@@ -19,8 +19,10 @@
 use crate::io::InputOutputError;
 use flate2::read::GzDecoder;
 use hifitime::prelude::*;
-use serde::Deserialize;
-use std::collections::BTreeMap;
+use serde::{Deserialize, Serialize};
+use serde_dhall::{SimpleType, StaticType};
+use std::collections::{BTreeMap, HashMap};
+use std::fmt;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::path::Path;
@@ -32,7 +34,7 @@ use pyo3::prelude::*;
 use std::path::PathBuf;
 
 /// Comprehensive representation of a single daily record in the CelesTrak Space Weather CSV.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, StaticType)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all))]
 pub struct RawSpaceWeatherRow {
     #[serde(rename = "DATE")]
@@ -86,7 +88,7 @@ pub struct RawSpaceWeatherRow {
     #[serde(rename = "CP")]
     pub cp: f64,
     #[serde(rename = "C9")]
-    pub c9: u8,
+    pub c9: u16,
     #[serde(rename = "ISN")]
     pub isn: u32,
 
@@ -133,9 +135,10 @@ impl RawSpaceWeatherRow {
 }
 
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all))]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SpaceWeatherData {
-    records: BTreeMap<Epoch, RawSpaceWeatherRow>,
+    #[serde(with = "as_vec")]
+    pub records: BTreeMap<Epoch, RawSpaceWeatherRow>,
 }
 
 impl SpaceWeatherData {
@@ -253,11 +256,67 @@ impl SpaceWeatherData {
     }
 
     fn __str__(&self) -> String {
-        format!("{self:?}")
+        format!("{self}")
     }
 
     fn __repr__(&self) -> String {
-        format!("{self:?} @ {self:p}")
+        format!("{self} @ {self:p}")
+    }
+}
+
+impl fmt::Display for SpaceWeatherData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.records.is_empty() {
+            write!(f, "empty SpaceWeatherData")
+        } else {
+            write!(
+                f,
+                "SpaceWeatherData from {} to {}",
+                self.records.first_key_value().unwrap().0,
+                self.records.last_key_value().unwrap().0
+            )
+        }
+    }
+}
+
+// Implement StaticType manually by mapping BTreeMap to a List of key-value pairs
+impl StaticType for SpaceWeatherData {
+    fn static_type() -> SimpleType {
+        let mut rcrd = HashMap::new();
+        rcrd.insert("epoch".to_string(), String::static_type());
+        rcrd.insert("raw_weather".to_string(), RawSpaceWeatherRow::static_type());
+
+        SimpleType::List(Box::new(SimpleType::Record(rcrd)))
+    }
+}
+
+/// Serde helper module to serialize BTreeMap as a vector of pairs
+/// so it matches Dhall's List of records representation.
+mod as_vec {
+    use super::*;
+    use serde::{Deserializer, Serializer};
+
+    pub fn serialize<S>(
+        map: &BTreeMap<Epoch, RawSpaceWeatherRow>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::Serialize;
+        let vec: Vec<(&Epoch, &RawSpaceWeatherRow)> = map.iter().collect();
+        vec.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(
+        deserializer: D,
+    ) -> Result<BTreeMap<Epoch, RawSpaceWeatherRow>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use serde::Deserialize;
+        let vec: Vec<(Epoch, RawSpaceWeatherRow)> = Vec::deserialize(deserializer)?;
+        Ok(vec.into_iter().collect())
     }
 }
 
