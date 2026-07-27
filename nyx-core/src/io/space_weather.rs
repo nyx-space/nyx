@@ -34,7 +34,7 @@ use pyo3::prelude::*;
 use std::path::PathBuf;
 
 /// Comprehensive representation of a single daily record in the CelesTrak Space Weather CSV.
-#[derive(Debug, Clone, Deserialize, Serialize, StaticType)]
+#[derive(Debug, Clone, Deserialize, Serialize, StaticType, PartialEq)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all))]
 pub struct RawSpaceWeatherRow {
     #[serde(rename = "DATE")]
@@ -135,7 +135,7 @@ impl RawSpaceWeatherRow {
 }
 
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all))]
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct SpaceWeatherData {
     #[serde(with = "as_vec")]
     pub records: BTreeMap<Epoch, RawSpaceWeatherRow>,
@@ -303,8 +303,15 @@ mod as_vec {
     where
         S: Serializer,
     {
-        use serde::Serialize;
-        let vec: Vec<(&Epoch, &RawSpaceWeatherRow)> = map.iter().collect();
+        #[derive(serde::Serialize)]
+        struct WeatherEntry<'a> {
+            epoch: &'a Epoch,
+            raw_weather: &'a RawSpaceWeatherRow,
+        }
+        let vec: Vec<WeatherEntry> = map
+            .iter()
+            .map(|(epoch, raw_weather)| WeatherEntry { epoch, raw_weather })
+            .collect();
         vec.serialize(serializer)
     }
 

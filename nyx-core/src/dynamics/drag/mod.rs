@@ -41,7 +41,7 @@ use pyo3::types::PyType;
 
 pub mod nrlmsise00;
 
-/// Density in kg/m^3 and altitudes in meters, not kilometers!
+/// Density in kg/m^3 and altitudes in kilometers
 #[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub enum AtmDensity {
@@ -64,10 +64,10 @@ pub enum AtmDensity {
     Exponential {
         /// Reference atmospheric density $\rho_0$ at altitude $h_0$ [kg/m³].
         rho0: f64,
-        /// Reference geodetic altitude $h_0$ [m].
-        ref_alt_m: f64,
-        /// Atmospheric scale height $H = \frac{R T}{M g}$ [m].
-        scale_height_m: f64,
+        /// Reference geodetic altitude $h_0$ [km].
+        ref_alt_km: f64,
+        /// Atmospheric scale height $H = \frac{R T}{M g}$ [km].
+        scale_height_km: f64,
     },
 
     /// U.S. Standard Atmosphere 1976 (USSA76) empirical density model.
@@ -78,8 +78,8 @@ pub enum AtmDensity {
     /// **Limitations:** Static global average model. Does not capture solar EUV heating cycles,
     /// geomagnetic storm surges, or diurnal day/night atmospheric expansion.
     StdAtm {
-        /// Maximum operational altitude [m]. Above this threshold, density returns 0.0 kg/m³.
-        max_alt_m: f64,
+        /// Maximum operational altitude [km]. Above this threshold, density returns 0.0 kg/m³.
+        max_alt_km: f64,
     },
 
     NRLMSISE00 {
@@ -99,8 +99,8 @@ impl AtmDensity {
     fn earth_exponential(_cls: &Bound<'_, PyType>) -> Self {
         AtmDensity::Exponential {
             rho0: 3.614e-13,
-            ref_alt_m: 700_000.0,
-            scale_height_m: 88_667.0,
+            ref_alt_km: 700.000,
+            scale_height_km: 88.667,
         }
     }
 }
@@ -127,8 +127,8 @@ impl Drag {
         Ok(Arc::new(Self {
             density: AtmDensity::Exponential {
                 rho0: 3.614e-13,
-                ref_alt_m: 700_000.0,
-                scale_height_m: 88_667.0,
+                ref_alt_km: 700.000,
+                scale_height_km: 88.667,
             },
             frame: almanac
                 .frame_info(IAU_EARTH_FRAME)
@@ -146,7 +146,7 @@ impl Drag {
     pub fn std_atm1976(almanac: &Almanac) -> Result<Arc<Self>, DynamicsError> {
         Ok(Arc::new(Self {
             density: AtmDensity::StdAtm {
-                max_alt_m: 1_000_000.0,
+                max_alt_km: 1_000.0,
             },
             frame: almanac
                 .frame_info(IAU_EARTH_FRAME)
@@ -198,28 +198,23 @@ impl ForceModel for Drag {
 
             AtmDensity::Exponential {
                 rho0,
-                scale_height_m,
-                ref_alt_m,
+                scale_height_km,
+                ref_alt_km,
             } => {
-                // Compute rho in the drag frame.
-                rho0 * (-(osc_drag_frame.rmag_km()
-                    - (scale_height_m * 1e-3
-                        + self
-                            .frame
-                            .mean_equatorial_radius_km()
-                            .context(AstroPhysicsSnafu)
-                            .context(DynamicsAstroSnafu)?))
-                    / ref_alt_m)
-                    .exp()
+                let altitude_km = osc_drag_frame
+                    .altitude_km()
+                    .context(AstroPhysicsSnafu)
+                    .context(DynamicsAstroSnafu)?;
+                rho0 * (-(altitude_km - ref_alt_km) / scale_height_km).exp()
             }
 
-            AtmDensity::StdAtm { max_alt_m } => {
+            AtmDensity::StdAtm { max_alt_km } => {
                 let altitude_km = osc_drag_frame
                     .altitude_km()
                     .context(AstroPhysicsSnafu)
                     .context(DynamicsAstroSnafu)?;
 
-                if altitude_km > max_alt_m / 1_000.0 {
+                if altitude_km > *max_alt_km {
                     // Use a constant density
                     10.0_f64.powf((-7e-5) * altitude_km - 14.464)
                 } else {

@@ -398,6 +398,15 @@ fn test_prop_nrlmsise00(almanac: Arc<Almanac>) {
     )
     .unwrap();
 
+    // Test that we can serialize the space weather BTreeMap
+    let weather_toml =
+        toml::to_string(&weather).expect("should be able to serialize the weather as TOML");
+    let weather_rtn: SpaceWeatherData = toml::from_str(&weather_toml).unwrap();
+
+    println!("{weather_toml}");
+
+    assert_eq!(weather_rtn, weather);
+
     let eme2k = almanac
         .frame_info(EARTH_J2000)
         .unwrap()
