@@ -1,16 +1,17 @@
 extern crate nyx_space as nyx;
 
 use anise::constants::frames::{IAU_EARTH_FRAME, MOON_J2000};
+use anise::f64_eq_tol;
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use nyx::cosmic::{Orbit, Spacecraft};
-use nyx::dynamics::{Drag, OrbitalDynamics, SolarPressure, SpacecraftDynamics};
+use nyx::dynamics::{AtmDensity, Drag, OrbitalDynamics, SolarPressure, SpacecraftDynamics};
+use nyx::io::space_weather::{SpaceWeatherData, SpaceWeatherFallback};
 use nyx::linalg::Vector6;
 use nyx::md::prelude::{Interpolatable, State};
 use nyx::propagators::Propagator;
 use nyx::time::{Epoch, Unit};
 use nyx::utils::rss_orbit_vec_errors;
-use nyx_space::dynamics::AtmDensity;
-use nyx_space::io::space_weather::SpaceWeatherData;
+use nyx_space::od::Dynamics;
 use rstest::*;
 use std::sync::Arc;
 
@@ -395,6 +396,7 @@ fn test_prop_nrlmsise00(almanac: Arc<Almanac>) {
 
     let weather = SpaceWeatherData::from_csv_file(
         manifest_dir.join("SpaceWeather-2021-01-01_2026-09-06.csv.gz"),
+        SpaceWeatherFallback::SolarAverage(),
     )
     .unwrap();
 
@@ -402,8 +404,6 @@ fn test_prop_nrlmsise00(almanac: Arc<Almanac>) {
     let weather_toml =
         toml::to_string(&weather).expect("should be able to serialize the weather as TOML");
     let weather_rtn: SpaceWeatherData = toml::from_str(&weather_toml).unwrap();
-
-    println!("{weather_toml}");
 
     assert_eq!(weather_rtn, weather);
 
@@ -413,8 +413,12 @@ fn test_prop_nrlmsise00(almanac: Arc<Almanac>) {
         .with_mu_km3_s2(GMAT_EARTH_GM);
 
     let epoch = Epoch::from_gregorian_utc(2024, 3, 20, 12, 0, 0, 0);
+
+    let orbit = Orbit::keplerian(6778.137, 0.001, 51.6, 0.0, 0.0, 0.0, epoch, eme2k);
+    let spacecraft = Spacecraft::from_drag_defaults(orbit, 100.0, 1.0);
+
     let dynamics = SpacecraftDynamics::from_models(
-        nyx_space::dynamics::OrbitalDynamics::two_body(),
+        OrbitalDynamics::two_body(),
         vec![Arc::new(Drag {
             density: AtmDensity::NRLMSISE00 { weather },
             frame: IAU_EARTH_FRAME,
@@ -422,13 +426,40 @@ fn test_prop_nrlmsise00(almanac: Arc<Almanac>) {
         })],
     );
 
-    let orbit = Orbit::keplerian(6778.137, 0.001, 51.6, 0.0, 0.0, 0.0, epoch, eme2k);
-    let spacecraft = Spacecraft::from_drag_defaults(orbit, 100.0, 1.0);
+    let accel_km_s2_with_msise00 = dynamics
+        .eom(0.0, &spacecraft.to_vector(), &spacecraft, &almanac)
+        .unwrap();
 
-    let propagator = Propagator::default(dynamics);
+    let accel_km_s2_with_msise00 = accel_km_s2_with_msise00.fixed_rows::<3>(3);
 
-    let _end_state = propagator
+    let state_with_msise00 = Propagator::default(dynamics)
         .with(spacecraft, almanac.clone())
         .for_duration(1.0 * Unit::Hour)
         .unwrap();
+
+    // Build another propagator without drag and ensure drag was correctly applied.
+    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
+
+    let accel_km_s2_without_msise00 = dynamics
+        .eom(0.0, &spacecraft.to_vector(), &spacecraft, &almanac)
+        .unwrap();
+    let accel_km_s2_without_msise00 = accel_km_s2_without_msise00.fixed_rows::<3>(3);
+
+    let state_without_msise00 = Propagator::default(dynamics)
+        .with(spacecraft, almanac.clone())
+        .for_duration(1.0 * Unit::Hour)
+        .unwrap();
+
+    assert_ne!(state_without_msise00, state_with_msise00);
+
+    let diff_accel_m_s2 = (accel_km_s2_without_msise00 - accel_km_s2_with_msise00) * 1e3;
+
+    println!("Accel diff in m/s^2: {diff_accel_m_s2:.3e}");
+
+    f64_eq_tol!(
+        diff_accel_m_s2.norm(),
+        5e-6,
+        1e-6,
+        "expected an acceleration difference"
+    );
 }

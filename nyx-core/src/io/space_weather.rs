@@ -33,6 +33,58 @@ use pyo3::prelude::*;
 #[cfg(feature = "python")]
 use std::path::PathBuf;
 
+/// Strategy for resolving missing predictive space weather parameters (F10.7, Ap, Kp).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "python", pyclass(from_py_object, get_all))]
+pub enum SpaceWeatherFallback {
+    /// Solar minimum conditions (F10.7 = 65.0 SFU, Ap = 4.0, Kp = 1.0).
+    SolarMinimum(),
+    /// 11-year solar cycle average (F10.7 = 130.0 SFU, Ap = 15.0, Kp = 3.0). Standard default.
+    SolarAverage(),
+    /// Sustained solar maximum conditions (F10.7 = 200.0 SFU, Ap = 30.0, Kp = 4.3).
+    SolarMaximum(),
+    /// Custom operator-defined fallback values for missing data.
+    Custom { f107: f64, ap: f64, kp: f64 },
+}
+
+impl Default for SpaceWeatherFallback {
+    fn default() -> Self {
+        Self::SolarAverage()
+    }
+}
+
+impl SpaceWeatherFallback {
+    /// Resolves the effective F10.7 solar flux [SFU].
+    pub fn resolve_f107(&self, value: Option<f64>) -> f64 {
+        value.unwrap_or(match self {
+            Self::SolarMinimum() => 65.0,
+            Self::SolarAverage() => 130.0,
+            Self::SolarMaximum() => 200.0,
+            Self::Custom { f107, .. } => *f107,
+        })
+    }
+
+    /// Resolves the effective Ap index.
+    pub fn resolve_ap(&self, value: Option<f64>) -> f64 {
+        value.unwrap_or(match self {
+            Self::SolarMinimum() => 4.0,
+            Self::SolarAverage() => 15.0,
+            Self::SolarMaximum() => 30.0,
+            Self::Custom { ap, .. } => *ap,
+        })
+    }
+
+    /// Resolves the effective Kp index (unscaled float, e.g., 3.0).
+    pub fn resolve_kp(&self, value: Option<f64>) -> f64 {
+        value.unwrap_or(match self {
+            Self::SolarMinimum() => 1.0,
+            Self::SolarAverage() => 3.0,
+            Self::SolarMaximum() => 4.3,
+            Self::Custom { kp, .. } => *kp,
+        })
+    }
+}
+
 /// Comprehensive representation of a single daily record in the CelesTrak Space Weather CSV.
 #[derive(Debug, Clone, Deserialize, Serialize, StaticType, PartialEq)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all))]
@@ -46,51 +98,51 @@ pub struct RawSpaceWeatherRow {
 
     // Kp Planetary Indices (Encoded as Kp * 10 in CelesTrak CSV)
     #[serde(rename = "KP1")]
-    pub kp1: f64,
+    pub kp1: Option<f64>,
     #[serde(rename = "KP2")]
-    pub kp2: f64,
+    pub kp2: Option<f64>,
     #[serde(rename = "KP3")]
-    pub kp3: f64,
+    pub kp3: Option<f64>,
     #[serde(rename = "KP4")]
-    pub kp4: f64,
+    pub kp4: Option<f64>,
     #[serde(rename = "KP5")]
-    pub kp5: f64,
+    pub kp5: Option<f64>,
     #[serde(rename = "KP6")]
-    pub kp6: f64,
+    pub kp6: Option<f64>,
     #[serde(rename = "KP7")]
-    pub kp7: f64,
+    pub kp7: Option<f64>,
     #[serde(rename = "KP8")]
-    pub kp8: f64,
+    pub kp8: Option<f64>,
     #[serde(rename = "KP_SUM")]
-    pub kp_sum: f64,
+    pub kp_sum: Option<f64>,
 
     // Ap Linear Indices
     #[serde(rename = "AP1")]
-    pub ap1: f64,
+    pub ap1: Option<f64>,
     #[serde(rename = "AP2")]
-    pub ap2: f64,
+    pub ap2: Option<f64>,
     #[serde(rename = "AP3")]
-    pub ap3: f64,
+    pub ap3: Option<f64>,
     #[serde(rename = "AP4")]
-    pub ap4: f64,
+    pub ap4: Option<f64>,
     #[serde(rename = "AP5")]
-    pub ap5: f64,
+    pub ap5: Option<f64>,
     #[serde(rename = "AP6")]
-    pub ap6: f64,
+    pub ap6: Option<f64>,
     #[serde(rename = "AP7")]
-    pub ap7: f64,
+    pub ap7: Option<f64>,
     #[serde(rename = "AP8")]
-    pub ap8: f64,
+    pub ap8: Option<f64>,
     #[serde(rename = "AP_AVG")]
-    pub ap_avg: f64,
+    pub ap_avg: Option<f64>,
 
     // Geophysical & Solar Indicators
     #[serde(rename = "CP")]
-    pub cp: f64,
+    pub cp: Option<f64>,
     #[serde(rename = "C9")]
-    pub c9: u16,
+    pub c9: Option<u16>,
     #[serde(rename = "ISN")]
-    pub isn: u32,
+    pub isn: Option<u32>,
 
     // Solar Radio Flux (10.7 cm) - Observed & Adjusted
     #[serde(rename = "F10.7_OBS")]
@@ -100,36 +152,62 @@ pub struct RawSpaceWeatherRow {
     #[serde(rename = "F10.7_DATA_TYPE")]
     pub f107_data_type: String,
     #[serde(rename = "F10.7_OBS_CENTER81")]
-    pub f107_obs_center81: f64,
+    pub f107_obs_center81: Option<f64>,
     #[serde(rename = "F10.7_OBS_LAST81")]
-    pub f107_obs_last81: f64,
+    pub f107_obs_last81: Option<f64>,
     #[serde(rename = "F10.7_ADJ_CENTER81")]
-    pub f107_adj_center81: f64,
+    pub f107_adj_center81: Option<f64>,
     #[serde(rename = "F10.7_ADJ_LAST81")]
-    pub f107_adj_last81: f64,
+    pub f107_adj_last81: Option<f64>,
 }
 
 impl RawSpaceWeatherRow {
     /// Returns the eight 3-hour Kp values rescaled to standard floating-point bounds [0.0, 9.0].
+    ///
+    /// Missing bins default first to the row's mean daily Kp (derived from `KP_SUM`),
+    /// and secondarily to the provided `SpaceWeatherFallback` policy.
     #[inline]
-    pub fn kp_bins(&self) -> [f64; 8] {
+    pub fn kp_bins(&self, fallback: SpaceWeatherFallback) -> [f64; 8] {
+        // KP_SUM in CelesTrak CSV is the sum of the eight 3-hour $K_p \times 10$ values.
+        // Dividing KP_SUM by $80.0$ yields the mean 3-hour $K_p$ index in standard $0.0\text{--}9.0$ scale
+        let daily_mean_kp = self
+            .kp_sum
+            .map(|sum| sum / 80.0)
+            .unwrap_or_else(|| fallback.resolve_kp(None));
+
+        let resolve = |bin: Option<f64>| bin.map(|v| v / 10.0).unwrap_or(daily_mean_kp);
+
         [
-            self.kp1 / 10.0,
-            self.kp2 / 10.0,
-            self.kp3 / 10.0,
-            self.kp4 / 10.0,
-            self.kp5 / 10.0,
-            self.kp6 / 10.0,
-            self.kp7 / 10.0,
-            self.kp8 / 10.0,
+            resolve(self.kp1),
+            resolve(self.kp2),
+            resolve(self.kp3),
+            resolve(self.kp4),
+            resolve(self.kp5),
+            resolve(self.kp6),
+            resolve(self.kp7),
+            resolve(self.kp8),
         ]
     }
 
     /// Returns the eight 3-hour linear Ap values.
+    ///
+    /// Missing bins default first to the row's `AP_AVG`, and secondarily to the
+    /// provided `SpaceWeatherFallback` policy.
     #[inline]
-    pub fn ap_bins(&self) -> [f64; 8] {
+    pub fn ap_bins(&self, fallback: SpaceWeatherFallback) -> [f64; 8] {
+        let daily_mean_ap = self.ap_avg.unwrap_or_else(|| fallback.resolve_ap(None));
+
+        let resolve = |bin: Option<f64>| bin.unwrap_or(daily_mean_ap);
+
         [
-            self.ap1, self.ap2, self.ap3, self.ap4, self.ap5, self.ap6, self.ap7, self.ap8,
+            resolve(self.ap1),
+            resolve(self.ap2),
+            resolve(self.ap3),
+            resolve(self.ap4),
+            resolve(self.ap5),
+            resolve(self.ap6),
+            resolve(self.ap7),
+            resolve(self.ap8),
         ]
     }
 }
@@ -139,11 +217,15 @@ impl RawSpaceWeatherRow {
 pub struct SpaceWeatherData {
     #[serde(with = "as_vec")]
     pub records: BTreeMap<Epoch, RawSpaceWeatherRow>,
+    pub fallback: SpaceWeatherFallback,
 }
 
 impl SpaceWeatherData {
     /// Ingests a complete CelesTrak Space Weather CSV file into an Epoch-indexed map.
-    pub fn from_csv_file<P: AsRef<Path>>(path: P) -> Result<Self, InputOutputError> {
+    pub fn from_csv_file<P: AsRef<Path>>(
+        path: P,
+        fallback: SpaceWeatherFallback,
+    ) -> Result<Self, InputOutputError> {
         let path_ref = path.as_ref();
         let file = File::open(path_ref).map_err(|e| InputOutputError::StdIOError {
             source: e,
@@ -186,7 +268,7 @@ impl SpaceWeatherData {
             }
         }
 
-        Ok(Self { records })
+        Ok(Self { records, fallback })
     }
 
     /// Returns a reference to the raw, unparsed daily row for an exact midnight UTC epoch.
@@ -207,8 +289,8 @@ impl SpaceWeatherData {
 
         Some(Msise00DailyWeather {
             f107_daily_sfu: current_day.f107_obs,
-            f107_avg_sfu: current_day.f107_obs_center81,
-            ap_daily: current_day.ap_avg,
+            f107_avg_sfu: self.fallback.resolve_f107(current_day.f107_obs_center81),
+            ap_daily: self.fallback.resolve_ap(current_day.ap_avg),
             ap_3hour_history: ap_history,
         })
     }
@@ -223,10 +305,10 @@ impl SpaceWeatherData {
         let day_m3 = self.records.get(&(midnight - one_day * 3.0))?;
 
         let mut continuous_ap = [0.0; 32];
-        continuous_ap[0..8].copy_from_slice(&day_m3.ap_bins());
-        continuous_ap[8..16].copy_from_slice(&day_m2.ap_bins());
-        continuous_ap[16..24].copy_from_slice(&day_m1.ap_bins());
-        continuous_ap[24..32].copy_from_slice(&day_0.ap_bins());
+        continuous_ap[0..8].copy_from_slice(&day_m3.ap_bins(self.fallback));
+        continuous_ap[8..16].copy_from_slice(&day_m2.ap_bins(self.fallback));
+        continuous_ap[16..24].copy_from_slice(&day_m1.ap_bins(self.fallback));
+        continuous_ap[24..32].copy_from_slice(&day_0.ap_bins(self.fallback));
 
         let idx = 24 + bin_idx;
 
@@ -236,12 +318,12 @@ impl SpaceWeatherData {
         };
 
         Some([
-            day_0.ap_avg,                  // ap_3hour_history[0]: Daily Ap
-            continuous_ap[idx],            // ap_3hour_history[1]: Ap at target epoch
-            continuous_ap[idx - 1],        // ap_3hour_history[2]: Ap at T - 3h
-            continuous_ap[idx - 2],        // ap_3hour_history[3]: Ap at T - 6h
-            continuous_ap[idx - 3],        // ap_3hour_history[4]: Ap at T - 9h
-            avg_slice(idx - 11, idx - 4),  // ap_3hour_history[5]: Average Ap from T-12h to T-33h
+            self.fallback.resolve_ap(day_0.ap_avg), // ap_3hour_history[0]: Daily Ap
+            continuous_ap[idx],                     // ap_3hour_history[1]: Ap at target epoch
+            continuous_ap[idx - 1],                 // ap_3hour_history[2]: Ap at T - 3h
+            continuous_ap[idx - 2],                 // ap_3hour_history[3]: Ap at T - 6h
+            continuous_ap[idx - 3],                 // ap_3hour_history[4]: Ap at T - 9h
+            avg_slice(idx - 11, idx - 4), // ap_3hour_history[5]: Average Ap from T-12h to T-33h
             avg_slice(idx - 19, idx - 12), // ap_3hour_history[6]: Average Ap from T-36h to T-57h
         ])
     }
@@ -251,8 +333,11 @@ impl SpaceWeatherData {
 #[cfg_attr(feature = "python", pymethods)]
 impl SpaceWeatherData {
     #[new]
-    fn py_new(path: PathBuf) -> Result<Self, InputOutputError> {
-        Self::from_csv_file(path)
+    fn py_new(
+        path: PathBuf,
+        fallback: Option<SpaceWeatherFallback>,
+    ) -> Result<Self, InputOutputError> {
+        Self::from_csv_file(path, fallback.unwrap_or_default())
     }
 
     fn __str__(&self) -> String {
@@ -296,6 +381,12 @@ mod as_vec {
     use super::*;
     use serde::{Deserializer, Serializer};
 
+    #[derive(Serialize, Deserialize)]
+    struct WeatherEntry {
+        epoch: Epoch,
+        raw_weather: RawSpaceWeatherRow,
+    }
+
     pub fn serialize<S>(
         map: &BTreeMap<Epoch, RawSpaceWeatherRow>,
         serializer: S,
@@ -303,14 +394,12 @@ mod as_vec {
     where
         S: Serializer,
     {
-        #[derive(serde::Serialize)]
-        struct WeatherEntry<'a> {
-            epoch: &'a Epoch,
-            raw_weather: &'a RawSpaceWeatherRow,
-        }
         let vec: Vec<WeatherEntry> = map
             .iter()
-            .map(|(epoch, raw_weather)| WeatherEntry { epoch, raw_weather })
+            .map(|(epoch, raw_weather)| WeatherEntry {
+                epoch: *epoch,
+                raw_weather: raw_weather.clone(),
+            })
             .collect();
         vec.serialize(serializer)
     }
@@ -322,8 +411,12 @@ mod as_vec {
         D: Deserializer<'de>,
     {
         use serde::Deserialize;
-        let vec: Vec<(Epoch, RawSpaceWeatherRow)> = Vec::deserialize(deserializer)?;
-        Ok(vec.into_iter().collect())
+        let vec: Vec<WeatherEntry> = Vec::deserialize(deserializer)?;
+        let mut rcrd = BTreeMap::new();
+        for entry in vec {
+            rcrd.insert(entry.epoch, entry.raw_weather);
+        }
+        Ok(rcrd)
     }
 }
 
