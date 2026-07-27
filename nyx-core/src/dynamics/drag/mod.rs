@@ -19,14 +19,15 @@
 use super::{
     DynamicsAlmanacSnafu, DynamicsAstroSnafu, DynamicsError, DynamicsPlanetarySnafu, ForceModel,
 };
-use crate::cosmic::{AstroError, AstroPhysicsSnafu, Frame, Spacecraft};
-use crate::dynamics::nrlmsise00::Nrlmsise00;
+use crate::cosmic::{AstroPhysicsSnafu, Frame, Spacecraft};
+use crate::dynamics::nrlmsise00::msise00_density;
 use crate::io::space_weather::SpaceWeatherData;
-use crate::linalg::{Matrix4x3, Vector3};
+use crate::linalg::{Const, Matrix4x3, Vector3};
 use anise::almanac::Almanac;
 use anise::constants::frames::IAU_EARTH_FRAME;
 use anise::errors::OrientationSnafu;
 use hifitime::Unit;
+use hyperdual::{hyperspace_from_vector, linalg::norm, Float, OHyperdual};
 use serde::{Deserialize, Serialize};
 use serde_dhall::StaticType;
 use snafu::ResultExt;
@@ -248,7 +249,7 @@ impl ForceModel for Drag {
 
                 let sw = weather.msise_weather(epoch);
 
-                Nrlmsise00::density_with_composition_for_weather(
+                msise00_density(
                     sw,
                     lst_h.to_unit(Unit::Hour),
                     lat_deg,
@@ -287,12 +288,10 @@ impl ForceModel for Drag {
 
     fn gradient(
         &self,
-        _osc_ctx: &Spacecraft,
-        _almanac: &Almanac,
+        ctx: &Spacecraft,
+        almanac: &Almanac,
     ) -> Result<(Vector3<f64>, Matrix4x3<f64>), DynamicsError> {
-        Err(DynamicsError::DynamicsAstro {
-            source: AstroError::PartialsUndefined,
-        })
+        todo!()
     }
 }
 
