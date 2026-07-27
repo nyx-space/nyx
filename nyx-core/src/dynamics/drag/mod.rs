@@ -27,7 +27,6 @@ use anise::almanac::Almanac;
 use anise::constants::frames::IAU_EARTH_FRAME;
 use anise::errors::OrientationSnafu;
 use hifitime::Unit;
-use log::warn;
 use serde::{Deserialize, Serialize};
 use serde_dhall::StaticType;
 use snafu::ResultExt;
@@ -247,23 +246,17 @@ impl ForceModel for Drag {
 
                 let epoch = ctx.orbit.epoch;
 
-                match weather.msise_weather(epoch) {
-                    None => {
-                        warn!("[NRLMSISE-00] no space weather loaded at {epoch}");
-                        0.0
-                    }
-                    Some(sw) => {
-                        Nrlmsise00::density_with_composition_for_weather(
-                            sw,
-                            lst_h.to_unit(Unit::Hour),
-                            lat_deg,
-                            long_deg,
-                            alt_km,
-                            ctx.orbit.epoch,
-                        )?
-                        .total_mass_density_kg_m3
-                    }
-                }
+                let sw = weather.msise_weather(epoch);
+
+                Nrlmsise00::density_with_composition_for_weather(
+                    sw,
+                    lst_h.to_unit(Unit::Hour),
+                    lat_deg,
+                    long_deg,
+                    alt_km,
+                    ctx.orbit.epoch,
+                )?
+                .total_mass_density_kg_m3
             }
         };
 

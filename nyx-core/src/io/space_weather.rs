@@ -212,7 +212,9 @@ impl RawSpaceWeatherRow {
     }
 }
 
-#[cfg_attr(feature = "python", pyclass(from_py_object, get_all))]
+/// Stores SpaceWeather data as provided by [CelesTrak](https://celestrak.org/SpaceData/).
+/// Data may be provided either as original CSV or in a compressed (non-archived) gunzip (gz) format.
+#[cfg_attr(feature = "python", pyclass(from_py_object))]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct SpaceWeatherData {
     #[serde(with = "as_vec")]
@@ -277,38 +279,68 @@ impl SpaceWeatherData {
     }
 
     /// Evaluates the space weather state at `epoch` and constructs the `Msise00DailyWeather` payload.
-    pub fn msise_weather(&self, epoch: Epoch) -> Option<Msise00DailyWeather> {
+    ///
+    /// Missing daily records or unforecasted fields are resolved using `SpaceWeatherFallback`.
+    pub fn msise_weather(&self, epoch: Epoch) -> Msise00DailyWeather {
         let target_midnight = epoch.with_hms(0, 0, 0);
-        let current_day = self.records.get(&target_midnight)?;
+        let current_day = self.records.get(&target_midnight);
 
         let seconds_into_day = (epoch - target_midnight).to_seconds();
-        // Bins are 3 hours large
+        // Bins are 3 hours large (0..7)
         let bin_idx = ((seconds_into_day / (Unit::Hour * 3).to_seconds()).floor() as usize).min(7);
 
-        let ap_history = self.build_ap_history(target_midnight, bin_idx)?;
+        let ap_history = self.build_ap_history(target_midnight, bin_idx);
 
-        Some(Msise00DailyWeather {
-            f107_daily_sfu: current_day.f107_obs,
-            f107_avg_sfu: self.fallback.resolve_f107(current_day.f107_obs_center81),
-            ap_daily: self.fallback.resolve_ap(current_day.ap_avg),
+        // 1. Daily F10.7: Prefer observed, fall back to adjusted, then global fallback
+        let f107_daily = self
+            .fallback
+            .resolve_f107(current_day.and_then(|r| Some(r.f107_obs)));
+
+        // 2. 81-day Centered Mean F10.7: Prefer observed 81d, then adjusted 81d,
+        // fall back to resolved daily F10.7 before applying static global fallback
+        let f107_avg = current_day
+            .and_then(|r| r.f107_obs_center81.or(r.f107_adj_center81))
+            .unwrap_or(f107_daily);
+
+        // 3. Daily Ap: Prefer recorded ap_avg, fall back to fallback policy
+        let ap_daily = self.fallback.resolve_ap(current_day.and_then(|r| r.ap_avg));
+
+        Msise00DailyWeather {
+            f107_daily_sfu: f107_daily,
+            f107_avg_sfu: f107_avg,
+            ap_daily,
             ap_3hour_history: ap_history,
-        })
+        }
     }
 
     /// Assembles the 7-element Ap array spanning current bin back 57 hours across 4 calendar days.
-    fn build_ap_history(&self, midnight: Epoch, bin_idx: usize) -> Option<[f64; 7]> {
+    ///
+    /// Missing daily records or unforecasted bins are populated using the configured `SpaceWeatherFallback`.
+    fn build_ap_history(&self, midnight: Epoch, bin_idx: usize) -> [f64; 7] {
         let one_day = Unit::Day * 1.0;
 
-        let day_0 = self.records.get(&midnight)?;
-        let day_m1 = self.records.get(&(midnight - one_day))?;
-        let day_m2 = self.records.get(&(midnight - one_day * 2.0))?;
-        let day_m3 = self.records.get(&(midnight - one_day * 3.0))?;
+        // Helper to retrieve or synthesize a 8-bin 3-hour Ap slice for a given day offset.
+        let get_ap_bins = |offset_days: f64| -> [f64; 8] {
+            let target_epoch = midnight - one_day * offset_days;
+            match self.records.get(&target_epoch) {
+                Some(row) => row.ap_bins(self.fallback),
+                None => [self.fallback.resolve_ap(None); 8],
+            }
+        };
+
+        // Extract day 0 metadata and bins
+        let day_0_row = self.records.get(&midnight);
+        let daily_ap = self.fallback.resolve_ap(day_0_row.and_then(|r| r.ap_avg));
+        let day_0_bins = match day_0_row {
+            Some(row) => row.ap_bins(self.fallback),
+            None => [self.fallback.resolve_ap(None); 8],
+        };
 
         let mut continuous_ap = [0.0; 32];
-        continuous_ap[0..8].copy_from_slice(&day_m3.ap_bins(self.fallback));
-        continuous_ap[8..16].copy_from_slice(&day_m2.ap_bins(self.fallback));
-        continuous_ap[16..24].copy_from_slice(&day_m1.ap_bins(self.fallback));
-        continuous_ap[24..32].copy_from_slice(&day_0.ap_bins(self.fallback));
+        continuous_ap[0..8].copy_from_slice(&get_ap_bins(3.0));
+        continuous_ap[8..16].copy_from_slice(&get_ap_bins(2.0));
+        continuous_ap[16..24].copy_from_slice(&get_ap_bins(1.0));
+        continuous_ap[24..32].copy_from_slice(&day_0_bins);
 
         let idx = 24 + bin_idx;
 
@@ -317,15 +349,15 @@ impl SpaceWeatherData {
             slice.iter().sum::<f64>() / slice.len() as f64
         };
 
-        Some([
-            self.fallback.resolve_ap(day_0.ap_avg), // ap_3hour_history[0]: Daily Ap
-            continuous_ap[idx],                     // ap_3hour_history[1]: Ap at target epoch
-            continuous_ap[idx - 1],                 // ap_3hour_history[2]: Ap at T - 3h
-            continuous_ap[idx - 2],                 // ap_3hour_history[3]: Ap at T - 6h
-            continuous_ap[idx - 3],                 // ap_3hour_history[4]: Ap at T - 9h
-            avg_slice(idx - 11, idx - 4), // ap_3hour_history[5]: Average Ap from T-12h to T-33h
+        [
+            daily_ap,                      // ap_3hour_history[0]: Daily Ap
+            continuous_ap[idx],            // ap_3hour_history[1]: Ap at target epoch
+            continuous_ap[idx - 1],        // ap_3hour_history[2]: Ap at T - 3h
+            continuous_ap[idx - 2],        // ap_3hour_history[3]: Ap at T - 6h
+            continuous_ap[idx - 3],        // ap_3hour_history[4]: Ap at T - 9h
+            avg_slice(idx - 11, idx - 4),  // ap_3hour_history[5]: Average Ap from T-12h to T-33h
             avg_slice(idx - 19, idx - 12), // ap_3hour_history[6]: Average Ap from T-36h to T-57h
-        ])
+        ]
     }
 }
 
@@ -356,9 +388,10 @@ impl fmt::Display for SpaceWeatherData {
         } else {
             write!(
                 f,
-                "SpaceWeatherData from {} to {}",
+                "SpaceWeatherData from {} to {} ({:?})",
                 self.records.first_key_value().unwrap().0,
-                self.records.last_key_value().unwrap().0
+                self.records.last_key_value().unwrap().0,
+                self.fallback
             )
         }
     }
