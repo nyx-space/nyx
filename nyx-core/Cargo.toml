@@ -61,6 +61,7 @@ premium = []
 python = ["pyo3", "hifitime/python", "anise/python"]
 
 [dev-dependencies]
+criterion = "0.5.1"
 polars = { version = "0.54.0", features = ["parquet"] }
 rstest = "0.26.1"
 pretty_env_logger = "0.5"
@@ -130,3 +131,9 @@ path = "examples/06_lunar_orbit_determination/main.rs"
 doc-scrape-examples = true
 
 
+
+
+
+[[bench]]
+name = "anise_bench"
+harness = false
