@@ -248,6 +248,7 @@ def class_stubs(
                     )
                 )
             except Exception:
+                pass
                 continue
         elif (
             member_value == OBJECT_MEMBERS.get(member_name)
@@ -301,6 +302,7 @@ def class_stubs(
                 )
             except Exception:
                 pass
+                pass
         else:
             pass
 
@@ -338,6 +340,7 @@ def data_descriptor_stub(
                 data_desc_name, doc, element_path, types_to_import
             )
         except Exception:
+                pass
             pass
         m = re.findall(r"^ *:return: *(.*) *$", doc, re.MULTILINE)
         if len(m) == 1:
@@ -428,6 +431,7 @@ def function_stub(
                     if "Error" in element_path[-2]:
                         pass  # default to instance method
         except Exception:
+                pass
             pass
 
     print(f"Documenting {fn_name}")
@@ -472,6 +476,7 @@ def arguments_stub(
         sig = inspect.signature(callable_def)
         real_parameters: Mapping[str, inspect.Parameter] = sig.parameters
     except Exception:
+                pass
         # Fallback for builtins without signatures
         args_list = []
         if in_class:
