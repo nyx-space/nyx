@@ -5,9 +5,9 @@ import inspect
 import logging
 import re
 import subprocess
-from functools import reduce
-from typing import Any, Optional, Union
 from collections.abc import Mapping
+from functools import reduce
+from typing import Any
 
 
 def path_to_type(*elements: str) -> ast.AST:
@@ -18,7 +18,7 @@ def path_to_type(*elements: str) -> ast.AST:
 
 
 OBJECT_MEMBERS = dict(inspect.getmembers(object))
-BUILTINS: dict[str, Union[None, tuple[list[ast.AST], ast.AST]]] = {
+BUILTINS: dict[str, None | tuple[list[ast.AST], ast.AST]] = {
     "__annotations__": None,
     "__bool__": ([], path_to_type("bool")),
     "__bytes__": ([], path_to_type("bytes")),
@@ -170,7 +170,7 @@ def module_stubs(module: Any) -> ast.Module:
                 )
             )
         else:
-            logging.warning(f"Unsupported root construction {member_name}")
+            logging.getLogger(__name__).warning(f"Unsupported root construction {member_name}")
     # Add metadata constants if they exist in the module
     for meta in ["__author__", "__version__"]:
         if hasattr(module, meta):
@@ -247,8 +247,8 @@ def class_stubs(
                         cls_def=cls_def,
                     )
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logging.getLogger(__name__).debug(e)
                 continue
         elif (
             member_value == OBJECT_MEMBERS.get(member_name)
@@ -300,9 +300,8 @@ def class_stubs(
                         simple=1,
                     )
                 )
-            except Exception:
-                pass
-                pass
+            except Exception as e:
+                logging.getLogger(__name__).debug(e)
         else:
             pass
 
@@ -329,7 +328,7 @@ def data_descriptor_stub(
     data_desc_def: Any,
     element_path: list[str],
     types_to_import: set[str],
-) -> Union[tuple[ast.AnnAssign, ast.Expr], tuple[ast.AnnAssign]]:
+) -> tuple[ast.AnnAssign, ast.Expr] | tuple[ast.AnnAssign]:
     annotation = None
     doc_comment = None
 
@@ -339,9 +338,8 @@ def data_descriptor_stub(
             annotation = returns_stub(
                 data_desc_name, doc, element_path, types_to_import
             )
-        except Exception:
-                pass
-            pass
+        except Exception as e:
+                logging.getLogger(__name__).debug(e)
         m = re.findall(r"^ *:return: *(.*) *$", doc, re.MULTILINE)
         if len(m) == 1:
             doc_comment = m[0]
@@ -370,9 +368,8 @@ def function_stub(
 ) -> ast.FunctionDef:
     body: list[ast.AST] = []
     doc = getattr(fn_def, "__doc__", None) or inspect.getdoc(fn_def)
-    if not isinstance(doc, str):
-        if doc is not None:
-            doc = doc.__doc__
+    if not isinstance(doc, str) and doc is not None:
+        doc = doc.__doc__
 
     if doc == "Create and return a new object.  See help(type) for accurate signature.":
         doc = None
@@ -430,9 +427,8 @@ def function_stub(
                     # Fallback for builtins in exception classes
                     if "Error" in element_path[-2]:
                         pass  # default to instance method
-        except Exception:
-                pass
-            pass
+        except Exception as e:
+                logging.getLogger(__name__).debug(e)
 
     print(f"Documenting {fn_name}")
 
@@ -475,8 +471,8 @@ def arguments_stub(
     try:
         sig = inspect.signature(callable_def)
         real_parameters: Mapping[str, inspect.Parameter] = sig.parameters
-    except Exception:
-                pass
+    except Exception as e:
+        logging.getLogger(__name__).debug(e)
         # Fallback for builtins without signatures
         args_list = []
         if in_class:
@@ -640,7 +636,7 @@ def arguments_stub(
                     match[0], inspect.Parameter.POSITIONAL_OR_KEYWORD
                 )
             else:
-                logging.warning(
+                logging.getLogger(__name__).warning(
                     f"The parameter {match[0]} of {'.'.join(element_path)} "
                     "is defined in the documentation but not in the function signature"
                 )
@@ -674,7 +670,7 @@ def arguments_stub(
                 if element_path[1] in ("DragData", "Mass", "SRPData"):
                     pass  # ignore anise types based on user guidance
                 else:
-                    logging.warning(
+                    logging.getLogger(__name__).warning(
                         f"The parameter {param.name} of {'.'.join(element_path)} "
                         "has no type definition in the function documentation"
                     )
@@ -726,7 +722,7 @@ def returns_stub(
     element_path: list[str],
     types_to_import: set[str],
     in_class: bool = False,
-) -> Optional[ast.AST]:
+) -> ast.AST | None:
     if "Error" in element_path[1]:
         # Don't document errors
         return
@@ -922,7 +918,7 @@ def concatenated_path_to_type(
     return path_to_type(*parts)
 
 
-def build_doc_comment(doc: str) -> Optional[ast.Expr]:
+def build_doc_comment(doc: str) -> ast.Expr | None:
     lines = [line.strip() for line in doc.split("\n")]
     clean_lines = []
     for line in lines:
