@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
+import json
 import os
 import sys
-import json
+
 import requests
 from google import genai
 from google.genai import types
