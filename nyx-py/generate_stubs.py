@@ -247,8 +247,8 @@ def class_stubs(
                         cls_def=cls_def,
                     )
                 )
-            except Exception as e:
-                logging.getLogger(__name__).debug(e)
+            except Exception:
+                logging.getLogger(__name__).exception("Error generating stubs")
                 continue
         elif (
             member_value == OBJECT_MEMBERS.get(member_name)
@@ -300,8 +300,8 @@ def class_stubs(
                         simple=1,
                     )
                 )
-            except Exception as e:
-                logging.getLogger(__name__).debug(e)
+            except Exception:
+                logging.getLogger(__name__).exception("Error generating stubs")
         else:
             pass
 
@@ -338,8 +338,8 @@ def data_descriptor_stub(
             annotation = returns_stub(
                 data_desc_name, doc, element_path, types_to_import
             )
-        except Exception as e:
-                logging.getLogger(__name__).debug(e)
+        except Exception:
+                logging.getLogger(__name__).exception("Error generating stubs")
         m = re.findall(r"^ *:return: *(.*) *$", doc, re.MULTILINE)
         if len(m) == 1:
             doc_comment = m[0]
@@ -427,8 +427,8 @@ def function_stub(
                     # Fallback for builtins in exception classes
                     if "Error" in element_path[-2]:
                         pass  # default to instance method
-        except Exception as e:
-                logging.getLogger(__name__).debug(e)
+        except Exception:
+                logging.getLogger(__name__).exception("Error generating stubs")
 
     print(f"Documenting {fn_name}")
 
@@ -471,8 +471,8 @@ def arguments_stub(
     try:
         sig = inspect.signature(callable_def)
         real_parameters: Mapping[str, inspect.Parameter] = sig.parameters
-    except Exception as e:
-        logging.getLogger(__name__).debug(e)
+    except Exception:
+        logging.getLogger(__name__).exception("Error generating stubs")
         # Fallback for builtins without signatures
         args_list = []
         if in_class:
