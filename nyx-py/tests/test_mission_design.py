@@ -19,7 +19,7 @@ from nyx_space.mission_design import (
     PointMasses,
     Propagator,
     SpaceWeatherData,
-    SpaceWeatherFallback,
+    StaticSpaceWeather,
     SolarPressure,
     SolidTides,
     TidalPerturber,
@@ -77,7 +77,7 @@ def test_howto_propagate_with_perturbations():
     # data set. This can be specified either as Solar Minimum, Solar Maximum, Solar Average,
     # or a custom number for the F10.7 (in SFU), Ap, and Kp values.
     # Data may be provided either as CSV or in non-archived gunzip (gz) format (decoded on the fly).
-    weather = SpaceWeatherData("../data/01_planetary/SpaceWeather-2021-01-01_2026-09-06.csv.gz", SpaceWeatherFallback.SolarAverage())
+    weather = SpaceWeatherData("../data/01_planetary/SpaceWeather-2021-01-01_2026-09-06.csv.gz", StaticSpaceWeather.SolarAverage())
     drag = Drag(
         AtmDensity.NRLMSISE00(weather),
         almanac.frame_info(Frames.IAU_EARTH_FRAME),

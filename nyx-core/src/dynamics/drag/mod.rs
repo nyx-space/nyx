@@ -512,6 +512,15 @@ impl ForceModel for Drag {
             }
         }
 
+        // Partial wrt Cd: drag acceleration is exactly linear in coeff_drag,
+        // so this is computed analytically rather than by finite differencing.
+        // (This is d(accel)/d(Cd), not d(Cd)/d(Cd) -- the latter is the separate,
+        // legitimately-zero term for Cd's own dynamics under a constant model.)
+        let wrt_cd = dx / ctx.drag.coeff_drag;
+        for j in 0..3 {
+            grad[(3, j)] = wrt_cd[j];
+        }
+
         Ok((dx, grad))
     }
 }
