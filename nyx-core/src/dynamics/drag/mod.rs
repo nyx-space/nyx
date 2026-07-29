@@ -251,6 +251,18 @@ impl AtmDensity {
             scale_height_km: 88.667,
         }
     }
+
+    /// Constructs an NRLMSISE-00 atmospheric density model with optional flags.
+    #[classmethod]
+    #[pyo3(name = "NRLMSISE00")]
+    #[pyo3(signature = (weather, flags = None))]
+    fn py_nrlmsise00(
+        _cls: &Bound<'_, PyType>,
+        weather: SpaceWeatherData,
+        flags: Option<Nrlmsise00Flags>,
+    ) -> Self {
+        AtmDensity::NRLMSISE00 { weather, flags }
+    }
 }
 
 /// `Drag` implements all three drag models.
@@ -377,7 +389,11 @@ impl Drag {
                     long_deg,
                     alt_km,
                     ctx.orbit.epoch,
-                    flags.unwrap_or_default(),
+                    flags.unwrap_or(Nrlmsise00Flags {
+                        units: OutputUnits::Si,
+                        geomagnetic: GeomagneticMode::StandardDailyAp,
+                        ..Default::default()
+                    }),
                 )?
                 .total_mass_density_kg_m3
             }
