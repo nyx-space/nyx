@@ -2,28 +2,34 @@ name: "Nyx Space Intelligent Code Review"
 
 on:
   pull_request:
-    types: [opened]
+    types: [opened, synchronize]
   issue_comment:
     types: [created]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Target Pull Request Number'
+        required: true
+        type: string
 
 jobs:
   gemini-review:
-    # Execute ONLY if a PR is opened, OR if a comment containing '/review' is posted on a PR.
     if: >
-      (github.event_name == 'pull_request' && github.event.action == 'opened') ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'synchronize')) ||
       (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '/review'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
-      issues: write # Required to read the issue_comment payload
+      issues: write
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v7
 
       - name: Setup Python Runtime
-        uses: actions/setup-python@v5.3.0
+        uses: actions/setup-python@v5
         with:
           python-version: '3.13'
 
@@ -31,12 +37,12 @@ jobs:
         run: pip install google-genai requests pydantic
 
       - name: Resolve PR Number Context
-        # The payload structure shifts depending on the trigger event.
-        # This step guarantees the Python script receives the correct integer.
         id: pr_context
         run: |
           if [[ "${{ github.event_name }}" == "issue_comment" ]]; then
             echo "PR_NUMBER=${{ github.event.issue.number }}" >> $GITHUB_ENV
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "PR_NUMBER=${{ github.event.inputs.pr_number }}" >> $GITHUB_ENV
           else
             echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
           fi

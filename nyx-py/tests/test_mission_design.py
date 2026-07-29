@@ -18,6 +18,8 @@ from nyx_space.mission_design import (
     IntegratorOptions,
     PointMasses,
     Propagator,
+    SpaceWeatherData,
+    StaticSpaceWeather,
     SolarPressure,
     SolidTides,
     TidalPerturber,
@@ -29,7 +31,7 @@ from nyx_space.time import Duration, Epoch, Unit
 def test_howto_propagate_with_perturbations():
     """
     Goal: Propagate a spacecraft's orbit over time while accounting for
-    Solar Radiation Pressure (SRP) and atmospheric drag.
+    Solar Radiation Pressure (SRP) and the Naval Research Lab MSISE-00 atmospheric drag.
 
     IMPORTANT: This demonstrates SIMPLE propagation segments. It is NOT representative of the sequencing
     available in the premium package of Nyx. Refer to the website for these cases.
@@ -70,8 +72,14 @@ def test_howto_propagate_with_perturbations():
         [Frames.EARTH_J2000, Frames.MOON_J2000], almanac, estimate=False
     )
     # Configure atmospheric drag using a standard exponential atmospheric model.
+    # Load the Space Weather as provided by CelesTrak: https://celestrak.org/SpaceData/.
+    # You should also provide a fallback for propagation that extends further from the
+    # data set. This can be specified either as Solar Minimum, Solar Maximum, Solar Average,
+    # or a custom number for the F10.7 (in SFU), Ap, and Kp values.
+    # Data may be provided either as CSV or in non-archived gunzip (gz) format (decoded on the fly).
+    weather = SpaceWeatherData("../data/01_planetary/SpaceWeather-2021-01-01_2026-09-06.csv.gz", StaticSpaceWeather.SolarAverage())
     drag = Drag(
-        AtmDensity.earth_exponential(),
+        AtmDensity.NRLMSISE00(weather),
         almanac.frame_info(Frames.IAU_EARTH_FRAME),
         estimate=False,
     )

@@ -63,7 +63,7 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
                     solar_pressure: None,
                     drag: Some(Drag {
                         density: AtmDensity::StdAtm {
-                            max_alt_m: 1_000_000.0,
+                            max_alt_km: 1_000.0,
                         },
                         frame: almanac.frame_info(IAU_EARTH_FRAME).unwrap(),
                         estimate: false,
@@ -326,7 +326,7 @@ fn spacecraft_low_thrust_orbit_raise(
                     solar_pressure: None,
                     drag: Some(Drag {
                         density: AtmDensity::StdAtm {
-                            max_alt_m: 1_000_000.0,
+                            max_alt_km: 1_000.0,
                         },
                         frame: almanac.frame_info(IAU_EARTH_FRAME).unwrap(),
                         estimate: false,

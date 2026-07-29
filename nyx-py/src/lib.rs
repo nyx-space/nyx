@@ -52,6 +52,7 @@ use nyx_space::dynamics::{
     AtmDensity, Drag, PointMasses, SolarPressure, SolidTides, TidalPerturber,
 };
 use nyx_space::io::gravity::GravityFieldConfig;
+use nyx_space::io::space_weather::{SpaceWeatherData, StaticSpaceWeather};
 use nyx_space::mc::{MvnSpacecraft, StateDispersion};
 use nyx_space::md::StateParameter;
 use nyx_space::md::trajectory::ExportCfg;
@@ -164,6 +165,8 @@ fn mission_design(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
     sm.add_class::<ShadowModel>()?;
     sm.add_class::<SolidTides>()?;
     sm.add_class::<TidalPerturber>()?;
+    sm.add_class::<SpaceWeatherData>()?;
+    sm.add_class::<StaticSpaceWeather>()?;
     sm.add_class::<py_md::PyTrajectory>()?;
 
     Ok(())

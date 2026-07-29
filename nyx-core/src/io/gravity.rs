@@ -28,9 +28,12 @@ use serde_dhall::{SimpleType, StaticType};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fs::File;
-use std::io::prelude::*;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+
+/// Unnormalized J2 value of Earth
+pub const EARTH_J2: f64 = -0.484169548456e-03;
 
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
@@ -113,7 +116,7 @@ impl GravityFieldData {
         }
     }
 
-    /// Initialize `GravityFieldData` with a custom J2 value
+    /// Initialize `GravityFieldData` with a custom unnormalized J2 value
     pub fn from_j2(j2: f64, frame: Frame) -> GravityFieldData {
         let mut c_nm = DMatrix::from_element(3, 3, 0.0);
         c_nm[(2, 0)] = j2;
