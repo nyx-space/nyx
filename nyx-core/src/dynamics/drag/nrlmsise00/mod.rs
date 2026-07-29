@@ -387,3 +387,74 @@ pub fn msise00_density(
 
     Ok(calculate(&input, flags))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_nrlmsise00_flags() {
+        let default_flags = Nrlmsise00Flags::default();
+        let default_switches = default_flags.to_switches();
+
+        // Spot-check standard switches mapping
+        assert_eq!(default_switches[0], 0.0); // OutputUnits::Cgs -> 0.0
+        assert_eq!(default_switches[9], -1.0); // GeomagneticMode::ExtendedHistory57h -> -1.0
+        assert_eq!(default_switches[1], 1.0);
+        assert_eq!(default_switches[2], 1.0);
+
+        // Customize some flags
+        let mut custom_flags = Nrlmsise00Flags {
+            units: OutputUnits::Si,
+            geomagnetic: GeomagneticMode::StandardDailyAp,
+            f107_solar_flux: false,
+            time_independent: false,
+            annual_harmonics: false,
+            semiannual_harmonics: false,
+            diurnal_tides: false,
+            semidiurnal_tides: false,
+            terdiurnal_tides: false,
+            ut_and_longitude: false,
+            exospheric_temp_variations: false,
+            lower_boundary_temp_variations: false,
+            gradient_variations: false,
+            departures_from_diffusive_equilibrium: false,
+            lower_thermosphere_temp_variations: false,
+            upper_stratosphere_temp_variations: false,
+            boundary_density_variations: false,
+            lower_mesosphere_temp_variations: false,
+            turbopause_scale_height_variations: false,
+        };
+
+        let custom_switches = custom_flags.to_switches();
+        assert_eq!(custom_switches[0], 1.0); // OutputUnits::Si -> 1.0
+        assert_eq!(custom_switches[9], 1.0); // GeomagneticMode::StandardDailyAp -> 1.0
+        assert_eq!(custom_switches[1], 0.0);
+        assert_eq!(custom_switches[2], 0.0);
+        assert_eq!(custom_switches[3], 0.0);
+        assert_eq!(custom_switches[5], 0.0);
+        assert_eq!(custom_switches[4], 0.0);
+        assert_eq!(custom_switches[6], 0.0);
+        assert_eq!(custom_switches[7], 0.0);
+        assert_eq!(custom_switches[8], 0.0);
+        assert_eq!(custom_switches[14], 0.0);
+        assert_eq!(custom_switches[10], 0.0);
+        assert_eq!(custom_switches[11], 0.0);
+        assert_eq!(custom_switches[12], 0.0);
+        assert_eq!(custom_switches[13], 0.0);
+        assert_eq!(custom_switches[16], 0.0);
+        assert_eq!(custom_switches[17], 0.0);
+        assert_eq!(custom_switches[19], 0.0);
+        assert_eq!(custom_switches[15], 0.0);
+        assert_eq!(custom_switches[18], 0.0);
+        assert_eq!(custom_switches[20], 0.0);
+        assert_eq!(custom_switches[21], 0.0);
+        assert_eq!(custom_switches[22], 0.0);
+        assert_eq!(custom_switches[23], 0.0);
+
+        // Test GeomagneticMode::Off
+        custom_flags.geomagnetic = GeomagneticMode::Off;
+        let switches_off = custom_flags.to_switches();
+        assert_eq!(switches_off[9], 0.0);
+    }
+}
