@@ -565,3 +565,92 @@ fn val_ioastro_nrlmsise00(almanac: Arc<Almanac>) {
     assert!(dbg!(ric_error.rmag_km()) < 0.72);
     assert!(dbg!(ric_error.vmag_km_s()) < 2e-3);
 }
+
+#[rstest]
+fn regression_harris_drag(almanac: Arc<Almanac>) {
+    let eme2k = almanac
+        .frame_info(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
+
+    let iau_earth = almanac
+        .frame_info(IAU_EARTH_FRAME)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
+
+    let epoch = Epoch::from_gregorian_utc_hms(2024, 2, 29, 1, 2, 3);
+
+    let orbit = Orbit::new(
+        -6210.6003575395861844,
+        -445.9010437211380236,
+        2353.4286399045840881,
+        -0.6027299684384100,
+        -7.2371397713442924,
+        -2.7084864602730194,
+        epoch,
+        eme2k,
+    );
+
+    println!("Initial: {orbit:x}");
+
+    let spacecraft = Spacecraft::builder()
+        .orbit(orbit)
+        .mass(Mass::from_dry_mass(1000.0))
+        .drag(DragData {
+            area_m2: 20.0,
+            coeff_drag: 2.2,
+        })
+        .build();
+
+    // Define the dynamics
+    let earth_sph_harm = GravityFieldData::from_j2(EARTH_J2, iau_earth);
+    let j2_mdl = GravityField::new(earth_sph_harm);
+
+    let dynamics = SpacecraftDynamics::from_models(
+        OrbitalDynamics::from_model(j2_mdl),
+        vec![Arc::new(Drag {
+            density: AtmDensity::HarrisPriester { n_parameter: 2 },
+            frame: iau_earth,
+            estimate: false,
+        })],
+    );
+
+    let final_state = Propagator::default(dynamics)
+        .with(spacecraft, almanac.clone())
+        .for_duration(1.0 * Unit::Day)
+        .unwrap()
+        .orbit;
+
+    let expected_state = Orbit::new(
+        -5866.260358,
+        1429.893388,
+        2719.496468,
+        -2.783483,
+        -6.933258,
+        -2.187250,
+        Epoch::from_gregorian_utc_hms(2024, 3, 1, 1, 2, 3),
+        eme2k,
+    );
+
+    let ric_error = expected_state.ric_difference(&final_state).unwrap();
+
+    println!("=== Cartesian ===\nGot:  {final_state}");
+    println!("Want: {expected_state}");
+
+    println!("=== Keplerian ===\nGot:  {final_state:x}");
+    println!("Want: {expected_state:x}");
+
+    println!(
+        "RIC pos error (km) = {:.6}\n{:.6}",
+        ric_error.rmag_km(),
+        ric_error.radius_km
+    );
+    println!(
+        "RIC vel error (km/s) = {:.6}\n{:.6}",
+        ric_error.vmag_km_s(),
+        ric_error.velocity_km_s
+    );
+
+    assert!(dbg!(ric_error.rmag_km()) < 2e-5);
+    assert!(dbg!(ric_error.vmag_km_s()) < 2e-6);
+}
