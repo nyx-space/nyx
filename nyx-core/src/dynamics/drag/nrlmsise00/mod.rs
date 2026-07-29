@@ -186,23 +186,62 @@ impl Nrlmsise00Flags {
         };
 
         // Specific feature toggles
-        if !self.f107_solar_flux { sw[1] = 0.0; }
-        if !self.time_independent { sw[2] = 0.0; }
-        if !self.annual_harmonics { sw[3] = 0.0; sw[5] = 0.0; }
-        if !self.semiannual_harmonics { sw[4] = 0.0; sw[6] = 0.0; }
-        if !self.diurnal_tides { sw[7] = 0.0; }
-        if !self.semidiurnal_tides { sw[8] = 0.0; }
-        if !self.terdiurnal_tides { sw[14] = 0.0; }
-        if !self.ut_and_longitude { sw[10] = 0.0; sw[11] = 0.0; sw[12] = 0.0; sw[13] = 0.0; }
-        if !self.exospheric_temp_variations { sw[16] = 0.0; }
-        if !self.lower_boundary_temp_variations { sw[17] = 0.0; }
-        if !self.gradient_variations { sw[19] = 0.0; }
-        if !self.departures_from_diffusive_equilibrium { sw[15] = 0.0; }
-        if !self.lower_thermosphere_temp_variations { sw[18] = 0.0; }
-        if !self.upper_stratosphere_temp_variations { sw[20] = 0.0; }
-        if !self.boundary_density_variations { sw[21] = 0.0; }
-        if !self.lower_mesosphere_temp_variations { sw[22] = 0.0; }
-        if !self.turbopause_scale_height_variations { sw[23] = 0.0; }
+        if !self.f107_solar_flux {
+            sw[1] = 0.0;
+        }
+        if !self.time_independent {
+            sw[2] = 0.0;
+        }
+        if !self.annual_harmonics {
+            sw[3] = 0.0;
+            sw[5] = 0.0;
+        }
+        if !self.semiannual_harmonics {
+            sw[4] = 0.0;
+            sw[6] = 0.0;
+        }
+        if !self.diurnal_tides {
+            sw[7] = 0.0;
+        }
+        if !self.semidiurnal_tides {
+            sw[8] = 0.0;
+        }
+        if !self.terdiurnal_tides {
+            sw[14] = 0.0;
+        }
+        if !self.ut_and_longitude {
+            sw[10] = 0.0;
+            sw[11] = 0.0;
+            sw[12] = 0.0;
+            sw[13] = 0.0;
+        }
+        if !self.exospheric_temp_variations {
+            sw[16] = 0.0;
+        }
+        if !self.lower_boundary_temp_variations {
+            sw[17] = 0.0;
+        }
+        if !self.gradient_variations {
+            sw[19] = 0.0;
+        }
+        if !self.departures_from_diffusive_equilibrium {
+            sw[15] = 0.0;
+        }
+        if !self.lower_thermosphere_temp_variations {
+            sw[18] = 0.0;
+        }
+        if !self.upper_stratosphere_temp_variations {
+            sw[20] = 0.0;
+        }
+        if !self.boundary_density_variations {
+            sw[21] = 0.0;
+        }
+        if !self.lower_mesosphere_temp_variations {
+            sw[22] = 0.0;
+        }
+        if !self.turbopause_scale_height_variations {
+            sw[23] = 0.0;
+        }
 
         sw
     }

@@ -45,13 +45,13 @@ use hifitime::*;
 
 use nyx_space::cosmic::eclipse::ShadowModel;
 use nyx_space::dynamics::guidance::Thruster;
+use nyx_space::dynamics::nrlmsise00::{GeomagneticMode, Nrlmsise00Flags, OutputUnits};
 use nyx_space::dynamics::sequence::{
     AccelModels, Dynamics, ForceModels, PropagatorConfig, SpacecraftSequence,
 };
 use nyx_space::dynamics::{
     AtmDensity, Drag, PointMasses, SolarPressure, SolidTides, TidalPerturber,
 };
-use nyx_space::dynamics::nrlmsise00::{GeomagneticMode, Nrlmsise00Flags, OutputUnits};
 use nyx_space::io::gravity::GravityFieldConfig;
 use nyx_space::io::space_weather::{SpaceWeatherData, StaticSpaceWeather};
 use nyx_space::mc::{MvnSpacecraft, StateDispersion};

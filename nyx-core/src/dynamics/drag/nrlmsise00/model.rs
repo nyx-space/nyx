@@ -712,7 +712,6 @@ fn composition_correction_dual(alt: f64, r: f64, h1: f64, zh: f64, h2: f64) -> f
 /// Returns (densities\[9\], temperature_exo, temperature_alt).
 /// Densities in cm⁻³: \[He, O, N2, O2, Ar, total_mass, H, N, anomO\].
 pub fn compute(input: &Nrlmsise00Input, sw: &[f64; 24]) -> ([f64; 9], f64, f64) {
-
     let sin_lat = input.latitude_deg.to_radians().sin();
     let plg = compute_legendre(sin_lat);
 
