@@ -1,3 +1,4 @@
+# ruff: noqa
 from nyx_space import anise as __mod
 
 __all__ = []

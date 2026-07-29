@@ -1,3 +1,4 @@
+# ruff: noqa
 import logging
 
 import polars as pl
@@ -18,10 +19,10 @@ from nyx_space.mission_design import (
     IntegratorOptions,
     PointMasses,
     Propagator,
-    SpaceWeatherData,
-    StaticSpaceWeather,
     SolarPressure,
     SolidTides,
+    SpaceWeatherData,
+    StaticSpaceWeather,
     TidalPerturber,
 )
 from nyx_space.monte_carlo import MvnSpacecraft, StateDispersion, StateParameter

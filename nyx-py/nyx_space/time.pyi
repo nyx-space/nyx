@@ -1,7 +1,8 @@
-from __future__ import annotations
-from anise import time
+# ruff: noqa
 import datetime
 import typing
+
+from anise import time
 
 @typing.final
 class Duration:
@@ -205,13 +206,13 @@ class Duration:
         """Return self+value."""
 
     def __div__(self, other: float): ...
-    def __eq__(self, value: typing.Any) -> bool:
+    def __eq__(self, value: object) -> bool:
         """Return self==value."""
 
     def __ge__(self, value: typing.Any) -> bool:
         """Return self>=value."""
 
-    def __getnewargs__(self) -> typing.Tuple: ...
+    def __getnewargs__(self) -> tuple: ...
     def __gt__(self, value: typing.Any) -> bool:
         """Return self>value."""
 
@@ -224,14 +225,12 @@ class Duration:
     def __mul__(self, value: typing.Any):
         """Return self*value."""
 
-    def __ne__(self, value: typing.Any) -> bool:
+    def __ne__(self, value: object) -> bool:
         """Return self!=value."""
 
     def __radd__(self, value: typing.Any):
         """Return value+self."""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
 
     def __rmul__(self, value: typing.Any):
         """Return value*self."""
@@ -239,8 +238,6 @@ class Duration:
     def __rsub__(self, value: typing.Any):
         """Return value-self."""
 
-    def __str__(self) -> str:
-        """Return str(self)."""
 
     def __sub__(self, value: typing.Any):
         """Return self-value."""
@@ -1031,7 +1028,7 @@ class Epoch:
         """Returns seconds past GPS Time Epoch, defined as UTC midnight of January 5th to 6th 1980 (cf. <https://gssc.esa.int/navipedia/index.php/Time_References_in_GNSS#GPS_Time_.28GPST.29>)."""
 
     def to_gregorian(
-        self, time_scale: typing.Optional[time.TimeScale] = None
+        self, time_scale: time.TimeScale | None = None
     ) -> tuple[int, int, int, int, int, int, int]:
         """Converts the Epoch to the Gregorian parts in the (optionally) provided time scale as (year, month, day, hour, minute, second)."""
 
@@ -1333,13 +1330,13 @@ class Epoch:
     def __add__(self, value: typing.Any):
         """Return self+value."""
 
-    def __eq__(self, value: typing.Any) -> bool:
+    def __eq__(self, value: object) -> bool:
         """Return self==value."""
 
     def __ge__(self, value: typing.Any) -> bool:
         """Return self>=value."""
 
-    def __getnewargs__(self) -> typing.Tuple: ...
+    def __getnewargs__(self) -> tuple: ...
     def __gt__(self, value: typing.Any) -> bool:
         """Return self>value."""
 
@@ -1349,20 +1346,16 @@ class Epoch:
     def __lt__(self, value: typing.Any) -> bool:
         """Return self<value."""
 
-    def __ne__(self, value: typing.Any) -> bool:
+    def __ne__(self, value: object) -> bool:
         """Return self!=value."""
 
     def __radd__(self, value: typing.Any):
         """Return value+self."""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
 
     def __rsub__(self, value: typing.Any):
         """Return value-self."""
 
-    def __str__(self) -> str:
-        """Return str(self)."""
 
     def __sub__(self, value: typing.Any):
         """Return self-value."""
@@ -1411,21 +1404,17 @@ class LatestLeapSeconds:
         assert!(LatestLeapSeconds::default().is_up_to_date().unwrap(), "Hifitime needs to update its leap seconds list!");
         ```"""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
 
 @typing.final
 class LeapSecondsFile:
     """A leap second provider that uses an IERS formatted leap seconds file."""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
 
 @typing.final
 class MonthName:
     """Defines Month names, can be initialized either from its variant or its integer (1 for January)."""
 
-    def __eq__(self, value: typing.Any) -> bool:
+    def __eq__(self, value: object) -> bool:
         """Return self==value."""
 
     def __ge__(self, value: typing.Any) -> bool:
@@ -1443,11 +1432,9 @@ class MonthName:
     def __lt__(self, value: typing.Any) -> bool:
         """Return self<value."""
 
-    def __ne__(self, value: typing.Any) -> bool:
+    def __ne__(self, value: object) -> bool:
         """Return self!=value."""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
     April: time.MonthName = ...
     August: time.MonthName = ...
     December: time.MonthName = ...
@@ -1517,7 +1504,7 @@ class Polynomial:
     def from_offset_rate_nanoseconds(offset_ns: float, drift_ns_s: float) -> Polynomial:
         """Create a [Polynomial] structure from a static offset and drift, in nanoseconds and nanoseconds.s⁻¹"""
 
-    def __eq__(self, value: typing.Any) -> bool:
+    def __eq__(self, value: object) -> bool:
         """Return self==value."""
 
     def __ge__(self, value: typing.Any) -> bool:
@@ -1532,11 +1519,9 @@ class Polynomial:
     def __lt__(self, value: typing.Any) -> bool:
         """Return self<value."""
 
-    def __ne__(self, value: typing.Any) -> bool:
+    def __ne__(self, value: object) -> bool:
         """Return self!=value."""
 
-    def __str__(self) -> str:
-        """Return str(self)."""
 
 @typing.final
 class TimeScale:
@@ -1545,7 +1530,7 @@ class TimeScale:
     def uses_leap_seconds(self) -> bool:
         """Returns true if self takes leap seconds into account"""
 
-    def __eq__(self, value: typing.Any) -> bool:
+    def __eq__(self, value: object) -> bool:
         """Return self==value."""
 
     def __ge__(self, value: typing.Any) -> bool:
@@ -1563,11 +1548,9 @@ class TimeScale:
     def __lt__(self, value: typing.Any) -> bool:
         """Return self<value."""
 
-    def __ne__(self, value: typing.Any) -> bool:
+    def __ne__(self, value: object) -> bool:
         """Return self!=value."""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
     BDT: time.TimeScale = ...
     ET: time.TimeScale = ...
     GPST: time.TimeScale = ...
@@ -1588,13 +1571,13 @@ class TimeSeries:
 
     (Python documentation hints)"""
 
-    def __eq__(self, value: typing.Any) -> bool:
+    def __eq__(self, value: object) -> bool:
         """Return self==value."""
 
     def __ge__(self, value: typing.Any) -> bool:
         """Return self>=value."""
 
-    def __getnewargs__(self) -> typing.Tuple: ...
+    def __getnewargs__(self) -> tuple: ...
     def __gt__(self, value: typing.Any) -> bool:
         """Return self>value."""
 
@@ -1607,17 +1590,13 @@ class TimeSeries:
     def __lt__(self, value: typing.Any) -> bool:
         """Return self<value."""
 
-    def __ne__(self, value: typing.Any) -> bool:
+    def __ne__(self, value: object) -> bool:
         """Return self!=value."""
 
     def __next__(self) -> typing.Any:
         """Implement next(self)."""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
 
-    def __str__(self) -> str:
-        """Return str(self)."""
 
 @typing.final
 class Unit:
@@ -1628,7 +1607,7 @@ class Unit:
     def __add__(self, value: typing.Any):
         """Return self+value."""
 
-    def __eq__(self, value: typing.Any) -> bool:
+    def __eq__(self, value: object) -> bool:
         """Return self==value."""
 
     def __ge__(self, value: typing.Any) -> bool:
@@ -1649,14 +1628,12 @@ class Unit:
     def __mul__(self, value: typing.Any):
         """Return self*value."""
 
-    def __ne__(self, value: typing.Any) -> bool:
+    def __ne__(self, value: object) -> bool:
         """Return self!=value."""
 
     def __radd__(self, value: typing.Any):
         """Return value+self."""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
 
     def __rmul__(self, value: typing.Any):
         """Return value*self."""
@@ -1690,12 +1667,10 @@ class Ut1Provider:
     def from_eop_file(path: str) -> Ut1Provider:
         """Builds a UT1 provider from the provided path to an EOP file."""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
 
 @typing.final
 class Weekday:
-    def __eq__(self, value: typing.Any) -> bool:
+    def __eq__(self, value: object) -> bool:
         """Return self==value."""
 
     def __ge__(self, value: typing.Any) -> bool:
@@ -1713,11 +1688,9 @@ class Weekday:
     def __lt__(self, value: typing.Any) -> bool:
         """Return self<value."""
 
-    def __ne__(self, value: typing.Any) -> bool:
+    def __ne__(self, value: object) -> bool:
         """Return self!=value."""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
     Friday: time.Weekday = ...
     Monday: time.Weekday = ...
     Saturday: time.Weekday = ...

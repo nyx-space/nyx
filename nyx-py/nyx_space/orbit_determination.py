@@ -1,3 +1,4 @@
+# ruff: noqa
 from nyx_space._nyx import orbit_determination as __mod
 
 __all__ = []
