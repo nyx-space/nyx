@@ -182,7 +182,7 @@ impl TrackingDataArc {
                 if mtype == MeasurementType::Range {
                     if let Some(range_units) = metadata.get("RANGE_UNITS") {
                         match range_units.as_str() {
-"km" => {
+                            "km" => {
                                 // For distance units, simply apply the effective_divider.
                                 scaled_value /= effective_divider;
                             }
@@ -191,39 +191,49 @@ impl TrackingDataArc {
                                     which: "RANGE_UNITS `RU` requires mission-specific conversion and is not currently supported".to_string(),
                                 });
                             }
-                                // For distance units, simply apply the effective_divider.
-                                scaled_value /= effective_divider;
-                            }
                             "s" => {
                                 // For time units (e.g. round trip light time), convert to distance
                                 // then divide by effective divider.
-                                scaled_value = (scaled_value * SPEED_OF_LIGHT_KM_S) / effective_divider;
+                                scaled_value =
+                                    (scaled_value * SPEED_OF_LIGHT_KM_S) / effective_divider;
                             }
                             "m" => {
-                                warn!("RANGE_UNITS in TDM file is `m`, which is not CCSDS compliant. Proceeding with conversion to km.");
+                                warn!(
+                                    "RANGE_UNITS in TDM file is `m`, which is not CCSDS compliant. Proceeding with conversion to km."
+                                );
                                 scaled_value = (scaled_value / 1000.0) / effective_divider;
                             }
                             "ms" => {
-                                warn!("RANGE_UNITS in TDM file is `ms`, which is not CCSDS compliant. Proceeding with conversion to km.");
-                                scaled_value = (scaled_value * 1e-3 * SPEED_OF_LIGHT_KM_S) / effective_divider;
+                                warn!(
+                                    "RANGE_UNITS in TDM file is `ms`, which is not CCSDS compliant. Proceeding with conversion to km."
+                                );
+                                scaled_value =
+                                    (scaled_value * 1e-3 * SPEED_OF_LIGHT_KM_S) / effective_divider;
                             }
                             "us" => {
-                                warn!("RANGE_UNITS in TDM file is `us`, which is not CCSDS compliant. Proceeding with conversion to km.");
-                                scaled_value = (scaled_value * 1e-6 * SPEED_OF_LIGHT_KM_S) / effective_divider;
+                                warn!(
+                                    "RANGE_UNITS in TDM file is `us`, which is not CCSDS compliant. Proceeding with conversion to km."
+                                );
+                                scaled_value =
+                                    (scaled_value * 1e-6 * SPEED_OF_LIGHT_KM_S) / effective_divider;
                             }
                             "ns" => {
-                                warn!("RANGE_UNITS in TDM file is `ns`, which is not CCSDS compliant. Proceeding with conversion to km.");
-                                scaled_value = (scaled_value * 1e-9 * SPEED_OF_LIGHT_KM_S) / effective_divider;
+                                warn!(
+                                    "RANGE_UNITS in TDM file is `ns`, which is not CCSDS compliant. Proceeding with conversion to km."
+                                );
+                                scaled_value =
+                                    (scaled_value * 1e-9 * SPEED_OF_LIGHT_KM_S) / effective_divider;
                             }
                             _ => {
                                 return Err(InputOutputError::UnsupportedData {
-                                    which: format!("unsupported RANGE_UNITS `{}`", range_units),
+                                    which: format!("unsupported RANGE_UNITS `{range_units}`"),
                                 });
                             }
                         }
                     } else {
                         return Err(InputOutputError::MissingData {
-                            which: "RANGE_UNITS not specified in metadata for RANGE measurement".to_string(),
+                            which: "RANGE_UNITS not specified in metadata for RANGE measurement"
+                                .to_string(),
                         });
                     }
                 } else {
