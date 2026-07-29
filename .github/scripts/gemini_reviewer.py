@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
+import json
 import os
 import sys
-import json
+
 import requests
-from time import sleep
 from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
@@ -33,16 +33,13 @@ def get_pr_metadata():
 
 
 def get_pr_diff():
-    response = requests.get(
-        f"https://patch-diff.githubusercontent.com/raw/nyx-space/nyx/pull/{PR_NUMBER}.patch"
-    )
+    response = requests.get(f"https://patch-diff.githubusercontent.com/raw/nyx-space/nyx/pull/{PR_NUMBER}.patch")
     response.raise_for_status()
     return response.text
 
 
 def post_review_comments(summary_markdown, comments):
-    reviews_url = f"https://api.github.com/repos/{REPO}/pulls/{PR_NUMBER}/reviews"
-    issues_url = f"https://api.github.com/repos/{REPO}/issues/{PR_NUMBER}/comments"
+    url = f"https://api.github.com/repos/{REPO}/pulls/{PR_NUMBER}/reviews"
     headers = {
         "Authorization": f"token {GITHUB_TOKEN}",
         "Accept": "application.vnd.github.v3+json",
@@ -57,80 +54,18 @@ def post_review_comments(summary_markdown, comments):
                 "line": int(c["line"]),
                 "side": "RIGHT",
                 "body": f"{c['explanation']}\n\n```suggestion\n{c['suggestion'].strip()}\n```",
-                # Preserve raw data for the issue comment fallback where `suggestion` blocks don't work
-                "_raw_explanation": c["explanation"],
-                "_raw_suggestion": c["suggestion"].strip(),
             }
         )
 
-    # 1. Attempt Optimistic Batch Execution
-    batch_payload = {
+    payload = {
         "body": f"# 🤖 Automated Gemini Code Review\n\n{summary_markdown}",
         "event": "COMMENT",
-        "comments": [
-            {"path": c["path"], "line": c["line"], "side": c["side"], "body": c["body"]}
-            for c in github_comments
-        ],
+        "comments": github_comments,
     }
 
-    res = requests.post(reviews_url, headers=headers, json=batch_payload)
-
-    if res.status_code != 422:
-        res.raise_for_status()
-        print(
-            f"Successfully posted summary and {len(github_comments)} inline comments in a single batch."
-        )
-        return
-
-    print(
-        "Batch POST rejected with 422 (Line Hallucination). Initiating iterative fallback routing."
-    )
-
-    # 2. Post the summary by itself (guaranteed to succeed as it lacks line dependencies)
-    summary_payload = {
-        "body": f"# 🤖 Automated Gemini Code Review\n\n{summary_markdown}",
-        "event": "COMMENT",
-    }
-    requests.post(reviews_url, headers=headers, json=summary_payload).raise_for_status()
-
-    # 3. Iterate through comments and isolate the failures
-    success_count = 0
-    fallback_count = 0
-
-    for c in github_comments:
-        single_payload = {
-            "event": "COMMENT",
-            "comments": [
-                {
-                    "path": c["path"],
-                    "line": c["line"],
-                    "side": c["side"],
-                    "body": c["body"],
-                }
-            ],
-        }
-        single_res = requests.post(reviews_url, headers=headers, json=single_payload)
-
-        if single_res.status_code == 422:
-            # Route to the standard issues timeline if the line target is invalid
-            fallback_body = (
-                f"**Target:** `{c['path']}` around line `{c['line']}`\n\n"
-                f"{c['_raw_explanation']}\n\n"
-                f"```rust\n{c['_raw_suggestion']}\n```"  # Replaced `suggestion` with `rust` as suggestions require diff context
-            )
-            fallback_res = requests.post(
-                issues_url, headers=headers, json={"body": fallback_body}
-            )
-            fallback_res.raise_for_status()
-            fallback_count += 1
-            sleep(0.05)  # Avoid spamming github
-        else:
-            single_res.raise_for_status()
-            success_count += 1
-
-    print(
-        f"Successfully recovered: {success_count} inline comments and {fallback_count} general timeline comments."
-    )
+    res = requests.post(url, headers=headers, json=payload)
+    res.raise_for_status()
+    print(f"Successfully posted {len(github_comments)} review comments.")
 
 
 # Define standard Pydantic models for structured output
@@ -148,13 +83,11 @@ class ReviewComment(BaseModel):
         description="The exact code replacement block. Do not include markdown wrappers here."
     )
 
-
 class ReviewPayload(BaseModel):
     summary_markdown: str = Field(
         description="The high-level PR summary formatted exactly according to the requested markdown template."
     )
     comments: list[ReviewComment] = Field(description="List of inline code suggestions")
-
 
 SYSTEM_INSTRUCTION = """
 You are providing a strict and uncompromising pull request code review for Nyx, a high-fidelity, fast, and validated astrodynamics toolkit.
@@ -235,7 +168,6 @@ This PR does not primarily deal with documentation changes.
 ```
 """
 
-
 def main():
     metadata = get_pr_metadata()
     diff_data = get_pr_diff()
@@ -260,18 +192,15 @@ Description:
             system_instruction=SYSTEM_INSTRUCTION,
             response_mime_type="application/json",
             response_schema=ReviewPayload,
-            temperature=1,
+            temperature=0.1,  # Low temperature minimizes creative hallucination of lines
         ),
     )
 
     try:
         review_data = json.loads(response.text)
-        post_review_comments(
-            review_data.get("summary_markdown", "No summary provided"),
-            review_data.get("comments", []),
-        )
-    except Exception as e:
-        print(f"Failed to parse model output or post review: {e}")
+        post_review_comments(review_data.get("summary_markdown", "No summary provided"), review_data.get("comments", []))
+    except json.JSONDecodeError:
+        print("Failed to parse model output or post review.")
         print(f"Raw response: {response.text}")
         sys.exit(1)
 
