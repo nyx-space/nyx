@@ -32,6 +32,7 @@ use serde_dhall::StaticType;
 use snafu::ResultExt;
 use std::fmt;
 use std::sync::Arc;
+use trig_const::{ln, sqrt};
 
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
@@ -40,121 +41,133 @@ use pyo3::types::PyType;
 
 pub mod nrlmsise00;
 
+const SIN_30_DEG: f64 = 0.5;
+const COS_30_DEG: f64 = sqrt(3.0_f64) / 2.0_f64;
+
 /// Standard Harris-Priester altitude profile node (100 km to 1000 km)
 /// Densities in kg/m^3
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 struct HpNode {
     alt_km: f64,
-    min_density: f64,
-    max_density: f64,
+    min_density_kg_m3: f64,
+    max_density_kg_m3: f64,
+}
+
+impl HpNode {
+    const fn ln_min_density(&self) -> f64 {
+        ln(self.min_density_kg_m3)
+    }
+    const fn ln_max_density(&self) -> f64 {
+        ln(self.max_density_kg_m3)
+    }
 }
 
 /// Baseline Harris-Priester reference table for mean solar activity (~F10.7 = 150)
 const HP_TABLE: &[HpNode] = &[
     HpNode {
         alt_km: 100.0,
-        min_density: 4.974e-07,
-        max_density: 4.974e-07,
+        min_density_kg_m3: 4.974e-07,
+        max_density_kg_m3: 4.974e-07,
     },
     HpNode {
         alt_km: 120.0,
-        min_density: 2.490e-08,
-        max_density: 2.490e-08,
+        min_density_kg_m3: 2.490e-08,
+        max_density_kg_m3: 2.490e-08,
     },
     HpNode {
         alt_km: 140.0,
-        min_density: 3.840e-09,
-        max_density: 3.840e-09,
+        min_density_kg_m3: 3.840e-09,
+        max_density_kg_m3: 3.840e-09,
     },
     HpNode {
         alt_km: 160.0,
-        min_density: 1.170e-09,
-        max_density: 1.170e-09,
+        min_density_kg_m3: 1.170e-09,
+        max_density_kg_m3: 1.170e-09,
     },
     HpNode {
         alt_km: 180.0,
-        min_density: 4.820e-10,
-        max_density: 5.220e-10,
+        min_density_kg_m3: 4.820e-10,
+        max_density_kg_m3: 5.220e-10,
     },
     HpNode {
         alt_km: 200.0,
-        min_density: 2.260e-10,
-        max_density: 2.620e-10,
+        min_density_kg_m3: 2.260e-10,
+        max_density_kg_m3: 2.620e-10,
     },
     HpNode {
         alt_km: 240.0,
-        min_density: 6.880e-11,
-        max_density: 9.380e-11,
+        min_density_kg_m3: 6.880e-11,
+        max_density_kg_m3: 9.380e-11,
     },
     HpNode {
         alt_km: 280.0,
-        min_density: 2.570e-11,
-        max_density: 4.180e-11,
+        min_density_kg_m3: 2.570e-11,
+        max_density_kg_m3: 4.180e-11,
     },
     HpNode {
         alt_km: 320.0,
-        min_density: 1.090e-11,
-        max_density: 2.060e-11,
+        min_density_kg_m3: 1.090e-11,
+        max_density_kg_m3: 2.060e-11,
     },
     HpNode {
         alt_km: 360.0,
-        min_density: 4.980e-12,
-        max_density: 1.070e-11,
+        min_density_kg_m3: 4.980e-12,
+        max_density_kg_m3: 1.070e-11,
     },
     HpNode {
         alt_km: 400.0,
-        min_density: 2.380e-12,
-        max_density: 5.820e-12,
+        min_density_kg_m3: 2.380e-12,
+        max_density_kg_m3: 5.820e-12,
     },
     HpNode {
         alt_km: 440.0,
-        min_density: 1.180e-12,
-        max_density: 3.250e-12,
+        min_density_kg_m3: 1.180e-12,
+        max_density_kg_m3: 3.250e-12,
     },
     HpNode {
         alt_km: 480.0,
-        min_density: 6.020e-13,
-        max_density: 1.860e-12,
+        min_density_kg_m3: 6.020e-13,
+        max_density_kg_m3: 1.860e-12,
     },
     HpNode {
         alt_km: 520.0,
-        min_density: 3.150e-13,
-        max_density: 1.080e-12,
+        min_density_kg_m3: 3.150e-13,
+        max_density_kg_m3: 1.080e-12,
     },
     HpNode {
         alt_km: 560.0,
-        min_density: 1.680e-13,
-        max_density: 6.400e-13,
+        min_density_kg_m3: 1.680e-13,
+        max_density_kg_m3: 6.400e-13,
     },
     HpNode {
         alt_km: 600.0,
-        min_density: 9.100e-14,
-        max_density: 3.830e-13,
+        min_density_kg_m3: 9.100e-14,
+        max_density_kg_m3: 3.830e-13,
     },
     HpNode {
         alt_km: 680.0,
-        min_density: 2.820e-14,
-        max_density: 1.440e-13,
+        min_density_kg_m3: 2.820e-14,
+        max_density_kg_m3: 1.440e-13,
     },
     HpNode {
         alt_km: 760.0,
-        min_density: 9.200e-15,
-        max_density: 5.760e-14,
+        min_density_kg_m3: 9.200e-15,
+        max_density_kg_m3: 5.760e-14,
     },
     HpNode {
         alt_km: 840.0,
-        min_density: 3.100e-15,
-        max_density: 2.400e-14,
+        min_density_kg_m3: 3.100e-15,
+        max_density_kg_m3: 2.400e-14,
     },
     HpNode {
         alt_km: 920.0,
-        min_density: 1.100e-15,
-        max_density: 1.050e-14,
+        min_density_kg_m3: 1.100e-15,
+        max_density_kg_m3: 1.050e-14,
     },
     HpNode {
         alt_km: 1000.0,
-        min_density: 4.000e-16,
-        max_density: 4.800e-15,
+        min_density_kg_m3: 4.000e-16,
+        max_density_kg_m3: 4.800e-15,
     },
 ];
 
@@ -180,7 +193,7 @@ pub enum AtmDensity {
     /// degrades rapidly outside a narrow altitude band around $h_0$.
     Exponential {
         /// Reference atmospheric density $\rho_0$ at altitude $h_0$ [kg/m³].
-        rho0: f64,
+        rho0_kg_m3: f64,
         /// Reference geodetic altitude $h_0$ [km].
         ref_alt_km: f64,
         /// Atmospheric scale height $H = \frac{R T}{M g}$ [km].
@@ -228,7 +241,7 @@ impl AtmDensity {
     #[classmethod]
     fn earth_exponential(_cls: &Bound<'_, PyType>) -> Self {
         AtmDensity::Exponential {
-            rho0: 3.614e-13,
+            rho0_kg_m3: 3.614e-13,
             ref_alt_km: 700.000,
             scale_height_km: 88.667,
         }
@@ -256,7 +269,7 @@ impl Drag {
     pub fn earth_exp(almanac: &Almanac) -> Result<Arc<Self>, DynamicsError> {
         Ok(Arc::new(Self {
             density: AtmDensity::Exponential {
-                rho0: 3.614e-13,
+                rho0_kg_m3: 3.614e-13,
                 ref_alt_km: 700.000,
                 scale_height_km: 88.667,
             },
@@ -300,7 +313,7 @@ impl Drag {
             AtmDensity::Constant(rho) => *rho,
 
             AtmDensity::Exponential {
-                rho0,
+                rho0_kg_m3,
                 scale_height_km,
                 ref_alt_km,
             } => {
@@ -308,7 +321,7 @@ impl Drag {
                     .altitude_km()
                     .context(AstroPhysicsSnafu)
                     .context(DynamicsAstroSnafu)?;
-                rho0 * (-(altitude_km - ref_alt_km) / scale_height_km).exp()
+                rho0_kg_m3 * (-(altitude_km - ref_alt_km) / scale_height_km).exp()
             }
 
             AtmDensity::StdAtm { max_alt_km } => {
@@ -384,11 +397,13 @@ impl Drag {
                     let n1 = &HP_TABLE[idx + 1];
 
                     // Scale height interpolation for min and max density
-                    let h_min = (n0.alt_km - n1.alt_km) / (n1.min_density / n0.min_density).ln();
-                    let h_max = (n0.alt_km - n1.alt_km) / (n1.max_density / n0.max_density).ln();
+                    let h_min =
+                        (n0.alt_km - n1.alt_km) / (n1.ln_min_density() - n0.ln_min_density());
+                    let h_max =
+                        (n0.alt_km - n1.alt_km) / (n1.ln_max_density() - n0.ln_max_density());
 
-                    let rho_min = n0.min_density * (-(altitude_km - n0.alt_km) / h_min).exp();
-                    let rho_max = n0.max_density * (-(altitude_km - n0.alt_km) / h_max).exp();
+                    let rho_min = n0.min_density_kg_m3 * (-(altitude_km - n0.alt_km) / h_min).exp();
+                    let rho_max = n0.max_density_kg_m3 * (-(altitude_km - n0.alt_km) / h_max).exp();
 
                     // Compute Sun unit vector in drag frame
                     let u_sun = almanac
@@ -397,13 +412,10 @@ impl Drag {
                             action: "fetching sun position for Harris-Priester model",
                         })?;
 
-                    // Diurnal bulge apex: lagging Sun by ~30 deg (0.5235987756 rad) in Right Ascension
-                    let lag = 30.0_f64.to_radians();
-                    let cos_l = lag.cos();
-                    let sin_l = lag.sin();
+                    // Diurnal bulge apex: lagging Sun by ~30 deg in Right Ascension
                     let u_bulge = Vector3::new(
-                        u_sun.x * cos_l - u_sun.y * sin_l,
-                        u_sun.x * sin_l + u_sun.y * cos_l,
+                        u_sun.x * COS_30_DEG - u_sun.y * SIN_30_DEG,
+                        u_sun.x * SIN_30_DEG + u_sun.y * COS_30_DEG,
                         u_sun.z,
                     );
 

@@ -622,8 +622,8 @@ fn regression_harris_drag(almanac: Arc<Almanac>) {
         .orbit;
 
     let expected_state = Orbit::new(
-        -5866.260358,
-        1429.893388,
+        -5866.260366,
+        1429.893370,
         2719.496468,
         -2.783483,
         -6.933258,
@@ -653,4 +653,35 @@ fn regression_harris_drag(almanac: Arc<Almanac>) {
 
     assert!(dbg!(ric_error.rmag_km()) < 2e-5);
     assert!(dbg!(ric_error.vmag_km_s()) < 2e-6);
+
+    // For checking purposes, add the diff to NRLMSISE00.
+
+    let expected_state = Orbit::new(
+        -5904.4748605974446036,
+        1330.9542946601800395,
+        2687.0267716822277180,
+        -2.6688074464373877,
+        -6.9600802661844208,
+        -2.2412448735527049,
+        Epoch::from_gregorian_utc_hms(2024, 3, 1, 1, 2, 3),
+        eme2k,
+    );
+    let ric_error = expected_state.ric_difference(&final_state).unwrap();
+    println!("*** NRLMSISE-00 COMPARISON ***");
+    println!("=== Cartesian ===\nGot:  {final_state}");
+    println!("Want: {expected_state}");
+
+    println!("=== Keplerian ===\nGot:  {final_state:x}");
+    println!("Want: {expected_state:x}");
+
+    println!(
+        "RIC pos error (km) = {:.6}\n{:.6}",
+        ric_error.rmag_km(),
+        ric_error.radius_km
+    );
+    println!(
+        "RIC vel error (km/s) = {:.6}\n{:.6}",
+        ric_error.vmag_km_s(),
+        ric_error.velocity_km_s
+    );
 }
