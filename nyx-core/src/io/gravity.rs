@@ -59,12 +59,7 @@ pub struct GravityFieldConfig {
 impl GravityFieldConfig {
     #[pyo3(signature=(degree, order, filepath, frame))]
     #[new]
-    fn py_new(
-        degree: usize,
-        order: usize,
-        filepath: PathBuf,
-        frame: FrameUid,
-    ) -> Self {
+    fn py_new(degree: usize, order: usize, filepath: PathBuf, frame: FrameUid) -> Self {
         Self {
             filepath,
             degree,
@@ -171,7 +166,8 @@ impl GravityFieldData {
                     msg: "could not read file as gunzip".to_string(),
                 })?;
         } else {
-            buf_reader.read_to_end(&mut buffer)
+            buf_reader
+                .read_to_end(&mut buffer)
                 .map_err(|_| NyxError::FileUnreadable {
                     msg: "could not read file to end".to_string(),
                 })?;
@@ -401,7 +397,8 @@ impl GravityFieldData {
                     msg: "could not read file as gunzip".to_string(),
                 })?;
         } else {
-            buf_reader.read_to_end(&mut buffer)
+            buf_reader
+                .read_to_end(&mut buffer)
                 .map_err(|_| NyxError::FileUnreadable {
                     msg: "could not read file to end".to_string(),
                 })?;
@@ -552,13 +549,8 @@ fn test_load_harmonic_files() {
         .iter()
         .collect();
 
-    GravityFieldData::from_cof(
-        data_folder.join("JGM3.cof.gz"),
-        50,
-        50,
-        IAU_EARTH_FRAME,
-    )
-    .expect("could not load JGM3");
+    GravityFieldData::from_cof(data_folder.join("JGM3.cof.gz"), 50, 50, IAU_EARTH_FRAME)
+        .expect("could not load JGM3");
 
     GravityFieldData::from_shadr(
         data_folder.join("EGM2008_to2190_TideFree.gz"),

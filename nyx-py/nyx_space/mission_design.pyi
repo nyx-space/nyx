@@ -1,4 +1,3 @@
-from __future__ import annotations
 import typing
 
 @typing.final
@@ -10,7 +9,7 @@ class AccelModels:
     solid_tides: typing.Any
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self, *args: typing.Any | None, **kwargs: typing.Any | None
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Acceleration models alter the orbital dynamics"""
@@ -23,18 +22,14 @@ class AccelModels:
     ) -> AccelModels:
         """Acceleration models alter the orbital dynamics"""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
 
-    def __str__(self) -> str:
-        """Return str(self)."""
 
 @typing.final
 class AtmDensity:
     """Density in kg/m^3 and altitudes in meters, not kilometers!"""
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self, *args: typing.Any | None, **kwargs: typing.Any | None
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Density in kg/m^3 and altitudes in meters, not kilometers!"""
@@ -57,7 +52,7 @@ class Drag:
     frame: typing.Any
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self, *args: typing.Any | None, **kwargs: typing.Any | None
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         `Drag` implements all three drag models."""
@@ -67,18 +62,14 @@ class Drag:
     ) -> Drag:
         """`Drag` implements all three drag models."""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
 
-    def __str__(self) -> str:
-        """Return str(self)."""
 
 @typing.final
 class Dynamics:
     """Dynamics defines the dynamical environment with a set of acceleration and force models"""
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self, *args: typing.Any | None, **kwargs: typing.Any | None
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Dynamics defines the dynamical environment with a set of acceleration and force models"""
@@ -88,18 +79,14 @@ class Dynamics:
     ) -> Dynamics:
         """Dynamics defines the dynamical environment with a set of acceleration and force models"""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
 
-    def __str__(self) -> str:
-        """Return str(self)."""
 
 @typing.final
 class ExportCfg:
     """Configuration for exporting from Nyx to local disk."""
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self, *args: typing.Any | None, **kwargs: typing.Any | None
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Configuration for exporting from Nyx to local disk."""
@@ -107,7 +94,7 @@ class ExportCfg:
     def __new__(cls, timestamped: typing.Any = False) -> ExportCfg:
         """Configuration for exporting from Nyx to local disk."""
 
-    def __eq__(self, value: typing.Any) -> bool:
+    def __eq__(self, value: object) -> bool:
         """Return self==value."""
 
     def __ge__(self, value: typing.Any) -> bool:
@@ -122,14 +109,10 @@ class ExportCfg:
     def __lt__(self, value: typing.Any) -> bool:
         """Return self<value."""
 
-    def __ne__(self, value: typing.Any) -> bool:
+    def __ne__(self, value: object) -> bool:
         """Return self!=value."""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
 
-    def __str__(self) -> str:
-        """Return str(self)."""
 
 @typing.final
 class ForceModels:
@@ -139,7 +122,7 @@ class ForceModels:
     solar_pressure: typing.Any
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self, *args: typing.Any | None, **kwargs: typing.Any | None
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Force models alter the spacecraft dynamics (they need a mass)."""
@@ -149,11 +132,7 @@ class ForceModels:
     ) -> ForceModels:
         """Force models alter the spacecraft dynamics (they need a mass)."""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
 
-    def __str__(self) -> str:
-        """Return str(self)."""
 
 @typing.final
 class GravityFieldConfig:
@@ -167,7 +146,7 @@ class GravityFieldConfig:
     order: typing.Any
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self, *args: typing.Any | None, **kwargs: typing.Any | None
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Configuration holder for gravity field.
@@ -185,11 +164,7 @@ class GravityFieldConfig:
 
         Data is first loaded as a SHADR, if that fails, Nyx will try to load it as a COF file."""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
 
-    def __str__(self) -> str:
-        """Return str(self)."""
 
 @typing.final
 class IntegratorMethod:
@@ -197,7 +172,7 @@ class IntegratorMethod:
     Nomenclature: X-Y means that this is an X order solver with a Y order error correction step."""
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self, *args: typing.Any | None, **kwargs: typing.Any | None
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Enum of supported integration methods, all of which are part of the Runge Kutta family of ordinary differential equation (ODE) solvers.
@@ -210,8 +185,6 @@ class IntegratorMethod:
     def __int__(self) -> None:
         """int(self)"""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
     CashKarp45: IntegratorMethod = ...
     DormandPrince45: IntegratorMethod = ...
     DormandPrince78: IntegratorMethod = ...
@@ -233,7 +206,7 @@ class IntegratorOptions:
     tolerance: typing.Any
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self, *args: typing.Any | None, **kwargs: typing.Any | None
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Stores the integrator options, including the minimum and maximum step sizes, and the central body to perform the integration.
@@ -265,11 +238,7 @@ class IntegratorOptions:
     def set_min_step(self, min_step: typing.Any) -> typing.Any:
         """Set the minimum step size and sets the initial step to that value if currently smaller"""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
 
-    def __str__(self) -> str:
-        """Return str(self)."""
 
 @typing.final
 class PointMasses:
@@ -279,7 +248,7 @@ class PointMasses:
     correction: typing.Any
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self, *args: typing.Any | None, **kwargs: typing.Any | None
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         PointMasses model"""
@@ -289,11 +258,7 @@ class PointMasses:
     ) -> PointMasses:
         """PointMasses model"""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
 
-    def __str__(self) -> str:
-        """Return str(self)."""
 
 @typing.final
 class Propagator:
@@ -302,7 +267,7 @@ class Propagator:
     options: typing.Any
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self, *args: typing.Any | None, **kwargs: typing.Any | None
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature."""
 
@@ -393,7 +358,7 @@ class PropagatorConfig:
     """Propagator config includes the method, options, and all dynamics"""
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self, *args: typing.Any | None, **kwargs: typing.Any | None
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Propagator config includes the method, options, and all dynamics"""
@@ -403,11 +368,7 @@ class PropagatorConfig:
     ) -> PropagatorConfig:
         """Propagator config includes the method, options, and all dynamics"""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
 
-    def __str__(self) -> str:
-        """Return str(self)."""
 
 @typing.final
 class ShadowModel:
@@ -415,7 +376,7 @@ class ShadowModel:
     shadow_bodies: typing.Any
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self, *args: typing.Any | None, **kwargs: typing.Any | None
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature."""
 
@@ -430,7 +391,7 @@ class SolarPressure:
     shadow_model: typing.Any
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self, *args: typing.Any | None, **kwargs: typing.Any | None
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Computation of solar radiation pressure is based on STK: <http://help.agi.com/stk/index.htm#gator/eq-solar.htm> ."""
@@ -444,11 +405,7 @@ class SolarPressure:
     ) -> SolarPressure:
         """Computation of solar radiation pressure is based on STK: <http://help.agi.com/stk/index.htm#gator/eq-solar.htm> ."""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
 
-    def __str__(self) -> str:
-        """Return str(self)."""
 
 @typing.final
 class SolidTides:
@@ -462,7 +419,7 @@ class SolidTides:
     perturbers: typing.Any
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self, *args: typing.Any | None, **kwargs: typing.Any | None
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         `SolidTides` implements the solid tide acceleration model.
@@ -480,7 +437,7 @@ class SolidTides:
     def earth_moon_system(
         earth_frame: typing.Any, moon_frame: typing.Any, almanac: typing.Any
     ) -> typing.Any: ...
-    def __eq__(self, value: typing.Any) -> bool:
+    def __eq__(self, value: object) -> bool:
         """Return self==value."""
 
     def __ge__(self, value: typing.Any) -> bool:
@@ -495,21 +452,17 @@ class SolidTides:
     def __lt__(self, value: typing.Any) -> bool:
         """Return self<value."""
 
-    def __ne__(self, value: typing.Any) -> bool:
+    def __ne__(self, value: object) -> bool:
         """Return self!=value."""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
 
-    def __str__(self) -> str:
-        """Return str(self)."""
 
 @typing.final
 class SpacecraftSequence:
     thruster_sets: typing.Any
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self, *args: typing.Any | None, **kwargs: typing.Any | None
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature."""
 
@@ -533,14 +486,14 @@ class TidalPerturber:
     frame: typing.Any
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self, *args: typing.Any | None, **kwargs: typing.Any | None
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature."""
 
     def __new__(
         cls, frame: typing.Any, compute_degree_3: typing.Any
     ) -> TidalPerturber: ...
-    def __eq__(self, value: typing.Any) -> bool:
+    def __eq__(self, value: object) -> bool:
         """Return self==value."""
 
     def __ge__(self, value: typing.Any) -> bool:
@@ -555,19 +508,15 @@ class TidalPerturber:
     def __lt__(self, value: typing.Any) -> bool:
         """Return self<value."""
 
-    def __ne__(self, value: typing.Any) -> bool:
+    def __ne__(self, value: object) -> bool:
         """Return self!=value."""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
 
-    def __str__(self) -> str:
-        """Return str(self)."""
 
 @typing.final
 class Trajectory:
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self, *args: typing.Any | None, **kwargs: typing.Any | None
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature."""
 
@@ -593,8 +542,4 @@ class Trajectory:
         """Export this spacecraft trajectory estimate to an ANISE Ephemeris"""
 
     def to_parquet(self, path: typing.Any, cfg: typing.Any) -> typing.Any: ...
-    def __repr__(self) -> str:
-        """Return repr(self)."""
 
-    def __str__(self) -> str:
-        """Return str(self)."""
