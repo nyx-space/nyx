@@ -22,12 +22,11 @@ use super::{
 use crate::cosmic::{AstroPhysicsSnafu, Frame, Spacecraft};
 use crate::dynamics::nrlmsise00::msise00_density;
 use crate::io::space_weather::SpaceWeatherData;
-use crate::linalg::{Const, Matrix4x3, Vector3};
+use crate::linalg::{Matrix4x3, Vector3};
 use anise::almanac::Almanac;
 use anise::constants::frames::IAU_EARTH_FRAME;
 use anise::errors::OrientationSnafu;
 use hifitime::Unit;
-use hyperdual::{hyperspace_from_vector, linalg::norm, Float, OHyperdual};
 use serde::{Deserialize, Serialize};
 use serde_dhall::StaticType;
 use snafu::ResultExt;
@@ -156,36 +155,9 @@ impl Drag {
             estimate: false,
         }))
     }
-}
 
-impl fmt::Display for Drag {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "\tDrag density {:?} in frame {}",
-            self.density, self.frame
-        )
-    }
-}
-
-impl ForceModel for Drag {
-    fn estimation_index(&self) -> Option<usize> {
-        if self.estimate {
-            Some(7)
-        } else {
-            None
-        }
-    }
-
-    fn eom(&self, ctx: &Spacecraft, almanac: &Almanac) -> Result<Vector3<f64>, DynamicsError> {
-        let integration_frame = ctx.orbit.frame;
-
-        let drag_frame = almanac
-            .frame_info(self.frame)
-            .context(DynamicsPlanetarySnafu {
-                action: "fetching drag frame information",
-            })?;
-
+    /// Calculate the density as a private function, since it's duplicated in the EOM and Gradient
+    fn rho_kg_m3(&self, ctx: &Spacecraft, almanac: &Almanac) -> Result<f64, DynamicsError> {
         let osc_drag_frame =
             almanac
                 .transform_to(ctx.orbit, self.frame, None)
@@ -261,6 +233,47 @@ impl ForceModel for Drag {
             }
         };
 
+        Ok(rho_kg_m3)
+    }
+}
+
+impl fmt::Display for Drag {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "\tDrag density {:?} in frame {}",
+            self.density, self.frame
+        )
+    }
+}
+
+impl ForceModel for Drag {
+    fn estimation_index(&self) -> Option<usize> {
+        if self.estimate {
+            Some(7)
+        } else {
+            None
+        }
+    }
+
+    fn eom(&self, ctx: &Spacecraft, almanac: &Almanac) -> Result<Vector3<f64>, DynamicsError> {
+        let integration_frame = ctx.orbit.frame;
+
+        let drag_frame = almanac
+            .frame_info(self.frame)
+            .context(DynamicsPlanetarySnafu {
+                action: "fetching drag frame information",
+            })?;
+
+        let osc_drag_frame =
+            almanac
+                .transform_to(ctx.orbit, self.frame, None)
+                .context(DynamicsAlmanacSnafu {
+                    action: "transforming into drag frame",
+                })?;
+
+        let rho_kg_m3 = self.rho_kg_m3(ctx, almanac)?;
+
         let v_km_s = osc_drag_frame.velocity_km_s;
 
         // Note this is in kg*km/s^2 (or kN) because the vehicle mass has not yet been divided.
@@ -286,12 +299,37 @@ impl ForceModel for Drag {
         Ok(accel_integr_frame)
     }
 
+    /// This model uses central differencing for gradient computation instead of hyperdual numbers.
+    /// This is required given the complexity of the NRLMSISE00 model.
     fn gradient(
         &self,
         ctx: &Spacecraft,
         almanac: &Almanac,
     ) -> Result<(Vector3<f64>, Matrix4x3<f64>), DynamicsError> {
-        todo!()
+        let dx = self.eom(ctx, almanac)?;
+
+        let mut grad = Matrix4x3::zeros();
+
+        // Central differencing: 6 EOM evaluations, O(h^2) error
+        for j in 0..3 {
+            // Optimal step size for central diff: h ~ eps^(1/3) * |r|
+            let h = 6.0e-6 * ctx.orbit.radius_km[j].abs().max(1.0);
+
+            let mut ctx_plus = *ctx;
+            ctx_plus.orbit.radius_km[j] += h;
+            let f_plus = self.eom(&ctx_plus, almanac)?;
+
+            let mut ctx_minus = *ctx;
+            ctx_minus.orbit.radius_km[j] -= h;
+            let f_minus = self.eom(&ctx_minus, almanac)?;
+
+            let df_dr = (f_plus - f_minus) / (2.0 * h);
+            for i in 0..3 {
+                grad[(i, j)] = df_dr[i];
+            }
+        }
+
+        Ok((dx, grad))
     }
 }
 

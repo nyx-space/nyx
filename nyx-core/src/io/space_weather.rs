@@ -36,7 +36,7 @@ use std::path::PathBuf;
 /// Strategy for resolving missing predictive space weather parameters (F10.7, Ap, Kp).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all))]
-pub enum SpaceWeatherFallback {
+pub enum StaticSpaceWeather {
     /// Solar minimum conditions (F10.7 = 65.0 SFU, Ap = 4.0, Kp = 1.0).
     SolarMinimum(),
     /// 11-year solar cycle average (F10.7 = 130.0 SFU, Ap = 15.0, Kp = 3.0). Standard default.
@@ -47,13 +47,13 @@ pub enum SpaceWeatherFallback {
     Custom { f107: f64, ap: f64, kp: f64 },
 }
 
-impl Default for SpaceWeatherFallback {
+impl Default for StaticSpaceWeather {
     fn default() -> Self {
         Self::SolarAverage()
     }
 }
 
-impl SpaceWeatherFallback {
+impl StaticSpaceWeather {
     /// Resolves the effective F10.7 solar flux [SFU].
     pub fn resolve_f107(&self, value: Option<f64>) -> f64 {
         value.unwrap_or(match self {
@@ -167,7 +167,7 @@ impl RawSpaceWeatherRow {
     /// Missing bins default first to the row's mean daily Kp (derived from `KP_SUM`),
     /// and secondarily to the provided `SpaceWeatherFallback` policy.
     #[inline]
-    pub fn kp_bins(&self, fallback: SpaceWeatherFallback) -> [f64; 8] {
+    pub fn kp_bins(&self, fallback: StaticSpaceWeather) -> [f64; 8] {
         // KP_SUM in CelesTrak CSV is the sum of the eight 3-hour $K_p \times 10$ values.
         // Dividing KP_SUM by $80.0$ yields the mean 3-hour $K_p$ index in standard $0.0\text{--}9.0$ scale
         let daily_mean_kp = self
@@ -194,7 +194,7 @@ impl RawSpaceWeatherRow {
     /// Missing bins default first to the row's `AP_AVG`, and secondarily to the
     /// provided `SpaceWeatherFallback` policy.
     #[inline]
-    pub fn ap_bins(&self, fallback: SpaceWeatherFallback) -> [f64; 8] {
+    pub fn ap_bins(&self, fallback: StaticSpaceWeather) -> [f64; 8] {
         let daily_mean_ap = self.ap_avg.unwrap_or_else(|| fallback.resolve_ap(None));
 
         let resolve = |bin: Option<f64>| bin.unwrap_or(daily_mean_ap);
@@ -219,14 +219,22 @@ impl RawSpaceWeatherRow {
 pub struct SpaceWeatherData {
     #[serde(with = "as_vec")]
     pub records: BTreeMap<Epoch, RawSpaceWeatherRow>,
-    pub fallback: SpaceWeatherFallback,
+    pub fallback: StaticSpaceWeather,
 }
 
 impl SpaceWeatherData {
+    /// Initialize new space weather by provided fixed values only.
+    pub fn from_static_weather(weather: StaticSpaceWeather) -> Self {
+        Self {
+            records: BTreeMap::new(),
+            fallback: weather,
+        }
+    }
+
     /// Ingests a complete CelesTrak Space Weather CSV file into an Epoch-indexed map.
     pub fn from_csv_file<P: AsRef<Path>>(
         path: P,
-        fallback: SpaceWeatherFallback,
+        fallback: StaticSpaceWeather,
     ) -> Result<Self, InputOutputError> {
         let path_ref = path.as_ref();
         let file = File::open(path_ref).map_err(|e| InputOutputError::StdIOError {
@@ -277,7 +285,10 @@ impl SpaceWeatherData {
     pub fn raw_daily_record(&self, midnight_epoch: Epoch) -> Option<&RawSpaceWeatherRow> {
         self.records.get(&midnight_epoch)
     }
+}
 
+#[cfg_attr(feature = "python", pymethods)]
+impl SpaceWeatherData {
     /// Evaluates the space weather state at `epoch` and constructs the `Msise00DailyWeather` payload.
     ///
     /// Missing daily records or unforecasted fields are resolved using `SpaceWeatherFallback`.
@@ -366,10 +377,20 @@ impl SpaceWeatherData {
 impl SpaceWeatherData {
     #[new]
     fn py_new(
-        path: PathBuf,
-        fallback: Option<SpaceWeatherFallback>,
+        path: Option<PathBuf>,
+        fallback: Option<StaticSpaceWeather>,
     ) -> Result<Self, InputOutputError> {
-        Self::from_csv_file(path, fallback.unwrap_or_default())
+        if let Some(path) = path {
+            Self::from_csv_file(path, fallback.unwrap_or_default())
+        } else if let Some(weather) = fallback {
+            Ok(Self::from_static_weather(weather))
+        } else {
+            Err(InputOutputError::MissingData {
+                which:
+                    "must provide at least either a path to a weather file or a fallback, or both"
+                        .to_string(),
+            })
+        }
     }
 
     fn __str__(&self) -> String {
@@ -457,6 +478,7 @@ mod as_vec {
 
 /// Target weather payload required by the NRLMSISE-00 density model.
 #[derive(Debug, Clone, Copy, Default)]
+#[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub struct Msise00DailyWeather {
     /// Daily F10.7 solar radio flux: $\text{ SFU} = 10^{-22} \text{ W}\cdot\text{m}^{-2}\cdot\text{Hz}^{-1}$.
     pub f107_daily_sfu: f64,
@@ -466,4 +488,16 @@ pub struct Msise00DailyWeather {
     pub ap_daily: f64,
     /// 7-element Ap historical array covering the 57-hour lookback window.
     pub ap_3hour_history: [f64; 7],
+}
+
+#[cfg(feature = "python")]
+#[cfg_attr(feature = "python", pymethods)]
+impl Msise00DailyWeather {
+    fn __str__(&self) -> String {
+        format!("{self:?}")
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self:?} @ {self:p}")
+    }
 }
