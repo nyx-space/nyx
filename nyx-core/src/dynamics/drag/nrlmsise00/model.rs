@@ -7,8 +7,8 @@
 //!
 //! All coefficient indices are 0-based (matching Rust arrays).
 
-use super::coefficients::*;
 use super::Nrlmsise00Input;
+use super::coefficients::*;
 use core::f64::consts::PI;
 
 const DEG_TO_RAD: f64 = PI / 180.0;

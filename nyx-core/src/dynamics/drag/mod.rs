@@ -81,9 +81,12 @@ pub enum AtmDensity {
         max_alt_km: f64,
     },
 
-    NRLMSISE00 {
-        weather: SpaceWeatherData,
-    },
+    /// NRLMSISE-00 empirical atmosphere model.
+    ///
+    /// Computes neutral atmospheric density and composition from 0 to ~1000 km altitude
+    /// as a function of location, time, solar activity (F10.7), and geomagnetic
+    /// activity (Ap).
+    NRLMSISE00 { weather: SpaceWeatherData },
 }
 
 #[cfg(feature = "python")]
@@ -249,11 +252,7 @@ impl fmt::Display for Drag {
 
 impl ForceModel for Drag {
     fn estimation_index(&self) -> Option<usize> {
-        if self.estimate {
-            Some(7)
-        } else {
-            None
-        }
+        if self.estimate { Some(7) } else { None }
     }
 
     fn eom(&self, ctx: &Spacecraft, almanac: &Almanac) -> Result<Vector3<f64>, DynamicsError> {

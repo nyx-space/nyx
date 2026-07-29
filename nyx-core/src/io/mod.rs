@@ -172,7 +172,10 @@ pub enum InputOutputError {
     #[snafu(display("empty dataset error when (de)serializing {action}"))]
     EmptyDataset { action: &'static str },
     #[snafu(display("CSV reading errors when {action}: {source}"))]
-    CsvData {source: csv::Error, action: &'static str}
+    CsvData {
+        source: csv::Error,
+        action: &'static str,
+    },
 }
 
 impl PartialEq for InputOutputError {

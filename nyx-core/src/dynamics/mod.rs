@@ -16,12 +16,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use crate::State;
 use crate::cosmic::{AstroError, Orbit};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, Matrix3, Matrix4x3, OMatrix, OVector, Vector3};
-use crate::State;
-use anise::almanac::planetary::PlanetaryDataError;
 use anise::almanac::Almanac;
+use anise::almanac::planetary::PlanetaryDataError;
 use anise::errors::AlmanacError;
 use hyperdual::Owned;
 use snafu::Snafu;

@@ -251,7 +251,7 @@ impl SpaceWeatherData {
                 return Err(InputOutputError::StdIOError {
                     source,
                     action: "reading header of CSV file",
-                })
+                });
             }
         };
 
@@ -303,9 +303,7 @@ impl SpaceWeatherData {
         let ap_history = self.build_ap_history(target_midnight, bin_idx);
 
         // 1. Daily F10.7: Prefer observed, fall back to adjusted, then global fallback
-        let f107_daily = self
-            .fallback
-            .resolve_f107(current_day.and_then(|r| Some(r.f107_obs)));
+        let f107_daily = self.fallback.resolve_f107(current_day.map(|r| r.f107_obs));
 
         // 2. 81-day Centered Mean F10.7: Prefer observed 81d, then adjusted 81d,
         // fall back to resolved daily F10.7 before applying static global fallback

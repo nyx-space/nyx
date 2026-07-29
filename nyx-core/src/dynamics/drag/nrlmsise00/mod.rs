@@ -97,15 +97,6 @@ pub struct Nrlmsise00Input {
     pub ap_array: [f64; 7],
 }
 
-/// NRLMSISE-00 empirical atmosphere model.
-///
-/// Computes neutral atmospheric density and composition from 0 to ~1000 km altitude
-/// as a function of location, time, solar activity (F10.7), and geomagnetic
-/// activity (Ap).
-///
-/// Generic over the space weather provider `P`. Use [`ConstantWeather`] for
-/// fixed conditions, or [`CssiSpaceWeather`] for time-varying data.
-
 /// Compute full NRLMSISE-00 output for the given input parameters.
 ///
 /// Returns temperatures and all species number densities.

@@ -16,8 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::linalg::DMatrix;
 use crate::NyxError;
+use crate::linalg::DMatrix;
 use anise::errors::AlmanacError;
 use anise::frames::{Frame, FrameUid};
 use anise::prelude::Almanac;
