@@ -7,6 +7,7 @@ class AccelModels:
 
     gravity_field: typing.Any
     point_masses: typing.Any
+    solid_tides: typing.Any
 
     def __init__(
         self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
@@ -15,7 +16,10 @@ class AccelModels:
         Acceleration models alter the orbital dynamics"""
 
     def __new__(
-        cls, point_masses: typing.Any = None, gravity_field: typing.Any = None
+        cls,
+        point_masses: typing.Any = None,
+        gravity_field: typing.Any = None,
+        solid_tides: typing.Any = None,
     ) -> AccelModels:
         """Acceleration models alter the orbital dynamics"""
 
@@ -311,6 +315,9 @@ class Propagator:
         method: typing.Any = ...,
         options: typing.Any = ...,
     ) -> Propagator: ...
+    def accel_km_s2(self, spacecraft: typing.Any) -> typing.Any:
+        """Compute the instantaneous equations of motion for this spacecraft"""
+
     def for_duration(
         self,
         spacecraft: typing.Any,
@@ -446,6 +453,60 @@ class SolarPressure:
         """Return str(self)."""
 
 @typing.final
+class SolidTides:
+    """`SolidTides` implements the solid tide acceleration model.
+    It accounts for the crust deformation due to the configured tidal perturbers.
+    Formulas are based on IERS 2010 Conventions."""
+
+    frame: typing.Any
+    k2: typing.Any
+    k3: typing.Any
+    perturbers: typing.Any
+
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        `SolidTides` implements the solid tide acceleration model.
+        It accounts for the crust deformation due to the configured tidal perturbers.
+        Formulas are based on IERS 2010 Conventions."""
+
+    def __new__(
+        cls, frame: typing.Any, k2: typing.Any, k3: typing.Any, perturbers: typing.Any
+    ) -> SolidTides:
+        """`SolidTides` implements the solid tide acceleration model.
+        It accounts for the crust deformation due to the configured tidal perturbers.
+        Formulas are based on IERS 2010 Conventions."""
+
+    @staticmethod
+    def earth_moon_system(
+        earth_frame: typing.Any, moon_frame: typing.Any, almanac: typing.Any
+    ) -> typing.Any: ...
+    def __eq__(self, value: typing.Any) -> bool:
+        """Return self==value."""
+
+    def __ge__(self, value: typing.Any) -> bool:
+        """Return self>=value."""
+
+    def __gt__(self, value: typing.Any) -> bool:
+        """Return self>value."""
+
+    def __le__(self, value: typing.Any) -> bool:
+        """Return self<=value."""
+
+    def __lt__(self, value: typing.Any) -> bool:
+        """Return self<value."""
+
+    def __ne__(self, value: typing.Any) -> bool:
+        """Return self!=value."""
+
+    def __repr__(self) -> str:
+        """Return repr(self)."""
+
+    def __str__(self) -> str:
+        """Return str(self)."""
+
+@typing.final
 class SpacecraftSequence:
     thruster_sets: typing.Any
 
@@ -467,3 +528,75 @@ class SpacecraftSequence:
         self, name: typing.Any, thruster: typing.Any
     ) -> typing.Any: ...
     def thruster_set_remove(self, name: typing.Any) -> typing.Any: ...
+
+@typing.final
+class TidalPerturber:
+    compute_degree_3: typing.Any
+    frame: typing.Any
+
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature."""
+
+    def __new__(
+        cls, frame: typing.Any, compute_degree_3: typing.Any
+    ) -> TidalPerturber: ...
+    def __eq__(self, value: typing.Any) -> bool:
+        """Return self==value."""
+
+    def __ge__(self, value: typing.Any) -> bool:
+        """Return self>=value."""
+
+    def __gt__(self, value: typing.Any) -> bool:
+        """Return self>value."""
+
+    def __le__(self, value: typing.Any) -> bool:
+        """Return self<=value."""
+
+    def __lt__(self, value: typing.Any) -> bool:
+        """Return self<value."""
+
+    def __ne__(self, value: typing.Any) -> bool:
+        """Return self!=value."""
+
+    def __repr__(self) -> str:
+        """Return repr(self)."""
+
+    def __str__(self) -> str:
+        """Return str(self)."""
+
+@typing.final
+class Trajectory:
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature."""
+
+    def __new__(cls, path: typing.Any, template: typing.Any) -> Trajectory: ...
+    def append(self, many_spacecraft: typing.Any) -> typing.Any:
+        """Append many spacecraft to this trajectory."""
+
+    def at(self, epoch: typing.Any) -> typing.Any:
+        """Evaluate the trajectory at this specific epoch."""
+
+    def push(self, spacecraft: typing.Any) -> typing.Any:
+        """Add another state to this trajectory."""
+
+    def ric_diff_to_parquet(
+        self, other: typing.Any, path: typing.Any, cfg: typing.Any
+    ) -> typing.Any:
+        """Export the difference in RIC from of this trajectory compare to the "other" trajectory in parquet format.
+
+        # Notes
+        + The RIC frame accounts for the transport theorem by performing a finite differencing of the RIC frame."""
+
+    def to_ephemeris(self, object_id: typing.Any, cfg: typing.Any) -> typing.Any:
+        """Export this spacecraft trajectory estimate to an ANISE Ephemeris"""
+
+    def to_parquet(self, path: typing.Any, cfg: typing.Any) -> typing.Any: ...
+    def __repr__(self) -> str:
+        """Return repr(self)."""
+
+    def __str__(self) -> str:
+        """Return str(self)."""

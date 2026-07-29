@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
+import json
 import os
 import sys
-import json
+
 import requests
 from google import genai
 from google.genai import types
@@ -198,8 +199,8 @@ Description:
     try:
         review_data = json.loads(response.text)
         post_review_comments(review_data.get("summary_markdown", "No summary provided"), review_data.get("comments", []))
-    except Exception as e:
-        print(f"Failed to parse model output or post review: {e}")
+    except json.JSONDecodeError:
+        print("Failed to parse model output or post review.")
         print(f"Raw response: {response.text}")
         sys.exit(1)
 
