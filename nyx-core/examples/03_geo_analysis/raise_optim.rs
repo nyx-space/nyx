@@ -48,7 +48,6 @@ impl SharedState {
             &jgm3_meta.uri,
             4,
             4,
-            true,
             almanac.frame_info(IAU_EARTH_FRAME)?,
         )?);
         let srp_dyn = SolarPressure::default_flux(EARTH_J2000, &almanac)?;

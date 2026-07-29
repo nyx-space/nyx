@@ -137,7 +137,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         &jggrx_meta.uri,
         80,
         80,
-        true,
         almanac.frame_info(moon_pa_frame)?,
     )?);
 

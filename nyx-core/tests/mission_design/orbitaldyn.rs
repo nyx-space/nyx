@@ -940,7 +940,7 @@ fn val_earth_sph_harmonics_12x12(almanac_gmat: Arc<Almanac>) {
     let itrf93 = almanac.frame_info(EARTH_ITRF93).unwrap();
 
     let earth_sph_harm =
-        GravityFieldData::from_cof("../data/01_planetary/JGM3.cof.gz", 12, 12, true, itrf93)
+        GravityFieldData::from_cof("../data/01_planetary/JGM3.cof.gz", 12, 12, itrf93)
             .unwrap();
     let harmonics = GravityField::new(earth_sph_harm);
 
@@ -1027,7 +1027,7 @@ fn val_earth_sph_harmonics_70x70(almanac_gmat: Arc<Almanac>) {
     let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
 
     let earth_sph_harm =
-        GravityFieldData::from_cof("../data/01_planetary/JGM3.cof.gz", 70, 70, true, iau_earth)
+        GravityFieldData::from_cof("../data/01_planetary/JGM3.cof.gz", 70, 70, iau_earth)
             .unwrap();
     let harmonics = GravityField::new(earth_sph_harm);
 
@@ -1079,7 +1079,7 @@ fn val_earth_sph_harmonics_70x70_partials(almanac_gmat: Arc<Almanac>) {
     let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
 
     let earth_sph_harm =
-        GravityFieldData::from_cof("../data/01_planetary/JGM3.cof.gz", 70, 70, true, iau_earth)
+        GravityFieldData::from_cof("../data/01_planetary/JGM3.cof.gz", 70, 70, iau_earth)
             .unwrap();
     let harmonics = GravityField::new(earth_sph_harm);
 
@@ -1139,7 +1139,6 @@ fn val_ioastro_earth_egm2008_10x10(almanac: Arc<Almanac>) {
     let hh = GravityFieldData::from_config(
         GravityFieldConfig {
             filepath: "../data/01_planetary/EGM2008_to2190_TideFree.gz".into(),
-            gunzipped: true,
             degree: 10,
             order: 10,
             frame: EARTH_ITRF93.into(),
@@ -1207,7 +1206,7 @@ fn hf_prop(almanac: Arc<Almanac>) {
     let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
 
     let earth_sph_harm =
-        GravityFieldData::from_cof("../data/01_planetary/JGM3.cof.gz", 21, 21, true, iau_earth)
+        GravityFieldData::from_cof("../data/01_planetary/JGM3.cof.gz", 21, 21, iau_earth)
             .unwrap();
     let harmonics = GravityField::new(earth_sph_harm);
 

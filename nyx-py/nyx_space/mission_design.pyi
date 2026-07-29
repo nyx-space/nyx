@@ -164,7 +164,6 @@ class GravityFieldConfig:
     degree: typing.Any
     filepath: typing.Any
     frame: typing.Any
-    gunzipped: typing.Any
     order: typing.Any
 
     def __init__(
@@ -181,7 +180,6 @@ class GravityFieldConfig:
         order: typing.Any,
         filepath: typing.Any,
         frame: typing.Any,
-        gunzipped: typing.Any = True,
     ) -> GravityFieldConfig:
         """Configuration holder for gravity field.
 

@@ -1216,7 +1216,7 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect(
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     let earth_sph_harm =
-        GravityFieldData::from_cof("../data/01_planetary/JGM3.cof.gz", 70, 70, true, iau_earth)
+        GravityFieldData::from_cof("../data/01_planetary/JGM3.cof.gz", 70, 70, iau_earth)
             .unwrap();
     let harmonics = GravityField::new(earth_sph_harm);
     let orbital_dyn = SpacecraftDynamics::new(OrbitalDynamics::from_model(harmonics));

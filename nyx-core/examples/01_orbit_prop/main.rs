@@ -125,7 +125,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             &jgm3_meta.uri,
             21,
             21,
-            true,
             almanac.frame_info(IAU_EARTH_FRAME)?,
         )
         .unwrap(),

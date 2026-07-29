@@ -86,7 +86,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         &jgm3_meta.uri,
         8,
         8,
-        true,
         almanac.frame_info(IAU_EARTH_FRAME)?,
     )?);
     orbital_dyn.accel_models.push(harmonics);

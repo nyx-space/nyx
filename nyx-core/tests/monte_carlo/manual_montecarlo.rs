@@ -40,7 +40,7 @@ fn multi_thread_monte_carlo_demo(almanac: Arc<Almanac>) {
     let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
 
     let earth_sph_harm =
-        GravityFieldData::from_cof("../data/01_planetary/JGM3.cof.gz", 70, 70, true, iau_earth)
+        GravityFieldData::from_cof("../data/01_planetary/JGM3.cof.gz", 70, 70, iau_earth)
             .unwrap();
     let harmonics = GravityField::new(earth_sph_harm);
 

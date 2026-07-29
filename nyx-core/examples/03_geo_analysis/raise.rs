@@ -110,8 +110,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         GravityFieldData::from_cof(
             &jgm3_meta.uri,
             8,
-            8,
-            true,
+             8,
             almanac.frame_info(IAU_EARTH_FRAME)?,
         )
         .unwrap(),
