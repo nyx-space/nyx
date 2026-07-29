@@ -182,7 +182,15 @@ impl TrackingDataArc {
                 if mtype == MeasurementType::Range {
                     if let Some(range_units) = metadata.get("RANGE_UNITS") {
                         match range_units.as_str() {
-                            "km" | "RU" => {
+"km" => {
+                                // For distance units, simply apply the effective_divider.
+                                scaled_value /= effective_divider;
+                            }
+                            "RU" => {
+                                return Err(InputOutputError::UnsupportedData {
+                                    which: "RANGE_UNITS `RU` requires mission-specific conversion and is not currently supported".to_string(),
+                                });
+                            }
                                 // For distance units, simply apply the effective_divider.
                                 scaled_value /= effective_divider;
                             }
