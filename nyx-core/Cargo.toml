@@ -53,6 +53,7 @@ num-traits = "=0.2.19"
 # Optional dependencies
 pyo3 = {workspace = true, optional = true}
 csv = "1.4.0"
+trig-const = "0.4.0"
 
 
 [features]
