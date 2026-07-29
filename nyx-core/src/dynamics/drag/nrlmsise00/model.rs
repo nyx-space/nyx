@@ -711,8 +711,7 @@ fn composition_correction_dual(alt: f64, r: f64, h1: f64, zh: f64, h2: f64) -> f
 ///
 /// Returns (densities\[9\], temperature_exo, temperature_alt).
 /// Densities in cm⁻³: \[He, O, N2, O2, Ar, total_mass, H, N, anomO\].
-pub fn compute(input: &Nrlmsise00Input) -> ([f64; 9], f64, f64) {
-    let sw = [1.0f64; 24]; // all switches on
+pub fn compute(input: &Nrlmsise00Input, sw: &[f64; 24]) -> ([f64; 9], f64, f64) {
 
     let sin_lat = input.latitude_deg.to_radians().sin();
     let plg = compute_legendre(sin_lat);
@@ -1437,7 +1436,7 @@ mod ut_nrlmsise {
     #[test]
     fn debug_compute_400km() {
         let input = test_input();
-        let (d, tinf, temp) = compute(&input);
+        let (d, tinf, temp) = compute(&input, &[1.0; 24]);
         eprintln!("tinf={tinf:.1} temp={temp:.1}");
         eprintln!("rho={:.4e} kg/m3", d[5] * 1000.0);
         eprintln!(
@@ -1765,7 +1764,7 @@ mod ut_nrlmsise {
         }
 
         // Full compute for comparison
-        let (d, _, _) = compute(&input);
+        let (d, _, _) = compute(&input, &[1.0; 24]);
         eprintln!("\nFull compute at 400km:");
         eprintln!(
             "  He={:.4e} O={:.4e} N2={:.4e} O2={:.4e} Ar={:.4e} H={:.4e} N={:.4e}",
@@ -2068,7 +2067,7 @@ mod ut_nrlmsise {
         {
             let mut inp = base.clone();
             inp.altitude_km = alt;
-            let (d, _, temp) = compute(&inp);
+            let (d, _, temp) = compute(&inp, &[1.0; 24]);
             let he_err = (d[0] - c_he[i]) / c_he[i] * 100.0;
             let h_err = (d[6] - c_h[i]) / c_h[i] * 100.0;
             eprintln!(
@@ -2100,7 +2099,7 @@ mod ut_nrlmsise {
         {
             let mut inp = base2.clone();
             inp.altitude_km = alt;
-            let (d, _, temp) = compute(&inp);
+            let (d, _, temp) = compute(&inp, &[1.0; 24]);
             let he_err = (d[0] - c_he2[i]) / c_he2[i] * 100.0;
             eprintln!(
                 "  {alt:7.1}km: He={:.6e} ({he_err:+.2}%)  T={temp:.2}",

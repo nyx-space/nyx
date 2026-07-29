@@ -424,7 +424,7 @@ fn test_prop_nrlmsise00_from_weather(almanac: Arc<Almanac>) {
     let dynamics = SpacecraftDynamics::from_models(
         OrbitalDynamics::two_body(),
         vec![Arc::new(Drag {
-            density: AtmDensity::NRLMSISE00 { weather },
+            density: AtmDensity::NRLMSISE00 { weather, flags: Default::default() },
             frame: IAU_EARTH_FRAME,
             estimate: false,
         })],
@@ -514,7 +514,7 @@ fn val_ioastro_nrlmsise00(almanac: Arc<Almanac>) {
     let dynamics = SpacecraftDynamics::from_models(
         OrbitalDynamics::from_model(j2_mdl),
         vec![Arc::new(Drag {
-            density: AtmDensity::NRLMSISE00 { weather },
+            density: AtmDensity::NRLMSISE00 { weather, flags: Default::default() },
             frame: iau_earth,
             estimate: false,
         })],
