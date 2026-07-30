@@ -91,6 +91,9 @@ impl StaticType for Phase {
 }
 
 /// Dynamics defines the dynamical environment with a set of acceleration and force models
+///
+/// :type accel_models: AccelModels
+/// :type force_models: ForceModels
 #[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
 #[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub struct Dynamics {
@@ -133,6 +136,10 @@ impl Dynamics {
 }
 
 /// Propagator config includes the method, options, and all dynamics
+///
+/// :type dynamics: Dynamics
+/// :type method: IntegratorMethod
+/// :type options: IntegratorOptions
 #[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
 #[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub struct PropagatorConfig {
@@ -152,6 +159,10 @@ impl PropagatorConfig {
 }
 
 /// Acceleration models alter the orbital dynamics
+///
+/// :type point_masses: PointMasses | None
+/// :type gravity_field: GravityFieldConfig | None
+/// :type solid_tides: SolidTides | None
 #[derive(Clone, Default, Serialize, Deserialize, Debug)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct AccelModels {
@@ -161,6 +172,9 @@ pub struct AccelModels {
 }
 
 /// Force models alter the spacecraft dynamics (they need a mass).
+///
+/// :type solar_pressure: SolarPressure | None
+/// :type drag: Drag | None
 #[derive(Clone, Default, Serialize, Deserialize, Debug)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct ForceModels {

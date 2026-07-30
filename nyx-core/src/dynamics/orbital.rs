@@ -173,6 +173,9 @@ impl OrbitalDynamics {
 }
 
 /// PointMasses model
+///
+/// :type celestial_objects: list[int]
+/// :type correction: Aberration | None
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct PointMasses {

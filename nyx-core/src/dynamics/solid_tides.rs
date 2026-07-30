@@ -41,6 +41,11 @@ use pyo3::types::PyType;
 /// `SolidTides` implements the solid tide acceleration model.
 /// It accounts for the crust deformation due to the configured tidal perturbers.
 /// Formulas are based on IERS 2010 Conventions.
+///
+/// :type frame: Frame
+/// :type k2: float
+/// :type k3: float
+/// :type perturbers: list[TidalPerturber]
 #[derive(Clone, Debug, Serialize, Deserialize, StaticType, TypedBuilder, PartialEq)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct SolidTides {
@@ -54,6 +59,10 @@ pub struct SolidTides {
     pub perturbers: Vec<TidalPerturber>,
 }
 
+/// A celestial body raising tides on the central body.
+///
+/// :type frame: Frame
+/// :type compute_degree_3: bool
 #[derive(Clone, Debug, Serialize, Deserialize, StaticType, TypedBuilder, PartialEq)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct TidalPerturber {
@@ -599,6 +608,12 @@ impl SolidTides {
         }
     }
 
+    /// Initializes solid tides with the Moon and the Sun, where the k3 is only computed for the Moon.
+    /// Sets the k2 Love number to 0.3019 and the k3 Love number to 0.093
+    ///
+    /// :type earth_frame: Frame
+    /// :type moon_frame: Frame
+    /// :type almanac: Almanac
     #[classmethod]
     #[pyo3(name = "earth_moon_system")]
     fn py_earth_moon_system(

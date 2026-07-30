@@ -249,6 +249,10 @@ impl AtmDensity {
 }
 
 /// `Drag` implements all three drag models.
+///
+/// :type density: AtmDensity
+/// :type frame: Frame
+/// :type estimate: bool
 #[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct Drag {
