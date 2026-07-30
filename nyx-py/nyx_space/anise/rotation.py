@@ -1,3 +1,4 @@
+# ruff: noqa
 from nyx_space.anise import rotation
 
 __all__ = []

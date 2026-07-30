@@ -1,3 +1,4 @@
+# ruff: noqa
 from nyx_space._nyx import monte_carlo as __mod
 
 __all__ = []

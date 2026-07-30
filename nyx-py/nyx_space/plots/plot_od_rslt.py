@@ -1,16 +1,16 @@
 import click
 import polars as pl
 
+from nyx_space.plots.md import ric_diff
 from nyx_space.plots.od import (
     cr_cd,
-    kalman_gains,
     filter_smoother_ratios,
-    residuals,
-    uncertainty,
+    kalman_gains,
     od_dashboard,
     orbital_element_uncertainty,
+    residuals,
+    uncertainty,
 )
-from nyx_space.plots.md import ric_diff
 
 optional_est_params = ["cr", "cd"]
 

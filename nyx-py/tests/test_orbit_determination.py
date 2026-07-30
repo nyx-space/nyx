@@ -1,3 +1,4 @@
+# ruff: noqa
 import os
 
 from nyx_space import Spacecraft
@@ -20,12 +21,12 @@ from nyx_space.orbit_determination import (
     GroundStation,
     GroundTrackingArcSim,
     Handoff,
+    KalmanVariant,
     Location,
     MeasurementType,
     ProcessNoise,
-    SigmaRejection,
-    KalmanVariant,
     Scheduler,
+    SigmaRejection,
     SpacecraftEstimate,
     SpacecraftODProcess,
     StochasticNoise,

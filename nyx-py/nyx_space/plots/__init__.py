@@ -6,7 +6,7 @@ from nyx_space.time import Epoch
 
 TEMPLATE = "seaborn"
 
-__all__ = ["od", "md"]
+__all__ = ["md", "od"]
 
 
 def convert_units(df):
@@ -52,8 +52,8 @@ def watermark(fig, filepath: str):
         yanchor="middle",
         showarrow=False,
         textangle=90,
-        font=dict(size=12, color="gray"),
+        font={"size": 12, "color": "gray"},
         xshift=15,
     )
-    fig.update_layout(margin=dict(r=80))
+    fig.update_layout(margin={"r": 80})
     return fig

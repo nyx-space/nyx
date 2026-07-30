@@ -1,16 +1,15 @@
-from __future__ import annotations
-from anise import astro
-from anise import rotation
-from anise import time
-import numpy
+# ruff: noqa
 import typing
+
+import numpy
+from anise import astro, rotation, time
 
 @typing.final
 class DragData:
     area_m2: float
     coeff_drag: float
 
-    def __init__(self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]) -> None:
+    def __init__(self, *args: typing.Any | None, **kwargs: typing.Any | None) -> None:
         """Initialize self.  See help(type(self)) for accurate signature."""
 
     def __new__(cls, area_m2: typing.Any, coeff_drag: typing.Any=None) -> DragData:...
@@ -22,24 +21,20 @@ class DragData:
     def to_asn1(self) -> bytes:
         """Encodes this DragData object into an ASN.1 DER encoded byte array."""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
 
-    def __str__(self) -> str:
-        """Return str(self)."""
 
 @typing.final
 class ExportCfg:
     """Configuration for exporting from Nyx to local disk."""
 
-    def __init__(self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]) -> None:
+    def __init__(self, *args: typing.Any | None, **kwargs: typing.Any | None) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
 Configuration for exporting from Nyx to local disk."""
 
     def __new__(cls, timestamped: typing.Any=False) -> ExportCfg:
         """Configuration for exporting from Nyx to local disk."""
 
-    def __eq__(self, value: typing.Any) -> bool:
+    def __eq__(self, value: object) -> bool:
         """Return self==value."""
 
     def __ge__(self, value: typing.Any) -> bool:
@@ -54,14 +49,10 @@ Configuration for exporting from Nyx to local disk."""
     def __lt__(self, value: typing.Any) -> bool:
         """Return self<value."""
 
-    def __ne__(self, value: typing.Any) -> bool:
+    def __ne__(self, value: object) -> bool:
         """Return self!=value."""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
 
-    def __str__(self) -> str:
-        """Return str(self)."""
 
 @typing.final
 class Frame:
@@ -72,11 +63,11 @@ class Frame:
     orientation_id: int
     shape: astro.Ellipsoid
 
-    def __init__(self, ephemeris_id: int, orientation_id: int, force_inertial: bool, mu_km3_s2: typing.Optional[float], shape: typing.Optional[astro.Ellipsoid], frozen_epoch: typing.Optional[time.Epoch], *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]) -> astro.Frame:
+    def __init__(self, ephemeris_id: int, orientation_id: int, force_inertial: bool, mu_km3_s2: float | None, shape: astro.Ellipsoid | None, frozen_epoch: time.Epoch | None, *args: typing.Any | None, **kwargs: typing.Any | None) -> astro.Frame:
         """Initialize self.  See help(type(self)) for accurate signature.
 A Frame uniquely defined by its ephemeris center and orientation. Refer to FrameDetail for frames combined with parameters."""
 
-    def __new__(cls, ephemeris_id: int, orientation_id: int, mu_km3_s2: typing.Optional[float]=None, shape: typing.Optional[astro.Ellipsoid]=None, force_inertial: bool=False, frozen_epoch: typing.Optional[time.Epoch]=None) -> Frame:
+    def __new__(cls, ephemeris_id: int, orientation_id: int, mu_km3_s2: float | None=None, shape: astro.Ellipsoid | None=None, force_inertial: bool=False, frozen_epoch: time.Epoch | None=None) -> Frame:
         """A Frame uniquely defined by its ephemeris center and orientation. Refer to FrameDetail for frames combined with parameters."""
 
     def ephem_origin_id_match(self, other_id: int) -> bool:
@@ -142,13 +133,13 @@ Use this to prevent astrodynamical computations."""
     def with_orient(self, new_orient_id: int) -> astro.Frame:
         """Returns a copy of this Frame whose orientation ID is set to the provided ID"""
 
-    def __eq__(self, value: typing.Any) -> bool:
+    def __eq__(self, value: object) -> bool:
         """Return self==value."""
 
     def __ge__(self, value: typing.Any) -> bool:
         """Return self>=value."""
 
-    def __getnewargs__(self) -> typing.Tuple:
+    def __getnewargs__(self) -> tuple:
         """Allows for pickling the object"""
 
     def __gt__(self, value: typing.Any) -> bool:
@@ -160,19 +151,15 @@ Use this to prevent astrodynamical computations."""
     def __lt__(self, value: typing.Any) -> bool:
         """Return self<value."""
 
-    def __ne__(self, value: typing.Any) -> bool:
+    def __ne__(self, value: object) -> bool:
         """Return self!=value."""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
 
-    def __str__(self) -> str:
-        """Return str(self)."""
 
 @typing.final
 class GuidanceMode:
 
-    def __init__(self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]) -> None:
+    def __init__(self, *args: typing.Any | None, **kwargs: typing.Any | None) -> None:
         """Initialize self.  See help(type(self)) for accurate signature."""
 
     def __new__(cls) -> GuidanceMode:...
@@ -180,8 +167,6 @@ class GuidanceMode:
     def __int__(self) -> None:
         """int(self)"""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
     Coast: GuidanceMode = ...
     Inhibit: GuidanceMode = ...
     Thrust: GuidanceMode = ...
@@ -193,7 +178,7 @@ class Mass:
     extra_mass_kg: float
     prop_mass_kg: float
 
-    def __init__(self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]) -> None:
+    def __init__(self, *args: typing.Any | None, **kwargs: typing.Any | None) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
 Defines a spacecraft mass a the sum of the dry (structural) mass and the propellant mass, both in kilogram"""
 
@@ -216,11 +201,7 @@ Defines a spacecraft mass a the sum of the dry (structural) mass and the propell
     def total_mass_kg(self) -> float:
         """Returns the total mass in kg"""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
 
-    def __str__(self) -> str:
-        """Return str(self)."""
 
 @typing.final
 class Orbit:
@@ -237,20 +218,20 @@ Unless noted otherwise, algorithms are from GMAT 2016a [StateConversionUtil.cpp]
     y_km: float
     z_km: float
 
-    def __init__(self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]) -> astro.Orbit:
+    def __init__(self, *args: typing.Any | None, **kwargs: typing.Any | None) -> astro.Orbit:
         """Initialize self.  See help(type(self)) for accurate signature.
 Defines a Cartesian state in a given frame at a given epoch in a given time scale. Radius data is expressed in kilometers. Velocity data is expressed in kilometers per second.
 Regardless of the constructor used, this struct stores all the state information in Cartesian coordinates as these are always non singular.
 
 Unless noted otherwise, algorithms are from GMAT 2016a [StateConversionUtil.cpp](https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/util/StateConversionUtil.cpp)."""
 
-    def __new__(cls, *args: typing.Optional[typing.Any]) -> Orbit:
+    def __new__(cls, *args: typing.Any | None) -> Orbit:
         """Defines a Cartesian state in a given frame at a given epoch in a given time scale. Radius data is expressed in kilometers. Velocity data is expressed in kilometers per second.
 Regardless of the constructor used, this struct stores all the state information in Cartesian coordinates as these are always non singular.
 
 Unless noted otherwise, algorithms are from GMAT 2016a [StateConversionUtil.cpp](https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/util/StateConversionUtil.cpp)."""
 
-    def abs_difference(self, other: astro.Orbit) -> typing.Tuple:
+    def abs_difference(self, other: astro.Orbit) -> tuple:
         """Returns the absolute position and velocity differences in km and km/s between this orbit and another.
 Raises an error if the frames do not match (epochs do not need to match)."""
 
@@ -623,7 +604,7 @@ main celestial body around which the state is defined (GMAT does perform this ve
 # Frame warning
 This state MUST be in the body fixed frame (e.g. ITRF93) prior to calling this function, or the computation is **invalid**."""
 
-    def latlongalt(self) -> typing.Tuple:
+    def latlongalt(self) -> tuple:
         """Returns the geodetic latitude, geodetic longitude, and geodetic height, respectively in degrees, degrees, and kilometers.
 
 # Algorithm
@@ -676,7 +657,7 @@ This is a conversion from GMAT's StateConversionUtil::TrueToMeanAnomaly"""
     def radius_km(self) -> numpy.ndarray:
         """radius vector in km"""
 
-    def rel_difference(self, other: astro.Orbit) -> typing.Tuple:
+    def rel_difference(self, other: astro.Orbit) -> tuple:
         """Returns the relative difference between this orbit and another for the position and velocity, respectively the first and second return values.
 Both return values are UNITLESS because the relative difference is computed as the absolute difference divided by the rmag and vmag of this object.
 Raises an error if the frames do not match, if the position is zero or the velocity is zero."""
@@ -819,13 +800,13 @@ Refer to dcm_from_vnc_to_inertial for details on the VNC frame.
     def with_ta_deg(self, new_ta_deg: float) -> astro.Orbit:
         """Returns a copy of the state with a new TA"""
 
-    def __eq__(self, value: typing.Any) -> bool:
+    def __eq__(self, value: object) -> bool:
         """Return self==value."""
 
     def __ge__(self, value: typing.Any) -> bool:
         """Return self>=value."""
 
-    def __getnewargs__(self) -> typing.Tuple:...
+    def __getnewargs__(self) -> tuple:...
 
     def __gt__(self, value: typing.Any) -> bool:
         """Return self>value."""
@@ -836,21 +817,17 @@ Refer to dcm_from_vnc_to_inertial for details on the VNC frame.
     def __lt__(self, value: typing.Any) -> bool:
         """Return self<value."""
 
-    def __ne__(self, value: typing.Any) -> bool:
+    def __ne__(self, value: object) -> bool:
         """Return self!=value."""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
 
-    def __str__(self) -> str:
-        """Return str(self)."""
 
 @typing.final
 class SRPData:
     area_m2: float
     coeff_reflectivity: float
 
-    def __init__(self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]) -> None:
+    def __init__(self, *args: typing.Any | None, **kwargs: typing.Any | None) -> None:
         """Initialize self.  See help(type(self)) for accurate signature."""
 
     def __new__(cls, area_m2: typing.Any, coeff_reflectivity: typing.Any=None) -> SRPData:...
@@ -862,11 +839,7 @@ class SRPData:
     def to_asn1(self) -> bytes:
         """Encodes this SRPData object into an ASN.1 DER encoded byte array."""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
 
-    def __str__(self) -> str:
-        """Return str(self)."""
 
 @typing.final
 class Spacecraft:
@@ -878,7 +851,7 @@ Optionally, the spacecraft state can also store the state transition matrix from
     orbit: typing.Any
     srp: typing.Any
 
-    def __init__(self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]) -> None:
+    def __init__(self, *args: typing.Any | None, **kwargs: typing.Any | None) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
 A spacecraft state, composed of its orbit, its masses (dry, prop, extra, all in kg), its SRP configuration, its drag configuration, its thruster configuration, and its guidance mode.
 
@@ -899,7 +872,7 @@ Optionally, the spacecraft state can also store the state transition matrix from
     def to_asn1(self) -> bytes:
         """Encodes this Mass object into an ASN.1 DER encoded byte array."""
 
-    def __eq__(self, value: typing.Any) -> bool:
+    def __eq__(self, value: object) -> bool:
         """Return self==value."""
 
     def __ge__(self, value: typing.Any) -> bool:
@@ -914,14 +887,10 @@ Optionally, the spacecraft state can also store the state transition matrix from
     def __lt__(self, value: typing.Any) -> bool:
         """Return self<value."""
 
-    def __ne__(self, value: typing.Any) -> bool:
+    def __ne__(self, value: object) -> bool:
         """Return self!=value."""
 
-    def __repr__(self) -> str:
-        """Return repr(self)."""
 
-    def __str__(self) -> str:
-        """Return str(self)."""
 
 @typing.final
 class Thruster:
@@ -929,7 +898,7 @@ class Thruster:
     isp_s: typing.Any
     thrust_N: typing.Any
 
-    def __init__(self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]) -> None:
+    def __init__(self, *args: typing.Any | None, **kwargs: typing.Any | None) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
 Defines a thruster with a maximum isp and a maximum thrust."""
 

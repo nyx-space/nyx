@@ -1,3 +1,4 @@
+# ruff: noqa
 from nyx_space import _nyx as __mod
 
 __all__ = ["plots"]
