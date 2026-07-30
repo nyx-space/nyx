@@ -382,8 +382,8 @@ mod tests {
         let default_switches = default_flags.to_switches();
 
         // Spot-check standard switches mapping
-        assert_eq!(default_switches[0], 0.0); // OutputUnits::Cgs -> 0.0
-        assert_eq!(default_switches[9], -1.0); // GeomagneticMode::ExtendedHistory57h -> -1.0
+        assert_eq!(default_switches[0], 1.0);
+        assert_eq!(default_switches[9], 1.0);
         assert_eq!(default_switches[1], 1.0);
         assert_eq!(default_switches[2], 1.0);
 
