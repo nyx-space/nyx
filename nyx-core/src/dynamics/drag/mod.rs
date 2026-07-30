@@ -20,8 +20,8 @@ use super::{
     DynamicsAlmanacSnafu, DynamicsAstroSnafu, DynamicsError, DynamicsPlanetarySnafu, ForceModel,
 };
 use crate::cosmic::{AstroPhysicsSnafu, Frame, Spacecraft};
+use crate::dynamics::nrlmsise00::Nrlmsise00Flags;
 use crate::dynamics::nrlmsise00::msise00_density;
-pub use crate::dynamics::nrlmsise00::{GeomagneticMode, Nrlmsise00Flags, OutputUnits};
 use crate::io::space_weather::SpaceWeatherData;
 use crate::linalg::{Matrix4x3, Vector3};
 use anise::almanac::Almanac;
@@ -213,17 +213,14 @@ pub enum AtmDensity {
         max_alt_km: f64,
     },
 
-    /// NRLMSISE-00 empirical atmosphere model.
+    /// NRLMSISE-00 empirical atmosphere model, with optional model flags
     ///
     /// Computes neutral atmospheric density and composition from 0 to ~1000 km altitude
     /// as a function of location, time, solar activity (F10.7), and geomagnetic
     /// activity (Ap).
-    NRLMSISE00 { weather: SpaceWeatherData },
-
-    /// NRLMSISE-00 empirical atmosphere model with custom flags.
-    NRLMSISE00WithFlags {
+    NRLMSISE00 {
         weather: SpaceWeatherData,
-        flags: Nrlmsise00Flags,
+        flags: Option<Nrlmsise00Flags>,
     },
 
     /// Harris-Priester atmospheric density model.
@@ -356,7 +353,7 @@ impl Drag {
                 }
             }
 
-            AtmDensity::NRLMSISE00 { weather } => {
+            AtmDensity::NRLMSISE00 { weather, flags } => {
                 let (lat_deg, long_deg, alt_km) = osc_drag_frame
                     .latlongalt()
                     .context(AstroPhysicsSnafu)
@@ -379,39 +376,7 @@ impl Drag {
                     long_deg,
                     alt_km,
                     ctx.orbit.epoch,
-                    Nrlmsise00Flags {
-                        units: OutputUnits::Si,
-                        geomagnetic: GeomagneticMode::StandardDailyAp,
-                        ..Default::default()
-                    },
-                )?
-                .total_mass_density_kg_m3
-            }
-
-            AtmDensity::NRLMSISE00WithFlags { weather, flags } => {
-                let (lat_deg, long_deg, alt_km) = osc_drag_frame
-                    .latlongalt()
-                    .context(AstroPhysicsSnafu)
-                    .context(DynamicsAstroSnafu)?;
-
-                let lst_h = almanac.local_solar_time(osc_drag_frame, None).context(
-                    DynamicsAlmanacSnafu {
-                        action: "computing local solar time",
-                    },
-                )?;
-
-                let epoch = ctx.orbit.epoch;
-
-                let sw = weather.msise_weather(epoch);
-
-                msise00_density(
-                    sw,
-                    lst_h.to_unit(Unit::Hour),
-                    lat_deg,
-                    long_deg,
-                    alt_km,
-                    ctx.orbit.epoch,
-                    *flags,
+                    flags.unwrap_or_default(),
                 )?
                 .total_mass_density_kg_m3
             }

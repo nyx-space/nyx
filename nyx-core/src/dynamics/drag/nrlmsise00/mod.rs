@@ -111,16 +111,8 @@ pub enum GeomagneticMode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, StaticType)]
-#[cfg_attr(feature = "python", pyclass(from_py_object, eq, eq_int))]
-pub enum OutputUnits {
-    Cgs, // g/cm³ and cm⁻³ (sw[0] = 0.0)
-    Si,  // kg/m³ and m⁻³  (sw[0] = 1.0)
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, StaticType)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct Nrlmsise00Flags {
-    pub units: OutputUnits,
     pub geomagnetic: GeomagneticMode,
     pub f107_solar_flux: bool,
     pub time_independent: bool,
@@ -144,8 +136,7 @@ pub struct Nrlmsise00Flags {
 impl Default for Nrlmsise00Flags {
     fn default() -> Self {
         Self {
-            units: OutputUnits::Cgs,
-            geomagnetic: GeomagneticMode::ExtendedHistory57h,
+            geomagnetic: GeomagneticMode::StandardDailyAp,
             f107_solar_flux: true,
             time_independent: true,
             annual_harmonics: true,
@@ -169,14 +160,10 @@ impl Default for Nrlmsise00Flags {
 
 impl Nrlmsise00Flags {
     /// Compiles the high-level flags into the raw 24-element float array consumed by the kernel.
-    pub fn to_switches(&self) -> [f64; 24] {
+    pub(crate) fn to_switches(&self) -> [f64; 24] {
         let mut sw = [1.0f64; 24];
 
-        // Units selection
-        sw[0] = match self.units {
-            OutputUnits::Cgs => 0.0,
-            OutputUnits::Si => 1.0,
-        };
+        // NOTE Unit selection is ALWAYS set to 1.0 because the calculation code does not even check it.
 
         // Geomagnetic storm mode
         sw[9] = match self.geomagnetic {
@@ -252,7 +239,6 @@ impl Nrlmsise00Flags {
 impl Nrlmsise00Flags {
     #[new]
     #[pyo3(signature = (
-        units = None,
         geomagnetic = None,
         f107_solar_flux = true,
         time_independent = true,
@@ -274,7 +260,6 @@ impl Nrlmsise00Flags {
     ))]
     #[allow(clippy::too_many_arguments)]
     fn py_new(
-        units: Option<OutputUnits>,
         geomagnetic: Option<GeomagneticMode>,
         f107_solar_flux: bool,
         time_independent: bool,
@@ -295,8 +280,7 @@ impl Nrlmsise00Flags {
         turbopause_scale_height_variations: bool,
     ) -> Self {
         Self {
-            units: units.unwrap_or(OutputUnits::Cgs),
-            geomagnetic: geomagnetic.unwrap_or(GeomagneticMode::ExtendedHistory57h),
+            geomagnetic: geomagnetic.unwrap_or(GeomagneticMode::StandardDailyAp),
             f107_solar_flux,
             time_independent,
             annual_harmonics,
@@ -322,7 +306,7 @@ impl Nrlmsise00Flags {
     }
 
     fn __str__(&self) -> String {
-        format!("{:?}", self)
+        format!("{:?} @ {self:p}", self)
     }
 }
 
@@ -405,7 +389,6 @@ mod tests {
 
         // Customize some flags
         let mut custom_flags = Nrlmsise00Flags {
-            units: OutputUnits::Si,
             geomagnetic: GeomagneticMode::StandardDailyAp,
             f107_solar_flux: false,
             time_independent: false,
@@ -427,7 +410,7 @@ mod tests {
         };
 
         let custom_switches = custom_flags.to_switches();
-        assert_eq!(custom_switches[0], 1.0); // OutputUnits::Si -> 1.0
+        assert_eq!(custom_switches[0], 1.0); // Always 1.0
         assert_eq!(custom_switches[9], 1.0); // GeomagneticMode::StandardDailyAp -> 1.0
         assert_eq!(custom_switches[1], 0.0);
         assert_eq!(custom_switches[2], 0.0);

@@ -17,6 +17,7 @@ from nyx_space.mission_design import (
     GravityFieldConfig,
     IntegratorMethod,
     IntegratorOptions,
+    Nrlmsise00Flags,
     PointMasses,
     Propagator,
     SolarPressure,
@@ -79,8 +80,10 @@ def test_howto_propagate_with_perturbations():
     # or a custom number for the F10.7 (in SFU), Ap, and Kp values.
     # Data may be provided either as CSV or in non-archived gunzip (gz) format (decoded on the fly).
     weather = SpaceWeatherData("../data/01_planetary/SpaceWeather-2021-01-01_2026-09-06.csv.gz", StaticSpaceWeather.SolarAverage())
+    # NOTE While you must specify the flags for the NRLMSISE00 models, the default ones are typically what you want.
+    # Call `help(Nrlmsise00Flag)` for details on available options.
     drag = Drag(
-        AtmDensity.NRLMSISE00(weather),
+        AtmDensity.NRLMSISE00(weather, Nrlmsise00Flags()),
         almanac.frame_info(Frames.IAU_EARTH_FRAME),
         estimate=False,
     )

@@ -732,7 +732,7 @@ pub fn compute(input: &Nrlmsise00Input, sw: &[f64; 24]) -> ([f64; 9], f64, f64) 
     let tinf_k = if alt_km > za {
         (TEMP_BOUNDARY[0]
             * TEMP_COEFFICIENTS_K[0]
-            * (1.0 + sw[16] * geographic_variation_ratio(&TEMP_COEFFICIENTS_K, input, &sw, &plg)))
+            * (1.0 + sw[16] * geographic_variation_ratio(&TEMP_COEFFICIENTS_K, input, sw, &plg)))
         .max(0.0)
     } else {
         TEMP_BOUNDARY[0] * TEMP_COEFFICIENTS_K[0]
@@ -741,7 +741,7 @@ pub fn compute(input: &Nrlmsise00Input, sw: &[f64; 24]) -> ([f64; 9], f64, f64) 
     // Temperature at lower boundary (120 km)
     let tlb_k = TEMP_BOUNDARY[1]
         * DENSITY_COEFFICIENTS[3][0]
-        * (1.0 + sw[17] * geographic_variation_ratio(&DENSITY_COEFFICIENTS[3], input, &sw, &plg));
+        * (1.0 + sw[17] * geographic_variation_ratio(&DENSITY_COEFFICIENTS[3], input, sw, &plg));
 
     // Gradient parameter (g0) and normalized s
     // g0 is in Kelvin per km and is the vertical temperature gradient at the $120\text{ km}$
@@ -749,7 +749,7 @@ pub fn compute(input: &Nrlmsise00Input, sw: &[f64; 24]) -> ([f64; 9], f64, f64) 
     let g0_k_km = if alt_km > SPLINE_ALTITUDES_km[4] {
         TEMP_BOUNDARY[3]
             * GRADIENT_COEFFICIENTS[0]
-            * (1.0 + sw[19] * geographic_variation_ratio(&GRADIENT_COEFFICIENTS, input, &sw, &plg))
+            * (1.0 + sw[19] * geographic_variation_ratio(&GRADIENT_COEFFICIENTS, input, sw, &plg))
     } else {
         TEMP_BOUNDARY[3] * GRADIENT_COEFFICIENTS[0]
     };
@@ -783,7 +783,7 @@ pub fn compute(input: &Nrlmsise00Input, sw: &[f64; 24]) -> ([f64; 9], f64, f64) 
                     * geographic_variation_lower_ratio(
                         &TEMP_NODE_COEFFICIENTS[0],
                         input,
-                        &sw,
+                        sw,
                         &plg,
                         apdf,
                     ));
@@ -793,7 +793,7 @@ pub fn compute(input: &Nrlmsise00Input, sw: &[f64; 24]) -> ([f64; 9], f64, f64) 
                     * geographic_variation_lower_ratio(
                         &TEMP_NODE_COEFFICIENTS[1],
                         input,
-                        &sw,
+                        sw,
                         &plg,
                         apdf,
                     ));
@@ -803,7 +803,7 @@ pub fn compute(input: &Nrlmsise00Input, sw: &[f64; 24]) -> ([f64; 9], f64, f64) 
                     * geographic_variation_lower_ratio(
                         &TEMP_NODE_COEFFICIENTS[2],
                         input,
-                        &sw,
+                        sw,
                         &plg,
                         apdf,
                     ));
@@ -814,7 +814,7 @@ pub fn compute(input: &Nrlmsise00Input, sw: &[f64; 24]) -> ([f64; 9], f64, f64) 
                     * geographic_variation_lower_ratio(
                         &TEMP_NODE_COEFFICIENTS[3],
                         input,
-                        &sw,
+                        sw,
                         &plg,
                         apdf,
                     ));
@@ -826,7 +826,7 @@ pub fn compute(input: &Nrlmsise00Input, sw: &[f64; 24]) -> ([f64; 9], f64, f64) 
                     * geographic_variation_lower_ratio(
                         &MID_ATMO_COEFFICIENTS[8],
                         input,
-                        &sw,
+                        sw,
                         &plg,
                         apdf,
                     ))
@@ -868,7 +868,7 @@ pub fn compute(input: &Nrlmsise00Input, sw: &[f64; 24]) -> ([f64; 9], f64, f64) 
                 * (DAY_ANGLE_RATE * (input.day_of_year as f64 - TEMP_COEFFICIENTS_K[13])).cos());
 
     // N2 reference density at ZLB
-    let g28 = sw[20] * geographic_variation_ratio(&DENSITY_COEFFICIENTS[2], input, &sw, &plg);
+    let g28 = sw[20] * geographic_variation_ratio(&DENSITY_COEFFICIENTS[2], input, sw, &plg);
     let db28 = DENSITY_BOUNDARY[2][0] * g28.exp() * DENSITY_COEFFICIENTS[2][0];
 
     // N2 mixing reference at turbopause height (shared by all species for rl)
@@ -892,7 +892,7 @@ pub fn compute(input: &Nrlmsise00Input, sw: &[f64; 24]) -> ([f64; 9], f64, f64) 
 
     // He
     {
-        let g1 = sw[20] * geographic_variation_ratio(&DENSITY_COEFFICIENTS[0], input, &sw, &plg);
+        let g1 = sw[20] * geographic_variation_ratio(&DENSITY_COEFFICIENTS[0], input, sw, &plg);
         let db04 = DENSITY_BOUNDARY[0][0] * g1.exp() * DENSITY_COEFFICIENTS[0][0];
         #[cfg(test)]
         eprintln!("  He: g1={g1:.8} db04={db04:.6e}");
@@ -959,7 +959,7 @@ pub fn compute(input: &Nrlmsise00Input, sw: &[f64; 24]) -> ([f64; 9], f64, f64) 
 
     // O
     {
-        let g1 = sw[20] * geographic_variation_ratio(&DENSITY_COEFFICIENTS[1], input, &sw, &plg);
+        let g1 = sw[20] * geographic_variation_ratio(&DENSITY_COEFFICIENTS[1], input, sw, &plg);
         let db16 = DENSITY_BOUNDARY[1][0] * g1.exp() * DENSITY_COEFFICIENTS[1][0];
         let dd = density_temperature_profile(
             alt_km,
@@ -1091,7 +1091,7 @@ pub fn compute(input: &Nrlmsise00Input, sw: &[f64; 24]) -> ([f64; 9], f64, f64) 
 
     // O2
     {
-        let g1 = sw[20] * geographic_variation_ratio(&DENSITY_COEFFICIENTS[4], input, &sw, &plg);
+        let g1 = sw[20] * geographic_variation_ratio(&DENSITY_COEFFICIENTS[4], input, sw, &plg);
         let db32 = DENSITY_BOUNDARY[3][0] * g1.exp() * DENSITY_COEFFICIENTS[4][0];
         let dd = density_temperature_profile(
             alt_km,
@@ -1164,7 +1164,7 @@ pub fn compute(input: &Nrlmsise00Input, sw: &[f64; 24]) -> ([f64; 9], f64, f64) 
 
     // Ar
     {
-        let g1 = sw[20] * geographic_variation_ratio(&DENSITY_COEFFICIENTS[5], input, &sw, &plg);
+        let g1 = sw[20] * geographic_variation_ratio(&DENSITY_COEFFICIENTS[5], input, sw, &plg);
         let db40 = DENSITY_BOUNDARY[4][0] * g1.exp() * DENSITY_COEFFICIENTS[5][0];
         let dd = density_temperature_profile(
             alt_km,
@@ -1229,7 +1229,7 @@ pub fn compute(input: &Nrlmsise00Input, sw: &[f64; 24]) -> ([f64; 9], f64, f64) 
 
     // H
     {
-        let g1 = sw[20] * geographic_variation_ratio(&DENSITY_COEFFICIENTS[6], input, &sw, &plg);
+        let g1 = sw[20] * geographic_variation_ratio(&DENSITY_COEFFICIENTS[6], input, sw, &plg);
         let db01 = DENSITY_BOUNDARY[5][0] * g1.exp() * DENSITY_COEFFICIENTS[6][0];
         let dd = density_temperature_profile(
             alt_km,
@@ -1299,7 +1299,7 @@ pub fn compute(input: &Nrlmsise00Input, sw: &[f64; 24]) -> ([f64; 9], f64, f64) 
 
     // N
     {
-        let g1 = sw[20] * geographic_variation_ratio(&DENSITY_COEFFICIENTS[7], input, &sw, &plg);
+        let g1 = sw[20] * geographic_variation_ratio(&DENSITY_COEFFICIENTS[7], input, sw, &plg);
         let db14 = DENSITY_BOUNDARY[6][0] * g1.exp() * DENSITY_COEFFICIENTS[7][0];
         let dd = density_temperature_profile(
             alt_km,
@@ -1369,7 +1369,7 @@ pub fn compute(input: &Nrlmsise00Input, sw: &[f64; 24]) -> ([f64; 9], f64, f64) 
 
     // Anomalous O
     {
-        let g1 = sw[20] * geographic_variation_ratio(&DENSITY_COEFFICIENTS[8], input, &sw, &plg);
+        let g1 = sw[20] * geographic_variation_ratio(&DENSITY_COEFFICIENTS[8], input, sw, &plg);
         let db16h = DENSITY_BOUNDARY[7][0] * g1.exp() * DENSITY_COEFFICIENTS[8][0];
         let tho = DENSITY_BOUNDARY[7][9] * CORRECTION_PARAMS[0][6];
         let dd = density_temperature_profile(
