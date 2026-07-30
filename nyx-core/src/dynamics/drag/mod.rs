@@ -20,6 +20,7 @@ use super::{
     DynamicsAlmanacSnafu, DynamicsAstroSnafu, DynamicsError, DynamicsPlanetarySnafu, ForceModel,
 };
 use crate::cosmic::{AstroPhysicsSnafu, Frame, Spacecraft};
+use crate::dynamics::nrlmsise00::Nrlmsise00Flags;
 use crate::dynamics::nrlmsise00::msise00_density;
 use crate::io::space_weather::SpaceWeatherData;
 use crate::linalg::{Matrix4x3, Vector3};
@@ -212,12 +213,15 @@ pub enum AtmDensity {
         max_alt_km: f64,
     },
 
-    /// NRLMSISE-00 empirical atmosphere model.
+    /// NRLMSISE-00 empirical atmosphere model, with optional model flags
     ///
     /// Computes neutral atmospheric density and composition from 0 to ~1000 km altitude
     /// as a function of location, time, solar activity (F10.7), and geomagnetic
     /// activity (Ap).
-    NRLMSISE00 { weather: SpaceWeatherData },
+    NRLMSISE00 {
+        weather: SpaceWeatherData,
+        flags: Option<Nrlmsise00Flags>,
+    },
 
     /// Harris-Priester atmospheric density model.
     ///
@@ -353,7 +357,7 @@ impl Drag {
                 }
             }
 
-            AtmDensity::NRLMSISE00 { weather } => {
+            AtmDensity::NRLMSISE00 { weather, flags } => {
                 let (lat_deg, long_deg, alt_km) = osc_drag_frame
                     .latlongalt()
                     .context(AstroPhysicsSnafu)
@@ -376,6 +380,7 @@ impl Drag {
                     long_deg,
                     alt_km,
                     ctx.orbit.epoch,
+                    flags.unwrap_or_default(),
                 )?
                 .total_mass_density_kg_m3
             }

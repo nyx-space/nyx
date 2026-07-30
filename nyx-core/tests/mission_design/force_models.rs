@@ -15,6 +15,7 @@ use nyx::propagators::Propagator;
 use nyx::time::{Epoch, Unit};
 use nyx::utils::rss_orbit_vec_errors;
 use nyx_space::cosmic::{DragData, Mass};
+use nyx_space::dynamics::nrlmsise00::Nrlmsise00Flags;
 use nyx_space::od::Dynamics;
 use rstest::*;
 use std::sync::Arc;
@@ -424,7 +425,10 @@ fn test_prop_nrlmsise00_from_weather(almanac: Arc<Almanac>) {
     let dynamics = SpacecraftDynamics::from_models(
         OrbitalDynamics::two_body(),
         vec![Arc::new(Drag {
-            density: AtmDensity::NRLMSISE00 { weather },
+            density: AtmDensity::NRLMSISE00 {
+                weather,
+                flags: None,
+            },
             frame: IAU_EARTH_FRAME,
             estimate: false,
         })],
@@ -480,8 +484,10 @@ fn val_ioastro_nrlmsise00(almanac: Arc<Almanac>) {
         .frame_info(EARTH_J2000)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
-    let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
-    // .with_mu_km3_s2(GMAT_EARTH_GM);
+    let iau_earth = almanac
+        .frame_info(IAU_EARTH_FRAME)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
 
     let epoch = Epoch::from_gregorian_utc_hms(2024, 2, 29, 1, 2, 3);
 
@@ -514,7 +520,10 @@ fn val_ioastro_nrlmsise00(almanac: Arc<Almanac>) {
     let dynamics = SpacecraftDynamics::from_models(
         OrbitalDynamics::from_model(j2_mdl),
         vec![Arc::new(Drag {
-            density: AtmDensity::NRLMSISE00 { weather },
+            density: AtmDensity::NRLMSISE00 {
+                weather,
+                flags: Some(Nrlmsise00Flags::default()),
+            },
             frame: iau_earth,
             estimate: false,
         })],
@@ -564,6 +573,99 @@ fn val_ioastro_nrlmsise00(almanac: Arc<Almanac>) {
 
     assert!(dbg!(ric_error.rmag_km()) < 0.72);
     assert!(dbg!(ric_error.vmag_km_s()) < 2e-3);
+}
+
+/// Compares a few configurations of the NRLMSISE00 model
+#[rstest]
+fn nrlmsise00_compare(almanac: Arc<Almanac>) {
+    let weather = SpaceWeatherData::from_static_weather(StaticSpaceWeather::SolarMaximum());
+
+    let eme2k = almanac
+        .frame_info(EARTH_J2000)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
+    let iau_earth = almanac
+        .frame_info(IAU_EARTH_FRAME)
+        .unwrap()
+        .with_mu_km3_s2(GMAT_EARTH_GM);
+
+    let epoch = Epoch::from_gregorian_utc_hms(2024, 2, 29, 1, 2, 3);
+
+    let orbit = Orbit::new(
+        -6210.6003575395861844,
+        -445.9010437211380236,
+        2353.4286399045840881,
+        -0.6027299684384100,
+        -7.2371397713442924,
+        -2.7084864602730194,
+        epoch,
+        eme2k,
+    );
+
+    println!("Initial: {orbit:x}");
+
+    let spacecraft = Spacecraft::builder()
+        .orbit(orbit)
+        .mass(Mass::from_dry_mass(1000.0))
+        .drag(DragData {
+            area_m2: 20.0,
+            coeff_drag: 2.2,
+        })
+        .build();
+
+    // Define the dynamics
+    let earth_sph_harm = GravityFieldData::from_j2(EARTH_J2, iau_earth);
+    let j2_mdl = GravityField::new(earth_sph_harm);
+
+    let mut outputs = vec![];
+
+    for flags in [
+        Nrlmsise00Flags::default(), // All flags enabled
+        Nrlmsise00Flags {
+            geomagnetic: nyx_space::dynamics::nrlmsise00::GeomagneticMode::Off,
+            annual_harmonics: false,
+            ..Default::default()
+        },
+        Nrlmsise00Flags {
+            geomagnetic: nyx_space::dynamics::nrlmsise00::GeomagneticMode::ExtendedHistory57h,
+            annual_harmonics: false,
+            ..Default::default()
+        },
+        Nrlmsise00Flags {
+            geomagnetic: nyx_space::dynamics::nrlmsise00::GeomagneticMode::ExtendedHistory57h,
+            annual_harmonics: true,
+            ..Default::default()
+        },
+    ] {
+        let dynamics = SpacecraftDynamics::from_models(
+            OrbitalDynamics::from_model(j2_mdl.clone()),
+            vec![Arc::new(Drag {
+                density: AtmDensity::NRLMSISE00 {
+                    weather: weather.clone(),
+                    flags: Some(flags),
+                },
+                frame: iau_earth,
+                estimate: false,
+            })],
+        );
+
+        let final_state = Propagator::default(dynamics)
+            .with(spacecraft, almanac.clone())
+            .for_duration(0.25 * Unit::Day)
+            .unwrap()
+            .orbit;
+
+        outputs.push((flags, final_state));
+    }
+
+    let nominal = outputs[0].1;
+
+    for (flags, other_rslt) in outputs.iter().skip(1) {
+        let ric_error = nominal.ric_difference(&other_rslt).unwrap();
+
+        println!("=== FLAGS ===\n{flags:?}");
+        println!("RIC pos diff (km) = {:.6}", ric_error.rmag_km());
+    }
 }
 
 #[rstest]

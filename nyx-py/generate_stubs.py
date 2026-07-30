@@ -170,7 +170,9 @@ def module_stubs(module: Any) -> ast.Module:
                 )
             )
         else:
-            logging.getLogger(__name__).warning(f"Unsupported root construction {member_name}")
+            logging.getLogger(__name__).warning(
+                f"Unsupported root construction {member_name}"
+            )
     # Add metadata constants if they exist in the module
     for meta in ["__author__", "__version__"]:
         if hasattr(module, meta):
@@ -339,7 +341,7 @@ def data_descriptor_stub(
                 data_desc_name, doc, element_path, types_to_import
             )
         except Exception:
-                logging.getLogger(__name__).exception("Error generating stubs")
+            logging.getLogger(__name__).exception("Error generating stubs")
         m = re.findall(r"^ *:return: *(.*) *$", doc, re.MULTILINE)
         if len(m) == 1:
             doc_comment = m[0]
@@ -428,7 +430,7 @@ def function_stub(
                     if "Error" in element_path[-2]:
                         pass  # default to instance method
         except Exception:
-                logging.getLogger(__name__).exception("Error generating stubs")
+            logging.getLogger(__name__).exception("Error generating stubs")
 
     print(f"Documenting {fn_name}")
 

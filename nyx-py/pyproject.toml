@@ -22,3 +22,20 @@ module-name = "nyx_space._nyx"
 nyx_plot_od = "nyx_space.plots.plot_od_rslt:main"
 nyx_plot_elements = "nyx_space.plots.plot_orbital_elements:plot_orbit_elements"
 nyx_plot_pnt_rslts = "nyx_space.plots.plot_pnt_rslts:main"
+
+[tool.ruff.lint]
+ignore = [
+    "PYI032",
+    "UP045",
+    "PYI029",
+    "I001",
+    "PYI044",
+    "PLE0604",
+    "RUF022",
+    "C408",
+    "RUF015",
+    "LOG015",
+    "PLR0124",
+    "UP006",
+    "PLW0406",
+]

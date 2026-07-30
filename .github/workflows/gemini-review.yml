@@ -2,7 +2,7 @@ name: "Nyx Space Intelligent Code Review"
 
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened]
   issue_comment:
     types: [created]
   workflow_dispatch:
