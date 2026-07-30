@@ -1,3 +1,4 @@
+from __future__ import annotations
 import typing
 
 @typing.final
@@ -9,7 +10,7 @@ class AccelModels:
     solid_tides: typing.Any
 
     def __init__(
-        self, *args: typing.Any | None, **kwargs: typing.Any | None
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Acceleration models alter the orbital dynamics"""
@@ -22,25 +23,36 @@ class AccelModels:
     ) -> AccelModels:
         """Acceleration models alter the orbital dynamics"""
 
+    def __repr__(self) -> str:
+        """Return repr(self)."""
 
+    def __str__(self) -> str:
+        """Return str(self)."""
 
 @typing.final
 class AtmDensity:
-    """Density in kg/m^3 and altitudes in meters, not kilometers!"""
+    """Density in kg/m^3 and altitudes in kilometers"""
 
     def __init__(
-        self, *args: typing.Any | None, **kwargs: typing.Any | None
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
-        Density in kg/m^3 and altitudes in meters, not kilometers!"""
+        Density in kg/m^3 and altitudes in kilometers"""
 
     def __new__(cls) -> AtmDensity:
-        """Density in kg/m^3 and altitudes in meters, not kilometers!"""
+        """Density in kg/m^3 and altitudes in kilometers"""
 
     @staticmethod
-    def earth_exponential() -> typing.Any: ...
+    def earth_exponential() -> typing.Any:
+        """Constructs a standard exponential drag model for Earth orbiters.
+
+        Configured with nominal LEO reference parameters at $h_0 = 700\\text{ km}$:
+        * $\\rho_0 = 3.614 \\times 10^{-13}\\text{ kg/m}^3$
+        * $H = 88.667\\text{ km}$ ($88,667\\text{ m}$)"""
     Constant: type = ...
     Exponential: type = ...
+    HarrisPriester: type = ...
+    NRLMSISE00: type = ...
     StdAtm: type = ...
 
 @typing.final
@@ -52,7 +64,7 @@ class Drag:
     frame: typing.Any
 
     def __init__(
-        self, *args: typing.Any | None, **kwargs: typing.Any | None
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         `Drag` implements all three drag models."""
@@ -62,14 +74,18 @@ class Drag:
     ) -> Drag:
         """`Drag` implements all three drag models."""
 
+    def __repr__(self) -> str:
+        """Return repr(self)."""
 
+    def __str__(self) -> str:
+        """Return str(self)."""
 
 @typing.final
 class Dynamics:
     """Dynamics defines the dynamical environment with a set of acceleration and force models"""
 
     def __init__(
-        self, *args: typing.Any | None, **kwargs: typing.Any | None
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Dynamics defines the dynamical environment with a set of acceleration and force models"""
@@ -79,14 +95,18 @@ class Dynamics:
     ) -> Dynamics:
         """Dynamics defines the dynamical environment with a set of acceleration and force models"""
 
+    def __repr__(self) -> str:
+        """Return repr(self)."""
 
+    def __str__(self) -> str:
+        """Return str(self)."""
 
 @typing.final
 class ExportCfg:
     """Configuration for exporting from Nyx to local disk."""
 
     def __init__(
-        self, *args: typing.Any | None, **kwargs: typing.Any | None
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Configuration for exporting from Nyx to local disk."""
@@ -94,7 +114,7 @@ class ExportCfg:
     def __new__(cls, timestamped: typing.Any = False) -> ExportCfg:
         """Configuration for exporting from Nyx to local disk."""
 
-    def __eq__(self, value: object) -> bool:
+    def __eq__(self, value: typing.Any) -> bool:
         """Return self==value."""
 
     def __ge__(self, value: typing.Any) -> bool:
@@ -109,10 +129,14 @@ class ExportCfg:
     def __lt__(self, value: typing.Any) -> bool:
         """Return self<value."""
 
-    def __ne__(self, value: object) -> bool:
+    def __ne__(self, value: typing.Any) -> bool:
         """Return self!=value."""
 
+    def __repr__(self) -> str:
+        """Return repr(self)."""
 
+    def __str__(self) -> str:
+        """Return str(self)."""
 
 @typing.final
 class ForceModels:
@@ -122,7 +146,7 @@ class ForceModels:
     solar_pressure: typing.Any
 
     def __init__(
-        self, *args: typing.Any | None, **kwargs: typing.Any | None
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Force models alter the spacecraft dynamics (they need a mass)."""
@@ -132,7 +156,46 @@ class ForceModels:
     ) -> ForceModels:
         """Force models alter the spacecraft dynamics (they need a mass)."""
 
+    def __repr__(self) -> str:
+        """Return repr(self)."""
 
+    def __str__(self) -> str:
+        """Return str(self)."""
+
+@typing.final
+class GeomagneticMode:
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature."""
+
+    def __new__(cls) -> GeomagneticMode: ...
+    def __eq__(self, value: typing.Any) -> bool:
+        """Return self==value."""
+
+    def __ge__(self, value: typing.Any) -> bool:
+        """Return self>=value."""
+
+    def __gt__(self, value: typing.Any) -> bool:
+        """Return self>value."""
+
+    def __int__(self) -> None:
+        """int(self)"""
+
+    def __le__(self, value: typing.Any) -> bool:
+        """Return self<=value."""
+
+    def __lt__(self, value: typing.Any) -> bool:
+        """Return self<value."""
+
+    def __ne__(self, value: typing.Any) -> bool:
+        """Return self!=value."""
+
+    def __repr__(self) -> str:
+        """Return repr(self)."""
+    ExtendedHistory57h: GeomagneticMode = ...
+    Off: GeomagneticMode = ...
+    StandardDailyAp: GeomagneticMode = ...
 
 @typing.final
 class GravityFieldConfig:
@@ -146,7 +209,7 @@ class GravityFieldConfig:
     order: typing.Any
 
     def __init__(
-        self, *args: typing.Any | None, **kwargs: typing.Any | None
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Configuration holder for gravity field.
@@ -164,7 +227,11 @@ class GravityFieldConfig:
 
         Data is first loaded as a SHADR, if that fails, Nyx will try to load it as a COF file."""
 
+    def __repr__(self) -> str:
+        """Return repr(self)."""
 
+    def __str__(self) -> str:
+        """Return str(self)."""
 
 @typing.final
 class IntegratorMethod:
@@ -172,7 +239,7 @@ class IntegratorMethod:
     Nomenclature: X-Y means that this is an X order solver with a Y order error correction step."""
 
     def __init__(
-        self, *args: typing.Any | None, **kwargs: typing.Any | None
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Enum of supported integration methods, all of which are part of the Runge Kutta family of ordinary differential equation (ODE) solvers.
@@ -185,6 +252,8 @@ class IntegratorMethod:
     def __int__(self) -> None:
         """int(self)"""
 
+    def __repr__(self) -> str:
+        """Return repr(self)."""
     CashKarp45: IntegratorMethod = ...
     DormandPrince45: IntegratorMethod = ...
     DormandPrince78: IntegratorMethod = ...
@@ -206,7 +275,7 @@ class IntegratorOptions:
     tolerance: typing.Any
 
     def __init__(
-        self, *args: typing.Any | None, **kwargs: typing.Any | None
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Stores the integrator options, including the minimum and maximum step sizes, and the central body to perform the integration.
@@ -238,7 +307,64 @@ class IntegratorOptions:
     def set_min_step(self, min_step: typing.Any) -> typing.Any:
         """Set the minimum step size and sets the initial step to that value if currently smaller"""
 
+    def __repr__(self) -> str:
+        """Return repr(self)."""
 
+    def __str__(self) -> str:
+        """Return str(self)."""
+
+@typing.final
+class Nrlmsise00Flags:
+    annual_harmonics: typing.Any
+    boundary_density_variations: typing.Any
+    departures_from_diffusive_equilibrium: typing.Any
+    diurnal_tides: typing.Any
+    exospheric_temp_variations: typing.Any
+    f107_solar_flux: typing.Any
+    geomagnetic: typing.Any
+    gradient_variations: typing.Any
+    lower_boundary_temp_variations: typing.Any
+    lower_mesosphere_temp_variations: typing.Any
+    lower_thermosphere_temp_variations: typing.Any
+    semiannual_harmonics: typing.Any
+    semidiurnal_tides: typing.Any
+    terdiurnal_tides: typing.Any
+    time_independent: typing.Any
+    turbopause_scale_height_variations: typing.Any
+    upper_stratosphere_temp_variations: typing.Any
+    ut_and_longitude: typing.Any
+
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature."""
+
+    def __new__(
+        cls,
+        geomagnetic: typing.Any = None,
+        f107_solar_flux: typing.Any = True,
+        time_independent: typing.Any = True,
+        annual_harmonics: typing.Any = True,
+        semiannual_harmonics: typing.Any = True,
+        diurnal_tides: typing.Any = True,
+        semidiurnal_tides: typing.Any = True,
+        terdiurnal_tides: typing.Any = True,
+        ut_and_longitude: typing.Any = True,
+        exospheric_temp_variations: typing.Any = True,
+        lower_boundary_temp_variations: typing.Any = True,
+        gradient_variations: typing.Any = True,
+        departures_from_diffusive_equilibrium: typing.Any = True,
+        lower_thermosphere_temp_variations: typing.Any = True,
+        upper_stratosphere_temp_variations: typing.Any = True,
+        boundary_density_variations: typing.Any = True,
+        lower_mesosphere_temp_variations: typing.Any = True,
+        turbopause_scale_height_variations: typing.Any = True,
+    ) -> Nrlmsise00Flags: ...
+    def __repr__(self) -> str:
+        """Return repr(self)."""
+
+    def __str__(self) -> str:
+        """Return str(self)."""
 
 @typing.final
 class PointMasses:
@@ -248,7 +374,7 @@ class PointMasses:
     correction: typing.Any
 
     def __init__(
-        self, *args: typing.Any | None, **kwargs: typing.Any | None
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         PointMasses model"""
@@ -258,7 +384,11 @@ class PointMasses:
     ) -> PointMasses:
         """PointMasses model"""
 
+    def __repr__(self) -> str:
+        """Return repr(self)."""
 
+    def __str__(self) -> str:
+        """Return str(self)."""
 
 @typing.final
 class Propagator:
@@ -267,7 +397,7 @@ class Propagator:
     options: typing.Any
 
     def __init__(
-        self, *args: typing.Any | None, **kwargs: typing.Any | None
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature."""
 
@@ -358,7 +488,7 @@ class PropagatorConfig:
     """Propagator config includes the method, options, and all dynamics"""
 
     def __init__(
-        self, *args: typing.Any | None, **kwargs: typing.Any | None
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Propagator config includes the method, options, and all dynamics"""
@@ -368,7 +498,11 @@ class PropagatorConfig:
     ) -> PropagatorConfig:
         """Propagator config includes the method, options, and all dynamics"""
 
+    def __repr__(self) -> str:
+        """Return repr(self)."""
 
+    def __str__(self) -> str:
+        """Return str(self)."""
 
 @typing.final
 class ShadowModel:
@@ -376,7 +510,7 @@ class ShadowModel:
     shadow_bodies: typing.Any
 
     def __init__(
-        self, *args: typing.Any | None, **kwargs: typing.Any | None
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature."""
 
@@ -391,7 +525,7 @@ class SolarPressure:
     shadow_model: typing.Any
 
     def __init__(
-        self, *args: typing.Any | None, **kwargs: typing.Any | None
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Computation of solar radiation pressure is based on STK: <http://help.agi.com/stk/index.htm#gator/eq-solar.htm> ."""
@@ -405,7 +539,11 @@ class SolarPressure:
     ) -> SolarPressure:
         """Computation of solar radiation pressure is based on STK: <http://help.agi.com/stk/index.htm#gator/eq-solar.htm> ."""
 
+    def __repr__(self) -> str:
+        """Return repr(self)."""
 
+    def __str__(self) -> str:
+        """Return str(self)."""
 
 @typing.final
 class SolidTides:
@@ -419,7 +557,7 @@ class SolidTides:
     perturbers: typing.Any
 
     def __init__(
-        self, *args: typing.Any | None, **kwargs: typing.Any | None
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         `SolidTides` implements the solid tide acceleration model.
@@ -437,7 +575,7 @@ class SolidTides:
     def earth_moon_system(
         earth_frame: typing.Any, moon_frame: typing.Any, almanac: typing.Any
     ) -> typing.Any: ...
-    def __eq__(self, value: object) -> bool:
+    def __eq__(self, value: typing.Any) -> bool:
         """Return self==value."""
 
     def __ge__(self, value: typing.Any) -> bool:
@@ -452,17 +590,53 @@ class SolidTides:
     def __lt__(self, value: typing.Any) -> bool:
         """Return self<value."""
 
-    def __ne__(self, value: object) -> bool:
+    def __ne__(self, value: typing.Any) -> bool:
         """Return self!=value."""
 
+    def __repr__(self) -> str:
+        """Return repr(self)."""
 
+    def __str__(self) -> str:
+        """Return str(self)."""
+
+@typing.final
+class SpaceWeatherData:
+    """Stores SpaceWeather data as provided by [CelesTrak](https://celestrak.org/SpaceData/).
+    Data may be provided either as original CSV or in a compressed (non-archived) gunzip (gz) format."""
+
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        Stores SpaceWeather data as provided by [CelesTrak](https://celestrak.org/SpaceData/).
+        Data may be provided either as original CSV or in a compressed (non-archived) gunzip (gz) format."""
+
+    def __new__(cls, path: typing.Any, fallback: typing.Any) -> SpaceWeatherData:
+        """Stores SpaceWeather data as provided by [CelesTrak](https://celestrak.org/SpaceData/).
+        Data may be provided either as original CSV or in a compressed (non-archived) gunzip (gz) format."""
+
+    def build_ap_history(self, midnight: typing.Any, bin_idx: typing.Any) -> typing.Any:
+        """Assembles the 7-element Ap array spanning current bin back 57 hours across 4 calendar days.
+
+        Missing daily records or unforecasted bins are populated using the configured `SpaceWeatherFallback`."""
+
+    def msise_weather(self, epoch: typing.Any) -> typing.Any:
+        """Evaluates the space weather state at `epoch` and constructs the `Msise00DailyWeather` payload.
+
+        Missing daily records or unforecasted fields are resolved using `SpaceWeatherFallback`."""
+
+    def __repr__(self) -> str:
+        """Return repr(self)."""
+
+    def __str__(self) -> str:
+        """Return str(self)."""
 
 @typing.final
 class SpacecraftSequence:
     thruster_sets: typing.Any
 
     def __init__(
-        self, *args: typing.Any | None, **kwargs: typing.Any | None
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature."""
 
@@ -481,19 +655,36 @@ class SpacecraftSequence:
     def thruster_set_remove(self, name: typing.Any) -> typing.Any: ...
 
 @typing.final
+class StaticSpaceWeather:
+    """Strategy for resolving missing predictive space weather parameters (F10.7, Ap, Kp)."""
+
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        Strategy for resolving missing predictive space weather parameters (F10.7, Ap, Kp)."""
+
+    def __new__(cls) -> StaticSpaceWeather:
+        """Strategy for resolving missing predictive space weather parameters (F10.7, Ap, Kp)."""
+    Custom: type = ...
+    SolarAverage: type = ...
+    SolarMaximum: type = ...
+    SolarMinimum: type = ...
+
+@typing.final
 class TidalPerturber:
     compute_degree_3: typing.Any
     frame: typing.Any
 
     def __init__(
-        self, *args: typing.Any | None, **kwargs: typing.Any | None
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature."""
 
     def __new__(
         cls, frame: typing.Any, compute_degree_3: typing.Any
     ) -> TidalPerturber: ...
-    def __eq__(self, value: object) -> bool:
+    def __eq__(self, value: typing.Any) -> bool:
         """Return self==value."""
 
     def __ge__(self, value: typing.Any) -> bool:
@@ -508,15 +699,19 @@ class TidalPerturber:
     def __lt__(self, value: typing.Any) -> bool:
         """Return self<value."""
 
-    def __ne__(self, value: object) -> bool:
+    def __ne__(self, value: typing.Any) -> bool:
         """Return self!=value."""
 
+    def __repr__(self) -> str:
+        """Return repr(self)."""
 
+    def __str__(self) -> str:
+        """Return str(self)."""
 
 @typing.final
 class Trajectory:
     def __init__(
-        self, *args: typing.Any | None, **kwargs: typing.Any | None
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature."""
 
@@ -542,4 +737,8 @@ class Trajectory:
         """Export this spacecraft trajectory estimate to an ANISE Ephemeris"""
 
     def to_parquet(self, path: typing.Any, cfg: typing.Any) -> typing.Any: ...
+    def __repr__(self) -> str:
+        """Return repr(self)."""
 
+    def __str__(self) -> str:
+        """Return str(self)."""
