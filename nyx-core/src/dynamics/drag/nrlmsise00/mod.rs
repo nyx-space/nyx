@@ -39,6 +39,11 @@
 use crate::dynamics::DynamicsError;
 pub use crate::io::space_weather::Msise00DailyWeather;
 use hifitime::Epoch;
+use serde::{Deserialize, Serialize};
+use serde_dhall::StaticType;
+
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
 
 pub mod coefficients;
 mod model;
@@ -97,11 +102,220 @@ pub struct Nrlmsise00Input {
     pub ap_array: [f64; 7],
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, StaticType)]
+#[cfg_attr(feature = "python", pyclass(from_py_object, eq, eq_int))]
+pub enum GeomagneticMode {
+    Off,
+    StandardDailyAp,
+    ExtendedHistory57h, // Sets sw[9] = -1.0
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, StaticType)]
+#[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
+pub struct Nrlmsise00Flags {
+    pub geomagnetic: GeomagneticMode,
+    pub f107_solar_flux: bool,
+    pub time_independent: bool,
+    pub annual_harmonics: bool,
+    pub semiannual_harmonics: bool,
+    pub diurnal_tides: bool,
+    pub semidiurnal_tides: bool,
+    pub terdiurnal_tides: bool,
+    pub ut_and_longitude: bool,
+    pub exospheric_temp_variations: bool,
+    pub lower_boundary_temp_variations: bool,
+    pub gradient_variations: bool,
+    pub departures_from_diffusive_equilibrium: bool,
+    pub lower_thermosphere_temp_variations: bool,
+    pub upper_stratosphere_temp_variations: bool,
+    pub boundary_density_variations: bool,
+    pub lower_mesosphere_temp_variations: bool,
+    pub turbopause_scale_height_variations: bool,
+}
+
+impl Default for Nrlmsise00Flags {
+    fn default() -> Self {
+        Self {
+            geomagnetic: GeomagneticMode::StandardDailyAp,
+            f107_solar_flux: true,
+            time_independent: true,
+            annual_harmonics: true,
+            semiannual_harmonics: true,
+            diurnal_tides: true,
+            semidiurnal_tides: true,
+            terdiurnal_tides: true,
+            ut_and_longitude: true,
+            exospheric_temp_variations: true,
+            lower_boundary_temp_variations: true,
+            gradient_variations: true,
+            departures_from_diffusive_equilibrium: true,
+            lower_thermosphere_temp_variations: true,
+            upper_stratosphere_temp_variations: true,
+            boundary_density_variations: true,
+            lower_mesosphere_temp_variations: true,
+            turbopause_scale_height_variations: true,
+        }
+    }
+}
+
+impl Nrlmsise00Flags {
+    /// Compiles the high-level flags into the raw 24-element float array consumed by the kernel.
+    pub(crate) fn to_switches(&self) -> [f64; 24] {
+        let mut sw = [1.0f64; 24];
+
+        // NOTE Unit selection is ALWAYS set to 1.0 because the calculation code does not even check it.
+
+        // Geomagnetic storm mode
+        sw[9] = match self.geomagnetic {
+            GeomagneticMode::Off => 0.0,
+            GeomagneticMode::StandardDailyAp => 1.0,
+            GeomagneticMode::ExtendedHistory57h => -1.0,
+        };
+
+        // Specific feature toggles
+        if !self.f107_solar_flux {
+            sw[1] = 0.0;
+        }
+        if !self.time_independent {
+            sw[2] = 0.0;
+        }
+        if !self.annual_harmonics {
+            sw[3] = 0.0;
+            sw[5] = 0.0;
+        }
+        if !self.semiannual_harmonics {
+            sw[4] = 0.0;
+            sw[6] = 0.0;
+        }
+        if !self.diurnal_tides {
+            sw[7] = 0.0;
+        }
+        if !self.semidiurnal_tides {
+            sw[8] = 0.0;
+        }
+        if !self.terdiurnal_tides {
+            sw[14] = 0.0;
+        }
+        if !self.ut_and_longitude {
+            sw[10] = 0.0;
+            sw[11] = 0.0;
+            sw[12] = 0.0;
+            sw[13] = 0.0;
+        }
+        if !self.exospheric_temp_variations {
+            sw[16] = 0.0;
+        }
+        if !self.lower_boundary_temp_variations {
+            sw[17] = 0.0;
+        }
+        if !self.gradient_variations {
+            sw[19] = 0.0;
+        }
+        if !self.departures_from_diffusive_equilibrium {
+            sw[15] = 0.0;
+        }
+        if !self.lower_thermosphere_temp_variations {
+            sw[18] = 0.0;
+        }
+        if !self.upper_stratosphere_temp_variations {
+            sw[20] = 0.0;
+        }
+        if !self.boundary_density_variations {
+            sw[21] = 0.0;
+        }
+        if !self.lower_mesosphere_temp_variations {
+            sw[22] = 0.0;
+        }
+        if !self.turbopause_scale_height_variations {
+            sw[23] = 0.0;
+        }
+
+        sw
+    }
+}
+
+#[cfg(feature = "python")]
+#[pymethods]
+impl Nrlmsise00Flags {
+    #[new]
+    #[pyo3(signature = (
+        geomagnetic = None,
+        f107_solar_flux = true,
+        time_independent = true,
+        annual_harmonics = true,
+        semiannual_harmonics = true,
+        diurnal_tides = true,
+        semidiurnal_tides = true,
+        terdiurnal_tides = true,
+        ut_and_longitude = true,
+        exospheric_temp_variations = true,
+        lower_boundary_temp_variations = true,
+        gradient_variations = true,
+        departures_from_diffusive_equilibrium = true,
+        lower_thermosphere_temp_variations = true,
+        upper_stratosphere_temp_variations = true,
+        boundary_density_variations = true,
+        lower_mesosphere_temp_variations = true,
+        turbopause_scale_height_variations = true,
+    ))]
+    #[allow(clippy::too_many_arguments)]
+    fn py_new(
+        geomagnetic: Option<GeomagneticMode>,
+        f107_solar_flux: bool,
+        time_independent: bool,
+        annual_harmonics: bool,
+        semiannual_harmonics: bool,
+        diurnal_tides: bool,
+        semidiurnal_tides: bool,
+        terdiurnal_tides: bool,
+        ut_and_longitude: bool,
+        exospheric_temp_variations: bool,
+        lower_boundary_temp_variations: bool,
+        gradient_variations: bool,
+        departures_from_diffusive_equilibrium: bool,
+        lower_thermosphere_temp_variations: bool,
+        upper_stratosphere_temp_variations: bool,
+        boundary_density_variations: bool,
+        lower_mesosphere_temp_variations: bool,
+        turbopause_scale_height_variations: bool,
+    ) -> Self {
+        Self {
+            geomagnetic: geomagnetic.unwrap_or(GeomagneticMode::StandardDailyAp),
+            f107_solar_flux,
+            time_independent,
+            annual_harmonics,
+            semiannual_harmonics,
+            diurnal_tides,
+            semidiurnal_tides,
+            terdiurnal_tides,
+            ut_and_longitude,
+            exospheric_temp_variations,
+            lower_boundary_temp_variations,
+            gradient_variations,
+            departures_from_diffusive_equilibrium,
+            lower_thermosphere_temp_variations,
+            upper_stratosphere_temp_variations,
+            boundary_density_variations,
+            lower_mesosphere_temp_variations,
+            turbopause_scale_height_variations,
+        }
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{:?}", self)
+    }
+
+    fn __str__(&self) -> String {
+        format!("{:?} @ {self:p}", self)
+    }
+}
+
 /// Compute full NRLMSISE-00 output for the given input parameters.
 ///
 /// Returns temperatures and all species number densities.
-fn calculate(input: &Nrlmsise00Input) -> Nrlmsise00Output {
-    let (d, temp_exo, temp_alt) = model::compute(input);
+fn calculate(input: &Nrlmsise00Input, flags: Nrlmsise00Flags) -> Nrlmsise00Output {
+    let sw = flags.to_switches();
+    let (d, temp_exo, temp_alt) = model::compute(input, &sw);
     // d[0..8]: He, O, N2, O2, Ar, total_mass(g/cm³), H, N, anomO
     // Total mass density: d[5] is in g/cm³, convert to kg/m³ (* 1000)
     Nrlmsise00Output {
@@ -137,6 +351,7 @@ pub fn msise00_density(
     longitude_deg: f64,
     altitude_km: f64,
     epoch: Epoch,
+    flags: Nrlmsise00Flags,
 ) -> Result<Nrlmsise00Output, DynamicsError> {
     let at_midnight = epoch.with_hms(0, 0, 0);
     let ut_seconds = (epoch - at_midnight).to_seconds();
@@ -154,5 +369,75 @@ pub fn msise00_density(
         ap_array: sw.ap_3hour_history,
     };
 
-    Ok(calculate(&input))
+    Ok(calculate(&input, flags))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_nrlmsise00_flags() {
+        let default_flags = Nrlmsise00Flags::default();
+        let default_switches = default_flags.to_switches();
+
+        // Spot-check standard switches mapping
+        assert_eq!(default_switches[0], 1.0);
+        assert_eq!(default_switches[9], 1.0);
+        assert_eq!(default_switches[1], 1.0);
+        assert_eq!(default_switches[2], 1.0);
+
+        // Customize some flags
+        let mut custom_flags = Nrlmsise00Flags {
+            geomagnetic: GeomagneticMode::StandardDailyAp,
+            f107_solar_flux: false,
+            time_independent: false,
+            annual_harmonics: false,
+            semiannual_harmonics: false,
+            diurnal_tides: false,
+            semidiurnal_tides: false,
+            terdiurnal_tides: false,
+            ut_and_longitude: false,
+            exospheric_temp_variations: false,
+            lower_boundary_temp_variations: false,
+            gradient_variations: false,
+            departures_from_diffusive_equilibrium: false,
+            lower_thermosphere_temp_variations: false,
+            upper_stratosphere_temp_variations: false,
+            boundary_density_variations: false,
+            lower_mesosphere_temp_variations: false,
+            turbopause_scale_height_variations: false,
+        };
+
+        let custom_switches = custom_flags.to_switches();
+        assert_eq!(custom_switches[0], 1.0); // Always 1.0
+        assert_eq!(custom_switches[9], 1.0); // GeomagneticMode::StandardDailyAp -> 1.0
+        assert_eq!(custom_switches[1], 0.0);
+        assert_eq!(custom_switches[2], 0.0);
+        assert_eq!(custom_switches[3], 0.0);
+        assert_eq!(custom_switches[5], 0.0);
+        assert_eq!(custom_switches[4], 0.0);
+        assert_eq!(custom_switches[6], 0.0);
+        assert_eq!(custom_switches[7], 0.0);
+        assert_eq!(custom_switches[8], 0.0);
+        assert_eq!(custom_switches[14], 0.0);
+        assert_eq!(custom_switches[10], 0.0);
+        assert_eq!(custom_switches[11], 0.0);
+        assert_eq!(custom_switches[12], 0.0);
+        assert_eq!(custom_switches[13], 0.0);
+        assert_eq!(custom_switches[16], 0.0);
+        assert_eq!(custom_switches[17], 0.0);
+        assert_eq!(custom_switches[19], 0.0);
+        assert_eq!(custom_switches[15], 0.0);
+        assert_eq!(custom_switches[18], 0.0);
+        assert_eq!(custom_switches[20], 0.0);
+        assert_eq!(custom_switches[21], 0.0);
+        assert_eq!(custom_switches[22], 0.0);
+        assert_eq!(custom_switches[23], 0.0);
+
+        // Test GeomagneticMode::Off
+        custom_flags.geomagnetic = GeomagneticMode::Off;
+        let switches_off = custom_flags.to_switches();
+        assert_eq!(switches_off[9], 0.0);
+    }
 }

@@ -45,6 +45,7 @@ use hifitime::*;
 
 use nyx_space::cosmic::eclipse::ShadowModel;
 use nyx_space::dynamics::guidance::Thruster;
+use nyx_space::dynamics::nrlmsise00::{GeomagneticMode, Nrlmsise00Flags};
 use nyx_space::dynamics::sequence::{
     AccelModels, Dynamics, ForceModels, PropagatorConfig, SpacecraftSequence,
 };
@@ -162,6 +163,8 @@ fn mission_design(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
     sm.add_class::<SolarPressure>()?;
     sm.add_class::<Drag>()?;
     sm.add_class::<AtmDensity>()?;
+    sm.add_class::<GeomagneticMode>()?;
+    sm.add_class::<Nrlmsise00Flags>()?;
     sm.add_class::<ShadowModel>()?;
     sm.add_class::<SolidTides>()?;
     sm.add_class::<TidalPerturber>()?;
