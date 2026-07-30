@@ -1,3 +1,4 @@
+# ruff: noqa
 from nyx_space._nyx import mission_design as __mod
 
 __all__ = []

@@ -2,6 +2,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import polars as pl
 from plotly.subplots import make_subplots
+
 from nyx_space.plots import TEMPLATE, convert_units, watermark
 
 

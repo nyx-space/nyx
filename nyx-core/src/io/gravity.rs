@@ -28,7 +28,7 @@ use serde_dhall::{SimpleType, StaticType};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fs::File;
-use std::io::Read;
+use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -50,8 +50,6 @@ pub struct GravityFieldConfig {
     pub order: usize,
     /// Path to the file, relative to the current working directory
     pub filepath: PathBuf,
-    /// Set to true if the data is gunzipped
-    pub gunzipped: bool,
     /// The frame in which to compute this gravity field
     pub frame: FrameUid,
 }
@@ -59,18 +57,11 @@ pub struct GravityFieldConfig {
 #[cfg(feature = "python")]
 #[cfg_attr(feature = "python", pymethods)]
 impl GravityFieldConfig {
-    #[pyo3(signature=(degree, order, filepath, frame, gunzipped=true))]
+    #[pyo3(signature=(degree, order, filepath, frame))]
     #[new]
-    fn py_new(
-        degree: usize,
-        order: usize,
-        filepath: PathBuf,
-        frame: FrameUid,
-        gunzipped: bool,
-    ) -> Self {
+    fn py_new(degree: usize, order: usize, filepath: PathBuf, frame: FrameUid) -> Self {
         Self {
             filepath,
-            gunzipped,
             degree,
             order,
             frame,
@@ -107,12 +98,11 @@ impl GravityFieldData {
                 action: "fetching gravity field frame",
             })?;
 
-        if !cfg.gunzipped && cfg.filepath.ends_with(".cof")
-            || cfg.gunzipped && cfg.filepath.ends_with(".cof.gz")
-        {
-            Self::from_cof(cfg.filepath, cfg.degree, cfg.order, cfg.gunzipped, frame)
+        let path_str = cfg.filepath.to_string_lossy().to_lowercase();
+        if path_str.ends_with(".cof") || path_str.ends_with(".cof.gz") {
+            Self::from_cof(cfg.filepath, cfg.degree, cfg.order, frame)
         } else {
-            Self::from_shadr(cfg.filepath, cfg.degree, cfg.order, cfg.gunzipped, frame)
+            Self::from_shadr(cfg.filepath, cfg.degree, cfg.order, frame)
         }
     }
 
@@ -141,11 +131,10 @@ impl GravityFieldData {
         filepath: P,
         degree: usize,
         order: usize,
-        gunzipped: bool,
         frame: Frame,
     ) -> Result<GravityFieldData, NyxError> {
         Self::load(
-            filepath, gunzipped, true, //SHADR has a header which we ignore
+            filepath, true, //SHADR has a header which we ignore
             degree, order, frame,
         )
     }
@@ -154,21 +143,31 @@ impl GravityFieldData {
         filepath: P,
         degree: usize,
         order: usize,
-        gunzipped: bool,
         frame: Frame,
     ) -> Result<GravityFieldData, NyxError> {
-        let mut f = File::open(&filepath).map_err(|_| NyxError::FileUnreadable {
+        let f = File::open(&filepath).map_err(|_| NyxError::FileUnreadable {
             msg: format!("File not found: {filepath:?}"),
         })?;
+        let mut buf_reader = BufReader::new(f);
+        let is_gzipped = match buf_reader.fill_buf() {
+            Ok(header) => header.len() >= 2 && header[0] == 0x1f && header[1] == 0x8b,
+            Err(_) => {
+                return Err(NyxError::FileUnreadable {
+                    msg: format!("Could not read header of file: {filepath:?}"),
+                });
+            }
+        };
+
         let mut buffer = vec![0; 0];
-        if gunzipped {
-            let mut d = GzDecoder::new(f);
+        if is_gzipped {
+            let mut d = GzDecoder::new(buf_reader);
             d.read_to_end(&mut buffer)
                 .map_err(|_| NyxError::FileUnreadable {
                     msg: "could not read file as gunzip".to_string(),
                 })?;
         } else {
-            f.read_to_end(&mut buffer)
+            buf_reader
+                .read_to_end(&mut buffer)
                 .map_err(|_| NyxError::FileUnreadable {
                     msg: "could not read file to end".to_string(),
                 })?;
@@ -372,24 +371,34 @@ impl GravityFieldData {
     /// `load` handles the actual loading in memory.
     fn load<P: AsRef<Path> + Debug>(
         filepath: P,
-        gunzipped: bool,
         skip_first_line: bool,
         degree: usize,
         order: usize,
         frame: Frame,
     ) -> Result<GravityFieldData, NyxError> {
-        let mut f = File::open(&filepath).map_err(|_| NyxError::FileUnreadable {
+        let f = File::open(&filepath).map_err(|_| NyxError::FileUnreadable {
             msg: format!("File not found: {filepath:?}"),
         })?;
+        let mut buf_reader = BufReader::new(f);
+        let is_gzipped = match buf_reader.fill_buf() {
+            Ok(header) => header.len() >= 2 && header[0] == 0x1f && header[1] == 0x8b,
+            Err(_) => {
+                return Err(NyxError::FileUnreadable {
+                    msg: format!("Could not read header of file: {filepath:?}"),
+                });
+            }
+        };
+
         let mut buffer = vec![0; 0];
-        if gunzipped {
-            let mut d = GzDecoder::new(f);
+        if is_gzipped {
+            let mut d = GzDecoder::new(buf_reader);
             d.read_to_end(&mut buffer)
                 .map_err(|_| NyxError::FileUnreadable {
                     msg: "could not read file as gunzip".to_string(),
                 })?;
         } else {
-            f.read_to_end(&mut buffer)
+            buf_reader
+                .read_to_end(&mut buffer)
                 .map_err(|_| NyxError::FileUnreadable {
                     msg: "could not read file to end".to_string(),
                 })?;
@@ -524,7 +533,6 @@ impl StaticType for GravityFieldConfig {
         let mut fields = HashMap::new();
 
         fields.insert("filepath".to_string(), String::static_type());
-        fields.insert("gunzipped".to_string(), bool::static_type());
         fields.insert("degree".to_string(), usize::static_type());
         fields.insert("order".to_string(), usize::static_type());
 
@@ -541,20 +549,13 @@ fn test_load_harmonic_files() {
         .iter()
         .collect();
 
-    GravityFieldData::from_cof(
-        data_folder.join("JGM3.cof.gz"),
-        50,
-        50,
-        true,
-        IAU_EARTH_FRAME,
-    )
-    .expect("could not load JGM3");
+    GravityFieldData::from_cof(data_folder.join("JGM3.cof.gz"), 50, 50, IAU_EARTH_FRAME)
+        .expect("could not load JGM3");
 
     GravityFieldData::from_shadr(
         data_folder.join("EGM2008_to2190_TideFree.gz"),
         120,
         120,
-        true,
         IAU_EARTH_FRAME,
     )
     .expect("could not load EGM2008");
@@ -563,7 +564,6 @@ fn test_load_harmonic_files() {
         data_folder.join("Luna_jggrx_1500e_sha.tab.gz"),
         1500,
         1500,
-        true,
         IAU_EARTH_FRAME,
     )
     .expect("could not load jggrx");

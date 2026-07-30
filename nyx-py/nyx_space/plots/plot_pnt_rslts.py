@@ -32,14 +32,14 @@ def main(path: str):
             x=df_plot["Longitude (deg)"],
             y=df_plot["Latitude (deg)"],
             mode="lines+markers",
-            marker=dict(
-                size=6,
-                color=df_plot["minutes"],
-                colorscale=color_scale,
-                showscale=True,
+            marker={
+                "size": 6,
+                "color": df_plot["minutes"],
+                "colorscale": color_scale,
+                "showscale": True,
                 # colorbar=dict(title="Time Index"),
-            ),
-            line=dict(color="lightgray", width=1),
+            },
+            line={"color": "lightgray", "width": 1},
             name="Trajectory (TRK minutes)",
             text=df_plot["Epoch (UTC)"],
             hovertemplate="Lon: %{x}<br>Lat: %{y}<br>Time: %{text}<extra></extra>",
@@ -72,7 +72,7 @@ def main(path: str):
                 x=ellipse_x,
                 y=ellipse_y,
                 mode="lines",
-                line=dict(color=ellipse_color, width=2, dash="dash"),
+                line={"color": ellipse_color, "width": 2, "dash": "dash"},
                 showlegend=False,
                 hoverinfo="skip",
             )
@@ -122,15 +122,15 @@ def main(path: str):
         fig = px.scatter(df, x="Epoch (UTC)", y=y_cols)
         fig.update_traces(
             mode="lines",
-            selector=dict(name=f"Measurement noise 3-Sigma: {msr}"),
+            selector={"name": f"Measurement noise 3-Sigma: {msr}"},
             connectgaps=True,
-            line=dict(dash="dash", color="black"),
+            line={"dash": "dash", "color": "black"},
         )
         fig.update_traces(
             mode="lines",
-            selector=dict(name=f"Measurement noise -3-Sigma: {msr}"),
+            selector={"name": f"Measurement noise -3-Sigma: {msr}"},
             connectgaps=True,
-            line=dict(dash="dash", color="black"),
+            line={"dash": "dash", "color": "black"},
         )
         unit = msr.split()[-1][1:-1]
         fig.update_layout(yaxis_title=unit, template=TEMPLATE)

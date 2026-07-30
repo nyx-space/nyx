@@ -89,7 +89,7 @@ def residuals(df: pl.DataFrame, path: str | None = None) -> go.Figure:
                     mode="markers",
                     name=y,
                     legendgroup=y,
-                    marker=dict(color="blue" if "Prefit" in y else "red"),
+                    marker={"color": "blue" if "Prefit" in y else "red"},
                     showlegend=True,
                 ),
                 row=idx,
@@ -105,7 +105,7 @@ def residuals(df: pl.DataFrame, path: str | None = None) -> go.Figure:
                     y=df[y],
                     mode="lines",
                     name=trace_type,
-                    line=dict(color="black"),
+                    line={"color": "black"},
                     legendgroup=trace_type,
                     connectgaps=True,
                     showlegend=(trace_type not in legend_added),
@@ -277,7 +277,7 @@ def od_dashboard(df: pl.DataFrame, path: str | None = None) -> [go.Figure]:
                 y=osr,
                 mode="markers",
                 name=f"{whitened_resid} QQ",
-                marker=dict(color="blue"),
+                marker={"color": "blue"},
             ),
             row=4,
             col=2,
@@ -290,7 +290,7 @@ def od_dashboard(df: pl.DataFrame, path: str | None = None) -> [go.Figure]:
                 y=x_line,
                 mode="lines",
                 name="Expected N(0,1)",
-                line=dict(color="red", dash="dash"),
+                line={"color": "red", "dash": "dash"},
             ),
             row=4,
             col=2,
@@ -303,7 +303,7 @@ def od_dashboard(df: pl.DataFrame, path: str | None = None) -> [go.Figure]:
                 y=slope * x_line + intercept,
                 mode="lines",
                 name=f"Fitted normal: μ={intercept:.3f}, σ={slope:.3f}, R={r:.3f}",
-                line=dict(color="gray"),
+                line={"color": "gray"},
             ),
             row=4,
             col=2,
@@ -343,7 +343,7 @@ def od_dashboard(df: pl.DataFrame, path: str | None = None) -> [go.Figure]:
                     x=[0, len(rho) - 1],
                     y=[bound, bound],
                     mode="lines",
-                    line=dict(dash="dash"),
+                    line={"dash": "dash"},
                     name=f"{tracker} +95%",
                     showlegend=False,
                 ),
@@ -356,7 +356,7 @@ def od_dashboard(df: pl.DataFrame, path: str | None = None) -> [go.Figure]:
                     x=[0, len(rho) - 1],
                     y=[-bound, -bound],
                     mode="lines",
-                    line=dict(dash="dash"),
+                    line={"dash": "dash"},
                     name=f"{tracker} -95%",
                     showlegend=False,
                 ),
@@ -391,9 +391,9 @@ def cr_cd(df: pl.DataFrame, path: str | None = None) -> pl.DataFrame:
     for col in optional_est_params:
         if df[col].max() != df[col].min():
             # We should plot this!
-            sigma_col = [
+            sigma_col = next(
                 c for c in df.columns if col in c.lower() and "sigma" in c.lower()
-            ][0]
+            )
             plots_to_make += [(col.capitalize(), col, sigma_col)]
 
     if not plots_to_make:
@@ -420,7 +420,7 @@ def cr_cd(df: pl.DataFrame, path: str | None = None) -> pl.DataFrame:
                 mode="lines+markers",
                 name=title,
                 legendgroup=title,
-                marker=dict(color="blue" if "cr" in title.lower() else "green"),
+                marker={"color": "blue" if "cr" in title.lower() else "green"},
                 showlegend=True,
             ),
             row=idx,
@@ -442,7 +442,7 @@ def cr_cd(df: pl.DataFrame, path: str | None = None) -> pl.DataFrame:
                     y=df[bound],
                     mode="lines",
                     name="3-Sigma bounds",
-                    line=dict(color="black", dash="dash"),
+                    line={"color": "black", "dash": "dash"},
                     legendgroup="3-Sigma bounds",
                     connectgaps=True,
                     showlegend=show_this_legend,
