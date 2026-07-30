@@ -47,6 +47,13 @@ use pyo3::types::{PyBytes, PyType};
 mod python;
 
 /// GroundStation defines a one-way or two-way ranging and doppler station. Set the integration time for two-way.
+///
+/// :type name: str
+/// :type location: Location
+/// :type stochastic_noises: dict[MeasurementType, StochasticNoise]
+/// :type integration_time: Duration | None
+/// :type light_time_correction: bool | None
+/// :type timestamp_noise_s: StochasticNoise | None
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub struct GroundStation {
@@ -66,6 +73,10 @@ pub struct GroundStation {
 impl GroundStation {
     /// Computes the azimuth and elevation of the provided object seen from this ground station, both in degrees.
     /// This is a shortcut to almanac.azimuth_elevation_range_sez.
+    ///
+    /// :type rx: Orbit
+    /// :type obstructing_body: Frame | None
+    /// :type almanac: Almanac
     pub fn azimuth_elevation_of(
         &self,
         rx: Orbit,
@@ -86,6 +97,9 @@ impl GroundStation {
     }
 
     /// Return this ground station as an orbit in its current frame
+    ///
+    /// :type epoch: Epoch
+    /// :type almanac: Almanac
     pub fn to_orbit(&self, epoch: Epoch, almanac: &Almanac) -> AlmanacResult<Orbit> {
         Orbit::try_latlongalt(
             self.location.latitude_deg,

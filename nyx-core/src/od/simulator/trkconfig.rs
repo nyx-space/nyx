@@ -35,6 +35,10 @@ use pyo3::{exceptions::PyValueError, prelude::*, types::PyBytes, types::PyType};
 /// Stores a tracking configuration, there is one per tracking data simulator (e.g. one for ground station #1 and another for #2).
 /// By default, the tracking configuration is continuous and the tracking arc is from the beginning of the simulation to the end.
 /// In Python, any value that is set to None at initialization will use the default values: no scheduler, no strands, sampling at 1 min.
+///
+/// :type scheduler: Scheduler | None
+/// :type sampling: Duration
+/// :type strands: list[Strand] | None
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypedBuilder)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 #[builder(doc)]
@@ -258,6 +262,9 @@ impl Default for TrkConfig {
 }
 
 /// Stores a tracking strand with a start and end epoch
+///
+/// :type start: Epoch
+/// :type end: Epoch
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct Strand {

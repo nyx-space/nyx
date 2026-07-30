@@ -47,6 +47,9 @@ use super::Stochastics;
 ///
 /// - Range: 60 cm process noise over a 60 second average (tau, half life)
 /// - Doppler: 0.03 mm/s process noise over a 60 second average (tau, half life)
+///
+/// :type tau: Duration
+/// :type process_noise: float
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct GaussMarkov {
@@ -226,6 +229,10 @@ impl ConfigRepr for GaussMarkov {}
 #[cfg(feature = "python")]
 #[cfg_attr(feature = "python", pymethods)]
 impl GaussMarkov {
+    /// Create a new first order Gauss-Markov process.
+    ///
+    /// :type tau: Duration
+    /// :type process_noise: float
     #[new]
     fn py_new(tau: Duration, process_noise: f64) -> Result<Self, ConfigError> {
         Self::new(tau, process_noise)

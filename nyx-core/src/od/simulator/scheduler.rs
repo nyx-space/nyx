@@ -57,6 +57,11 @@ impl Handoff {
 }
 
 /// A scheduler allows building a scheduling of spaceraft tracking for a set of ground stations.
+///
+/// :type handoff: Handoff
+/// :type cadence: Cadence | None
+/// :type min_samples: int
+/// :type sample_alignment: Duration | None
 #[derive(Copy, Clone, Debug, Default, Deserialize, PartialEq, Serialize, TypedBuilder)]
 #[cfg_attr(feature = "python", pyclass(from_py_object))]
 #[builder(doc)]
@@ -162,6 +167,10 @@ impl PyCadence {
         }
     }
 
+    /// Set an intermittent cadence with specific on and off durations.
+    ///
+    /// :type on: Duration
+    /// :type off: Duration
     #[classmethod]
     fn intermittent(_cls: &Bound<'_, PyType>, on: Duration, off: Duration) -> Self {
         Self {

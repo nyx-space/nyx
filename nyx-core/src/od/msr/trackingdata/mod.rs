@@ -71,6 +71,7 @@ mod python;
 ///
 /// Reference: JPL DESCANSO, document 214, _Pseudo-Noise and Regenerative Ranging_.
 ///
+/// :type measurements: list[Measurement]
 #[derive(Clone, Default)]
 #[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub struct TrackingDataArc {
@@ -160,6 +161,9 @@ impl TrackingDataArc {
         }
     }
     /// Set (or overwrites) the modulus of the provided measurement type.
+    ///
+    /// :type msr_type: MeasurementType
+    /// :type modulus: float
     pub fn set_moduli(&mut self, msr_type: MeasurementType, modulus: f64) {
         if modulus.is_nan() || modulus.abs() < f64::EPSILON {
             warn!("cannot set modulus for {msr_type:?} to {modulus}");
@@ -277,6 +281,8 @@ impl TrackingDataArc {
     }
 
     /// Splits a long tracking data arc into smaller chunks, each up to `max_duration` long.
+    ///
+    /// :type max_duration: Duration
     pub fn chunk(&self, max_duration: Duration) -> Vec<TrackingDataArc> {
         let mut chunks = Vec::new();
         if self.is_empty() || max_duration <= Duration::ZERO {

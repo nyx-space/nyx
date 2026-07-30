@@ -28,6 +28,8 @@ use pyo3::prelude::*;
 /// Some software, like ODTK, processes each measurement as a scalar. Nyx can process the measurements together.
 /// As such, if the prefit on range is bad, then the Doppler measurement with the same time stamp will also be rejected.
 /// This can lead to better convergence of the filter, and more appropriate results.
+///
+/// :type num_sigmas: float
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct SigmaRejection {

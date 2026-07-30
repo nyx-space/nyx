@@ -31,6 +31,8 @@ impl Measurement {
     }
 
     /// Returns the floating point value of this observation if this measurement contains the provided measurement type
+    ///
+    /// :type msr_type: MeasurementType
     #[pyo3(name = "observation")]
     fn py_observation(&self, msr_type: MeasurementType) -> Option<f64> {
         self.data.get(&msr_type).copied()
