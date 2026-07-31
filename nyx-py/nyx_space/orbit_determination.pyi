@@ -3,6 +3,9 @@ from anise import Almanac
 from anise import astro
 from anise import time
 import numpy
+from nyx_space import Spacecraft
+from nyx_space.mission_design import Propagator, Trajectory
+from nyx_space.monte_carlo import MvnSpacecraft, StateDispersion
 import nyx_space.od
 import typing
 
@@ -413,7 +416,7 @@ class GroundTrackingArcSim:
     def __init__(
         self,
         devices: dict[str, GroundStation],
-        trajectory: PyTrajectory,
+        trajectory: Trajectory,
         configs: dict[str, TrkConfig],
         seed: int | None,
         *args: typing.Optional[typing.Any],
@@ -425,7 +428,7 @@ class GroundTrackingArcSim:
     def __new__(
         cls,
         devices: dict[str, GroundStation],
-        trajectory: PyTrajectory,
+        trajectory: Trajectory,
         configs: dict[str, TrkConfig],
         seed: typing.Optional[int | None] = None,
     ) -> GroundTrackingArcSim:
@@ -724,6 +727,45 @@ class ProcessNoise:
         """Return str(self)."""
 
 @typing.final
+class NormalizedConsistency:
+    """Normalized consistency check result (NIS/NEES)."""
+
+    is_nees: bool
+    k: float
+    lower_bound: float
+    normalized_sum: float
+    upper_bound: float
+
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature."""
+
+    def has_statistical_power(self) -> bool:
+        """Returns whether the test has statistical power."""
+
+    def is_consistent(self) -> bool:
+        """Returns whether the filter is consistent."""
+
+    def is_overconfident(self) -> bool:
+        """Returns whether the filter is overconfident."""
+
+    def is_underconfident(self) -> bool:
+        """Returns whether the filter is underconfident."""
+
+    def log(self) -> None:
+        """Log the consistency check result."""
+
+    def name(self) -> str:
+        """Returns the name of the consistency check."""
+
+    def __repr__(self) -> str:
+        """Return repr(self)."""
+
+    def __str__(self) -> str:
+        """Return str(self)."""
+
+@typing.final
 class Residual:
     epoch: typing.Any
     postfit: typing.Any
@@ -1006,7 +1048,7 @@ class SpacecraftODSolution:
 
     def is_filter_run(self) -> bool: ...
     def is_nees_consistent(
-        self, truth_traj: PyTrajectory, alpha: typing.Optional[float | None] = None
+        self, truth_traj: Trajectory, alpha: typing.Optional[float | None] = None
     ) -> bool:
         """Checks whether the filter estimates are statistically consistent
         by performing a Chi-squared test on the Normalized Estimation Error Squared (NEES).
@@ -1061,7 +1103,7 @@ class SpacecraftODSolution:
         Returns Ok(ks_statistic) if residuals are available."""
 
     def nees_consistency(
-        self, truth_traj: PyTrajectory, alpha: typing.Optional[float | None] = None
+        self, truth_traj: Trajectory, alpha: typing.Optional[float | None] = None
     ) -> NormalizedConsistency:
         """Checks whether the filter estimates are statistically consistent
         by performing a Chi-squared test on the Normalized Estimation Error Squared (NEES).

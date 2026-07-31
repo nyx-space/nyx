@@ -4,6 +4,7 @@ from anise import Almanac
 from anise import analysis
 from anise import astro
 from anise import time
+from nyx_space import Spacecraft, Thruster
 import typing
 
 @typing.final
@@ -354,6 +355,21 @@ class IntegratorOptions:
         """Return str(self)."""
 
 @typing.final
+class Msise00DailyWeather:
+    """Msise00 daily weather data."""
+
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature."""
+
+    def __repr__(self) -> str:
+        """Return repr(self)."""
+
+    def __str__(self) -> str:
+        """Return str(self)."""
+
+@typing.final
 class Nrlmsise00Flags:
     annual_harmonics: typing.Any
     boundary_density_variations: typing.Any
@@ -429,6 +445,24 @@ class PointMasses:
         correction: typing.Optional[Aberration | None] = None,
     ) -> PointMasses:
         """PointMasses model"""
+
+    def __repr__(self) -> str:
+        """Return repr(self)."""
+
+    def __str__(self) -> str:
+        """Return str(self)."""
+
+@typing.final
+class PropagationResult:
+    """The result of a propagation, containing the final spacecraft state and the generated trajectory."""
+
+    state: Spacecraft
+    trajectory: Trajectory | None
+
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature."""
 
     def __repr__(self) -> str:
         """Return repr(self)."""
@@ -742,7 +776,7 @@ class SpacecraftSequence:
 
     def propagate(
         self, state: Spacecraft, until_phase: str | None, almanac: Almanac
-    ) -> list[string, string]:
+    ) -> list[str]:
         """Propagate the state through the sequence until a given phase."""
 
     def setup(self, almanac: Almanac) -> None:
