@@ -279,6 +279,7 @@ impl StochasticNoise {
     /// Return the covariance of these stochastics at a given time.
     ///
     /// :type epoch: Epoch
+    /// :rtype: float
     pub fn covariance(&self, epoch: Epoch) -> f64 {
         let mut variance = 0.0;
         if let Some(wn) = &self.white_noise {
@@ -342,6 +343,7 @@ impl StochasticNoise {
     /// :type integration_time: Duration
     /// :type chip_rate: ChipRate
     /// :type s_n0: SN0
+    /// :rtype: StochasticNoise
     #[cfg(feature = "python")]
     #[pyo3(name = "from_hardware_range_km")]
     #[classmethod]
@@ -362,6 +364,7 @@ impl StochasticNoise {
     /// :type integration_time: Duration
     /// :type carrier: CarrierFreq
     /// :type c_n0: CN0
+    /// :rtype: StochasticNoise
     #[cfg(feature = "python")]
     #[pyo3(name = "from_hardware_doppler_km_s")]
     #[classmethod]

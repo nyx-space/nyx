@@ -242,6 +242,7 @@ impl AtmDensity {
     /// Configured with nominal LEO reference parameters at $h_0 = 700\text{ km}$:
     /// * $\rho_0 = 3.614 \times 10^{-13}\text{ kg/m}^3$
     /// * $H = 88.667\text{ km}$ ($88,667\text{ m}$)
+    /// :rtype: AtmDensity
     #[classmethod]
     fn earth_exponential(_cls: &Bound<'_, PyType>) -> Self {
         AtmDensity::Exponential {

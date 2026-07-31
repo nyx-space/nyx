@@ -614,6 +614,7 @@ impl SolidTides {
     /// :type earth_frame: Frame
     /// :type moon_frame: Frame
     /// :type almanac: Almanac
+    /// :rtype: SolidTides
     #[classmethod]
     #[pyo3(name = "earth_moon_system")]
     fn py_earth_moon_system(

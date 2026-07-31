@@ -47,6 +47,7 @@ impl GroundStation {
     /// Load GroundStation from a YAML string.
     ///
     /// :type yaml_str: str
+    /// :rtype: GroundStation
     #[classmethod]
     #[pyo3(name = "from_yaml")]
     fn py_from_yaml(_cls: &Bound<'_, pyo3::types::PyType>, yaml_str: &str) -> PyResult<Self> {
@@ -54,6 +55,7 @@ impl GroundStation {
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
     }
 
+    /// :rtype: str
     #[pyo3(name = "to_yaml")]
     fn py_to_yaml(&self) -> PyResult<String> {
         serde_yml::to_string(self)
@@ -63,6 +65,7 @@ impl GroundStation {
     /// Load multiple GroundStations from a YAML file.
     ///
     /// :type path: str
+    /// :rtype: list[GroundStation]
     #[classmethod]
     #[pyo3(name = "load_many_yaml")]
     fn py_load_many_yaml(_cls: &Bound<'_, pyo3::types::PyType>, path: &str) -> PyResult<Vec<Self>> {
@@ -73,6 +76,7 @@ impl GroundStation {
     /// Load multiple GroundStations from a YAML string.
     ///
     /// :type yaml_str: str
+    /// :rtype: list[GroundStation]
     #[classmethod]
     #[pyo3(name = "loads_many_yaml")]
     fn py_loads_many_yaml(
@@ -88,6 +92,7 @@ impl GroundStation {
     ///
     /// :type stations: list[GroundStation]
     /// :type path: str
+    /// :rtype: None
     #[classmethod]
     #[pyo3(name = "dump_many_yaml")]
     fn py_dump_many_yaml(
@@ -103,6 +108,7 @@ impl GroundStation {
     /// Dump multiple GroundStations to a YAML string.
     ///
     /// :type stations: list[GroundStation]
+    /// :rtype: str
     #[classmethod]
     #[pyo3(name = "dumps_many_yaml")]
     fn py_dumps_many_yaml(
@@ -177,6 +183,7 @@ impl GroundStation {
     ///
     /// :type msr_type: MeasurementType
     /// :type noise: StochasticNoise
+    /// :rtype: None
     pub fn add_measurement_type(&mut self, msr_type: MeasurementType, noise: StochasticNoise) {
         self.measurement_types.insert(msr_type);
         self.stochastic_noises
@@ -187,12 +194,16 @@ impl GroundStation {
     /// Remove a measurement type.
     ///
     /// :type msr_type: MeasurementType
+    /// :rtype: bool
     pub fn remove_measurement_type(&mut self, msr_type: &MeasurementType) -> bool {
         // (Note: Requires IndexSet to be used with the `shift_remove` method to maintain order,
         // fallback to `.remove()` if order preservation upon deletion is not strictly required)
         self.measurement_types.shift_remove(msr_type)
     }
 
+    /// Clear all measurement types
+    ///
+    /// :rtype: None
     pub fn clear_measurement_types(&mut self) {
         self.measurement_types.clear();
     }
@@ -207,6 +218,7 @@ impl GroundStation {
     /// Get stochastic noise for a measurement type.
     ///
     /// :type m_type: MeasurementType
+    /// :rtype: StochasticNoise | None
     pub fn get_stochastic_noise(&self, m_type: &MeasurementType) -> Option<StochasticNoise> {
         self.stochastic_noises
             .as_ref()
@@ -217,6 +229,7 @@ impl GroundStation {
     ///
     /// :type m_type: MeasurementType
     /// :type noise: StochasticNoise
+    /// :rtype: None
     pub fn set_stochastic_noise(&mut self, m_type: MeasurementType, noise: StochasticNoise) {
         self.stochastic_noises
             .get_or_insert_with(indexmap::IndexMap::new)
@@ -226,12 +239,16 @@ impl GroundStation {
     /// Remove stochastic noise for a measurement type.
     ///
     /// :type m_type: MeasurementType
+    /// :rtype: StochasticNoise | None
     pub fn remove_stochastic_noise(&mut self, m_type: &MeasurementType) -> Option<StochasticNoise> {
         self.stochastic_noises
             .as_mut()
             .and_then(|map| map.shift_remove(m_type))
     }
 
+    /// Clear stochastic noises
+    ///
+    /// :rtype: None
     pub fn clear_stochastic_noises(&mut self) {
         self.stochastic_noises = None;
     }

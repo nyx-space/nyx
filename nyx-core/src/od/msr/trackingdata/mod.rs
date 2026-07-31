@@ -88,6 +88,7 @@ pub struct TrackingDataArc {
 #[cfg_attr(feature = "python", pymethods)]
 impl TrackingDataArc {
     /// Sort these measurements by epoch
+    /// :rtype: None
     pub fn sort(&mut self) {
         self.measurements.sort_unstable_by(|a, b| {
             a.epoch
@@ -117,16 +118,19 @@ impl TrackingDataArc {
         });
     }
     /// Returns the start epoch of this tracking arc
+    /// :rtype: Epoch | None
     pub fn start_epoch(&self) -> Option<Epoch> {
         self.measurements.first().map(|msr| msr.epoch)
     }
 
     /// Returns the end epoch of this tracking arc
+    /// :rtype: Epoch | None
     pub fn end_epoch(&self) -> Option<Epoch> {
         self.measurements.last().map(|msr| msr.epoch)
     }
 
     /// Returns the duration this tracking arc
+    /// :rtype: Duration | None
     pub fn duration(&self) -> Option<Duration> {
         match self.start_epoch() {
             Some(start) => self.end_epoch().map(|end| end - start),
@@ -135,16 +139,19 @@ impl TrackingDataArc {
     }
 
     /// Returns the number of measurements in this data arc
+    /// :rtype: int
     pub fn len(&self) -> usize {
         self.measurements.len()
     }
 
     /// Returns whether this arc has no measurements.
+    /// :rtype: bool
     pub fn is_empty(&self) -> bool {
         self.measurements.is_empty()
     }
 
     /// Returns the minimum duration between two subsequent measurements.
+    /// :rtype: Duration | None
     pub fn min_duration_sep(&self) -> Option<Duration> {
         if self.is_empty() {
             None
@@ -164,6 +171,7 @@ impl TrackingDataArc {
     ///
     /// :type msr_type: MeasurementType
     /// :type modulus: float
+    /// :rtype: None
     pub fn set_moduli(&mut self, msr_type: MeasurementType, modulus: f64) {
         if modulus.is_nan() || modulus.abs() < f64::EPSILON {
             warn!("cannot set modulus for {msr_type:?} to {modulus}");
@@ -177,6 +185,7 @@ impl TrackingDataArc {
     }
 
     /// Applies the moduli to each measurement, if defined.
+    /// :rtype: None
     pub fn apply_moduli(&mut self) {
         if let Some(moduli) = &self.moduli {
             for msr in &mut self.measurements {
@@ -283,6 +292,7 @@ impl TrackingDataArc {
     /// Splits a long tracking data arc into smaller chunks, each up to `max_duration` long.
     ///
     /// :type max_duration: Duration
+    /// :rtype: list[TrackingDataArc]
     pub fn chunk(&self, max_duration: Duration) -> Vec<TrackingDataArc> {
         let mut chunks = Vec::new();
         if self.is_empty() || max_duration <= Duration::ZERO {

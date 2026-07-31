@@ -56,13 +56,13 @@ class Cadence:
 
     def __new__(cls) -> Cadence: ...
     @staticmethod
-    def continuous() -> typing.Any: ...
+    def continuous() -> Cadence: ...
     @staticmethod
     def from_asn1(data: bytes) -> Cadence:
         """Decodes an ASN.1 DER encoded byte array into a Cadence object."""
 
     @staticmethod
-    def intermittent(on: time.Duration, off: time.Duration) -> typing.Any:
+    def intermittent(on: time.Duration, off: time.Duration) -> Cadence:
         """Set an intermittent cadence with specific on and off durations."""
 
     def to_asn1(self) -> bytes:
@@ -317,23 +317,27 @@ class GroundStation:
 
     def add_measurement_type(
         self, msr_type: MeasurementType, noise: StochasticNoise
-    ) -> typing.Any:
+    ) -> None:
         """Add a measurement type with stochastic noise."""
 
     def azimuth_elevation_of(
         self, rx: astro.Orbit, obstructing_body: astro.Frame | None, almanac: Almanac
-    ) -> typing.Any:
+    ) -> astro.AzElRange:
         """Computes the azimuth and elevation of the provided object seen from this ground station, both in degrees.
         This is a shortcut to almanac.azimuth_elevation_range_sez."""
 
-    def clear_measurement_types(self) -> typing.Any: ...
-    def clear_stochastic_noises(self) -> typing.Any: ...
+    def clear_measurement_types(self) -> None:
+        """Clear all measurement types"""
+
+    def clear_stochastic_noises(self) -> None:
+        """Clear stochastic noises"""
+
     @staticmethod
-    def dump_many_yaml(stations: list[GroundStation], path: str) -> typing.Any:
+    def dump_many_yaml(stations: list[GroundStation], path: str) -> None:
         """Dump multiple GroundStations to a YAML file."""
 
     @staticmethod
-    def dumps_many_yaml(stations: list[GroundStation]) -> typing.Any:
+    def dumps_many_yaml(stations: list[GroundStation]) -> str:
         """Dump multiple GroundStations to a YAML string."""
 
     @staticmethod
@@ -341,38 +345,40 @@ class GroundStation:
         """Decodes an ASN.1 DER encoded byte array into a GroundStation object."""
 
     @staticmethod
-    def from_yaml(yaml_str: str) -> typing.Any:
+    def from_yaml(yaml_str: str) -> GroundStation:
         """Load GroundStation from a YAML string."""
 
-    def get_stochastic_noise(self, m_type: MeasurementType) -> typing.Any:
+    def get_stochastic_noise(self, m_type: MeasurementType) -> StochasticNoise | None:
         """Get stochastic noise for a measurement type."""
 
     @staticmethod
-    def load_many_yaml(path: str) -> typing.Any:
+    def load_many_yaml(path: str) -> list[GroundStation]:
         """Load multiple GroundStations from a YAML file."""
 
     @staticmethod
-    def loads_many_yaml(yaml_str: str) -> typing.Any:
+    def loads_many_yaml(yaml_str: str) -> list[GroundStation]:
         """Load multiple GroundStations from a YAML string."""
 
-    def remove_measurement_type(self, msr_type: MeasurementType) -> typing.Any:
+    def remove_measurement_type(self, msr_type: MeasurementType) -> bool:
         """Remove a measurement type."""
 
-    def remove_stochastic_noise(self, m_type: MeasurementType) -> typing.Any:
+    def remove_stochastic_noise(
+        self, m_type: MeasurementType
+    ) -> StochasticNoise | None:
         """Remove stochastic noise for a measurement type."""
 
     def set_stochastic_noise(
         self, m_type: MeasurementType, noise: StochasticNoise
-    ) -> typing.Any:
+    ) -> None:
         """Set stochastic noise for a measurement type."""
 
     def to_asn1(self) -> bytes:
         """Encodes this GroundStation object into an ASN.1 DER encoded byte array."""
 
-    def to_orbit(self, epoch: time.Epoch, almanac: Almanac) -> typing.Any:
+    def to_orbit(self, epoch: time.Epoch, almanac: Almanac) -> astro.Orbit:
         """Return this ground station as an orbit in its current frame"""
 
-    def to_yaml(self) -> typing.Any: ...
+    def to_yaml(self) -> str: ...
     def __eq__(self, value: typing.Any) -> bool:
         """Return self==value."""
 
@@ -425,7 +431,7 @@ class GroundTrackingArcSim:
     ) -> GroundTrackingArcSim:
         """Simulated tracking architecture for a spacecraft."""
 
-    def build_schedule(self, almanac: Almanac) -> typing.Any:
+    def build_schedule(self, almanac: Almanac) -> None:
         """Builds a schedule using the generate_schedule function, and set that schedule in this instance's configuration."""
 
     def generate_measurements(self, almanac: Almanac) -> TrackingDataArc:
@@ -622,13 +628,13 @@ class Measurement:
         Note that two measurements are considered equal if the tracker and epoch match exactly, and if both have the same measurement types,
         and those measurements are equal to within 1e-10 (this allows for some leeway in TDM producers)."""
 
-    def correct(self, msr_type: MeasurementType, correction: float) -> typing.Any:
+    def correct(self, msr_type: MeasurementType, correction: float) -> None:
         """Correct the provided measurement type with the provided correction, if that measurement type is available"""
 
-    def observation(self, msr_type: MeasurementType) -> typing.Any:
+    def observation(self, msr_type: MeasurementType) -> float | None:
         """Returns the floating point value of this observation if this measurement contains the provided measurement type"""
 
-    def push(self, msr_type: MeasurementType, msr_value: float) -> typing.Any:
+    def push(self, msr_type: MeasurementType, msr_value: float) -> None:
         """Push a measurement type and value."""
 
     def __repr__(self) -> str:
@@ -679,7 +685,7 @@ class ProcessNoise:
         x_decay_s: float | None,
         y_decay_s: float | None,
         z_decay_s: float | None,
-    ) -> typing.Any:
+    ) -> ProcessNoise:
         """Create process noise from acceleration standard deviations with optional exponential decay."""
 
     @staticmethod
@@ -690,7 +696,7 @@ class ProcessNoise:
         noise_duration: time.Duration,
         disable_time: time.Duration,
         local_frame: astro.LocalFrame | None,
-    ) -> typing.Any:
+    ) -> ProcessNoise:
         """Create process noise from velocity standard deviations."""
 
     def __eq__(self, value: typing.Any) -> bool:
@@ -732,16 +738,16 @@ class Residual:
         """Initialize self.  See help(type(self)) for accurate signature."""
 
     def __new__(cls) -> Residual: ...
-    def computed_obs(self, msr_type: MeasurementType) -> typing.Any:
+    def computed_obs(self, msr_type: MeasurementType) -> float | None:
         """Returns the computed/expected observation for this measurement type, if available"""
 
-    def nis(self) -> typing.Any:
+    def nis(self) -> float:
         """Returns the normalized innovation squared (NIS) as the norm squares of the whitened residual"""
 
-    def real_obs(self, msr_type: MeasurementType) -> typing.Any:
+    def real_obs(self, msr_type: MeasurementType) -> float | None:
         """Returns the real observation for this measurement type, if available"""
 
-    def whitened_residual(self, msr_type: MeasurementType) -> typing.Any:
+    def whitened_residual(self, msr_type: MeasurementType) -> float | None:
         """Returns the whitened residual for this measurement type, if available"""
 
     def __repr__(self) -> str:
@@ -891,7 +897,7 @@ class SpacecraftEstimate:
 
     def __new__(cls) -> SpacecraftEstimate: ...
     @staticmethod
-    def from_diag(nominal: Spacecraft, diag: numpy.ndarray) -> typing.Any:
+    def from_diag(nominal: Spacecraft, diag: numpy.ndarray) -> SpacecraftEstimate:
         """Initializes a new filter estimate from the nominal state (not dispersed) and the diagonal of the covariance"""
 
     @staticmethod
@@ -899,18 +905,18 @@ class SpacecraftEstimate:
         nominal_state: Spacecraft,
         dispersions: list[StateDispersion],
         seed: typing.Optional[int | None] = None,
-    ) -> typing.Any:
+    ) -> SpacecraftEstimate:
         """Generates an initial Kalman filter state estimate dispersed from the nominal state using the provided standard deviation parameters.
 
         The resulting estimate will have a diagonal covariance matrix constructed from the variances of each parameter."""
 
-    def to_random_variable(self) -> typing.Any:
+    def to_random_variable(self) -> MvnSpacecraft:
         """Builds a multivariate random variable spacecraft from this estimate's nominal state and covariance, zero mean."""
 
-    def within_3sigma(self) -> typing.Any:
+    def within_3sigma(self) -> bool:
         """Returns whether this estimate is within three sigmas"""
 
-    def within_sigma(self, sigma: float) -> typing.Any:
+    def within_sigma(self, sigma: float) -> bool:
         """Returns whether this estimate is within some bound
         The 68-95-99.7 rule is a good way to assess whether the filter is operating normally"""
 
@@ -970,17 +976,17 @@ class SpacecraftODProcess:
 
     def predict_for(
         self, initial_estimate: SpacecraftEstimate, duration: time.Duration
-    ) -> typing.Any:
+    ) -> SpacecraftODSolution:
         """Perform a time update. Continuously predicts the trajectory for the provided duration, with covariance mapping at each step."""
 
     def predict_until(
         self, initial_estimate: SpacecraftEstimate, end_epoch: time.Epoch
-    ) -> typing.Any:
+    ) -> SpacecraftODSolution:
         """Perform a time update. Continuously predicts the trajectory until the provided end epoch, with covariance mapping at each step."""
 
     def process_arc(
         self, initial_estimate: SpacecraftEstimate, arc: TrackingDataArc
-    ) -> typing.Any:
+    ) -> SpacecraftODSolution:
         """Process the provided tracking arc for this orbit determination process."""
 
 @typing.final
@@ -991,15 +997,17 @@ class SpacecraftODSolution:
         """Initialize self.  See help(type(self)) for accurate signature."""
 
     def __new__(cls) -> SpacecraftODSolution: ...
-    def accepted_residuals(self) -> typing.Any: ...
+    def accepted_residuals(self) -> list[Residual]: ...
     @staticmethod
-    def from_parquet(path: str, devices: dict[str, GroundStation]) -> typing.Any:
+    def from_parquet(
+        path: str, devices: dict[str, GroundStation]
+    ) -> SpacecraftODSolution:
         """Reconstruct an ODSolution from a parquet file."""
 
-    def is_filter_run(self) -> typing.Any: ...
+    def is_filter_run(self) -> bool: ...
     def is_nees_consistent(
         self, truth_traj: PyTrajectory, alpha: typing.Optional[float | None] = None
-    ) -> typing.Any:
+    ) -> bool:
         """Checks whether the filter estimates are statistically consistent
         by performing a Chi-squared test on the Normalized Estimation Error Squared (NEES).
 
@@ -1017,9 +1025,7 @@ class SpacecraftODSolution:
         Returns Ok(true) if the filter is consistent, Ok(false) if the filter
         is over-confident or under-confident, or an error if no estimates are available."""
 
-    def is_nis_consistent(
-        self, alpha: typing.Optional[float | None] = None
-    ) -> typing.Any:
+    def is_nis_consistent(self, alpha: typing.Optional[float | None] = None) -> bool:
         """Checks whether the filter innovations are statistically consistent
         by performing a Chi-squared test on the Normalized Innovation Squared (NIS).
 
@@ -1035,7 +1041,7 @@ class SpacecraftODSolution:
         Returns Ok(true) if the filter is consistent, Ok(false) if the filter
         is over-confident or under-confident, or an error if no residuals are available."""
 
-    def is_normal(self, alpha: typing.Optional[float | None] = None) -> typing.Any:
+    def is_normal(self, alpha: typing.Optional[float | None] = None) -> bool:
         """Checks whether the whitened residuals of the accepted residuals pass a normality test at a given significance level `alpha`, default to 0.05.
 
         This uses a simplified KS-test threshold: D_alpha = c(α) / √n.
@@ -1048,15 +1054,15 @@ class SpacecraftODSolution:
         Returns Ok(true) if the residuals are consistent with a normal distribution,
         Ok(false) if not, or None if no residuals are available."""
 
-    def is_smoother_run(self) -> typing.Any: ...
-    def ks_test_normality(self) -> typing.Any:
+    def is_smoother_run(self) -> bool: ...
+    def ks_test_normality(self) -> float:
         """Computes the Kolmogorov–Smirnov statistic for the aggregated residual ratios of the accepted residuals.
 
         Returns Ok(ks_statistic) if residuals are available."""
 
     def nees_consistency(
         self, truth_traj: PyTrajectory, alpha: typing.Optional[float | None] = None
-    ) -> typing.Any:
+    ) -> NormalizedConsistency:
         """Checks whether the filter estimates are statistically consistent
         by performing a Chi-squared test on the Normalized Estimation Error Squared (NEES).
 
@@ -1076,7 +1082,7 @@ class SpacecraftODSolution:
 
     def nis_consistency(
         self, alpha: typing.Optional[float | None] = None
-    ) -> typing.Any:
+    ) -> NormalizedConsistency:
         """Checks whether the filter innovations are statistically consistent
         by performing a Chi-squared test on the Normalized Innovation Squared (NIS).
 
@@ -1092,20 +1098,20 @@ class SpacecraftODSolution:
         Returns Ok(true) if the filter is consistent, Ok(false) if the filter
         is over-confident or under-confident, or an error if no residuals are available."""
 
-    def rejected_residuals(self) -> typing.Any: ...
-    def residual_ratio_within_threshold(self, threshold: float) -> typing.Any:
+    def rejected_residuals(self) -> list[Residual]: ...
+    def residual_ratio_within_threshold(self, threshold: float) -> float:
         """Computes the fraction of residual ratios that lie within ±threshold."""
 
-    def rms_postfit_residuals(self) -> typing.Any:
+    def rms_postfit_residuals(self) -> float:
         """Returns the root mean square of the postfit residuals"""
 
-    def rms_prefit_residuals(self) -> typing.Any:
+    def rms_prefit_residuals(self) -> float:
         """Returns the root mean square of the prefit residuals"""
 
-    def rms_residual_ratios(self) -> typing.Any:
+    def rms_residual_ratios(self) -> float:
         """Returns the root mean square of the prefit residual ratios"""
 
-    def smooth(self, almanac: Almanac) -> typing.Any:
+    def smooth(self, almanac: Almanac) -> SpacecraftODSolution:
         """Smoothes this OD solution, returning a new OD solution and the filter-smoother consistency ratios, with updated **postfit** residuals, and where the ratio now represents the filter-smoother consistency ratio.
 
         Notes:
@@ -1161,13 +1167,13 @@ class SpacecraftODSolution:
         - If $ |R_{i,k}| \\leq 3 $ for all $ i $ and $ k $, the filter-smoother consistency test is satisfied, indicating good consistency.
         - If $ |R_{i,k}| > 3 $ for any $ i $ or $ k $, the test fails, suggesting potential modeling inconsistencies or issues with the estimation process."""
 
-    def to_ephemeris(self, object_id: str) -> typing.Any:
+    def to_ephemeris(self, object_id: str) -> astro.Ephemeris:
         """Export to an ANISE ephemeris, which can be converted to a CCSDS OEM"""
 
-    def to_parquet(self, path: str, cfg: ExportCfg) -> typing.Any:
+    def to_parquet(self, path: str, cfg: ExportCfg) -> str:
         """Export OD solutions, gains, ratios, residuals, sigmas, etc. to parquet"""
 
-    def to_traj(self) -> typing.Any: ...
+    def to_traj(self) -> Trajectory: ...
     def __repr__(self) -> str:
         """Return repr(self)."""
 
@@ -1206,7 +1212,7 @@ class StochasticNoise:
 
         This implementation distinguishes between the white noise model and the bias model. It also includes a constant offset."""
 
-    def covariance(self, epoch: time.Epoch) -> typing.Any:
+    def covariance(self, epoch: time.Epoch) -> float:
         """Return the covariance of these stochastics at a given time."""
 
     @staticmethod
@@ -1215,7 +1221,7 @@ class StochasticNoise:
         integration_time: time.Duration,
         carrier: CarrierFreq,
         c_n0: CN0,
-    ) -> typing.Any:
+    ) -> StochasticNoise:
         """Constructs a hardware Doppler noise model."""
 
     @staticmethod
@@ -1224,7 +1230,7 @@ class StochasticNoise:
         integration_time: time.Duration,
         chip_rate: ChipRate,
         s_n0: SN0,
-    ) -> typing.Any:
+    ) -> StochasticNoise:
         """Constructs a high precision zero-mean range noise model (accounting for clock error and thermal error) from
         the Allan deviation of the clock, integration time, chip rate (depends on the ranging code), and
         signal-power-to-noise-density ratio (S/N₀).
@@ -1451,10 +1457,10 @@ class TrackingDataArc:
 
         Reference: JPL DESCANSO, document 214, _Pseudo-Noise and Regenerative Ranging_."""
 
-    def apply_moduli(self) -> typing.Any:
+    def apply_moduli(self) -> None:
         """Applies the moduli to each measurement, if defined."""
 
-    def chunk(self, max_duration: time.Duration) -> typing.Any:
+    def chunk(self, max_duration: time.Duration) -> list[TrackingDataArc]:
         """Splits a long tracking data arc into smaller chunks, each up to `max_duration` long."""
 
     def downsample(self, target_step: time.Duration) -> TrackingDataArc:
@@ -1485,37 +1491,37 @@ class TrackingDataArc:
         - Adequate for many orbit determination and tracking tasks where computational speed is prioritized.
         - For high-precision applications (e.g., interplanetary navigation), consider using more advanced filtering techniques."""
 
-    def duration(self) -> typing.Any:
+    def duration(self) -> time.Duration | None:
         """Returns the duration this tracking arc"""
 
-    def end_epoch(self) -> typing.Any:
+    def end_epoch(self) -> time.Epoch | None:
         """Returns the end epoch of this tracking arc"""
 
     def exclude_by_epoch(
         self, start: time.Epoch | None, end: time.Epoch | None
-    ) -> typing.Any:
+    ) -> TrackingDataArc:
         """Exclude measurements by epoch range."""
 
-    def exclude_measurement_type(self, msr_type: MeasurementType) -> typing.Any:
+    def exclude_measurement_type(self, msr_type: MeasurementType) -> TrackingDataArc:
         """Exclude measurements by measurement type."""
 
-    def exclude_tracker(self, tracker: str) -> typing.Any:
+    def exclude_tracker(self, tracker: str) -> TrackingDataArc:
         """Exclude measurements by tracker alias."""
 
     def filter_by_epoch(
         self, start: time.Epoch | None, end: time.Epoch | None
-    ) -> typing.Any:
+    ) -> TrackingDataArc:
         """Filter measurements by epoch range."""
 
-    def filter_by_measurement_type(self, msr_type: MeasurementType) -> typing.Any:
+    def filter_by_measurement_type(self, msr_type: MeasurementType) -> TrackingDataArc:
         """Filter measurements by measurement type."""
 
     def filter_by_offset(
         self, start: time.Duration | None, end: time.Duration | None
-    ) -> typing.Any:
+    ) -> TrackingDataArc:
         """Filter measurements by duration offset."""
 
-    def filter_by_tracker(self, tracker: str) -> typing.Any:
+    def filter_by_tracker(self, tracker: str) -> TrackingDataArc:
         """Filter measurements by tracker alias."""
 
     @staticmethod
@@ -1523,36 +1529,36 @@ class TrackingDataArc:
         """Initializes a new Almanac from a file path to CCSDS OEM file, after converting to to SPICE SPK/BSP"""
 
     @staticmethod
-    def from_parquet(path: str) -> typing.Any:
+    def from_parquet(path: str) -> TrackingDataArc:
         """Load TrackingDataArc from a parquet file."""
 
-    def is_empty(self) -> typing.Any:
+    def is_empty(self) -> bool:
         """Returns whether this arc has no measurements."""
 
-    def len(self) -> typing.Any:
+    def len(self) -> int:
         """Returns the number of measurements in this data arc"""
 
-    def min_duration_sep(self) -> typing.Any:
+    def min_duration_sep(self) -> time.Duration | None:
         """Returns the minimum duration between two subsequent measurements."""
 
-    def resid_vs_ref_check(self) -> typing.Any: ...
-    def set_moduli(self, msr_type: MeasurementType, modulus: float) -> typing.Any:
+    def resid_vs_ref_check(self) -> TrackingDataArc: ...
+    def set_moduli(self, msr_type: MeasurementType, modulus: float) -> None:
         """Set (or overwrites) the modulus of the provided measurement type."""
 
-    def sort(self) -> typing.Any:
+    def sort(self) -> None:
         """Sort these measurements by epoch"""
 
-    def start_epoch(self) -> typing.Any:
+    def start_epoch(self) -> time.Epoch | None:
         """Returns the start epoch of this tracking arc"""
 
-    def to_parquet(self, path: str, cfg: ExportCfg) -> typing.Any:
+    def to_parquet(self, path: str, cfg: ExportCfg) -> str:
         """Write tracking data arc to a parquet file."""
 
-    def unique_aliases(self) -> typing.Any: ...
-    def unique_types(self) -> typing.Any: ...
+    def unique_aliases(self) -> list[str]: ...
+    def unique_types(self) -> list[MeasurementType]: ...
     def write_ccsds_tdm(
         self, spacecraft_name: str, aliases: dict | None, path: str
-    ) -> typing.Any:
+    ) -> str:
         """Write tracking data in CCSDS TDM format."""
 
     def __repr__(self) -> str:

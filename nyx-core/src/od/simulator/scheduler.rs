@@ -160,6 +160,7 @@ pub struct PyCadence {
 #[cfg(feature = "python")]
 #[pymethods]
 impl PyCadence {
+    /// :rtype: Cadence
     #[classmethod]
     fn continuous(_cls: &Bound<'_, PyType>) -> Self {
         Self {
@@ -171,6 +172,7 @@ impl PyCadence {
     ///
     /// :type on: Duration
     /// :type off: Duration
+    /// :rtype: Cadence
     #[classmethod]
     fn intermittent(_cls: &Bound<'_, PyType>, on: Duration, off: Duration) -> Self {
         Self {

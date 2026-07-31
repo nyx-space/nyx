@@ -297,6 +297,7 @@ impl SpaceWeatherData {
     /// Missing daily records or unforecasted fields are resolved using `SpaceWeatherFallback`.
     ///
     /// :type epoch: Epoch
+    /// :rtype: Msise00DailyWeather
     pub fn msise_weather(&self, epoch: Epoch) -> Msise00DailyWeather {
         let target_midnight = epoch.with_hms(0, 0, 0);
         let current_day = self.records.get(&target_midnight);
@@ -333,6 +334,7 @@ impl SpaceWeatherData {
     ///
     /// :type midnight: Epoch
     /// :type bin_idx: int
+    /// :rtype: list[float]
     fn build_ap_history(&self, midnight: Epoch, bin_idx: usize) -> [f64; 7] {
         let one_day = Unit::Day * 1.0;
 

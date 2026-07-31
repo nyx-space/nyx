@@ -56,6 +56,7 @@ impl Measurement {
     ///
     /// :type msr_type: MeasurementType
     /// :type correction: float
+    /// :rtype: None
     pub fn correct(&mut self, msr_type: MeasurementType, correction: f64) {
         if let Some(cur_value) = self.data.get_mut(&msr_type) {
             let new_value = *cur_value + correction;
@@ -68,6 +69,7 @@ impl Measurement {
     ///
     /// :type msr_type: MeasurementType
     /// :type msr_value: float
+    /// :rtype: None
     pub fn push(&mut self, msr_type: MeasurementType, msr_value: f64) {
         self.data.insert(msr_type, msr_value);
     }

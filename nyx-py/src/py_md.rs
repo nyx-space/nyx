@@ -110,6 +110,7 @@ impl Propagator {
     /// Compute the instantaneous equations of motion for this spacecraft
     ///
     /// :type spacecraft: Spacecraft
+    /// :rtype: list[float]
     fn accel_km_s2(&self, spacecraft: Spacecraft) -> Result<Vec<f64>, PropagationError> {
         let dynamics = self
             .dynamics
@@ -134,6 +135,7 @@ impl Propagator {
     /// :type spacecraft: Spacecraft
     /// :type epoch: Epoch
     /// :type trajectory: bool
+    /// :rtype: PropagationResult
     #[pyo3(signature = (spacecraft, epoch, trajectory=true))]
     fn until_epoch(
         &self,
@@ -161,6 +163,7 @@ impl Propagator {
     /// :type spacecraft: Spacecraft
     /// :type duration: Duration
     /// :type trajectory: bool
+    /// :rtype: PropagationResult
     #[pyo3(signature = (spacecraft, duration, trajectory=true))]
     fn for_duration(
         &self,
@@ -217,6 +220,7 @@ impl Propagator {
     /// :type trigger: int
     /// :type event_frame: Frame | None
     /// :type trajectory: bool
+    /// :rtype: PropagationResult
     #[pyo3(signature = (spacecraft, event, max_duration, trigger=1, event_frame=None, trajectory=true))]
     fn until_event(
         &self,
@@ -248,6 +252,7 @@ impl Propagator {
     /// :type spacecraft: list[Spacecraft]
     /// :type epoch: Epoch
     /// :type trajectory: bool
+    /// :rtype: list[PropagationResult]
     #[pyo3(signature = (spacecraft, epoch, trajectory=true))]
     fn many_until_epoch(
         &self,
@@ -302,6 +307,7 @@ impl Propagator {
     /// :type spacecraft: list[Spacecraft]
     /// :type duration: Duration
     /// :type trajectory: bool
+    /// :rtype: list[PropagationResult]
     #[pyo3(signature = (spacecraft, duration, trajectory=true))]
     fn many_for_duration(
         &self,
@@ -359,6 +365,7 @@ impl Propagator {
     /// :type trigger: int
     /// :type event_frame: Frame | None
     /// :type trajectory: bool
+    /// :rtype: list[PropagationResult]
     #[pyo3(signature = (spacecraft, event, max_duration, trigger=1, event_frame=None, trajectory=true))]
     fn many_until_event(
         &self,
@@ -451,6 +458,7 @@ impl PyTrajectory {
     /// Add another state to this trajectory.
     ///
     /// :type spacecraft: Spacecraft
+    /// :rtype: None
     fn push(&mut self, spacecraft: Spacecraft) {
         self.inner.states.push(spacecraft);
         self.inner.finalize();
@@ -459,6 +467,7 @@ impl PyTrajectory {
     /// Append many spacecraft to this trajectory.
     ///
     /// :type many_spacecraft: list[Spacecraft]
+    /// :rtype: None
     fn append(&mut self, many_spacecraft: Vec<Spacecraft>) {
         for sc in many_spacecraft {
             self.inner.states.push(sc);
@@ -474,6 +483,7 @@ impl PyTrajectory {
     /// :type other: Trajectory
     /// :type path: str
     /// :type cfg: ExportCfg
+    /// :rtype: str
     fn ric_diff_to_parquet(
         &self,
         other: &Self,
@@ -488,6 +498,7 @@ impl PyTrajectory {
     /// Evaluate the trajectory at this specific epoch.
     ///
     /// :type epoch: Epoch
+    /// :rtype: Spacecraft
     fn at(&self, epoch: Epoch) -> Result<Spacecraft, TrajError> {
         self.inner.at(epoch)
     }
@@ -496,6 +507,7 @@ impl PyTrajectory {
     ///
     /// :type path: str
     /// :type cfg: ExportCfg
+    /// :rtype: str
     fn to_parquet(&self, path: &str, cfg: ExportCfg) -> Result<String, TrajError> {
         self.inner
             .to_parquet(path, cfg)
@@ -507,6 +519,7 @@ impl PyTrajectory {
     ///
     /// :type object_id: str
     /// :type cfg: ExportCfg
+    /// :rtype: Ephemeris
     fn to_ephemeris(&self, object_id: String, cfg: ExportCfg) -> Ephemeris {
         self.inner.to_ephemeris(object_id, cfg)
     }

@@ -22,6 +22,7 @@ impl SpacecraftSequence {
     /// Load SpacecraftSequence from Dhall.
     ///
     /// :type dhall_str: str
+    /// :rtype: SpacecraftSequence
     #[classmethod]
     #[pyo3(name = "from_dhall")]
     fn py_from_dhall(_cls: &Bound<'_, pyo3::types::PyType>, dhall_str: &str) -> PyResult<Self> {
@@ -33,6 +34,7 @@ impl SpacecraftSequence {
     /// Load SpacecraftSequence from YAML.
     ///
     /// :type yaml_str: str
+    /// :rtype: SpacecraftSequence
     #[classmethod]
     #[pyo3(name = "from_yaml")]
     fn py_from_yaml(_cls: &Bound<'_, pyo3::types::PyType>, yaml_str: &str) -> PyResult<Self> {
@@ -43,6 +45,7 @@ impl SpacecraftSequence {
     /// Setup the sequence with the provided Almanac.
     ///
     /// :type almanac: Almanac
+    /// :rtype: None
     #[pyo3(name = "setup")]
     fn py_setup(&mut self, py: Python<'_>, almanac: Py<Almanac>) -> PyResult<()> {
         let almanac_ref = almanac.borrow(py);
@@ -55,6 +58,7 @@ impl SpacecraftSequence {
     /// :type state: Spacecraft
     /// :type until_phase: str | None
     /// :type almanac: Almanac
+    /// :rtype: list[string, string]
     #[pyo3(name = "propagate")]
     fn py_propagate(
         &self,
@@ -84,6 +88,7 @@ impl SpacecraftSequence {
     ///
     /// :type name: str
     /// :type thruster: Thruster
+    /// :rtype: None
     fn thruster_set_insert(&mut self, name: String, thruster: Thruster) {
         self.thruster_sets.insert(name, thruster);
     }
@@ -91,6 +96,7 @@ impl SpacecraftSequence {
     /// Remove a thruster with the given name from the thruster set.
     ///
     /// :type name: str
+    /// :rtype: None
     fn thruster_set_remove(&mut self, name: String) -> PyResult<()> {
         if self.thruster_sets.remove(&name).is_none() {
             Err(PyException::new_err(format!("{name} not in thruster set")))

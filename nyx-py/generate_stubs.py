@@ -338,7 +338,7 @@ def data_descriptor_stub(
     if doc is not None:
         try:
             annotation = returns_stub(
-                data_desc_name, doc, element_path, types_to_import
+                data_desc_name, doc, element_path, types_to_import, is_function=False
             )
         except Exception:
             logging.getLogger(__name__).exception("Error generating stubs")
@@ -724,6 +724,7 @@ def returns_stub(
     element_path: list[str],
     types_to_import: set[str],
     in_class: bool = False,
+    is_function: bool = True,
 ) -> ast.AST | None:
     if "Error" in element_path[1]:
         # Don't document errors
@@ -752,6 +753,10 @@ def returns_stub(
         builtin = BUILTINS.get(callable_name)
         if isinstance(builtin, tuple) and builtin[1] is not None:
             return builtin[1]
+        if is_function and not callable_name.startswith("__"):
+            warning_msg = f"The return type of {'.'.join(element_path)} is missing from the function documentation"
+            logging.getLogger(__name__).warning(warning_msg)
+            print(f"Warning: {warning_msg}")
         return path_to_type("typing", "Any")
     if len(m) > 1:
         raise ValueError(
@@ -936,6 +941,7 @@ def format_with_ruff(file: str) -> None:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.WARNING)
     parser = argparse.ArgumentParser(
         description="Extract Python type stub from a python module."
     )

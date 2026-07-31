@@ -1,7 +1,7 @@
-# ruff: noqa
+from __future__ import annotations
+from anise import analysis
+from anise import astro
 import typing
-
-from anise import analysis, astro
 
 @typing.final
 class MvnSpacecraft:
@@ -33,7 +33,7 @@ class MvnSpacecraft:
     dispersions: typing.Any
 
     def __init__(
-        self, *args: typing.Any | None, **kwargs: typing.Any | None
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         A multivariate spacecraft state generator for Monte Carlo analyses. Ensures that the covariance is properly applied on all provided state variables.
@@ -109,7 +109,7 @@ class OrbitalElement:
     """Orbital element defines all of the supported orbital elements in ANISE, which are all built from a State."""
 
     def __init__(
-        self, *args: typing.Any | None, **kwargs: typing.Any | None
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Orbital element defines all of the supported orbital elements in ANISE, which are all built from a State."""
@@ -120,7 +120,7 @@ class OrbitalElement:
     def evaluate(self, orbit: astro.Orbit) -> float:
         """Evaluate the orbital element enum variant for the provided orbit"""
 
-    def __eq__(self, value: object) -> bool:
+    def __eq__(self, value: typing.Any) -> bool:
         """Return self==value."""
 
     def __ge__(self, value: typing.Any) -> bool:
@@ -138,9 +138,11 @@ class OrbitalElement:
     def __lt__(self, value: typing.Any) -> bool:
         """Return self<value."""
 
-    def __ne__(self, value: object) -> bool:
+    def __ne__(self, value: typing.Any) -> bool:
         """Return self!=value."""
 
+    def __repr__(self) -> str:
+        """Return repr(self)."""
     Altitude: analysis.OrbitalElement = ...
     AoL: analysis.OrbitalElement = ...
     AoP: analysis.OrbitalElement = ...
@@ -204,7 +206,7 @@ class StateDispersion:
     std_dev: typing.Any
 
     def __init__(
-        self, *args: typing.Any | None, **kwargs: typing.Any | None
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         A dispersions configuration, allows specifying min/max bounds (by default, they are not set)"""
@@ -220,7 +222,7 @@ class StateDispersion:
 @typing.final
 class StateParameter:
     def __init__(
-        self, *args: typing.Any | None, **kwargs: typing.Any | None
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature."""
 

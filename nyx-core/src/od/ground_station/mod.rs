@@ -77,6 +77,7 @@ impl GroundStation {
     /// :type rx: Orbit
     /// :type obstructing_body: Frame | None
     /// :type almanac: Almanac
+    /// :rtype: AzElRange
     pub fn azimuth_elevation_of(
         &self,
         rx: Orbit,
@@ -100,6 +101,7 @@ impl GroundStation {
     ///
     /// :type epoch: Epoch
     /// :type almanac: Almanac
+    /// :rtype: Orbit
     pub fn to_orbit(&self, epoch: Epoch, almanac: &Almanac) -> AlmanacResult<Orbit> {
         Orbit::try_latlongalt(
             self.location.latitude_deg,

@@ -138,6 +138,7 @@ impl IntegratorOptions {
 #[cfg_attr(feature = "python", pymethods)]
 impl IntegratorOptions {
     /// Returns a string with the information about these options
+    /// :rtype: str
     pub fn info(&self) -> String {
         format!("{self}")
     }
@@ -145,6 +146,7 @@ impl IntegratorOptions {
     /// Set the maximum step size and sets the initial step to that value if currently greater
     ///
     /// :type max_step: Duration
+    /// :rtype: None
     pub fn set_max_step(&mut self, max_step: Duration) {
         if self.init_step > max_step {
             self.init_step = max_step;
@@ -155,6 +157,7 @@ impl IntegratorOptions {
     /// Set the minimum step size and sets the initial step to that value if currently smaller
     ///
     /// :type min_step: Duration
+    /// :rtype: None
     pub fn set_min_step(&mut self, min_step: Duration) {
         if self.init_step < min_step {
             self.init_step = min_step;
