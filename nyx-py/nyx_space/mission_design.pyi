@@ -28,9 +28,9 @@ class AccelModels:
 
     def __new__(
         cls,
-        point_masses: typing.Optional[PointMasses | None] = None,
-        gravity_field: typing.Optional[GravityFieldConfig | None] = None,
-        solid_tides: typing.Optional[SolidTides | None] = None,
+        point_masses: PointMasses | None = None,
+        gravity_field: GravityFieldConfig | None = None,
+        solid_tides: SolidTides | None = None,
     ) -> AccelModels:
         """Acceleration models alter the orbital dynamics"""
 
@@ -185,8 +185,8 @@ class ForceModels:
 
     def __new__(
         cls,
-        solar_pressure: typing.Optional[SolarPressure | None] = None,
-        drag: typing.Optional[Drag | None] = None,
+        solar_pressure: SolarPressure | None = None,
+        drag: Drag | None = None,
     ) -> ForceModels:
         """Force models alter the spacecraft dynamics (they need a mass)."""
 
@@ -328,9 +328,9 @@ class IntegratorOptions:
 
     def __new__(
         cls,
-        min_step: typing.Optional[time.Duration | None] = None,
-        max_step: typing.Optional[time.Duration | None] = None,
-        tolerance: typing.Optional[float | None] = None,
+        min_step: time.Duration | None = None,
+        max_step: time.Duration | None = None,
+        tolerance: float | None = None,
     ) -> IntegratorOptions:
         """Stores the integrator options, including the minimum and maximum step sizes, and the central body to perform the integration.
 
@@ -442,7 +442,7 @@ class PointMasses:
     def __new__(
         cls,
         celestial_objects: list[int],
-        correction: typing.Optional[Aberration | None] = None,
+        correction: Aberration | None = None,
     ) -> PointMasses:
         """PointMasses model"""
 
@@ -506,7 +506,7 @@ class Propagator:
         self,
         spacecraft: Spacecraft,
         duration: time.Duration,
-        trajectory: typing.Optional[bool] = True,
+        trajectory: bool | None = True,
     ) -> PropagationResult:
         """Propagates the initialization state for the desired duration, optionally not building the trajectory"""
 
@@ -514,7 +514,7 @@ class Propagator:
         self,
         spacecraft: list[Spacecraft],
         duration: time.Duration,
-        trajectory: typing.Optional[bool] = True,
+        trajectory: bool | None = True,
     ) -> list[PropagationResult]:
         """Propagates the initialization state for the desired duration, optionally not building the trajectory"""
 
@@ -522,7 +522,7 @@ class Propagator:
         self,
         spacecraft: list[Spacecraft],
         epoch: time.Epoch,
-        trajectory: typing.Optional[bool] = True,
+        trajectory: bool | None = True,
     ) -> list[PropagationResult]:
         """Propagates the initialization state until the desired epoch, optionally not building the trajectory"""
 
@@ -532,8 +532,8 @@ class Propagator:
         event: analysis.Event,
         max_duration: time.Duration,
         trigger: typing.Optional[int] = 1,
-        event_frame: typing.Optional[astro.Frame | None] = None,
-        trajectory: typing.Optional[bool] = True,
+        event_frame: astro.Frame | None = None,
+        trajectory: bool | None = True,
     ) -> list[PropagationResult]:
         """Propagates many states until event."""
 
@@ -541,7 +541,7 @@ class Propagator:
         self,
         spacecraft: Spacecraft,
         epoch: time.Epoch,
-        trajectory: typing.Optional[bool] = True,
+        trajectory: bool | None = True,
     ) -> PropagationResult:
         """Propagates the initialization state until the desired epoch, optionally not building the trajectory"""
 
@@ -550,9 +550,9 @@ class Propagator:
         spacecraft: Spacecraft,
         event: analysis.Event,
         max_duration: time.Duration,
-        trigger: typing.Optional[int] = 1,
-        event_frame: typing.Optional[astro.Frame | None] = None,
-        trajectory: typing.Optional[bool] = True,
+        trigger: int | None = 1,
+        event_frame: astro.Frame | None = None,
+        trajectory: bool | None = True,
     ) -> PropagationResult:
         """Propagates the initialization state until the specified event has occurred `trigger` times, or until `max_duration` is reached.
 
