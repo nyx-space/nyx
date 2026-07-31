@@ -30,6 +30,9 @@ use pyo3::prelude::*;
 ///
 /// Note that two measurements are considered equal if the tracker and epoch match exactly, and if both have the same measurement types,
 /// and those measurements are equal to within 1e-10 (this allows for some leeway in TDM producers).
+///
+/// :type tracker: str
+/// :type epoch: Epoch
 #[cfg_attr(
     feature = "python",
     pyclass(from_py_object),
@@ -50,6 +53,10 @@ pub struct Measurement {
 #[cfg_attr(feature = "python", pymethods)]
 impl Measurement {
     /// Correct the provided measurement type with the provided correction, if that measurement type is available
+    ///
+    /// :type msr_type: MeasurementType
+    /// :type correction: float
+    /// :rtype: None
     pub fn correct(&mut self, msr_type: MeasurementType, correction: f64) {
         if let Some(cur_value) = self.data.get_mut(&msr_type) {
             let new_value = *cur_value + correction;
@@ -58,6 +65,11 @@ impl Measurement {
         }
     }
 
+    /// Push a measurement type and value.
+    ///
+    /// :type msr_type: MeasurementType
+    /// :type msr_value: float
+    /// :rtype: None
     pub fn push(&mut self, msr_type: MeasurementType, msr_value: f64) {
         self.data.insert(msr_type, msr_value);
     }

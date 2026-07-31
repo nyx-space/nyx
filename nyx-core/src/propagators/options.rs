@@ -36,6 +36,10 @@ use pyo3::prelude::*;
 /// methods. To use a fixed step integrator, initialize the options using `with_fixed_step`, and
 /// use whichever adaptive step integrator is desired.  For example, initializing an RK45 with
 /// fixed step options will lead to an RK4 being used instead of an RK45.
+///
+/// :type min_step: Duration | None
+/// :type max_step: Duration | None
+/// :type tolerance: float | None
 #[derive(Clone, Copy, Debug, TypedBuilder, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass(from_py_object))]
 #[builder(doc)]
@@ -134,11 +138,15 @@ impl IntegratorOptions {
 #[cfg_attr(feature = "python", pymethods)]
 impl IntegratorOptions {
     /// Returns a string with the information about these options
+    /// :rtype: str
     pub fn info(&self) -> String {
         format!("{self}")
     }
 
     /// Set the maximum step size and sets the initial step to that value if currently greater
+    ///
+    /// :type max_step: Duration
+    /// :rtype: None
     pub fn set_max_step(&mut self, max_step: Duration) {
         if self.init_step > max_step {
             self.init_step = max_step;
@@ -147,6 +155,9 @@ impl IntegratorOptions {
     }
 
     /// Set the minimum step size and sets the initial step to that value if currently smaller
+    ///
+    /// :type min_step: Duration
+    /// :rtype: None
     pub fn set_min_step(&mut self, min_step: Duration) {
         if self.init_step < min_step {
             self.init_step = min_step;

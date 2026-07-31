@@ -55,12 +55,22 @@ impl TrackingDataArc {
         TrackingDataArc::from_tdm(path, aliases)
     }
 
+    /// Load TrackingDataArc from a parquet file.
+    ///
+    /// :type path: str
+    /// :rtype: TrackingDataArc
     #[classmethod]
     #[pyo3(name = "from_parquet")]
     fn py_from_parquet(_cls: Bound<'_, PyType>, path: &str) -> Result<Self, InputOutputError> {
         Self::from_parquet(path)
     }
 
+    /// Write tracking data in CCSDS TDM format.
+    ///
+    /// :type spacecraft_name: str
+    /// :type aliases: dict | None
+    /// :type path: str
+    /// :rtype: str
     #[pyo3(name = "write_ccsds_tdm")]
     fn py_write_ccsds_tdm(
         &self,
@@ -76,10 +86,12 @@ impl TrackingDataArc {
             .to_string())
     }
 
+    /// :rtype: list[str]
     #[pyo3(name = "unique_aliases")]
     fn py_unique_aliases(&self) -> Vec<String> {
         self.unique_aliases().iter().cloned().collect()
     }
+    /// :rtype: list[MeasurementType]
     #[pyo3(name = "unique_types")]
     fn py_unique_types(&self) -> Vec<MeasurementType> {
         self.unique_types().iter().cloned().collect()
@@ -103,6 +115,11 @@ impl TrackingDataArc {
         self.force_reject = reject;
     }
 
+    /// Filter measurements by epoch range.
+    ///
+    /// :type start: Epoch | None
+    /// :type end: Epoch | None
+    /// :rtype: TrackingDataArc
     #[pyo3(name = "filter_by_epoch")]
     fn py_filter_by_epoch(&self, start: Option<Epoch>, end: Option<Epoch>) -> Self {
         let start_bound = start.map(Included).unwrap_or(Unbounded);
@@ -110,6 +127,11 @@ impl TrackingDataArc {
         self.clone().filter_by_epoch((start_bound, end_bound))
     }
 
+    /// Filter measurements by duration offset.
+    ///
+    /// :type start: Duration | None
+    /// :type end: Duration | None
+    /// :rtype: TrackingDataArc
     #[pyo3(name = "filter_by_offset")]
     fn py_filter_by_offset(&self, start: Option<Duration>, end: Option<Duration>) -> Self {
         let start_bound = match start {
@@ -123,21 +145,38 @@ impl TrackingDataArc {
         self.clone().filter_by_offset((start_bound, end_bound))
     }
 
+    /// Filter measurements by tracker alias.
+    ///
+    /// :type tracker: str
+    /// :rtype: TrackingDataArc
     #[pyo3(name = "filter_by_tracker")]
     fn py_filter_by_tracker(&self, tracker: String) -> Self {
         self.clone().filter_by_tracker(tracker)
     }
 
+    /// Filter measurements by measurement type.
+    ///
+    /// :type msr_type: MeasurementType
+    /// :rtype: TrackingDataArc
     #[pyo3(name = "filter_by_measurement_type")]
     fn py_filter_by_measurement_type(&self, msr_type: MeasurementType) -> Self {
         self.clone().filter_by_measurement_type(msr_type)
     }
 
+    /// Exclude measurements by tracker alias.
+    ///
+    /// :type tracker: str
+    /// :rtype: TrackingDataArc
     #[pyo3(name = "exclude_tracker")]
     fn py_exclude_tracker(&self, tracker: String) -> Self {
         self.clone().exclude_tracker(tracker)
     }
 
+    /// Exclude measurements by epoch range.
+    ///
+    /// :type start: Epoch | None
+    /// :type end: Epoch | None
+    /// :rtype: TrackingDataArc
     #[pyo3(name = "exclude_by_epoch")]
     fn py_exclude_by_epoch(&self, start: Option<Epoch>, end: Option<Epoch>) -> Self {
         let start_bound = match start {
@@ -151,16 +190,26 @@ impl TrackingDataArc {
         self.clone().exclude_by_epoch((start_bound, end_bound))
     }
 
+    /// Exclude measurements by measurement type.
+    ///
+    /// :type msr_type: MeasurementType
+    /// :rtype: TrackingDataArc
     #[pyo3(name = "exclude_measurement_type")]
     fn py_exclude_measurement_type(&self, msr_type: MeasurementType) -> Self {
         self.clone().exclude_measurement_type(msr_type)
     }
 
+    /// :rtype: TrackingDataArc
     #[pyo3(name = "resid_vs_ref_check")]
     fn py_resid_vs_ref_check(&self) -> Self {
         self.clone().resid_vs_ref_check()
     }
 
+    /// Write tracking data arc to a parquet file.
+    ///
+    /// :type path: str
+    /// :type cfg: ExportCfg
+    /// :rtype: str
     #[pyo3(name = "to_parquet")]
     fn py_to_parquet(&self, path: String, cfg: ExportCfg) -> Result<String, InputOutputError> {
         self.to_parquet(path, cfg)

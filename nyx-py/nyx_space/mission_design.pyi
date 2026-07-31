@@ -1,4 +1,10 @@
 from __future__ import annotations
+from anise import Aberration
+from anise import Almanac
+from anise import analysis
+from anise import astro
+from anise import time
+from nyx_space import Spacecraft, Thruster
 import typing
 
 @typing.final
@@ -10,16 +16,21 @@ class AccelModels:
     solid_tides: typing.Any
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self,
+        point_masses: PointMasses | None,
+        gravity_field: GravityFieldConfig | None,
+        solid_tides: SolidTides | None,
+        *args: typing.Optional[typing.Any],
+        **kwargs: typing.Optional[typing.Any],
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Acceleration models alter the orbital dynamics"""
 
     def __new__(
         cls,
-        point_masses: typing.Any = None,
-        gravity_field: typing.Any = None,
-        solid_tides: typing.Any = None,
+        point_masses: PointMasses | None = None,
+        gravity_field: GravityFieldConfig | None = None,
+        solid_tides: SolidTides | None = None,
     ) -> AccelModels:
         """Acceleration models alter the orbital dynamics"""
 
@@ -43,7 +54,7 @@ class AtmDensity:
         """Density in kg/m^3 and altitudes in kilometers"""
 
     @staticmethod
-    def earth_exponential() -> typing.Any:
+    def earth_exponential() -> AtmDensity:
         """Constructs a standard exponential drag model for Earth orbiters.
 
         Configured with nominal LEO reference parameters at $h_0 = 700\\text{ km}$:
@@ -64,13 +75,21 @@ class Drag:
     frame: typing.Any
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self,
+        density: AtmDensity,
+        frame: astro.Frame,
+        estimate: bool,
+        *args: typing.Optional[typing.Any],
+        **kwargs: typing.Optional[typing.Any],
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         `Drag` implements all three drag models."""
 
     def __new__(
-        cls, density: typing.Any, frame: typing.Any, estimate: typing.Any = True
+        cls,
+        density: AtmDensity,
+        frame: astro.Frame,
+        estimate: typing.Optional[bool] = True,
     ) -> Drag:
         """`Drag` implements all three drag models."""
 
@@ -85,13 +104,19 @@ class Dynamics:
     """Dynamics defines the dynamical environment with a set of acceleration and force models"""
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self,
+        accel_models: AccelModels,
+        force_models: ForceModels,
+        *args: typing.Optional[typing.Any],
+        **kwargs: typing.Optional[typing.Any],
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Dynamics defines the dynamical environment with a set of acceleration and force models"""
 
     def __new__(
-        cls, accel_models: typing.Any = ..., force_models: typing.Any = ...
+        cls,
+        accel_models: typing.Optional[AccelModels] = ...,
+        force_models: typing.Optional[ForceModels] = ...,
     ) -> Dynamics:
         """Dynamics defines the dynamical environment with a set of acceleration and force models"""
 
@@ -106,12 +131,15 @@ class ExportCfg:
     """Configuration for exporting from Nyx to local disk."""
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self,
+        timestamped: bool,
+        *args: typing.Optional[typing.Any],
+        **kwargs: typing.Optional[typing.Any],
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Configuration for exporting from Nyx to local disk."""
 
-    def __new__(cls, timestamped: typing.Any = False) -> ExportCfg:
+    def __new__(cls, timestamped: typing.Optional[bool] = False) -> ExportCfg:
         """Configuration for exporting from Nyx to local disk."""
 
     def __eq__(self, value: typing.Any) -> bool:
@@ -146,13 +174,19 @@ class ForceModels:
     solar_pressure: typing.Any
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self,
+        solar_pressure: SolarPressure | None,
+        drag: Drag | None,
+        *args: typing.Optional[typing.Any],
+        **kwargs: typing.Optional[typing.Any],
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Force models alter the spacecraft dynamics (they need a mass)."""
 
     def __new__(
-        cls, solar_pressure: typing.Any = None, drag: typing.Any = None
+        cls,
+        solar_pressure: SolarPressure | None = None,
+        drag: Drag | None = None,
     ) -> ForceModels:
         """Force models alter the spacecraft dynamics (they need a mass)."""
 
@@ -209,7 +243,13 @@ class GravityFieldConfig:
     order: typing.Any
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self,
+        degree: int,
+        order: int,
+        filepath: str,
+        frame: astro.FrameUid,
+        *args: typing.Optional[typing.Any],
+        **kwargs: typing.Optional[typing.Any],
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Configuration holder for gravity field.
@@ -217,11 +257,7 @@ class GravityFieldConfig:
         Data is first loaded as a SHADR, if that fails, Nyx will try to load it as a COF file."""
 
     def __new__(
-        cls,
-        degree: typing.Any,
-        order: typing.Any,
-        filepath: typing.Any,
-        frame: typing.Any,
+        cls, degree: int, order: int, filepath: str, frame: astro.FrameUid
     ) -> GravityFieldConfig:
         """Configuration holder for gravity field.
 
@@ -275,7 +311,12 @@ class IntegratorOptions:
     tolerance: typing.Any
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self,
+        min_step: time.Duration | None,
+        max_step: time.Duration | None,
+        tolerance: float | None,
+        *args: typing.Optional[typing.Any],
+        **kwargs: typing.Optional[typing.Any],
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Stores the integrator options, including the minimum and maximum step sizes, and the central body to perform the integration.
@@ -287,9 +328,9 @@ class IntegratorOptions:
 
     def __new__(
         cls,
-        min_step: typing.Any = None,
-        max_step: typing.Any = None,
-        tolerance: typing.Any = None,
+        min_step: time.Duration | None = None,
+        max_step: time.Duration | None = None,
+        tolerance: float | None = None,
     ) -> IntegratorOptions:
         """Stores the integrator options, including the minimum and maximum step sizes, and the central body to perform the integration.
 
@@ -298,14 +339,29 @@ class IntegratorOptions:
         use whichever adaptive step integrator is desired.  For example, initializing an RK45 with
         fixed step options will lead to an RK4 being used instead of an RK45."""
 
-    def info(self) -> typing.Any:
+    def info(self) -> str:
         """Returns a string with the information about these options"""
 
-    def set_max_step(self, max_step: typing.Any) -> typing.Any:
+    def set_max_step(self, max_step: time.Duration) -> None:
         """Set the maximum step size and sets the initial step to that value if currently greater"""
 
-    def set_min_step(self, min_step: typing.Any) -> typing.Any:
+    def set_min_step(self, min_step: time.Duration) -> None:
         """Set the minimum step size and sets the initial step to that value if currently smaller"""
+
+    def __repr__(self) -> str:
+        """Return repr(self)."""
+
+    def __str__(self) -> str:
+        """Return str(self)."""
+
+@typing.final
+class Msise00DailyWeather:
+    """Msise00 daily weather data."""
+
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature."""
 
     def __repr__(self) -> str:
         """Return repr(self)."""
@@ -374,13 +430,19 @@ class PointMasses:
     correction: typing.Any
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self,
+        celestial_objects: list[int],
+        correction: Aberration | None,
+        *args: typing.Optional[typing.Any],
+        **kwargs: typing.Optional[typing.Any],
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         PointMasses model"""
 
     def __new__(
-        cls, celestial_objects: typing.Any, correction: typing.Any = None
+        cls,
+        celestial_objects: list[int],
+        correction: Aberration | None = None,
     ) -> PointMasses:
         """PointMasses model"""
 
@@ -391,70 +453,107 @@ class PointMasses:
         """Return str(self)."""
 
 @typing.final
-class Propagator:
-    dynamics: typing.Any
-    method: typing.Any
-    options: typing.Any
+class PropagationResult:
+    """The result of a propagation, containing the final spacecraft state and the generated trajectory."""
+
+    state: Spacecraft
+    trajectory: Trajectory | None
 
     def __init__(
         self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature."""
 
+    def __repr__(self) -> str:
+        """Return repr(self)."""
+
+    def __str__(self) -> str:
+        """Return str(self)."""
+
+@typing.final
+class Propagator:
+    """Numerical propagator for a spacecraft state."""
+
+    dynamics: typing.Any
+    method: typing.Any
+    options: typing.Any
+
+    def __init__(
+        self,
+        dynamics: Dynamics,
+        almanac: Almanac,
+        method: IntegratorMethod,
+        options: IntegratorOptions,
+        *args: typing.Optional[typing.Any],
+        **kwargs: typing.Optional[typing.Any],
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        Numerical propagator for a spacecraft state."""
+
     def __new__(
         cls,
-        dynamics: typing.Any,
-        almanac: typing.Any,
-        method: typing.Any = ...,
-        options: typing.Any = ...,
-    ) -> Propagator: ...
-    def accel_km_s2(self, spacecraft: typing.Any) -> typing.Any:
+        dynamics: Dynamics,
+        almanac: Almanac,
+        method: typing.Optional[IntegratorMethod] = ...,
+        options: typing.Optional[IntegratorOptions] = ...,
+    ) -> Propagator:
+        """Numerical propagator for a spacecraft state."""
+
+    def accel_km_s2(self, spacecraft: Spacecraft) -> list[float]:
         """Compute the instantaneous equations of motion for this spacecraft"""
 
     def for_duration(
         self,
-        spacecraft: typing.Any,
-        duration: typing.Any,
-        trajectory: typing.Any = True,
-    ) -> typing.Any:
+        spacecraft: Spacecraft,
+        duration: time.Duration,
+        trajectory: bool | None = True,
+    ) -> PropagationResult:
         """Propagates the initialization state for the desired duration, optionally not building the trajectory"""
 
     def many_for_duration(
         self,
-        spacecraft: typing.Any,
-        duration: typing.Any,
-        trajectory: typing.Any = True,
-    ) -> typing.Any:
+        spacecraft: list[Spacecraft],
+        duration: time.Duration,
+        trajectory: bool | None = True,
+    ) -> list[PropagationResult]:
         """Propagates the initialization state for the desired duration, optionally not building the trajectory"""
 
     def many_until_epoch(
-        self, spacecraft: typing.Any, epoch: typing.Any, trajectory: typing.Any = True
-    ) -> typing.Any:
+        self,
+        spacecraft: list[Spacecraft],
+        epoch: time.Epoch,
+        trajectory: bool | None = True,
+    ) -> list[PropagationResult]:
         """Propagates the initialization state until the desired epoch, optionally not building the trajectory"""
 
     def many_until_event(
         self,
-        spacecraft: typing.Any,
-        event: typing.Any,
-        max_duration: typing.Any,
-        trigger: typing.Any = 1,
-        event_frame: typing.Any = None,
-        trajectory: typing.Any = True,
-    ) -> typing.Any: ...
+        spacecraft: list[Spacecraft],
+        event: analysis.Event,
+        max_duration: time.Duration,
+        trigger: typing.Optional[int] = 1,
+        event_frame: astro.Frame | None = None,
+        trajectory: bool | None = True,
+    ) -> list[PropagationResult]:
+        """Propagates many states until event."""
+
     def until_epoch(
-        self, spacecraft: typing.Any, epoch: typing.Any, trajectory: typing.Any = True
-    ) -> typing.Any:
+        self,
+        spacecraft: Spacecraft,
+        epoch: time.Epoch,
+        trajectory: bool | None = True,
+    ) -> PropagationResult:
         """Propagates the initialization state until the desired epoch, optionally not building the trajectory"""
 
     def until_event(
         self,
-        spacecraft: typing.Any,
-        event: typing.Any,
-        max_duration: typing.Any,
-        trigger: typing.Any = 1,
-        event_frame: typing.Any = None,
-        trajectory: typing.Any = True,
-    ) -> typing.Any:
+        spacecraft: Spacecraft,
+        event: analysis.Event,
+        max_duration: time.Duration,
+        trigger: int | None = 1,
+        event_frame: astro.Frame | None = None,
+        trajectory: bool | None = True,
+    ) -> PropagationResult:
         """Propagates the initialization state until the specified event has occurred `trigger` times, or until `max_duration` is reached.
 
         This method monitors the provided `event` during propagation. Once the event condition is met
@@ -488,13 +587,18 @@ class PropagatorConfig:
     """Propagator config includes the method, options, and all dynamics"""
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self,
+        dynamics: Dynamics,
+        method: IntegratorMethod,
+        options: IntegratorOptions,
+        *args: typing.Optional[typing.Any],
+        **kwargs: typing.Optional[typing.Any],
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Propagator config includes the method, options, and all dynamics"""
 
     def __new__(
-        cls, dynamics: typing.Any, method: typing.Any, options: typing.Any
+        cls, dynamics: Dynamics, method: IntegratorMethod, options: IntegratorOptions
     ) -> PropagatorConfig:
         """Propagator config includes the method, options, and all dynamics"""
 
@@ -525,17 +629,23 @@ class SolarPressure:
     shadow_model: typing.Any
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self,
+        shadow_bodies: list[astro.Frame],
+        almanac: Almanac,
+        flux_w_m2: float,
+        estimate: bool,
+        *args: typing.Optional[typing.Any],
+        **kwargs: typing.Optional[typing.Any],
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Computation of solar radiation pressure is based on STK: <http://help.agi.com/stk/index.htm#gator/eq-solar.htm> ."""
 
     def __new__(
         cls,
-        shadow_bodies: typing.Any,
-        almanac: typing.Any,
-        flux_w_m2: typing.Any = ...,
-        estimate: typing.Any = True,
+        shadow_bodies: list[astro.Frame],
+        almanac: Almanac,
+        flux_w_m2: typing.Optional[float] = ...,
+        estimate: typing.Optional[bool] = True,
     ) -> SolarPressure:
         """Computation of solar radiation pressure is based on STK: <http://help.agi.com/stk/index.htm#gator/eq-solar.htm> ."""
 
@@ -557,7 +667,13 @@ class SolidTides:
     perturbers: typing.Any
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self,
+        frame: astro.Frame,
+        k2: float,
+        k3: float,
+        perturbers: list[TidalPerturber],
+        *args: typing.Optional[typing.Any],
+        **kwargs: typing.Optional[typing.Any],
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         `SolidTides` implements the solid tide acceleration model.
@@ -565,7 +681,7 @@ class SolidTides:
         Formulas are based on IERS 2010 Conventions."""
 
     def __new__(
-        cls, frame: typing.Any, k2: typing.Any, k3: typing.Any, perturbers: typing.Any
+        cls, frame: astro.Frame, k2: float, k3: float, perturbers: list[TidalPerturber]
     ) -> SolidTides:
         """`SolidTides` implements the solid tide acceleration model.
         It accounts for the crust deformation due to the configured tidal perturbers.
@@ -573,8 +689,11 @@ class SolidTides:
 
     @staticmethod
     def earth_moon_system(
-        earth_frame: typing.Any, moon_frame: typing.Any, almanac: typing.Any
-    ) -> typing.Any: ...
+        earth_frame: astro.Frame, moon_frame: astro.Frame, almanac: Almanac
+    ) -> SolidTides:
+        """Initializes solid tides with the Moon and the Sun, where the k3 is only computed for the Moon.
+        Sets the k2 Love number to 0.3019 and the k3 Love number to 0.093"""
+
     def __eq__(self, value: typing.Any) -> bool:
         """Return self==value."""
 
@@ -605,22 +724,28 @@ class SpaceWeatherData:
     Data may be provided either as original CSV or in a compressed (non-archived) gunzip (gz) format."""
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self,
+        path: str | None,
+        fallback: StaticSpaceWeather | None,
+        *args: typing.Optional[typing.Any],
+        **kwargs: typing.Optional[typing.Any],
     ) -> None:
         """Initialize self.  See help(type(self)) for accurate signature.
         Stores SpaceWeather data as provided by [CelesTrak](https://celestrak.org/SpaceData/).
         Data may be provided either as original CSV or in a compressed (non-archived) gunzip (gz) format."""
 
-    def __new__(cls, path: typing.Any, fallback: typing.Any) -> SpaceWeatherData:
+    def __new__(
+        cls, path: str | None, fallback: StaticSpaceWeather | None
+    ) -> SpaceWeatherData:
         """Stores SpaceWeather data as provided by [CelesTrak](https://celestrak.org/SpaceData/).
         Data may be provided either as original CSV or in a compressed (non-archived) gunzip (gz) format."""
 
-    def build_ap_history(self, midnight: typing.Any, bin_idx: typing.Any) -> typing.Any:
+    def build_ap_history(self, midnight: time.Epoch, bin_idx: int) -> list[float]:
         """Assembles the 7-element Ap array spanning current bin back 57 hours across 4 calendar days.
 
         Missing daily records or unforecasted bins are populated using the configured `SpaceWeatherFallback`."""
 
-    def msise_weather(self, epoch: typing.Any) -> typing.Any:
+    def msise_weather(self, epoch: time.Epoch) -> Msise00DailyWeather:
         """Evaluates the space weather state at `epoch` and constructs the `Msise00DailyWeather` payload.
 
         Missing daily records or unforecasted fields are resolved using `SpaceWeatherFallback`."""
@@ -642,17 +767,26 @@ class SpacecraftSequence:
 
     def __new__(cls) -> SpacecraftSequence: ...
     @staticmethod
-    def from_dhall(dhall_str: typing.Any) -> typing.Any: ...
+    def from_dhall(dhall_str: str) -> SpacecraftSequence:
+        """Load SpacecraftSequence from Dhall."""
+
     @staticmethod
-    def from_yaml(yaml_str: typing.Any) -> typing.Any: ...
+    def from_yaml(yaml_str: str) -> SpacecraftSequence:
+        """Load SpacecraftSequence from YAML."""
+
     def propagate(
-        self, state: typing.Any, until_phase: typing.Any, almanac: typing.Any
-    ) -> typing.Any: ...
-    def setup(self, almanac: typing.Any) -> typing.Any: ...
-    def thruster_set_insert(
-        self, name: typing.Any, thruster: typing.Any
-    ) -> typing.Any: ...
-    def thruster_set_remove(self, name: typing.Any) -> typing.Any: ...
+        self, state: Spacecraft, until_phase: str | None, almanac: Almanac
+    ) -> list[str]:
+        """Propagate the state through the sequence until a given phase."""
+
+    def setup(self, almanac: Almanac) -> None:
+        """Setup the sequence with the provided Almanac."""
+
+    def thruster_set_insert(self, name: str, thruster: Thruster) -> None:
+        """Insert a thruster with the given name into the thruster set."""
+
+    def thruster_set_remove(self, name: str) -> None:
+        """Remove a thruster with the given name from the thruster set."""
 
 @typing.final
 class StaticSpaceWeather:
@@ -673,17 +807,24 @@ class StaticSpaceWeather:
 
 @typing.final
 class TidalPerturber:
+    """A celestial body raising tides on the central body."""
+
     compute_degree_3: typing.Any
     frame: typing.Any
 
     def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+        self,
+        frame: astro.Frame,
+        compute_degree_3: bool,
+        *args: typing.Optional[typing.Any],
+        **kwargs: typing.Optional[typing.Any],
     ) -> None:
-        """Initialize self.  See help(type(self)) for accurate signature."""
+        """Initialize self.  See help(type(self)) for accurate signature.
+        A celestial body raising tides on the central body."""
 
-    def __new__(
-        cls, frame: typing.Any, compute_degree_3: typing.Any
-    ) -> TidalPerturber: ...
+    def __new__(cls, frame: astro.Frame, compute_degree_3: bool) -> TidalPerturber:
+        """A celestial body raising tides on the central body."""
+
     def __eq__(self, value: typing.Any) -> bool:
         """Return self==value."""
 
@@ -710,33 +851,42 @@ class TidalPerturber:
 
 @typing.final
 class Trajectory:
-    def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
-    ) -> None:
-        """Initialize self.  See help(type(self)) for accurate signature."""
+    """Spacecraft Trajectory."""
 
-    def __new__(cls, path: typing.Any, template: typing.Any) -> Trajectory: ...
-    def append(self, many_spacecraft: typing.Any) -> typing.Any:
+    def __init__(
+        self,
+        path: str,
+        template: Spacecraft | None,
+        *args: typing.Optional[typing.Any],
+        **kwargs: typing.Optional[typing.Any],
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        Spacecraft Trajectory."""
+
+    def __new__(cls, path: str, template: Spacecraft | None) -> Trajectory:
+        """Spacecraft Trajectory."""
+
+    def append(self, many_spacecraft: list[Spacecraft]) -> None:
         """Append many spacecraft to this trajectory."""
 
-    def at(self, epoch: typing.Any) -> typing.Any:
+    def at(self, epoch: time.Epoch) -> Spacecraft:
         """Evaluate the trajectory at this specific epoch."""
 
-    def push(self, spacecraft: typing.Any) -> typing.Any:
+    def push(self, spacecraft: Spacecraft) -> None:
         """Add another state to this trajectory."""
 
-    def ric_diff_to_parquet(
-        self, other: typing.Any, path: typing.Any, cfg: typing.Any
-    ) -> typing.Any:
+    def ric_diff_to_parquet(self, other: Trajectory, path: str, cfg: ExportCfg) -> str:
         """Export the difference in RIC from of this trajectory compare to the "other" trajectory in parquet format.
 
         # Notes
         + The RIC frame accounts for the transport theorem by performing a finite differencing of the RIC frame."""
 
-    def to_ephemeris(self, object_id: typing.Any, cfg: typing.Any) -> typing.Any:
+    def to_ephemeris(self, object_id: str, cfg: ExportCfg) -> astro.Ephemeris:
         """Export this spacecraft trajectory estimate to an ANISE Ephemeris"""
 
-    def to_parquet(self, path: typing.Any, cfg: typing.Any) -> typing.Any: ...
+    def to_parquet(self, path: str, cfg: ExportCfg) -> str:
+        """Write trajectory to a parquet file."""
+
     def __repr__(self) -> str:
         """Return repr(self)."""
 

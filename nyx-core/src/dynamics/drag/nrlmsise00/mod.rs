@@ -160,7 +160,7 @@ impl Default for Nrlmsise00Flags {
 
 impl Nrlmsise00Flags {
     /// Compiles the high-level flags into the raw 24-element float array consumed by the kernel.
-    pub(crate) fn to_switches(&self) -> [f64; 24] {
+    pub(crate) fn to_switches(self) -> [f64; 24] {
         let mut sw = [1.0f64; 24];
 
         // NOTE Unit selection is ALWAYS set to 1.0 because the calculation code does not even check it.

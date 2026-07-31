@@ -38,6 +38,11 @@ pub const SOLAR_FLUX_W_m2: f64 = 1367.0;
 use pyo3::prelude::*;
 
 /// Computation of solar radiation pressure is based on STK: <http://help.agi.com/stk/index.htm#gator/eq-solar.htm> .
+///
+/// :type shadow_bodies: list[Frame]
+/// :type almanac: Almanac
+/// :type flux_w_m2: float
+/// :type estimate: bool
 #[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct SolarPressure {

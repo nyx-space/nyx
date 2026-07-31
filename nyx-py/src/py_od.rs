@@ -57,6 +57,15 @@ pub struct PyProcessNoise {
 
 #[pymethods]
 impl PyProcessNoise {
+    /// Create process noise from velocity standard deviations.
+    ///
+    /// :type vx_m_s: float
+    /// :type vy_m_s: float
+    /// :type vz_m_s: float
+    /// :type noise_duration: Duration
+    /// :type disable_time: Duration
+    /// :type local_frame: LocalFrame | None
+    /// :rtype: ProcessNoise
     #[classmethod]
     fn from_velocity_m_s(
         _cls: &Bound<'_, PyType>,
@@ -76,6 +85,17 @@ impl PyProcessNoise {
         Self { inner }
     }
 
+    /// Create process noise from acceleration standard deviations with optional exponential decay.
+    ///
+    /// :type ax_m_s2: float
+    /// :type ay_m_s2: float
+    /// :type az_m_s2: float
+    /// :type disable_time: Duration
+    /// :type local_frame: LocalFrame | None
+    /// :type x_decay_s: float | None
+    /// :type y_decay_s: float | None
+    /// :type z_decay_s: float | None
+    /// :rtype: ProcessNoise
     #[classmethod]
     fn from_accel_m_s2(
         _cls: &Bound<'_, PyType>,
@@ -117,6 +137,13 @@ impl PyProcessNoise {
     }
 }
 
+/// Orbit determination process for a spacecraft.
+///
+/// :type prop: Propagator
+/// :type kf_variant: KalmanVariant
+/// :type devices: dict[str, GroundStation]
+/// :type sigma_reject: SigmaRejection | None
+/// :type process_noise: ProcessNoise | None
 #[derive(Clone)]
 #[pyclass(from_py_object, name = "SpacecraftODProcess")]
 pub struct PySpacecraftODProcess {
@@ -150,6 +177,10 @@ impl PySpacecraftODProcess {
         Ok(Self { inner })
     }
     /// Process the provided tracking arc for this orbit determination process.
+    ///
+    /// :type initial_estimate: SpacecraftEstimate
+    /// :type arc: TrackingDataArc
+    /// :rtype: SpacecraftODSolution
     fn process_arc(
         &self,
         initial_estimate: PySpacecraftEstimate,
@@ -163,6 +194,10 @@ impl PySpacecraftODProcess {
     }
 
     /// Perform a time update. Continuously predicts the trajectory until the provided end epoch, with covariance mapping at each step.
+    ///
+    /// :type initial_estimate: SpacecraftEstimate
+    /// :type end_epoch: Epoch
+    /// :rtype: SpacecraftODSolution
     fn predict_until(
         &self,
         initial_estimate: PySpacecraftEstimate,
@@ -176,6 +211,10 @@ impl PySpacecraftODProcess {
     }
 
     /// Perform a time update. Continuously predicts the trajectory for the provided duration, with covariance mapping at each step.
+    ///
+    /// :type initial_estimate: SpacecraftEstimate
+    /// :type duration: Duration
+    /// :rtype: SpacecraftODSolution
     fn predict_for(
         &self,
         initial_estimate: PySpacecraftEstimate,
@@ -218,6 +257,10 @@ pub struct PySpacecraftEstimate {
 #[pymethods]
 impl PySpacecraftEstimate {
     /// Initializes a new filter estimate from the nominal state (not dispersed) and the diagonal of the covariance
+    ///
+    /// :type nominal: Spacecraft
+    /// :type diag: numpy.ndarray
+    /// :rtype: SpacecraftEstimate
     #[classmethod]
     fn from_diag(
         _cls: &Bound<'_, PyType>,
@@ -241,6 +284,11 @@ impl PySpacecraftEstimate {
     /// Generates an initial Kalman filter state estimate dispersed from the nominal state using the provided standard deviation parameters.
     ///
     /// The resulting estimate will have a diagonal covariance matrix constructed from the variances of each parameter.
+    ///
+    /// :type nominal_state: Spacecraft
+    /// :type dispersions: list[StateDispersion]
+    /// :type seed: int | None
+    /// :rtype: SpacecraftEstimate
     #[pyo3(signature=(nominal_state, dispersions, seed=None))]
     #[classmethod]
     fn from_dispersions(
@@ -256,6 +304,7 @@ impl PySpacecraftEstimate {
     }
 
     /// Builds a multivariate random variable spacecraft from this estimate's nominal state and covariance, zero mean.
+    /// :rtype: MvnSpacecraft
     fn to_random_variable(&self) -> Result<MvnSpacecraft, NyxError> {
         self.inner.to_random_variable().map_err(|e| *e)
     }
@@ -302,11 +351,15 @@ impl PySpacecraftEstimate {
 
     /// Returns whether this estimate is within some bound
     /// The 68-95-99.7 rule is a good way to assess whether the filter is operating normally
+    ///
+    /// :type sigma: float
+    /// :rtype: bool
     fn within_sigma(&self, sigma: f64) -> bool {
         self.inner.within_sigma(sigma)
     }
 
     /// Returns whether this estimate is within three sigmas
+    /// :rtype: bool
     fn within_3sigma(&self) -> bool {
         self.inner.within_3sigma()
     }
@@ -363,21 +416,31 @@ impl PyResidual {
     }
 
     /// Returns the normalized innovation squared (NIS) as the norm squares of the whitened residual
+    /// :rtype: float
     fn nis(&self) -> f64 {
         self.inner.nis()
     }
 
     /// Returns the whitened residual for this measurement type, if available
+    ///
+    /// :type msr_type: MeasurementType
+    /// :rtype: float | None
     fn whitened_residual(&self, msr_type: MeasurementType) -> Option<f64> {
         self.inner.whitened_resid(msr_type)
     }
 
     /// Returns the real observation for this measurement type, if available
+    ///
+    /// :type msr_type: MeasurementType
+    /// :rtype: float | None
     fn real_obs(&self, msr_type: MeasurementType) -> Option<f64> {
         self.inner.real_obs(msr_type)
     }
 
     /// Returns the computed/expected observation for this measurement type, if available
+    ///
+    /// :type msr_type: MeasurementType
+    /// :rtype: float | None
     fn computed_obs(&self, msr_type: MeasurementType) -> Option<f64> {
         self.inner.computed_obs(msr_type)
     }
@@ -399,14 +462,17 @@ pub struct PySpacecraftODSolution {
 
 #[pymethods]
 impl PySpacecraftODSolution {
+    /// :rtype: bool
     fn is_filter_run(&self) -> bool {
         self.inner.is_filter_run()
     }
 
+    /// :rtype: bool
     fn is_smoother_run(&self) -> bool {
         self.inner.is_smoother_run()
     }
 
+    /// :rtype: Trajectory
     fn to_traj(&self) -> Result<PyTrajectory, PyErr> {
         let traj = self
             .inner
@@ -416,6 +482,10 @@ impl PySpacecraftODSolution {
     }
 
     /// Export OD solutions, gains, ratios, residuals, sigmas, etc. to parquet
+    ///
+    /// :type path: str
+    /// :type cfg: ExportCfg
+    /// :rtype: str
     fn to_parquet(&self, path: &str, cfg: ExportCfg) -> Result<String, ODError> {
         self.inner
             .to_parquet(path, cfg)
@@ -423,10 +493,14 @@ impl PySpacecraftODSolution {
     }
 
     /// Export to an ANISE ephemeris, which can be converted to a CCSDS OEM
+    ///
+    /// :type object_id: str
+    /// :rtype: Ephemeris
     fn to_ephemeris(&self, object_id: String) -> Ephemeris {
         self.inner.to_ephemeris(object_id)
     }
 
+    /// :rtype: list[Residual]
     fn accepted_residuals(&self) -> Vec<PyResidual> {
         self.inner
             .accepted_residuals()
@@ -435,6 +509,7 @@ impl PySpacecraftODSolution {
             .collect()
     }
 
+    /// :rtype: list[Residual]
     fn rejected_residuals(&self) -> Vec<PyResidual> {
         self.inner
             .rejected_residuals()
@@ -443,21 +518,27 @@ impl PySpacecraftODSolution {
             .collect()
     }
     /// Returns the root mean square of the prefit residuals
+    /// :rtype: float
     pub fn rms_prefit_residuals(&self) -> f64 {
         self.inner.rms_prefit_residuals()
     }
 
     /// Returns the root mean square of the postfit residuals
+    /// :rtype: float
     pub fn rms_postfit_residuals(&self) -> f64 {
         self.inner.rms_postfit_residuals()
     }
 
     /// Returns the root mean square of the prefit residual ratios
+    /// :rtype: float
     pub fn rms_residual_ratios(&self) -> f64 {
         self.inner.rms_residual_ratios()
     }
 
     /// Computes the fraction of residual ratios that lie within ±threshold.
+    ///
+    /// :type threshold: float
+    /// :rtype: float
     pub fn residual_ratio_within_threshold(&self, threshold: f64) -> Result<f64, ODError> {
         self.inner.residual_ratio_within_threshold(threshold)
     }
@@ -465,6 +546,7 @@ impl PySpacecraftODSolution {
     /// Computes the Kolmogorov–Smirnov statistic for the aggregated residual ratios of the accepted residuals.
     ///
     /// Returns Ok(ks_statistic) if residuals are available.
+    /// :rtype: float
     pub fn ks_test_normality(&self) -> Result<f64, ODError> {
         self.inner.ks_test_normality()
     }
@@ -480,6 +562,9 @@ impl PySpacecraftODSolution {
     ///
     /// Returns Ok(true) if the residuals are consistent with a normal distribution,
     /// Ok(false) if not, or None if no residuals are available.
+    ///
+    /// :type alpha: float | None
+    /// :rtype: bool
     #[pyo3(signature=(alpha=None))]
     pub fn is_normal(&self, alpha: Option<f64>) -> Result<bool, ODError> {
         self.inner.is_normal(alpha)
@@ -499,6 +584,9 @@ impl PySpacecraftODSolution {
     ///
     /// Returns Ok(true) if the filter is consistent, Ok(false) if the filter
     /// is over-confident or under-confident, or an error if no residuals are available.
+    ///
+    /// :type alpha: float | None
+    /// :rtype: NormalizedConsistency
     #[pyo3(signature=(alpha=None))]
     pub fn nis_consistency(&self, alpha: Option<f64>) -> Result<NormalizedConsistency, ODError> {
         self.inner.nis_consistency(alpha)
@@ -520,6 +608,10 @@ impl PySpacecraftODSolution {
     ///
     /// Returns Ok(true) if the filter is consistent, Ok(false) if the filter
     /// is over-confident or under-confident, or an error if no estimates are available.
+    ///
+    /// :type truth_traj: PyTrajectory
+    /// :type alpha: float | None
+    /// :rtype: NormalizedConsistency
     #[pyo3(signature=(truth_traj, alpha=None))]
     pub fn nees_consistency(
         &self,
@@ -543,6 +635,9 @@ impl PySpacecraftODSolution {
     ///
     /// Returns Ok(true) if the filter is consistent, Ok(false) if the filter
     /// is over-confident or under-confident, or an error if no residuals are available.
+    ///
+    /// :type alpha: float | None
+    /// :rtype: bool
     #[pyo3(signature=(alpha=None))]
     #[allow(deprecated)]
     pub fn is_nis_consistent(&self, alpha: Option<f64>) -> Result<bool, ODError> {
@@ -568,6 +663,10 @@ impl PySpacecraftODSolution {
     ///
     /// Returns Ok(true) if the filter is consistent, Ok(false) if the filter
     /// is over-confident or under-confident, or an error if no estimates are available.
+    ///
+    /// :type truth_traj: PyTrajectory
+    /// :type alpha: float | None
+    /// :rtype: bool
     #[pyo3(signature=(truth_traj, alpha=None))]
     #[allow(deprecated)]
     pub fn is_nees_consistent(
@@ -636,12 +735,19 @@ impl PySpacecraftODSolution {
     /// - If $ |R_{i,k}| \leq 3 $ for all $ i $ and $ k $, the filter-smoother consistency test is satisfied, indicating good consistency.
     /// - If $ |R_{i,k}| > 3 $ for any $ i $ or $ k $, the test fails, suggesting potential modeling inconsistencies or issues with the estimation process.
     ///
+    /// :type almanac: Almanac
+    /// :rtype: SpacecraftODSolution
     fn smooth(&self, almanac: &Almanac) -> Result<Self, ODError> {
         let inner = self.clone().inner.smooth(almanac)?;
 
         Ok(Self { inner })
     }
 
+    /// Reconstruct an ODSolution from a parquet file.
+    ///
+    /// :type path: str
+    /// :type devices: dict[str, GroundStation]
+    /// :rtype: SpacecraftODSolution
     #[classmethod]
     fn from_parquet(
         _cls: &Bound<'_, PyType>,
@@ -662,6 +768,12 @@ impl PySpacecraftODSolution {
     }
 }
 
+/// Simulated tracking architecture for a spacecraft.
+///
+/// :type devices: dict[str, GroundStation]
+/// :type trajectory: PyTrajectory
+/// :type configs: dict[str, TrkConfig]
+/// :type seed: int | None
 #[derive(Clone)]
 #[pyclass(from_py_object)]
 pub struct GroundTrackingArcSim {
@@ -743,6 +855,7 @@ impl GroundTrackingArcSim {
 
     /// Builds a schedule using the generate_schedule function, and set that schedule in this instance's configuration.
     /// :type almanac: Almanac
+    /// :rtype: None
     pub fn build_schedule(&mut self, almanac: &Almanac) -> Result<(), AnalysisError> {
         self.inner.build_schedule(almanac)
     }

@@ -1,8 +1,7 @@
-# ruff: noqa
+from __future__ import annotations
+from anise import time
 import datetime
 import typing
-
-from anise import time
 
 @typing.final
 class Duration:
@@ -29,6 +28,36 @@ class Duration:
     def MIN_POSITIVE() -> typing.Any: ...
     @staticmethod
     def ZERO() -> typing.Any: ...
+    def __init__(
+        self,
+        string_repr: str,
+        *args: typing.Optional[typing.Any],
+        **kwargs: typing.Optional[typing.Any],
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        Defines generally usable durations for nanosecond precision valid for 32,768 centuries in either direction, and only on 80 bits / 10 octets.
+
+        **Important conventions:**
+        1. The negative durations can be mentally modeled "BC" years. One hours before 01 Jan 0000, it was "-1" years but  365 days and 23h into the current day.
+        It was decided that the nanoseconds corresponds to the nanoseconds _into_ the current century. In other words,
+        a duration with centuries = -1 and nanoseconds = 0 is _a greater duration_ (further from zero) than centuries = -1 and nanoseconds = 1.
+        Duration zero minus one nanosecond returns a century of -1 and a nanosecond set to the number of nanoseconds in one century minus one.
+        That difference is exactly 1 nanoseconds, where the former duration is "closer to zero" than the latter.
+        As such, the largest negative duration that can be represented sets the centuries to i16::MAX and its nanoseconds to NANOSECONDS_PER_CENTURY.
+        2. Negative and positive durations are distinct: -15 minutes != 15 minutes. Use the signum function to check the sign, and abs() to get the absolute value."""
+
+    def __new__(cls, string_repr: str) -> Duration:
+        """Defines generally usable durations for nanosecond precision valid for 32,768 centuries in either direction, and only on 80 bits / 10 octets.
+
+        **Important conventions:**
+        1. The negative durations can be mentally modeled "BC" years. One hours before 01 Jan 0000, it was "-1" years but  365 days and 23h into the current day.
+        It was decided that the nanoseconds corresponds to the nanoseconds _into_ the current century. In other words,
+        a duration with centuries = -1 and nanoseconds = 0 is _a greater duration_ (further from zero) than centuries = -1 and nanoseconds = 1.
+        Duration zero minus one nanosecond returns a century of -1 and a nanosecond set to the number of nanoseconds in one century minus one.
+        That difference is exactly 1 nanoseconds, where the former duration is "closer to zero" than the latter.
+        As such, the largest negative duration that can be represented sets the centuries to i16::MAX and its nanoseconds to NANOSECONDS_PER_CENTURY.
+        2. Negative and positive durations are distinct: -15 minutes != 15 minutes. Use the signum function to check the sign, and abs() to get the absolute value."""
+
     def abs(self) -> time.Duration:
         """Returns the absolute value of this duration"""
 
@@ -206,13 +235,13 @@ class Duration:
         """Return self+value."""
 
     def __div__(self, other: float): ...
-    def __eq__(self, value: object) -> bool:
+    def __eq__(self, value: typing.Any) -> bool:
         """Return self==value."""
 
     def __ge__(self, value: typing.Any) -> bool:
         """Return self>=value."""
 
-    def __getnewargs__(self) -> tuple: ...
+    def __getnewargs__(self) -> typing.Tuple: ...
     def __gt__(self, value: typing.Any) -> bool:
         """Return self>value."""
 
@@ -225,12 +254,14 @@ class Duration:
     def __mul__(self, value: typing.Any):
         """Return self*value."""
 
-    def __ne__(self, value: object) -> bool:
+    def __ne__(self, value: typing.Any) -> bool:
         """Return self!=value."""
 
     def __radd__(self, value: typing.Any):
         """Return value+self."""
 
+    def __repr__(self) -> str:
+        """Return repr(self)."""
 
     def __rmul__(self, value: typing.Any):
         """Return value*self."""
@@ -238,6 +269,8 @@ class Duration:
     def __rsub__(self, value: typing.Any):
         """Return value-self."""
 
+    def __str__(self) -> str:
+        """Return str(self)."""
 
     def __sub__(self, value: typing.Any):
         """Return self-value."""
@@ -281,6 +314,26 @@ class Epoch:
 
     duration: time.Duration
     time_scale: time.TimeScale
+
+    def __init__(
+        self,
+        string_repr: str,
+        *args: typing.Optional[typing.Any],
+        **kwargs: typing.Optional[typing.Any],
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        Defines a nanosecond-precision Epoch.
+
+        Refer to the appropriate functions for initializing this Epoch from different time scales or representations.
+
+        (Python documentation hints)"""
+
+    def __new__(cls, string_repr: str) -> Epoch:
+        """Defines a nanosecond-precision Epoch.
+
+        Refer to the appropriate functions for initializing this Epoch from different time scales or representations.
+
+        (Python documentation hints)"""
 
     def ceil(self, duration: time.Duration) -> time.Epoch:
         """Ceils this epoch to the closest provided duration in the TAI time scale
@@ -1028,7 +1081,7 @@ class Epoch:
         """Returns seconds past GPS Time Epoch, defined as UTC midnight of January 5th to 6th 1980 (cf. <https://gssc.esa.int/navipedia/index.php/Time_References_in_GNSS#GPS_Time_.28GPST.29>)."""
 
     def to_gregorian(
-        self, time_scale: time.TimeScale | None = None
+        self, time_scale: typing.Optional[time.TimeScale] = None
     ) -> tuple[int, int, int, int, int, int, int]:
         """Converts the Epoch to the Gregorian parts in the (optionally) provided time scale as (year, month, day, hour, minute, second)."""
 
@@ -1330,13 +1383,13 @@ class Epoch:
     def __add__(self, value: typing.Any):
         """Return self+value."""
 
-    def __eq__(self, value: object) -> bool:
+    def __eq__(self, value: typing.Any) -> bool:
         """Return self==value."""
 
     def __ge__(self, value: typing.Any) -> bool:
         """Return self>=value."""
 
-    def __getnewargs__(self) -> tuple: ...
+    def __getnewargs__(self) -> typing.Tuple: ...
     def __gt__(self, value: typing.Any) -> bool:
         """Return self>value."""
 
@@ -1346,16 +1399,20 @@ class Epoch:
     def __lt__(self, value: typing.Any) -> bool:
         """Return self<value."""
 
-    def __ne__(self, value: object) -> bool:
+    def __ne__(self, value: typing.Any) -> bool:
         """Return self!=value."""
 
     def __radd__(self, value: typing.Any):
         """Return value+self."""
 
+    def __repr__(self) -> str:
+        """Return repr(self)."""
 
     def __rsub__(self, value: typing.Any):
         """Return value-self."""
 
+    def __str__(self) -> str:
+        """Return str(self)."""
 
     def __sub__(self, value: typing.Any):
         """Return self-value."""
@@ -1395,6 +1452,19 @@ class LatestLeapSeconds:
     This list corresponds the number of seconds in TAI to the UTC offset and to whether it was an announced leap second or not.
     The unannoucned leap seconds come from dat.c in the SOFA library."""
 
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        List of leap seconds from <https://data.iana.org/time-zones/data/leap-seconds.list>.
+        This list corresponds the number of seconds in TAI to the UTC offset and to whether it was an announced leap second or not.
+        The unannoucned leap seconds come from dat.c in the SOFA library."""
+
+    def __new__(cls) -> LatestLeapSeconds:
+        """List of leap seconds from <https://data.iana.org/time-zones/data/leap-seconds.list>.
+        This list corresponds the number of seconds in TAI to the UTC offset and to whether it was an announced leap second or not.
+        The unannoucned leap seconds come from dat.c in the SOFA library."""
+
     def is_up_to_date(self) -> bool:
         """Downloads the latest leap second list from IANA, and returns whether the embedded leap seconds are still up to date
 
@@ -1404,17 +1474,45 @@ class LatestLeapSeconds:
         assert!(LatestLeapSeconds::default().is_up_to_date().unwrap(), "Hifitime needs to update its leap seconds list!");
         ```"""
 
+    def __repr__(self) -> str:
+        """Return repr(self)."""
 
 @typing.final
 class LeapSecondsFile:
     """A leap second provider that uses an IERS formatted leap seconds file."""
 
+    def __init__(
+        self,
+        path: str,
+        *args: typing.Optional[typing.Any],
+        **kwargs: typing.Optional[typing.Any],
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        A leap second provider that uses an IERS formatted leap seconds file."""
+
+    def __new__(cls, path: str) -> LeapSecondsFile:
+        """A leap second provider that uses an IERS formatted leap seconds file."""
+
+    def __repr__(self) -> str:
+        """Return repr(self)."""
 
 @typing.final
 class MonthName:
     """Defines Month names, can be initialized either from its variant or its integer (1 for January)."""
 
-    def __eq__(self, value: object) -> bool:
+    def __init__(
+        self,
+        month: int,
+        *args: typing.Optional[typing.Any],
+        **kwargs: typing.Optional[typing.Any],
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        Defines Month names, can be initialized either from its variant or its integer (1 for January)."""
+
+    def __new__(cls, month: int) -> MonthName:
+        """Defines Month names, can be initialized either from its variant or its integer (1 for January)."""
+
+    def __eq__(self, value: typing.Any) -> bool:
         """Return self==value."""
 
     def __ge__(self, value: typing.Any) -> bool:
@@ -1432,9 +1530,11 @@ class MonthName:
     def __lt__(self, value: typing.Any) -> bool:
         """Return self<value."""
 
-    def __ne__(self, value: object) -> bool:
+    def __ne__(self, value: typing.Any) -> bool:
         """Return self!=value."""
 
+    def __repr__(self) -> str:
+        """Return repr(self)."""
     April: time.MonthName = ...
     August: time.MonthName = ...
     December: time.MonthName = ...
@@ -1482,6 +1582,17 @@ class Polynomial:
     """Interpolation [Polynomial] used for example in [TimeScale]
     maintenance, precise monitoring or conversions."""
 
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        Interpolation [Polynomial] used for example in [TimeScale]
+        maintenance, precise monitoring or conversions."""
+
+    def __new__(cls) -> Polynomial:
+        """Interpolation [Polynomial] used for example in [TimeScale]
+        maintenance, precise monitoring or conversions."""
+
     def correction_duration(self, time_interval: time.Duration) -> time.Duration:
         """Calculate the correction (as [Duration] once again) from [Self] and given
         the interpolation time interval"""
@@ -1504,7 +1615,7 @@ class Polynomial:
     def from_offset_rate_nanoseconds(offset_ns: float, drift_ns_s: float) -> Polynomial:
         """Create a [Polynomial] structure from a static offset and drift, in nanoseconds and nanoseconds.s⁻¹"""
 
-    def __eq__(self, value: object) -> bool:
+    def __eq__(self, value: typing.Any) -> bool:
         """Return self==value."""
 
     def __ge__(self, value: typing.Any) -> bool:
@@ -1519,18 +1630,29 @@ class Polynomial:
     def __lt__(self, value: typing.Any) -> bool:
         """Return self<value."""
 
-    def __ne__(self, value: object) -> bool:
+    def __ne__(self, value: typing.Any) -> bool:
         """Return self!=value."""
 
+    def __str__(self) -> str:
+        """Return str(self)."""
 
 @typing.final
 class TimeScale:
     """Enum of the different time systems available"""
 
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        Enum of the different time systems available"""
+
+    def __new__(cls) -> TimeScale:
+        """Enum of the different time systems available"""
+
     def uses_leap_seconds(self) -> bool:
         """Returns true if self takes leap seconds into account"""
 
-    def __eq__(self, value: object) -> bool:
+    def __eq__(self, value: typing.Any) -> bool:
         """Return self==value."""
 
     def __ge__(self, value: typing.Any) -> bool:
@@ -1548,9 +1670,11 @@ class TimeScale:
     def __lt__(self, value: typing.Any) -> bool:
         """Return self<value."""
 
-    def __ne__(self, value: object) -> bool:
+    def __ne__(self, value: typing.Any) -> bool:
         """Return self!=value."""
 
+    def __repr__(self) -> str:
+        """Return repr(self)."""
     BDT: time.TimeScale = ...
     ET: time.TimeScale = ...
     GPST: time.TimeScale = ...
@@ -1571,13 +1695,34 @@ class TimeSeries:
 
     (Python documentation hints)"""
 
-    def __eq__(self, value: object) -> bool:
+    def __init__(
+        self,
+        start: time.Epoch,
+        end: time.Epoch,
+        step: time.Duration,
+        inclusive: bool,
+        *args: typing.Optional[typing.Any],
+        **kwargs: typing.Optional[typing.Any],
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        An iterator of a sequence of evenly spaced Epochs.
+
+        (Python documentation hints)"""
+
+    def __new__(
+        cls, start: time.Epoch, end: time.Epoch, step: time.Duration, inclusive: bool
+    ) -> TimeSeries:
+        """An iterator of a sequence of evenly spaced Epochs.
+
+        (Python documentation hints)"""
+
+    def __eq__(self, value: typing.Any) -> bool:
         """Return self==value."""
 
     def __ge__(self, value: typing.Any) -> bool:
         """Return self>=value."""
 
-    def __getnewargs__(self) -> tuple: ...
+    def __getnewargs__(self) -> typing.Tuple: ...
     def __gt__(self, value: typing.Any) -> bool:
         """Return self>value."""
 
@@ -1590,24 +1735,37 @@ class TimeSeries:
     def __lt__(self, value: typing.Any) -> bool:
         """Return self<value."""
 
-    def __ne__(self, value: object) -> bool:
+    def __ne__(self, value: typing.Any) -> bool:
         """Return self!=value."""
 
     def __next__(self) -> typing.Any:
         """Implement next(self)."""
 
+    def __repr__(self) -> str:
+        """Return repr(self)."""
 
+    def __str__(self) -> str:
+        """Return str(self)."""
 
 @typing.final
 class Unit:
     """An Enum to perform time unit conversions."""
+
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        An Enum to perform time unit conversions."""
+
+    def __new__(cls) -> Unit:
+        """An Enum to perform time unit conversions."""
 
     def from_seconds(self) -> typing.Any: ...
     def in_seconds(self) -> typing.Any: ...
     def __add__(self, value: typing.Any):
         """Return self+value."""
 
-    def __eq__(self, value: object) -> bool:
+    def __eq__(self, value: typing.Any) -> bool:
         """Return self==value."""
 
     def __ge__(self, value: typing.Any) -> bool:
@@ -1628,12 +1786,14 @@ class Unit:
     def __mul__(self, value: typing.Any):
         """Return self*value."""
 
-    def __ne__(self, value: object) -> bool:
+    def __ne__(self, value: typing.Any) -> bool:
         """Return self!=value."""
 
     def __radd__(self, value: typing.Any):
         """Return value+self."""
 
+    def __repr__(self) -> str:
+        """Return repr(self)."""
 
     def __rmul__(self, value: typing.Any):
         """Return value*self."""
@@ -1660,6 +1820,15 @@ class Ut1Provider:
     data: list
     iter_pos: int
 
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        A structure storing all of the TAI-UT1 data"""
+
+    def __new__(cls) -> Ut1Provider:
+        """A structure storing all of the TAI-UT1 data"""
+
     def as_list(self) -> list:
         """Returns the list of Delta TAI-UT1 values"""
 
@@ -1667,10 +1836,18 @@ class Ut1Provider:
     def from_eop_file(path: str) -> Ut1Provider:
         """Builds a UT1 provider from the provided path to an EOP file."""
 
+    def __repr__(self) -> str:
+        """Return repr(self)."""
 
 @typing.final
 class Weekday:
-    def __eq__(self, value: object) -> bool:
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature."""
+
+    def __new__(cls) -> Weekday: ...
+    def __eq__(self, value: typing.Any) -> bool:
         """Return self==value."""
 
     def __ge__(self, value: typing.Any) -> bool:
@@ -1688,9 +1865,11 @@ class Weekday:
     def __lt__(self, value: typing.Any) -> bool:
         """Return self<value."""
 
-    def __ne__(self, value: object) -> bool:
+    def __ne__(self, value: typing.Any) -> bool:
         """Return self!=value."""
 
+    def __repr__(self) -> str:
+        """Return repr(self)."""
     Friday: time.Weekday = ...
     Monday: time.Weekday = ...
     Saturday: time.Weekday = ...

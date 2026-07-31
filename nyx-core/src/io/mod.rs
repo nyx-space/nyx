@@ -47,6 +47,8 @@ use pyo3::prelude::*;
 mod python;
 
 /// Configuration for exporting from Nyx to local disk.
+///
+/// :type timestamped: bool
 #[derive(Clone, Debug, Default, Serialize, Deserialize, TypedBuilder, PartialEq)]
 #[builder(doc)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, eq))]

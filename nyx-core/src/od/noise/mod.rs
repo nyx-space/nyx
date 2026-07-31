@@ -63,6 +63,10 @@ pub trait Stochastics {
 /// Stochastic noise modeling used primarily for synthetic orbit determination measurements.
 ///
 /// This implementation distinguishes between the white noise model and the bias model. It also includes a constant offset.
+///
+/// :type white_noise: WhiteNoise | None
+/// :type bias: GaussMarkov | None
+/// :type name: str | None
 #[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct StochasticNoise {
@@ -273,6 +277,9 @@ impl StochasticNoise {
     }
 
     /// Return the covariance of these stochastics at a given time.
+    ///
+    /// :type epoch: Epoch
+    /// :rtype: float
     pub fn covariance(&self, epoch: Epoch) -> f64 {
         let mut variance = 0.0;
         if let Some(wn) = &self.white_noise {
@@ -331,6 +338,12 @@ impl StochasticNoise {
     /// is one second, the Allan Deviation should be the deviation over one second.
     ///
     /// IMPORTANT: These do NOT include atmospheric noises, which add up to ~10 cm one-sigma.
+    ///
+    /// :type allan_deviation: float
+    /// :type integration_time: Duration
+    /// :type chip_rate: ChipRate
+    /// :type s_n0: SN0
+    /// :rtype: StochasticNoise
     #[cfg(feature = "python")]
     #[pyo3(name = "from_hardware_range_km")]
     #[classmethod]
@@ -345,6 +358,13 @@ impl StochasticNoise {
         Self::from_hardware_range_km(allan_deviation, integration_time, chip_rate, s_n0)
     }
 
+    /// Constructs a hardware Doppler noise model.
+    ///
+    /// :type allan_deviation: float
+    /// :type integration_time: Duration
+    /// :type carrier: CarrierFreq
+    /// :type c_n0: CN0
+    /// :rtype: StochasticNoise
     #[cfg(feature = "python")]
     #[pyo3(name = "from_hardware_doppler_km_s")]
     #[classmethod]

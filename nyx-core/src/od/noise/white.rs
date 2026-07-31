@@ -32,6 +32,9 @@ use pyo3::prelude::*;
 use super::Stochastics;
 
 /// White noise is an uncorrelated random variable.
+///
+/// :type mean: float
+/// :type sigma: float
 #[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize, Sequence)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct WhiteNoise {

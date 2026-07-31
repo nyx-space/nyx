@@ -214,6 +214,9 @@ impl RawSpaceWeatherRow {
 
 /// Stores SpaceWeather data as provided by [CelesTrak](https://celestrak.org/SpaceData/).
 /// Data may be provided either as original CSV or in a compressed (non-archived) gunzip (gz) format.
+///
+/// :type path: str | None
+/// :type fallback: StaticSpaceWeather | None
 #[cfg_attr(feature = "python", pyclass(from_py_object))]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct SpaceWeatherData {
@@ -292,6 +295,9 @@ impl SpaceWeatherData {
     /// Evaluates the space weather state at `epoch` and constructs the `Msise00DailyWeather` payload.
     ///
     /// Missing daily records or unforecasted fields are resolved using `SpaceWeatherFallback`.
+    ///
+    /// :type epoch: Epoch
+    /// :rtype: Msise00DailyWeather
     pub fn msise_weather(&self, epoch: Epoch) -> Msise00DailyWeather {
         let target_midnight = epoch.with_hms(0, 0, 0);
         let current_day = self.records.get(&target_midnight);
@@ -325,6 +331,10 @@ impl SpaceWeatherData {
     /// Assembles the 7-element Ap array spanning current bin back 57 hours across 4 calendar days.
     ///
     /// Missing daily records or unforecasted bins are populated using the configured `SpaceWeatherFallback`.
+    ///
+    /// :type midnight: Epoch
+    /// :type bin_idx: int
+    /// :rtype: list[float]
     fn build_ap_history(&self, midnight: Epoch, bin_idx: usize) -> [f64; 7] {
         let one_day = Unit::Day * 1.0;
 

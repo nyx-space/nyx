@@ -242,6 +242,7 @@ impl AtmDensity {
     /// Configured with nominal LEO reference parameters at $h_0 = 700\text{ km}$:
     /// * $\rho_0 = 3.614 \times 10^{-13}\text{ kg/m}^3$
     /// * $H = 88.667\text{ km}$ ($88,667\text{ m}$)
+    /// :rtype: AtmDensity
     #[classmethod]
     fn earth_exponential(_cls: &Bound<'_, PyType>) -> Self {
         AtmDensity::Exponential {
@@ -253,6 +254,10 @@ impl AtmDensity {
 }
 
 /// `Drag` implements all three drag models.
+///
+/// :type density: AtmDensity
+/// :type frame: Frame
+/// :type estimate: bool
 #[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct Drag {

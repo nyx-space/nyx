@@ -59,6 +59,12 @@ impl PropagationResult {
     }
 }
 
+/// Numerical propagator for a spacecraft state.
+///
+/// :type dynamics: Dynamics
+/// :type almanac: Almanac
+/// :type method: IntegratorMethod
+/// :type options: IntegratorOptions
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct Propagator {
@@ -102,6 +108,9 @@ impl Propagator {
     }
 
     /// Compute the instantaneous equations of motion for this spacecraft
+    ///
+    /// :type spacecraft: Spacecraft
+    /// :rtype: list[float]
     fn accel_km_s2(&self, spacecraft: Spacecraft) -> Result<Vec<f64>, PropagationError> {
         let dynamics = self
             .dynamics
@@ -122,6 +131,11 @@ impl Propagator {
     }
 
     /// Propagates the initialization state until the desired epoch, optionally not building the trajectory
+    ///
+    /// :type spacecraft: Spacecraft
+    /// :type epoch: Epoch
+    /// :type trajectory: bool
+    /// :rtype: PropagationResult
     #[pyo3(signature = (spacecraft, epoch, trajectory=true))]
     fn until_epoch(
         &self,
@@ -145,6 +159,11 @@ impl Propagator {
     }
 
     /// Propagates the initialization state for the desired duration, optionally not building the trajectory
+    ///
+    /// :type spacecraft: Spacecraft
+    /// :type duration: Duration
+    /// :type trajectory: bool
+    /// :rtype: PropagationResult
     #[pyo3(signature = (spacecraft, duration, trajectory=true))]
     fn for_duration(
         &self,
@@ -194,6 +213,14 @@ impl Propagator {
     /// * `PropagationError::NthEventError`: Returned if `max_duration` is reached before the event was triggered `trigger` times.
     /// * `PropagationError::TrajectoryEvent`: Returned if the interpolation of the event state fails.
     /// * `PropagationError::Analysis`: Returned if the event evaluation fails during the search.
+    ///
+    /// :type spacecraft: Spacecraft
+    /// :type event: Event
+    /// :type max_duration: Duration
+    /// :type trigger: int
+    /// :type event_frame: Frame | None
+    /// :type trajectory: bool
+    /// :rtype: PropagationResult
     #[pyo3(signature = (spacecraft, event, max_duration, trigger=1, event_frame=None, trajectory=true))]
     fn until_event(
         &self,
@@ -221,6 +248,11 @@ impl Propagator {
     }
 
     /// Propagates the initialization state until the desired epoch, optionally not building the trajectory
+    ///
+    /// :type spacecraft: list[Spacecraft]
+    /// :type epoch: Epoch
+    /// :type trajectory: bool
+    /// :rtype: list[PropagationResult]
     #[pyo3(signature = (spacecraft, epoch, trajectory=true))]
     fn many_until_epoch(
         &self,
@@ -271,6 +303,11 @@ impl Propagator {
     }
 
     /// Propagates the initialization state for the desired duration, optionally not building the trajectory
+    ///
+    /// :type spacecraft: list[Spacecraft]
+    /// :type duration: Duration
+    /// :type trajectory: bool
+    /// :rtype: list[PropagationResult]
     #[pyo3(signature = (spacecraft, duration, trajectory=true))]
     fn many_for_duration(
         &self,
@@ -320,6 +357,15 @@ impl Propagator {
         }))
     }
 
+    /// Propagates many states until event.
+    ///
+    /// :type spacecraft: list[Spacecraft]
+    /// :type event: Event
+    /// :type max_duration: Duration
+    /// :type trigger: int
+    /// :type event_frame: Frame | None
+    /// :type trajectory: bool
+    /// :rtype: list[PropagationResult]
     #[pyo3(signature = (spacecraft, event, max_duration, trigger=1, event_frame=None, trajectory=true))]
     fn many_until_event(
         &self,
@@ -364,6 +410,10 @@ impl Propagator {
     }
 }
 
+/// Spacecraft Trajectory.
+///
+/// :type path: str
+/// :type template: Spacecraft | None
 #[pyclass(from_py_object, name = "Trajectory")]
 #[derive(Clone, Debug)]
 pub struct PyTrajectory {
@@ -406,12 +456,18 @@ impl PyTrajectory {
     }
 
     /// Add another state to this trajectory.
+    ///
+    /// :type spacecraft: Spacecraft
+    /// :rtype: None
     fn push(&mut self, spacecraft: Spacecraft) {
         self.inner.states.push(spacecraft);
         self.inner.finalize();
     }
 
     /// Append many spacecraft to this trajectory.
+    ///
+    /// :type many_spacecraft: list[Spacecraft]
+    /// :rtype: None
     fn append(&mut self, many_spacecraft: Vec<Spacecraft>) {
         for sc in many_spacecraft {
             self.inner.states.push(sc);
@@ -423,6 +479,11 @@ impl PyTrajectory {
     ///
     /// # Notes
     /// + The RIC frame accounts for the transport theorem by performing a finite differencing of the RIC frame.
+    ///
+    /// :type other: Trajectory
+    /// :type path: str
+    /// :type cfg: ExportCfg
+    /// :rtype: str
     fn ric_diff_to_parquet(
         &self,
         other: &Self,
@@ -435,17 +496,30 @@ impl PyTrajectory {
     }
 
     /// Evaluate the trajectory at this specific epoch.
+    ///
+    /// :type epoch: Epoch
+    /// :rtype: Spacecraft
     fn at(&self, epoch: Epoch) -> Result<Spacecraft, TrajError> {
         self.inner.at(epoch)
     }
 
+    /// Write trajectory to a parquet file.
+    ///
+    /// :type path: str
+    /// :type cfg: ExportCfg
+    /// :rtype: str
     fn to_parquet(&self, path: &str, cfg: ExportCfg) -> Result<String, TrajError> {
         self.inner
             .to_parquet(path, cfg)
             .map(|path| path.to_string_lossy().to_string())
             .map_err(|e| TrajError::TrajGeneric { err: e.to_string() })
     }
+
     /// Export this spacecraft trajectory estimate to an ANISE Ephemeris
+    ///
+    /// :type object_id: str
+    /// :type cfg: ExportCfg
+    /// :rtype: Ephemeris
     fn to_ephemeris(&self, object_id: String, cfg: ExportCfg) -> Ephemeris {
         self.inner.to_ephemeris(object_id, cfg)
     }

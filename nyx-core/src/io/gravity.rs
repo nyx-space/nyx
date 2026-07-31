@@ -41,6 +41,11 @@ use pyo3::prelude::*;
 /// Configuration holder for gravity field.
 ///
 /// Data is first loaded as a SHADR, if that fails, Nyx will try to load it as a COF file.
+///
+/// :type degree: int
+/// :type order: int
+/// :type filepath: str
+/// :type frame: FrameUid
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct GravityFieldConfig {

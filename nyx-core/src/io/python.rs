@@ -3,6 +3,9 @@ use pyo3::prelude::*;
 
 #[pymethods]
 impl ExportCfg {
+    /// Create a new export configuration.
+    ///
+    /// :type timestamped: bool
     #[pyo3(signature=(timestamped = false))]
     #[new]
     fn py_new(timestamped: bool) -> Self {
