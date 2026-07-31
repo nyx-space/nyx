@@ -312,9 +312,9 @@ class GroundStation:
         name: str,
         location: astro.Location,
         stochastic_noises: dict[MeasurementType, StochasticNoise],
-        integration_time: typing.Optional[time.Duration | None] = None,
-        light_time_correction: typing.Optional[bool | None] = False,
-        timestamp_noise_s: typing.Optional[StochasticNoise | None] = None,
+        integration_time: time.Duration | None = None,
+        light_time_correction: bool | None = False,
+        timestamp_noise_s: StochasticNoise | None = None,
     ) -> GroundStation:
         """GroundStation defines a one-way or two-way ranging and doppler station. Set the integration time for two-way."""
 
@@ -430,7 +430,7 @@ class GroundTrackingArcSim:
         devices: dict[str, GroundStation],
         trajectory: Trajectory,
         configs: dict[str, TrkConfig],
-        seed: typing.Optional[int | None] = None,
+        seed: int | None = None,
     ) -> GroundTrackingArcSim:
         """Simulated tracking architecture for a spacecraft."""
 
@@ -866,9 +866,9 @@ class Scheduler:
     def __new__(
         cls,
         handoff: typing.Optional[Handoff] = ...,
-        cadence: typing.Optional[Cadence | None] = None,
+        cadence: Cadence | None = None,
         min_samples: typing.Optional[int] = 10,
-        sample_alignment: typing.Optional[time.Duration | None] = None,
+        sample_alignment: time.Duration = None,
     ) -> Scheduler:
         """A scheduler allows building a scheduling of spaceraft tracking for a set of ground stations."""
 
@@ -946,7 +946,7 @@ class SpacecraftEstimate:
     def from_dispersions(
         nominal_state: Spacecraft,
         dispersions: list[StateDispersion],
-        seed: typing.Optional[int | None] = None,
+        seed: int | None = None,
     ) -> SpacecraftEstimate:
         """Generates an initial Kalman filter state estimate dispersed from the nominal state using the provided standard deviation parameters.
 
@@ -1011,8 +1011,8 @@ class SpacecraftODProcess:
         prop: Propagator,
         kf_variant: KalmanVariant,
         devices: dict[str, GroundStation],
-        sigma_reject: typing.Optional[SigmaRejection | None] = ...,
-        process_noise: typing.Optional[ProcessNoise | None] = None,
+        sigma_reject: SigmaRejection | None = ...,
+        process_noise: ProcessNoise | None = None,
     ) -> SpacecraftODProcess:
         """Orbit determination process for a spacecraft."""
 
@@ -1048,7 +1048,7 @@ class SpacecraftODSolution:
 
     def is_filter_run(self) -> bool: ...
     def is_nees_consistent(
-        self, truth_traj: Trajectory, alpha: typing.Optional[float | None] = None
+        self, truth_traj: Trajectory, alpha: float | None = None
     ) -> bool:
         """Checks whether the filter estimates are statistically consistent
         by performing a Chi-squared test on the Normalized Estimation Error Squared (NEES).
@@ -1067,7 +1067,7 @@ class SpacecraftODSolution:
         Returns Ok(true) if the filter is consistent, Ok(false) if the filter
         is over-confident or under-confident, or an error if no estimates are available."""
 
-    def is_nis_consistent(self, alpha: typing.Optional[float | None] = None) -> bool:
+    def is_nis_consistent(self, alpha: float | None = None) -> bool:
         """Checks whether the filter innovations are statistically consistent
         by performing a Chi-squared test on the Normalized Innovation Squared (NIS).
 
@@ -1083,7 +1083,7 @@ class SpacecraftODSolution:
         Returns Ok(true) if the filter is consistent, Ok(false) if the filter
         is over-confident or under-confident, or an error if no residuals are available."""
 
-    def is_normal(self, alpha: typing.Optional[float | None] = None) -> bool:
+    def is_normal(self, alpha: float | None = None) -> bool:
         """Checks whether the whitened residuals of the accepted residuals pass a normality test at a given significance level `alpha`, default to 0.05.
 
         This uses a simplified KS-test threshold: D_alpha = c(α) / √n.
@@ -1103,7 +1103,7 @@ class SpacecraftODSolution:
         Returns Ok(ks_statistic) if residuals are available."""
 
     def nees_consistency(
-        self, truth_traj: Trajectory, alpha: typing.Optional[float | None] = None
+        self, truth_traj: Trajectory, alpha: float | None = None
     ) -> NormalizedConsistency:
         """Checks whether the filter estimates are statistically consistent
         by performing a Chi-squared test on the Normalized Estimation Error Squared (NEES).
@@ -1123,7 +1123,7 @@ class SpacecraftODSolution:
         is over-confident or under-confident, or an error if no estimates are available."""
 
     def nis_consistency(
-        self, alpha: typing.Optional[float | None] = None
+        self, alpha: float | None = None
     ) -> NormalizedConsistency:
         """Checks whether the filter innovations are statistically consistent
         by performing a Chi-squared test on the Normalized Innovation Squared (NIS).
@@ -1246,9 +1246,9 @@ class StochasticNoise:
 
     def __new__(
         cls,
-        white_noise: typing.Optional[WhiteNoise | None] = None,
-        bias: typing.Optional[GaussMarkov | None] = None,
-        name: typing.Optional[str | None] = None,
+        white_noise: WhiteNoise | None = None,
+        bias: GaussMarkov | None = None,
+        name: str | None = None,
     ) -> StochasticNoise:
         """Stochastic noise modeling used primarily for synthetic orbit determination measurements.
 
@@ -1634,9 +1634,9 @@ class TrkConfig:
 
     def __new__(
         cls,
-        scheduler: typing.Optional[Scheduler | None] = None,
-        sampling: typing.Optional[time.Duration] = ...,
-        strands: typing.Optional[list[Strand] | None] = None,
+        scheduler: Scheduler | None = None,
+        sampling: time.Duration = ...,
+        strands: list[Strand] | None = None,
     ) -> TrkConfig:
         """Stores a tracking configuration, there is one per tracking data simulator (e.g. one for ground station #1 and another for #2).
         By default, the tracking configuration is continuous and the tracking arc is from the beginning of the simulation to the end.
