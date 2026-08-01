@@ -45,7 +45,7 @@ impl TrackingDevice<Spacecraft> for PositionDevice {
         &mut self,
         rx: Spacecraft,
         rng: Option<&mut Pcg64Mcg>,
-        _almanac: &Almanac,
+        almanac: &Almanac,
     ) -> Result<Option<Measurement>, ODError> {
         let mut msr = Measurement::new(self.name.clone(), rx.orbit.epoch);
         let mut noises = IndexMap::with_capacity(self.measurement_types.len());
@@ -73,10 +73,20 @@ impl TrackingDevice<Spacecraft> for PositionDevice {
             }
         }
 
+        let orbit = if let Some(frame) = self.frame {
+            almanac
+                .transform_to(rx.orbit, frame, None)
+                .map_err(|e| ODError::MeasurementSimError {
+                    details: format!("Failed to transform to frame {frame:?}: {e}"),
+                })?
+        } else {
+            rx.orbit
+        };
+
         for (ii, msr_type) in self.measurement_types.iter().copied().enumerate() {
             msr.push(
                 msr_type,
-                rx.orbit.radius_km[ii]
+                orbit.radius_km[ii]
                     + noises.get(&msr_type).unwrap_or(&0.0)
                     + self.measurement_bias(msr_type, rx.orbit.epoch)?,
             );

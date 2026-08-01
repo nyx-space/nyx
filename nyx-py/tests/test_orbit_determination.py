@@ -32,6 +32,11 @@ from nyx_space.orbit_determination import (
     StochasticNoise,
     TrackingDataArc,
     TrkConfig,
+    PositionDevice,
+    SpacecraftPositionODProcess,
+    PositionTrackingArcSim,
+    Strand,
+    WhiteNoise,
 )
 from nyx_space.time import Duration, Epoch, Unit
 
@@ -463,6 +468,96 @@ def test_howto_exec_orbit_determination_filter():
 
     print(od_sol_5sigma.nis_consistency())
     print(od_sol_5sigma.nees_consistency(traj))
+
+
+def test_howto_position_device_orbit_determination():
+    """
+    Goal: Simulate GNSS tracking data in an Earth-fixed frame (such as IAU_EARTH_FRAME)
+    for a spacecraft trajectory specified in EME2000, and run the orbit determination filter
+    using PositionDevice to estimate spacecraft state.
+    """
+    almanac = MetaAlmanac("../data/02_config/ci_almanac.dhall").process()
+    eme2k = almanac.frame_info(Frames.EME2000)
+
+    # Step 1: Reference Trajectory
+    orbit = Orbit(
+        5442.1625926801835,
+        -4068.9498468206248,
+        -13.456851447751518,
+        2.8581975428173836,
+        3.8097859312745794,
+        6.002126693122689,
+        Epoch("2025-08-25 11:55:44 UTC"),
+        eme2k,
+    )
+    spacecraft = Spacecraft(orbit)
+
+    # Simple point-mass gravity
+    accel_models = AccelModels(
+        point_masses=PointMasses(
+            celestial_objects=[CelestialObjects.EARTH]
+        )
+    )
+
+    dynamics = Dynamics(accel_models)
+    propagator = Propagator(dynamics, almanac)
+
+    # Propagate for 6 hours
+    prop_duration = Unit.Hour * 6
+    traj = propagator.for_duration(spacecraft, prop_duration, trajectory=True).trajectory
+
+    # Step 2: Configure Position Device with noise in Earth-fixed frame
+    device_frame = almanac.frame_info(Frames.IAU_EARTH_FRAME)
+
+    # Coordinates in Nyx are in kilometers, so 1e-3 sigma = 1 meter noise
+    meter_level_noise = StochasticNoise(white_noise=WhiteNoise(mean=0.0, sigma=1e-3))
+
+    device = PositionDevice("GPS", device_frame).with_noise(
+        MeasurementType.X, meter_level_noise
+    ).with_noise(
+        MeasurementType.Y, meter_level_noise
+    ).with_noise(
+        MeasurementType.Z, meter_level_noise
+    )
+
+    # Step 3: Simulate Tracking Arc
+    strand = Strand(orbit.epoch, orbit.epoch + prop_duration)
+    configs = {
+        "GPS": TrkConfig(sampling=Unit.Minute * 1, strands=[strand])
+    }
+
+    trk_sim = PositionTrackingArcSim({"GPS": device}, traj, configs, seed=12345)
+    trk_arc = trk_sim.generate_measurements(almanac)
+
+    assert not trk_arc.is_empty()
+    assert trk_arc.len() == 361  # 6 hours = 360 minutes + 1 endpoint inclusive
+
+    # Step 4: Disperse initial state to create filter error
+    disp = [
+        StateDispersion.zero_mean(
+            StateParameter.Element(OrbitalElement.SemiMajorAxis), 1.0
+        ),
+        StateDispersion.zero_mean(
+            StateParameter.Element(OrbitalElement.Eccentricity), 1e-6
+        ),
+    ]
+
+    estimate = SpacecraftEstimate.from_dispersions(
+        nominal_state=spacecraft, dispersions=disp, seed=123
+    )
+
+    # Step 5: Filter the tracking arc
+    od_proc = SpacecraftPositionODProcess(
+        propagator, KalmanVariant.ReferenceUpdate, {"GPS": device}
+    )
+    od_sol = od_proc.process_arc(estimate, trk_arc)
+
+    assert od_sol.is_filter_run()
+    assert len(od_sol.accepted_residuals()) >= 300
+
+    # Ensure residuals are stored and NIS consistency can be computed
+    nis = od_sol.nis_consistency()
+    assert nis is not None
 
 
 if __name__ == "__main__":

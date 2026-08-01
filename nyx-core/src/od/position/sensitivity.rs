@@ -54,9 +54,9 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, PositionDevice>
     fn new(
         msr_type: MeasurementType,
         _msr: &Measurement,
-        _rx: &Spacecraft,
-        _tx: &PositionDevice,
-        _almanac: &Almanac,
+        rx: &Spacecraft,
+        tx: &PositionDevice,
+        almanac: &Almanac,
     ) -> Result<Self, ODError> {
         let idx = match msr_type {
             MeasurementType::X => 0,
@@ -64,13 +64,30 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, PositionDevice>
             MeasurementType::Z => 2,
             _ => {
                 return Err(ODError::MeasurementSimError {
-                    details: format!("{msr_type:?} is not supported by XyzDevice"),
+                    details: format!("{msr_type:?} is not supported by PositionDevice"),
                 });
             }
         };
 
         let mut sensitivity_row = OMatrix::<f64, U1, <Spacecraft as State>::Size>::zeros();
-        sensitivity_row[(0, idx)] = 1.0;
+
+        let dcm = if let Some(device_frame) = tx.frame {
+            almanac
+                .rotate(rx.orbit.frame, device_frame, rx.orbit.epoch)
+                .map_err(|e| ODError::MeasurementSimError {
+                    details: format!(
+                        "Failed to get rotation from {:?} to {:?}: {}",
+                        rx.orbit.frame, device_frame, e
+                    ),
+                })?
+                .rot_mat
+        } else {
+            nalgebra::Matrix3::identity()
+        };
+
+        for i in 0..3 {
+            sensitivity_row[(0, i)] = dcm[(idx, i)];
+        }
 
         Ok(Self {
             sensitivity_row,

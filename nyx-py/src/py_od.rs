@@ -454,6 +454,438 @@ impl PyResidual {
     }
 }
 
+use nyx_space::od::position::PositionDevice;
+
+pub type SpacecraftPositionODProcess = nyx_space::od::process::KalmanODProcess<
+    nyx_space::md::prelude::SpacecraftDynamics,
+    Const<3>,
+    Const<3>,
+    PositionDevice,
+>;
+
+/// Orbit determination process for a spacecraft using position tracking devices.
+///
+/// :type prop: Propagator
+/// :type kf_variant: KalmanVariant
+/// :type devices: dict[str, PositionDevice]
+/// :type sigma_reject: SigmaRejection | None
+/// :type process_noise: ProcessNoise | None
+#[derive(Clone)]
+#[pyclass(from_py_object, name = "SpacecraftPositionODProcess")]
+pub struct PySpacecraftPositionODProcess {
+    pub(crate) inner: SpacecraftPositionODProcess,
+}
+
+#[pymethods]
+impl PySpacecraftPositionODProcess {
+    #[new]
+    #[pyo3(signature=(prop, kf_variant, devices, sigma_reject=Some(SigmaRejection::default()), process_noise=None))]
+    fn py_new(
+        prop: Propagator,
+        kf_variant: KalmanVariant,
+        devices: BTreeMap<String, PositionDevice>,
+        sigma_reject: Option<SigmaRejection>,
+        process_noise: Option<PyProcessNoise>,
+    ) -> Result<Self, PropagationError> {
+        let almanac = prop.almanac.clone();
+        let mut inner = SpacecraftPositionODProcess::new(
+            prop.build()?,
+            kf_variant,
+            sigma_reject,
+            devices,
+            almanac,
+        );
+
+        if let Some(pn) = process_noise {
+            inner = inner.with_process_noise(pn.inner);
+        }
+
+        Ok(Self { inner })
+    }
+
+    /// Process the provided tracking arc for this orbit determination process.
+    ///
+    /// :type initial_estimate: SpacecraftEstimate
+    /// :type arc: TrackingDataArc
+    /// :rtype: SpacecraftPositionODSolution
+    fn process_arc(
+        &self,
+        initial_estimate: PySpacecraftEstimate,
+        arc: &TrackingDataArc,
+    ) -> Result<PySpacecraftPositionODSolution, PyErr> {
+        let inner_res = self
+            .inner
+            .process_arc(initial_estimate.inner, arc)
+            .map_err(|e| PyValueError::new_err(format!("{e}")))?;
+        Ok(PySpacecraftPositionODSolution { inner: inner_res })
+    }
+
+    /// Perform a time update. Continuously predicts the trajectory until the provided end epoch, with covariance mapping at each step.
+    ///
+    /// :type initial_estimate: SpacecraftEstimate
+    /// :type end_epoch: Epoch
+    /// :rtype: SpacecraftPositionODSolution
+    fn predict_until(
+        &self,
+        initial_estimate: PySpacecraftEstimate,
+        end_epoch: Epoch,
+    ) -> Result<PySpacecraftPositionODSolution, PyErr> {
+        let inner_res = self
+            .inner
+            .predict_until(initial_estimate.inner, end_epoch)
+            .map_err(|e| PyValueError::new_err(format!("{e}")))?;
+        Ok(PySpacecraftPositionODSolution { inner: inner_res })
+    }
+
+    /// Perform a time update. Continuously predicts the trajectory for the provided duration, with covariance mapping at each step.
+    ///
+    /// :type initial_estimate: SpacecraftEstimate
+    /// :type duration: Duration
+    /// :rtype: SpacecraftPositionODSolution
+    fn predict_for(
+        &self,
+        initial_estimate: PySpacecraftEstimate,
+        duration: Duration,
+    ) -> Result<PySpacecraftPositionODSolution, PyErr> {
+        let inner_res = self
+            .inner
+            .predict_for(initial_estimate.inner, duration)
+            .map_err(|e| PyValueError::new_err(format!("{e}")))?;
+        Ok(PySpacecraftPositionODSolution { inner: inner_res })
+    }
+
+    #[getter]
+    fn sigma_rejection(&self) -> Option<SigmaRejection> {
+        self.inner.sigma_reject
+    }
+
+    #[setter]
+    fn set_sigma_rejection(&mut self, sigma_reject: Option<SigmaRejection>) {
+        self.inner.sigma_reject = sigma_reject;
+    }
+
+    #[getter]
+    fn variant(&self) -> KalmanVariant {
+        self.inner.kf_variant
+    }
+
+    #[setter]
+    fn set_variant(&mut self, kf_variant: KalmanVariant) {
+        self.inner.kf_variant = kf_variant
+    }
+}
+
+#[derive(Clone)]
+#[pyclass(from_py_object, name = "SpacecraftPositionODSolution")]
+pub struct PySpacecraftPositionODSolution {
+    pub(crate) inner: ODSolution<Spacecraft, KfEstimate<Spacecraft>, Const<3>, PositionDevice>,
+}
+
+#[pymethods]
+impl PySpacecraftPositionODSolution {
+    /// :rtype: bool
+    fn is_filter_run(&self) -> bool {
+        self.inner.is_filter_run()
+    }
+
+    /// :rtype: bool
+    fn is_smoother_run(&self) -> bool {
+        self.inner.is_smoother_run()
+    }
+
+    /// :rtype: Trajectory
+    fn to_traj(&self) -> Result<PyTrajectory, PyErr> {
+        let traj = self
+            .inner
+            .to_traj()
+            .map_err(|e| PyValueError::new_err(format!("{e}")))?;
+        Ok(PyTrajectory { inner: traj })
+    }
+
+    /// Export OD solutions, gains, ratios, residuals, sigmas, etc. to parquet
+    ///
+    /// :type path: str
+    /// :type cfg: ExportCfg
+    /// :rtype: str
+    fn to_parquet(&self, path: &str, cfg: ExportCfg) -> Result<String, ODError> {
+        self.inner
+            .to_parquet(path, cfg)
+            .map(|path| path.to_string_lossy().to_string())
+    }
+
+    /// Export to an ANISE ephemeris, which can be converted to a CCSDS OEM
+    ///
+    /// :type object_id: str
+    /// :rtype: Ephemeris
+    fn to_ephemeris(&self, object_id: String) -> Ephemeris {
+        self.inner.to_ephemeris(object_id)
+    }
+
+    /// :rtype: list[PositionResidual]
+    fn accepted_residuals(&self) -> Vec<PyPositionResidual> {
+        self.inner
+            .accepted_residuals()
+            .into_iter()
+            .map(|r| PyPositionResidual { inner: r })
+            .collect()
+    }
+
+    /// :rtype: list[PositionResidual]
+    fn rejected_residuals(&self) -> Vec<PyPositionResidual> {
+        self.inner
+            .rejected_residuals()
+            .into_iter()
+            .map(|r| PyPositionResidual { inner: r })
+            .collect()
+    }
+
+    /// Returns the root mean square of the prefit residuals
+    /// :rtype: float
+    pub fn rms_prefit_residuals(&self) -> f64 {
+        self.inner.rms_prefit_residuals()
+    }
+
+    /// Returns the root mean square of the postfit residuals
+    /// :rtype: float
+    pub fn rms_postfit_residuals(&self) -> f64 {
+        self.inner.rms_postfit_residuals()
+    }
+
+    /// Returns the root mean square of the prefit residual ratios
+    /// :rtype: float
+    pub fn rms_residual_ratios(&self) -> f64 {
+        self.inner.rms_residual_ratios()
+    }
+
+    /// Computes the fraction of residual ratios that lie within ±threshold.
+    ///
+    /// :type threshold: float
+    /// :rtype: float
+    pub fn residual_ratio_within_threshold(&self, threshold: f64) -> Result<f64, ODError> {
+        self.inner.residual_ratio_within_threshold(threshold)
+    }
+
+    /// Computes the Kolmogorov–Smirnov statistic for the aggregated residual ratios of the accepted residuals.
+    ///
+    /// Returns Ok(ks_statistic) if residuals are available.
+    /// :rtype: float
+    pub fn ks_test_normality(&self) -> Result<f64, ODError> {
+        self.inner.ks_test_normality()
+    }
+
+    /// Checks whether the whitened residuals of the accepted residuals pass a normality test at a given significance level `alpha`, default to 0.05.
+    ///
+    /// :type alpha: float | None
+    /// :rtype: bool
+    #[pyo3(signature=(alpha=None))]
+    pub fn is_normal(&self, alpha: Option<f64>) -> Result<bool, ODError> {
+        self.inner.is_normal(alpha)
+    }
+
+    /// Checks whether the filter innovations are statistically consistent
+    /// by performing a Chi-squared test on the Normalized Innovation Squared (NIS).
+    ///
+    /// :type alpha: float | None
+    /// :rtype: NormalizedConsistency
+    #[pyo3(signature=(alpha=None))]
+    pub fn nis_consistency(&self, alpha: Option<f64>) -> Result<NormalizedConsistency, ODError> {
+        self.inner.nis_consistency(alpha)
+    }
+
+    /// Checks whether the filter estimates are statistically consistent
+    /// by performing a Chi-squared test on the Normalized Estimation Error Squared (NEES).
+    ///
+    /// :type truth_traj: PyTrajectory
+    /// :type alpha: float | None
+    /// :rtype: NormalizedConsistency
+    #[pyo3(signature=(truth_traj, alpha=None))]
+    pub fn nees_consistency(
+        &self,
+        truth_traj: &PyTrajectory,
+        alpha: Option<f64>,
+    ) -> Result<NormalizedConsistency, ODError> {
+        self.inner.nees_consistency(&truth_traj.inner, alpha)
+    }
+
+    /// Smoothes this OD solution.
+    ///
+    /// :type almanac: Almanac
+    /// :rtype: SpacecraftPositionODSolution
+    fn smooth(&self, almanac: &Almanac) -> Result<Self, ODError> {
+        let inner = self.clone().inner.smooth(almanac)?;
+        Ok(Self { inner })
+    }
+
+    /// Reconstruct an ODSolution from a parquet file.
+    ///
+    /// :type path: str
+    /// :type devices: dict[str, PositionDevice]
+    /// :rtype: SpacecraftPositionODSolution
+    #[classmethod]
+    fn from_parquet(
+        _cls: &Bound<'_, PyType>,
+        path: &str,
+        devices: BTreeMap<String, PositionDevice>,
+    ) -> Result<Self, InputOutputError> {
+        let inner = ODSolution::from_parquet(path, devices)?;
+        Ok(Self { inner })
+    }
+
+    fn __str__(&self) -> String {
+        format!("{}", self.inner)
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{} @ {self:p}", self.inner)
+    }
+}
+
+#[derive(Clone)]
+#[pyclass(from_py_object, name = "PositionResidual")]
+pub struct PyPositionResidual {
+    pub(crate) inner: Residual<Const<3>>,
+}
+
+#[pymethods]
+impl PyPositionResidual {
+    #[getter]
+    fn epoch(&self) -> Epoch {
+        self.inner.epoch
+    }
+
+    #[getter]
+    fn prefit(&self) -> Vec<f64> {
+        self.inner.prefit.as_slice().to_vec()
+    }
+
+    #[getter]
+    fn postfit(&self) -> Vec<f64> {
+        self.inner.postfit.as_slice().to_vec()
+    }
+
+    #[getter]
+    fn ratio(&self) -> f64 {
+        self.inner.ratio
+    }
+
+    #[getter]
+    fn rejected(&self) -> bool {
+        self.inner.rejected
+    }
+
+    #[getter]
+    fn tracker(&self) -> Option<String> {
+        self.inner.tracker.clone()
+    }
+
+    /// Returns the normalized innovation squared (NIS) as the norm squares of the whitened residual
+    /// :rtype: float
+    fn nis(&self) -> f64 {
+        self.inner.nis()
+    }
+
+    /// Returns the whitened residual for this measurement type, if available
+    ///
+    /// :type msr_type: MeasurementType
+    /// :rtype: float | None
+    fn whitened_residual(&self, msr_type: MeasurementType) -> Option<f64> {
+        self.inner.whitened_resid(msr_type)
+    }
+
+    /// Returns the real observation for this measurement type, if available
+    ///
+    /// :type msr_type: MeasurementType
+    /// :rtype: float | None
+    fn real_obs(&self, msr_type: MeasurementType) -> Option<f64> {
+        self.inner.real_obs(msr_type)
+    }
+
+    /// Returns the computed/expected observation for this measurement type, if available
+    ///
+    /// :type msr_type: MeasurementType
+    /// :rtype: float | None
+    fn computed_obs(&self, msr_type: MeasurementType) -> Option<f64> {
+        self.inner.computed_obs(msr_type)
+    }
+
+    fn __str__(&self) -> String {
+        format!("{}", self.inner)
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{} @ {self:p}", self.inner)
+    }
+}
+
+/// Simulated tracking architecture for a spacecraft using position tracking devices.
+///
+/// :type devices: dict[str, PositionDevice]
+/// :type trajectory: PyTrajectory
+/// :type configs: dict[str, TrkConfig]
+/// :type seed: int | None
+#[derive(Clone)]
+#[pyclass(from_py_object)]
+pub struct PositionTrackingArcSim {
+    inner: TrackingArcSim<Spacecraft, PositionDevice>,
+}
+
+#[pymethods]
+impl PositionTrackingArcSim {
+    /// Initializes a simulated tracking architecture for a spacecraft.
+    ///
+    /// :param devices: Mapping of position identifiers to their respective physical definitions.
+    /// :type devices: dict[str, PositionDevice]
+    /// :param trajectory: The deterministic ephemeris of the target spacecraft.
+    /// :type trajectory: PyTrajectory
+    /// :param configs: Tasking and measurement constraints per device (e.g., sample rates, cadences).
+    /// :type configs: dict[str, TrkConfig]
+    /// :param seed: Initialization seed for the underlying PRNG.
+    /// :type seed: int | None
+    /// :rtype: PositionTrackingArcSim
+    /// :raises ConfigError: If initialization fails due to malformed configurations.
+    #[pyo3(signature=(devices, trajectory, configs, seed=None))]
+    #[new]
+    fn py_new(
+        devices: BTreeMap<String, PositionDevice>,
+        trajectory: PyTrajectory,
+        configs: BTreeMap<String, TrkConfig>,
+        seed: Option<u64>,
+    ) -> Result<Self, ConfigError> {
+        let inner = match seed {
+            Some(seed) => TrackingArcSim::with_seed(devices, trajectory.inner, configs, seed)?,
+            None => TrackingArcSim::new(devices, trajectory.inner, configs)?,
+        };
+        Ok(Self { inner })
+    }
+
+    /// Simulates operational tracking data across predefined tracking strands.
+    ///
+    /// :type almanac: Almanac
+    /// :rtype: TrackingDataArc
+    /// :raises ConfigError: If a scheduling configuration is present but the schedule was not built prior to execution.
+    fn generate_measurements(&mut self, almanac: &Almanac) -> Result<TrackingDataArc, ConfigError> {
+        self.inner.generate_measurements(almanac)
+    }
+
+    #[getter]
+    fn configs(&self) -> BTreeMap<String, TrkConfig> {
+        self.inner.configs.clone()
+    }
+
+    #[getter]
+    fn devices(&self) -> BTreeMap<String, PositionDevice> {
+        self.inner.devices.clone()
+    }
+
+    fn __str__(&self) -> String {
+        format!("{}", self.inner)
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{} @ {self:p}", self.inner)
+    }
+}
+
 #[derive(Clone)]
 #[pyclass(from_py_object, name = "SpacecraftODSolution")]
 pub struct PySpacecraftODSolution {

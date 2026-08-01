@@ -37,7 +37,7 @@ fn test_gps_od_position_filtering() {
         bias: None,
     };
 
-    let device = PositionDevice::new("GPS".to_string())
+    let device = PositionDevice::new("GPS".to_string(), None)
         .with_noise(MeasurementType::X, meter_level_noise)
         .with_noise(MeasurementType::Y, meter_level_noise)
         .with_noise(MeasurementType::Z, meter_level_noise);
