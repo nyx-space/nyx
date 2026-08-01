@@ -1,9 +1,10 @@
-use super::PositionDevice;
 use crate::od::msr::MeasurementType;
 use crate::od::noise::StochasticNoise;
 use anise::prelude::Frame;
 use indexmap::IndexMap;
 use pyo3::prelude::*;
+
+use super::PositionDevice;
 
 #[cfg(feature = "python")]
 #[pymethods]
