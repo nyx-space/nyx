@@ -1,7 +1,7 @@
-pub mod sensitivity;
-pub mod trk_device;
 #[cfg(feature = "python")]
 pub mod python;
+pub mod sensitivity;
+pub mod trk_device;
 
 use crate::io::ConfigRepr;
 use crate::od::msr::MeasurementType;
