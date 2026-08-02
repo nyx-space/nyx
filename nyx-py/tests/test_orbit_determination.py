@@ -1,6 +1,8 @@
 # ruff: noqa
 import os
 
+import numpy as np
+
 from nyx_space import Spacecraft
 from nyx_space.anise import MetaAlmanac
 from nyx_space.anise.analysis import OrbitalElement
@@ -470,7 +472,7 @@ def test_howto_exec_orbit_determination_filter():
     print(od_sol_5sigma.nees_consistency(traj))
 
 
-def test_howto_position_device_orbit_determination():
+def test_howto_position_device_gps_gnss_orbit_determination():
     """
     Goal: Simulate GNSS tracking data in an Earth-fixed frame (such as IAU_EARTH_FRAME)
     for a spacecraft trajectory specified in EME2000, and run the orbit determination filter
@@ -532,18 +534,17 @@ def test_howto_position_device_orbit_determination():
     assert not trk_arc.is_empty()
     assert trk_arc.len() == 361  # 6 hours = 360 minutes + 1 endpoint inclusive
 
-    # Step 4: Disperse initial state to create filter error
-    disp = [
-        StateDispersion.zero_mean(
-            StateParameter.Element(OrbitalElement.SemiMajorAxis), 1.0
-        ),
-        StateDispersion.zero_mean(
-            StateParameter.Element(OrbitalElement.Eccentricity), 1e-6
-        ),
-    ]
+    # Step 4: Disperse initial state with a fixed error of 1.732 km of norm
+    disp_orbit = orbit
+    disp_orbit.x_km += 1.0e-3
+    disp_orbit.y_km -= 1.0e-3
+    disp_orbit.z_km += 1.0e-3
 
-    estimate = SpacecraftEstimate.from_dispersions(
-        nominal_state=spacecraft, dispersions=disp, seed=123
+    disp_spacecraft = Spacecraft(disp_orbit)
+
+    # Build a fixed estimate from diagonals, always defined in 1-sigma!
+    estimate = SpacecraftEstimate.from_diag(
+        disp_spacecraft, np.array([1e-3, 1e-3, 1e-3, 10e-6, 10e-6, 10e-6, 0.0, 0.0, 0.0])
     )
 
     # Step 5: Filter the tracking arc
@@ -555,9 +556,9 @@ def test_howto_position_device_orbit_determination():
     assert od_sol.is_filter_run()
     assert len(od_sol.accepted_residuals()) >= 300
 
-    # Ensure residuals are stored and NIS consistency can be computed
+    # Ensure residuals are stored and NIS consistency check passes
     nis = od_sol.nis_consistency()
-    assert nis is not None
+    assert nis.is_consistent()
 
 
 if __name__ == "__main__":
