@@ -781,7 +781,7 @@ class PositionTrackingArcSim:
         devices: dict[str, PositionDevice],
         trajectory: Trajectory,
         configs: dict[str, TrkConfig],
-        seed: typing.Optional[int | None] = None,
+        seed: typing.Optional[int] = None,
     ) -> PositionTrackingArcSim:
         """Simulated tracking architecture for a spacecraft using position tracking devices."""
 
@@ -1374,8 +1374,8 @@ class SpacecraftPositionODProcess:
         prop: Propagator,
         kf_variant: KalmanVariant,
         devices: dict[str, PositionDevice],
-        sigma_reject: typing.Optional[SigmaRejection | None] = ...,
-        process_noise: typing.Optional[ProcessNoise | None] = None,
+        sigma_reject: typing.Optional[SigmaRejection] = ...,
+        process_noise: typing.Optional[ProcessNoise] = None,
     ) -> SpacecraftPositionODProcess:
         """Orbit determination process for a spacecraft using position tracking devices."""
 
@@ -1410,7 +1410,7 @@ class SpacecraftPositionODSolution:
         """Reconstruct an ODSolution from a parquet file."""
 
     def is_filter_run(self) -> bool: ...
-    def is_normal(self, alpha: typing.Optional[float | None] = None) -> bool:
+    def is_normal(self, alpha: typing.Optional[float] = None) -> bool:
         """Checks whether the whitened residuals of the accepted residuals pass a normality test at a given significance level `alpha`, default to 0.05."""
 
     def is_smoother_run(self) -> bool: ...
@@ -1420,13 +1420,13 @@ class SpacecraftPositionODSolution:
         Returns Ok(ks_statistic) if residuals are available."""
 
     def nees_consistency(
-        self, truth_traj: Trajectory, alpha: typing.Optional[float | None] = None
+        self, truth_traj: Trajectory, alpha: typing.Optional[float] = None
     ) -> NormalizedConsistency:
         """Checks whether the filter estimates are statistically consistent
         by performing a Chi-squared test on the Normalized Estimation Error Squared (NEES)."""
 
     def nis_consistency(
-        self, alpha: typing.Optional[float | None] = None
+        self, alpha: typing.Optional[float] = None
     ) -> NormalizedConsistency:
         """Checks whether the filter innovations are statistically consistent
         by performing a Chi-squared test on the Normalized Innovation Squared (NIS)."""
