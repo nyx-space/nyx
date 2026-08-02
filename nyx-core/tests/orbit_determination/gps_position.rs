@@ -1,4 +1,5 @@
-use anise::constants::frames::EARTH_J2000;
+use anise::constants::celestial_objects::EARTH;
+use anise::constants::frames::{EARTH_J2000, IAU_EARTH_FRAME};
 use hifitime::Unit;
 use nalgebra::{Const, OMatrix};
 use nyx_space::Spacecraft;
@@ -22,9 +23,7 @@ fn test_gps_od_position_filtering() {
         22000.0, 0.01, 30.0, 80.0, 40.0, 170.0, epoch, eme2k,
     ));
 
-    let dyns = SpacecraftDynamics::new(OrbitalDynamics::point_masses(vec![
-        anise::constants::celestial_objects::EARTH,
-    ]));
+    let dyns = SpacecraftDynamics::new(OrbitalDynamics::point_masses(vec![EARTH]));
     let sim_prop = Propagator::default(dyns);
     let prop_time = Unit::Hour * 6;
     let (_, sim_traj) = sim_prop
@@ -37,7 +36,8 @@ fn test_gps_od_position_filtering() {
         bias: None,
     };
 
-    let device = PositionDevice::new("GPS".to_string())
+    let device_frame = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
+    let device = PositionDevice::new("GPS".to_string(), device_frame)
         .with_noise(MeasurementType::X, meter_level_noise)
         .with_noise(MeasurementType::Y, meter_level_noise)
         .with_noise(MeasurementType::Z, meter_level_noise);
@@ -89,7 +89,14 @@ fn test_gps_od_position_filtering() {
 
     let od_res = od.process_arc(initial_estimate, &msr_arc).unwrap();
 
-    let final_state = od_res.estimates.last().unwrap().nominal_state;
+    let final_estimate = od_res.estimates.last().unwrap();
+    println!(
+        "3-sigma X = {:.1e} m\tY = {:.1e} m\tZ = {:.1e} m",
+        1e3 * final_estimate.sigma_for(OrbitalElement::X).unwrap(),
+        1e3 * final_estimate.sigma_for(OrbitalElement::Y).unwrap(),
+        1e3 * final_estimate.sigma_for(OrbitalElement::Z).unwrap()
+    );
+    let final_state = final_estimate.nominal_state;
     let truth = sim_traj.at(final_state.epoch()).unwrap();
 
     let pos_ric_err_m = final_state
@@ -99,7 +106,13 @@ fn test_gps_od_position_filtering() {
         .radius_km
         * 1e3;
 
-    println!("RIC error in meters: {pos_ric_err_m:.3}");
+    println!("RIC error in meters with frame: {pos_ric_err_m:.3}");
 
     assert!(pos_ric_err_m.norm() < 1e-1);
+
+    assert!(final_estimate.within_3sigma());
+
+    let nis_test = od_res.nis_consistency(None).unwrap();
+    assert!(nis_test.is_consistent());
+    println!("{nis_test}");
 }

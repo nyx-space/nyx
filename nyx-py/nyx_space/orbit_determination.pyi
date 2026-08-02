@@ -2,10 +2,10 @@ from __future__ import annotations
 from anise import Almanac
 from anise import astro
 from anise import time
-import numpy
 from nyx_space import Spacecraft
 from nyx_space.mission_design import Propagator, Trajectory
 from nyx_space.monte_carlo import MvnSpacecraft, StateDispersion
+import numpy
 import nyx_space.od
 import typing
 
@@ -671,6 +671,132 @@ class MeasurementType:
     Z: MeasurementType = ...
 
 @typing.final
+class PositionDevice:
+    """Position device can be used to post-filter position measurements from GNSS/GPS devices.
+
+    For GNSS devices, ensure to set the PositionDevice frame in the ITRF93 frame, the closest realization
+    to WSG84."""
+
+    frame: typing.Any
+    name: typing.Any
+
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        Position device can be used to post-filter position measurements from GNSS/GPS devices.
+
+        For GNSS devices, ensure to set the PositionDevice frame in the ITRF93 frame, the closest realization
+        to WSG84."""
+
+    def __new__(cls, name: typing.Any, frame: typing.Any) -> PositionDevice:
+        """Position device can be used to post-filter position measurements from GNSS/GPS devices.
+
+        For GNSS devices, ensure to set the PositionDevice frame in the ITRF93 frame, the closest realization
+        to WSG84."""
+
+    def with_noise(
+        self, msr_type: MeasurementType, noise: StochasticNoise
+    ) -> PositionDevice:
+        """Add a measurement type with stochastic noise."""
+
+    def __eq__(self, value: typing.Any) -> bool:
+        """Return self==value."""
+
+    def __ge__(self, value: typing.Any) -> bool:
+        """Return self>=value."""
+
+    def __gt__(self, value: typing.Any) -> bool:
+        """Return self>value."""
+
+    def __le__(self, value: typing.Any) -> bool:
+        """Return self<=value."""
+
+    def __lt__(self, value: typing.Any) -> bool:
+        """Return self<value."""
+
+    def __ne__(self, value: typing.Any) -> bool:
+        """Return self!=value."""
+
+    def __repr__(self) -> str:
+        """Return repr(self)."""
+
+    def __str__(self) -> str:
+        """Return str(self)."""
+
+@typing.final
+class PositionResidual:
+    epoch: typing.Any
+    postfit: typing.Any
+    prefit: typing.Any
+    ratio: typing.Any
+    rejected: typing.Any
+    tracker: typing.Any
+
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature."""
+
+    def __new__(cls) -> PositionResidual: ...
+    def computed_obs(self, msr_type: MeasurementType) -> float | None:
+        """Returns the computed/expected observation for this measurement type, if available"""
+
+    def nis(self) -> float:
+        """Returns the normalized innovation squared (NIS) as the norm squares of the whitened residual"""
+
+    def real_obs(self, msr_type: MeasurementType) -> float | None:
+        """Returns the real observation for this measurement type, if available"""
+
+    def whitened_residual(self, msr_type: MeasurementType) -> float | None:
+        """Returns the whitened residual for this measurement type, if available"""
+
+    def __repr__(self) -> str:
+        """Return repr(self)."""
+
+    def __str__(self) -> str:
+        """Return str(self)."""
+
+@typing.final
+class PositionTrackingArcSim:
+    """Simulated tracking architecture for a spacecraft using position tracking devices."""
+
+    configs: typing.Any
+    devices: typing.Any
+
+    def __init__(
+        self,
+        devices: dict[str, PositionDevice],
+        trajectory: Trajectory,
+        configs: dict[str, TrkConfig],
+        seed: int | None,
+        *args: typing.Optional[typing.Any],
+        **kwargs: typing.Optional[typing.Any],
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        Simulated tracking architecture for a spacecraft using position tracking devices."""
+
+    def __new__(
+        cls,
+        devices: dict[str, PositionDevice],
+        trajectory: Trajectory,
+        configs: dict[str, TrkConfig],
+        seed: typing.Optional[int] = None,
+    ) -> PositionTrackingArcSim:
+        """Simulated tracking architecture for a spacecraft using position tracking devices."""
+
+    def generate_measurements(self, almanac: Almanac) -> TrackingDataArc:
+        """Simulates operational tracking data across predefined tracking strands.
+
+        :raises ConfigError: If a scheduling configuration is present but the schedule was not built prior to execution."""
+
+    def __repr__(self) -> str:
+        """Return repr(self)."""
+
+    def __str__(self) -> str:
+        """Return str(self)."""
+
+@typing.final
 class ProcessNoise:
     def __init__(
         self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
@@ -725,6 +851,7 @@ class ProcessNoise:
 
     def __str__(self) -> str:
         """Return str(self)."""
+
 
 @typing.final
 class NormalizedConsistency:
@@ -866,9 +993,9 @@ class Scheduler:
     def __new__(
         cls,
         handoff: typing.Optional[Handoff] = ...,
-        cadence: Cadence | None = None,
+        cadence: typing.Optional[Cadence] = None,
         min_samples: typing.Optional[int] = 10,
-        sample_alignment: time.Duration = None,
+        sample_alignment: typing.Optional[time.Duration] = None,
     ) -> Scheduler:
         """A scheduler allows building a scheduling of spaceraft tracking for a set of ground stations."""
 
@@ -946,7 +1073,7 @@ class SpacecraftEstimate:
     def from_dispersions(
         nominal_state: Spacecraft,
         dispersions: list[StateDispersion],
-        seed: int | None = None,
+        seed: typing.Optional[int] = None,
     ) -> SpacecraftEstimate:
         """Generates an initial Kalman filter state estimate dispersed from the nominal state using the provided standard deviation parameters.
 
@@ -1011,8 +1138,8 @@ class SpacecraftODProcess:
         prop: Propagator,
         kf_variant: KalmanVariant,
         devices: dict[str, GroundStation],
-        sigma_reject: SigmaRejection | None = ...,
-        process_noise: ProcessNoise | None = None,
+        sigma_reject: typing.Optional[SigmaRejection] = ...,
+        process_noise: typing.Optional[ProcessNoise] = None,
     ) -> SpacecraftODProcess:
         """Orbit determination process for a spacecraft."""
 
@@ -1223,6 +1350,117 @@ class SpacecraftODSolution:
         """Return str(self)."""
 
 @typing.final
+class SpacecraftPositionODProcess:
+    """Orbit determination process for a spacecraft using position tracking devices."""
+
+    sigma_rejection: typing.Any
+    variant: typing.Any
+
+    def __init__(
+        self,
+        prop: Propagator,
+        kf_variant: KalmanVariant,
+        devices: dict[str, PositionDevice],
+        sigma_reject: SigmaRejection | None,
+        process_noise: ProcessNoise | None,
+        *args: typing.Optional[typing.Any],
+        **kwargs: typing.Optional[typing.Any],
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        Orbit determination process for a spacecraft using position tracking devices."""
+
+    def __new__(
+        cls,
+        prop: Propagator,
+        kf_variant: KalmanVariant,
+        devices: dict[str, PositionDevice],
+        sigma_reject: typing.Optional[SigmaRejection] = ...,
+        process_noise: typing.Optional[ProcessNoise] = None,
+    ) -> SpacecraftPositionODProcess:
+        """Orbit determination process for a spacecraft using position tracking devices."""
+
+    def predict_for(
+        self, initial_estimate: SpacecraftEstimate, duration: time.Duration
+    ) -> SpacecraftPositionODSolution:
+        """Perform a time update. Continuously predicts the trajectory for the provided duration, with covariance mapping at each step."""
+
+    def predict_until(
+        self, initial_estimate: SpacecraftEstimate, end_epoch: time.Epoch
+    ) -> SpacecraftPositionODSolution:
+        """Perform a time update. Continuously predicts the trajectory until the provided end epoch, with covariance mapping at each step."""
+
+    def process_arc(
+        self, initial_estimate: SpacecraftEstimate, arc: TrackingDataArc
+    ) -> SpacecraftPositionODSolution:
+        """Process the provided tracking arc for this orbit determination process."""
+
+@typing.final
+class SpacecraftPositionODSolution:
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature."""
+
+    def __new__(cls) -> SpacecraftPositionODSolution: ...
+    def accepted_residuals(self) -> list[PositionResidual]: ...
+    @staticmethod
+    def from_parquet(
+        path: str, devices: dict[str, PositionDevice]
+    ) -> SpacecraftPositionODSolution:
+        """Reconstruct an ODSolution from a parquet file."""
+
+    def is_filter_run(self) -> bool: ...
+    def is_normal(self, alpha: typing.Optional[float] = None) -> bool:
+        """Checks whether the whitened residuals of the accepted residuals pass a normality test at a given significance level `alpha`, default to 0.05."""
+
+    def is_smoother_run(self) -> bool: ...
+    def ks_test_normality(self) -> float:
+        """Computes the Kolmogorov–Smirnov statistic for the aggregated residual ratios of the accepted residuals.
+
+        Returns Ok(ks_statistic) if residuals are available."""
+
+    def nees_consistency(
+        self, truth_traj: Trajectory, alpha: typing.Optional[float] = None
+    ) -> NormalizedConsistency:
+        """Checks whether the filter estimates are statistically consistent
+        by performing a Chi-squared test on the Normalized Estimation Error Squared (NEES)."""
+
+    def nis_consistency(
+        self, alpha: typing.Optional[float] = None
+    ) -> NormalizedConsistency:
+        """Checks whether the filter innovations are statistically consistent
+        by performing a Chi-squared test on the Normalized Innovation Squared (NIS)."""
+
+    def rejected_residuals(self) -> list[PositionResidual]: ...
+    def residual_ratio_within_threshold(self, threshold: float) -> float:
+        """Computes the fraction of residual ratios that lie within ±threshold."""
+
+    def rms_postfit_residuals(self) -> float:
+        """Returns the root mean square of the postfit residuals"""
+
+    def rms_prefit_residuals(self) -> float:
+        """Returns the root mean square of the prefit residuals"""
+
+    def rms_residual_ratios(self) -> float:
+        """Returns the root mean square of the prefit residual ratios"""
+
+    def smooth(self, almanac: Almanac) -> SpacecraftPositionODSolution:
+        """Smoothes this OD solution."""
+
+    def to_ephemeris(self, object_id: str) -> astro.Ephemeris:
+        """Export to an ANISE ephemeris, which can be converted to a CCSDS OEM"""
+
+    def to_parquet(self, path: str, cfg: ExportCfg) -> str:
+        """Export OD solutions, gains, ratios, residuals, sigmas, etc. to parquet"""
+
+    def to_traj(self) -> Trajectory: ...
+    def __repr__(self) -> str:
+        """Return repr(self)."""
+
+    def __str__(self) -> str:
+        """Return str(self)."""
+
+@typing.final
 class StochasticNoise:
     """Stochastic noise modeling used primarily for synthetic orbit determination measurements.
 
@@ -1246,9 +1484,9 @@ class StochasticNoise:
 
     def __new__(
         cls,
-        white_noise: WhiteNoise | None = None,
-        bias: GaussMarkov | None = None,
-        name: str | None = None,
+        white_noise: WhiteNoise | None,
+        bias: GaussMarkov | None,
+        name: str | None,
     ) -> StochasticNoise:
         """Stochastic noise modeling used primarily for synthetic orbit determination measurements.
 
@@ -1634,9 +1872,9 @@ class TrkConfig:
 
     def __new__(
         cls,
-        scheduler: Scheduler | None = None,
-        sampling: time.Duration = ...,
-        strands: list[Strand] | None = None,
+        scheduler: typing.Optional[Scheduler] = None,
+        sampling: typing.Optional[time.Duration] = ...,
+        strands: typing.Optional[list[Strand]] = None,
     ) -> TrkConfig:
         """Stores a tracking configuration, there is one per tracking data simulator (e.g. one for ground station #1 and another for #2).
         By default, the tracking configuration is continuous and the tracking arc is from the beginning of the simulation to the end.

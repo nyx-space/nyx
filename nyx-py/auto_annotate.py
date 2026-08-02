@@ -9,7 +9,7 @@ def rust_to_py_type(rust_type: str, class_name: str) -> str:
         return "None"
 
     # Handle Result types: Result<T, E> or PyResult<T>
-    if rust_type.startswith("Result<") or rust_type.startswith("PyResult<"):
+    if rust_type.startswith(("Result<", "PyResult<")):
         depth = 0
         inner = ""
         start_idx = rust_type.index("<") + 1
@@ -35,7 +35,7 @@ def rust_to_py_type(rust_type: str, class_name: str) -> str:
         return f"{py_inner} | None"
 
     # Handle Vec / arrays
-    if rust_type.startswith("Vec<") or rust_type.startswith("&["):
+    if rust_type.startswith(("Vec<", "&[")):
         if rust_type.startswith("Vec<"):
             inner = rust_type[4:-1].strip()
         else:
@@ -102,7 +102,7 @@ def rust_to_py_type(rust_type: str, class_name: str) -> str:
 
 def get_missing_rtypes(module_name: str) -> list[tuple[str, str]]:
     cmd = [".venv/bin/python", "generate_stubs.py", module_name, "temp.pyi"]
-    res = subprocess.run(cmd, capture_output=True, text=True)
+    res = subprocess.run(cmd, capture_output=True, text=True, check=False)
     warnings = []
     # Search in both stdout and stderr
     combined_output = res.stdout + "\n" + res.stderr
