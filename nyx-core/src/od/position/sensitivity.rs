@@ -4,7 +4,7 @@ use crate::od::ODError;
 use crate::{Spacecraft, State};
 use anise::prelude::Almanac;
 use indexmap::IndexSet;
-use nalgebra::{DimName, OMatrix, U1};
+use nalgebra::{DimName, Matrix3, OMatrix, U1};
 use std::marker::PhantomData;
 
 use super::PositionDevice;
@@ -82,7 +82,7 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, PositionDevice>
                 })?
                 .rot_mat
         } else {
-            nalgebra::Matrix3::identity()
+            Matrix3::identity()
         };
 
         for i in 0..3 {

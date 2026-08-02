@@ -83,11 +83,21 @@ impl TrackingDevice<Spacecraft> for PositionDevice {
             rx.orbit
         };
 
-        for (ii, msr_type) in self.measurement_types.iter().copied().enumerate() {
+        for msr_type in self.measurement_types.iter().copied() {
+            let val = match msr_type {
+                MeasurementType::X => orbit.radius_km.x,
+                MeasurementType::Y => orbit.radius_km.y,
+                MeasurementType::Z => orbit.radius_km.z,
+                _ => {
+                    return Err(ODError::MeasurementSimError {
+                        details: format!("{msr_type:?} not supported by PositionDevice"),
+                    });
+                }
+            };
+
             msr.push(
                 msr_type,
-                orbit.radius_km[ii]
-                    + noises.get(&msr_type).unwrap_or(&0.0)
+                val + noises.get(&msr_type).unwrap_or(&0.0)
                     + self.measurement_bias(msr_type, rx.orbit.epoch)?,
             );
         }
