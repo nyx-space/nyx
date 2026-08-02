@@ -12,10 +12,9 @@ impl PositionDevice {
     /// Create a new Position Tracking Device.
     ///
     /// :type name: str
-    /// :type frame: Frame | None
+    /// :type frame: Frame
     #[new]
-    #[pyo3(signature = (name, frame=None))]
-    fn py_new(name: String, frame: Option<Frame>) -> Self {
+    fn py_new(name: String, frame: Frame) -> Self {
         Self::new(name, frame)
     }
 
@@ -52,12 +51,12 @@ impl PositionDevice {
     }
 
     #[getter]
-    pub fn get_frame(&self) -> Option<Frame> {
+    pub fn get_frame(&self) -> Frame {
         self.frame
     }
 
     #[setter]
-    pub fn set_frame(&mut self, frame: Option<Frame>) {
+    pub fn set_frame(&mut self, frame: Frame) {
         self.frame = frame;
     }
 

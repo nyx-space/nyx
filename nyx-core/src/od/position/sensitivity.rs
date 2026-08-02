@@ -4,7 +4,7 @@ use crate::od::ODError;
 use crate::{Spacecraft, State};
 use anise::prelude::Almanac;
 use indexmap::IndexSet;
-use nalgebra::{DimName, Matrix3, OMatrix, U1};
+use nalgebra::{DimName, OMatrix, U1};
 use std::marker::PhantomData;
 
 use super::PositionDevice;
@@ -71,19 +71,17 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, PositionDevice>
 
         let mut sensitivity_row = OMatrix::<f64, U1, <Spacecraft as State>::Size>::zeros();
 
-        let dcm = if let Some(device_frame) = tx.frame {
-            almanac
-                .rotate(rx.orbit.frame, device_frame, rx.orbit.epoch)
-                .map_err(|e| ODError::MeasurementSimError {
-                    details: format!(
-                        "Failed to get rotation from {:?} to {:?}: {}",
-                        rx.orbit.frame, device_frame, e
-                    ),
-                })?
-                .rot_mat
-        } else {
-            Matrix3::identity()
-        };
+        // Rotate into the device frame
+        let dcm = almanac
+            .rotate(rx.orbit.frame, tx.frame, rx.orbit.epoch)
+            .map_err(|e| ODError::MeasurementSimError {
+                details: format!(
+                    "Failed to get rotation from {:?} to {:?}: {e}",
+                    rx.orbit.frame,
+                    tx.frame.stripped()
+                ),
+            })?
+            .rot_mat;
 
         for i in 0..3 {
             sensitivity_row[(0, i)] = dcm[(idx, i)];

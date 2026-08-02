@@ -73,15 +73,11 @@ impl TrackingDevice<Spacecraft> for PositionDevice {
             }
         }
 
-        let orbit = if let Some(frame) = self.frame {
-            almanac.transform_to(rx.orbit, frame, None).map_err(|e| {
-                ODError::MeasurementSimError {
-                    details: format!("Failed to transform to frame {frame:?}: {e}"),
-                }
-            })?
-        } else {
-            rx.orbit
-        };
+        let orbit = almanac
+            .transform_to(rx.orbit, self.frame, None)
+            .map_err(|e| ODError::MeasurementSimError {
+                details: format!("Failed to transform to frame {:?}: {e}", self.frame),
+            })?;
 
         for msr_type in self.measurement_types.iter().copied() {
             let val = match msr_type {

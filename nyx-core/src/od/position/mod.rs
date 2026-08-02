@@ -17,17 +17,20 @@ use std::fmt::Display;
 use pyo3::prelude::*;
 
 /// Position device can be used to post-filter position measurements from GNSS/GPS devices.
+///
+/// For GNSS devices, ensure to set the PositionDevice frame in the ITRF93 frame, the closest realization
+/// to WSG84.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub struct PositionDevice {
     pub name: String,
-    pub frame: Option<Frame>,
+    pub frame: Frame,
     pub stochastic_noises: Option<IndexMap<MeasurementType, StochasticNoise>>,
     pub measurement_types: IndexSet<MeasurementType>,
 }
 
 impl PositionDevice {
-    pub fn new(name: String, frame: Option<Frame>) -> Self {
+    pub fn new(name: String, frame: Frame) -> Self {
         Self {
             name,
             frame,
@@ -53,6 +56,11 @@ impl ConfigRepr for PositionDevice {}
 
 impl Display for PositionDevice {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "PositionDevice({})", self.name)
+        write!(
+            f,
+            "PositionDevice({}) in {}",
+            self.name,
+            self.frame.stripped()
+        )
     }
 }
