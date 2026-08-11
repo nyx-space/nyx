@@ -24,7 +24,7 @@ log = {workspace = true}
 rayon = {workspace = true}
 snafu = {workspace = true}
 pyo3 = {workspace = true, optional = false}
-pyo3-log = "0.13.3"
+pyo3-log = "0.13.4"
 ndarray = ">= 0.17, < 0.18"
 numpy = {workspace = true}
 

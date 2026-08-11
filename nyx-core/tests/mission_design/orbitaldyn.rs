@@ -1,19 +1,19 @@
-extern crate nalgebra as na;
 extern crate nyx_space as nyx;
+extern crate pretty_env_logger as pel;
 
 use anise::constants::celestial_objects::{EARTH, JUPITER_BARYCENTER, MOON, SUN};
 use anise::constants::frames::{EARTH_ITRF93, IAU_EARTH_FRAME};
 use hifitime::MJD_J2000;
 use nalgebra::{Const, OMatrix};
-use nyx::State;
-use nyx::cosmic::{Orbit, assert_orbit_eq_or_abs};
+use nyx::cosmic::{assert_orbit_eq_or_abs, Orbit};
 use nyx::dynamics::GravityField;
 use nyx::dynamics::{Dynamics, OrbitalDynamics, PointMasses, SpacecraftDynamics};
 use nyx::io::gravity::*;
 use nyx::linalg::Vector6;
 use nyx::time::{Epoch, Unit};
 use nyx::utils::{rss_orbit_errors, rss_orbit_vec_errors};
-use nyx::{Spacecraft, propagators::*};
+use nyx::State;
+use nyx::{propagators::*, Spacecraft};
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use rstest::*;
@@ -1119,6 +1119,7 @@ fn val_earth_sph_harmonics_70x70_partials(almanac_gmat: Arc<Almanac>) {
 
 #[rstest]
 fn val_ioastro_earth_egm2008_10x10(almanac: Arc<Almanac>) {
+    let _ = pel::try_init();
     let epoch = Epoch::from_gregorian_utc_hms(2025, 8, 25, 11, 55, 44);
     let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
     let orbit = Orbit::new(
@@ -1135,7 +1136,7 @@ fn val_ioastro_earth_egm2008_10x10(almanac: Arc<Almanac>) {
     // Configure the EGM2008 model
     let hh = GravityFieldData::from_config(
         GravityFieldConfig {
-            filepath: "../data/01_planetary/EGM2008_to2190_TideFree.gz".into(),
+            filepath: "../data/01_planetary/EGM2008_to2190_TideFree_sha.gz".into(),
             degree: 10,
             order: 10,
             frame: EARTH_ITRF93.into(),
@@ -1175,7 +1176,7 @@ fn val_ioastro_earth_egm2008_10x10(almanac: Arc<Almanac>) {
 
     let ric_error = expected_state.ric_difference(&final_state.orbit).unwrap();
 
-    assert!(dbg!(ric_error.rmag_km()) < 0.05);
+    assert!(dbg!(ric_error.rmag_km()) < 0.03);
     assert!(dbg!(ric_error.vmag_km_s()) < 5e-5);
 
     println!(
