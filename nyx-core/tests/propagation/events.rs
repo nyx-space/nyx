@@ -82,6 +82,7 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
     let e_loc = ShadowModel {
         light_source: SUN_J2000,
         shadow_bodies: vec![eme2k],
+        correction: None,
     };
 
     // Adding this print to confirm that the penumbra calculation continuously increases and then decreases.

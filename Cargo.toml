@@ -3,7 +3,7 @@ resolver = "2"
 members = ["nyx-core", "nyx-py"]
 
 [workspace.package]
-version = "2.5.0"
+version = "2.5.1"
 edition = "2024"
 authors = ["Christopher Rabotin <christopher.rabotin@gmail.com>"]
 description = "Flight-proven, blazing fast astrodynamics from preliminary design to operations"
@@ -30,12 +30,12 @@ exclude = [
 ]
 
 [workspace.dependencies]
-hifitime = "4.3.0"
-anise = { version = "0.10.4", features = ["analysis"] }
+hifitime = "4.3.1"
+anise = { version = "0.10.6", features = ["analysis"] }
 log = { version = "0.4", features = ["max_level_info"] }
 rayon = "1.6"
-pyo3 = { version = "0.28", features = ["multiple-pymethods"] }
-numpy = "0.28"
+pyo3 = { version = "0.29", features = ["multiple-pymethods"] }
+numpy = "0.29"
 snafu = { version = "0.9.0", features = ["backtrace"] }
 
 nyx-space = { path = "nyx-core" }

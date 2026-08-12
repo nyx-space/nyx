@@ -16,6 +16,20 @@ def path_to_type(*elements: str) -> ast.AST:
         base = ast.Attribute(value=base, attr=e, ctx=ast.Load())
     return base
 
+def is_optional_ast(node: ast.AST) -> bool:
+    """Recursively checks if an AST type annotation already contains None or Optional."""
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
+        return is_optional_ast(node.left) or is_optional_ast(node.right)
+    if isinstance(node, ast.Name) and node.id == "None":
+        return True
+    if isinstance(node, ast.Constant) and node.value is None:
+        return True
+    if isinstance(node, ast.Subscript):
+        if isinstance(node.value, ast.Attribute) and node.value.attr == "Optional":
+            return True
+        if isinstance(node.value, ast.Name) and node.value.id == "Optional":
+            return True
+    return False
 
 OBJECT_MEMBERS = dict(inspect.getmembers(object))
 BUILTINS: dict[str, None | tuple[list[ast.AST], ast.AST]] = {
@@ -681,7 +695,7 @@ def arguments_stub(
             )
         else:
             annotation = parsed_param_types.get(param.name)
-            if param.name in optional_params or param.default != param.empty:
+            if (param.name in optional_params or param.default != param.empty) and not is_optional_ast(annotation):
                 annotation = ast.Subscript(
                     value=path_to_type("typing", "Optional"),
                     slice=annotation,

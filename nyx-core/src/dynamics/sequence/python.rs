@@ -58,7 +58,7 @@ impl SpacecraftSequence {
     /// :type state: Spacecraft
     /// :type until_phase: str | None
     /// :type almanac: Almanac
-    /// :rtype: list[string, string]
+    /// :rtype: list[str, str]
     #[pyo3(name = "propagate")]
     fn py_propagate(
         &self,

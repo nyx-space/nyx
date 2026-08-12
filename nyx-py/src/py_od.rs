@@ -695,7 +695,7 @@ impl PySpacecraftPositionODSolution {
     /// Checks whether the filter estimates are statistically consistent
     /// by performing a Chi-squared test on the Normalized Estimation Error Squared (NEES).
     ///
-    /// :type truth_traj: PyTrajectory
+    /// :type truth_traj: Trajectory
     /// :type alpha: float | None
     /// :rtype: NormalizedConsistency
     #[pyo3(signature=(truth_traj, alpha=None))]
@@ -820,7 +820,7 @@ impl PyPositionResidual {
 /// Simulated tracking architecture for a spacecraft using position tracking devices.
 ///
 /// :type devices: dict[str, PositionDevice]
-/// :type trajectory: PyTrajectory
+/// :type trajectory: Trajectory
 /// :type configs: dict[str, TrkConfig]
 /// :type seed: int | None
 #[derive(Clone)]
@@ -836,7 +836,7 @@ impl PositionTrackingArcSim {
     /// :param devices: Mapping of position identifiers to their respective physical definitions.
     /// :type devices: dict[str, PositionDevice]
     /// :param trajectory: The deterministic ephemeris of the target spacecraft.
-    /// :type trajectory: PyTrajectory
+    /// :type trajectory: Trajectory
     /// :param configs: Tasking and measurement constraints per device (e.g., sample rates, cadences).
     /// :type configs: dict[str, TrkConfig]
     /// :param seed: Initialization seed for the underlying PRNG.
@@ -1041,7 +1041,7 @@ impl PySpacecraftODSolution {
     /// Returns Ok(true) if the filter is consistent, Ok(false) if the filter
     /// is over-confident or under-confident, or an error if no estimates are available.
     ///
-    /// :type truth_traj: PyTrajectory
+    /// :type truth_traj: Trajectory
     /// :type alpha: float | None
     /// :rtype: NormalizedConsistency
     #[pyo3(signature=(truth_traj, alpha=None))]
@@ -1096,7 +1096,7 @@ impl PySpacecraftODSolution {
     /// Returns Ok(true) if the filter is consistent, Ok(false) if the filter
     /// is over-confident or under-confident, or an error if no estimates are available.
     ///
-    /// :type truth_traj: PyTrajectory
+    /// :type truth_traj: Trajectory
     /// :type alpha: float | None
     /// :rtype: bool
     #[pyo3(signature=(truth_traj, alpha=None))]
@@ -1203,7 +1203,7 @@ impl PySpacecraftODSolution {
 /// Simulated tracking architecture for a spacecraft.
 ///
 /// :type devices: dict[str, GroundStation]
-/// :type trajectory: PyTrajectory
+/// :type trajectory: Trajectory
 /// :type configs: dict[str, TrkConfig]
 /// :type seed: int | None
 #[derive(Clone)]
@@ -1224,7 +1224,7 @@ impl GroundTrackingArcSim {
     /// :param devices: Mapping of ground station identifiers to their respective physical definitions.
     /// :type devices: dict[str, GroundStation]
     /// :param trajectory: The deterministic ephemeris of the target spacecraft.
-    /// :type trajectory: PyTrajectory
+    /// :type trajectory: Trajectory
     /// :param configs: Tasking and measurement constraints per device (e.g., sample rates, cadences).
     /// :type configs: dict[str, TrkConfig]
     /// :param seed: Initialization seed for the underlying PRNG.

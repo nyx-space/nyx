@@ -2,9 +2,6 @@ from __future__ import annotations
 from anise import Almanac
 from anise import astro
 from anise import time
-from nyx_space import Spacecraft
-from nyx_space.mission_design import Propagator, Trajectory
-from nyx_space.monte_carlo import MvnSpacecraft, StateDispersion
 import numpy
 import nyx_space.od
 import typing
@@ -671,6 +668,143 @@ class MeasurementType:
     Z: MeasurementType = ...
 
 @typing.final
+class MvnSpacecraft:
+    """A multivariate spacecraft state generator for Monte Carlo analyses. Ensures that the covariance is properly applied on all provided state variables.
+
+    # Algorithm
+
+    The `MvnSpacecraft` allows sampling from a multivariate normal distribution defined by a template state (mean) and a set of state dispersions (uncertainties).
+    The core difficulty is that dispersions are often defined in non-Cartesian spaces (like Keplerian orbital elements or B-Plane parameters), while the spacecraft state is represented in Cartesian coordinates (Position and Velocity).
+
+    The algorithm proceeds as follows:
+    1.  **Jacobian Computation**: It computes the Jacobian matrix `J` representing the partial derivatives of the provided dispersion parameters with respect to the Cartesian state elements (x, y, z, vx, vy, vz).
+    2.  **Covariance Transformation**: It constructs a diagonal covariance matrix `P` in the parameter space (assuming input dispersions are independent in that space). It then transforms this into the Cartesian covariance matrix `C` using the linear mapping approximation:
+    `C = J_inv * P * J_inv^T`
+    where `J_inv` is the Moore-Penrose pseudo-inverse of `J`.
+    3.  **Decomposition**: It performs a Singular Value Decomposition (SVD) on `C` (or the full state covariance including mass, Cr, Cd) to obtain the square root of the covariance matrix, denoted as `L`.
+    `C = U * S * V^T = (V * sqrt(S)) * (V * sqrt(S))^T` implies `L = V * sqrt(S)`
+    4.  **Sampling**: To generate a sample state `X`, it draws a vector `Z` of independent standard normal variables (N(0, 1)) and applies the transformation:
+    `X = mu + L * Z`
+
+    # Correctness vs. Independent Sampling
+
+    One might ask: "Why not just sample each Cartesian coordinate independently using a normal distribution?"
+
+    1.  **Correlations**: Independent sampling of Cartesian coordinates assumes a diagonal covariance matrix, implying no correlation between position and velocity components. In orbital mechanics, states are highly correlated (e.g., velocity magnitude and radial distance are coupled by energy). `MvnSpacecraft` preserves these physical correlations by mapping the physically meaningful uncertainties (e.g., in SMA or Inclination) into the Cartesian space.
+    2.  **Geometry**: Uncertainties defined in orbital elements form complex shapes (like "bananas") in Cartesian space. A multivariate normal approximation in Cartesian space captures the principal axes and orientation of this uncertainty volume, which an axis-aligned bounding box (implied by independent sampling) effectively destroys.
+    3.  **Consistency**: By using the Jacobian transformation, we ensure that the generated samples, when mapped back to the parameter space (linearized), reproduce the input statistics (mean and standard deviation) provided by the user."""
+
+    dispersions: typing.Any
+
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        A multivariate spacecraft state generator for Monte Carlo analyses. Ensures that the covariance is properly applied on all provided state variables.
+
+        # Algorithm
+
+        The `MvnSpacecraft` allows sampling from a multivariate normal distribution defined by a template state (mean) and a set of state dispersions (uncertainties).
+        The core difficulty is that dispersions are often defined in non-Cartesian spaces (like Keplerian orbital elements or B-Plane parameters), while the spacecraft state is represented in Cartesian coordinates (Position and Velocity).
+
+        The algorithm proceeds as follows:
+        1.  **Jacobian Computation**: It computes the Jacobian matrix `J` representing the partial derivatives of the provided dispersion parameters with respect to the Cartesian state elements (x, y, z, vx, vy, vz).
+        2.  **Covariance Transformation**: It constructs a diagonal covariance matrix `P` in the parameter space (assuming input dispersions are independent in that space). It then transforms this into the Cartesian covariance matrix `C` using the linear mapping approximation:
+        `C = J_inv * P * J_inv^T`
+        where `J_inv` is the Moore-Penrose pseudo-inverse of `J`.
+        3.  **Decomposition**: It performs a Singular Value Decomposition (SVD) on `C` (or the full state covariance including mass, Cr, Cd) to obtain the square root of the covariance matrix, denoted as `L`.
+        `C = U * S * V^T = (V * sqrt(S)) * (V * sqrt(S))^T` implies `L = V * sqrt(S)`
+        4.  **Sampling**: To generate a sample state `X`, it draws a vector `Z` of independent standard normal variables (N(0, 1)) and applies the transformation:
+        `X = mu + L * Z`
+
+        # Correctness vs. Independent Sampling
+
+        One might ask: "Why not just sample each Cartesian coordinate independently using a normal distribution?"
+
+        1.  **Correlations**: Independent sampling of Cartesian coordinates assumes a diagonal covariance matrix, implying no correlation between position and velocity components. In orbital mechanics, states are highly correlated (e.g., velocity magnitude and radial distance are coupled by energy). `MvnSpacecraft` preserves these physical correlations by mapping the physically meaningful uncertainties (e.g., in SMA or Inclination) into the Cartesian space.
+        2.  **Geometry**: Uncertainties defined in orbital elements form complex shapes (like "bananas") in Cartesian space. A multivariate normal approximation in Cartesian space captures the principal axes and orientation of this uncertainty volume, which an axis-aligned bounding box (implied by independent sampling) effectively destroys.
+        3.  **Consistency**: By using the Jacobian transformation, we ensure that the generated samples, when mapped back to the parameter space (linearized), reproduce the input statistics (mean and standard deviation) provided by the user."""
+
+    def __new__(cls, template: typing.Any, dispersions: typing.Any) -> MvnSpacecraft:
+        """A multivariate spacecraft state generator for Monte Carlo analyses. Ensures that the covariance is properly applied on all provided state variables.
+
+        # Algorithm
+
+        The `MvnSpacecraft` allows sampling from a multivariate normal distribution defined by a template state (mean) and a set of state dispersions (uncertainties).
+        The core difficulty is that dispersions are often defined in non-Cartesian spaces (like Keplerian orbital elements or B-Plane parameters), while the spacecraft state is represented in Cartesian coordinates (Position and Velocity).
+
+        The algorithm proceeds as follows:
+        1.  **Jacobian Computation**: It computes the Jacobian matrix `J` representing the partial derivatives of the provided dispersion parameters with respect to the Cartesian state elements (x, y, z, vx, vy, vz).
+        2.  **Covariance Transformation**: It constructs a diagonal covariance matrix `P` in the parameter space (assuming input dispersions are independent in that space). It then transforms this into the Cartesian covariance matrix `C` using the linear mapping approximation:
+        `C = J_inv * P * J_inv^T`
+        where `J_inv` is the Moore-Penrose pseudo-inverse of `J`.
+        3.  **Decomposition**: It performs a Singular Value Decomposition (SVD) on `C` (or the full state covariance including mass, Cr, Cd) to obtain the square root of the covariance matrix, denoted as `L`.
+        `C = U * S * V^T = (V * sqrt(S)) * (V * sqrt(S))^T` implies `L = V * sqrt(S)`
+        4.  **Sampling**: To generate a sample state `X`, it draws a vector `Z` of independent standard normal variables (N(0, 1)) and applies the transformation:
+        `X = mu + L * Z`
+
+        # Correctness vs. Independent Sampling
+
+        One might ask: "Why not just sample each Cartesian coordinate independently using a normal distribution?"
+
+        1.  **Correlations**: Independent sampling of Cartesian coordinates assumes a diagonal covariance matrix, implying no correlation between position and velocity components. In orbital mechanics, states are highly correlated (e.g., velocity magnitude and radial distance are coupled by energy). `MvnSpacecraft` preserves these physical correlations by mapping the physically meaningful uncertainties (e.g., in SMA or Inclination) into the Cartesian space.
+        2.  **Geometry**: Uncertainties defined in orbital elements form complex shapes (like "bananas") in Cartesian space. A multivariate normal approximation in Cartesian space captures the principal axes and orientation of this uncertainty volume, which an axis-aligned bounding box (implied by independent sampling) effectively destroys.
+        3.  **Consistency**: By using the Jacobian transformation, we ensure that the generated samples, when mapped back to the parameter space (linearized), reproduce the input statistics (mean and standard deviation) provided by the user."""
+
+    @staticmethod
+    def from_spacecraft_cov(
+        template: typing.Any, cov: typing.Any, mean: typing.Any
+    ) -> typing.Any: ...
+    def sample(self, count: typing.Any, seed: typing.Any = None) -> typing.Any:
+        """Samples the multivariate distribution to generate a list of spacecraft states (up to 100k).
+
+        The Pseudo-Random Number Generator (PRNG) used is the Permuted Congruential Generator (PCG).
+        PCG is an excellent choice for Monte Carlo simulations because:
+        1. **Statistical Quality**: It passes difficult statistical tests (like TestU01), ensuring the generated numbers are random enough for high-fidelity simulations.
+        2. **Performance**: It is very fast and efficient, which is crucial when generating a large number of samples.
+        3. **Small State**: It has a small state size and is easy to seed, making it ideal for reproducible simulations.
+        4. **Reproducibility**: By providing a seed, the exact same sequence of spacecraft states can be generated, allowing for debugging and validation of Monte Carlo runs."""
+
+    @staticmethod
+    def zero_mean(template: typing.Any, dispersions: typing.Any) -> typing.Any: ...
+
+@typing.final
+class NormalizedConsistency:
+    is_nees: typing.Any
+    k: typing.Any
+    lower_bound: typing.Any
+    normalized_sum: typing.Any
+    upper_bound: typing.Any
+
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature."""
+
+    def __new__(cls) -> NormalizedConsistency: ...
+    def has_statistical_power(self) -> typing.Any:
+        """Returns true if there are more than 35 degrees of freedom"""
+
+    def is_consistent(self) -> typing.Any:
+        """Returns true if the sum metric is within the lower and upper bounds"""
+
+    def is_overconfident(self) -> typing.Any:
+        """Returns true if the normalized sum is greater than the upper bound"""
+
+    def is_underconfident(self) -> typing.Any:
+        """Returns true if the normalized sum is less than the lower bound"""
+
+    def log(self) -> typing.Any:
+        """Log the status to the logger"""
+
+    def name(self) -> typing.Any: ...
+    def __repr__(self) -> str:
+        """Return repr(self)."""
+
+    def __str__(self) -> str:
+        """Return str(self)."""
+
+@typing.final
 class PositionDevice:
     """Position device can be used to post-filter position measurements from GNSS/GPS devices.
 
@@ -781,7 +915,7 @@ class PositionTrackingArcSim:
         devices: dict[str, PositionDevice],
         trajectory: Trajectory,
         configs: dict[str, TrkConfig],
-        seed: typing.Optional[int] = None,
+        seed: int | None = None,
     ) -> PositionTrackingArcSim:
         """Simulated tracking architecture for a spacecraft using position tracking devices."""
 
@@ -845,46 +979,6 @@ class ProcessNoise:
 
     def __ne__(self, value: typing.Any) -> bool:
         """Return self!=value."""
-
-    def __repr__(self) -> str:
-        """Return repr(self)."""
-
-    def __str__(self) -> str:
-        """Return str(self)."""
-
-
-@typing.final
-class NormalizedConsistency:
-    """Normalized consistency check result (NIS/NEES)."""
-
-    is_nees: bool
-    k: float
-    lower_bound: float
-    normalized_sum: float
-    upper_bound: float
-
-    def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
-    ) -> None:
-        """Initialize self.  See help(type(self)) for accurate signature."""
-
-    def has_statistical_power(self) -> bool:
-        """Returns whether the test has statistical power."""
-
-    def is_consistent(self) -> bool:
-        """Returns whether the filter is consistent."""
-
-    def is_overconfident(self) -> bool:
-        """Returns whether the filter is overconfident."""
-
-    def is_underconfident(self) -> bool:
-        """Returns whether the filter is underconfident."""
-
-    def log(self) -> None:
-        """Log the consistency check result."""
-
-    def name(self) -> str:
-        """Returns the name of the consistency check."""
 
     def __repr__(self) -> str:
         """Return repr(self)."""
@@ -993,9 +1087,9 @@ class Scheduler:
     def __new__(
         cls,
         handoff: typing.Optional[Handoff] = ...,
-        cadence: typing.Optional[Cadence] = None,
+        cadence: Cadence | None = None,
         min_samples: typing.Optional[int] = 10,
-        sample_alignment: typing.Optional[time.Duration] = None,
+        sample_alignment: time.Duration | None = None,
     ) -> Scheduler:
         """A scheduler allows building a scheduling of spaceraft tracking for a set of ground stations."""
 
@@ -1073,7 +1167,7 @@ class SpacecraftEstimate:
     def from_dispersions(
         nominal_state: Spacecraft,
         dispersions: list[StateDispersion],
-        seed: typing.Optional[int] = None,
+        seed: int | None = None,
     ) -> SpacecraftEstimate:
         """Generates an initial Kalman filter state estimate dispersed from the nominal state using the provided standard deviation parameters.
 
@@ -1138,8 +1232,8 @@ class SpacecraftODProcess:
         prop: Propagator,
         kf_variant: KalmanVariant,
         devices: dict[str, GroundStation],
-        sigma_reject: typing.Optional[SigmaRejection] = ...,
-        process_noise: typing.Optional[ProcessNoise] = None,
+        sigma_reject: SigmaRejection | None = ...,
+        process_noise: ProcessNoise | None = None,
     ) -> SpacecraftODProcess:
         """Orbit determination process for a spacecraft."""
 
@@ -1249,9 +1343,7 @@ class SpacecraftODSolution:
         Returns Ok(true) if the filter is consistent, Ok(false) if the filter
         is over-confident or under-confident, or an error if no estimates are available."""
 
-    def nis_consistency(
-        self, alpha: float | None = None
-    ) -> NormalizedConsistency:
+    def nis_consistency(self, alpha: float | None = None) -> NormalizedConsistency:
         """Checks whether the filter innovations are statistically consistent
         by performing a Chi-squared test on the Normalized Innovation Squared (NIS).
 
@@ -1374,8 +1466,8 @@ class SpacecraftPositionODProcess:
         prop: Propagator,
         kf_variant: KalmanVariant,
         devices: dict[str, PositionDevice],
-        sigma_reject: typing.Optional[SigmaRejection] = ...,
-        process_noise: typing.Optional[ProcessNoise] = None,
+        sigma_reject: SigmaRejection | None = ...,
+        process_noise: ProcessNoise | None = None,
     ) -> SpacecraftPositionODProcess:
         """Orbit determination process for a spacecraft using position tracking devices."""
 
@@ -1410,7 +1502,7 @@ class SpacecraftPositionODSolution:
         """Reconstruct an ODSolution from a parquet file."""
 
     def is_filter_run(self) -> bool: ...
-    def is_normal(self, alpha: typing.Optional[float] = None) -> bool:
+    def is_normal(self, alpha: float | None = None) -> bool:
         """Checks whether the whitened residuals of the accepted residuals pass a normality test at a given significance level `alpha`, default to 0.05."""
 
     def is_smoother_run(self) -> bool: ...
@@ -1420,14 +1512,12 @@ class SpacecraftPositionODSolution:
         Returns Ok(ks_statistic) if residuals are available."""
 
     def nees_consistency(
-        self, truth_traj: Trajectory, alpha: typing.Optional[float] = None
+        self, truth_traj: Trajectory, alpha: float | None = None
     ) -> NormalizedConsistency:
         """Checks whether the filter estimates are statistically consistent
         by performing a Chi-squared test on the Normalized Estimation Error Squared (NEES)."""
 
-    def nis_consistency(
-        self, alpha: typing.Optional[float] = None
-    ) -> NormalizedConsistency:
+    def nis_consistency(self, alpha: float | None = None) -> NormalizedConsistency:
         """Checks whether the filter innovations are statistically consistent
         by performing a Chi-squared test on the Normalized Innovation Squared (NIS)."""
 
@@ -1461,6 +1551,28 @@ class SpacecraftPositionODSolution:
         """Return str(self)."""
 
 @typing.final
+class StateDispersion:
+    """A dispersions configuration, allows specifying min/max bounds (by default, they are not set)"""
+
+    mean: typing.Any
+    param: typing.Any
+    std_dev: typing.Any
+
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        A dispersions configuration, allows specifying min/max bounds (by default, they are not set)"""
+
+    def __new__(
+        cls, param: typing.Any, std_dev: typing.Any, mean: typing.Any
+    ) -> StateDispersion:
+        """A dispersions configuration, allows specifying min/max bounds (by default, they are not set)"""
+
+    @staticmethod
+    def zero_mean(param: typing.Any, std_dev: typing.Any) -> typing.Any: ...
+
+@typing.final
 class StochasticNoise:
     """Stochastic noise modeling used primarily for synthetic orbit determination measurements.
 
@@ -1484,9 +1596,9 @@ class StochasticNoise:
 
     def __new__(
         cls,
-        white_noise: WhiteNoise | None,
-        bias: GaussMarkov | None,
-        name: str | None,
+        white_noise: WhiteNoise | None = None,
+        bias: GaussMarkov | None = None,
+        name: str | None = None,
     ) -> StochasticNoise:
         """Stochastic noise modeling used primarily for synthetic orbit determination measurements.
 
@@ -1848,6 +1960,50 @@ class TrackingDataArc:
         """Return str(self)."""
 
 @typing.final
+class Trajectory:
+    """Spacecraft Trajectory."""
+
+    def __init__(
+        self,
+        path: str,
+        template: Spacecraft | None,
+        *args: typing.Optional[typing.Any],
+        **kwargs: typing.Optional[typing.Any],
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        Spacecraft Trajectory."""
+
+    def __new__(cls, path: str, template: Spacecraft | None) -> Trajectory:
+        """Spacecraft Trajectory."""
+
+    def append(self, many_spacecraft: list[Spacecraft]) -> None:
+        """Append many spacecraft to this trajectory."""
+
+    def at(self, epoch: time.Epoch) -> Spacecraft:
+        """Evaluate the trajectory at this specific epoch."""
+
+    def push(self, spacecraft: Spacecraft) -> None:
+        """Add another state to this trajectory."""
+
+    def ric_diff_to_parquet(self, other: Trajectory, path: str, cfg: ExportCfg) -> str:
+        """Export the difference in RIC from of this trajectory compare to the "other" trajectory in parquet format.
+
+        # Notes
+        + The RIC frame accounts for the transport theorem by performing a finite differencing of the RIC frame."""
+
+    def to_ephemeris(self, object_id: str, cfg: ExportCfg) -> astro.Ephemeris:
+        """Export this spacecraft trajectory estimate to an ANISE Ephemeris"""
+
+    def to_parquet(self, path: str, cfg: ExportCfg) -> str:
+        """Write trajectory to a parquet file."""
+
+    def __repr__(self) -> str:
+        """Return repr(self)."""
+
+    def __str__(self) -> str:
+        """Return str(self)."""
+
+@typing.final
 class TrkConfig:
     """Stores a tracking configuration, there is one per tracking data simulator (e.g. one for ground station #1 and another for #2).
     By default, the tracking configuration is continuous and the tracking arc is from the beginning of the simulation to the end.
@@ -1872,9 +2028,9 @@ class TrkConfig:
 
     def __new__(
         cls,
-        scheduler: typing.Optional[Scheduler] = None,
+        scheduler: Scheduler | None = None,
         sampling: typing.Optional[time.Duration] = ...,
-        strands: typing.Optional[list[Strand]] = None,
+        strands: list[Strand] | None = None,
     ) -> TrkConfig:
         """Stores a tracking configuration, there is one per tracking data simulator (e.g. one for ground station #1 and another for #2).
         By default, the tracking configuration is continuous and the tracking arc is from the beginning of the simulation to the end.

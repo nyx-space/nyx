@@ -329,8 +329,9 @@ class Orbit:
     def aol_deg(self) -> float:
         """Returns the argument of latitude in degrees
 
-        NOTE: If the orbit is near circular, the AoL will be computed from the true longitude
-        instead of relying on the ill-defined true anomaly."""
+        NOTE: This computation uses vector geometry, ensuring proper conditioning with circular orbits.
+        NOTE: If the orbit is near equatorial (inclination < 1e-6 deg), then the AoL is ill-defined
+        and an error will be returned."""
 
     def aop_brouwer_short_deg(self) -> float:
         """Returns the Brouwer-short mean Argument of Perigee in degrees."""

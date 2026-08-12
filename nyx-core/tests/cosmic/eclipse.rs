@@ -50,6 +50,7 @@ fn leo_sun_earth_eclipses(almanac: Arc<Almanac>) {
     let e_loc = ShadowModel {
         light_source: almanac.frame_info(SUN_J2000).unwrap(),
         shadow_bodies: vec![eme2k],
+        correction: None,
     };
 
     // Receive the states on the main thread.
@@ -102,6 +103,7 @@ fn geo_sun_earth_eclipses(almanac: Arc<Almanac>) {
     let e_loc = ShadowModel {
         light_source: almanac.frame_info(SUN_J2000).unwrap(),
         shadow_bodies: vec![eme2k],
+        correction: None,
     };
 
     // Receive the states on the main thread.

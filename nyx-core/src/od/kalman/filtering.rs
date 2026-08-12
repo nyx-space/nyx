@@ -82,6 +82,17 @@ where
         } else {
             OVector::<f64, <T as State>::Size>::zeros()
         };
+
+        // Force symmetry on the covariance
+        covar_bar = 0.5 * (covar_bar + covar_bar.transpose());
+
+        // Clamp negative machine-precision noise on the diagonal
+        for i in 0..<T as State>::Size::DIM {
+            if covar_bar[(i, i)].is_sign_negative() {
+                covar_bar[(i, i)] = 0.0;
+            }
+        }
+
         let estimate = KfEstimate {
             nominal_state,
             state_deviation: state_bar,
@@ -290,11 +301,18 @@ where
         // Compute covariance (Joseph update)
         let first_term =
             OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity() - &gain * &h_tilde;
-        let covar =
+        let mut covar =
             first_term * covar_bar * first_term.transpose() + &gain * &r_k * &gain.transpose();
 
         // Force symmetry on the covariance
-        let covar = 0.5 * (covar + covar.transpose());
+        covar = 0.5 * (covar + covar.transpose());
+
+        // Clamp negative machine-precision noise on the diagonal
+        for i in 0..<T as State>::Size::DIM {
+            if covar[(i, i)].is_sign_negative() {
+                covar[(i, i)] = 0.0;
+            }
+        }
 
         // And wrap up
         let estimate = KfEstimate {

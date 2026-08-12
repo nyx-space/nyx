@@ -82,7 +82,8 @@ impl GravityFieldConfig {
     }
 }
 
-/// `GravityFieldData` loads the requested gravity potential files and stores them in memory (in a HashMap).
+/// `GravityFieldData` loads the requested gravity potential files and stores them in memory.
+/// Download the latest gravity fields from NASA Planetary Data Service <https://pds-geosciences.wustl.edu/dataserv/gravity_models.htm>
 ///
 /// WARNING: This memory backend may require a lot of RAM (e.g. EMG2008 2190x2190 requires nearly 400 MB of RAM).
 #[derive(Clone)]
@@ -92,6 +93,8 @@ pub struct GravityFieldData {
     c_nm: DMatrix<f64>,
     s_nm: DMatrix<f64>,
     pub frame: Frame,
+    pub mu_km3_s2: Option<f64>,
+    pub radius_km: Option<f64>,
 }
 
 impl GravityFieldData {
@@ -111,7 +114,7 @@ impl GravityFieldData {
         }
     }
 
-    /// Initialize `GravityFieldData` with a custom unnormalized J2 value
+    /// Initialize `GravityFieldData` with a custom normalized J2 value
     pub fn from_j2(j2: f64, frame: Frame) -> GravityFieldData {
         let mut c_nm = DMatrix::from_element(3, 3, 0.0);
         c_nm[(2, 0)] = j2;
@@ -122,26 +125,9 @@ impl GravityFieldData {
             c_nm,
             s_nm: DMatrix::from_element(3, 3, 0.0),
             frame,
+            mu_km3_s2: None,
+            radius_km: None,
         }
-    }
-
-    /// Initialize `GravityFieldData` from the file path (must be a gunzipped file)
-    ///
-    /// Gravity models provided by `nyx`:
-    /// + EMG2008 to 2190 for Earth (tide free)
-    /// + Moon to 1500 (from SHADR file)
-    /// + Mars to 120 (from SHADR file)
-    /// + Venus to 150 (from SHADR file)
-    pub fn from_shadr<P: AsRef<Path> + Debug>(
-        filepath: P,
-        degree: usize,
-        order: usize,
-        frame: Frame,
-    ) -> Result<GravityFieldData, NyxError> {
-        Self::load(
-            filepath, true, //SHADR has a header which we ignore
-            degree, order, frame,
-        )
     }
 
     pub fn from_cof<P: AsRef<Path> + Debug>(
@@ -188,9 +174,72 @@ impl GravityFieldData {
         let mut s_nm_mat = DMatrix::from_element(degree + 1, degree + 1, 0.0);
         let mut max_order: usize = 0;
         let mut max_degree: usize = 0;
+        let mut mu_km3_s2 = None;
+        let mut radius_km = None;
         for (lno, line) in data_as_str.split('\n').enumerate() {
-            if line.is_empty() || !line.starts_with('R') {
-                continue; // This is either a comment, a header or "END"
+            if line.is_empty() {
+                continue;
+            } else if line.starts_with("POTFIELD") {
+                // Useful header
+                let words = line.split_whitespace().collect::<Vec<&str>>();
+                if words.len() != 7 {
+                    return Err(NyxError::FileUnreadable {
+                        msg: format!(
+                            "COF header should have 7 columns, but found {}",
+                            words.len()
+                        ),
+                    });
+                }
+                if let Ok(degree) = words[1].parse::<usize>() {
+                    max_degree = degree;
+                } else {
+                    return Err(NyxError::FileUnreadable {
+                        msg: format!(
+                            "could not parse `{}` for the model's maximum degree",
+                            words[1]
+                        ),
+                    });
+                }
+
+                if let Ok(order) = words[2].parse::<usize>() {
+                    max_order = order;
+                } else {
+                    return Err(NyxError::FileUnreadable {
+                        msg: format!(
+                            "could not parse `{}` for the model's maximum order",
+                            words[2]
+                        ),
+                    });
+                }
+
+                // Check this field is normalized; else it can't be used.
+                if let Ok(normalized_flag) = words[3].parse::<u8>()
+                    && normalized_flag != 1
+                {
+                    return Err(NyxError::FileUnreadable {
+                        msg: "unsupported: COF file is UNNORMALIZED.".to_string(),
+                    });
+                }
+                if let Ok(mu_m3_s2) = words[4].parse::<f64>() {
+                    mu_km3_s2 = Some(mu_m3_s2 * 1e-9);
+                } else {
+                    warn!(
+                        "could not parse `{}` for the model's gravitational parameter",
+                        words[4]
+                    );
+                }
+                if let Ok(radius_m) = words[5].parse::<f64>() {
+                    radius_km = Some(radius_m * 1e-3);
+                } else {
+                    warn!(
+                        "could not parse `{}` for the model's reference radius",
+                        words[5]
+                    );
+                }
+                continue;
+            } else if !line.starts_with("RECOEF") {
+                // Comment line or in general something we don't care about.
+                continue;
             }
             // These variables need to be declared as mutable because rustc does not know
             // we nwon't match each ino more than once.
@@ -205,10 +254,7 @@ impl GravityFieldData {
                         Ok(val) => cur_degree = val,
                         Err(_) => {
                             return Err(NyxError::FileUnreadable {
-                                msg: format!(
-                                    "Harmonics file:
-                                could not parse degree `{item}` on line {lno}"
-                                ),
+                                msg: format!("could not parse degree `{item}` on line {lno}"),
                             });
                         }
                     },
@@ -216,104 +262,77 @@ impl GravityFieldData {
                         Ok(val) => cur_order = val,
                         Err(_) => {
                             return Err(NyxError::FileUnreadable {
-                                msg: format!(
-                                    "Harmonics file:
-                                could not parse order `{item}` on line {lno}"
-                                ),
+                                msg: format!("could not parse order `{item}` on line {lno}"),
                             });
                         }
                     },
                     3 => {
-                        // If we are at degree zero, then there is only one item, so we can parse that and
-                        // set the S_nm to zero.
-                        if degree == 0 {
-                            s_nm = 0.0;
-                            match f64::from_str(item) {
-                                Ok(val) => c_nm = val,
-                                Err(_) => {
-                                    return Err(NyxError::FileUnreadable {
-                                        msg: format!(
-                                            "Harmonics file:
-                                        could not parse C_nm `{item}` on line {lno}"
-                                        ),
-                                    });
-                                }
-                            }
-                        } else {
-                            // There is a space as a delimiting character between the C_nm and S_nm only if the S_nm
-                            // is a positive number, otherwise, they are continuous (what a great format).
-                            if (item.matches('-').count() == 3 && !item.starts_with('-'))
-                                || item.matches('-').count() == 4
-                            {
-                                // Now we have two items concatenated into one... great
-                                let parts: Vec<&str> = item.split('-').collect();
-                                if parts.len() == 5 {
-                                    // That mean we have five minus signs, so both the C and S are negative.
-                                    let c_nm_str = "-".to_owned() + parts[1] + "-" + parts[2];
-                                    match f64::from_str(&c_nm_str) {
-                                        Ok(val) => c_nm = val,
-                                        Err(_) => {
-                                            return Err(NyxError::FileUnreadable {
-                                                msg: format!(
-                                                    "Harmonics file:
-                                                could not parse C_nm `{item}` on line {lno}"
-                                                ),
-                                            });
-                                        }
-                                    }
-                                    // That mean we have five minus signs, so both the C and S are negative.
-                                    let s_nm_str = "-".to_owned() + parts[3] + "-" + parts[4];
-                                    match f64::from_str(&s_nm_str) {
-                                        Ok(val) => s_nm = val,
-                                        Err(_) => {
-                                            return Err(NyxError::FileUnreadable {
-                                                msg: format!(
-                                                    "Harmonics file:
-                                                could not parse S_nm `{item}` on line {lno}"
-                                                ),
-                                            });
-                                        }
-                                    }
-                                } else {
-                                    // That mean we have fouve minus signs, and since both values are concatenated, C_nm is positive and S_nm is negative
-                                    let c_nm_str = parts[0].to_owned() + "-" + parts[1];
-                                    match f64::from_str(&c_nm_str) {
-                                        Ok(val) => c_nm = val,
-                                        Err(_) => {
-                                            return Err(NyxError::FileUnreadable {
-                                                msg: format!(
-                                                    "Harmonics file:
-                                                could not parse C_nm `{item}` on line {lno}"
-                                                ),
-                                            });
-                                        }
-                                    }
-                                    // That mean we have five minus signs, so both the C and S are negative.
-                                    let s_nm_str = "-".to_owned() + parts[2] + "-" + parts[3];
-                                    match f64::from_str(&s_nm_str) {
-                                        Ok(val) => s_nm = val,
-                                        Err(_) => {
-                                            return Err(NyxError::FileUnreadable {
-                                                msg: format!(
-                                                    "Harmonics file:
-                                                could not parse S_nm `{item}` on line {lno}"
-                                                ),
-                                            });
-                                        }
-                                    }
-                                }
-                            } else {
-                                // We only have the first item, and that's the C_nm
-                                match f64::from_str(item) {
+                        // There is a space as a delimiting character between the C_nm and S_nm only if the S_nm
+                        // is a positive number, otherwise, they are continuous (what a great format).
+                        if (item.matches('-').count() == 3 && !item.starts_with('-'))
+                            || item.matches('-').count() == 4
+                        {
+                            // Now we have two items concatenated into one... great
+                            let parts: Vec<&str> = item.split('-').collect();
+                            if parts.len() == 5 {
+                                // That mean we have five minus signs, so both the C and S are negative.
+                                let c_nm_str = "-".to_owned() + parts[1] + "-" + parts[2];
+                                match f64::from_str(&c_nm_str) {
                                     Ok(val) => c_nm = val,
                                     Err(_) => {
                                         return Err(NyxError::FileUnreadable {
                                             msg: format!(
-                                                "Harmonics file:
-                                            could not parse C_nm `{item}` on line {lno}"
+                                                "could not parse C_nm `{item}` on line {lno}"
                                             ),
                                         });
                                     }
+                                }
+                                // That mean we have five minus signs, so both the C and S are negative.
+                                let s_nm_str = "-".to_owned() + parts[3] + "-" + parts[4];
+                                match f64::from_str(&s_nm_str) {
+                                    Ok(val) => s_nm = val,
+                                    Err(_) => {
+                                        return Err(NyxError::FileUnreadable {
+                                            msg: format!(
+                                                "could not parse S_nm `{item}` on line {lno}"
+                                            ),
+                                        });
+                                    }
+                                }
+                            } else {
+                                // That mean we have fouve minus signs, and since both values are concatenated, C_nm is positive and S_nm is negative
+                                let c_nm_str = parts[0].to_owned() + "-" + parts[1];
+                                match f64::from_str(&c_nm_str) {
+                                    Ok(val) => c_nm = val,
+                                    Err(_) => {
+                                        return Err(NyxError::FileUnreadable {
+                                            msg: format!(
+                                                "could not parse C_nm `{item}` on line {lno}"
+                                            ),
+                                        });
+                                    }
+                                }
+                                // That mean we have five minus signs, so both the C and S are negative.
+                                let s_nm_str = "-".to_owned() + parts[2] + "-" + parts[3];
+                                match f64::from_str(&s_nm_str) {
+                                    Ok(val) => s_nm = val,
+                                    Err(_) => {
+                                        return Err(NyxError::FileUnreadable {
+                                            msg: format!(
+                                                "could not parse S_nm `{item}` on line {lno}"
+                                            ),
+                                        });
+                                    }
+                                }
+                            }
+                        } else {
+                            // We only have the first item, and that's the C_nm
+                            match f64::from_str(item) {
+                                Ok(val) => c_nm = val,
+                                Err(_) => {
+                                    return Err(NyxError::FileUnreadable {
+                                        msg: format!("could not parse C_nm `{item}` on line {lno}"),
+                                    });
                                 }
                             }
                         }
@@ -324,8 +343,7 @@ impl GravityFieldData {
                         Err(_) => {
                             return Err(NyxError::FileUnreadable {
                                 msg: format!(
-                                    "Harmonics file:
-                                could not parse S_nm `{item}` on line {lno}"
+                                    "Harmonics file: could not parse S_nm `{item}` on line {lno}"
                                 ),
                             });
                         }
@@ -345,38 +363,31 @@ impl GravityFieldData {
                 c_nm_mat[(cur_degree, cur_order)] = c_nm;
                 s_nm_mat[(cur_degree, cur_order)] = s_nm;
             }
-            // This serves as a warning.
-            max_order = if cur_order > max_order {
-                cur_order
-            } else {
-                max_order
-            };
-            max_degree = if cur_degree > max_degree {
-                cur_degree
-            } else {
-                max_degree
-            };
         }
+        // Keep the warning at the end of the parsing.
         if max_degree < degree || max_order < order {
             warn!(
                 "{filepath:?} only contained (degree, order) of ({max_degree}, {max_order}) instead of requested ({degree}, {order})"
             );
         } else {
-            info!("{filepath:?} loaded with (degree, order) = ({degree}, {order})");
+            info!("Loaded {filepath:?} COF file with {degree}x{order} field");
         }
         Ok(GravityFieldData {
-            degree: max_degree,
-            order: max_order,
+            degree,
+            order,
             c_nm: c_nm_mat,
             s_nm: s_nm_mat,
             frame,
+            mu_km3_s2,
+            radius_km,
         })
     }
 
-    /// `load` handles the actual loading in memory.
-    fn load<P: AsRef<Path> + Debug>(
+    /// Initialize `GravityFieldData` from the SHADR file path (may be a gunzipped file)
+    /// Download the latest gravity fields from NASA Planetary Data Service <https://pds-geosciences.wustl.edu/dataserv/gravity_models.htm>
+    /// Nyx only supports FULLY NORMALIZED.
+    pub fn from_shadr<P: AsRef<Path> + Debug>(
         filepath: P,
-        skip_first_line: bool,
         degree: usize,
         order: usize,
         frame: Frame,
@@ -418,8 +429,76 @@ impl GravityFieldData {
 
         let mut max_degree: usize = 0;
         let mut max_order: usize = 0;
+
+        let mut mu_km3_s2 = None;
+        let mut radius_km = None;
+
         for (lno, line) in data_as_str.split('\n').enumerate() {
-            if lno == 0 && skip_first_line {
+            if lno == 0 {
+                // Parse the header.
+                let words = line
+                    .trim()
+                    .split(",")
+                    .collect::<Vec<&str>>()
+                    .iter()
+                    .map(|w| w.trim())
+                    .collect::<Vec<&str>>();
+                if words.len() != 8 {
+                    return Err(NyxError::FileUnreadable {
+                        msg: format!(
+                            "SHADR header should have 8 columns, but found {}",
+                            words.len()
+                        ),
+                    });
+                }
+                if let Ok(degree) = words[3].parse::<usize>() {
+                    max_degree = degree;
+                } else {
+                    return Err(NyxError::FileUnreadable {
+                        msg: format!(
+                            "could not parse `{}` for the model's maximum degree",
+                            words[3]
+                        ),
+                    });
+                }
+                if let Ok(order) = words[4].parse::<usize>() {
+                    max_order = order;
+                } else {
+                    return Err(NyxError::FileUnreadable {
+                        msg: format!(
+                            "could not parse `{}` for the model's maximum order",
+                            words[4]
+                        ),
+                    });
+                }
+
+                // Check this field is normalized; else it can't be used.
+                if let Ok(normalized_flag) = words[5].parse::<u8>()
+                    && normalized_flag != 1
+                {
+                    return Err(NyxError::FileUnreadable {
+                        msg: "unsupported: SHADR file is UNNORMALIZED.".to_string(),
+                    });
+                }
+                if let Ok(parsed_mu_km3_s2) = words[1].parse::<f64>() {
+                    mu_km3_s2 = Some(parsed_mu_km3_s2);
+                } else {
+                    warn!(
+                        "could not parse `{}` for the model's gravitational parameter",
+                        words[1]
+                    );
+                }
+                if let Ok(parsed_radius_km) = words[0].parse::<f64>() {
+                    radius_km = Some(parsed_radius_km);
+                } else {
+                    warn!(
+                        "could not parse `{}` for the model's reference radius",
+                        words[0]
+                    );
+                }
+                continue;
+            }
+            if line.trim().is_empty() {
                 continue;
             }
             // These variables need to be declared as mutable because rustc does not know
@@ -434,10 +513,7 @@ impl GravityFieldData {
                         Ok(val) => cur_degree = val,
                         Err(_) => {
                             return Err(NyxError::FileUnreadable {
-                                msg: format!(
-                                    "Harmonics file:
-                                could not parse degree on line {lno} (`{item}`)",
-                                ),
+                                msg: format!("could not parse degree on line {lno} (`{item}`)",),
                             });
                         }
                     },
@@ -445,10 +521,7 @@ impl GravityFieldData {
                         Ok(val) => cur_order = val,
                         Err(_) => {
                             return Err(NyxError::FileUnreadable {
-                                msg: format!(
-                                    "Harmonics file:
-                                could not parse order on line {lno} (`{item}`)"
-                                ),
+                                msg: format!("could not parse order on line {lno} (`{item}`)"),
                             });
                         }
                     },
@@ -456,10 +529,7 @@ impl GravityFieldData {
                         Ok(val) => c_nm = val,
                         Err(_) => {
                             return Err(NyxError::FileUnreadable {
-                                msg: format!(
-                                    "Harmonics file:
-                                could not parse C_nm `{item}` on line {lno}"
-                                ),
+                                msg: format!("could not parse C_nm `{item}` on line {lno}"),
                             });
                         }
                     },
@@ -467,10 +537,7 @@ impl GravityFieldData {
                         Ok(val) => s_nm = val,
                         Err(_) => {
                             return Err(NyxError::FileUnreadable {
-                                msg: format!(
-                                    "Harmonics file:
-                                could not parse S_nm `{item}` on line {lno}"
-                                ),
+                                msg: format!("could not parse S_nm `{item}` on line {lno}"),
                             });
                         }
                     },
@@ -489,31 +556,22 @@ impl GravityFieldData {
                 c_nm_mat[(cur_degree, cur_order)] = c_nm;
                 s_nm_mat[(cur_degree, cur_order)] = s_nm;
             }
-            // This serves as a warning.
-            max_order = if cur_order > max_order {
-                cur_order
-            } else {
-                max_order
-            };
-            max_degree = if cur_degree > max_degree {
-                cur_degree
-            } else {
-                max_degree
-            };
         }
         if max_degree < degree || max_order < order {
             warn!(
                 "{filepath:?} only contained (degree, order) of ({max_degree}, {max_order}) instead of requested ({degree}, {order})",
             );
         } else {
-            info!("{filepath:?} loaded with (degree, order) = ({degree}, {order})");
+            info!("Loaded {filepath:?} SHADR file with {degree}x{order} field");
         }
         Ok(GravityFieldData {
-            order: max_order,
-            degree: max_degree,
+            order,
+            degree,
             c_nm: c_nm_mat,
             s_nm: s_nm_mat,
             frame,
+            radius_km,
+            mu_km3_s2,
         })
     }
 

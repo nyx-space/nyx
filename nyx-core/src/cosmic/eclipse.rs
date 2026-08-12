@@ -18,6 +18,7 @@
 
 use anise::almanac::Almanac;
 use anise::analysis::prelude::Event;
+use anise::astro::Aberration;
 use anise::astro::Occultation;
 use anise::constants::frames::{EARTH_J2000, MOON_J2000, SUN_J2000};
 use anise::errors::AlmanacResult;
@@ -31,10 +32,12 @@ use std::fmt;
 use pyo3::prelude::*;
 
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
-#[derive(Clone, Debug, Serialize, Deserialize, StaticType)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, StaticType)]
 pub struct ShadowModel {
     pub light_source: Frame,
     pub shadow_bodies: Vec<Frame>,
+    /// Light-time correction for the Sun position at emission time of photons.
+    pub correction: Option<Aberration>,
 }
 
 impl fmt::Display for ShadowModel {
@@ -44,11 +47,13 @@ impl fmt::Display for ShadowModel {
             .iter()
             .map(|b| format!("{b:x}"))
             .collect();
+
         write!(
             f,
-            "light-source: {:x}, shadows casted by: {}",
+            "light-source: {:x}, shadows casted by: {} (correction: {:?})",
             self.light_source,
-            shadow_bodies.join(", ")
+            shadow_bodies.join(", "),
+            self.correction
         )
     }
 }
@@ -62,6 +67,7 @@ impl ShadowModel {
         Self {
             light_source: almanac.frame_info(SUN_J2000).unwrap(),
             shadow_bodies: vec![eme2k, moon_j2k],
+            correction: None,
         }
     }
 
@@ -74,7 +80,7 @@ impl ShadowModel {
             percentage: 0.0,
         };
         for eclipsing_body in &self.shadow_bodies {
-            let this_state = almanac.solar_eclipsing(*eclipsing_body, observer, None)?;
+            let this_state = almanac.solar_eclipsing(*eclipsing_body, observer, self.correction)?;
             if this_state.percentage > state.percentage {
                 state = this_state;
             }
@@ -100,5 +106,43 @@ impl ShadowModel {
             .copied()
             .map(Event::eclipse)
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod ut_shadow_mdl {
+    use super::{Aberration, EARTH_J2000, MOON_J2000, SUN_J2000, ShadowModel};
+    #[test]
+    fn ut_shadow_mdl_dhall_no_corr() {
+        let mdl_no_corr = ShadowModel {
+            light_source: SUN_J2000,
+            shadow_bodies: vec![EARTH_J2000, MOON_J2000],
+            correction: None,
+        };
+        let as_dhall = serde_dhall::serialize(&mdl_no_corr)
+            .static_type_annotation()
+            .to_string()
+            .unwrap();
+        println!("{as_dhall}");
+
+        let from_dhall: ShadowModel = serde_dhall::from_str(&as_dhall).parse().unwrap();
+        assert_eq!(from_dhall, mdl_no_corr);
+    }
+
+    #[test]
+    fn ut_shadow_mdl_dhall() {
+        let mdl_no_corr = ShadowModel {
+            light_source: SUN_J2000,
+            shadow_bodies: vec![EARTH_J2000, MOON_J2000],
+            correction: Aberration::LT,
+        };
+        let as_dhall = serde_dhall::serialize(&mdl_no_corr)
+            .static_type_annotation()
+            .to_string()
+            .unwrap();
+        println!("{as_dhall}");
+
+        let from_dhall: ShadowModel = serde_dhall::from_str(&as_dhall).parse().unwrap();
+        assert_eq!(from_dhall, mdl_no_corr);
     }
 }

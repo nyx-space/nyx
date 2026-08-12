@@ -21,6 +21,8 @@ use crate::cosmic::eclipse::ShadowModel;
 use crate::cosmic::{AU, Frame, SPEED_OF_LIGHT_M_S, Spacecraft};
 use crate::linalg::{Const, Matrix4x3, Vector3};
 use anise::almanac::Almanac;
+#[cfg(feature = "python")]
+use anise::astro::Aberration;
 use anise::constants::frames::{EARTH_J2000, SUN_J2000};
 use hyperdual::{Float, OHyperdual, hyperspace_from_vector, linalg::norm};
 use log::warn;
@@ -62,6 +64,7 @@ impl Default for SolarPressure {
             shadow_model: ShadowModel {
                 light_source: SUN_J2000,
                 shadow_bodies: vec![EARTH_J2000],
+                correction: None,
             },
         }
     }
@@ -89,6 +92,7 @@ impl SolarPressure {
                     }
                 })
                 .collect(),
+            correction: None,
         };
         Ok(Self {
             phi: SOLAR_FLUX_W_m2,
@@ -250,17 +254,19 @@ impl fmt::Display for SolarPressure {
 #[cfg(feature = "python")]
 #[cfg_attr(feature = "python", pymethods)]
 impl SolarPressure {
-    #[pyo3(signature = (shadow_bodies, almanac, flux_w_m2=SOLAR_FLUX_W_m2, estimate=true))]
+    #[pyo3(signature = (shadow_bodies, almanac, correction=None, flux_w_m2=SOLAR_FLUX_W_m2, estimate=true))]
     #[new]
     fn py_new(
         shadow_bodies: Vec<Frame>,
         almanac: &Almanac,
+        correction: Option<Aberration>,
         flux_w_m2: f64,
         estimate: bool,
     ) -> Result<Self, DynamicsError> {
         let mut me = Self::default_flux_raw(shadow_bodies, almanac)?;
         me.phi = flux_w_m2;
         me.estimate = estimate;
+        me.shadow_model.correction = correction;
 
         Ok(me)
     }

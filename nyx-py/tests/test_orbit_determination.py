@@ -195,7 +195,7 @@ def test_howto_simulate_tracking_data():
     # Step 6: Verify the Generated Tracking Arc
     # VERIFICATION: Ensure the arc is populated with the expected temporal constraints and volume.
     assert not trk_arc.is_empty()
-    assert trk_arc.len() == 72
+    assert trk_arc.len() == 74
     # The arc duration is measured from the timestamp of the first to the last measurement.
     assert trk_arc.duration() > Unit.Hour * 18
 
@@ -233,7 +233,7 @@ def test_howto_simulate_tracking_data():
     trk_reloaded = TrackingDataArc.from_ccsds_tdm(tdm_filepath, reverse_aliases)
 
     assert not trk_reloaded.is_empty()
-    assert trk_reloaded.len() == 72
+    assert trk_reloaded.len() == 74
     # The arc duration is measured from the timestamp of the first to the last measurement.
     assert trk_reloaded.duration() > Unit.Hour * 18
     # Check that the reverse aliases were applied

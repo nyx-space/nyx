@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anise::astro::Aberration;
 use anise::constants::frames::SUN_J2000;
 use anise::errors::OrientationSnafu;
 use anise::prelude::Almanac;
@@ -46,6 +47,7 @@ use pyo3::types::PyType;
 /// :type k2: float
 /// :type k3: float
 /// :type perturbers: list[TidalPerturber]
+/// :type correction: Aberration
 #[derive(Clone, Debug, Serialize, Deserialize, StaticType, TypedBuilder, PartialEq)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct SolidTides {
@@ -57,6 +59,8 @@ pub struct SolidTides {
     pub k3: f64,
     /// The collection of celestial bodies raising the tide.
     pub perturbers: Vec<TidalPerturber>,
+    /// Light-time correction used in the tidal perturbers
+    pub correction: Option<Aberration>,
 }
 
 /// A celestial body raising tides on the central body.
@@ -79,11 +83,12 @@ impl TidalPerturber {
         epoch: Epoch,
         tidal_model: &SolidTides,
         almanac: &Almanac,
+        ab_corr: Option<Aberration>,
         delta_c: &mut [[f64; 4]; 4],
         delta_s: &mut [[f64; 4]; 4],
     ) -> Result<(), DynamicsError> {
         let radius_km = almanac
-            .transform(self.frame, tidal_model.frame, epoch, None)
+            .transform(self.frame, tidal_model.frame, epoch, ab_corr)
             .context(DynamicsAlmanacSnafu {
                 action: "Moon position in ECEF",
             })?
@@ -190,6 +195,7 @@ impl SolidTides {
         mut earth_frame: Frame,
         mut moon_frame: Frame,
         almanac: &Almanac,
+        ab_corr: Option<Aberration>,
     ) -> Result<Self, DynamicsError> {
         let mut sun_j2k = almanac
             .frame_info(SUN_J2000)
@@ -199,9 +205,9 @@ impl SolidTides {
 
         // Repeat for the Earth and Moon
         for frame in [&mut earth_frame, &mut moon_frame, &mut sun_j2k] {
-            if frame.mu_km3_s2.is_none() {
+            if frame.mu_km3_s2.is_none() || frame.mean_equatorial_radius_km().is_err() {
                 *frame = almanac.frame_info(*frame).context(DynamicsPlanetarySnafu {
-                    action: "fetching sun frame",
+                    action: "fetching frame",
                 })?;
             }
 
@@ -232,6 +238,7 @@ impl SolidTides {
                     .compute_degree_3(false)
                     .build(),
             ])
+            .correction(ab_corr)
             .build();
 
         Ok(me)
@@ -247,7 +254,14 @@ impl SolidTides {
         let mut delta_s = [[0.0f64; 4]; 4];
 
         for pert in &self.perturbers {
-            pert.compute_pert(epoch, self, almanac, &mut delta_c, &mut delta_s)?;
+            pert.compute_pert(
+                epoch,
+                self,
+                almanac,
+                self.correction,
+                &mut delta_c,
+                &mut delta_s,
+            )?;
         }
 
         Ok((delta_c, delta_s))
@@ -599,12 +613,20 @@ impl fmt::Display for TidalPerturber {
 #[cfg_attr(feature = "python", pymethods)]
 impl SolidTides {
     #[new]
-    fn py_new(frame: Frame, k2: f64, k3: f64, perturbers: Vec<TidalPerturber>) -> Self {
+    #[pyo3(signature=(frame, k2, k3, perturbers, correction=None))]
+    fn py_new(
+        frame: Frame,
+        k2: f64,
+        k3: f64,
+        perturbers: Vec<TidalPerturber>,
+        correction: Option<Aberration>,
+    ) -> Self {
         Self {
             frame,
             k2,
             k3,
             perturbers,
+            correction,
         }
     }
 
@@ -614,16 +636,18 @@ impl SolidTides {
     /// :type earth_frame: Frame
     /// :type moon_frame: Frame
     /// :type almanac: Almanac
+    /// :type correction: Aberration
     /// :rtype: SolidTides
     #[classmethod]
-    #[pyo3(name = "earth_moon_system")]
+    #[pyo3(name = "earth_moon_system", signature=(earth_frame, moon_frame, almanac, correction=None))]
     fn py_earth_moon_system(
         _cls: &Bound<'_, PyType>,
         earth_frame: Frame,
         moon_frame: Frame,
         almanac: &Almanac,
+        correction: Option<Aberration>,
     ) -> Result<Self, DynamicsError> {
-        Self::earth_moon_system(earth_frame, moon_frame, almanac)
+        Self::earth_moon_system(earth_frame, moon_frame, almanac, correction)
     }
 
     fn __str__(&self) -> String {
@@ -689,7 +713,7 @@ mod tests {
         let sc_orbit = Orbit::cartesian(7000.0, 0.0, 0.0, 0.0, 7.5, 0.0, epoch, EARTH_J2000);
 
         let tides =
-            SolidTides::earth_moon_system(IAU_EARTH_FRAME, IAU_MOON_FRAME, &almanac.clone())
+            SolidTides::earth_moon_system(IAU_EARTH_FRAME, IAU_MOON_FRAME, &almanac.clone(), None)
                 .expect("could not init solid tides");
         let acc = tides.eom(&sc_orbit, &almanac).unwrap();
 
