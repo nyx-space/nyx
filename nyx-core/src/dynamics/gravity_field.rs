@@ -329,19 +329,21 @@ impl AccelModel for GravityField {
             i_m.push(s_ * i_m[m - 1] + t_ * r_m[m - 1]);
         }
 
-        let real_eq_radius_km = self
-            .grav_data
-            .frame
-            .mean_equatorial_radius_km()
-            .context(AstroPhysicsSnafu)
-            .context(DynamicsAstroSnafu)?;
+        let real_eq_radius_km = self.grav_data.radius_km.unwrap_or(
+            self.grav_data
+                .frame
+                .mean_equatorial_radius_km()
+                .context(AstroPhysicsSnafu)
+                .context(DynamicsAstroSnafu)?,
+        );
 
-        let real_mu_km3_s2 = self
-            .grav_data
-            .frame
-            .mu_km3_s2()
-            .context(AstroPhysicsSnafu)
-            .context(DynamicsAstroSnafu)?;
+        let real_mu_km3_s2 = self.grav_data.mu_km3_s2.unwrap_or(
+            self.grav_data
+                .frame
+                .mu_km3_s2()
+                .context(AstroPhysicsSnafu)
+                .context(DynamicsAstroSnafu)?,
+        );
 
         let eq_radius = OHyperdual::<f64, U7>::from(real_eq_radius_km);
         let rho = eq_radius / r_;

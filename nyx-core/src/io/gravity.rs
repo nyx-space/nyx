@@ -193,19 +193,23 @@ impl GravityFieldData {
                 if let Ok(degree) = words[1].parse::<usize>() {
                     max_degree = degree;
                 } else {
-                    warn!(
-                        "could not parse `{}` for the model's maximum degree",
-                        words[1]
-                    );
+                    return Err(NyxError::FileUnreadable {
+                        msg: format!(
+                            "could not parse `{}` for the model's maximum degree",
+                            words[1]
+                        ),
+                    });
                 }
 
                 if let Ok(order) = words[2].parse::<usize>() {
                     max_order = order;
                 } else {
-                    warn!(
-                        "could not parse `{}` for the model's maximum degree",
-                        words[2]
-                    );
+                    return Err(NyxError::FileUnreadable {
+                        msg: format!(
+                            "could not parse `{}` for the model's maximum order",
+                            words[2]
+                        ),
+                    });
                 }
 
                 // Check this field is normalized; else it can't be used.
@@ -232,7 +236,8 @@ impl GravityFieldData {
                         words[5]
                     );
                 }
-            } else if !line.starts_with("R") {
+                continue;
+            } else if !line.starts_with("RECOEF") {
                 // Comment line or in general something we don't care about.
                 continue;
             }
@@ -262,80 +267,17 @@ impl GravityFieldData {
                         }
                     },
                     3 => {
-                        // If we are at degree zero, then there is only one item, so we can parse that and
-                        // set the S_nm to zero.
-                        if degree == 0 {
-                            s_nm = 0.0;
-                            match f64::from_str(item) {
-                                Ok(val) => c_nm = val,
-                                Err(_) => {
-                                    return Err(NyxError::FileUnreadable {
-                                        msg: format!("could not parse C_nm `{item}` on line {lno}"),
-                                    });
-                                }
-                            }
-                        } else {
-                            // There is a space as a delimiting character between the C_nm and S_nm only if the S_nm
-                            // is a positive number, otherwise, they are continuous (what a great format).
-                            if (item.matches('-').count() == 3 && !item.starts_with('-'))
-                                || item.matches('-').count() == 4
-                            {
-                                // Now we have two items concatenated into one... great
-                                let parts: Vec<&str> = item.split('-').collect();
-                                if parts.len() == 5 {
-                                    // That mean we have five minus signs, so both the C and S are negative.
-                                    let c_nm_str = "-".to_owned() + parts[1] + "-" + parts[2];
-                                    match f64::from_str(&c_nm_str) {
-                                        Ok(val) => c_nm = val,
-                                        Err(_) => {
-                                            return Err(NyxError::FileUnreadable {
-                                                msg: format!(
-                                                    "could not parse C_nm `{item}` on line {lno}"
-                                                ),
-                                            });
-                                        }
-                                    }
-                                    // That mean we have five minus signs, so both the C and S are negative.
-                                    let s_nm_str = "-".to_owned() + parts[3] + "-" + parts[4];
-                                    match f64::from_str(&s_nm_str) {
-                                        Ok(val) => s_nm = val,
-                                        Err(_) => {
-                                            return Err(NyxError::FileUnreadable {
-                                                msg: format!(
-                                                    "could not parse S_nm `{item}` on line {lno}"
-                                                ),
-                                            });
-                                        }
-                                    }
-                                } else {
-                                    // That mean we have fouve minus signs, and since both values are concatenated, C_nm is positive and S_nm is negative
-                                    let c_nm_str = parts[0].to_owned() + "-" + parts[1];
-                                    match f64::from_str(&c_nm_str) {
-                                        Ok(val) => c_nm = val,
-                                        Err(_) => {
-                                            return Err(NyxError::FileUnreadable {
-                                                msg: format!(
-                                                    "could not parse C_nm `{item}` on line {lno}"
-                                                ),
-                                            });
-                                        }
-                                    }
-                                    // That mean we have five minus signs, so both the C and S are negative.
-                                    let s_nm_str = "-".to_owned() + parts[2] + "-" + parts[3];
-                                    match f64::from_str(&s_nm_str) {
-                                        Ok(val) => s_nm = val,
-                                        Err(_) => {
-                                            return Err(NyxError::FileUnreadable {
-                                                msg: format!(
-                                                    "could not parse S_nm `{item}` on line {lno}"
-                                                ),
-                                            });
-                                        }
-                                    }
-                                }
-                            } else {
-                                // We only have the first item, and that's the C_nm
-                                match f64::from_str(item) {
+                        // There is a space as a delimiting character between the C_nm and S_nm only if the S_nm
+                        // is a positive number, otherwise, they are continuous (what a great format).
+                        if (item.matches('-').count() == 3 && !item.starts_with('-'))
+                            || item.matches('-').count() == 4
+                        {
+                            // Now we have two items concatenated into one... great
+                            let parts: Vec<&str> = item.split('-').collect();
+                            if parts.len() == 5 {
+                                // That mean we have five minus signs, so both the C and S are negative.
+                                let c_nm_str = "-".to_owned() + parts[1] + "-" + parts[2];
+                                match f64::from_str(&c_nm_str) {
                                     Ok(val) => c_nm = val,
                                     Err(_) => {
                                         return Err(NyxError::FileUnreadable {
@@ -344,6 +286,53 @@ impl GravityFieldData {
                                             ),
                                         });
                                     }
+                                }
+                                // That mean we have five minus signs, so both the C and S are negative.
+                                let s_nm_str = "-".to_owned() + parts[3] + "-" + parts[4];
+                                match f64::from_str(&s_nm_str) {
+                                    Ok(val) => s_nm = val,
+                                    Err(_) => {
+                                        return Err(NyxError::FileUnreadable {
+                                            msg: format!(
+                                                "could not parse S_nm `{item}` on line {lno}"
+                                            ),
+                                        });
+                                    }
+                                }
+                            } else {
+                                // That mean we have fouve minus signs, and since both values are concatenated, C_nm is positive and S_nm is negative
+                                let c_nm_str = parts[0].to_owned() + "-" + parts[1];
+                                match f64::from_str(&c_nm_str) {
+                                    Ok(val) => c_nm = val,
+                                    Err(_) => {
+                                        return Err(NyxError::FileUnreadable {
+                                            msg: format!(
+                                                "could not parse C_nm `{item}` on line {lno}"
+                                            ),
+                                        });
+                                    }
+                                }
+                                // That mean we have five minus signs, so both the C and S are negative.
+                                let s_nm_str = "-".to_owned() + parts[2] + "-" + parts[3];
+                                match f64::from_str(&s_nm_str) {
+                                    Ok(val) => s_nm = val,
+                                    Err(_) => {
+                                        return Err(NyxError::FileUnreadable {
+                                            msg: format!(
+                                                "could not parse S_nm `{item}` on line {lno}"
+                                            ),
+                                        });
+                                    }
+                                }
+                            }
+                        } else {
+                            // We only have the first item, and that's the C_nm
+                            match f64::from_str(item) {
+                                Ok(val) => c_nm = val,
+                                Err(_) => {
+                                    return Err(NyxError::FileUnreadable {
+                                        msg: format!("could not parse C_nm `{item}` on line {lno}"),
+                                    });
                                 }
                             }
                         }
@@ -465,19 +454,22 @@ impl GravityFieldData {
                 if let Ok(degree) = words[3].parse::<usize>() {
                     max_degree = degree;
                 } else {
-                    warn!(
-                        "could not parse `{}` for the model's maximum degree",
-                        words[3]
-                    );
+                    return Err(NyxError::FileUnreadable {
+                        msg: format!(
+                            "could not parse `{}` for the model's maximum degree",
+                            words[3]
+                        ),
+                    });
                 }
-
                 if let Ok(order) = words[4].parse::<usize>() {
                     max_order = order;
                 } else {
-                    warn!(
-                        "could not parse `{}` for the model's maximum degree",
-                        words[4]
-                    );
+                    return Err(NyxError::FileUnreadable {
+                        msg: format!(
+                            "could not parse `{}` for the model's maximum order",
+                            words[4]
+                        ),
+                    });
                 }
 
                 // Check this field is normalized; else it can't be used.
