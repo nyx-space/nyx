@@ -5,15 +5,15 @@ use anise::constants::celestial_objects::{EARTH, JUPITER_BARYCENTER, MOON, SUN};
 use anise::constants::frames::{EARTH_ITRF93, IAU_EARTH_FRAME};
 use hifitime::MJD_J2000;
 use nalgebra::{Const, OMatrix};
-use nyx::cosmic::{assert_orbit_eq_or_abs, Orbit};
+use nyx::State;
+use nyx::cosmic::{Orbit, assert_orbit_eq_or_abs};
 use nyx::dynamics::GravityField;
 use nyx::dynamics::{Dynamics, OrbitalDynamics, PointMasses, SpacecraftDynamics};
 use nyx::io::gravity::*;
 use nyx::linalg::Vector6;
 use nyx::time::{Epoch, Unit};
 use nyx::utils::{rss_orbit_errors, rss_orbit_vec_errors};
-use nyx::State;
-use nyx::{propagators::*, Spacecraft};
+use nyx::{Spacecraft, propagators::*};
 
 use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use rstest::*;

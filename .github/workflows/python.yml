@@ -27,7 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-            lfs: true
+            lfs: false
       - name: Setup Python on ${{ matrix.target }}
         uses: actions/setup-python@v6
         with:
@@ -66,6 +66,18 @@ jobs:
         with:
           name: wheels-linux-${{ matrix.target }}
           path: nyx-py/dist
+
+      - name: Cache planetary data
+        uses: actions/cache@v3
+        with:
+          path: data/
+          # This key never changes unless you manually update the suffix version string,
+          # meaning your CI will pull these heavy files from the cache infinitely.
+          key: planetary-data-v2.5.0
+
+      - name: Download model data
+        shell: bash
+        run: sh download_model_data.sh
 
       - name: pytest
         if: ${{ startsWith(matrix.target, 'x86_64') }}

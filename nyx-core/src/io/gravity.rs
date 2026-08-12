@@ -381,7 +381,7 @@ impl GravityFieldData {
                 "{filepath:?} only contained (degree, order) of ({max_degree}, {max_order}) instead of requested ({degree}, {order})"
             );
         } else {
-            info!("{filepath:?} COF file loaded with (degree, order) = ({degree}, {order})");
+            info!("Loaded {filepath:?} COF file with {degree}x{order} field");
         }
         Ok(GravityFieldData {
             degree,
@@ -570,7 +570,7 @@ impl GravityFieldData {
                 "{filepath:?} only contained (degree, order) of ({max_degree}, {max_order}) instead of requested ({degree}, {order})",
             );
         } else {
-            info!("{filepath:?} SHADR file loaded with (degree, order) = ({degree}, {order})")
+            info!("Loaded {filepath:?} SHADR file with {degree}x{order} field");
         }
         Ok(GravityFieldData {
             order,
