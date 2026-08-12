@@ -6,6 +6,11 @@ _Blazing fast astrodynamics from mission concept to operations, analysis, and au
     pip install nyx_space
 ```
 
+Flight dynamics operations demand an unforgiving synthesis of computational speed and physical fidelity.
+
+While heritage tools provide the necessary precision for deep space and near-Earth navigation, their monolithic architectures and sluggish sequential processing bottleneck modern Monte Carlo analysis and autonomous operations.
+Nyx answers this limitation by marrying a high-performance Rust computational engine with a productive Python interface, achieving sub-meter accuracy in high-fidelity scenarios. It is validated and proven to [match GMAT and industry-standard commercial astrodynamics suites to sub-meter tolerances](https://nyxspace.com/nyxspace/MathSpec/?utm_source=pyreadme).
+
 Requires Python 3.11 or later; [works on Linux, Windows, MacOS (Intel and arm64)](https://pypi.org/project/nyx_space/#files).
 
 ## High fidelity example
@@ -149,11 +154,6 @@ More examples:
 - <https://github.com/nyx-space/nyx/tree/master/nyx-py/examples>
 - <https://github.com/nyx-space/nyx/tree/master/nyx-py/tests>
 - [https://nyxspace.com/nyxspace/showcase/](https://nyxspace.com/nyxspace/showcase/?utm_source=pyreadme)
-
-Flight dynamics operations demand an unforgiving synthesis of computational speed and physical fidelity.
-
-While heritage tools provide the necessary precision for deep space and near-Earth navigation, their monolithic architectures and sluggish sequential processing bottleneck modern Monte Carlo analysis and autonomous operations.
-Nyx answers this limitation by marrying a high-performance Rust computational engine with a productive Python interface, achieving sub-meter accuracy in high-fidelity scenarios. It is validated and proven to [match GMAT and industry-standard commercial astrodynamics suites to sub-meter tolerances](https://nyxspace.com/nyxspace/MathSpec/?utm_source=pyreadme).
 
 ## The Engine: Determinism and Precision
 

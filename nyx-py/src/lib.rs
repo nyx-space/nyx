@@ -177,6 +177,8 @@ fn mission_design(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
     sm.add_class::<SpaceWeatherData>()?;
     sm.add_class::<StaticSpaceWeather>()?;
     sm.add_class::<py_md::PyTrajectory>()?;
+    sm.add_class::<py_md::PropagationResult>()?;
+    sm.add_class::<Spacecraft>()?;
 
     Ok(())
 }

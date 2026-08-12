@@ -433,6 +433,18 @@ class PointMasses:
         """Return str(self)."""
 
 @typing.final
+class PropagationResult:
+    state: typing.Any
+    trajectory: typing.Any
+
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature."""
+
+    def __new__(cls) -> PropagationResult: ...
+
+@typing.final
 class Propagator:
     """Numerical propagator for a spacecraft state."""
 
@@ -723,6 +735,72 @@ class SpaceWeatherData:
         """Evaluates the space weather state at `epoch` and constructs the `Msise00DailyWeather` payload.
 
         Missing daily records or unforecasted fields are resolved using `SpaceWeatherFallback`."""
+
+    def __repr__(self) -> str:
+        """Return repr(self)."""
+
+    def __str__(self) -> str:
+        """Return str(self)."""
+
+@typing.final
+class Spacecraft:
+    """A spacecraft state, composed of its orbit, its masses (dry, prop, extra, all in kg), its SRP configuration, its drag configuration, its thruster configuration, and its guidance mode.
+
+    Optionally, the spacecraft state can also store the state transition matrix from the start of the propagation until the current time (i.e. trajectory STM, not step-size STM)."""
+
+    drag: typing.Any
+    mass: typing.Any
+    orbit: typing.Any
+    srp: typing.Any
+
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        A spacecraft state, composed of its orbit, its masses (dry, prop, extra, all in kg), its SRP configuration, its drag configuration, its thruster configuration, and its guidance mode.
+
+        Optionally, the spacecraft state can also store the state transition matrix from the start of the propagation until the current time (i.e. trajectory STM, not step-size STM)."""
+
+    def __new__(
+        cls,
+        orbit: typing.Any,
+        mass: typing.Any = None,
+        srp: typing.Any = None,
+        drag: typing.Any = None,
+        thruster: typing.Any = None,
+        mode: typing.Any = None,
+    ) -> Spacecraft:
+        """A spacecraft state, composed of its orbit, its masses (dry, prop, extra, all in kg), its SRP configuration, its drag configuration, its thruster configuration, and its guidance mode.
+
+        Optionally, the spacecraft state can also store the state transition matrix from the start of the propagation until the current time (i.e. trajectory STM, not step-size STM)."""
+
+    @staticmethod
+    def from_asn1(data: bytes) -> astro.Mass:
+        """Decodes an ASN.1 DER encoded byte array into a Mass object."""
+
+    def rss(self, other: typing.Any) -> typing.Any:
+        """Returns the root sum square error between this spacecraft and the other, in kilometers for the position, kilometers per second in velocity, and kilograms in prop"""
+
+    def to_asn1(self) -> bytes:
+        """Encodes this Mass object into an ASN.1 DER encoded byte array."""
+
+    def __eq__(self, value: typing.Any) -> bool:
+        """Return self==value."""
+
+    def __ge__(self, value: typing.Any) -> bool:
+        """Return self>=value."""
+
+    def __gt__(self, value: typing.Any) -> bool:
+        """Return self>value."""
+
+    def __le__(self, value: typing.Any) -> bool:
+        """Return self<=value."""
+
+    def __lt__(self, value: typing.Any) -> bool:
+        """Return self<value."""
+
+    def __ne__(self, value: typing.Any) -> bool:
+        """Return self!=value."""
 
     def __repr__(self) -> str:
         """Return repr(self)."""
