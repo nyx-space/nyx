@@ -46,6 +46,7 @@ download_if_missing "http://public-data.nyxspace.com/anise/v0.10/moon_fk_de440.e
 download_if_missing "http://public-data.nyxspace.com/anise/moon_pa_de440_200625.bpc" "moon_pa_de440_200625.bpc"
 download_if_missing "http://public-data.nyxspace.com/anise/ci/earth_latest_high_prec-2023-09-08.bpc" "earth_latest_high_prec.bpc"
 download_if_missing "http://public-data.nyxspace.com/anise/ci/earth_longterm_000101_251211_250915.bpc" "earth_longterm_000101_251211_250915.bpc"
+download_if_missing "http://public-data.nyxspace.com/anise/ci/earth_2025_250826_2125_predict.bpc" "earth_2025_250826_2125_predict.bpc"
 # Download Nyx models
 download_if_missing "http://public-data.nyxspace.com/nyx/models/EGM2008_to2190_TideFree_sha.gz" "EGM2008_to2190_TideFree_sha.gz"
 download_if_missing "http://public-data.nyxspace.com/nyx/models/EGM2008_to2190_TideFree.gz" "EGM2008_to2190_TideFree.gz"
