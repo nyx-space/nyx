@@ -45,7 +45,7 @@ use hifitime::*;
 
 use nyx_space::cosmic::eclipse::ShadowModel;
 use nyx_space::dynamics::guidance::Thruster;
-use nyx_space::dynamics::nrlmsise00::{GeomagneticMode, Nrlmsise00Flags};
+use nyx_space::dynamics::nrlmsise00::{GeomagneticMode, Msise00DailyWeather, Nrlmsise00Flags};
 use nyx_space::dynamics::sequence::{
     AccelModels, Dynamics, ForceModels, PropagatorConfig, SpacecraftSequence,
 };
@@ -63,7 +63,7 @@ use nyx_space::od::msr::{Measurement, MeasurementType, TrackingDataArc};
 use nyx_space::od::noise::link_specific::{CN0, CarrierFreq, ChipRate, SN0};
 use nyx_space::od::noise::{GaussMarkov, StochasticNoise, StochasticState, WhiteNoise};
 use nyx_space::od::position::PositionDevice;
-use nyx_space::od::process::SigmaRejection;
+use nyx_space::od::process::{NormalizedConsistency, SigmaRejection};
 use nyx_space::od::simulator::{Handoff, PyCadence, Scheduler, Strand, TrkConfig};
 use nyx_space::propagators::{IntegratorMethod, IntegratorOptions};
 use nyx_space::{Spacecraft, cosmic::GuidanceMode};
@@ -129,6 +129,7 @@ fn orbit_determination(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
     sm.add_class::<CarrierFreq>()?;
     sm.add_class::<KalmanVariant>()?;
     sm.add_class::<SigmaRejection>()?;
+    sm.add_class::<NormalizedConsistency>()?;
     sm.add_class::<py_od::GroundTrackingArcSim>()?;
     sm.add_class::<py_od::PySpacecraftODProcess>()?;
     sm.add_class::<py_od::PySpacecraftODSolution>()?;
@@ -139,6 +140,9 @@ fn orbit_determination(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
     sm.add_class::<py_od::PositionTrackingArcSim>()?;
     sm.add_class::<py_od::PyPositionResidual>()?;
     sm.add_class::<py_od::PyProcessNoise>()?;
+    sm.add_class::<py_md::PyTrajectory>()?;
+    sm.add_class::<MvnSpacecraft>()?;
+    sm.add_class::<StateDispersion>()?;
 
     Ok(())
 }
@@ -175,10 +179,12 @@ fn mission_design(_py: Python, sm: &Bound<PyModule>) -> PyResult<()> {
     sm.add_class::<SolidTides>()?;
     sm.add_class::<TidalPerturber>()?;
     sm.add_class::<SpaceWeatherData>()?;
+    sm.add_class::<Msise00DailyWeather>()?;
     sm.add_class::<StaticSpaceWeather>()?;
     sm.add_class::<py_md::PyTrajectory>()?;
     sm.add_class::<py_md::PropagationResult>()?;
     sm.add_class::<Spacecraft>()?;
+    sm.add_class::<Thruster>()?;
 
     Ok(())
 }

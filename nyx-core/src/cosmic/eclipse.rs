@@ -111,7 +111,7 @@ impl ShadowModel {
 
 #[cfg(test)]
 mod ut_shadow_mdl {
-    use super::{Aberration, ShadowModel, EARTH_J2000, MOON_J2000, SUN_J2000};
+    use super::{Aberration, EARTH_J2000, MOON_J2000, SUN_J2000, ShadowModel};
     #[test]
     fn ut_shadow_mdl_dhall_no_corr() {
         let mdl_no_corr = ShadowModel {

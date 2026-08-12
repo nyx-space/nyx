@@ -352,6 +352,25 @@ class IntegratorOptions:
         """Return str(self)."""
 
 @typing.final
+class Msise00DailyWeather:
+    """Target weather payload required by the NRLMSISE-00 density model."""
+
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        Target weather payload required by the NRLMSISE-00 density model."""
+
+    def __new__(cls) -> Msise00DailyWeather:
+        """Target weather payload required by the NRLMSISE-00 density model."""
+
+    def __repr__(self) -> str:
+        """Return repr(self)."""
+
+    def __str__(self) -> str:
+        """Return str(self)."""
+
+@typing.final
 class Nrlmsise00Flags:
     annual_harmonics: typing.Any
     boundary_density_variations: typing.Any
@@ -828,7 +847,7 @@ class SpacecraftSequence:
 
     def propagate(
         self, state: Spacecraft, until_phase: str | None, almanac: Almanac
-    ) -> list[string, string]:
+    ) -> list[str, str]:
         """Propagate the state through the sequence until a given phase."""
 
     def setup(self, almanac: Almanac) -> None:
@@ -856,6 +875,25 @@ class StaticSpaceWeather:
     SolarAverage: type = ...
     SolarMaximum: type = ...
     SolarMinimum: type = ...
+
+@typing.final
+class Thruster:
+    """Defines a thruster with a maximum isp and a maximum thrust."""
+
+    isp_s: typing.Any
+    thrust_N: typing.Any
+
+    def __init__(
+        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
+    ) -> None:
+        """Initialize self.  See help(type(self)) for accurate signature.
+        Defines a thruster with a maximum isp and a maximum thrust."""
+
+    def __new__(cls, thrust_N: typing.Any, isp_s: typing.Any) -> Thruster:
+        """Defines a thruster with a maximum isp and a maximum thrust."""
+
+    def exhaust_velocity_m_s(self) -> typing.Any:
+        """Returns the exhaust velocity v_e in meters per second"""
 
 @typing.final
 class TidalPerturber:
