@@ -181,7 +181,7 @@ impl GravityFieldData {
                 continue;
             } else if line.starts_with("POTFIELD") {
                 // Useful header
-                let words = line.trim().split_whitespace().collect::<Vec<&str>>();
+                let words = line.split_whitespace().collect::<Vec<&str>>();
                 if words.len() != 7 {
                     return Err(NyxError::FileUnreadable {
                         msg: format!(

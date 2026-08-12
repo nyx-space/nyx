@@ -29,9 +29,9 @@ use crate::cosmic::{AstroPhysicsSnafu, Epoch, Frame, Orbit};
 use crate::dynamics::{
     AccelModel, DynamicsAlmanacSnafu, DynamicsAstroSnafu, DynamicsError, DynamicsPlanetarySnafu,
 };
-use crate::linalg::{Matrix3, U7, Vector3, Vector4};
+use crate::linalg::{Matrix3, Vector3, Vector4, U7};
 use hyperdual::linalg::norm;
-use hyperdual::{OHyperdual, hyperspace_from_vector};
+use hyperdual::{hyperspace_from_vector, OHyperdual};
 use std::fmt;
 
 #[cfg(feature = "python")]
@@ -613,6 +613,7 @@ impl fmt::Display for TidalPerturber {
 #[cfg_attr(feature = "python", pymethods)]
 impl SolidTides {
     #[new]
+    #[pyo3(signature=(frame, k2, k3, perturbers, correction=None))]
     fn py_new(
         frame: Frame,
         k2: f64,

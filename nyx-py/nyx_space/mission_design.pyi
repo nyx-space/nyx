@@ -683,7 +683,7 @@ class SolidTides:
         k2: float,
         k3: float,
         perturbers: list[TidalPerturber],
-        correction: Aberration,
+        correction: typing.Optional[Aberration] = None,
     ) -> SolidTides:
         """`SolidTides` implements the solid tide acceleration model.
         It accounts for the crust deformation due to the configured tidal perturbers.
