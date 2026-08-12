@@ -2,9 +2,6 @@ from __future__ import annotations
 from anise import Almanac
 from anise import astro
 from anise import time
-from nyx_space import Spacecraft
-from nyx_space.mission_design import Propagator, Trajectory
-from nyx_space.monte_carlo import MvnSpacecraft, StateDispersion
 import numpy
 import nyx_space.od
 import typing
@@ -416,7 +413,7 @@ class GroundTrackingArcSim:
     def __init__(
         self,
         devices: dict[str, GroundStation],
-        trajectory: Trajectory,
+        trajectory: PyTrajectory,
         configs: dict[str, TrkConfig],
         seed: int | None,
         *args: typing.Optional[typing.Any],
@@ -428,7 +425,7 @@ class GroundTrackingArcSim:
     def __new__(
         cls,
         devices: dict[str, GroundStation],
-        trajectory: Trajectory,
+        trajectory: PyTrajectory,
         configs: dict[str, TrkConfig],
         seed: int | None = None,
     ) -> GroundTrackingArcSim:
@@ -767,7 +764,7 @@ class PositionTrackingArcSim:
     def __init__(
         self,
         devices: dict[str, PositionDevice],
-        trajectory: Trajectory,
+        trajectory: PyTrajectory,
         configs: dict[str, TrkConfig],
         seed: int | None,
         *args: typing.Optional[typing.Any],
@@ -779,9 +776,9 @@ class PositionTrackingArcSim:
     def __new__(
         cls,
         devices: dict[str, PositionDevice],
-        trajectory: Trajectory,
+        trajectory: PyTrajectory,
         configs: dict[str, TrkConfig],
-        seed: typing.Optional[int] = None,
+        seed: int | None = None,
     ) -> PositionTrackingArcSim:
         """Simulated tracking architecture for a spacecraft using position tracking devices."""
 
@@ -845,46 +842,6 @@ class ProcessNoise:
 
     def __ne__(self, value: typing.Any) -> bool:
         """Return self!=value."""
-
-    def __repr__(self) -> str:
-        """Return repr(self)."""
-
-    def __str__(self) -> str:
-        """Return str(self)."""
-
-
-@typing.final
-class NormalizedConsistency:
-    """Normalized consistency check result (NIS/NEES)."""
-
-    is_nees: bool
-    k: float
-    lower_bound: float
-    normalized_sum: float
-    upper_bound: float
-
-    def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
-    ) -> None:
-        """Initialize self.  See help(type(self)) for accurate signature."""
-
-    def has_statistical_power(self) -> bool:
-        """Returns whether the test has statistical power."""
-
-    def is_consistent(self) -> bool:
-        """Returns whether the filter is consistent."""
-
-    def is_overconfident(self) -> bool:
-        """Returns whether the filter is overconfident."""
-
-    def is_underconfident(self) -> bool:
-        """Returns whether the filter is underconfident."""
-
-    def log(self) -> None:
-        """Log the consistency check result."""
-
-    def name(self) -> str:
-        """Returns the name of the consistency check."""
 
     def __repr__(self) -> str:
         """Return repr(self)."""
@@ -993,9 +950,9 @@ class Scheduler:
     def __new__(
         cls,
         handoff: typing.Optional[Handoff] = ...,
-        cadence: typing.Optional[Cadence] = None,
+        cadence: Cadence | None = None,
         min_samples: typing.Optional[int] = 10,
-        sample_alignment: typing.Optional[time.Duration] = None,
+        sample_alignment: time.Duration | None = None,
     ) -> Scheduler:
         """A scheduler allows building a scheduling of spaceraft tracking for a set of ground stations."""
 
@@ -1073,7 +1030,7 @@ class SpacecraftEstimate:
     def from_dispersions(
         nominal_state: Spacecraft,
         dispersions: list[StateDispersion],
-        seed: typing.Optional[int] = None,
+        seed: int | None = None,
     ) -> SpacecraftEstimate:
         """Generates an initial Kalman filter state estimate dispersed from the nominal state using the provided standard deviation parameters.
 
@@ -1138,8 +1095,8 @@ class SpacecraftODProcess:
         prop: Propagator,
         kf_variant: KalmanVariant,
         devices: dict[str, GroundStation],
-        sigma_reject: typing.Optional[SigmaRejection] = ...,
-        process_noise: typing.Optional[ProcessNoise] = None,
+        sigma_reject: SigmaRejection | None = ...,
+        process_noise: ProcessNoise | None = None,
     ) -> SpacecraftODProcess:
         """Orbit determination process for a spacecraft."""
 
@@ -1175,7 +1132,7 @@ class SpacecraftODSolution:
 
     def is_filter_run(self) -> bool: ...
     def is_nees_consistent(
-        self, truth_traj: Trajectory, alpha: float | None = None
+        self, truth_traj: PyTrajectory, alpha: float | None = None
     ) -> bool:
         """Checks whether the filter estimates are statistically consistent
         by performing a Chi-squared test on the Normalized Estimation Error Squared (NEES).
@@ -1230,7 +1187,7 @@ class SpacecraftODSolution:
         Returns Ok(ks_statistic) if residuals are available."""
 
     def nees_consistency(
-        self, truth_traj: Trajectory, alpha: float | None = None
+        self, truth_traj: PyTrajectory, alpha: float | None = None
     ) -> NormalizedConsistency:
         """Checks whether the filter estimates are statistically consistent
         by performing a Chi-squared test on the Normalized Estimation Error Squared (NEES).
@@ -1249,9 +1206,7 @@ class SpacecraftODSolution:
         Returns Ok(true) if the filter is consistent, Ok(false) if the filter
         is over-confident or under-confident, or an error if no estimates are available."""
 
-    def nis_consistency(
-        self, alpha: float | None = None
-    ) -> NormalizedConsistency:
+    def nis_consistency(self, alpha: float | None = None) -> NormalizedConsistency:
         """Checks whether the filter innovations are statistically consistent
         by performing a Chi-squared test on the Normalized Innovation Squared (NIS).
 
@@ -1374,8 +1329,8 @@ class SpacecraftPositionODProcess:
         prop: Propagator,
         kf_variant: KalmanVariant,
         devices: dict[str, PositionDevice],
-        sigma_reject: typing.Optional[SigmaRejection] = ...,
-        process_noise: typing.Optional[ProcessNoise] = None,
+        sigma_reject: SigmaRejection | None = ...,
+        process_noise: ProcessNoise | None = None,
     ) -> SpacecraftPositionODProcess:
         """Orbit determination process for a spacecraft using position tracking devices."""
 
@@ -1410,7 +1365,7 @@ class SpacecraftPositionODSolution:
         """Reconstruct an ODSolution from a parquet file."""
 
     def is_filter_run(self) -> bool: ...
-    def is_normal(self, alpha: typing.Optional[float] = None) -> bool:
+    def is_normal(self, alpha: float | None = None) -> bool:
         """Checks whether the whitened residuals of the accepted residuals pass a normality test at a given significance level `alpha`, default to 0.05."""
 
     def is_smoother_run(self) -> bool: ...
@@ -1420,14 +1375,12 @@ class SpacecraftPositionODSolution:
         Returns Ok(ks_statistic) if residuals are available."""
 
     def nees_consistency(
-        self, truth_traj: Trajectory, alpha: typing.Optional[float] = None
+        self, truth_traj: PyTrajectory, alpha: float | None = None
     ) -> NormalizedConsistency:
         """Checks whether the filter estimates are statistically consistent
         by performing a Chi-squared test on the Normalized Estimation Error Squared (NEES)."""
 
-    def nis_consistency(
-        self, alpha: typing.Optional[float] = None
-    ) -> NormalizedConsistency:
+    def nis_consistency(self, alpha: float | None = None) -> NormalizedConsistency:
         """Checks whether the filter innovations are statistically consistent
         by performing a Chi-squared test on the Normalized Innovation Squared (NIS)."""
 
@@ -1484,9 +1437,9 @@ class StochasticNoise:
 
     def __new__(
         cls,
-        white_noise: WhiteNoise | None,
-        bias: GaussMarkov | None,
-        name: str | None,
+        white_noise: WhiteNoise | None = None,
+        bias: GaussMarkov | None = None,
+        name: str | None = None,
     ) -> StochasticNoise:
         """Stochastic noise modeling used primarily for synthetic orbit determination measurements.
 
@@ -1872,9 +1825,9 @@ class TrkConfig:
 
     def __new__(
         cls,
-        scheduler: typing.Optional[Scheduler] = None,
+        scheduler: Scheduler | None = None,
         sampling: typing.Optional[time.Duration] = ...,
-        strands: typing.Optional[list[Strand]] = None,
+        strands: list[Strand] | None = None,
     ) -> TrkConfig:
         """Stores a tracking configuration, there is one per tracking data simulator (e.g. one for ground station #1 and another for #2).
         By default, the tracking configuration is continuous and the tracking arc is from the beginning of the simulation to the end.

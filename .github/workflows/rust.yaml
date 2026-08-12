@@ -105,12 +105,30 @@ jobs:
           toolchain: stable
           components: rustfmt, clippy
 
-      - name: Download data
-        run: |
-          wget -O data/01_planetary/de440s.bsp http://public-data.nyxspace.com/anise/de440s.bsp
-          wget -O data/01_planetary/pck08.pca http://public-data.nyxspace.com/anise/v0.5/pck08.pca
-          wget -O data/01_planetary/earth_latest_high_prec.bpc http://public-data.nyxspace.com/anise/ci/earth_latest_high_prec-2023-09-08.bpc
-          wget -O data/01_planetary/earth_longterm_000101_251211_250915.bpc http://public-data.nyxspace.com/anise/ci/earth_longterm_000101_251211_250915.bpc
+      - name: Cache planetary data
+        uses: actions/cache@v3
+        with:
+          path: data/
+          # This key never changes unless you manually update the suffix version string,
+          # meaning your CI will pull these heavy files from the cache infinitely.
+          key: planetary-data-v2.5.0
+
+      - name: Set up cargo cache
+        uses: actions/cache@v3
+        continue-on-error: false
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Download model data
+        shell: bash
+        run: sh download_model_data.sh
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov

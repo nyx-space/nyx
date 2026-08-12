@@ -19,7 +19,7 @@ use anise::constants::frames::*;
 use anise::frames::Frame;
 
 #[pyclass]
-#[pyo3(module = "anise.astro.constants")]
+#[pyo3(module = "anise.constants")]
 struct Frames {}
 
 #[pymethods]
@@ -55,6 +55,10 @@ impl Frames {
     #[classattr]
     const EARTH_ECLIPJ2000: Frame = EARTH_ECLIPJ2000;
     #[classattr]
+    const GCRF: Frame = GCRF;
+    #[classattr]
+    const ICRF: Frame = ICRF;
+    #[classattr]
     const IAU_MERCURY_FRAME: Frame = IAU_MERCURY_FRAME;
     #[classattr]
     const IAU_VENUS_FRAME: Frame = IAU_VENUS_FRAME;
@@ -62,6 +66,18 @@ impl Frames {
     const IAU_EARTH_FRAME: Frame = IAU_EARTH_FRAME;
     #[classattr]
     const EARTH_ITRF93: Frame = EARTH_ITRF93;
+    #[classattr]
+    const EARTH_MOD_FRAME: Frame = EARTH_MOD_FRAME;
+    #[classattr]
+    const EARTH_TOD_FRAME: Frame = EARTH_TOD_FRAME;
+    #[classattr]
+    const EARTH_MOD_LEGACY_FRAME: Frame = EARTH_MOD_LEGACY_FRAME;
+    #[classattr]
+    const EARTH_TOD_LEGACY_FRAME: Frame = EARTH_TOD_LEGACY_FRAME;
+    #[classattr]
+    const EARTH_TEME_FRAME: Frame = EARTH_TEME_FRAME;
+    #[classattr]
+    const EARTH_TEME_LEGACY_FRAME: Frame = EARTH_TEME_LEGACY_FRAME;
     #[classattr]
     const MOON_ME_FRAME: Frame = MOON_ME_FRAME;
     #[classattr]
@@ -75,6 +91,10 @@ impl Frames {
     #[classattr]
     const MOON_PA_DE440_FRAME: Frame = MOON_PA_DE440_FRAME;
     #[classattr]
+    const MOON_MOD_FRAME: Frame = MOON_MOD_FRAME;
+    #[classattr]
+    const MOON_TOD_FRAME: Frame = MOON_TOD_FRAME;
+    #[classattr]
     const IAU_MOON_FRAME: Frame = IAU_MOON_FRAME;
     #[classattr]
     const IAU_MARS_FRAME: Frame = IAU_MARS_FRAME;
@@ -86,10 +106,24 @@ impl Frames {
     const IAU_NEPTUNE_FRAME: Frame = IAU_NEPTUNE_FRAME;
     #[classattr]
     const IAU_URANUS_FRAME: Frame = IAU_URANUS_FRAME;
+    #[classattr]
+    const MERCURY_INERTIAL_FRAME: Frame = MERCURY_INERTIAL_FRAME;
+    #[classattr]
+    const VENUS_INERTIAL_FRAME: Frame = VENUS_INERTIAL_FRAME;
+    #[classattr]
+    const MARS_INERTIAL_FRAME: Frame = MARS_INERTIAL_FRAME;
+    #[classattr]
+    const JUPITER_INERTIAL_FRAME: Frame = JUPITER_INERTIAL_FRAME;
+    #[classattr]
+    const SATURN_INERTIAL_FRAME: Frame = SATURN_INERTIAL_FRAME;
+    #[classattr]
+    const URANUS_INERTIAL_FRAME: Frame = URANUS_INERTIAL_FRAME;
+    #[classattr]
+    const NEPTUNE_INERTIAL_FRAME: Frame = NEPTUNE_INERTIAL_FRAME;
 }
 
 #[pyclass]
-#[pyo3(module = "anise.astro.constants")]
+#[pyo3(module = "anise.constants")]
 struct Orientations {}
 
 #[pymethods]
@@ -98,6 +132,26 @@ impl Orientations {
     const J2000: i32 = J2000;
     #[classattr]
     const ECLIPJ2000: i32 = ECLIPJ2000;
+    #[classattr]
+    const ICRS: i32 = ICRS;
+    #[classattr]
+    const EARTH_MOD: i32 = EARTH_MOD;
+    #[classattr]
+    const EARTH_MOD_2000: i32 = EARTH_MOD_2000;
+    #[classattr]
+    const EARTH_MOD_1976: i32 = EARTH_MOD_1976;
+    #[classattr]
+    const EARTH_TOD: i32 = EARTH_TOD;
+    #[classattr]
+    const EARTH_TOD_2000A: i32 = EARTH_TOD_2000A;
+    #[classattr]
+    const EARTH_TOD_2000B: i32 = EARTH_TOD_2000B;
+    #[classattr]
+    const EARTH_TOD_1980: i32 = EARTH_TOD_1980;
+    #[classattr]
+    const EARTH_TEME: i32 = EARTH_TEME;
+    #[classattr]
+    const EARTH_TEME_LEGACY: i32 = EARTH_TEME_LEGACY;
     #[classattr]
     const IAU_MERCURY: i32 = IAU_MERCURY;
     #[classattr]
@@ -112,6 +166,10 @@ impl Orientations {
     const MOON_ME_DE421: i32 = MOON_ME_DE421;
     #[classattr]
     const MOON_ME_DE440_ME421: i32 = MOON_ME_DE440_ME421;
+    #[classattr]
+    const MOON_MOD: i32 = MOON_MOD;
+    #[classattr]
+    const MOON_TOD: i32 = MOON_TOD;
     #[classattr]
     const MOON_PA: i32 = MOON_PA;
     #[classattr]
@@ -133,7 +191,7 @@ impl Orientations {
 }
 
 #[pyclass]
-#[pyo3(module = "anise.astro.constants")]
+#[pyo3(module = "anise.constants")]
 struct CelestialObjects {}
 
 #[pymethods]
@@ -177,7 +235,7 @@ impl CelestialObjects {
 }
 
 #[pyclass]
-#[pyo3(module = "anise.astro.constants")]
+#[pyo3(module = "anise.constants")]
 struct UsualConstants {}
 
 #[pymethods]
@@ -200,7 +258,6 @@ impl UsualConstants {
     const SPEED_OF_LIGHT_KM_S: f64 = SPEED_OF_LIGHT_KM_S;
 }
 
-// NOTE: Constant is both in anise.astro.constants and anise.constants
 #[pymodule]
 pub(crate) fn constants(_py: Python, sm: &Bound<'_, PyModule>) -> PyResult<()> {
     sm.add_class::<CelestialObjects>()?;

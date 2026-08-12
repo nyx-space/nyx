@@ -4,7 +4,6 @@ from anise import Almanac
 from anise import analysis
 from anise import astro
 from anise import time
-from nyx_space import Spacecraft, Thruster
 import typing
 
 @typing.final
@@ -184,9 +183,7 @@ class ForceModels:
         Force models alter the spacecraft dynamics (they need a mass)."""
 
     def __new__(
-        cls,
-        solar_pressure: SolarPressure | None = None,
-        drag: Drag | None = None,
+        cls, solar_pressure: SolarPressure | None = None, drag: Drag | None = None
     ) -> ForceModels:
         """Force models alter the spacecraft dynamics (they need a mass)."""
 
@@ -355,21 +352,6 @@ class IntegratorOptions:
         """Return str(self)."""
 
 @typing.final
-class Msise00DailyWeather:
-    """Msise00 daily weather data."""
-
-    def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
-    ) -> None:
-        """Initialize self.  See help(type(self)) for accurate signature."""
-
-    def __repr__(self) -> str:
-        """Return repr(self)."""
-
-    def __str__(self) -> str:
-        """Return str(self)."""
-
-@typing.final
 class Nrlmsise00Flags:
     annual_harmonics: typing.Any
     boundary_density_variations: typing.Any
@@ -440,29 +422,9 @@ class PointMasses:
         PointMasses model"""
 
     def __new__(
-        cls,
-        celestial_objects: list[int],
-        correction: Aberration | None = None,
+        cls, celestial_objects: list[int], correction: Aberration | None = None
     ) -> PointMasses:
         """PointMasses model"""
-
-    def __repr__(self) -> str:
-        """Return repr(self)."""
-
-    def __str__(self) -> str:
-        """Return str(self)."""
-
-@typing.final
-class PropagationResult:
-    """The result of a propagation, containing the final spacecraft state and the generated trajectory."""
-
-    state: Spacecraft
-    trajectory: Trajectory | None
-
-    def __init__(
-        self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
-    ) -> None:
-        """Initialize self.  See help(type(self)) for accurate signature."""
 
     def __repr__(self) -> str:
         """Return repr(self)."""
@@ -506,7 +468,7 @@ class Propagator:
         self,
         spacecraft: Spacecraft,
         duration: time.Duration,
-        trajectory: bool | None = True,
+        trajectory: typing.Optional[bool] = True,
     ) -> PropagationResult:
         """Propagates the initialization state for the desired duration, optionally not building the trajectory"""
 
@@ -514,7 +476,7 @@ class Propagator:
         self,
         spacecraft: list[Spacecraft],
         duration: time.Duration,
-        trajectory: bool | None = True,
+        trajectory: typing.Optional[bool] = True,
     ) -> list[PropagationResult]:
         """Propagates the initialization state for the desired duration, optionally not building the trajectory"""
 
@@ -522,7 +484,7 @@ class Propagator:
         self,
         spacecraft: list[Spacecraft],
         epoch: time.Epoch,
-        trajectory: bool | None = True,
+        trajectory: typing.Optional[bool] = True,
     ) -> list[PropagationResult]:
         """Propagates the initialization state until the desired epoch, optionally not building the trajectory"""
 
@@ -533,7 +495,7 @@ class Propagator:
         max_duration: time.Duration,
         trigger: typing.Optional[int] = 1,
         event_frame: astro.Frame | None = None,
-        trajectory: bool | None = True,
+        trajectory: typing.Optional[bool] = True,
     ) -> list[PropagationResult]:
         """Propagates many states until event."""
 
@@ -541,7 +503,7 @@ class Propagator:
         self,
         spacecraft: Spacecraft,
         epoch: time.Epoch,
-        trajectory: bool | None = True,
+        trajectory: typing.Optional[bool] = True,
     ) -> PropagationResult:
         """Propagates the initialization state until the desired epoch, optionally not building the trajectory"""
 
@@ -550,9 +512,9 @@ class Propagator:
         spacecraft: Spacecraft,
         event: analysis.Event,
         max_duration: time.Duration,
-        trigger: int | None = 1,
+        trigger: typing.Optional[int] = 1,
         event_frame: astro.Frame | None = None,
-        trajectory: bool | None = True,
+        trajectory: typing.Optional[bool] = True,
     ) -> PropagationResult:
         """Propagates the initialization state until the specified event has occurred `trigger` times, or until `max_duration` is reached.
 
@@ -610,6 +572,7 @@ class PropagatorConfig:
 
 @typing.final
 class ShadowModel:
+    correction: typing.Any
     light_source: typing.Any
     shadow_bodies: typing.Any
 
@@ -644,6 +607,7 @@ class SolarPressure:
         cls,
         shadow_bodies: list[astro.Frame],
         almanac: Almanac,
+        correction: typing.Any = None,
         flux_w_m2: typing.Optional[float] = ...,
         estimate: typing.Optional[bool] = True,
     ) -> SolarPressure:
@@ -661,6 +625,7 @@ class SolidTides:
     It accounts for the crust deformation due to the configured tidal perturbers.
     Formulas are based on IERS 2010 Conventions."""
 
+    correction: typing.Any
     frame: typing.Any
     k2: typing.Any
     k3: typing.Any
@@ -672,6 +637,7 @@ class SolidTides:
         k2: float,
         k3: float,
         perturbers: list[TidalPerturber],
+        correction: Aberration,
         *args: typing.Optional[typing.Any],
         **kwargs: typing.Optional[typing.Any],
     ) -> None:
@@ -681,7 +647,12 @@ class SolidTides:
         Formulas are based on IERS 2010 Conventions."""
 
     def __new__(
-        cls, frame: astro.Frame, k2: float, k3: float, perturbers: list[TidalPerturber]
+        cls,
+        frame: astro.Frame,
+        k2: float,
+        k3: float,
+        perturbers: list[TidalPerturber],
+        correction: Aberration,
     ) -> SolidTides:
         """`SolidTides` implements the solid tide acceleration model.
         It accounts for the crust deformation due to the configured tidal perturbers.
@@ -689,7 +660,10 @@ class SolidTides:
 
     @staticmethod
     def earth_moon_system(
-        earth_frame: astro.Frame, moon_frame: astro.Frame, almanac: Almanac
+        earth_frame: astro.Frame,
+        moon_frame: astro.Frame,
+        almanac: Almanac,
+        correction: typing.Optional[Aberration] = None,
     ) -> SolidTides:
         """Initializes solid tides with the Moon and the Sun, where the k3 is only computed for the Moon.
         Sets the k2 Love number to 0.3019 and the k3 Love number to 0.093"""
@@ -776,7 +750,7 @@ class SpacecraftSequence:
 
     def propagate(
         self, state: Spacecraft, until_phase: str | None, almanac: Almanac
-    ) -> list[str]:
+    ) -> list[string, string]:
         """Propagate the state through the sequence until a given phase."""
 
     def setup(self, almanac: Almanac) -> None:
