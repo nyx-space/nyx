@@ -7,8 +7,8 @@
 //!
 //! All coefficient indices are 0-based (matching Rust arrays).
 
-use super::coefficients::*;
 use super::Nrlmsise00Input;
+use super::coefficients::*;
 use core::f64::consts::PI;
 
 const DEG_TO_RAD: f64 = PI / 180.0;
@@ -209,7 +209,6 @@ fn geographic_variation_ratio(
     // t[8]: Magnetic activity (Ap)
     if sw[9] == -1.0 {
         // 3-hour Ap mode
-        // let ap = &input.ap_array;
         if p[51] != 0.0 {
             t[8] = sg
                 * (p[50]
@@ -222,13 +221,6 @@ fn geographic_variation_ratio(
                         * sw[7].abs()
                         * (HOURS_TO_RAD * (tloc_h - p[131])).cos());
         }
-        // if p[51] != 0.0 {
-        //     let exp1 = (-10800.0 * p[51].abs()).exp();
-        //     let exp1 = if exp1 > 0.99999 { 0.99999 } else { exp1 };
-        //     let sg = ap_geomagnetic_index(exp1, ap, p);
-        //     t[8] = (p[50] * plg[0][2] + p[96] * plg[0][4]) * sg
-        //         + (p[53] * plg[1][3] + p[98] * plg[1][5]) * sg * ctloc;
-        // }
     } else {
         // Daily Ap mode with saturation
         let apd = input.ap_daily - 4.0;
@@ -420,12 +412,10 @@ fn geographic_variation_lower_ratio(
     }
 
     // t[8]: Magnetic activity (uses apdf computed by geographic_variation)
-    if sw[9].abs() > 0.0 {
-        if sw[9] == 1.0 {
-            t[8] = apdf * (p[32] + p[45] * plg[0][2] * sw[2].abs());
-        } else if sw[9] == -1.0 {
-            t[8] = apt1 * (p[50] + p[96] * plg[0][2] * sw[2].abs());
-        }
+    if sw[9] == 1.0 {
+        t[8] = apdf * (p[32] + p[45] * plg[0][2] * sw[2].abs());
+    } else if sw[9] == -1.0 {
+        t[8] = apt1 * (p[50] + p[96] * plg[0][2] * sw[2].abs());
     }
 
     // t[10]: Longitudinal (with seasonal modulation)

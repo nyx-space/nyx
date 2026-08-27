@@ -375,7 +375,6 @@ pub fn msise00_density(
 #[cfg(test)]
 mod tests {
     use super::*;
-    // use crate::dynamics::nrlmsise00::{compute, Nrlmsise00Input};
     use approx::assert_relative_eq;
     use serde::Deserialize;
     use std::fs;
