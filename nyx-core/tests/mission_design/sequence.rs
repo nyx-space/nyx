@@ -12,12 +12,12 @@ use nyx::dynamics::{AtmDensity, Drag, SolarPressure};
 use nyx::propagators::{IntegratorMethod, IntegratorOptions};
 use nyx::time::{Epoch, Unit};
 use nyx_space::cosmic::{Mass, SRPData};
-use nyx_space::dynamics::PointMasses;
 use nyx_space::dynamics::guidance::mnvr::ImpulsiveManeuver;
 use nyx_space::dynamics::guidance::{LocalFrame, Maneuver, ObjectiveEfficiency, ObjectiveWeight};
+use nyx_space::dynamics::PointMasses;
 use nyx_space::io::gravity::GravityFieldConfig;
-use nyx_space::md::StateParameter;
 use nyx_space::md::prelude::{Objective, OrbitalElement};
+use nyx_space::md::StateParameter;
 use rstest::*;
 use std::sync::Arc;
 
@@ -66,6 +66,7 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
                         },
                         frame: almanac.frame_info(IAU_EARTH_FRAME).unwrap(),
                         estimate: false,
+                        // correction: None,
                     }),
                 },
             },
@@ -327,6 +328,7 @@ fn spacecraft_low_thrust_orbit_raise(
                         },
                         frame: almanac.frame_info(IAU_EARTH_FRAME).unwrap(),
                         estimate: false,
+                        // correction: None,
                     }),
                 },
             },

@@ -20,14 +20,13 @@ use super::{
     DynamicsAlmanacSnafu, DynamicsAstroSnafu, DynamicsError, DynamicsPlanetarySnafu, ForceModel,
 };
 use crate::cosmic::{AstroPhysicsSnafu, Frame, Spacecraft};
-use crate::dynamics::nrlmsise00::Nrlmsise00Flags;
 use crate::dynamics::nrlmsise00::msise00_density;
+use crate::dynamics::nrlmsise00::Nrlmsise00Flags;
 use crate::io::space_weather::SpaceWeatherData;
 use crate::linalg::{Matrix4x3, Vector3};
-use anise::almanac::Almanac;
-use anise::constants::frames::IAU_EARTH_FRAME;
+use anise::constants::frames::{IAU_EARTH_FRAME, SUN_J2000};
 use anise::errors::OrientationSnafu;
-use hifitime::Unit;
+use anise::prelude::Almanac;
 use serde::{Deserialize, Serialize};
 use serde_dhall::StaticType;
 use snafu::ResultExt;
@@ -265,6 +264,9 @@ pub struct Drag {
     pub density: AtmDensity,
     /// Frame to compute the drag in
     pub frame: Frame,
+    // Will be added in the next version
+    // Light-time correction computation if the chosen drag model need solar position
+    // pub correction: Option<Aberration>,
     /// Set to true to estimate the coefficient of drag
     pub estimate: bool,
 }
@@ -288,6 +290,7 @@ impl Drag {
                     action: "planetary data from third body not loaded",
                 })?,
             estimate: false,
+            // correction: None,
         }))
     }
 
@@ -306,6 +309,7 @@ impl Drag {
                     action: "planetary data from third body not loaded",
                 })?,
             estimate: false,
+            // correction: None,
         }))
     }
 
@@ -364,11 +368,21 @@ impl Drag {
                     .context(AstroPhysicsSnafu)
                     .context(DynamicsAstroSnafu)?;
 
-                let lst_h = almanac.local_solar_time(osc_drag_frame, None).context(
-                    DynamicsAlmanacSnafu {
+                // Compute the geographic solar time
+                // TODO Implement in ANISE
+                let sun_state = almanac
+                    .transform(SUN_J2000, self.frame, ctx.orbit.epoch, None)
+                    .context(DynamicsAlmanacSnafu {
                         action: "computing local solar time",
-                    },
-                )?;
+                    })?;
+
+                let sun_long_deg = sun_state.longitude_360_deg();
+
+                // Angle between meridians
+                let delta_lon_deg = long_deg - sun_long_deg;
+
+                // Convert to hours (24 hours in 360 degrees), offset by 12 hours for noon definition
+                let lst_h = ((delta_lon_deg / 180.0 * 12.0) + 12.0).rem_euclid(24.0);
 
                 let epoch = ctx.orbit.epoch;
 
@@ -376,11 +390,11 @@ impl Drag {
 
                 msise00_density(
                     sw,
-                    lst_h.to_unit(Unit::Hour),
+                    lst_h,
                     lat_deg,
                     long_deg,
                     alt_km,
-                    ctx.orbit.epoch,
+                    epoch,
                     flags.unwrap_or_default(),
                 )?
                 .total_mass_density_kg_m3
@@ -458,7 +472,11 @@ impl fmt::Display for Drag {
 
 impl ForceModel for Drag {
     fn estimation_index(&self) -> Option<usize> {
-        if self.estimate { Some(7) } else { None }
+        if self.estimate {
+            Some(7)
+        } else {
+            None
+        }
     }
 
     fn eom(&self, ctx: &Spacecraft, almanac: &Almanac) -> Result<Vector3<f64>, DynamicsError> {
@@ -552,11 +570,17 @@ impl ForceModel for Drag {
 impl Drag {
     #[pyo3(signature = (density, frame, estimate=true))]
     #[new]
-    fn py_new(density: AtmDensity, frame: Frame, estimate: bool) -> Self {
+    fn py_new(
+        density: AtmDensity,
+        frame: Frame,
+        estimate: bool,
+        // correction: Option<Aberration>,
+    ) -> Self {
         Self {
             density,
             frame,
             estimate,
+            // correction,
         }
     }
 

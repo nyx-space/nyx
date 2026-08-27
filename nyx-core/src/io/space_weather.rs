@@ -299,7 +299,7 @@ impl SpaceWeatherData {
     /// :type epoch: Epoch
     /// :rtype: Msise00DailyWeather
     pub fn msise_weather(&self, epoch: Epoch) -> Msise00DailyWeather {
-        let target_midnight = epoch.with_hms(0, 0, 0);
+        let target_midnight = epoch.with_hms_strict(0, 0, 0) - Unit::Day * 1;
         let current_day = self.records.get(&target_midnight);
 
         let seconds_into_day = (epoch - target_midnight).to_seconds();

@@ -431,6 +431,7 @@ fn test_prop_nrlmsise00_from_weather(almanac: Arc<Almanac>) {
             },
             frame: IAU_EARTH_FRAME,
             estimate: false,
+            // correction: None,
         })],
     );
 
@@ -476,7 +477,7 @@ fn test_prop_nrlmsise00_from_weather(almanac: Arc<Almanac>) {
 fn val_ioastro_nrlmsise00(almanac: Arc<Almanac>) {
     let weather = SpaceWeatherData::from_static_weather(StaticSpaceWeather::Custom {
         f107: 150.0,
-        ap: 18.6,
+        ap: 20.0,
         kp: 3.0,
     });
 
@@ -526,6 +527,7 @@ fn val_ioastro_nrlmsise00(almanac: Arc<Almanac>) {
             },
             frame: iau_earth,
             estimate: false,
+            // correction: None,
         })],
     );
 
@@ -646,6 +648,7 @@ fn nrlmsise00_compare(almanac: Arc<Almanac>) {
                 },
                 frame: iau_earth,
                 estimate: false,
+                // correction: None,
             })],
         );
 
@@ -714,6 +717,7 @@ fn regression_harris_drag(almanac: Arc<Almanac>) {
             density: AtmDensity::HarrisPriester { n_parameter: 2 },
             frame: iau_earth,
             estimate: false,
+            // correction: None,
         })],
     );
 
