@@ -66,7 +66,7 @@ python = ["pyo3", "hifitime/python", "anise/python"]
 polars = { version = "0.54.0", features = ["parquet"] }
 rstest = "0.26.1"
 pretty_env_logger = "0.5"
-serde_arrow = { version = "0.14", features = ["arrow-59"] }
+serde_arrow = { version = "0.15", features = ["arrow-59"] }
 toml = "1.0.0"
 radiate = "1.2.22"
 approx = "0.5"
