@@ -298,8 +298,14 @@ impl SpaceWeatherData {
     ///
     /// :type epoch: Epoch
     /// :rtype: Msise00DailyWeather
-    pub fn msise_weather(&self, epoch: Epoch) -> Msise00DailyWeather {
-        let target_midnight = epoch.with_hms_strict(0, 0, 0) - Unit::Day * 1;
+    pub fn msise_weather(&self, mut epoch: Epoch) -> Msise00DailyWeather {
+        epoch = epoch.to_time_scale(TimeScale::UTC);
+        let target_midnight = epoch.with_hms_strict(0, 0, 0);
+        // The F10.7 _daily_ must be taken from the previous day
+        let yesterday = self
+            .records
+            .get(&(epoch.with_hms_strict(0, 0, 0) - Unit::Day * 1));
+        // But the rest of the data comes from today.
         let current_day = self.records.get(&target_midnight);
 
         let seconds_into_day = (epoch - target_midnight).to_seconds();
@@ -309,7 +315,7 @@ impl SpaceWeatherData {
         let ap_history = self.build_ap_history(target_midnight, bin_idx);
 
         // 1. Daily F10.7: Prefer observed, fall back to adjusted, then global fallback
-        let f107_daily = self.fallback.resolve_f107(current_day.map(|r| r.f107_obs));
+        let f107_daily = self.fallback.resolve_f107(yesterday.map(|r| r.f107_obs));
 
         // 2. 81-day Centered Mean F10.7: Prefer observed 81d, then adjusted 81d,
         // fall back to resolved daily F10.7 before applying static global fallback

@@ -314,7 +314,7 @@ impl Drag {
     }
 
     /// Calculate the density as a private function, since it's duplicated in the EOM and Gradient
-    fn rho_kg_m3(&self, ctx: &Spacecraft, almanac: &Almanac) -> Result<f64, DynamicsError> {
+    pub fn rho_kg_m3(&self, ctx: &Spacecraft, almanac: &Almanac) -> Result<f64, DynamicsError> {
         let osc_drag_frame =
             almanac
                 .transform_to(ctx.orbit, self.frame, None)
@@ -380,7 +380,8 @@ impl Drag {
                 // Angle between meridians
                 let delta_lon_deg = long_deg - sun_long_deg;
                 // Convert to hours (24 hours in 360 degrees), offset by 12 hours for noon definition
-                let lst_h = ((delta_lon_deg / 180.0 * 12.0) + 12.0).rem_euclid(24.0);
+                // SPICE 12 + (SITLNG - SUNLNG) / 15
+                let lst_h = (12.0 + (delta_lon_deg / 15.0)).rem_euclid(24.0);
 
                 let epoch = ctx.orbit.epoch;
 

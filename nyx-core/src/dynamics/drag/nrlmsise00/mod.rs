@@ -38,7 +38,7 @@
 
 use crate::dynamics::DynamicsError;
 pub use crate::io::space_weather::Msise00DailyWeather;
-use hifitime::Epoch;
+use hifitime::{Epoch, TimeScale};
 use serde::{Deserialize, Serialize};
 use serde_dhall::StaticType;
 
@@ -350,10 +350,12 @@ pub fn msise00_density(
     latitude_deg: f64,
     longitude_deg: f64,
     altitude_km: f64,
-    epoch: Epoch,
+    mut epoch: Epoch,
     flags: Nrlmsise00Flags,
 ) -> Result<Nrlmsise00Output, DynamicsError> {
-    let at_midnight = epoch.with_hms(0, 0, 0);
+    // Space weather is provided in UTC.
+    epoch = epoch.to_time_scale(TimeScale::UTC);
+    let at_midnight = epoch.with_hms_strict(0, 0, 0);
     let ut_seconds = (epoch - at_midnight).to_seconds();
 
     let input = Nrlmsise00Input {
@@ -511,7 +513,7 @@ mod tests {
             assert_relative_eq!(
                 t_alt,
                 tc.expected_temperature_k,
-                max_relative = 0.005,
+                max_relative = 0.001,
                 epsilon = 1e-5
             );
 
@@ -524,7 +526,7 @@ mod tests {
             assert_relative_eq!(
                 total_density_kg_m3,
                 tc.expected_total_density_kg_m3,
-                max_relative = 0.01,
+                max_relative = 0.004,
                 epsilon = 1e-18,
             );
         }

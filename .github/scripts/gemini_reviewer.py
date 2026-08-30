@@ -192,7 +192,7 @@ Description:
             system_instruction=SYSTEM_INSTRUCTION,
             response_mime_type="application/json",
             response_schema=ReviewPayload,
-            temperature=0.1,  # Low temperature minimizes creative hallucination of lines
+            temperature=1.0,
         ),
     )
 
