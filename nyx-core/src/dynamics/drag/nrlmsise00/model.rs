@@ -107,20 +107,18 @@ fn ap_sum_factor(ex: f64) -> f64 {
     1.0 + (1.0 - ex.powi(19)) / (1.0 - ex) * ex.sqrt()
 }
 
-/// Geomagnetic activity function using 3-hour Ap history.
 fn ap_geomagnetic_index(ex: f64, ap_array: &[f64; 7], p: &[f64]) -> f64 {
-    // 7 elements: current + 6 historical 3-hour Ap indices (NRLMSISE-00 spec).
-    let mut g0_vals = [0.0; 7];
-    for (i, &a) in ap_array.iter().enumerate() {
-        g0_vals[i] = ap_saturation(a, p[24], p[25]);
+    let p24 = p[24].max(1.0e-4);
+    let mut g0_vals = [0.0; 6];
+    for i in 0..6 {
+        g0_vals[i] = ap_saturation(ap_array[i + 1], p24, p[25]);
     }
 
     let sum = g0_vals[0]
         + g0_vals[1] * ex
         + g0_vals[2] * ex * ex
         + g0_vals[3] * ex.powi(3)
-        + g0_vals[4] * ex.powi(4)
-        + (g0_vals[5] * ex.powi(12) + g0_vals[6] * ex.powi(25)) * (1.0 - ex.powi(8)) / (1.0 - ex);
+        + (g0_vals[4] * ex.powi(4) + g0_vals[5] * ex.powi(12)) * (1.0 - ex.powi(8)) / (1.0 - ex);
 
     sum / ap_sum_factor(ex)
 }
@@ -142,6 +140,15 @@ fn geographic_variation_ratio(
     let doy = input.day_of_year as f64;
     let df_sfu = input.f107_daily - input.f107_avg;
     let dfa_sfu = input.f107_avg - 150.0;
+    let mut sg = 0.0;
+    if sw[9] == -1.0 && p[51] != 0.0 {
+        let lat_factor = 1.0 + p[138] * (45.0 - input.latitude_deg.abs());
+        let mut exp1 = (-10800.0 * p[51].abs() / lat_factor).exp();
+        if exp1 > 0.99999 {
+            exp1 = 0.99999;
+        }
+        sg = ap_geomagnetic_index(exp1, &input.ap_array, p);
+    }
 
     // F10.7 modulation of asymmetric annual and diurnal
     let f1 = 1.0 + (p[47] * dfa_sfu + p[19] * df_sfu + p[20] * df_sfu * df_sfu) * sw[1].abs();
@@ -202,13 +209,17 @@ fn geographic_variation_ratio(
     // t[8]: Magnetic activity (Ap)
     if sw[9] == -1.0 {
         // 3-hour Ap mode
-        let ap = &input.ap_array;
         if p[51] != 0.0 {
-            let exp1 = (-10800.0 * p[51].abs()).exp();
-            let exp1 = if exp1 > 0.99999 { 0.99999 } else { exp1 };
-            let sg = ap_geomagnetic_index(exp1, ap, p);
-            t[8] = (p[50] * plg[0][2] + p[96] * plg[0][4]) * sg
-                + (p[53] * plg[1][3] + p[98] * plg[1][5]) * sg * ctloc;
+            t[8] = sg
+                * (p[50]
+                    + p[96] * plg[0][2]
+                    + p[54] * plg[0][4]
+                    + (p[125] * plg[0][1] + p[126] * plg[0][3] + p[127] * plg[0][5])
+                        * cd14
+                        * sw[5].abs()
+                    + (p[128] * plg[1][1] + p[129] * plg[1][3] + p[130] * plg[1][5])
+                        * sw[7].abs()
+                        * (HOURS_TO_RAD * (tloc_h - p[131])).cos());
         }
     } else {
         // Daily Ap mode with saturation
@@ -277,14 +288,32 @@ fn geographic_variation_ratio(
     // t[12]: Mixed UT/longitude/Ap (daily Ap mode)
     if sw[13].abs() > 0.0 {
         let sr_rad_s = 7.2722e-5;
-        let apdf_local = {
-            let apd = input.ap_daily - 4.0;
-            let p44 = p[43].abs().max(1.0e-5);
-            let p45 = p[44];
-            apd + (p45 - 1.0) * (apd + ((-p44 * apd).exp() - 1.0) / p44)
-        };
-        // Longitude/Ap coupling
-        t[12] = apdf_local * sw[11].abs() * (1.0 + p[120] * plg[0][1])
+        let lon_rad = input.longitude_deg * DEG_TO_RAD;
+        if sw[9] == -1.0 {
+            if p[51] != 0.0 {
+                t[12] = sg
+                    * sw[11].abs()
+                    * (1.0 + p[132] * plg[0][1])
+                    * ((p[52] * plg[1][2] + p[98] * plg[1][4] + p[67] * plg[1][6])
+                        * (lon_rad - p[97] * DEG_TO_RAD).cos())
+                    + sg * sw[11].abs()
+                        * sw[5].abs()
+                        * (p[133] * plg[1][1] + p[134] * plg[1][3] + p[135] * plg[1][5])
+                        * cd14
+                        * (lon_rad - p[136] * DEG_TO_RAD).cos()
+                    + sg * sw[12].abs()
+                        * (p[55] * plg[0][1] + p[56] * plg[0][3] + p[57] * plg[0][5])
+                        * (sr_rad_s * (input.ut_seconds - p[58])).cos();
+            }
+        } else {
+            let apdf_local = {
+                let apd = input.ap_daily - 4.0;
+                let p44 = p[43].abs().max(1.0e-5);
+                let p45 = p[44];
+                apd + (p45 - 1.0) * (apd + ((-p44 * apd).exp() - 1.0) / p44)
+            };
+            // Longitude/Ap coupling
+            t[12] = apdf_local * sw[11].abs() * (1.0 + p[120] * plg[0][1])
             * ((p[60] * plg[1][2] + p[61] * plg[1][4] + p[62] * plg[1][6])
                 * (DEG_TO_RAD * (input.longitude_deg - p[63])).cos())
             // Seasonal longitude/Ap coupling
@@ -296,6 +325,7 @@ fn geographic_variation_ratio(
             + apdf_local * sw[12].abs()
                 * (p[83] * plg[0][1] + p[84] * plg[0][3] + p[85] * plg[0][5])
                 * (sr_rad_s * (input.ut_seconds - p[75])).cos();
+        }
     }
 
     // t[13]: Terdiurnal (with annual modulation)
@@ -321,6 +351,7 @@ fn geographic_variation_lower_ratio(
     sw: &[f64; 24],
     plg: &[[f64; 9]; 9],
     apdf: f64,
+    apt1: f64,
 ) -> f64 {
     let mut t = [0.0f64; 14];
     let doy = input.day_of_year as f64;
@@ -381,8 +412,10 @@ fn geographic_variation_lower_ratio(
     }
 
     // t[8]: Magnetic activity (uses apdf computed by geographic_variation)
-    if sw[9].abs() > 0.0 {
+    if sw[9] == 1.0 {
         t[8] = apdf * (p[32] + p[45] * plg[0][2] * sw[2].abs());
+    } else if sw[9] == -1.0 {
+        t[8] = apt1 * (p[50] + p[96] * plg[0][2] * sw[2].abs());
     }
 
     // t[10]: Longitudinal (with seasonal modulation)
@@ -768,6 +801,32 @@ pub fn compute(input: &Nrlmsise00Input, sw: &[f64; 24]) -> ([f64; 9], f64, f64) 
         apd + (p45 - 1.0) * (apd + ((-p44 * apd).exp() - 1.0) / p44)
     };
 
+    let apt1 = if sw[9] == -1.0 {
+        let mut current_apt = 0.0;
+
+        let mut update_apt = |p: &[f64]| {
+            if p[51] != 0.0 {
+                let lat_factor = 1.0 + p[138] * (45.0 - input.latitude_deg.abs());
+                let mut exp1 = (-10800.0 * p[51].abs() / lat_factor).exp();
+                if exp1 > 0.99999 {
+                    exp1 = 0.99999;
+                }
+                current_apt = ap_geomagnetic_index(exp1, &input.ap_array, p);
+            }
+        };
+
+        // Fortran unconditionally evaluates these three arrays in this exact sequence
+        // before evaluating the lower atmosphere temperature nodes. We must evaluate
+        // the storm history for them regardless of the current altitude.
+        update_apt(&TEMP_COEFFICIENTS_K); // TINF
+        update_apt(&DENSITY_COEFFICIENTS[3]); // TLB
+        update_apt(&GRADIENT_COEFFICIENTS); // G0
+
+        current_apt
+    } else {
+        0.0
+    };
+
     // Lower thermosphere temperature profile (TN1 nodes)
     // Nodes at: za(~123), 110, 100, 90, 72.5 km
     // tn1[0] is set inside density_temperature_profile from Bates-Walker at za, not from tlb directly.
@@ -786,6 +845,7 @@ pub fn compute(input: &Nrlmsise00Input, sw: &[f64; 24]) -> ([f64; 9], f64, f64) 
                         sw,
                         &plg,
                         apdf,
+                        apt1,
                     ));
         tn1[2] = TEMP_BOUNDARY[2] * TEMP_NODE_COEFFICIENTS[1][0]
             / (1.0
@@ -796,6 +856,7 @@ pub fn compute(input: &Nrlmsise00Input, sw: &[f64; 24]) -> ([f64; 9], f64, f64) 
                         sw,
                         &plg,
                         apdf,
+                        apt1,
                     ));
         tn1[3] = TEMP_BOUNDARY[7] * TEMP_NODE_COEFFICIENTS[2][0]
             / (1.0
@@ -806,6 +867,7 @@ pub fn compute(input: &Nrlmsise00Input, sw: &[f64; 24]) -> ([f64; 9], f64, f64) 
                         sw,
                         &plg,
                         apdf,
+                        apt1,
                     ));
         tn1[4] = TEMP_BOUNDARY[4] * TEMP_NODE_COEFFICIENTS[3][0]
             / (1.0
@@ -817,6 +879,7 @@ pub fn compute(input: &Nrlmsise00Input, sw: &[f64; 24]) -> ([f64; 9], f64, f64) 
                         sw,
                         &plg,
                         apdf,
+                        apt1,
                     ));
         tgn1[1] = TEMP_BOUNDARY[8]
             * MID_ATMO_COEFFICIENTS[8][0]
@@ -829,6 +892,7 @@ pub fn compute(input: &Nrlmsise00Input, sw: &[f64; 24]) -> ([f64; 9], f64, f64) 
                         sw,
                         &plg,
                         apdf,
+                        apt1,
                     ))
             * tn1[4]
             * tn1[4]
@@ -1486,6 +1550,7 @@ mod ut_nrlmsise {
                         &sw,
                         &plg,
                         apdf,
+                        0.0,
                     ));
         tn1[2] = TEMP_BOUNDARY[2] * TEMP_NODE_COEFFICIENTS[1][0]
             / (1.0
@@ -1496,6 +1561,7 @@ mod ut_nrlmsise {
                         &sw,
                         &plg,
                         apdf,
+                        0.0,
                     ));
         tn1[3] = TEMP_BOUNDARY[7] * TEMP_NODE_COEFFICIENTS[2][0]
             / (1.0
@@ -1506,6 +1572,7 @@ mod ut_nrlmsise {
                         &sw,
                         &plg,
                         apdf,
+                        0.0,
                     ));
         tn1[4] = TEMP_BOUNDARY[4] * TEMP_NODE_COEFFICIENTS[3][0]
             / (1.0
@@ -1517,6 +1584,7 @@ mod ut_nrlmsise {
                         &sw,
                         &plg,
                         apdf,
+                        0.0,
                     ));
         eprintln!("tn1: {:?}", tn1);
 
@@ -1533,6 +1601,7 @@ mod ut_nrlmsise {
                         &sw,
                         &plg,
                         apdf,
+                        0.0,
                     ))
             * tn1[4]
             * tn1[4]
@@ -1609,6 +1678,7 @@ mod ut_nrlmsise {
                         &sw,
                         &plg,
                         apdf,
+                        0.0,
                     ));
         tn1[2] = TEMP_BOUNDARY[2] * TEMP_NODE_COEFFICIENTS[1][0]
             / (1.0
@@ -1619,6 +1689,7 @@ mod ut_nrlmsise {
                         &sw,
                         &plg,
                         apdf,
+                        0.0,
                     ));
         tn1[3] = TEMP_BOUNDARY[7] * TEMP_NODE_COEFFICIENTS[2][0]
             / (1.0
@@ -1629,6 +1700,7 @@ mod ut_nrlmsise {
                         &sw,
                         &plg,
                         apdf,
+                        0.0,
                     ));
         tn1[4] = TEMP_BOUNDARY[4] * TEMP_NODE_COEFFICIENTS[3][0]
             / (1.0
@@ -1640,6 +1712,7 @@ mod ut_nrlmsise {
                         &sw,
                         &plg,
                         apdf,
+                        0.0,
                     ));
         tgn1[0] = g0_val;
         tgn1[1] = TEMP_BOUNDARY[8]
@@ -1653,6 +1726,7 @@ mod ut_nrlmsise {
                         &sw,
                         &plg,
                         apdf,
+                        0.0,
                     ))
             * tn1[4]
             * tn1[4]
@@ -1822,6 +1896,7 @@ mod ut_nrlmsise {
                         &sw,
                         &plg,
                         apdf,
+                        0.0,
                     ));
         tn1[2] = TEMP_BOUNDARY[2] * TEMP_NODE_COEFFICIENTS[1][0]
             / (1.0
@@ -1832,6 +1907,7 @@ mod ut_nrlmsise {
                         &sw,
                         &plg,
                         apdf,
+                        0.0,
                     ));
         tn1[3] = TEMP_BOUNDARY[7] * TEMP_NODE_COEFFICIENTS[2][0]
             / (1.0
@@ -1842,6 +1918,7 @@ mod ut_nrlmsise {
                         &sw,
                         &plg,
                         apdf,
+                        0.0,
                     ));
         tn1[4] = TEMP_BOUNDARY[4] * TEMP_NODE_COEFFICIENTS[3][0]
             / (1.0
@@ -1853,6 +1930,7 @@ mod ut_nrlmsise {
                         &sw,
                         &plg,
                         apdf,
+                        0.0,
                     ));
         tgn1[0] = g0_val;
         tgn1[1] = TEMP_BOUNDARY[8]
@@ -1866,6 +1944,7 @@ mod ut_nrlmsise {
                         &sw,
                         &plg,
                         apdf,
+                        0.0,
                     ))
             * tn1[4]
             * tn1[4]
@@ -2009,6 +2088,7 @@ mod ut_nrlmsise {
                 &sw,
                 &plg,
                 apdf,
+                0.0,
             );
             let tn1_2 = TEMP_BOUNDARY[2] * TEMP_NODE_COEFFICIENTS[1][0] / (1.0 - sw[18] * g7s_ptl1);
 
@@ -2018,6 +2098,7 @@ mod ut_nrlmsise {
                 &sw,
                 &plg,
                 apdf,
+                0.0,
             );
             let tn1_1 = TEMP_BOUNDARY[6] * TEMP_NODE_COEFFICIENTS[0][0] / (1.0 - sw[18] * g7s_ptl0);
 

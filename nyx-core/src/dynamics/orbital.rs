@@ -19,11 +19,12 @@
 use super::{
     AccelModel, DynamicsAlmanacSnafu, DynamicsAstroSnafu, DynamicsError, DynamicsPlanetarySnafu,
 };
-use crate::cosmic::{AstroPhysicsSnafu, Frame, Orbit};
+use crate::cosmic::{AstroPhysicsSnafu, Orbit};
 use crate::linalg::{Const, Matrix3, Matrix6, OVector, Vector3, Vector6};
 
 use anise::almanac::Almanac;
 use anise::astro::Aberration;
+use anise::constants::celestial_objects::celestial_name_from_id;
 use hyperdual::linalg::norm;
 use hyperdual::{Float, OHyperdual, extract_jacobian_and_result, hyperspace_from_vector};
 use serde::{Deserialize, Serialize};
@@ -207,7 +208,11 @@ impl fmt::Display for PointMasses {
         let masses: Vec<String> = self
             .celestial_objects
             .iter()
-            .map(|third_body| format!("{}", Frame::from_ephem_j2000(*third_body)))
+            .map(|third_body| {
+                celestial_name_from_id(*third_body)
+                    .unwrap_or(&format!("{third_body}"))
+                    .to_string()
+            })
             .collect();
         write!(f, "Point masses of {}", masses.join(", "))
     }

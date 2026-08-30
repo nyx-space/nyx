@@ -38,7 +38,7 @@
 
 use crate::dynamics::DynamicsError;
 pub use crate::io::space_weather::Msise00DailyWeather;
-use hifitime::Epoch;
+use hifitime::{Epoch, TimeScale};
 use serde::{Deserialize, Serialize};
 use serde_dhall::StaticType;
 
@@ -350,10 +350,12 @@ pub fn msise00_density(
     latitude_deg: f64,
     longitude_deg: f64,
     altitude_km: f64,
-    epoch: Epoch,
+    mut epoch: Epoch,
     flags: Nrlmsise00Flags,
 ) -> Result<Nrlmsise00Output, DynamicsError> {
-    let at_midnight = epoch.with_hms(0, 0, 0);
+    // Space weather is provided in UTC.
+    epoch = epoch.to_time_scale(TimeScale::UTC);
+    let at_midnight = epoch.with_hms_strict(0, 0, 0);
     let ut_seconds = (epoch - at_midnight).to_seconds();
 
     let input = Nrlmsise00Input {
@@ -375,6 +377,10 @@ pub fn msise00_density(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use approx::assert_relative_eq;
+    use serde::Deserialize;
+    use std::fs;
+    use std::path::PathBuf;
 
     #[test]
     fn test_nrlmsise00_flags() {
@@ -439,5 +445,90 @@ mod tests {
         custom_flags.geomagnetic = GeomagneticMode::Off;
         let switches_off = custom_flags.to_switches();
         assert_eq!(switches_off[9], 0.0);
+    }
+
+    #[derive(Deserialize)]
+    struct MsisTestCase {
+        altitude_km: f64,
+        latitude_deg: f64,
+        longitude_deg: f64,
+        day_of_year: u32,
+        ut_seconds: f64,
+        f107_daily: f64,
+        f107_avg: f64,
+        ap_array: [f64; 7],
+        is_storm: bool,
+        expected_total_density_kg_m3: f64,
+        expected_temperature_k: f64,
+    }
+
+    #[test]
+    fn pymsis_validation() {
+        let test_data: PathBuf = [
+            env!("CARGO_MANIFEST_DIR"),
+            "../data/03_tests/nrlmsise00_validation.json",
+        ]
+        .iter()
+        .collect();
+
+        let data = fs::read_to_string(test_data).expect("Failed to read validation JSON");
+        let test_cases: Vec<MsisTestCase> =
+            serde_json::from_str(&data).expect("Failed to deserialize test cases");
+
+        for (i, tc) in test_cases.iter().enumerate() {
+            let input = Nrlmsise00Input {
+                day_of_year: tc.day_of_year,
+                ut_seconds: tc.ut_seconds,
+                altitude_km: tc.altitude_km,
+                latitude_deg: tc.latitude_deg,
+                longitude_deg: tc.longitude_deg,
+                local_solar_time_hours: (tc.ut_seconds / 3600.0 + tc.longitude_deg / 15.0)
+                    .rem_euclid(24.0),
+                f107_daily: tc.f107_daily,
+                f107_avg: tc.f107_avg,
+                ap_daily: tc.ap_array[0],
+                ap_array: tc.ap_array,
+            };
+
+            // Standard switches: 57-hour history enabled
+            let sw = Nrlmsise00Flags {
+                geomagnetic: if tc.is_storm {
+                    GeomagneticMode::ExtendedHistory57h
+                } else {
+                    GeomagneticMode::StandardDailyAp
+                },
+                ..Default::default()
+            };
+
+            let output = calculate(&input, sw);
+
+            let total_density_kg_m3 = output.total_mass_density_kg_m3;
+            let t_alt = output.temp_alt_k;
+
+            // Verify temperature at altitude with a 0.5% relative tolerance
+            println!(
+                "[storm={}] Temperature #{i}: alt={} km, lat={} deg. Rust: {t_alt}, Pymsis: {}",
+                tc.is_storm, tc.altitude_km, tc.latitude_deg, tc.expected_temperature_k
+            );
+            assert_relative_eq!(
+                t_alt,
+                tc.expected_temperature_k,
+                max_relative = 0.001,
+                epsilon = 1e-5
+            );
+
+            // Verify total mass density with a 1.0% relative tolerance
+            // (Density integration magnifies the floating point differences in the exponential term)
+            println!(
+                "[storm={}] Density #{i}: alt={} km. Rust: {total_density_kg_m3:.6e}, Pymsis: {:.6e}",
+                tc.is_storm, tc.altitude_km, tc.expected_total_density_kg_m3
+            );
+            assert_relative_eq!(
+                total_density_kg_m3,
+                tc.expected_total_density_kg_m3,
+                max_relative = 0.004,
+                epsilon = 1e-18,
+            );
+        }
     }
 }
