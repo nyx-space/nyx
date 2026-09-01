@@ -6,6 +6,9 @@ import numpy
 import nyx_space.od
 import typing
 
+if typing.TYPE_CHECKING:
+    from nyx_space import Propagator, Spacecraft
+
 @typing.final
 class CN0:
     """Carrier power to noise density (C/N0) for stochastic modeling of Doppler observables.
