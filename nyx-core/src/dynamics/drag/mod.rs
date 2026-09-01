@@ -392,7 +392,8 @@ impl Drag {
                     (12.0 + (delta_lon_deg / 15.0)).rem_euclid(24.0)
                 } else {
                     // Use the mean local solar time  in UTC calculation as recommended by the NRLMSISE00 model.
-                    let target_midnight = epoch.to_time_scale(TimeScale::UTC).with_hms_strict(0, 0, 0);
+                    let target_midnight =
+                        epoch.to_time_scale(TimeScale::UTC).with_hms_strict(0, 0, 0);
                     let hours = (epoch - target_midnight).to_unit(Unit::Hour);
                     (hours + long_deg / 15.0).rem_euclid(24.0)
                 };
