@@ -372,6 +372,10 @@ class Msise00DailyWeather:
 
 @typing.final
 class Nrlmsise00Flags:
+    """Defines all of the available flags in the NRLMSISE00 model.
+    NOTE By default, Nyx will use the mean local solar time computation. Set mean_lst=false
+    to use the apparent local solar time."""
+
     annual_harmonics: typing.Any
     boundary_density_variations: typing.Any
     departures_from_diffusive_equilibrium: typing.Any
@@ -383,6 +387,7 @@ class Nrlmsise00Flags:
     lower_boundary_temp_variations: typing.Any
     lower_mesosphere_temp_variations: typing.Any
     lower_thermosphere_temp_variations: typing.Any
+    mean_lst: typing.Any
     semiannual_harmonics: typing.Any
     semidiurnal_tides: typing.Any
     terdiurnal_tides: typing.Any
@@ -394,7 +399,10 @@ class Nrlmsise00Flags:
     def __init__(
         self, *args: typing.Optional[typing.Any], **kwargs: typing.Optional[typing.Any]
     ) -> None:
-        """Initialize self.  See help(type(self)) for accurate signature."""
+        """Initialize self.  See help(type(self)) for accurate signature.
+        Defines all of the available flags in the NRLMSISE00 model.
+        NOTE By default, Nyx will use the mean local solar time computation. Set mean_lst=false
+        to use the apparent local solar time."""
 
     def __new__(
         cls,
@@ -416,7 +424,12 @@ class Nrlmsise00Flags:
         boundary_density_variations: typing.Any = True,
         lower_mesosphere_temp_variations: typing.Any = True,
         turbopause_scale_height_variations: typing.Any = True,
-    ) -> Nrlmsise00Flags: ...
+        mean_lst: typing.Any = True,
+    ) -> Nrlmsise00Flags:
+        """Defines all of the available flags in the NRLMSISE00 model.
+        NOTE By default, Nyx will use the mean local solar time computation. Set mean_lst=false
+        to use the apparent local solar time."""
+
     def __repr__(self) -> str:
         """Return repr(self)."""
 
@@ -728,6 +741,8 @@ class SpaceWeatherData:
     """Stores SpaceWeather data as provided by [CelesTrak](https://celestrak.org/SpaceData/).
     Data may be provided either as original CSV or in a compressed (non-archived) gunzip (gz) format."""
 
+    interpolate: typing.Any
+
     def __init__(
         self,
         path: str | None,
@@ -740,7 +755,10 @@ class SpaceWeatherData:
         Data may be provided either as original CSV or in a compressed (non-archived) gunzip (gz) format."""
 
     def __new__(
-        cls, path: str | None, fallback: StaticSpaceWeather | None
+        cls,
+        path: str | None,
+        fallback: StaticSpaceWeather | None,
+        interpolate: typing.Any = False,
     ) -> SpaceWeatherData:
         """Stores SpaceWeather data as provided by [CelesTrak](https://celestrak.org/SpaceData/).
         Data may be provided either as original CSV or in a compressed (non-archived) gunzip (gz) format."""

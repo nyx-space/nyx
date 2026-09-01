@@ -24,6 +24,7 @@ use crate::dynamics::nrlmsise00::Nrlmsise00Flags;
 use crate::dynamics::nrlmsise00::msise00_density;
 use crate::io::space_weather::SpaceWeatherData;
 use crate::linalg::{Matrix4x3, Vector3};
+use crate::time::Unit;
 use anise::constants::frames::{IAU_EARTH_FRAME, SUN_J2000};
 use anise::errors::OrientationSnafu;
 use anise::prelude::Almanac;
@@ -368,22 +369,32 @@ impl Drag {
                     .context(AstroPhysicsSnafu)
                     .context(DynamicsAstroSnafu)?;
 
-                // Compute the geographic solar time
-                // TODO Switch to the ANISE impl after https://github.com/nyx-space/anise/issues/42
-                let sun_state = almanac
-                    .transform(SUN_J2000, self.frame, ctx.orbit.epoch, None)
-                    .context(DynamicsAlmanacSnafu {
-                        action: "computing local solar time",
-                    })?;
-
-                let sun_long_deg = sun_state.longitude_360_deg();
-                // Angle between meridians
-                let delta_lon_deg = long_deg - sun_long_deg;
-                // Convert to hours (24 hours in 360 degrees), offset by 12 hours for noon definition
-                // SPICE 12 + (SITLNG - SUNLNG) / 15
-                let lst_h = (12.0 + (delta_lon_deg / 15.0)).rem_euclid(24.0);
-
                 let epoch = ctx.orbit.epoch;
+
+                // If the flags are not set, or if they are set and the mean LST is _disabled_ then use apparent.
+                let lst_h = if let Some(flags) = flags
+                    && !flags.mean_lst
+                {
+                    // Compute the geographic solar time
+                    // TODO Switch to the ANISE impl after https://github.com/nyx-space/anise/issues/42
+                    let sun_state = almanac
+                        .transform(SUN_J2000, self.frame, ctx.orbit.epoch, None)
+                        .context(DynamicsAlmanacSnafu {
+                            action: "computing local solar time",
+                        })?;
+
+                    let sun_long_deg = sun_state.longitude_360_deg();
+                    // Angle between meridians
+                    let delta_lon_deg = long_deg - sun_long_deg;
+                    // Convert to hours (24 hours in 360 degrees), offset by 12 hours for noon definition
+                    // SPICE 12 + (SITLNG - SUNLNG) / 15
+                    (12.0 + (delta_lon_deg / 15.0)).rem_euclid(24.0)
+                } else {
+                    // Use the mean local solar time calculation as recommended by the NRLMSISE00 model.
+                    let target_midnight = epoch.with_hms_strict(0, 0, 0);
+                    let hours = (epoch - target_midnight).to_unit(Unit::Hour);
+                    (hours + long_deg / 15.0).rem_euclid(24.0)
+                };
 
                 let sw = weather.msise_weather(epoch);
 
