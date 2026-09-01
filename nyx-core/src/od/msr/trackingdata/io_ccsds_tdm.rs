@@ -319,12 +319,16 @@ impl TrackingDataArc {
                                             ) {
                                                 Ok(sc) => sc,
                                                 Err(e) => {
-                                                    warn!("failed to convert CORRECTION_RANGE: {e}");
+                                                    warn!(
+                                                        "failed to convert CORRECTION_RANGE: {e}"
+                                                    );
                                                     continue;
                                                 }
                                             }
                                         } else {
-                                            warn!("RANGE_UNITS missing when converting CORRECTION_RANGE");
+                                            warn!(
+                                                "RANGE_UNITS missing when converting CORRECTION_RANGE"
+                                            );
                                             correction / msr_divider
                                         }
                                     }

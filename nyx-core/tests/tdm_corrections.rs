@@ -46,7 +46,12 @@ DATA_STOP
 #[test]
 fn test_tdm_correction_range_us_ms_s() {
     for (unit, val, corr, expected_1way) in [
-        ("us", 10000.0, 5000.0, (15000.0 * 1e-6 * SPEED_OF_LIGHT_KM_S) / 2.0),
+        (
+            "us",
+            10000.0,
+            5000.0,
+            (15000.0 * 1e-6 * SPEED_OF_LIGHT_KM_S) / 2.0,
+        ),
         ("ms", 10.0, 5.0, (15.0 * 1e-3 * SPEED_OF_LIGHT_KM_S) / 2.0),
         ("s", 2.0, 1.0, (3.0 * SPEED_OF_LIGHT_KM_S) / 2.0),
     ] {
@@ -68,7 +73,8 @@ DATA_STOP
 "#
         );
 
-        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("target/test_corr_{unit}.tdm"));
+        let path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("target/test_corr_{unit}.tdm"));
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         let mut file = File::create(&path).unwrap();
         file.write_all(tdm_content.as_bytes()).unwrap();
@@ -163,7 +169,8 @@ DATA_STOP
 "#
         );
 
-        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("target/test_corr_err_{unit}.tdm"));
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join(format!("target/test_corr_err_{unit}.tdm"));
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         let mut file = File::create(&path).unwrap();
         file.write_all(tdm_content.as_bytes()).unwrap();
@@ -192,9 +199,18 @@ DATA_STOP
 "#;
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/test_corr_yes.tdm");
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-    File::create(&path).unwrap().write_all(tdm_yes.as_bytes()).unwrap();
+    File::create(&path)
+        .unwrap()
+        .write_all(tdm_yes.as_bytes())
+        .unwrap();
     let arc = TrackingDataArc::from_tdm(&path, None).unwrap();
-    let range_km = *arc.measurements.first().unwrap().data.get(&MeasurementType::Range).unwrap();
+    let range_km = *arc
+        .measurements
+        .first()
+        .unwrap()
+        .data
+        .get(&MeasurementType::Range)
+        .unwrap();
     let expected_no_corr = (10000.0 * 1e-9 * SPEED_OF_LIGHT_KM_S) / 2.0;
     assert_eq!(range_km, expected_no_corr);
 
@@ -215,9 +231,18 @@ DATA_START
 DATA_STOP
 "#;
     let path2 = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/test_corr_inv_flag.tdm");
-    File::create(&path2).unwrap().write_all(tdm_invalid_flag.as_bytes()).unwrap();
+    File::create(&path2)
+        .unwrap()
+        .write_all(tdm_invalid_flag.as_bytes())
+        .unwrap();
     let arc2 = TrackingDataArc::from_tdm(&path2, None).unwrap();
-    let range_km2 = *arc2.measurements.first().unwrap().data.get(&MeasurementType::Range).unwrap();
+    let range_km2 = *arc2
+        .measurements
+        .first()
+        .unwrap()
+        .data
+        .get(&MeasurementType::Range)
+        .unwrap();
     assert_eq!(range_km2, 7500.0);
 }
 
@@ -242,7 +267,10 @@ DATA_STOP
 
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/test_corr_azel.tdm");
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-    File::create(&path).unwrap().write_all(tdm_content.as_bytes()).unwrap();
+    File::create(&path)
+        .unwrap()
+        .write_all(tdm_content.as_bytes())
+        .unwrap();
 
     let arc = TrackingDataArc::from_tdm(&path, None).unwrap();
     let msr = arc.measurements.first().unwrap();
@@ -274,7 +302,10 @@ DATA_STOP
 
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/test_corr_nan.tdm");
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-    File::create(&path).unwrap().write_all(tdm_content.as_bytes()).unwrap();
+    File::create(&path)
+        .unwrap()
+        .write_all(tdm_content.as_bytes())
+        .unwrap();
 
     let arc = TrackingDataArc::from_tdm(&path, None).unwrap();
     let msr = arc.measurements.first().unwrap();
