@@ -6,8 +6,7 @@ import numpy
 import nyx_space.od
 import typing
 
-if typing.TYPE_CHECKING:
-    from nyx_space import Propagator, Spacecraft
+from nyx_space import Propagator, Spacecraft
 
 @typing.final
 class CN0:
