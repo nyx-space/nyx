@@ -1,9 +1,8 @@
 import logging
 
-from nyx_space import DragData, ExportCfg, Mass, Spacecraft, SRPData
-from nyx_space.anise import Aberration, MetaAlmanac
-from nyx_space.anise.analysis import Event
-from nyx_space.anise.astro import DataType, Orbit
+from nyx_space import DragData, Mass, Spacecraft, SRPData
+from nyx_space.anise import MetaAlmanac
+from nyx_space.anise.astro import Orbit
 from nyx_space.anise.constants import CelestialObjects, Frames
 from nyx_space.mission_design import (
     AccelModels,
@@ -13,12 +12,9 @@ from nyx_space.mission_design import (
     ForceModels,
     GravityFieldConfig,
     IntegratorMethod,
-    IntegratorOptions,
     Nrlmsise00Flags,
     PointMasses,
     Propagator,
-    SolarPressure,
-    SolidTides,
     SpaceWeatherData,
     StaticSpaceWeather,
 )
@@ -27,9 +23,9 @@ from nyx_space.time import Duration, Epoch
 # NOTE Nyx uses the NAIF data for graviational parameters, which leads to an
 # accumulation of error between Nyx and GMAT.
 #
-# 36x36 EGM96 + Sun + Moon: 43 meters after 7 days
-#  ... + NRLMSISE00 constant:
-#  ... + NRLMSISE00 SpaceWeather:
+# 36x36 EGM96 + Sun + Moon: 43 meters after 7 days (cf. ISS example)
+#  ... + NRLMSISE00 constant: 77.5 meters after 3 days
+#  ... + NRLMSISE00 SpaceWeather: 58.4 meters after 3 days
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
@@ -116,7 +112,7 @@ if __name__ == "__main__":
         f"RIC diff with GMAT = {ric_diff.rmag_km() * 1e3:.3f} m\n\tR = {ric_diff.x_km * 1e3:.3f} m\tI = {ric_diff.y_km * 1e3:.3f} m\tC = {ric_diff.z_km * 1e3:.3f} m"
     )
 
-    assert ric_diff.rmag_km()*1e3 < 78
+    assert ric_diff.rmag_km() * 1e3 < 78
 
     # === NRLMSISE00 Space Weather File ===
     weather = SpaceWeatherData(
@@ -152,4 +148,4 @@ if __name__ == "__main__":
     print(
         f"RIC diff with GMAT = {ric_diff.rmag_km() * 1e3:.3f} m\n\tR = {ric_diff.x_km * 1e3:.3f} m\tI = {ric_diff.y_km * 1e3:.3f} m\tC = {ric_diff.z_km * 1e3:.3f} m"
     )
-    assert ric_diff.rmag_km()*1e3 < 59
+    assert ric_diff.rmag_km() * 1e3 < 59
