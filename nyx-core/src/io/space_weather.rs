@@ -223,6 +223,9 @@ pub struct SpaceWeatherData {
     #[serde(with = "as_vec")]
     pub records: BTreeMap<Epoch, RawSpaceWeatherRow>,
     pub fallback: StaticSpaceWeather,
+    /// Whether to interpolate between days for daily F10.7, F10.7 average, and daily Ap.
+    #[serde(default)]
+    pub interpolate: bool,
 }
 
 impl SpaceWeatherData {
@@ -231,6 +234,7 @@ impl SpaceWeatherData {
         Self {
             records: BTreeMap::new(),
             fallback: weather,
+            interpolate: false,
         }
     }
 
@@ -281,7 +285,17 @@ impl SpaceWeatherData {
             }
         }
 
-        Ok(Self { records, fallback })
+        Ok(Self {
+            records,
+            fallback,
+            interpolate: false,
+        })
+    }
+
+    /// Enable or disable linear interpolation of daily space weather indices between days.
+    pub fn with_interpolation(mut self, interpolate: bool) -> Self {
+        self.interpolate = interpolate;
+        self
     }
 
     /// Returns a reference to the raw, unparsed daily row for an exact midnight UTC epoch.
@@ -301,30 +315,75 @@ impl SpaceWeatherData {
     pub fn msise_weather(&self, mut epoch: Epoch) -> Msise00DailyWeather {
         epoch = epoch.to_time_scale(TimeScale::UTC);
         let target_midnight = epoch.with_hms_strict(0, 0, 0);
-        // The F10.7 _daily_ must be taken from the previous day
-        let yesterday = self
-            .records
-            .get(&(epoch.with_hms_strict(0, 0, 0) - Unit::Day * 1));
-        // But the rest of the data comes from today.
-        let current_day = self.records.get(&target_midnight);
 
         let seconds_into_day = (epoch - target_midnight).to_seconds();
         // Bins are 3 hours large (0..7)
         let bin_idx = ((seconds_into_day / (Unit::Hour * 3).to_seconds()).floor() as usize).min(7);
 
-        let ap_history = self.build_ap_history(target_midnight, bin_idx);
+        let mut ap_history = self.build_ap_history(target_midnight, bin_idx);
 
-        // 1. Daily F10.7: Prefer observed, fall back to adjusted, then global fallback
-        let f107_daily = self.fallback.resolve_f107(yesterday.map(|r| r.f107_obs));
+        let (f107_daily, f107_avg, ap_daily) = if self.interpolate {
+            let fraction = (seconds_into_day / 86400.0).clamp(0.0, 1.0);
 
-        // 2. 81-day Centered Mean F10.7: Prefer observed 81d, then adjusted 81d,
-        // fall back to resolved daily F10.7 before applying static global fallback
-        let f107_avg = current_day
-            .and_then(|r| r.f107_obs_center81.or(r.f107_adj_center81))
-            .unwrap_or(f107_daily);
+            // Get the records for yesterday, today, and tomorrow
+            let yesterday_epoch = target_midnight - Unit::Day * 1;
+            let today_epoch = target_midnight;
+            let tomorrow_epoch = target_midnight + Unit::Day * 1;
 
-        // 3. Daily Ap: Prefer recorded ap_avg, fall back to fallback policy
-        let ap_daily = self.fallback.resolve_ap(current_day.and_then(|r| r.ap_avg));
+            let yesterday = self.records.get(&yesterday_epoch);
+            let today = self.records.get(&today_epoch);
+            let tomorrow = self.records.get(&tomorrow_epoch);
+
+            // 1. Daily F10.7 (interpolated):
+            // F10.7 daily for today (V0) is based on yesterday's record.
+            // F10.7 daily for tomorrow (V1) is based on today's record.
+            let f107_daily_0 = self.fallback.resolve_f107(yesterday.map(|r| r.f107_obs));
+            let f107_daily_1 = self.fallback.resolve_f107(today.map(|r| r.f107_obs));
+            let f107_daily = f107_daily_0 + fraction * (f107_daily_1 - f107_daily_0);
+
+            // 2. 81-day Centered Mean F10.7 (interpolated):
+            // F10.7 81d centered average for today (V0) is based on today's record.
+            // F10.7 81d centered average for tomorrow (V1) is based on tomorrow's record.
+            let f107_avg_0 = today
+                .and_then(|r| r.f107_obs_center81.or(r.f107_adj_center81))
+                .unwrap_or(f107_daily_0);
+            let f107_avg_1 = tomorrow
+                .and_then(|r| r.f107_obs_center81.or(r.f107_adj_center81))
+                .unwrap_or(f107_daily_1);
+            let f107_avg = f107_avg_0 + fraction * (f107_avg_1 - f107_avg_0);
+
+            // 3. Daily Ap (interpolated):
+            // Daily Ap for today (V0) is based on today's record.
+            // Daily Ap for tomorrow (V1) is based on tomorrow's record.
+            let ap_daily_0 = self.fallback.resolve_ap(today.and_then(|r| r.ap_avg));
+            let ap_daily_1 = self.fallback.resolve_ap(tomorrow.and_then(|r| r.ap_avg));
+            let ap_daily = ap_daily_0 + fraction * (ap_daily_1 - ap_daily_0);
+
+            ap_history[0] = ap_daily;
+
+            (f107_daily, f107_avg, ap_daily)
+        } else {
+            // The F10.7 _daily_ must be taken from the previous day
+            let yesterday = self
+                .records
+                .get(&(epoch.with_hms_strict(0, 0, 0) - Unit::Day * 1));
+            // But the rest of the data comes from today.
+            let current_day = self.records.get(&target_midnight);
+
+            // 1. Daily F10.7: Prefer observed, fall back to adjusted, then global fallback
+            let f107_daily = self.fallback.resolve_f107(yesterday.map(|r| r.f107_obs));
+
+            // 2. 81-day Centered Mean F10.7: Prefer observed 81d, then adjusted 81d,
+            // fall back to resolved daily F10.7 before applying static global fallback
+            let f107_avg = current_day
+                .and_then(|r| r.f107_obs_center81.or(r.f107_adj_center81))
+                .unwrap_or(f107_daily);
+
+            // 3. Daily Ap: Prefer recorded ap_avg, fall back to fallback policy
+            let ap_daily = self.fallback.resolve_ap(current_day.and_then(|r| r.ap_avg));
+
+            (f107_daily, f107_avg, ap_daily)
+        };
 
         Msise00DailyWeather {
             f107_daily_sfu: f107_daily,
@@ -389,22 +448,38 @@ impl SpaceWeatherData {
 #[cfg(feature = "python")]
 #[cfg_attr(feature = "python", pymethods)]
 impl SpaceWeatherData {
+    #[pyo3(signature=(path, fallback, interpolate=false))]
     #[new]
     fn py_new(
         path: Option<PathBuf>,
         fallback: Option<StaticSpaceWeather>,
+        interpolate: Option<bool>,
     ) -> Result<Self, InputOutputError> {
-        if let Some(path) = path {
-            Self::from_csv_file(path, fallback.unwrap_or_default())
+        let mut sw = if let Some(path) = path {
+            Self::from_csv_file(path, fallback.unwrap_or_default())?
         } else if let Some(weather) = fallback {
-            Ok(Self::from_static_weather(weather))
+            Self::from_static_weather(weather)
         } else {
-            Err(InputOutputError::MissingData {
+            return Err(InputOutputError::MissingData {
                 which:
                     "must provide at least either a path to a weather file or a fallback, or both"
                         .to_string(),
-            })
+            });
+        };
+        if let Some(interp) = interpolate {
+            sw.interpolate = interp;
         }
+        Ok(sw)
+    }
+
+    #[getter]
+    fn get_interpolate(&self) -> bool {
+        self.interpolate
+    }
+
+    #[setter]
+    fn set_interpolate(&mut self, val: bool) {
+        self.interpolate = val;
     }
 
     fn __str__(&self) -> String {
@@ -513,5 +588,171 @@ impl Msise00DailyWeather {
 
     fn __repr__(&self) -> String {
         format!("{self:?} @ {self:p}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use hifitime::Epoch;
+
+    #[test]
+    fn test_space_weather_interpolation() {
+        let mut records = BTreeMap::new();
+
+        // Let's create mock rows
+        // Day 1: 2024-02-01
+        let row1 = RawSpaceWeatherRow {
+            date: "2024-02-01".to_string(),
+            bsrn: 0,
+            nd: 0,
+            kp1: None,
+            kp2: None,
+            kp3: None,
+            kp4: None,
+            kp5: None,
+            kp6: None,
+            kp7: None,
+            kp8: None,
+            kp_sum: None,
+            ap1: Some(10.0),
+            ap2: Some(10.0),
+            ap3: Some(10.0),
+            ap4: Some(10.0),
+            ap5: Some(10.0),
+            ap6: Some(10.0),
+            ap7: Some(10.0),
+            ap8: Some(10.0),
+            ap_avg: Some(10.0),
+            cp: None,
+            c9: None,
+            isn: None,
+            f107_obs: 100.0,
+            f107_adj: 100.0,
+            f107_data_type: "OBS".to_string(),
+            f107_obs_center81: Some(110.0),
+            f107_obs_last81: Some(110.0),
+            f107_adj_center81: Some(110.0),
+            f107_adj_last81: Some(110.0),
+        };
+
+        // Day 2: 2024-02-02
+        let row2 = RawSpaceWeatherRow {
+            date: "2024-02-02".to_string(),
+            bsrn: 0,
+            nd: 0,
+            kp1: None,
+            kp2: None,
+            kp3: None,
+            kp4: None,
+            kp5: None,
+            kp6: None,
+            kp7: None,
+            kp8: None,
+            kp_sum: None,
+            ap1: Some(20.0),
+            ap2: Some(20.0),
+            ap3: Some(20.0),
+            ap4: Some(20.0),
+            ap5: Some(20.0),
+            ap6: Some(20.0),
+            ap7: Some(20.0),
+            ap8: Some(20.0),
+            ap_avg: Some(20.0),
+            cp: None,
+            c9: None,
+            isn: None,
+            f107_obs: 200.0,
+            f107_adj: 200.0,
+            f107_data_type: "OBS".to_string(),
+            f107_obs_center81: Some(210.0),
+            f107_obs_last81: Some(210.0),
+            f107_adj_center81: Some(210.0),
+            f107_adj_last81: Some(210.0),
+        };
+
+        // Day 3: 2024-02-03
+        let row3 = RawSpaceWeatherRow {
+            date: "2024-02-03".to_string(),
+            bsrn: 0,
+            nd: 0,
+            kp1: None,
+            kp2: None,
+            kp3: None,
+            kp4: None,
+            kp5: None,
+            kp6: None,
+            kp7: None,
+            kp8: None,
+            kp_sum: None,
+            ap1: Some(30.0),
+            ap2: Some(30.0),
+            ap3: Some(30.0),
+            ap4: Some(30.0),
+            ap5: Some(30.0),
+            ap6: Some(30.0),
+            ap7: Some(30.0),
+            ap8: Some(30.0),
+            ap_avg: Some(30.0),
+            cp: None,
+            c9: None,
+            isn: None,
+            f107_obs: 300.0,
+            f107_adj: 300.0,
+            f107_data_type: "OBS".to_string(),
+            f107_obs_center81: Some(310.0),
+            f107_obs_last81: Some(310.0),
+            f107_adj_center81: Some(310.0),
+            f107_adj_last81: Some(310.0),
+        };
+
+        let epoch1 = Epoch::from_str("2024-02-01T00:00:00 UTC").unwrap();
+        let epoch2 = Epoch::from_str("2024-02-02T00:00:00 UTC").unwrap();
+        let epoch3 = Epoch::from_str("2024-02-03T00:00:00 UTC").unwrap();
+
+        records.insert(epoch1, row1);
+        records.insert(epoch2, row2);
+        records.insert(epoch3, row3);
+
+        let sw_no_interp = SpaceWeatherData {
+            records: records.clone(),
+            fallback: StaticSpaceWeather::SolarAverage(),
+            interpolate: false,
+        };
+
+        let sw_interp = SpaceWeatherData {
+            records,
+            fallback: StaticSpaceWeather::SolarAverage(),
+            interpolate: true,
+        };
+
+        // Midday on Day 2: 2024-02-02T12:00:00 UTC
+        let query_epoch = Epoch::from_str("2024-02-02T12:00:00 UTC").unwrap();
+
+        // 1. Without interpolation:
+        // f107_daily_sfu: daily F10.7 of yesterday (Day 1: 100.0)
+        // f107_avg_sfu: 81-day centered mean of current day (Day 2: 210.0)
+        // ap_daily: daily Ap of current day (Day 2: 20.0)
+        let w_no = sw_no_interp.msise_weather(query_epoch);
+        assert_eq!(w_no.f107_daily_sfu, 100.0);
+        assert_eq!(w_no.f107_avg_sfu, 210.0);
+        assert_eq!(w_no.ap_daily, 20.0);
+        assert_eq!(w_no.ap_3hour_history[0], 20.0);
+
+        // 2. With interpolation (midday = fraction 0.5):
+        // f107_daily_sfu: interpolated between yesterday's f107_daily (which is Day 1 F10.7 = 100)
+        //                 and tomorrow's f107_daily (which is Day 2 F10.7 = 200).
+        //                 Since fraction is 0.5, it should be 150.0.
+        // f107_avg_sfu: interpolated between current day's centered mean (Day 2: 210.0)
+        //               and tomorrow's centered mean (Day 3: 310.0).
+        //               Since fraction is 0.5, it should be 260.0.
+        // ap_daily: interpolated between current day's ap_avg (Day 2: 20.0)
+        //           and tomorrow's ap_avg (Day 3: 30.0).
+        //           Since fraction is 0.5, it should be 25.0.
+        let w_yes = sw_interp.msise_weather(query_epoch);
+        assert_eq!(w_yes.f107_daily_sfu, 150.0);
+        assert_eq!(w_yes.f107_avg_sfu, 260.0);
+        assert_eq!(w_yes.ap_daily, 25.0);
+        assert_eq!(w_yes.ap_3hour_history[0], 25.0);
     }
 }
