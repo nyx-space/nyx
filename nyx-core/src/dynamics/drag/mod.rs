@@ -28,6 +28,7 @@ use crate::time::Unit;
 use anise::constants::frames::{IAU_EARTH_FRAME, SUN_J2000};
 use anise::errors::OrientationSnafu;
 use anise::prelude::Almanac;
+use hifitime::TimeScale;
 use serde::{Deserialize, Serialize};
 use serde_dhall::StaticType;
 use snafu::ResultExt;
@@ -390,8 +391,8 @@ impl Drag {
                     // SPICE 12 + (SITLNG - SUNLNG) / 15
                     (12.0 + (delta_lon_deg / 15.0)).rem_euclid(24.0)
                 } else {
-                    // Use the mean local solar time calculation as recommended by the NRLMSISE00 model.
-                    let target_midnight = epoch.with_hms_strict(0, 0, 0);
+                    // Use the mean local solar time  in UTC calculation as recommended by the NRLMSISE00 model.
+                    let target_midnight = epoch.to_time_scale(TimeScale::UTC).with_hms_strict(0, 0, 0);
                     let hours = (epoch - target_midnight).to_unit(Unit::Hour);
                     (hours + long_deg / 15.0).rem_euclid(24.0)
                 };
