@@ -277,9 +277,9 @@ DATA_STOP
     let az = msr.data.get(&MeasurementType::Azimuth).unwrap();
     let el = msr.data.get(&MeasurementType::Elevation).unwrap();
 
-    // msr_divider = 2.0 for PATH = 1,2,1
-    assert_eq!(*az, (45.0 + 0.5) / 2.0);
-    assert_eq!(*el, (30.0 - 0.2) / 2.0);
+    // Azimuth and Elevation are 1-way measurements, so unscaled by msr_divider
+    assert_eq!(*az, 45.5);
+    assert_eq!(*el, 29.8);
 }
 
 #[test]

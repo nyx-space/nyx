@@ -164,18 +164,19 @@ impl TrackingDataArc {
 
             if let Some((mtype, epoch, value)) = parse_measurement_line(line, time_system)? {
                 // 1. Calculate the effective divider for this specific line.
-                // (See the critique below regarding why mutating msr_divider here was a bug).
-                let effective_divider = if [
-                    MeasurementType::ReceiveFrequency,
-                    MeasurementType::TransmitFrequency,
-                    MeasurementType::TransmitFrequencyRate,
-                ]
-                .contains(&mtype)
-                {
-                    has_freq_data = true;
-                    1.0
-                } else {
+                let effective_divider = if mtype.may_be_two_way() {
                     msr_divider
+                } else {
+                    if [
+                        MeasurementType::ReceiveFrequency,
+                        MeasurementType::TransmitFrequency,
+                        MeasurementType::TransmitFrequencyRate,
+                    ]
+                    .contains(&mtype)
+                    {
+                        has_freq_data = true;
+                    }
+                    1.0
                 };
 
                 let mut scaled_value = value;
@@ -332,12 +333,7 @@ impl TrackingDataArc {
                                             correction / msr_divider
                                         }
                                     }
-                                    MeasurementType::Doppler
-                                    | MeasurementType::Azimuth
-                                    | MeasurementType::Elevation => correction / msr_divider,
-                                    MeasurementType::ReceiveFrequency
-                                    | MeasurementType::TransmitFrequency
-                                    | MeasurementType::TransmitFrequencyRate => correction,
+                                    MeasurementType::Doppler => correction / msr_divider,
                                     _ => correction,
                                 };
 
