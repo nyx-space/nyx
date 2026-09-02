@@ -332,7 +332,12 @@ impl TrackingDataArc {
                                             correction / msr_divider
                                         }
                                     }
-                                    MeasurementType::Doppler
+MeasurementType::Doppler => correction / msr_divider,
+                                    MeasurementType::Azimuth
+                                    | MeasurementType::Elevation
+                                    | MeasurementType::ReceiveFrequency
+                                    | MeasurementType::TransmitFrequency
+                                    | MeasurementType::TransmitFrequencyRate => correction,
                                     | MeasurementType::Azimuth
                                     | MeasurementType::Elevation => correction / msr_divider,
                                     MeasurementType::ReceiveFrequency
