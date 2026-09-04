@@ -694,7 +694,7 @@ fn convert_range_units(
             );
             Ok((value * 1e-6 * SPEED_OF_LIGHT_KM_S) / divider)
         }
-        "ns" => {
+        "ns" | "NANOSEC" => {
             warn!(
                 "RANGE_UNITS in TDM file is `ns`, which is not CCSDS compliant. Proceeding with conversion to km."
             );
