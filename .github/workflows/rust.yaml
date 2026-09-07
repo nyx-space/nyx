@@ -15,7 +15,7 @@ env:
 jobs:
   check:
     name: Check
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - name: Checkout sources
         uses: actions/checkout@v7
@@ -34,7 +34,7 @@ jobs:
         rust:
           - { version: stable, name: stable }
 
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     name: Tests (ubuntu-latest, ${{ matrix.rust.name }})
     needs: [check]
     env:
@@ -93,7 +93,7 @@ jobs:
 
   coverage:
     name: Coverage analysis
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
 
     steps:
       - name: Checkout
@@ -147,7 +147,7 @@ jobs:
 
   lints:
     name: Lints
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     needs: [tests]
 
     steps:
@@ -168,7 +168,7 @@ jobs:
 
   release:
     name: Release
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     needs: [check, tests, lints]
 
     if: github.ref_type == 'tag'
