@@ -1,6 +1,6 @@
+from datetime import datetime, timezone
 import json
-import numpy as np
-from datetime import datetime
+
 from pymsis import msis
 
 
@@ -18,7 +18,7 @@ def generate_vectors():
     test_cases = []
 
     for hour in [6, 12, 18]:
-        date = datetime(2025, 1, 1, hour, 0)
+        date = datetime(2025, 1, 1, hour, 0, tzinfo=timezone.utc)
         for alt in alts_km:
             for lat in lats_deg:
                 for is_storm in [True, False]:

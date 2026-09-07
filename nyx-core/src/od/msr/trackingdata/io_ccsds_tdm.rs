@@ -164,72 +164,26 @@ impl TrackingDataArc {
 
             if let Some((mtype, epoch, value)) = parse_measurement_line(line, time_system)? {
                 // 1. Calculate the effective divider for this specific line.
-                // (See the critique below regarding why mutating msr_divider here was a bug).
-                let effective_divider = if [
-                    MeasurementType::ReceiveFrequency,
-                    MeasurementType::TransmitFrequency,
-                    MeasurementType::TransmitFrequencyRate,
-                ]
-                .contains(&mtype)
-                {
-                    has_freq_data = true;
-                    1.0
-                } else {
+                let effective_divider = if mtype.may_be_two_way() {
                     msr_divider
+                } else {
+                    if [
+                        MeasurementType::ReceiveFrequency,
+                        MeasurementType::TransmitFrequency,
+                        MeasurementType::TransmitFrequencyRate,
+                    ]
+                    .contains(&mtype)
+                    {
+                        has_freq_data = true;
+                    }
+                    1.0
                 };
 
                 let mut scaled_value = value;
                 if mtype == MeasurementType::Range {
                     if let Some(range_units) = metadata.get("RANGE_UNITS") {
-                        match range_units.as_str() {
-                            "km" => {
-                                // For distance units, simply apply the effective_divider.
-                                scaled_value /= effective_divider;
-                            }
-                            "RU" => {
-                                return Err(InputOutputError::UnsupportedData {
-                                    which: "RANGE_UNITS `RU` requires mission-specific conversion and is not currently supported".to_string(),
-                                });
-                            }
-                            "s" => {
-                                // For time units (e.g. round trip light time), convert to distance
-                                // then divide by effective divider.
-                                scaled_value =
-                                    (scaled_value * SPEED_OF_LIGHT_KM_S) / effective_divider;
-                            }
-                            "m" => {
-                                warn!(
-                                    "RANGE_UNITS in TDM file is `m`, which is not CCSDS compliant. Proceeding with conversion to km."
-                                );
-                                scaled_value = (scaled_value / 1000.0) / effective_divider;
-                            }
-                            "ms" => {
-                                warn!(
-                                    "RANGE_UNITS in TDM file is `ms`, which is not CCSDS compliant. Proceeding with conversion to km."
-                                );
-                                scaled_value =
-                                    (scaled_value * 1e-3 * SPEED_OF_LIGHT_KM_S) / effective_divider;
-                            }
-                            "us" => {
-                                warn!(
-                                    "RANGE_UNITS in TDM file is `us`, which is not CCSDS compliant. Proceeding with conversion to km."
-                                );
-                                scaled_value =
-                                    (scaled_value * 1e-6 * SPEED_OF_LIGHT_KM_S) / effective_divider;
-                            }
-                            "ns" => {
-                                warn!(
-                                    "RANGE_UNITS in TDM file is `ns`, which is not CCSDS compliant. Proceeding with conversion to km."
-                                );
-                                scaled_value =
-                                    (scaled_value * 1e-9 * SPEED_OF_LIGHT_KM_S) / effective_divider;
-                            }
-                            _ => {
-                                return Err(InputOutputError::UnsupportedData {
-                                    which: format!("unsupported RANGE_UNITS `{range_units}`"),
-                                });
-                            }
-                        }
+                        scaled_value =
+                            convert_range_units(value, range_units.as_str(), effective_divider)?;
                     } else {
                         return Err(InputOutputError::MissingData {
                             which: "RANGE_UNITS not specified in metadata for RANGE measurement"
@@ -311,11 +265,11 @@ impl TrackingDataArc {
                 "yes" => true,
                 _ => {
                     warn!("invalid CORRECTIONS_APPLIED `{corr_flag}`");
-                    true
+                    false
                 }
             }
         } else {
-            true
+            false
         };
 
         // Now, let's convert the receive and transmit frequencies to Doppler measurements in velocity units.
@@ -344,13 +298,50 @@ impl TrackingDataArc {
                     MeasurementType::TransmitFrequency,
                     MeasurementType::TransmitFrequencyRate,
                 ] {
-                    let kw = format!("CORRECTION_{}", msr_type.ccsds_tdm_name());
-                    if let Some(correction_str) = metadata.get(&kw) {
-                        if let Ok(correction) = correction_str.parse::<f64>() {
-                            measurement.correct(msr_type, correction);
-                            all_applied_corrections.insert(msr_type);
-                        } else {
-                            warn!("invalid correction value for {kw}");
+                    let kws = match msr_type {
+                        MeasurementType::Doppler => vec![
+                            "CORRECTION_DOPPLER".to_string(),
+                            "CORRECTION_DOPPLER_INTEGRATED".to_string(),
+                            "CORRECTION_DOPPLER_INSTANTANEOUS".to_string(),
+                        ],
+                        _ => vec![format!("CORRECTION_{}", msr_type.ccsds_tdm_name())],
+                    };
+
+                    for kw in kws {
+                        if let Some(correction_str) = metadata.get(&kw) {
+                            if let Ok(correction) = correction_str.parse::<f64>() {
+                                let scaled_correction = match msr_type {
+                                    MeasurementType::Range => {
+                                        if let Some(range_units) = metadata.get("RANGE_UNITS") {
+                                            match convert_range_units(
+                                                correction,
+                                                range_units,
+                                                msr_divider,
+                                            ) {
+                                                Ok(sc) => sc,
+                                                Err(e) => {
+                                                    warn!(
+                                                        "failed to convert CORRECTION_RANGE: {e}"
+                                                    );
+                                                    continue;
+                                                }
+                                            }
+                                        } else {
+                                            warn!(
+                                                "RANGE_UNITS missing when converting CORRECTION_RANGE"
+                                            );
+                                            correction / msr_divider
+                                        }
+                                    }
+                                    MeasurementType::Doppler => correction / msr_divider,
+                                    _ => correction,
+                                };
+
+                                measurement.correct(msr_type, scaled_correction);
+                                all_applied_corrections.insert(msr_type);
+                            } else {
+                                warn!("invalid correction value for {kw}");
+                            }
                         }
                     }
                 }
@@ -671,6 +662,47 @@ impl TrackingDataArc {
         let tock_time = Epoch::now().unwrap() - tick;
         info!("CCSDS TDM written to {} in {tock_time}", path_buf.display());
         Ok(path_buf)
+    }
+}
+
+fn convert_range_units(
+    value: f64,
+    range_units: &str,
+    divider: f64,
+) -> Result<f64, InputOutputError> {
+    match range_units {
+        "km" => Ok(value / divider),
+        "RU" => Err(InputOutputError::UnsupportedData {
+            which: "RANGE_UNITS `RU` requires mission-specific conversion and is not currently supported".to_string(),
+        }),
+        "s" => Ok((value * SPEED_OF_LIGHT_KM_S) / divider),
+        "m" => {
+            warn!(
+                "RANGE_UNITS in TDM file is `m`, which is not CCSDS compliant. Proceeding with conversion to km."
+            );
+            Ok((value / 1000.0) / divider)
+        }
+        "ms" => {
+            warn!(
+                "RANGE_UNITS in TDM file is `ms`, which is not CCSDS compliant. Proceeding with conversion to km."
+            );
+            Ok((value * 1e-3 * SPEED_OF_LIGHT_KM_S) / divider)
+        }
+        "us" => {
+            warn!(
+                "RANGE_UNITS in TDM file is `us`, which is not CCSDS compliant. Proceeding with conversion to km."
+            );
+            Ok((value * 1e-6 * SPEED_OF_LIGHT_KM_S) / divider)
+        }
+        "ns" | "NANOSEC" => {
+            warn!(
+                "RANGE_UNITS in TDM file is `ns`, which is not CCSDS compliant. Proceeding with conversion to km."
+            );
+            Ok((value * 1e-9 * SPEED_OF_LIGHT_KM_S) / divider)
+        }
+        _ => Err(InputOutputError::UnsupportedData {
+            which: format!("unsupported RANGE_UNITS `{range_units}`"),
+        }),
     }
 }
 

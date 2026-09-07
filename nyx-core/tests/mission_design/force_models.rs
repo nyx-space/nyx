@@ -532,7 +532,6 @@ fn val_orekit_nrlmsise00(almanac: Arc<Almanac>) {
         .unwrap()
         .with_mu_km3_s2(orekit_gm_km3_s2);
     let iau_earth = almanac
-        // .frame_info(EARTH_ITRF93)
         .frame_info(IAU_EARTH_FRAME)
         .unwrap()
         .with_mu_km3_s2(orekit_gm_km3_s2);
@@ -558,7 +557,11 @@ fn val_orekit_nrlmsise00(almanac: Arc<Almanac>) {
     let drag = Drag {
         density: AtmDensity::NRLMSISE00 {
             weather,
-            flags: Some(Nrlmsise00Flags::default()),
+            flags: Some(Nrlmsise00Flags {
+                // Orekit 13.1 uses the apparent solar time, but in the wrong frame.
+                mean_lst: false,
+                ..Default::default()
+            }),
         },
         frame: iau_earth,
         estimate: false,

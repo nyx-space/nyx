@@ -110,6 +110,9 @@ pub enum GeomagneticMode {
     ExtendedHistory57h, // Sets sw[9] = -1.0
 }
 
+/// Defines all of the available flags in the NRLMSISE00 model.
+/// NOTE By default, Nyx will use the mean local solar time computation. Set mean_lst=false
+/// to use the apparent local solar time.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, StaticType)]
 #[cfg_attr(feature = "python", pyclass(from_py_object, get_all, set_all))]
 pub struct Nrlmsise00Flags {
@@ -131,6 +134,8 @@ pub struct Nrlmsise00Flags {
     pub boundary_density_variations: bool,
     pub lower_mesosphere_temp_variations: bool,
     pub turbopause_scale_height_variations: bool,
+    /// Determines if the mean local solar time should be used instead of the apparent solar time.
+    pub mean_lst: bool,
 }
 
 impl Default for Nrlmsise00Flags {
@@ -154,6 +159,7 @@ impl Default for Nrlmsise00Flags {
             boundary_density_variations: true,
             lower_mesosphere_temp_variations: true,
             turbopause_scale_height_variations: true,
+            mean_lst: true,
         }
     }
 }
@@ -257,6 +263,7 @@ impl Nrlmsise00Flags {
         boundary_density_variations = true,
         lower_mesosphere_temp_variations = true,
         turbopause_scale_height_variations = true,
+        mean_lst = true
     ))]
     #[allow(clippy::too_many_arguments)]
     fn py_new(
@@ -278,6 +285,7 @@ impl Nrlmsise00Flags {
         boundary_density_variations: bool,
         lower_mesosphere_temp_variations: bool,
         turbopause_scale_height_variations: bool,
+        mean_lst: bool,
     ) -> Self {
         Self {
             geomagnetic: geomagnetic.unwrap_or(GeomagneticMode::StandardDailyAp),
@@ -298,6 +306,7 @@ impl Nrlmsise00Flags {
             boundary_density_variations,
             lower_mesosphere_temp_variations,
             turbopause_scale_height_variations,
+            mean_lst,
         }
     }
 
@@ -413,6 +422,7 @@ mod tests {
             boundary_density_variations: false,
             lower_mesosphere_temp_variations: false,
             turbopause_scale_height_variations: false,
+            mean_lst: false,
         };
 
         let custom_switches = custom_flags.to_switches();
