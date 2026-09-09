@@ -18,6 +18,7 @@
 
 use anise::astro::{Aberration, AzElRange, Location};
 use anise::errors::{AlmanacError, AlmanacResult};
+use anise::frames::FrameUid;
 use anise::prelude::{Almanac, Frame, Orbit};
 use der::{Decode, Encode};
 use indexmap::{IndexMap, IndexSet};
@@ -56,6 +57,7 @@ mod python;
 /// :type doppler_config: DopplerConfig | None
 /// :type light_time_correction: bool | None
 /// :type timestamp_noise_s: StochasticNoise | None
+/// :type obstruction_body: FrameUid | None
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub struct GroundStation {
@@ -70,9 +72,9 @@ pub struct GroundStation {
     /// Noise on the timestamp of the measurement
     pub timestamp_noise_s: Option<StochasticNoise>,
     pub stochastic_noises: Option<IndexMap<MeasurementType, StochasticNoise>>,
-    // TODO Add an explicit but optional obstruction body. Support just one because
-    // even at Mars, Phobos and Deimos are tiny enough to barely make a dent. Elevation
-    // acts as "obstruction from the body where the ground station lies."
+    /// Body that obstructs the line of sight (e.g. Moon if tracking a lunar spacecraft from Earth)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub obstruction_body: Option<FrameUid>,
 }
 
 #[cfg_attr(feature = "python", pymethods)]
@@ -152,6 +154,7 @@ impl GroundStation {
             light_time_correction: false,
             timestamp_noise_s: None,
             stochastic_noises: None,
+            obstruction_body: None,
         }
     }
 
@@ -184,6 +187,12 @@ impl GroundStation {
 
     pub fn with_doppler_config(mut self, doppler_config: Option<DopplerConfig>) -> Self {
         self.doppler_config = doppler_config;
+
+        self
+    }
+
+    pub fn with_obstruction_body(mut self, obstruction_body: Option<FrameUid>) -> Self {
+        self.obstruction_body = obstruction_body;
 
         self
     }
@@ -260,6 +269,9 @@ impl GroundStation {
         if self.stochastic_noises.is_some() {
             bits |= 1 << 2;
         }
+        if self.obstruction_body.is_some() {
+            bits |= 1 << 3;
+        }
         bits
     }
 }
@@ -304,6 +316,7 @@ impl Default for GroundStation {
             light_time_correction: false,
             timestamp_noise_s: None,
             stochastic_noises: None,
+            obstruction_body: None,
         }
     }
 }
@@ -384,6 +397,7 @@ mod gs_ut {
             light_time_correction: false,
             timestamp_noise_s: None,
             doppler_config: Some(DopplerConfig::default()),
+            obstruction_body: None,
         };
 
         println!("{}", serde_yml::to_string(&expected_gs).unwrap());
@@ -447,6 +461,7 @@ mod gs_ut {
                 light_time_correction: false,
                 timestamp_noise_s: None,
                 doppler_config: None,
+                obstruction_body: None,
             },
             GroundStation {
                 name: "Canberra".to_string(),
@@ -463,6 +478,7 @@ mod gs_ut {
                 light_time_correction: false,
                 timestamp_noise_s: None,
                 doppler_config: None,
+                obstruction_body: None,
             },
         ];
 

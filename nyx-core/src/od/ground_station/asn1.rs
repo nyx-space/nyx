@@ -70,6 +70,12 @@ impl<'a> Decode<'a> for GroundStation {
             None
         };
 
+        let obstruction_body = if flags & (1 << 3) != 0 {
+            Some(decoder.decode()?)
+        } else {
+            None
+        };
+
         Ok(GroundStation {
             name,
             location,
@@ -78,6 +84,7 @@ impl<'a> Decode<'a> for GroundStation {
             light_time_correction,
             timestamp_noise_s,
             stochastic_noises,
+            obstruction_body,
         })
     }
 }
@@ -103,6 +110,7 @@ impl Encode for GroundStation {
             + self.doppler_config.encoded_len()?
             + self.timestamp_noise_s.encoded_len()?
             + stochastics_vec.encoded_len()?
+            + self.obstruction_body.encoded_len()?
     }
 
     fn encode(&self, encoder: &mut impl der::Writer) -> der::Result<()> {
@@ -127,6 +135,8 @@ impl Encode for GroundStation {
                 .collect::<Vec<MsrNoisePair>>()
         });
         stochastics_vec.encode(encoder)?;
+
+        self.obstruction_body.encode(encoder)?;
 
         Ok(())
     }
@@ -179,6 +189,7 @@ mod tests {
             light_time_correction: true,
             timestamp_noise_s: None,
             stochastic_noises: None,
+            obstruction_body: None,
         };
 
         // 1. Minimal GroundStation (all optional fields None)
@@ -224,6 +235,13 @@ mod tests {
         // 6. With only stochastic_noises (doppler_config and timestamp_noise_s unset)
         gs.doppler_config = None;
         gs.timestamp_noise_s = None;
+        buf.clear();
+        gs.encode_to_vec(&mut buf).unwrap();
+        let decoded = GroundStation::from_der(&buf).unwrap();
+        assert_eq!(decoded, gs);
+
+        // 7. With obstruction_body
+        gs.obstruction_body = Some(IAU_EARTH_FRAME.into());
         buf.clear();
         gs.encode_to_vec(&mut buf).unwrap();
         let decoded = GroundStation::from_der(&buf).unwrap();

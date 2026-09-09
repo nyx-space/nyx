@@ -19,11 +19,12 @@
 use super::{ODAlmanacSnafu, ODError, ODTrajSnafu, TrackingDevice};
 use crate::Spacecraft;
 use crate::io::ConfigError;
-use crate::md::prelude::{Interpolatable, Traj};
+use crate::md::prelude::Traj;
 use crate::od::msr::measurement::Measurement;
 use crate::od::msr::two_way::solve_two_way_picard;
 use crate::od::msr::{IntegrationRef, MeasurementType};
 use crate::time::Epoch;
+use anise::astro::Aberration;
 use anise::errors::AlmanacResult;
 use anise::frames::Frame;
 use anise::prelude::{Almanac, Orbit};
@@ -61,11 +62,37 @@ impl TrackingDevice<Spacecraft> for GroundStation {
                 Err(_) => return Ok(None),
             };
 
+            let rx = traj.at(two_way_sol.t2_bounce).context(ODTrajSnafu {
+                details: "fetching state for bounce epoch".to_string(),
+            })?;
+
+            if let Some(obstruction_body) = self.obstruction_body {
+                let observer =
+                    Spacecraft::from(self.to_orbit(epoch, almanac).context(ODAlmanacSnafu {
+                        action: "building ground station orbit",
+                    })?);
+                let ab_corr = Aberration::LT;
+                let is_obstructed = almanac
+                    .line_of_sight_obstructed(
+                        observer.orbit,
+                        rx.orbit,
+                        obstruction_body.into(),
+                        ab_corr,
+                    )
+                    .context(ODAlmanacSnafu {
+                        action: "computing line of sight",
+                    })?;
+
+                if is_obstructed {
+                    return Ok(None);
+                }
+            }
+
             // Evaluate Azimuth/Elevation from Downlink Look Direction at t3
             // Construct the apparent target state using the solved bounce state r_sc(t2)
             let aer_downlink = almanac
                 .azimuth_elevation_range_sez_from_location(
-                    traj.at(two_way_sol.t2_bounce).unwrap().orbit,
+                    rx.orbit,
                     self.location.clone(),
                     None,
                     None, // Position r_sc(t2) is already retarded; do not apply LT twice
@@ -131,17 +158,33 @@ impl TrackingDevice<Spacecraft> for GroundStation {
                 details: "fetching state for instantaneous measurement".to_string(),
             })?;
 
-            let obstructing_body = if self.location.frame.ephemeris_id != rx.frame().ephemeris_id {
-                Some(rx.frame())
-            } else {
-                None
-            };
+            if let Some(obstruction_body) = self.obstruction_body {
+                let observer =
+                    Spacecraft::from(self.to_orbit(epoch, almanac).context(ODAlmanacSnafu {
+                        action: "building ground station orbit",
+                    })?);
+                let ab_corr = Aberration::NONE;
+                let is_obstructed = almanac
+                    .line_of_sight_obstructed(
+                        observer.orbit,
+                        rx.orbit,
+                        obstruction_body.into(),
+                        ab_corr,
+                    )
+                    .context(ODAlmanacSnafu {
+                        action: "computing line of sight",
+                    })?;
+
+                if is_obstructed {
+                    return Ok(None);
+                }
+            }
 
             let aer = almanac
                 .azimuth_elevation_range_sez_from_location(
                     rx.orbit,
                     self.location.clone(),
-                    obstructing_body,
+                    None,
                     None,
                 )
                 .context(ODAlmanacSnafu {
@@ -245,19 +288,35 @@ impl TrackingDevice<Spacecraft> for GroundStation {
     ) -> Result<Option<Measurement>, ODError> {
         // HACK This function should be avoided. A future version will remove the instantaneous measurement
         // because it isn't physically adequate.
-        let obstructing_body = if self.location.frame.ephemeris_id != rx.frame().ephemeris_id {
-            Some(rx.frame())
-        } else {
-            None
-        };
+        if let Some(obstruction_body) = self.obstruction_body {
+            let observer = Spacecraft::from(self.to_orbit(rx.orbit.epoch, almanac).context(
+                ODAlmanacSnafu {
+                    action: "building ground station orbit",
+                },
+            )?);
+            let ab_corr = if self.light_time_correction {
+                Aberration::LT
+            } else {
+                Aberration::NONE
+            };
+            let is_obstructed = almanac
+                .line_of_sight_obstructed(
+                    observer.orbit,
+                    rx.orbit,
+                    obstruction_body.into(),
+                    ab_corr,
+                )
+                .context(ODAlmanacSnafu {
+                    action: "computing line of sight",
+                })?;
+
+            if is_obstructed {
+                return Ok(None);
+            }
+        }
 
         let aer = almanac
-            .azimuth_elevation_range_sez_from_location(
-                rx.orbit,
-                self.location.clone(),
-                obstructing_body,
-                None,
-            )
+            .azimuth_elevation_range_sez_from_location(rx.orbit, self.location.clone(), None, None)
             .context(ODAlmanacSnafu {
                 action: "computing AER",
             })?;

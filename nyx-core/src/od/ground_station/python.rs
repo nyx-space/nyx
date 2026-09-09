@@ -2,6 +2,7 @@ use super::super::msr::MeasurementType;
 use super::super::noise::StochasticNoise;
 use super::{DopplerConfig, GroundStation};
 use anise::astro::Location;
+use anise::frames::FrameUid;
 use indexmap::{IndexMap, IndexSet};
 use pyo3::prelude::*;
 use std::collections::HashMap;
@@ -17,8 +18,9 @@ impl GroundStation {
     /// :type doppler_config: DopplerConfig | None
     /// :type light_time_correction: bool | None
     /// :type timestamp_noise_s: StochasticNoise | None
+    /// :type obstruction_body: FrameUid | None
     #[new]
-    #[pyo3(signature = (name, location, stochastic_noises, doppler_config=None, light_time_correction=false, timestamp_noise_s=None))]
+    #[pyo3(signature = (name, location, stochastic_noises, doppler_config=None, light_time_correction=false, timestamp_noise_s=None, obstruction_body=None))]
     fn py_new(
         name: String,
         location: Location,
@@ -26,6 +28,7 @@ impl GroundStation {
         doppler_config: Option<DopplerConfig>,
         light_time_correction: Option<bool>,
         timestamp_noise_s: Option<StochasticNoise>,
+        obstruction_body: Option<FrameUid>,
     ) -> Self {
         Self {
             name,
@@ -40,6 +43,7 @@ impl GroundStation {
             light_time_correction: light_time_correction.unwrap_or(false),
             timestamp_noise_s,
             stochastic_noises: Some(stochastic_noises.into_iter().collect()),
+            obstruction_body,
         }
     }
 
@@ -166,6 +170,16 @@ impl GroundStation {
     #[setter]
     pub fn set_timestamp_noise_s(&mut self, noise: Option<StochasticNoise>) {
         self.timestamp_noise_s = noise;
+    }
+
+    #[getter]
+    pub fn get_obstruction_body(&self) -> Option<FrameUid> {
+        self.obstruction_body
+    }
+
+    #[setter]
+    pub fn set_obstruction_body(&mut self, obstruction_body: Option<FrameUid>) {
+        self.obstruction_body = obstruction_body;
     }
 
     #[getter]
