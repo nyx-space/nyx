@@ -21,6 +21,8 @@ use crate::linalg::allocator::Allocator;
 use crate::md::prelude::Interpolatable;
 use crate::od::{GroundStation, ODAlmanacSnafu, ODError, TrackingDevice};
 use crate::{Spacecraft, State};
+use anise::constants::SPEED_OF_LIGHT_KM_S;
+use anise::errors::OrientationSnafu;
 use anise::prelude::Almanac;
 use indexmap::IndexSet;
 use nalgebra::{DimName, OMatrix, U1};
@@ -120,7 +122,7 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
 {
     fn new(
         msr_type: MeasurementType,
-        msr: &Measurement,
+        _msr: &Measurement,
         rx: &Spacecraft,
         tx: &GroundStation,
         almanac: &Almanac,
@@ -131,109 +133,138 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
         // This frame is required because the scalar measurements are frame independent, but the sensitivity
         // must be in the estimation frame.
         let transmitter = tx
-            .location(rx.orbit.epoch, rx.orbit.frame, almanac)
+            .location(receiver.epoch, receiver.frame, almanac)
             .context(ODAlmanacSnafu {
                 action: "computing transmitter location when computing sensitivity matrix",
             })?;
 
+        // Relative geometry in estimation frame
         let delta_r = receiver.radius_km - transmitter.radius_km;
         let delta_v = receiver.velocity_km_s - transmitter.velocity_km_s;
 
-        match msr_type {
+        let rho_km = delta_r.norm();
+        if rho_km < 1e-6 {
+            return Err(ODError::MeasurementSimError {
+                details: "Zero separation between ground station and spacecraft".to_string(),
+            });
+        }
+
+        // Line-of-sight unit vector pointing from station to spacecraft: d(rho)/d(r)
+        let u_los = delta_r / rho_km;
+
+        let sensitivity_row = match msr_type {
             MeasurementType::Doppler => {
-                // Always recompute the expected to range, a better model for scalar OD processing.
-                let ρ_km = tx
-                    .azimuth_elevation_of(receiver, None, almanac)
-                    .context(ODAlmanacSnafu {
-                        action: "computing range for Doppler measurement",
-                    })?
-                    .range_km;
+                // Nominal line-of-sight range-rate from trajectory geometry
+                let rho_dot_km_s = u_los.dot(&delta_v);
 
-                let ρ_dot_km_s = msr.data.get(&MeasurementType::Doppler).unwrap();
-                let m11 = delta_r.x / ρ_km;
-                let m12 = delta_r.y / ρ_km;
-                let m13 = delta_r.z / ρ_km;
-                let m21 = delta_v.x / ρ_km - ρ_dot_km_s * delta_r.x / ρ_km.powi(2);
-                let m22 = delta_v.y / ρ_km - ρ_dot_km_s * delta_r.y / ρ_km.powi(2);
-                let m23 = delta_v.z / ρ_km - ρ_dot_km_s * delta_r.z / ρ_km.powi(2);
+                // d(rho_dot)/d(r) = (delta_v - rho_dot * u_los) / rho
+                let dr = (delta_v - u_los * rho_dot_km_s) / rho_km;
 
-                let sensitivity_row =
-                    OMatrix::<f64, U1, <Spacecraft as State>::Size>::from_row_slice(&[
-                        m21, m22, m23, m11, m12, m13, 0.0, 0.0, 0.0,
-                    ]);
-
-                Ok(Self {
-                    sensitivity_row,
-                    _rx: PhantomData::<_>,
-                    _tx: PhantomData::<_>,
-                })
+                // d(rho_dot)/d(v) = u_los (for differenced/one-way equivalent Doppler)
+                OMatrix::<f64, U1, <Spacecraft as State>::Size>::from_row_slice(&[
+                    dr.x, dr.y, dr.z, u_los.x, u_los.y, u_los.z, 0.0, 0.0, 0.0,
+                ])
             }
             MeasurementType::Range => {
-                let ρ_km = msr.data.get(&MeasurementType::Range).unwrap();
-                let m11 = delta_r.x / ρ_km;
-                let m12 = delta_r.y / ρ_km;
-                let m13 = delta_r.z / ρ_km;
+                // Velocity sensitivity due to retarded bounce epoch: d(rho)/d(v) = -tau * u_los
+                let tau_s = if tx.light_time_correction {
+                    rho_km / SPEED_OF_LIGHT_KM_S
+                } else {
+                    0.0
+                };
 
-                let sensitivity_row =
-                    OMatrix::<f64, U1, <Spacecraft as State>::Size>::from_row_slice(&[
-                        m11, m12, m13, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                    ]);
-
-                Ok(Self {
-                    sensitivity_row,
-                    _rx: PhantomData::<_>,
-                    _tx: PhantomData::<_>,
-                })
+                OMatrix::<f64, U1, <Spacecraft as State>::Size>::from_row_slice(&[
+                    u_los.x,
+                    u_los.y,
+                    u_los.z,
+                    -tau_s * u_los.x,
+                    -tau_s * u_los.y,
+                    -tau_s * u_los.z,
+                    0.0,
+                    0.0,
+                    0.0,
+                ])
             }
-            MeasurementType::Azimuth => {
-                let denom = delta_r.x.powi(2) + delta_r.y.powi(2);
-                let m11 = -delta_r.y / denom;
-                let m12 = delta_r.x / denom;
-                let m13 = 0.0;
 
-                // Build the sensitivity matrix in the transmitter frame and rotate back into the inertial frame.
+            MeasurementType::Azimuth | MeasurementType::Elevation => {
+                // Transform line-of-sight vector into station topocentric SEZ frame
+                let rx_in_tx = almanac
+                    .transform_to(receiver, tx.location.frame.into(), None)
+                    .context(ODAlmanacSnafu {
+                        action: "transforming receiver to station frame for topocentric angles",
+                    })?;
 
-                let sensitivity_row =
-                    OMatrix::<f64, U1, <Spacecraft as State>::Size>::from_row_slice(&[
-                        m11, m12, m13, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                    ]);
+                let d_sez = rx_in_tx.radius_km; // Topocentric vector
+                let s = d_sez.x;
+                let e = d_sez.y;
+                let z = d_sez.z - tx.location.height_km;
+                let rho2_horiz = s * s + e * e;
+                let rho2_total = rho2_horiz + z * z;
 
-                Ok(Self {
-                    sensitivity_row,
-                    _rx: PhantomData::<_>,
-                    _tx: PhantomData::<_>,
-                })
+                if rho2_horiz < 1e-12 {
+                    return Err(ODError::MeasurementSimError {
+                        details: "Singularity at zenith for topocentric angle sensitivities".into(),
+                    });
+                }
+
+                // Partials in local SEZ frame
+                let d_sez_partials = if msr_type == MeasurementType::Azimuth {
+                    // Azimuth beta = atan2(E, -S) => d(beta)/d(S) = E / (S^2 + E^2), d(beta)/d(E) = -S / (S^2 + E^2)
+                    nalgebra::Vector3::new(e / rho2_horiz, -s / rho2_horiz, 0.0)
+                } else {
+                    // Elevation el = asin(Z / rho)
+                    let sqrt_horiz = rho2_horiz.sqrt();
+                    nalgebra::Vector3::new(
+                        -(s * z) / (rho2_total * sqrt_horiz),
+                        -(e * z) / (rho2_total * sqrt_horiz),
+                        sqrt_horiz / rho2_total,
+                    )
+                };
+
+                // Rotation matrix from SEZ back to estimation frame: R_sez_to_inertial
+                let rot_mat = almanac
+                    .rotate(tx.location.frame.into(), receiver.frame, receiver.epoch)
+                    .context(OrientationSnafu {
+                        action: "computing SEZ-to-inertial rotation",
+                    })
+                    .context(ODAlmanacSnafu {
+                        action: "computing SEZ-to-inertial rotation for angles",
+                    })?;
+
+                let d_inertial = rot_mat * d_sez_partials;
+
+                OMatrix::<f64, U1, <Spacecraft as State>::Size>::from_row_slice(&[
+                    d_inertial.x,
+                    d_inertial.y,
+                    d_inertial.z,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                ])
             }
-            MeasurementType::Elevation => {
-                let r2 = delta_r.norm().powi(2);
-                let z2 = delta_r.z.powi(2);
 
-                // Build the sensitivity matrix in the transmitter frame and rotate back into the inertial frame.
-                let m11 = -(delta_r.x * delta_r.z) / (r2 * (r2 - z2).sqrt());
-                let m12 = -(delta_r.y * delta_r.z) / (r2 * (r2 - z2).sqrt());
-                let m13 = (delta_r.x.powi(2) + delta_r.y.powi(2)).sqrt() / r2;
-
-                let sensitivity_row =
-                    OMatrix::<f64, U1, <Spacecraft as State>::Size>::from_row_slice(&[
-                        m11, m12, m13, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                    ]);
-
-                Ok(Self {
-                    sensitivity_row,
-                    _rx: PhantomData::<_>,
-                    _tx: PhantomData::<_>,
-                })
-            }
             MeasurementType::ReceiveFrequency
             | MeasurementType::TransmitFrequency
-            | MeasurementType::TransmitFrequencyRate => Err(ODError::MeasurementSimError {
-                details: format!("{msr_type:?} is only supported in CCSDS TDM parsing"),
-            }),
-            MeasurementType::X | MeasurementType::Y | MeasurementType::Z => {
-                Err(ODError::MeasurementSimError {
-                    details: format!("{msr_type:?} is not supported for ground stations"),
-                })
+            | MeasurementType::TransmitFrequencyRate => {
+                return Err(ODError::MeasurementSimError {
+                    details: format!("{msr_type:?} is only supported in CCSDS TDM parsing"),
+                });
             }
-        }
+
+            MeasurementType::X | MeasurementType::Y | MeasurementType::Z => {
+                return Err(ODError::MeasurementSimError {
+                    details: format!("{msr_type:?} is not supported for ground stations"),
+                });
+            }
+        };
+
+        Ok(Self {
+            sensitivity_row,
+            _rx: PhantomData,
+            _tx: PhantomData,
+        })
     }
 }
