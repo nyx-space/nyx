@@ -68,13 +68,13 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
         StochasticNoise::default_doppler_km_s(),
     );
     // Set the integration time so as to generate two way measurements
-    dss65_madrid.integration_time = Some(60.seconds());
+    dss65_madrid.doppler_config = Some(DopplerConfig::default());
     let mut dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
         StochasticNoise::default_range_km(),
         StochasticNoise::default_doppler_km_s(),
     );
-    dss34_canberra.integration_time = Some(60.seconds());
+    dss34_canberra.doppler_config = Some(DopplerConfig::default());
 
     // Define the tracking configurations
     let configs = BTreeMap::from([

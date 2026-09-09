@@ -21,6 +21,7 @@ use crate::linalg::{DefaultAllocator, DimName};
 use crate::md::trajectory::{Interpolatable, Traj};
 pub use crate::od::estimate::*;
 pub use crate::od::ground_station::*;
+use crate::od::msr::IntegrationRef;
 pub use crate::od::snc::*;
 pub use crate::od::*;
 use crate::propagators::Propagator;
@@ -230,7 +231,7 @@ where
                 traj.states.truncate(index);
 
                 debug!("propagate for {next_step_size} (Δt to next msr: {delta_t})");
-                let (_, traj_covar) = prop_instance
+                let (latest_state, traj_covar) = prop_instance
                     .for_duration_with_traj(next_step_size)
                     .context(ODPropSnafu)?;
 
@@ -255,7 +256,7 @@ where
                     prop_instance.state.set_epoch(next_msr_epoch);
 
                     if msr.rejected {
-                        debug!("Skipping manually rejected measurement at {}", epoch);
+                        debug!("Skipping manually rejected measurement at {epoch}");
                         let est = kf.time_update(nominal_state)?;
                         od_sol.push_time_update(est);
                         prop_instance.state.reset_stm();
@@ -265,6 +266,29 @@ where
                         match devices.get_mut(&msr.tracker) {
                             Some(device) => {
                                 let msr_types = device.measurement_types().clone();
+
+                                // Inspect the measurement to see if look-ahead is required for light-time computation
+                                let num_lookahead_states = if let Some(dop_cfg) = msr.doppler_config && dop_cfg.integration_ref != IntegrationRef::End {
+                                    let lookahead_by = match dop_cfg.integration_ref {
+                                        IntegrationRef::Start => dop_cfg.integration_time,
+                                        IntegrationRef::Middle => dop_cfg.integration_time * 0.5,
+                                        _ => unreachable!()
+                                    };
+                                    let mut lookahead_prop = prop.with(latest_state, self.almanac.clone()).quiet();
+                                    let (_, lookahead_traj) = lookahead_prop
+                                        .for_duration_with_traj(lookahead_by)
+                                        .context(ODPropSnafu)?;
+
+                                    let count = lookahead_traj.states.len();
+                                    for state in lookahead_traj.states {
+                                        traj.states.push(state);
+                                        println!("{state}")
+                                    }
+                                    count
+
+                                } else {
+                                    0
+                                };
 
                                 // Perform several measurement updates to ensure the desired dimensionality.
                                 let windows = msr_types.len() / MsrSize::DIM;
@@ -321,8 +345,16 @@ where
                                     let measurement_covar = device
                                         .measurement_covar_matrix(&cur_msr_types, epoch)?;
 
-                                    if let Some(computed_meas) =
-                                        device.measure(epoch, &traj, None, &self.almanac)?
+                                    // Evaluate the observation with the extended trajectory buffer
+                                    let computed_meas_res = device.measure(epoch, &traj, None, &self.almanac);
+
+                                    // Instantly strip the temporary states to maintain trajectory causality
+                                    if num_lookahead_states > 0 {
+                                        let keep_len = traj.states.len() - num_lookahead_states;
+                                        traj.states.truncate(keep_len);
+                                    }
+
+                                    if let Some(computed_meas) = computed_meas_res?
                                     {
                                         // Apply any biases on the computed observation
                                         let computed_obs = computed_meas

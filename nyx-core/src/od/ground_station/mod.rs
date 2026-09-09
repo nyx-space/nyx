@@ -19,23 +19,25 @@
 use anise::astro::{Aberration, AzElRange, Location};
 use anise::errors::{AlmanacError, AlmanacResult};
 use anise::prelude::{Almanac, Frame, Orbit};
-use der::{Decode, Encode, Reader};
+use der::{Decode, Encode};
 use indexmap::{IndexMap, IndexSet};
 use snafu::ensure;
 
 use super::msr::MeasurementType;
 use super::noise::{GaussMarkov, StochasticNoise};
 use super::{ODAlmanacSnafu, ODError, ODTrajSnafu, TrackingDevice};
-use crate::io::ConfigRepr;
 use crate::od::NoiseNotConfiguredSnafu;
 use crate::time::Epoch;
-use hifitime::Duration;
 use rand_pcg::Pcg64Mcg;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Debug};
 
+mod asn1;
 pub mod builtin;
+mod doppler_config;
 pub mod trk_device;
+
+pub use doppler_config::DopplerConfig;
 
 #[cfg(feature = "python")]
 use pyo3::exceptions::PyValueError;
@@ -46,12 +48,12 @@ use pyo3::types::{PyBytes, PyType};
 #[cfg(feature = "python")]
 mod python;
 
-/// GroundStation defines a one-way or two-way ranging and doppler station. Set the integration time for two-way.
+/// GroundStation defines a one-way or two-way ranging and doppler station. Set the doppler config for two-way.
 ///
 /// :type name: str
 /// :type location: Location
 /// :type stochastic_noises: dict[MeasurementType, StochasticNoise]
-/// :type integration_time: Duration | None
+/// :type doppler_config: DopplerConfig | None
 /// :type light_time_correction: bool | None
 /// :type timestamp_noise_s: StochasticNoise | None
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -60,13 +62,17 @@ pub struct GroundStation {
     pub name: String,
     pub location: Location,
     pub measurement_types: IndexSet<MeasurementType>,
-    /// Duration needed to generate a measurement (if unset, it is assumed to be instantaneous)
-    pub integration_time: Option<Duration>,
-    /// Whether to correct for light travel time
+    /// Doppler tracking loop settings (required if tracking Doppler)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub doppler_config: Option<DopplerConfig>,
+    /// If light-time correction is enabled, then Range and Doppler are assumed coherent Two-Way; Az/El is OneWay.
     pub light_time_correction: bool,
     /// Noise on the timestamp of the measurement
     pub timestamp_noise_s: Option<StochasticNoise>,
     pub stochastic_noises: Option<IndexMap<MeasurementType, StochasticNoise>>,
+    // TODO Add an explicit but optional obstruction body. Support just one because
+    // even at Mars, Phobos and Deimos are tiny enough to barely make a dent. Elevation
+    // acts as "obstruction from the body where the ground station lies."
 }
 
 #[cfg_attr(feature = "python", pymethods)]
@@ -142,7 +148,7 @@ impl GroundStation {
                 terrain_mask_ignored: true,
             },
             measurement_types: IndexSet::new(),
-            integration_time: None,
+            doppler_config: None,
             light_time_correction: false,
             timestamp_noise_s: None,
             stochastic_noises: None,
@@ -176,8 +182,8 @@ impl GroundStation {
         self
     }
 
-    pub fn with_integration_time(mut self, integration_time: Option<Duration>) -> Self {
-        self.integration_time = integration_time;
+    pub fn with_doppler_config(mut self, doppler_config: Option<DopplerConfig>) -> Self {
+        self.doppler_config = doppler_config;
 
         self
     }
@@ -242,10 +248,10 @@ impl GroundStation {
         Ok(noises)
     }
 
-    fn available_data(&self) -> u8 {
+    pub(crate) fn available_data(&self) -> u8 {
         let mut bits: u8 = 0;
 
-        if self.integration_time.is_some() {
+        if self.doppler_config.is_some() {
             bits |= 1 << 0;
         }
         if self.timestamp_noise_s.is_some() {
@@ -294,124 +300,11 @@ impl Default for GroundStation {
             name: "UNDEFINED".to_string(),
             measurement_types,
             location: Location::default(),
-            integration_time: None,
+            doppler_config: None,
             light_time_correction: false,
             timestamp_noise_s: None,
             stochastic_noises: None,
         }
-    }
-}
-
-impl ConfigRepr for GroundStation {}
-
-#[derive(der::Sequence)]
-struct MsrNoisePair {
-    msr_type: MeasurementType,
-    noise: StochasticNoise,
-}
-
-impl<'a> Decode<'a> for GroundStation {
-    fn decode<R: Reader<'a>>(decoder: &mut R) -> der::Result<Self> {
-        let name: String = decoder.decode()?;
-        let location = decoder.decode()?;
-        // Measurement types are stored as a sequence of measurement types
-        let msr_types_vec: Vec<MeasurementType> = decoder.decode()?;
-        let measurement_types = IndexSet::from_iter(msr_types_vec);
-
-        let light_time_correction = decoder.decode()?;
-
-        // The flags tell us what happens next
-        let flags: u8 = decoder.decode()?;
-
-        let integration_time = if flags & (1 << 0) != 0 {
-            Some(Duration::from_total_nanoseconds(decoder.decode()?))
-        } else {
-            None
-        };
-
-        let timestamp_noise_s = if flags & (1 << 1) != 0 {
-            Some(decoder.decode()?)
-        } else {
-            None
-        };
-
-        let stochastic_noises = if flags & (1 << 2) != 0 {
-            // Stochastic noises are stored as a sequence of (MeasurementType, StochasticNoise) tuples (SEQUENCE of SEQUENCE)
-            // We define a helper struct for decoding
-
-            let stochastics_vec: Vec<MsrNoisePair> = decoder.decode()?;
-            let mut map = IndexMap::new();
-            for pair in stochastics_vec {
-                map.insert(pair.msr_type, pair.noise);
-            }
-            Some(map)
-        } else {
-            None
-        };
-
-        Ok(GroundStation {
-            name,
-            location,
-            measurement_types,
-            integration_time,
-            light_time_correction,
-            timestamp_noise_s,
-            stochastic_noises,
-        })
-    }
-}
-
-impl Encode for GroundStation {
-    fn encoded_len(&self) -> der::Result<der::Length> {
-        let msr_types_vec: Vec<MeasurementType> = self.measurement_types.iter().copied().collect();
-
-        let integration_time_ns = self.integration_time.map(|d| d.total_nanoseconds());
-
-        let stochastics_vec = self.stochastic_noises.as_ref().map(|map| {
-            map.iter()
-                .map(|(k, v)| MsrNoisePair {
-                    msr_type: *k,
-                    noise: *v,
-                })
-                .collect::<Vec<MsrNoisePair>>()
-        });
-
-        self.name.encoded_len()?
-            + self.location.encoded_len()?
-            + msr_types_vec.encoded_len()?
-            + self.light_time_correction.encoded_len()?
-            + self.available_data().encoded_len()?
-            + integration_time_ns.encoded_len()?
-            + self.timestamp_noise_s.encoded_len()?
-            + stochastics_vec.encoded_len()?
-    }
-
-    fn encode(&self, encoder: &mut impl der::Writer) -> der::Result<()> {
-        self.name.encode(encoder)?;
-        self.location.encode(encoder)?;
-
-        let msr_types_vec: Vec<MeasurementType> = self.measurement_types.iter().copied().collect();
-        msr_types_vec.encode(encoder)?;
-
-        self.light_time_correction.encode(encoder)?;
-        self.available_data().encode(encoder)?;
-
-        let integration_time_ns = self.integration_time.map(|d| d.total_nanoseconds());
-        integration_time_ns.encode(encoder)?;
-
-        self.timestamp_noise_s.encode(encoder)?;
-
-        let stochastics_vec = self.stochastic_noises.as_ref().map(|map| {
-            map.iter()
-                .map(|(k, v)| MsrNoisePair {
-                    msr_type: *k,
-                    noise: *v,
-                })
-                .collect::<Vec<MsrNoisePair>>()
-        });
-        stochastics_vec.encode(encoder)?;
-
-        Ok(())
     }
 }
 
@@ -490,7 +383,7 @@ mod gs_ut {
 
             light_time_correction: false,
             timestamp_noise_s: None,
-            integration_time: Some(60 * Unit::Second),
+            doppler_config: Some(DopplerConfig::default()),
         };
 
         println!("{}", serde_yml::to_string(&expected_gs).unwrap());
@@ -553,7 +446,7 @@ mod gs_ut {
                 stochastic_noises: Some(stochastics.clone()),
                 light_time_correction: false,
                 timestamp_noise_s: None,
-                integration_time: None,
+                doppler_config: None,
             },
             GroundStation {
                 name: "Canberra".to_string(),
@@ -569,7 +462,7 @@ mod gs_ut {
                 stochastic_noises: Some(stochastics),
                 light_time_correction: false,
                 timestamp_noise_s: None,
-                integration_time: None,
+                doppler_config: None,
             },
         ];
 

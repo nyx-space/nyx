@@ -33,7 +33,7 @@ use crate::od::ODError;
 use crate::od::msr::MeasurementType;
 use crate::od::msr::measurement::Measurement as NewMeasurement;
 
-/// Tracking device simulator.
+/// Tracking device.
 pub trait TrackingDevice<MsrIn>: Clone + ConfigRepr
 where
     MsrIn: Interpolatable,

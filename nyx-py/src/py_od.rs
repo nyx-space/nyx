@@ -605,11 +605,12 @@ impl PySpacecraftPositionODSolution {
     /// Export OD solutions, gains, ratios, residuals, sigmas, etc. to parquet
     ///
     /// :type path: str
-    /// :type cfg: ExportCfg
+    /// :type cfg: ExportCfg, optional
     /// :rtype: str
-    fn to_parquet(&self, path: &str, cfg: ExportCfg) -> Result<String, ODError> {
+    #[pyo3(signature = (path, cfg=None))]
+    fn to_parquet(&self, path: &str, cfg: Option<ExportCfg>) -> Result<String, ODError> {
         self.inner
-            .to_parquet(path, cfg)
+            .to_parquet(path, cfg.unwrap_or_default())
             .map(|path| path.to_string_lossy().to_string())
     }
 
@@ -916,11 +917,12 @@ impl PySpacecraftODSolution {
     /// Export OD solutions, gains, ratios, residuals, sigmas, etc. to parquet
     ///
     /// :type path: str
-    /// :type cfg: ExportCfg
+    /// :type cfg: ExportCfg, optional
     /// :rtype: str
-    fn to_parquet(&self, path: &str, cfg: ExportCfg) -> Result<String, ODError> {
+    #[pyo3(signature = (path, cfg=None))]
+    fn to_parquet(&self, path: &str, cfg: Option<ExportCfg>) -> Result<String, ODError> {
         self.inner
-            .to_parquet(path, cfg)
+            .to_parquet(path, cfg.unwrap_or_default())
             .map(|path| path.to_string_lossy().to_string())
     }
 

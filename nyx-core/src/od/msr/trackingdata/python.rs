@@ -208,11 +208,16 @@ impl TrackingDataArc {
     /// Write tracking data arc to a parquet file.
     ///
     /// :type path: str
-    /// :type cfg: ExportCfg
+    /// :type cfg: ExportCfg, optional
     /// :rtype: str
+    #[pyo3(signature = (path, cfg=None))]
     #[pyo3(name = "to_parquet")]
-    fn py_to_parquet(&self, path: String, cfg: ExportCfg) -> Result<String, InputOutputError> {
-        self.to_parquet(path, cfg)
+    fn py_to_parquet(
+        &self,
+        path: String,
+        cfg: Option<ExportCfg>,
+    ) -> Result<String, InputOutputError> {
+        self.to_parquet(path, cfg.unwrap_or_default())
             .map(|pathbuf| pathbuf.to_string_lossy().into_owned())
     }
 }

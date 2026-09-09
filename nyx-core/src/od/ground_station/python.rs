@@ -1,8 +1,7 @@
 use super::super::msr::MeasurementType;
 use super::super::noise::StochasticNoise;
-use super::GroundStation;
+use super::{DopplerConfig, GroundStation};
 use anise::astro::Location;
-use hifitime::Duration;
 use indexmap::{IndexMap, IndexSet};
 use pyo3::prelude::*;
 use std::collections::HashMap;
@@ -15,16 +14,16 @@ impl GroundStation {
     /// :type name: str
     /// :type location: Location
     /// :type stochastic_noises: dict[MeasurementType, StochasticNoise]
-    /// :type integration_time: Duration | None
+    /// :type doppler_config: DopplerConfig | None
     /// :type light_time_correction: bool | None
     /// :type timestamp_noise_s: StochasticNoise | None
     #[new]
-    #[pyo3(signature = (name, location, stochastic_noises, integration_time=None, light_time_correction=false, timestamp_noise_s=None))]
+    #[pyo3(signature = (name, location, stochastic_noises, doppler_config=None, light_time_correction=false, timestamp_noise_s=None))]
     fn py_new(
         name: String,
         location: Location,
         stochastic_noises: HashMap<MeasurementType, StochasticNoise>,
-        integration_time: Option<Duration>,
+        doppler_config: Option<DopplerConfig>,
         light_time_correction: Option<bool>,
         timestamp_noise_s: Option<StochasticNoise>,
     ) -> Self {
@@ -37,7 +36,7 @@ impl GroundStation {
                     .copied()
                     .collect::<Vec<MeasurementType>>(),
             ),
-            integration_time,
+            doppler_config,
             light_time_correction: light_time_correction.unwrap_or(false),
             timestamp_noise_s,
             stochastic_noises: Some(stochastic_noises.into_iter().collect()),
@@ -140,13 +139,13 @@ impl GroundStation {
     }
 
     #[getter]
-    pub fn get_integration_time(&self) -> Option<Duration> {
-        self.integration_time
+    pub fn get_doppler_config(&self) -> Option<DopplerConfig> {
+        self.doppler_config
     }
 
     #[setter]
-    pub fn set_integration_time(&mut self, integration_time: Option<Duration>) {
-        self.integration_time = integration_time;
+    pub fn set_doppler_config(&mut self, doppler_config: Option<DopplerConfig>) {
+        self.doppler_config = doppler_config;
     }
 
     #[getter]

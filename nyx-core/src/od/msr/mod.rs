@@ -16,14 +16,49 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use std::str::FromStr;
+
+use serde::{Deserialize, Serialize};
+
 pub mod measurement;
 pub mod sensitivity;
 mod trackingdata;
+pub mod two_way;
 mod types;
 
+pub use crate::od::ground_station::DopplerConfig;
 pub use measurement::Measurement;
 pub use trackingdata::TrackingDataArc;
 pub use types::MeasurementType;
 
 #[cfg(feature = "python")]
 mod python;
+
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
+use crate::io::InputOutputError;
+
+#[cfg_attr(feature = "python", pyclass(from_py_object))]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, der::Enumerated)]
+#[repr(u8)]
+pub enum IntegrationRef {
+    Start = 0,
+    #[default]
+    Middle = 1,
+    End = 2,
+}
+
+impl FromStr for IntegrationRef {
+    type Err = InputOutputError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_lowercase().as_str() {
+            "middle" => Ok(Self::Middle),
+            "start" => Ok(Self::Start),
+            "end" => Ok(Self::End),
+            _ => Err(InputOutputError::UnsupportedData {
+                which: format!("`{s}` is not a valid integration reference"),
+            }),
+        }
+    }
+}

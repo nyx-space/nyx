@@ -18,13 +18,15 @@
 
 use super::{ODAlmanacSnafu, ODError, ODTrajSnafu, TrackingDevice};
 use crate::Spacecraft;
+use crate::io::ConfigError;
 use crate::md::prelude::{Interpolatable, Traj};
-use crate::od::msr::MeasurementType;
 use crate::od::msr::measurement::Measurement;
+use crate::od::msr::two_way::solve_two_way_picard;
+use crate::od::msr::{IntegrationRef, MeasurementType};
 use crate::time::Epoch;
 use anise::errors::AlmanacResult;
 use anise::frames::Frame;
-use anise::prelude::{Aberration, Almanac, Orbit};
+use anise::prelude::{Almanac, Orbit};
 use hifitime::TimeUnits;
 use indexmap::IndexSet;
 use log::debug;
@@ -39,6 +41,7 @@ impl TrackingDevice<Spacecraft> for GroundStation {
     }
 
     /// Perform a measurement from the ground station to the receiver (rx).
+    /// The epoch MUST be the station reception epoch.
     fn measure(
         &mut self,
         epoch: Epoch,
@@ -46,104 +49,183 @@ impl TrackingDevice<Spacecraft> for GroundStation {
         rng: Option<&mut Pcg64Mcg>,
         almanac: &Almanac,
     ) -> Result<Option<Measurement>, ODError> {
-        match self.integration_time {
-            Some(integration_time) => {
-                // TODO: This should support measurement alignment
-                // If out of traj bounds, return None, else the whole strand is rejected.
-                let rx_0 = match traj.at(epoch - integration_time).context(ODTrajSnafu {
-                    details: format!(
-                        "fetching state {epoch} at start of ground station integration time {integration_time}"
-                    ),
-                }) {
-                    Ok(rx) => rx,
-                    Err(_) => return Ok(None),
+        let mut msr = Measurement::new(self.name.clone(), epoch);
+        msr.doppler_config = self.doppler_config;
+
+        if self.light_time_correction {
+            // Solve for Relativistic Picard Light-Time
+
+            // Step 2a: Solve Downlink Leg (t3 -> t2) for Range & Angles
+            let two_way_sol = match solve_two_way_picard(epoch, self, traj, almanac) {
+                Ok(sol) => sol,
+                Err(_) => return Ok(None),
+            };
+
+            // Evaluate Azimuth/Elevation from Downlink Look Direction at t3
+            // Construct the apparent target state using the solved bounce state r_sc(t2)
+            let aer_downlink = almanac
+                .azimuth_elevation_range_sez_from_location(
+                    traj.at(two_way_sol.t2_bounce).unwrap().orbit,
+                    self.location.clone(),
+                    None,
+                    None, // Position r_sc(t2) is already retarded; do not apply LT twice
+                )
+                .context(ODAlmanacSnafu {
+                    action: "computing downlink AER",
+                })?;
+
+            if aer_downlink.elevation_above_mask_deg() < 0.0 || aer_downlink.is_obstructed() {
+                return Ok(None);
+            }
+
+            let noises = self.noises(epoch, rng)?;
+
+            for (ii, msr_type) in self.measurement_types.iter().enumerate() {
+                let noise = noises[ii + 1];
+                let val = match msr_type {
+                    MeasurementType::Range => two_way_sol.range_km() + noise,
+
+                    MeasurementType::Azimuth => aer_downlink.azimuth_deg + noise,
+                    MeasurementType::Elevation => aer_downlink.elevation_deg + noise,
+
+                    MeasurementType::Doppler => {
+                        let doppler_cfg = msr
+                            .doppler_config
+                            .ok_or_else(|| ODError::ODConfigError { source: ConfigError::InvalidConfig {
+                                msg: "Doppler measurement requires doppler_config on GroundStation".to_string()
+                            }})?;
+
+                        let integr_time = doppler_cfg.integration_time;
+
+                        // Compute integration window boundaries from integration_ref
+                        let (t_start, t_end) = match doppler_cfg.integration_ref {
+                            IntegrationRef::Start => (epoch, epoch + integr_time),
+                            IntegrationRef::Middle => {
+                                (epoch - integr_time * 0.5, epoch + integr_time * 0.5)
+                            }
+                            IntegrationRef::End => (epoch - integr_time, epoch),
+                        };
+
+                        // Evaluate two-way ranges at window boundaries
+                        let r_start =
+                            solve_two_way_picard(t_start, self, traj, almanac)?.range_km();
+                        let r_end = solve_two_way_picard(t_end, self, traj, almanac)?.range_km();
+
+                        // Differenced range rate + Doppler noise
+                        ((r_end - r_start) / integr_time.to_seconds()) + noise
+                    }
+
+                    _ => {
+                        return Err(ODError::ODLimitation {
+                            action: format!("MeasurementType::{msr_type:?} is unsupported"),
+                        });
+                    }
                 };
 
-                let rx_1 = match traj.at(epoch).context(ODTrajSnafu {
-                    details: format!(
-                        "fetching state {epoch} at end of ground station integration time"
-                    ),
-                }) {
-                    Ok(rx) => rx,
-                    Err(_) => return Ok(None),
-                };
+                msr.push(*msr_type, val);
+            }
 
-                let obstructing_body =
-                    if self.location.frame.ephemeris_id != rx_0.frame().ephemeris_id {
-                        Some(rx_0.frame())
-                    } else {
-                        None
-                    };
+            Ok(Some(msr))
+        } else {
+            let rx = traj.at(epoch).context(ODTrajSnafu {
+                details: "fetching state for instantaneous measurement".to_string(),
+            })?;
 
-                let ab_corr = if self.light_time_correction {
-                    Aberration::LT
-                } else {
-                    Aberration::NONE
-                };
+            let obstructing_body = if self.location.frame.ephemeris_id != rx.frame().ephemeris_id {
+                Some(rx.frame())
+            } else {
+                None
+            };
 
-                let aer_t0 = almanac
-                    .azimuth_elevation_range_sez_from_location(
-                        rx_0.orbit,
-                        self.location.clone(),
-                        obstructing_body,
-                        ab_corr,
-                    )
-                    .context(ODAlmanacSnafu {
-                        action: "computing AER",
-                    })?;
+            let aer = almanac
+                .azimuth_elevation_range_sez_from_location(
+                    rx.orbit,
+                    self.location.clone(),
+                    obstructing_body,
+                    None,
+                )
+                .context(ODAlmanacSnafu {
+                    action: "computing AER",
+                })?;
 
-                let aer_t1 = almanac
-                    .azimuth_elevation_range_sez_from_location(
-                        rx_1.orbit,
-                        self.location.clone(),
-                        obstructing_body,
-                        ab_corr,
-                    )
-                    .context(ODAlmanacSnafu {
-                        action: "computing AER",
-                    })?;
+            if aer.elevation_above_mask_deg() >= 0.0 && !aer.is_obstructed() {
+                // Only update the noises if the measurement is valid.
+                let noises = self.noises(rx.orbit.epoch, rng)?;
 
-                if aer_t0.elevation_above_mask_deg() < 0.0
-                    || aer_t1.elevation_above_mask_deg() < 0.0
-                {
-                    debug!(
-                        "{} {} obstructed by terrain ({:.3} - {:.3} deg) -- no measurement",
-                        self.name,
-                        aer_t0.epoch,
-                        aer_t0.elevation_above_mask_deg(),
-                        aer_t1.elevation_above_mask_deg()
-                    );
-                    return Ok(None);
-                } else if aer_t0.is_obstructed() || aer_t1.is_obstructed() {
-                    debug!(
-                        "{} {} obstruction at t0={}, t1={} -- no measurement",
-                        self.name,
-                        aer_t0.epoch,
-                        aer_t0.is_obstructed(),
-                        aer_t1.is_obstructed()
-                    );
-                    return Ok(None);
-                }
-
-                // Noises are computed at the midpoint of the integration time.
-                let noises = self.noises(epoch - integration_time * 0.5, rng)?;
-
-                let mut msr = Measurement::new(self.name.clone(), epoch + noises[0].seconds());
+                let mut msr =
+                    Measurement::new(self.name.clone(), rx.orbit.epoch + noises[0].seconds());
+                msr.doppler_config = self.doppler_config;
 
                 for (ii, msr_type) in self.measurement_types.iter().enumerate() {
-                    let msr_value = msr_type.compute_two_way(aer_t0, aer_t1, noises[ii + 1])?;
+                    let msr_value = if msr_type == &MeasurementType::Doppler {
+                        let doppler_cfg = msr.doppler_config.ok_or_else(|| {
+                            ODError::ODConfigError {
+                            source: ConfigError::InvalidConfig {
+                                msg: "Doppler measurement requires doppler_config on GroundStation"
+                                    .to_string(),
+                            },
+                        }
+                        })?;
+
+                        let integr_time = doppler_cfg.integration_time;
+
+                        // Compute integration window boundaries from integration_ref
+                        let (t_start, t_end) = match doppler_cfg.integration_ref {
+                            IntegrationRef::Start => (epoch, epoch + integr_time),
+                            IntegrationRef::Middle => {
+                                (epoch - integr_time * 0.5, epoch + integr_time * 0.5)
+                            }
+                            IntegrationRef::End => (epoch - integr_time, epoch),
+                        };
+
+                        // Evaluate two-way ranges at window boundaries
+                        let sc_start = traj.at(t_start).context(ODTrajSnafu {
+                            details: "fetching state for start of integration".to_string(),
+                        })?;
+                        let sc_end = traj.at(t_end).context(ODTrajSnafu {
+                            details: "fetching state for end of integration".to_string(),
+                        })?;
+                        let aer_start = almanac
+                            .azimuth_elevation_range_sez_from_location(
+                                sc_start.orbit,
+                                self.location.clone(),
+                                None,
+                                None,
+                            )
+                            .context(ODAlmanacSnafu {
+                                action: "computing AER at start of integration time",
+                            })?;
+
+                        let aer_end = almanac
+                            .azimuth_elevation_range_sez_from_location(
+                                sc_end.orbit,
+                                self.location.clone(),
+                                None,
+                                None,
+                            )
+                            .context(ODAlmanacSnafu {
+                                action: "computing AER at end of integration time",
+                            })?;
+
+                        // Differenced range rate + Doppler noise
+                        ((aer_end.range_km - aer_start.range_km) / integr_time.to_seconds())
+                            + noises[ii + 1]
+                    } else {
+                        msr_type.compute_one_way(aer, noises[ii + 1])?
+                    };
                     msr.push(*msr_type, msr_value);
                 }
 
                 Ok(Some(msr))
+            } else {
+                debug!(
+                    "{} {} object at {:.3} deg -- no measurement",
+                    self.name,
+                    rx.orbit.epoch,
+                    aer.elevation_above_mask_deg(),
+                );
+                Ok(None)
             }
-            None => self.measure_instantaneous(
-                traj.at(epoch).context(ODTrajSnafu {
-                    details: "fetching state for instantaneous measurement".to_string(),
-                })?,
-                rng,
-                almanac,
-            ),
         }
     }
 
@@ -161,16 +243,12 @@ impl TrackingDevice<Spacecraft> for GroundStation {
         rng: Option<&mut Pcg64Mcg>,
         almanac: &Almanac,
     ) -> Result<Option<Measurement>, ODError> {
+        // HACK This function should be avoided. A future version will remove the instantaneous measurement
+        // because it isn't physically adequate.
         let obstructing_body = if self.location.frame.ephemeris_id != rx.frame().ephemeris_id {
             Some(rx.frame())
         } else {
             None
-        };
-
-        let ab_corr = if self.light_time_correction {
-            Aberration::LT
-        } else {
-            Aberration::NONE
         };
 
         let aer = almanac
@@ -178,7 +256,7 @@ impl TrackingDevice<Spacecraft> for GroundStation {
                 rx.orbit,
                 self.location.clone(),
                 obstructing_body,
-                ab_corr,
+                None,
             )
             .context(ODAlmanacSnafu {
                 action: "computing AER",
@@ -189,6 +267,7 @@ impl TrackingDevice<Spacecraft> for GroundStation {
             let noises = self.noises(rx.orbit.epoch, rng)?;
 
             let mut msr = Measurement::new(self.name.clone(), rx.orbit.epoch + noises[0].seconds());
+            msr.doppler_config = self.doppler_config;
 
             for (ii, msr_type) in self.measurement_types.iter().enumerate() {
                 let msr_value = msr_type.compute_one_way(aer, noises[ii + 1])?;

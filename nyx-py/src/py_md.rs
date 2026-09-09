@@ -482,16 +482,17 @@ impl PyTrajectory {
     ///
     /// :type other: Trajectory
     /// :type path: str
-    /// :type cfg: ExportCfg
+    /// :type cfg: ExportCfg, optional
     /// :rtype: str
+    #[pyo3(signature = (other, path, cfg=None))]
     fn ric_diff_to_parquet(
         &self,
         other: &Self,
         path: &str,
-        cfg: ExportCfg,
+        cfg: Option<ExportCfg>,
     ) -> Result<String, TrajError> {
         self.inner
-            .ric_diff_to_parquet(&other.inner, path, cfg)
+            .ric_diff_to_parquet(&other.inner, path, cfg.unwrap_or_default())
             .map(|path| path.to_string_lossy().to_string())
     }
 
@@ -506,11 +507,12 @@ impl PyTrajectory {
     /// Write trajectory to a parquet file.
     ///
     /// :type path: str
-    /// :type cfg: ExportCfg
+    /// :type cfg: ExportCfg, optional
     /// :rtype: str
-    fn to_parquet(&self, path: &str, cfg: ExportCfg) -> Result<String, TrajError> {
+    #[pyo3(signature = (path, cfg=None))]
+    fn to_parquet(&self, path: &str, cfg: Option<ExportCfg>) -> Result<String, TrajError> {
         self.inner
-            .to_parquet(path, cfg)
+            .to_parquet(path, cfg.unwrap_or_default())
             .map(|path| path.to_string_lossy().to_string())
             .map_err(|e| TrajError::TrajGeneric { err: e.to_string() })
     }
@@ -518,10 +520,11 @@ impl PyTrajectory {
     /// Export this spacecraft trajectory estimate to an ANISE Ephemeris
     ///
     /// :type object_id: str
-    /// :type cfg: ExportCfg
+    /// :type cfg: ExportCfg, optional
     /// :rtype: Ephemeris
-    fn to_ephemeris(&self, object_id: String, cfg: ExportCfg) -> Ephemeris {
-        self.inner.to_ephemeris(object_id, cfg)
+    #[pyo3(signature = (object_id, cfg=None))]
+    fn to_ephemeris(&self, object_id: String, cfg: Option<ExportCfg>) -> Ephemeris {
+        self.inner.to_ephemeris(object_id, cfg.unwrap_or_default())
     }
 
     fn __str__(&self) -> String {

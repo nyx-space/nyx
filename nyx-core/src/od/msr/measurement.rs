@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use crate::od::ground_station::DopplerConfig;
+
 use super::MeasurementType;
 use hifitime::Epoch;
 use indexmap::{IndexMap, IndexSet};
@@ -48,6 +50,8 @@ pub struct Measurement {
     pub data: IndexMap<MeasurementType, f64>,
     /// Whether this measurement has been manually rejected
     pub rejected: bool,
+    /// Doppler measurement should specify a Doppler configuration, unused for other measurement types.
+    pub doppler_config: Option<DopplerConfig>,
 }
 
 #[cfg_attr(feature = "python", pymethods)]
@@ -82,11 +86,27 @@ impl Measurement {
             epoch,
             data: IndexMap::new(),
             rejected: false,
+            doppler_config: None,
         }
     }
 
-    pub fn with(mut self, msr_type: MeasurementType, msr_value: f64) -> Self {
+    /// Doppler configuration is expected for Doppler measurements, and set to default if not provided.
+    pub fn with(
+        mut self,
+        msr_type: MeasurementType,
+        msr_value: f64,
+        mut doppler_config: Option<DopplerConfig>,
+    ) -> Self {
         self.push(msr_type, msr_value);
+        if msr_type == MeasurementType::Doppler && doppler_config.is_none() {
+            doppler_config = Some(DopplerConfig::default());
+        }
+        self.doppler_config = doppler_config;
+        self
+    }
+
+    pub fn with_doppler_config(mut self, doppler_config: Option<DopplerConfig>) -> Self {
+        self.doppler_config = doppler_config;
         self
     }
 

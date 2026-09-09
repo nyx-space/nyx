@@ -983,16 +983,20 @@ class Trajectory:
     def push(self, spacecraft: Spacecraft) -> None:
         """Add another state to this trajectory."""
 
-    def ric_diff_to_parquet(self, other: Trajectory, path: str, cfg: ExportCfg) -> str:
+    def ric_diff_to_parquet(
+        self, other: Trajectory, path: str, cfg: typing.Optional[ExportCfg] = None
+    ) -> str:
         """Export the difference in RIC from of this trajectory compare to the "other" trajectory in parquet format.
 
         # Notes
         + The RIC frame accounts for the transport theorem by performing a finite differencing of the RIC frame."""
 
-    def to_ephemeris(self, object_id: str, cfg: ExportCfg) -> astro.Ephemeris:
+    def to_ephemeris(
+        self, object_id: str, cfg: typing.Optional[ExportCfg] = None
+    ) -> astro.Ephemeris:
         """Export this spacecraft trajectory estimate to an ANISE Ephemeris"""
 
-    def to_parquet(self, path: str, cfg: ExportCfg) -> str:
+    def to_parquet(self, path: str, cfg: typing.Optional[ExportCfg] = None) -> str:
         """Write trajectory to a parquet file."""
 
     def __repr__(self) -> str:

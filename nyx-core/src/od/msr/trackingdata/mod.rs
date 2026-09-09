@@ -268,6 +268,7 @@ impl TrackingDataArc {
                 epoch,
                 data: IndexMap::new(),
                 rejected: false,
+                doppler_config: msr.doppler_config,
             };
 
             // Apply moving average filter for each measurement type
