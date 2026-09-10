@@ -39,7 +39,7 @@ impl GroundStation {
                     .copied()
                     .collect::<Vec<MeasurementType>>(),
             ),
-            doppler_config,
+            doppler_config: Some(doppler_config.unwrap_or_default()),
             light_time_correction: light_time_correction.unwrap_or(false),
             timestamp_noise_s,
             stochastic_noises: Some(stochastic_noises.into_iter().collect()),

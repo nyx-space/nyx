@@ -18,6 +18,9 @@
 
 use anise::astro::TerrainMask;
 use anise::constants::frames::IAU_EARTH_FRAME;
+use hifitime::Unit;
+
+use crate::od::msr::IntegrationRef;
 
 use super::*;
 
@@ -46,7 +49,10 @@ impl GroundStation {
                 frame: IAU_EARTH_FRAME.into(),
             },
             measurement_types,
-            doppler_config: None,
+            doppler_config: Some(DopplerConfig {
+                integration_time: 1 * Unit::Second,
+                integration_ref: IntegrationRef::End,
+            }),
             light_time_correction: false,
             timestamp_noise_s: None,
             stochastic_noises: Some(stochastics),
