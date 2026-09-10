@@ -6,7 +6,6 @@ from typing import Literal
 
 import requests
 from google import genai
-from google.genai import types
 from pydantic import BaseModel, Field
 
 # Configurations from environment
@@ -186,9 +185,9 @@ Description:
         response_format={
             "type": "text",
             "mime_type": "application/json",
-            "schema": ReviewPayload,
+            "schema": ReviewPayload.model_json_schema(),
         },
-        generation_config={"temperature": 0.5, "thinking_level": "high"},
+        generation_config={"thinking_level": "high"},
     )
 
     try:

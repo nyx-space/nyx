@@ -20,7 +20,6 @@ use anise::astro::{Aberration, AzElRange, Location};
 use anise::errors::{AlmanacError, AlmanacResult};
 use anise::frames::FrameUid;
 use anise::prelude::{Almanac, Frame, Orbit};
-use der::{Decode, Encode};
 use indexmap::{IndexMap, IndexSet};
 use snafu::ensure;
 
@@ -49,6 +48,8 @@ use pyo3::types::{PyBytes, PyType};
 #[cfg(feature = "python")]
 mod python;
 
+#[cfg(feature = "python")]
+use der::{Decode, Encode};
 /// GroundStation defines a one-way or two-way ranging and doppler station. Set the doppler config for two-way.
 ///
 /// :type name: str

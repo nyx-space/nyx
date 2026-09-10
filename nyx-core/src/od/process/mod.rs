@@ -290,21 +290,23 @@ where
                                     0
                                 };
 
+                                // Current nominal prior (needed for separate processing of simultaneous measurements)
+                                let prior_nominal_state = prop_instance.state;
+                                let mut current_state_estimate = prior_nominal_state;
+                                let mut any_measurement_accepted = false;
+
                                 // Perform several measurement updates to ensure the desired dimensionality.
                                 let windows = msr_types.len() / MsrSize::DIM;
                                 for wno in 0..=windows {
                                     // Update the nominal state in case we're ingesting several measurements
                                     // sequentially for the same epoch.
                                     nominal_state = prop_instance.state;
-                                    let mut cur_msr_types = IndexSet::new();
-                                    for msr_type in msr_types
+                                    let cur_msr_types = msr_types
                                         .iter()
                                         .copied()
                                         .skip(wno * MsrSize::DIM)
                                         .take(MsrSize::DIM)
-                                    {
-                                        cur_msr_types.insert(msr_type);
-                                    }
+                                        .collect::<IndexSet<_>>();
 
                                     if cur_msr_types.is_empty() {
                                         // We've processed all measurements.
@@ -335,17 +337,21 @@ where
                                     }
 
                                     // Compute device specific matrices
+                                    // Sensitivity (H tilde) is computed on the _pristine_ nominal estimate
+                                    // i.e. it is not polluted by a partial measurement update if there are
+                                    // multiple concurrent measurement processed sequentially.
                                     let h_tilde = device.h_tilde::<MsrSize>(
                                         msr,
                                         &cur_msr_types,
-                                        &nominal_state,
+                                        &prior_nominal_state,
                                         &self.almanac,
                                     )?;
 
                                     let measurement_covar = device
                                         .measurement_covar_matrix(&cur_msr_types, epoch)?;
 
-                                    // Evaluate the observation with the extended trajectory buffer
+                                    // Evaluate the observation from the trajectory with the look-ahead states
+                                    // but it does not include any of the states from the measurement update.
                                     let computed_meas_res = device.measure(epoch, &traj, None, &self.almanac);
 
                                     // Instantly strip the temporary states to maintain trajectory causality
@@ -357,12 +363,14 @@ where
                                     if let Some(computed_meas) = computed_meas_res?
                                     {
                                         // Apply any biases on the computed observation
-                                        let computed_obs = computed_meas
+                                        let obs_bias = device.measurement_bias_vector::<MsrSize>(
+                                            &cur_msr_types,
+                                            epoch,
+                                        )?;
+
+                                        let mut computed_obs = computed_meas
                                             .observation::<MsrSize>(&cur_msr_types)
-                                            - device.measurement_bias_vector::<MsrSize>(
-                                                &cur_msr_types,
-                                                epoch,
-                                            )?;
+                                            - obs_bias;
 
                                         // Apply the modulo to the real obs
                                         if let Some(moduli) = &arc.moduli {
@@ -379,8 +387,14 @@ where
                                             real_obs += obs_ambiguity;
                                         }
 
+                                        // Map prior shifts to account for partial state update: h_eff = h(x0) + H * (x_curr - x0)
+                                        let delta_state = current_state_estimate.to_state_vector() - prior_nominal_state.to_state_vector();
+                                        let obs_shift = &h_tilde * delta_state;
+                                        computed_obs += obs_shift;
+
+                                        // Kalman measurement update on the filter covariance and state
                                         let (estimate, mut residual, gain) = kf.measurement_update(
-                                            nominal_state,
+                                            current_state_estimate,
                                             real_obs,
                                             computed_obs,
                                             measurement_covar,
@@ -393,23 +407,17 @@ where
                                             device.name()
                                         );
 
-                                        residual.tracker = Some(device.name());
-                                        residual.msr_types = cur_msr_types;
-
-                                        if kf.replace_state() && !residual.rejected {
-                                            // Only update the state of the EKF if the residual was not rejected.
-                                            prop_instance.state = estimate.state();
-                                            traj.states.pop();
-                                            traj.states.push(prop_instance.state);
-                                        }
-
-                                        prop_instance.state.reset_stm();
-
                                         if residual.rejected {
                                             msr_rejected_cnt += 1;
                                         } else {
                                             msr_accepted_cnt += 1;
+                                            current_state_estimate = estimate.state();
+                                            any_measurement_accepted = true;
                                         }
+
+
+                                        residual.tracker = Some(device.name());
+                                        residual.msr_types = cur_msr_types;
                                         od_sol.push_measurement_update(estimate, residual, gain);
                                     } else {
                                         debug!(
@@ -418,6 +426,16 @@ where
                                         );
                                         msr_rejected_cnt += 1;
                                     }
+                                }
+
+                                if kf.replace_state() && any_measurement_accepted {
+                                    // Only update the state of the EKF if at least one residual was not rejected.
+                                    prop_instance.state = current_state_estimate;
+                                    traj.states.pop();
+                                    traj.states.push(prop_instance.state);
+
+                                    // Reset the STM strictly once per epoch, after all updates have been absorbed
+                                    prop_instance.state.reset_stm();
                                 }
                             }
                             None => {
