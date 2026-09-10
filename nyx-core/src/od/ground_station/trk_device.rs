@@ -67,17 +67,17 @@ impl TrackingDevice<Spacecraft> for GroundStation {
             })?;
 
             if let Some(obstruction_body) = self.obstruction_body {
+                // Check if there was an obstruction at the bounce epoch with LT
                 let observer =
                     Spacecraft::from(self.to_orbit(epoch, almanac).context(ODAlmanacSnafu {
                         action: "building ground station orbit",
                     })?);
-                let ab_corr = Aberration::LT;
                 let is_obstructed = almanac
                     .line_of_sight_obstructed(
                         observer.orbit,
                         rx.orbit,
                         obstruction_body.into(),
-                        ab_corr,
+                        Aberration::LT,
                     )
                     .context(ODAlmanacSnafu {
                         action: "computing line of sight",

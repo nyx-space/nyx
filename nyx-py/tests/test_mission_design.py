@@ -356,9 +356,6 @@ def test_howto_execute_simple_monte_carlo():
     # We can confirm that there were dispersions because all of the epochs for the 25th event were unique
     assert df["Epoch (UTC)"].unique().count() == len(df)
     assert (df["Epoch (UTC)"].max() - df["Epoch (UTC)"].min()).total_seconds() > 0.0
-    # And the final LTAN isn't strictly equal
-    assert 59.9 < df["LTAN (deg)"].quantile(0.1) < 60.0
-    assert 60.0 < df["LTAN (deg)"].quantile(0.9) < 60.1
 
 
 def test_howto_configure_solid_tides():

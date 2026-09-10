@@ -167,6 +167,8 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
             }
             MeasurementType::Range => {
                 // Velocity sensitivity due to retarded bounce epoch: d(rho)/d(v) = -tau * u_los
+                // This is required because we're computing the sensitivity at the reception epoch
+                // and not at the bounce epoch.
                 let tau_s = if tx.light_time_correction {
                     rho_km / SPEED_OF_LIGHT_KM_S
                 } else {

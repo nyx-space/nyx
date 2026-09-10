@@ -244,7 +244,7 @@ where
                 // Now that we've advanced the propagator, let's see whether we're at the time of the next measurement.
 
                 // Extract the state and update the STM in the filter.
-                let mut nominal_state = prop_instance.state;
+                let nominal_state = prop_instance.state;
                 // Get the datetime and info needed to compute the theoretical measurement according to the model
                 epoch = nominal_state.epoch();
 
@@ -280,12 +280,12 @@ where
                                         .context(ODPropSnafu)?;
 
                                     let count = lookahead_traj.states.len();
-                                    for state in lookahead_traj.states {
+                                    for state in lookahead_traj.states.iter().copied().skip(1) {
+                                        // Skip the first state because it is a copy of the initial prop state
+                                        // which is the last state of the traj before we edit it.
                                         traj.states.push(state);
-                                        println!("{state}")
                                     }
-                                    count
-
+                                    count - 1
                                 } else {
                                     0
                                 };
@@ -300,7 +300,6 @@ where
                                 for wno in 0..=windows {
                                     // Update the nominal state in case we're ingesting several measurements
                                     // sequentially for the same epoch.
-                                    nominal_state = prop_instance.state;
                                     let cur_msr_types = msr_types
                                         .iter()
                                         .copied()
@@ -353,12 +352,6 @@ where
                                     // Evaluate the observation from the trajectory with the look-ahead states
                                     // but it does not include any of the states from the measurement update.
                                     let computed_meas_res = device.measure(epoch, &traj, None, &self.almanac);
-
-                                    // Instantly strip the temporary states to maintain trajectory causality
-                                    if num_lookahead_states > 0 {
-                                        let keep_len = traj.states.len() - num_lookahead_states;
-                                        traj.states.truncate(keep_len);
-                                    }
 
                                     if let Some(computed_meas) = computed_meas_res?
                                     {
@@ -426,6 +419,12 @@ where
                                         );
                                         msr_rejected_cnt += 1;
                                     }
+                                }
+
+                                // Strip the temporary states to maintain trajectory causality
+                                if num_lookahead_states > 0 {
+                                    let keep_len = traj.states.len() - num_lookahead_states;
+                                    traj.states.truncate(keep_len);
                                 }
 
                                 if kf.replace_state() && any_measurement_accepted {
