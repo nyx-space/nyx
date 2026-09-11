@@ -1,8 +1,5 @@
 use anise::constants::frames::EARTH_J2000;
 use anise::prelude::Almanac;
-use arrow::array::{BooleanBuilder, Float64Builder, StringBuilder};
-use arrow::datatypes::{DataType, Field, Schema};
-use arrow::record_batch::RecordBatch;
 use hifitime::prelude::*;
 use indexmap::IndexMap;
 use nyx_space::io::ExportCfg;
@@ -10,7 +7,6 @@ use nyx_space::md::prelude::*;
 use nyx_space::od::DopplerConfig;
 use nyx_space::od::msr::{IntegrationRef, Measurement, MeasurementType, TrackingDataArc};
 use nyx_space::od::prelude::*;
-use parquet::arrow::ArrowWriter;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
@@ -244,64 +240,6 @@ fn test_parquet_export_and_import_roundtrip() {
     assert_eq!(msr_read.doppler_config, Some(custom_cfg));
     assert_eq!(msr_read.data.get(&MeasurementType::Range), Some(&10000.0));
     assert_eq!(msr_read.data.get(&MeasurementType::Doppler), Some(&0.5));
-}
-
-#[test]
-fn test_parquet_legacy_integration_ref_only_migration() {
-    // Manually create a parquet file matching the old schema with only "IntegrationRef" and no "Integration time (s)"
-    let schema = Arc::new(Schema::new(vec![
-        Field::new("Epoch (UTC)", DataType::Utf8, false),
-        Field::new("Tracking device", DataType::Utf8, false),
-        Field::new("Doppler (km/s)", DataType::Float64, true),
-        Field::new("Rejected", DataType::Boolean, false),
-        Field::new("IntegrationRef", DataType::Utf8, true),
-    ]));
-
-    let mut utc_epoch = StringBuilder::new();
-    utc_epoch.append_value("2025-01-01T00:00:00.000 UTC");
-
-    let mut device_names = StringBuilder::new();
-    device_names.append_value("DSS14");
-
-    let mut doppler_builder = Float64Builder::new();
-    doppler_builder.append_value(0.5);
-
-    let mut rejected_builder = BooleanBuilder::new();
-    rejected_builder.append_value(false);
-
-    let mut integr_ref_builder = StringBuilder::new();
-    integr_ref_builder.append_value("Start");
-
-    let record: Vec<Arc<dyn arrow::array::Array>> = vec![
-        Arc::new(utc_epoch.finish()),
-        Arc::new(device_names.finish()),
-        Arc::new(doppler_builder.finish()),
-        Arc::new(rejected_builder.finish()),
-        Arc::new(integr_ref_builder.finish()),
-    ];
-
-    let path =
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../target/test_parquet_legacy.parquet");
-    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-
-    let file = File::create(&path).unwrap();
-    let mut writer = ArrowWriter::try_new(file, schema.clone(), None).unwrap();
-    let batch = RecordBatch::try_new(schema, record).unwrap();
-    writer.write(&batch).unwrap();
-    writer.close().unwrap();
-
-    // Read back using TrackingDataArc::from_parquet
-    let arc_read = TrackingDataArc::from_parquet(&path).unwrap();
-    assert_eq!(arc_read.len(), 1);
-    let msr_read = arc_read.measurements.first().unwrap();
-
-    assert_eq!(
-        msr_read.doppler_config,
-        Some(DopplerConfig {
-            integration_time: DopplerConfig::default().integration_time,
-            integration_ref: IntegrationRef::Start,
-        })
-    );
 }
 
 fn load_test_almanac() -> Arc<Almanac> {

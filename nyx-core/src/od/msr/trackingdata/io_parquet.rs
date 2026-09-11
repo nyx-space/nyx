@@ -358,7 +358,11 @@ impl TrackingDataArc {
         let has_doppler_config = measurements.iter().any(|m| m.doppler_config.is_some());
         if has_doppler_config {
             hdrs.push(Field::new("Integration reference", DataType::Utf8, true));
-            hdrs.push(Field::new("Integration time (s)", DataType::Float64, true));
+            hdrs.push(Field::new(
+                "Integration interval (s)",
+                DataType::Float64,
+                true,
+            ));
         }
 
         // Build the schema
