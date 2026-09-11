@@ -11,7 +11,7 @@ use nyx::io::ExportCfg;
 use nyx::md::StateParameter;
 use nyx::od::prelude::*;
 use nyx::propagators::Propagator;
-use nyx::time::{Epoch, TimeUnits, Unit};
+use nyx::time::{Epoch, Unit};
 use nyx::utils::rss_orbit_errors;
 use nyx_space::mc::StateDispersion;
 use polars::prelude::*;

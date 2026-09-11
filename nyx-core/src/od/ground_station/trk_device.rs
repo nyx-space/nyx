@@ -201,58 +201,53 @@ impl TrackingDevice<Spacecraft> for GroundStation {
 
                 for (ii, msr_type) in self.measurement_types.iter().enumerate() {
                     let msr_value = if msr_type == &MeasurementType::Doppler {
-                        let doppler_cfg = msr.doppler_config.ok_or_else(|| {
-                            ODError::ODConfigError {
-                            source: ConfigError::InvalidConfig {
-                                msg: "Doppler measurement requires doppler_config on GroundStation"
-                                    .to_string(),
-                            },
+                        if let Some(doppler_cfg) = msr.doppler_config {
+                            let integr_time = doppler_cfg.integration_time;
+
+                            // Compute integration window boundaries from integration_ref
+                            let (t_start, t_end) = match doppler_cfg.integration_ref {
+                                IntegrationRef::Start => (epoch, epoch + integr_time),
+                                IntegrationRef::Middle => {
+                                    (epoch - integr_time * 0.5, epoch + integr_time * 0.5)
+                                }
+                                IntegrationRef::End => (epoch - integr_time, epoch),
+                            };
+
+                            // Evaluate two-way ranges at window boundaries
+                            let sc_start = traj.at(t_start).context(ODTrajSnafu {
+                                details: "fetching state for start of integration".to_string(),
+                            })?;
+                            let sc_end = traj.at(t_end).context(ODTrajSnafu {
+                                details: "fetching state for end of integration".to_string(),
+                            })?;
+                            let aer_start = almanac
+                                .azimuth_elevation_range_sez_from_location(
+                                    sc_start.orbit,
+                                    self.location.clone(),
+                                    None,
+                                    None,
+                                )
+                                .context(ODAlmanacSnafu {
+                                    action: "computing AER at start of integration time",
+                                })?;
+
+                            let aer_end = almanac
+                                .azimuth_elevation_range_sez_from_location(
+                                    sc_end.orbit,
+                                    self.location.clone(),
+                                    None,
+                                    None,
+                                )
+                                .context(ODAlmanacSnafu {
+                                    action: "computing AER at end of integration time",
+                                })?;
+
+                            // Differenced range rate + Doppler noise
+                            ((aer_end.range_km - aer_start.range_km) / integr_time.to_seconds())
+                                + noises[ii + 1]
+                        } else {
+                            msr_type.compute_one_way(aer, noises[ii + 1])?
                         }
-                        })?;
-
-                        let integr_time = doppler_cfg.integration_time;
-
-                        // Compute integration window boundaries from integration_ref
-                        let (t_start, t_end) = match doppler_cfg.integration_ref {
-                            IntegrationRef::Start => (epoch, epoch + integr_time),
-                            IntegrationRef::Middle => {
-                                (epoch - integr_time * 0.5, epoch + integr_time * 0.5)
-                            }
-                            IntegrationRef::End => (epoch - integr_time, epoch),
-                        };
-
-                        // Evaluate two-way ranges at window boundaries
-                        let sc_start = traj.at(t_start).context(ODTrajSnafu {
-                            details: "fetching state for start of integration".to_string(),
-                        })?;
-                        let sc_end = traj.at(t_end).context(ODTrajSnafu {
-                            details: "fetching state for end of integration".to_string(),
-                        })?;
-                        let aer_start = almanac
-                            .azimuth_elevation_range_sez_from_location(
-                                sc_start.orbit,
-                                self.location.clone(),
-                                None,
-                                None,
-                            )
-                            .context(ODAlmanacSnafu {
-                                action: "computing AER at start of integration time",
-                            })?;
-
-                        let aer_end = almanac
-                            .azimuth_elevation_range_sez_from_location(
-                                sc_end.orbit,
-                                self.location.clone(),
-                                None,
-                                None,
-                            )
-                            .context(ODAlmanacSnafu {
-                                action: "computing AER at end of integration time",
-                            })?;
-
-                        // Differenced range rate + Doppler noise
-                        ((aer_end.range_km - aer_start.range_km) / integr_time.to_seconds())
-                            + noises[ii + 1]
                     } else {
                         msr_type.compute_one_way(aer, noises[ii + 1])?
                     };

@@ -155,7 +155,25 @@ where
                 MsrSize::DIM
             );
             error!("Filter should be configured for these numbers to match.");
-            error!("Consider running subsequent arcs if ground stations provide different measurements.")
+            error!("Consider running subsequent arcs if ground stations provide different measurements or switch to Scalar processing.");
+        }
+
+        let mut cfg_errors = vec![];
+        for tracker in &arc.unique_aliases() {
+            if let Some(device) = self.devices.get(tracker) {
+                if let Err(e) =
+                device.is_compatible(tracker, &arc.clone().filter_by_tracker(tracker.clone())) {
+                    errors.push(e);
+                }
+            } else {
+                error!("Tracker `{tracker}` from TrackingDataArc is not configured in the OD Process.");
+                error!("Measurements from `{tracker}` will be ignored!");
+            }
+        }
+        if !cfg_errors.is_empty() {
+            // Return all the errors at once.
+            let msg = cfg_errors.iter().map(|e| e.to_string()).collect::<Vec<String>>().join("\n\t");
+            return Err(ODError::ODConfigError { source: ConfigError::InvalidConfig { msg } })
         }
 
         // Start by propagating the estimator.
@@ -174,7 +192,7 @@ where
         info!("Navigation propagating for a total of {prop_time} with step size {}", self.max_step);
 
         let resid_crit = if arc.force_reject {
-            warn!("Rejecting all measurements from {arc} as requested");
+            warn!("Rejecting all measurements from {arc} (force_reject is True in TrackingDataArc)");
             Some(SigmaRejection { num_sigmas: 0.0 })
         } else {
             self.sigma_reject
@@ -427,17 +445,15 @@ where
                                     traj.states.truncate(keep_len);
                                 }
 
-                                if any_measurement_accepted {
-                                    // Reset the STM strictly once per epoch, after all updates have been absorbed
-                                    prop_instance.state.reset_stm();
-
-                                    if kf.replace_state() {
-                                        // Only update the state of the EKF if at least one residual was not rejected.
-                                        prop_instance.state = current_state_estimate;
-                                        traj.states.pop();
-                                        traj.states.push(prop_instance.state);
-                                    }
+                                if any_measurement_accepted && kf.replace_state() {
+                                    // Only update the state of the EKF if at least one residual was not rejected.
+                                    prop_instance.state = current_state_estimate;
+                                    traj.states.pop();
+                                    traj.states.push(prop_instance.state);
                                 }
+
+                                // Reset the STM strictly once per epoch, after all updates have been absorbed
+                                prop_instance.state.reset_stm();
                             }
                             None => {
                                 if !unknown_trackers.contains(&msr.tracker) {
@@ -471,7 +487,7 @@ where
                     // State deviation is always zero for an EKF time update so we don't do anything different than for a CKF.
                     let est = kf.time_update(nominal_state)?;
                     od_sol.push_time_update(est);
-                    // prop_instance.state.reset_stm();
+                    prop_instance.state.reset_stm();
                 }
             }
         }

@@ -652,8 +652,8 @@ impl TrackingDataArc {
                     }
                 }
 
-                if types.contains(&MeasurementType::Doppler) {
-                    if let Some(doppler_cfg) = tracker_data
+                if types.contains(&MeasurementType::Doppler)
+                    && let Some(doppler_cfg) = tracker_data
                         .measurements
                         .iter()
                         .find_map(|m| m.doppler_config)
@@ -671,7 +671,6 @@ impl TrackingDataArc {
                         };
                         writeln!(writer, "\tINTEGRATION_REF = {ref_str}").map_err(err_hdlr)?;
                     }
-                }
 
                 if types.contains(&MeasurementType::Range) {
                     writeln!(writer, "\tRANGE_UNITS = km").map_err(err_hdlr)?;

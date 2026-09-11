@@ -21,9 +21,6 @@ use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
 use rstest::*;
 use std::sync::Arc;
 
-// When the dynamics are perfect, allow for up to 1e-7 m = 0.1 micrometers of RSS error.
-const OD_EPSILON: f64 = 1e-10;
-
 #[fixture]
 fn almanac() -> Arc<Almanac> {
     use crate::test_almanac_arcd;
@@ -196,11 +193,11 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(
     );
 
     assert!(
-        delta.rmag_km() < OD_EPSILON,
+        delta.rmag_km() < f64::EPSILON,
         "Position error should be zero"
     );
     assert!(
-        delta.vmag_km_s() < OD_EPSILON,
+        delta.vmag_km_s() < f64::EPSILON,
         "Velocity error should be zero"
     );
 }
@@ -315,7 +312,7 @@ fn od_tb_val_with_arc(
     let est = &od_sol.estimates[od_sol.estimates.len() - 1];
     println!("Final estimate:\n{est}");
     assert!(
-        est.state_deviation().norm() < OD_EPSILON,
+        est.state_deviation().norm() < f64::EPSILON,
         "In perfect modeling, the state deviation should be near zero, got {:.3e}",
         est.state_deviation().norm()
     );
@@ -350,11 +347,11 @@ fn od_tb_val_with_arc(
     );
 
     assert!(
-        delta.rmag_km() < OD_EPSILON,
+        delta.rmag_km() < f64::EPSILON,
         "Position error should be zero"
     );
     assert!(
-        delta.vmag_km_s() < OD_EPSILON,
+        delta.vmag_km_s() < f64::EPSILON,
         "Velocity error should be zero"
     );
 }
@@ -549,11 +546,11 @@ fn od_tb_val_ckf_fixed_step_perfect_stations(
     );
 
     assert!(
-        delta.rmag_km() < OD_EPSILON,
+        delta.rmag_km() < f64::EPSILON,
         "Position error should be zero"
     );
     assert!(
-        delta.vmag_km_s() < OD_EPSILON,
+        delta.vmag_km_s() < f64::EPSILON,
         "Velocity error should be zero"
     );
 
@@ -810,11 +807,11 @@ fn od_tb_val_az_el_ckf_fixed_step_perfect_stations(
     );
 
     assert!(
-        delta.rmag_km() < OD_EPSILON,
+        delta.rmag_km() < f64::EPSILON,
         "Position error should be zero"
     );
     assert!(
-        delta.vmag_km_s() < OD_EPSILON,
+        delta.vmag_km_s() < f64::EPSILON,
         "Velocity error should be zero"
     );
 
@@ -1297,11 +1294,11 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect(
     );
 
     assert!(
-        delta.rmag_km() < OD_EPSILON,
+        delta.rmag_km() < f64::EPSILON,
         "Position error should be zero"
     );
     assert!(
-        delta.vmag_km_s() < OD_EPSILON,
+        delta.vmag_km_s() < f64::EPSILON,
         "Velocity error should be zero"
     );
 }
@@ -1425,11 +1422,11 @@ fn od_tb_fixed_step_perfect_stations_several_snc_covar_map(
     );
 
     assert!(
-        delta.rmag_km() < OD_EPSILON,
+        delta.rmag_km() < f64::EPSILON,
         "Position error should be zero"
     );
     assert!(
-        delta.vmag_km_s() < OD_EPSILON,
+        delta.vmag_km_s() < f64::EPSILON,
         "Velocity error should be zero"
     );
 }

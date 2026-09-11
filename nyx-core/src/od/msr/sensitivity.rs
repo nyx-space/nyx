@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use crate::io::ConfigError;
 use crate::linalg::DefaultAllocator;
 use crate::linalg::allocator::Allocator;
 use crate::md::prelude::Interpolatable;
@@ -29,8 +30,8 @@ use nalgebra::{DimName, OMatrix, U1};
 use snafu::ResultExt;
 use std::marker::PhantomData;
 
-use super::MeasurementType;
 use super::measurement::Measurement;
+use super::{MeasurementType, TrackingDataArc};
 
 pub trait ScalarSensitivityT<SolveState: State, Rx, Tx>
 where
@@ -67,6 +68,11 @@ where
     ) -> Result<OMatrix<f64, M, SolveState::Size>, ODError>
     where
         DefaultAllocator: Allocator<M> + Allocator<M, SolveState::Size>;
+
+    /// Returns whether this tracker is expected to be compatible with the tracking data arc
+    fn is_compatible(&self, _tracker: &str, _arc: &TrackingDataArc) -> Result<(), ODError> {
+        Ok(())
+    }
 }
 
 pub struct ScalarSensitivity<SolveState: State, Rx, Tx>
@@ -115,6 +121,23 @@ where
         }
         Ok(mat)
     }
+
+    fn is_compatible(&self, tracker: &str, arc: &TrackingDataArc) -> Result<(), ODError> {
+        // Ensure that the arc doppler config matches this ground station doppler config.
+        for msr in &arc.measurements {
+            if msr.doppler_config != self.doppler_config {
+                return Err(ODError::ODConfigError {
+                    source: ConfigError::InvalidConfig {
+                        msg: format!(
+                            "Tracker `{tracker}` Doppler config does not match measurement config @ {}\nGround Station:\n{:?}\nMeasurement:\n{:?}",
+                            msr.epoch, self.doppler_config, msr.doppler_config
+                        ),
+                    },
+                });
+            }
+        }
+        Ok(())
+    }
 }
 
 impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
@@ -122,7 +145,7 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
 {
     fn new(
         msr_type: MeasurementType,
-        msr: &Measurement,
+        _msr: &Measurement,
         rx: &Spacecraft,
         tx: &GroundStation,
         almanac: &Almanac,

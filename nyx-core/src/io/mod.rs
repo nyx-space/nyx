@@ -132,7 +132,7 @@ pub enum ConfigError {
     #[snafu(display("failed to parse YAML configuration file: {source}"))]
     ParseError { source: serde_yml::Error },
 
-    #[snafu(display("of invalid configuration: {msg}"))]
+    #[snafu(display("invalid configuration: {msg}"))]
     InvalidConfig { msg: String },
 }
 
