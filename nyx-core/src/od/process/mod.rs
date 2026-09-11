@@ -163,7 +163,7 @@ where
             if let Some(device) = self.devices.get(tracker) {
                 if let Err(e) =
                 device.is_compatible(tracker, &arc.clone().filter_by_tracker(tracker.clone())) {
-                    errors.push(e);
+                    cfg_errors.push(e);
                 }
             } else {
                 error!("Tracker `{tracker}` from TrackingDataArc is not configured in the OD Process.");
