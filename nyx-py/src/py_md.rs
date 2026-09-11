@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 use anise::analysis::event::Event;
+use anise::astro::Aberration;
+use anise::errors::AlmanacError;
 use anise::frames::Frame;
 use anise::{ephemerides::ephemeris::Ephemeris, prelude::Almanac};
 use hifitime::{Duration, Epoch};
@@ -38,6 +40,7 @@ use rayon::prelude::*;
 use std::sync::Arc;
 
 use pyo3::prelude::*;
+use pyo3::types::PyType;
 
 #[pyclass(unsendable, get_all, dict)]
 pub struct PropagationResult {
@@ -453,6 +456,37 @@ impl PyTrajectory {
             let inner = Trajectory::from_parquet(path)?;
             Ok(Self { inner })
         }
+    }
+
+    /// Builds a new trajectory built from the SPICE BSP (SPK) file loaded in the provided Almanac, provided the start and stop epochs.
+    ///
+    /// If the start and stop epochs are not provided, then the full domain of the trajectory will be used.
+    #[classmethod]
+    #[pyo3(signature=(target_frame, observer_frame, almanac, sc_template, step, start_epoch=None, end_epoch=None, ab_corr=None, name=None))]
+    pub fn from_bsp(
+        _cls: &Bound<'_, PyType>,
+        target_frame: Frame,
+        observer_frame: Frame,
+        almanac: &Almanac,
+        sc_template: Spacecraft,
+        step: Duration,
+        start_epoch: Option<Epoch>,
+        end_epoch: Option<Epoch>,
+        ab_corr: Option<Aberration>,
+        name: Option<String>,
+    ) -> Result<Self, AlmanacError> {
+        let inner = Trajectory::from_bsp(
+            target_frame,
+            observer_frame,
+            almanac,
+            sc_template,
+            step,
+            start_epoch,
+            end_epoch,
+            ab_corr,
+            name,
+        )?;
+        Ok(Self { inner })
     }
 
     /// Add another state to this trajectory.

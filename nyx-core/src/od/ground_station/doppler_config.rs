@@ -37,8 +37,8 @@ pub struct DopplerConfig {
 impl Default for DopplerConfig {
     fn default() -> Self {
         Self {
-            integration_time: 10 * Unit::Second,
-            integration_ref: IntegrationRef::Middle,
+            integration_time: 1 * Unit::Second,
+            integration_ref: IntegrationRef::End,
         }
     }
 }
@@ -68,5 +68,20 @@ impl Encode for DopplerConfig {
         self.integration_ref.encode(encoder)?;
 
         Ok(())
+    }
+}
+
+#[cfg_attr(feature = "python", pymethods)]
+impl DopplerConfig {
+    fn __str__(&self) -> String {
+        format!("{self:?}")
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self:?} @ {self:p}")
+    }
+
+    fn __eq__(&self, other: &Self) -> bool {
+        self == other
     }
 }

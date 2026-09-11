@@ -172,7 +172,7 @@ where
         }
         if !cfg_errors.is_empty() {
             // Return all the errors at once.
-            let msg = cfg_errors.iter().map(|e| e.to_string()).collect::<Vec<String>>().join("\n\t");
+            let msg = cfg_errors.iter().map(|e| e.to_string()).collect::<Vec<String>>().join("\n---\n");
             return Err(ODError::ODConfigError { source: ConfigError::InvalidConfig { msg } })
         }
 
