@@ -51,6 +51,7 @@ impl GroundStation {
             timestamp_noise_s: None,
             stochastic_noises: Some(stochastics),
             obstruction_body: None,
+            relativistic_corrections: None,
         }
     }
 
@@ -83,6 +84,7 @@ impl GroundStation {
             timestamp_noise_s: None,
             stochastic_noises: Some(stochastics),
             obstruction_body: None,
+            relativistic_corrections: None,
         }
     }
 
@@ -115,6 +117,7 @@ impl GroundStation {
             timestamp_noise_s: None,
             stochastic_noises: Some(stochastics),
             obstruction_body: None,
+            relativistic_corrections: None,
         }
     }
 }

@@ -83,18 +83,24 @@ pub(crate) fn solve_two_way_picard(
     traj: &Traj<Spacecraft>,
     almanac: &Almanac,
 ) -> Result<TwoWaySolution, ODError> {
-    let sun_mu_km3_s2 = almanac
-        .frame_info(SUN_J2000)
-        .context(ODPlanetaryDataSnafu {
-            action: "fetching Sun grav param for Shapiro delay",
-        })?
-        .mu_km3_s2()
-        .context(AlmanacPhysicsSnafu {
-            action: "Sun mu not defined",
-        })
-        .context(ODAlmanacSnafu {
-            action: "fetching Sun grav param for Shapiro delay",
-        })?;
+    let sun_mu_km3_s2 = if station.relativistic_corrections == Some(true) {
+        Some(
+            almanac
+                .frame_info(SUN_J2000)
+                .context(ODPlanetaryDataSnafu {
+                    action: "fetching Sun grav param for Shapiro delay",
+                })?
+                .mu_km3_s2()
+                .context(AlmanacPhysicsSnafu {
+                    action: "Sun mu not defined",
+                })
+                .context(ODAlmanacSnafu {
+                    action: "fetching Sun grav param for Shapiro delay",
+                })?,
+        )
+    } else {
+        None
+    };
     // Step 0: Anchor the reception state of the ground station in ICRF
     let gs_rx_orbit = station.to_orbit(t3, almanac).context(ODAlmanacSnafu {
         action: "building ground station orbit at t3",
@@ -131,7 +137,11 @@ pub(crate) fn solve_two_way_picard(
         let dist_down_km = (r2_icrf_km - r3_icrf_km).norm();
         // Geometric transit time + Solar Shapiro time dilation
         let tau_geometric = dist_down_km / SPEED_OF_LIGHT_KM_S;
-        let tau_shapiro = shapiro_delay_s(&r2_icrf_km, &r3_icrf_km, dist_down_km, sun_mu_km3_s2);
+        let tau_shapiro = if let Some(sun_mu) = sun_mu_km3_s2 {
+            shapiro_delay_s(&r2_icrf_km, &r3_icrf_km, dist_down_km, sun_mu)
+        } else {
+            0.0
+        };
         tau_down = (tau_geometric + tau_shapiro).seconds();
     }
 
@@ -165,7 +175,11 @@ pub(crate) fn solve_two_way_picard(
         r1_icrf_km = gs_tx_icrf.radius_km;
         let dist_up_km = (r2_icrf_km - r1_icrf_km).norm();
         let tau_geometric = dist_up_km / SPEED_OF_LIGHT_KM_S;
-        let tau_shapiro = shapiro_delay_s(&r1_icrf_km, &r2_icrf_km, dist_up_km, sun_mu_km3_s2);
+        let tau_shapiro = if let Some(sun_mu) = sun_mu_km3_s2 {
+            shapiro_delay_s(&r1_icrf_km, &r2_icrf_km, dist_up_km, sun_mu)
+        } else {
+            0.0
+        };
         tau_up = (tau_geometric + tau_shapiro).seconds();
     }
 
@@ -187,7 +201,7 @@ pub(crate) fn solve_two_way_picard(
     })
 }
 
-/// Shapiro delay is always enabled when light-time correction is enabled.
+/// Shapiro delay is computed when relativistic corrections are enabled.
 /// Signals passing near a massive object take slightly longer to travel to a target and longer to return than they
 /// would if the mass of the object were not present. The time delay is caused by time dilation, which increases
 /// the time it takes light to travel a given distance from the perspective of an outside observer.
