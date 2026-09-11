@@ -83,7 +83,7 @@ pub(crate) fn solve_two_way_picard(
     traj: &Traj<Spacecraft>,
     almanac: &Almanac,
 ) -> Result<TwoWaySolution, ODError> {
-    let sun_mu_km3_s2 = if station.relativistic_corrections == Some(true) {
+    let sun_mu_km3_s2 = if station.relativistic_corrections {
         Some(
             almanac
                 .frame_info(SUN_J2000)

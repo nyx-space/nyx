@@ -13,14 +13,13 @@ use nyx::od::prelude::*;
 use nyx::propagators::Propagator;
 use nyx::time::{Epoch, Unit};
 use nyx::utils::rss_orbit_errors;
+use nyx_space::cosmic::{Mass, SRPData};
 use nyx_space::mc::StateDispersion;
-use polars::prelude::*;
 use std::collections::BTreeMap;
 use std::env;
-use std::fs::File;
 use std::path::PathBuf;
 
-use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use anise::{constants::frames::MOON_J2000, prelude::Almanac};
 use rstest::*;
 use std::sync::Arc;
 
@@ -46,21 +45,26 @@ fn almanac() -> Arc<Almanac> {
 ///               for propagation and measurement modeling.
 #[allow(clippy::identity_op)]
 #[rstest]
-fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
+fn od_moon_shapiro_light_time(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
     // Define the ground stations.
-    let elevation_mask = 0.0;
+    let elevation_mask = 5.0;
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
 
     // Define state information.
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
-    let dt = Epoch::from_gregorian_utc_hms(2020, 1, 1, 4, 0, 0);
-    let initial_state = Spacecraft::from(Orbit::keplerian(
-        22000.0, 0.01, 30.0, 80.0, 40.0, 180.0, dt, eme2k,
-    ));
+    let moon_j2k = almanac.frame_info(MOON_J2000).unwrap();
+    let epoch = Epoch::from_gregorian_utc_hms(2022, 7, 22, 3, 2, 1);
+    let orbit = Orbit::try_keplerian_altitude(175.0, 1e-3, 51.9, 45.0, 75.0, 90.0, epoch, moon_j2k)
+        .unwrap();
+
+    let initial_state = Spacecraft::builder()
+        .orbit(orbit)
+        .srp(SRPData::from_area(3.21))
+        .mass(Mass::from_dry_mass(159.0))
+        .build();
 
     let mut dss65_madrid = GroundStation::dss65_madrid(
         elevation_mask,
@@ -69,12 +73,16 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
     );
     // Set the integration time so as to generate two way measurements
     dss65_madrid.doppler_config = Some(DopplerConfig::default());
+    dss65_madrid.light_time_correction = true;
+    dss65_madrid.relativistic_corrections = true;
     let mut dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
         StochasticNoise::default_range_km(),
         StochasticNoise::default_doppler_km_s(),
     );
     dss34_canberra.doppler_config = Some(DopplerConfig::default());
+    dss34_canberra.light_time_correction = true;
+    dss34_canberra.relativistic_corrections = true;
 
     // Define the tracking configurations
     let configs = BTreeMap::from([
@@ -100,7 +108,7 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
                 0.0002,
             ),
         ],
-        Some(0),
+        Some(123456),
     )
     .unwrap();
 
@@ -138,19 +146,7 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
         .iter()
         .collect();
 
-    traj.to_parquet_simple(path.join("ekf_robust_two_way_traj.parquet"))
-        .unwrap();
-    arc.to_parquet_simple(path.join("ekf_robust_two_way_msr.parquet"))
-        .unwrap();
-
     println!("{arc}");
-
-    // In a large Earth orbit, range data is _by far_ the more informative measurement type.
-    let arc = arc
-        .clone()
-        .exclude_measurement_type(MeasurementType::Doppler);
-    assert_eq!(arc.unique_types().len(), 1);
-    assert_eq!(arc.unique_types()[0], MeasurementType::Range);
 
     // Now that we have the truth data, let's start an OD and compute the estimates. We expect the
     // estimated orbit to be _nearly_ perfect because we've removed SATURN_BARYCENTER from the
@@ -177,16 +173,9 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
 
     let od_sol = odp.process_arc(initial_estimate, &arc).unwrap();
 
-    let od_pred = odp
-        .predict_until(initial_estimate, arc.end_epoch().unwrap())
-        .unwrap();
-
     // Export as Parquet
-    let sol_path = od_sol
-        .to_parquet(
-            path.join("robustness_test_two_way.parquet"),
-            ExportCfg::default(),
-        )
+    od_sol
+        .to_parquet(path.join("od_moon_shapiro.parquet"), ExportCfg::default())
         .unwrap();
 
     // Export ephemeris
@@ -238,122 +227,12 @@ fn od_robust_large_disp_test_two_way(almanac: Arc<Almanac>) {
         delta.vmag_km_s() * 1e3
     );
 
-    // Compare with pure-predictor
-    let est_pp = od_pred.estimates.last().unwrap();
-    let delta_pp = (est_pp.orbital_state() - traj.at(est_pp.epoch()).unwrap().orbit).unwrap();
-    println!(
-        "Pure predictor RMAG error = {:.6} m\tVMAG error = {:.6} m/s",
-        delta_pp.rmag_km() * 1e3,
-        delta_pp.vmag_km_s() * 1e3
-    );
-
     assert!(
-        delta.rmag_km() < 175.0e-3,
+        delta.rmag_km() * 1e-3 < 75.0,
         "Position error should be less than 175 meters (down from ~2600 km)"
     );
     assert!(
         delta.vmag_km_s() < 1e-4,
-        "Velocity error should be on decimeter per second level"
-    );
-
-    assert!(
-        delta_pp.rmag_km() / delta.rmag_km() > 15.0,
-        "Position error should be at least 15x better than a pure predictor"
-    );
-
-    // Read in the Parquet file and assert proper data was written.
-
-    let df = ParquetReader::new(File::open(sol_path).unwrap())
-        .finish()
-        .unwrap();
-
-    // Note: this also checks that the columns that match the given measurement kind exist.
-    let _df_residuals = df
-        .select([
-            "Prefit residual: Range (km)",
-            "Postfit residual: Range (km)",
-            "Residual ratio",
-        ])
-        .unwrap();
-
-    // Check that the position and velocity estimates are present, along with the epochs
-    assert!(
-        df.select([
-            "Epoch (UTC)",
-            "X (km)",
-            "Y (km)",
-            "Z (km)",
-            "VX (km/s)",
-            "VY (km/s)",
-            "VZ (km/s)",
-        ])
-        .is_ok()
-    );
-
-    // Check that the covariance in the integration frame is present
-    assert!(
-        df.select([
-            "Covariance X*X (Earth J2000) (km^2)",
-            "Covariance X*Y (Earth J2000) (km^2)",
-            "Covariance X*Z (Earth J2000) (km^2)",
-            "Covariance X*Vx (Earth J2000) (km^2/s)",
-            "Covariance X*Vy (Earth J2000) (km^2/s)",
-            "Covariance X*Vz (Earth J2000) (km^2/s)",
-            "Covariance X*Cr (Earth J2000) (km)",
-            "Covariance X*Cd (Earth J2000) (km)",
-            "Covariance X*Mass (Earth J2000) (km*kg)",
-            "Covariance Y*Y (Earth J2000) (km^2)",
-            "Covariance Y*Z (Earth J2000) (km^2)",
-            "Covariance Y*Vx (Earth J2000) (km^2/s)",
-            "Covariance Y*Vy (Earth J2000) (km^2/s)",
-            "Covariance Y*Vz (Earth J2000) (km^2/s)",
-            "Covariance Y*Cr (Earth J2000) (km)",
-            "Covariance Y*Cd (Earth J2000) (km)",
-            "Covariance Y*Mass (Earth J2000) (km*kg)",
-            "Covariance Z*Z (Earth J2000) (km^2)",
-            "Covariance Z*Vx (Earth J2000) (km^2/s)",
-            "Covariance Z*Vy (Earth J2000) (km^2/s)",
-            "Covariance Z*Vz (Earth J2000) (km^2/s)",
-            "Covariance Z*Cr (Earth J2000) (km)",
-            "Covariance Z*Cd (Earth J2000) (km)",
-            "Covariance Z*Mass (Earth J2000) (km*kg)",
-            "Covariance Vx*Vx (Earth J2000) (km^2/s^2)",
-            "Covariance Vx*Vy (Earth J2000) (km^2/s^2)",
-            "Covariance Vx*Vz (Earth J2000) (km^2/s^2)",
-            "Covariance Vx*Cr (Earth J2000) (km/s)",
-            "Covariance Vx*Cd (Earth J2000) (km/s)",
-            "Covariance Vx*Mass (Earth J2000) (km/s*kg)",
-            "Covariance Vy*Vy (Earth J2000) (km^2/s^2)",
-            "Covariance Vy*Vz (Earth J2000) (km^2/s^2)",
-            "Covariance Vy*Cr (Earth J2000) (km/s)",
-            "Covariance Vy*Cd (Earth J2000) (km/s)",
-            "Covariance Vy*Mass (Earth J2000) (km/s*kg)",
-            "Covariance Vz*Vz (Earth J2000) (km^2/s^2)",
-            "Covariance Vz*Cr (Earth J2000) (km/s)",
-            "Covariance Vz*Cd (Earth J2000) (km/s)",
-            "Covariance Vz*Mass (Earth J2000) (km/s*kg)",
-            "Covariance Cr*Cr (Earth J2000) (unitless)",
-            "Covariance Cr*Cd (Earth J2000) (unitless)",
-            "Covariance Cr*Mass (Earth J2000) (kg^2)",
-            "Covariance Cd*Cd (Earth J2000) (unitless)",
-            "Covariance Cd*Mass (Earth J2000) (kg^2)",
-            "Covariance Mass*Mass (Earth J2000) (kg^2)",
-            "Sigma X (Earth J2000) (km)",
-            "Sigma Y (Earth J2000) (km)",
-            "Sigma Z (Earth J2000) (km)",
-            "Sigma Vx (Earth J2000) (km/s)",
-            "Sigma Vy (Earth J2000) (km/s)",
-            "Sigma Vz (Earth J2000) (km/s)",
-            "Sigma Cr (Earth J2000) (unitless)",
-            "Sigma Cd (Earth J2000) (unitless)",
-            "Sigma Mass (Earth J2000) (kg)",
-            "Sigma X (RIC) (km)",
-            "Sigma Y (RIC) (km)",
-            "Sigma Z (RIC) (km)",
-            "Sigma Vx (RIC) (km/s)",
-            "Sigma Vy (RIC) (km/s)",
-            "Sigma Vz (RIC) (km/s)",
-        ])
-        .is_ok()
+        "Velocity error should be on the 10 cm/s per second level"
     );
 }

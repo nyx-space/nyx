@@ -657,20 +657,20 @@ impl TrackingDataArc {
                         .measurements
                         .iter()
                         .find_map(|m| m.doppler_config)
-                    {
-                        writeln!(
-                            writer,
-                            "\tINTEGRATION_INTERVAL = {:.6}",
-                            doppler_cfg.integration_time.to_seconds()
-                        )
-                        .map_err(err_hdlr)?;
-                        let ref_str = match doppler_cfg.integration_ref {
-                            IntegrationRef::Start => "START",
-                            IntegrationRef::Middle => "MIDDLE",
-                            IntegrationRef::End => "END",
-                        };
-                        writeln!(writer, "\tINTEGRATION_REF = {ref_str}").map_err(err_hdlr)?;
-                    }
+                {
+                    writeln!(
+                        writer,
+                        "\tINTEGRATION_INTERVAL = {:.6}",
+                        doppler_cfg.integration_time.to_seconds()
+                    )
+                    .map_err(err_hdlr)?;
+                    let ref_str = match doppler_cfg.integration_ref {
+                        IntegrationRef::Start => "START",
+                        IntegrationRef::Middle => "MIDDLE",
+                        IntegrationRef::End => "END",
+                    };
+                    writeln!(writer, "\tINTEGRATION_REF = {ref_str}").map_err(err_hdlr)?;
+                }
 
                 if types.contains(&MeasurementType::Range) {
                     writeln!(writer, "\tRANGE_UNITS = km").map_err(err_hdlr)?;

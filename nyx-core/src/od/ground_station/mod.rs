@@ -59,7 +59,7 @@ use der::{Decode, Encode};
 /// :type light_time_correction: bool | None
 /// :type timestamp_noise_s: StochasticNoise | None
 /// :type obstruction_body: FrameUid | None
-/// :type relativistic_corrections: bool | None
+/// :type relativistic_corrections: bool
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass(from_py_object))]
 pub struct GroundStation {
@@ -78,8 +78,8 @@ pub struct GroundStation {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub obstruction_body: Option<FrameUid>,
     /// Relativistic corrections (e.g. Shapiro delay)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub relativistic_corrections: Option<bool>,
+    #[serde(default)]
+    pub relativistic_corrections: bool,
 }
 
 #[cfg_attr(feature = "python", pymethods)]
@@ -160,7 +160,7 @@ impl GroundStation {
             timestamp_noise_s: None,
             stochastic_noises: None,
             obstruction_body: None,
-            relativistic_corrections: None,
+            relativistic_corrections: false,
         }
     }
 
@@ -203,7 +203,7 @@ impl GroundStation {
         self
     }
 
-    pub fn with_relativistic_corrections(mut self, relativistic_corrections: Option<bool>) -> Self {
+    pub fn with_relativistic_corrections(mut self, relativistic_corrections: bool) -> Self {
         self.relativistic_corrections = relativistic_corrections;
 
         self
@@ -284,9 +284,6 @@ impl GroundStation {
         if self.obstruction_body.is_some() {
             bits |= 1 << 3;
         }
-        if self.relativistic_corrections.is_some() {
-            bits |= 1 << 4;
-        }
         bits
     }
 }
@@ -332,7 +329,7 @@ impl Default for GroundStation {
             timestamp_noise_s: None,
             stochastic_noises: None,
             obstruction_body: None,
-            relativistic_corrections: None,
+            relativistic_corrections: false,
         }
     }
 }
@@ -415,7 +412,7 @@ mod gs_ut {
             timestamp_noise_s: None,
             doppler_config: Some(DopplerConfig::default()),
             obstruction_body: None,
-            relativistic_corrections: None,
+            relativistic_corrections: false,
         };
 
         println!("{}", serde_yml::to_string(&expected_gs).unwrap());
@@ -481,7 +478,7 @@ mod gs_ut {
                 timestamp_noise_s: None,
                 doppler_config: None,
                 obstruction_body: None,
-                relativistic_corrections: None,
+                relativistic_corrections: false,
             },
             GroundStation {
                 name: "Canberra".to_string(),
@@ -499,7 +496,7 @@ mod gs_ut {
                 timestamp_noise_s: None,
                 doppler_config: None,
                 obstruction_body: None,
-                relativistic_corrections: None,
+                relativistic_corrections: false,
             },
         ];
 

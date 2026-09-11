@@ -21,7 +21,7 @@ impl GroundStation {
     /// :type obstruction_body: FrameUid | None
     /// :type relativistic_corrections: bool | None
     #[new]
-    #[pyo3(signature = (name, location, stochastic_noises, doppler_config=None, light_time_correction=false, timestamp_noise_s=None, obstruction_body=None, relativistic_corrections=None))]
+    #[pyo3(signature = (name, location, stochastic_noises, doppler_config=None, light_time_correction=false, timestamp_noise_s=None, obstruction_body=None, relativistic_corrections=false))]
     fn py_new(
         name: String,
         location: Location,
@@ -46,7 +46,7 @@ impl GroundStation {
             timestamp_noise_s,
             stochastic_noises: Some(stochastic_noises.into_iter().collect()),
             obstruction_body,
-            relativistic_corrections,
+            relativistic_corrections: relativistic_corrections.unwrap_or(false),
         }
     }
 
@@ -186,12 +186,12 @@ impl GroundStation {
     }
 
     #[getter]
-    pub fn get_relativistic_corrections(&self) -> Option<bool> {
+    pub fn get_relativistic_corrections(&self) -> bool {
         self.relativistic_corrections
     }
 
     #[setter]
-    pub fn set_relativistic_corrections(&mut self, relativistic_corrections: Option<bool>) {
+    pub fn set_relativistic_corrections(&mut self, relativistic_corrections: bool) {
         self.relativistic_corrections = relativistic_corrections;
     }
 

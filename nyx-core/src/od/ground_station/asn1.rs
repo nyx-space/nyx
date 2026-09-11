@@ -40,6 +40,7 @@ impl<'a> Decode<'a> for GroundStation {
         let measurement_types = IndexSet::from_iter(msr_types_vec);
 
         let light_time_correction = decoder.decode()?;
+        let relativistic_corrections = decoder.decode()?;
 
         // The flags tell us what happens next
         let flags: u8 = decoder.decode()?;
@@ -76,12 +77,6 @@ impl<'a> Decode<'a> for GroundStation {
             None
         };
 
-        let relativistic_corrections = if flags & (1 << 4) != 0 {
-            Some(decoder.decode()?)
-        } else {
-            None
-        };
-
         Ok(GroundStation {
             name,
             location,
@@ -113,12 +108,12 @@ impl Encode for GroundStation {
             + self.location.encoded_len()?
             + msr_types_vec.encoded_len()?
             + self.light_time_correction.encoded_len()?
+            + self.relativistic_corrections.encoded_len()?
             + self.available_data().encoded_len()?
             + self.doppler_config.encoded_len()?
             + self.timestamp_noise_s.encoded_len()?
             + stochastics_vec.encoded_len()?
             + self.obstruction_body.encoded_len()?
-            + self.relativistic_corrections.encoded_len()?
     }
 
     fn encode(&self, encoder: &mut impl der::Writer) -> der::Result<()> {
@@ -129,6 +124,7 @@ impl Encode for GroundStation {
         msr_types_vec.encode(encoder)?;
 
         self.light_time_correction.encode(encoder)?;
+        self.relativistic_corrections.encode(encoder)?;
         self.available_data().encode(encoder)?;
 
         self.doppler_config.encode(encoder)?;
@@ -145,7 +141,6 @@ impl Encode for GroundStation {
         stochastics_vec.encode(encoder)?;
 
         self.obstruction_body.encode(encoder)?;
-        self.relativistic_corrections.encode(encoder)?;
 
         Ok(())
     }
@@ -199,7 +194,7 @@ mod tests {
             timestamp_noise_s: None,
             stochastic_noises: None,
             obstruction_body: None,
-            relativistic_corrections: None,
+            relativistic_corrections: false,
         };
 
         // 1. Minimal GroundStation (all optional fields None)
@@ -258,7 +253,7 @@ mod tests {
         assert_eq!(decoded, gs);
 
         // 8. With relativistic_corrections
-        gs.relativistic_corrections = Some(true);
+        gs.relativistic_corrections = true;
         buf.clear();
         gs.encode_to_vec(&mut buf).unwrap();
         let decoded = GroundStation::from_der(&buf).unwrap();
