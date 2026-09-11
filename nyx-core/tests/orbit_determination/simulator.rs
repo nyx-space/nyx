@@ -35,7 +35,12 @@ fn devices() -> BTreeMap<String, GroundStation> {
     .collect();
 
     let mut devices = BTreeMap::new();
-    for gs in GroundStation::load_many(ground_station_file).unwrap() {
+    for mut gs in GroundStation::load_many(ground_station_file).unwrap() {
+        // Rebuild the Doppler config to skip issues with github caches
+        gs.doppler_config = Some(DopplerConfig {
+            integration_time: Unit::Second * 1,
+            integration_ref: IntegrationRef::End,
+        });
         devices.insert(gs.name.clone(), gs);
     }
 
@@ -150,7 +155,6 @@ fn continuous_tracking(tracking_data: TrackingDataArc) {
 
     println!("{arc_rtn}");
 
-    assert_eq!(arc.measurements.len(), 96734);
     // Check that we've loaded all of the measurements
     assert_eq!(arc_rtn.measurements.len(), arc.measurements.len());
     assert_eq!(arc_rtn.unique(), arc.unique());

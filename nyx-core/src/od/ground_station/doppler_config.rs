@@ -37,7 +37,7 @@ pub struct DopplerConfig {
 impl Default for DopplerConfig {
     fn default() -> Self {
         Self {
-            integration_time: 1 * Unit::Minute,
+            integration_time: 10 * Unit::Second,
             integration_ref: IntegrationRef::Middle,
         }
     }

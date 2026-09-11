@@ -122,7 +122,7 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
 {
     fn new(
         msr_type: MeasurementType,
-        _msr: &Measurement,
+        msr: &Measurement,
         rx: &Spacecraft,
         tx: &GroundStation,
         almanac: &Almanac,
@@ -143,6 +143,7 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
         let delta_v = receiver.velocity_km_s - transmitter.velocity_km_s;
 
         let rho_km = delta_r.norm();
+        // let rho_km = *msr.data.get(&MeasurementType::Range).unwrap();
         if rho_km < 1e-6 {
             return Err(ODError::MeasurementSimError {
                 details: "Zero separation between ground station and spacecraft".to_string(),
@@ -156,14 +157,25 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
             MeasurementType::Doppler => {
                 // Nominal line-of-sight range-rate from trajectory geometry
                 let rho_dot_km_s = u_los.dot(&delta_v);
+                // let rho_dot_km_s = msr.data.get(&MeasurementType::Doppler).unwrap();
+                let m11 = delta_r.x / rho_km;
+                let m12 = delta_r.y / rho_km;
+                let m13 = delta_r.z / rho_km;
+                let m21 = delta_v.x / rho_km - rho_dot_km_s * delta_r.x / rho_km.powi(2);
+                let m22 = delta_v.y / rho_km - rho_dot_km_s * delta_r.y / rho_km.powi(2);
+                let m23 = delta_v.z / rho_km - rho_dot_km_s * delta_r.z / rho_km.powi(2);
 
-                // d(rho_dot)/d(r) = (delta_v - rho_dot * u_los) / rho
-                let dr = (delta_v - u_los * rho_dot_km_s) / rho_km;
-
-                // d(rho_dot)/d(v) = u_los (for differenced/one-way equivalent Doppler)
                 OMatrix::<f64, U1, <Spacecraft as State>::Size>::from_row_slice(&[
-                    dr.x, dr.y, dr.z, u_los.x, u_los.y, u_los.z, 0.0, 0.0, 0.0,
+                    m21, m22, m23, m11, m12, m13, 0.0, 0.0, 0.0,
                 ])
+
+                // // d(rho_dot)/d(r) = (delta_v - rho_dot * u_los) / rho
+                // let dr = (delta_v - u_los * rho_dot_km_s) / rho_km;
+
+                // // d(rho_dot)/d(v) = u_los (for differenced/one-way equivalent Doppler)
+                // OMatrix::<f64, U1, <Spacecraft as State>::Size>::from_row_slice(&[
+                //     dr.x, dr.y, dr.z, u_los.x, u_los.y, u_los.z, 0.0, 0.0, 0.0,
+                // ])
             }
             MeasurementType::Range => {
                 // Velocity sensitivity due to retarded bounce epoch: d(rho)/d(v) = -tau * u_los

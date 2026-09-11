@@ -30,16 +30,16 @@ use snafu::ResultExt;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct LightTimeLeg {
-    pub t_start: Epoch,
-    pub t_end: Epoch,
-    pub r_start_icrf: Vector3<f64>,
-    pub r_end_icrf: Vector3<f64>,
+    pub start_epoch: Epoch,
+    pub end_epoch: Epoch,
+    pub r_start_icrf_km: Vector3<f64>,
+    pub r_end_icrf_km: Vector3<f64>,
     pub light_time: Duration,
 }
 
 impl LightTimeLeg {
     pub fn range_km(&self) -> f64 {
-        (self.r_start_icrf - self.r_end_icrf).norm()
+        (self.r_start_icrf_km - self.r_end_icrf_km).norm()
     }
 }
 
@@ -90,18 +90,19 @@ pub(crate) fn solve_two_way_picard(
         .context(ODAlmanacSnafu {
             action: "transforming station at t3 to ICRF",
         })?;
-    let r3_icrf = gs_rx_icrf.radius_km;
+    let r3_icrf_km = gs_rx_icrf.radius_km;
 
     // Solve Downlink Leg (t3 -> t2)
     // Find t2 such that c * (t3 - t2) = || r_sc(t2) - r_gs(t3) ||
     let mut tau_down = Duration::ZERO;
-    let mut r2_icrf = Vector3::zeros();
+    let mut r2_icrf_km = Vector3::zeros();
     let mut t2 = t3;
 
     // Exactly 3 iterations converge to sub-millimeter precision in ICRF
     for _ in 0..3 {
         t2 = t3 - tau_down;
-        let sc_state = traj.at(t2).context(ODTrajSnafu {
+        // NOTE Using with_context to lazy eval the format on the error
+        let sc_state = traj.at(t2).with_context(|_| ODTrajSnafu {
             details: format!("interpolating spacecraft state at bounce epoch {t2}"),
         })?;
 
@@ -112,16 +113,16 @@ pub(crate) fn solve_two_way_picard(
                 action: "transforming spacecraft at t2 to ICRF",
             })?;
 
-        r2_icrf = sc_icrf.radius_km;
-        let dist_down = (r2_icrf - r3_icrf).norm();
-        tau_down = (dist_down / SPEED_OF_LIGHT_KM_S).seconds();
+        r2_icrf_km = sc_icrf.radius_km;
+        let dist_down_km = (r2_icrf_km - r3_icrf_km).norm();
+        tau_down = (dist_down_km / SPEED_OF_LIGHT_KM_S).seconds();
     }
 
     let downlink = LightTimeLeg {
-        t_start: t2,
-        t_end: t3,
-        r_start_icrf: r2_icrf,
-        r_end_icrf: r3_icrf,
+        start_epoch: t2,
+        end_epoch: t3,
+        r_start_icrf_km: r2_icrf_km,
+        r_end_icrf_km: r3_icrf_km,
         light_time: tau_down,
     };
 
@@ -129,7 +130,7 @@ pub(crate) fn solve_two_way_picard(
     // Spacecraft state r_sc(t2) is now fixed.
     // Find t1 such that c * (t2 - t1) = || r_sc(t2) - r_gs(t1) ||
     let mut tau_up = tau_down; // Good initial guess
-    let mut r1_icrf = Vector3::zeros();
+    let mut r1_icrf_km = Vector3::zeros();
     let mut t1 = t2 - tau_up;
 
     for _ in 0..3 {
@@ -144,16 +145,16 @@ pub(crate) fn solve_two_way_picard(
                 action: "transforming station at t1 to ICRF",
             })?;
 
-        r1_icrf = gs_tx_icrf.radius_km;
-        let dist_up = (r2_icrf - r1_icrf).norm();
+        r1_icrf_km = gs_tx_icrf.radius_km;
+        let dist_up = (r2_icrf_km - r1_icrf_km).norm();
         tau_up = (dist_up / SPEED_OF_LIGHT_KM_S).seconds();
     }
 
     let uplink = LightTimeLeg {
-        t_start: t1,
-        t_end: t2,
-        r_start_icrf: r1_icrf,
-        r_end_icrf: r2_icrf,
+        start_epoch: t1,
+        end_epoch: t2,
+        r_start_icrf_km: r1_icrf_km,
+        r_end_icrf_km: r2_icrf_km,
         light_time: tau_up,
     };
 

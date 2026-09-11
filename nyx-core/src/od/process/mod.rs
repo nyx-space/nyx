@@ -427,14 +427,16 @@ where
                                     traj.states.truncate(keep_len);
                                 }
 
-                                if kf.replace_state() && any_measurement_accepted {
-                                    // Only update the state of the EKF if at least one residual was not rejected.
-                                    prop_instance.state = current_state_estimate;
-                                    traj.states.pop();
-                                    traj.states.push(prop_instance.state);
-
+                                if any_measurement_accepted {
                                     // Reset the STM strictly once per epoch, after all updates have been absorbed
                                     prop_instance.state.reset_stm();
+
+                                    if kf.replace_state() {
+                                        // Only update the state of the EKF if at least one residual was not rejected.
+                                        prop_instance.state = current_state_estimate;
+                                        traj.states.pop();
+                                        traj.states.push(prop_instance.state);
+                                    }
                                 }
                             }
                             None => {
@@ -469,7 +471,7 @@ where
                     // State deviation is always zero for an EKF time update so we don't do anything different than for a CKF.
                     let est = kf.time_update(nominal_state)?;
                     od_sol.push_time_update(est);
-                    prop_instance.state.reset_stm();
+                    // prop_instance.state.reset_stm();
                 }
             }
         }

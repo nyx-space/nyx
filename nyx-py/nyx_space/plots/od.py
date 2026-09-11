@@ -296,7 +296,7 @@ def od_dashboard(df: pl.DataFrame, path: str | None = None) -> list[go.Figure]:
                         name=f"{trk} (Accepted)",
                         legendgroup=trk,
                         marker=dict(color=color, symbol="circle", size=5, opacity=0.75),
-                        hovertemplate=f"<b>{trk}</b> (Acc)<br>Epoch: %{{x}}<br>Norm Resid: %{{y:.3f}}σ<extra></extra>",
+                        hovertemplate=f"<b>{trk}</b> (Accepted)<br>Epoch: %{{x}}<br>Norm Resid: %{{y:.3f}}σ<extra></extra>",
                         showlegend=False,
                     ),
                     row=1,
