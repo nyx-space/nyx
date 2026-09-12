@@ -73,10 +73,10 @@ where
     }
     /// Orders the states, can be used to store the states out of order
     pub fn finalize(&mut self) {
-        // Remove duplicate epochs
-        self.states.dedup_by(|a, b| a.epoch().eq(&b.epoch()));
-        // And sort
+        // Sort first..
         self.states.sort_by_key(|a| a.epoch());
+        // and then remove duplicate epochs (dedup removes only if the preceeding value matches)
+        self.states.dedup_by(|a, b| a.epoch().eq(&b.epoch()));
     }
 
     /// Evaluate the trajectory at this specific epoch.

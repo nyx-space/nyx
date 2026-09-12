@@ -237,16 +237,9 @@ where
                 // Propagate for the minimum time between the maximum step size, the next step size, and the duration to the next measurement.
                 let next_step_size = delta_t.min(prop_instance.step_size).min(self.max_step);
 
-                // Remove old states from the trajectory
-                // This is a manual implementation of `retain` because we know it's a sorted vec, so no need to resort every time
-                let mut index = traj.states.len();
-                while index > 0 {
-                    index -= 1;
-                    if traj.states[index].epoch() >= epoch {
-                        break;
-                    }
-                }
-                traj.states.truncate(index);
+                // Remove any states at or after the current propagation epoch before appending new steps
+                let keep_idx = traj.states.partition_point(|s| s.epoch() < epoch);
+                traj.states.truncate(keep_idx);
 
                 debug!("propagate for {next_step_size} (Δt to next msr: {delta_t})");
                 let (latest_state, traj_covar) = prop_instance
@@ -286,7 +279,8 @@ where
                                 let msr_types = device.measurement_types().clone();
 
                                 // Inspect the measurement to see if look-ahead is required for light-time computation
-                                let num_lookahead_states = if let Some(dop_cfg) = msr.doppler_config && dop_cfg.integration_ref != IntegrationRef::End {
+                                let pre_lookahead_len = traj.states.len();
+                                if let Some(dop_cfg) = msr.doppler_config && dop_cfg.integration_ref != IntegrationRef::End {
                                     let lookahead_by = match dop_cfg.integration_ref {
                                         IntegrationRef::Start => dop_cfg.integration_time,
                                         IntegrationRef::Middle => dop_cfg.integration_time * 0.5,
@@ -297,16 +291,10 @@ where
                                         .for_duration_with_traj(lookahead_by)
                                         .context(ODPropSnafu)?;
 
-                                    let count = lookahead_traj.states.len();
-                                    for state in lookahead_traj.states.iter().copied().skip(1) {
-                                        // Skip the first state because it is a copy of the initial prop state
-                                        // which is the last state of the traj before we edit it.
+                                    for state in lookahead_traj.states.into_iter().filter(|s| s.epoch() > latest_state.epoch()) {
                                         traj.states.push(state);
                                     }
-                                    count - 1
-                                } else {
-                                    0
-                                };
+                                }
 
                                 // Current nominal prior (needed for separate processing of simultaneous measurements)
                                 let prior_nominal_state = prop_instance.state;
@@ -440,10 +428,7 @@ where
                                 }
 
                                 // Strip the temporary states to maintain trajectory causality
-                                if num_lookahead_states > 0 {
-                                    let keep_len = traj.states.len() - num_lookahead_states;
-                                    traj.states.truncate(keep_len);
-                                }
+                                traj.states.truncate(pre_lookahead_len);
 
                                 if any_measurement_accepted && kf.replace_state() {
                                     // Only update the state of the EKF if at least one residual was not rejected.
