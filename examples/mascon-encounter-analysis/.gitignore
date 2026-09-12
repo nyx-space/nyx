@@ -1,0 +1,7 @@
+﻿# Local data — users download per README instructions
+data/
+*.tab
+*.gfc
+
+# Notebook checkpoints
+.ipynb_checkpoints/
