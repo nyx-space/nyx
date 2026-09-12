@@ -67,6 +67,7 @@ impl PyProcessNoise {
     /// :type local_frame: LocalFrame | None
     /// :rtype: ProcessNoise
     #[classmethod]
+    #[pyo3(signature=(vx_m_s, vy_m_s, vz_m_s, noise_duration, disable_time, local_frame=None))]
     fn from_velocity_m_s(
         _cls: &Bound<'_, PyType>,
         vx_m_s: f64,
@@ -97,6 +98,7 @@ impl PyProcessNoise {
     /// :type z_decay_s: float | None
     /// :rtype: ProcessNoise
     #[classmethod]
+    #[pyo3(signature=(ax_m_s2, ay_m_s2, az_m_s2, disable_time, local_frame=None, x_decay_s=None, y_decay_s=None, z_decay_s=None))]
     fn from_accel_m_s2(
         _cls: &Bound<'_, PyType>,
         ax_m_s2: f64,
@@ -605,11 +607,12 @@ impl PySpacecraftPositionODSolution {
     /// Export OD solutions, gains, ratios, residuals, sigmas, etc. to parquet
     ///
     /// :type path: str
-    /// :type cfg: ExportCfg
+    /// :type cfg: ExportCfg, optional
     /// :rtype: str
-    fn to_parquet(&self, path: &str, cfg: ExportCfg) -> Result<String, ODError> {
+    #[pyo3(signature = (path, cfg=None))]
+    fn to_parquet(&self, path: &str, cfg: Option<ExportCfg>) -> Result<String, ODError> {
         self.inner
-            .to_parquet(path, cfg)
+            .to_parquet(path, cfg.unwrap_or_default())
             .map(|path| path.to_string_lossy().to_string())
     }
 
@@ -916,11 +919,12 @@ impl PySpacecraftODSolution {
     /// Export OD solutions, gains, ratios, residuals, sigmas, etc. to parquet
     ///
     /// :type path: str
-    /// :type cfg: ExportCfg
+    /// :type cfg: ExportCfg, optional
     /// :rtype: str
-    fn to_parquet(&self, path: &str, cfg: ExportCfg) -> Result<String, ODError> {
+    #[pyo3(signature = (path, cfg=None))]
+    fn to_parquet(&self, path: &str, cfg: Option<ExportCfg>) -> Result<String, ODError> {
         self.inner
-            .to_parquet(path, cfg)
+            .to_parquet(path, cfg.unwrap_or_default())
             .map(|path| path.to_string_lossy().to_string())
     }
 

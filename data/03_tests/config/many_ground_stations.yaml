@@ -25,6 +25,9 @@
   measurement_types:
     - range_km
     - doppler_km_s
+  doppler_config:
+    integration_ref: End
+    integration_time: 1 s
 
 - name: Canberra
   location:
@@ -53,3 +56,6 @@
   measurement_types:
     - range_km
     - doppler_km_s
+  doppler_config:
+    integration_ref: End
+    integration_time: 1 s

@@ -19,10 +19,11 @@
 use crate::io::ExportCfg;
 use crate::io::watermark::prj_name_ver;
 use crate::io::{InputOutputError, StdIOSnafu};
-use crate::od::msr::{Measurement, MeasurementType};
+use crate::od::ground_station::DopplerConfig;
+use crate::od::msr::{IntegrationRef, Measurement, MeasurementType};
 use anise::constants::SPEED_OF_LIGHT_KM_S;
 use hifitime::efmt::{Format, Formatter};
-use hifitime::{Duration, Epoch, TimeScale};
+use hifitime::{Duration, Epoch, TimeScale, Unit};
 use indexmap::{IndexMap, IndexSet};
 use log::{error, info, warn};
 use snafu::ResultExt;
@@ -104,6 +105,8 @@ impl TrackingDataArc {
         let mut time_system = TimeScale::UTC;
         let mut has_freq_data = false;
         let mut msr_divider = 1.0;
+        let mut integration_ref = None;
+        let mut integration_time = None;
 
         for line in reader.lines() {
             let line = line.context(StdIOSnafu {
@@ -149,6 +152,23 @@ impl TrackingDataArc {
                             });
                         }
                     }
+                } else if line.starts_with("INTEGRATION_REF") {
+                    let value = line.split('=').nth(1).unwrap_or("");
+                    integration_ref = Some(IntegrationRef::from_str(value)?);
+                } else if line.starts_with("INTEGRATION_TIME")
+                    || line.starts_with("INTEGRATION_INTERVAL")
+                {
+                    let value = line.split('=').nth(1).unwrap_or("").trim();
+                    let dur = if let Ok(val) = value.parse::<f64>() {
+                        Unit::Second * val
+                    } else if let Ok(dur) = Duration::from_str(value) {
+                        dur
+                    } else {
+                        return Err(InputOutputError::UnsupportedData {
+                            which: format!("invalid integration time `{value}`"),
+                        });
+                    };
+                    integration_time = Some(dur);
                 }
 
                 let mut splt = line.split('=');
@@ -200,12 +220,28 @@ impl TrackingDataArc {
                     last.epoch == epoch && last.tracker == current_tracker
                 });
 
+                let doppler_config = match (integration_time, integration_ref) {
+                    (Some(time), Some(reference)) => Some(DopplerConfig {
+                        integration_time: time,
+                        integration_ref: reference,
+                    }),
+                    (Some(time), None) => Some(DopplerConfig {
+                        integration_time: time,
+                        integration_ref: IntegrationRef::default(),
+                    }),
+                    (None, Some(reference)) => Some(DopplerConfig {
+                        integration_time: DopplerConfig::default().integration_time,
+                        integration_ref: reference,
+                    }),
+                    (None, None) => None,
+                };
+
                 if is_concurrent {
-                    measurements
-                        .last_mut()
-                        .unwrap() // Safe due to the is_concurrent check yielding true
-                        .data
-                        .insert(mtype, scaled_value);
+                    let last = measurements.last_mut().unwrap();
+                    last.data.insert(mtype, scaled_value);
+                    if last.doppler_config.is_none() {
+                        last.doppler_config = doppler_config;
+                    }
                 } else {
                     //  Otherwise, instantiate a new state record and push it.
                     let mut data = IndexMap::new();
@@ -216,6 +252,7 @@ impl TrackingDataArc {
                         epoch,
                         data,
                         rejected: false,
+                        doppler_config,
                     });
                 }
             }
@@ -606,9 +643,33 @@ impl TrackingDataArc {
 
                 // Add additional metadata, could include timetag ref for example.
                 for (k, v) in &metadata {
-                    if k != "originator" {
+                    let k_upper = k.to_uppercase();
+                    if k != "originator"
+                        && (!types.contains(&MeasurementType::Doppler)
+                            || (k_upper != "INTEGRATION_INTERVAL" && k_upper != "INTEGRATION_REF"))
+                    {
                         writeln!(writer, "\t{k} = {v}").map_err(err_hdlr)?;
                     }
+                }
+
+                if types.contains(&MeasurementType::Doppler)
+                    && let Some(doppler_cfg) = tracker_data
+                        .measurements
+                        .iter()
+                        .find_map(|m| m.doppler_config)
+                {
+                    writeln!(
+                        writer,
+                        "\tINTEGRATION_INTERVAL = {:.6}",
+                        doppler_cfg.integration_time.to_seconds()
+                    )
+                    .map_err(err_hdlr)?;
+                    let ref_str = match doppler_cfg.integration_ref {
+                        IntegrationRef::Start => "START",
+                        IntegrationRef::Middle => "MIDDLE",
+                        IntegrationRef::End => "END",
+                    };
+                    writeln!(writer, "\tINTEGRATION_REF = {ref_str}").map_err(err_hdlr)?;
                 }
 
                 if types.contains(&MeasurementType::Range) {

@@ -152,6 +152,8 @@ fn od_tb_val_ekf_fixed_step_perfect_stations(
 
     let od_sol = odp.process_arc(initial_estimate, &arc).unwrap();
 
+    od_sol.to_parquet("tb.pq", ExportCfg::default()).unwrap();
+
     // Check that the covariance deflated
     let est = &od_sol.estimates[od_sol.estimates.len() - 1];
     println!("Final estimate:\n{est}");

@@ -58,7 +58,7 @@ fn nil_measurement(almanac: Arc<Almanac>) {
         },
         timestamp_noise_s: None,
         stochastic_noises: Some(stochastics),
-        integration_time: None,
+        doppler_config: None,
         light_time_correction: false,
         ..Default::default()
     };
@@ -92,7 +92,7 @@ fn nil_measurement(almanac: Arc<Almanac>) {
     let station_dec = GroundStation::from_der(&buf).unwrap();
     assert_eq!(station_dec, station);
     // Set the integration time
-    station.integration_time = Some(Unit::Minute * 1);
+    station.doppler_config = Some(DopplerConfig::default());
     buf.clear();
     station.encode_to_vec(&mut buf).unwrap();
     let station_dec = GroundStation::from_der(&buf).unwrap();

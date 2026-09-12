@@ -25,4 +25,6 @@ light_time_correction: false
 measurement_types:
     - range_km
     - doppler_km_s
-integration_time: 1 min
+doppler_config:
+  integration_time: 1 min
+  integration_ref: Middle

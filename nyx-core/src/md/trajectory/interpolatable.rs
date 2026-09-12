@@ -19,7 +19,9 @@
 use anise::analysis::prelude::OrbitalElement;
 use anise::math::interpolation::{InterpolationError, hermite_eval};
 
-pub(crate) const INTERPOLATION_SAMPLES: usize = 13;
+// Using 5 significantly reduces interpolation errors
+// https://github.com/nyx-space/nyx/issues/602
+pub(crate) const INTERPOLATION_SAMPLES: usize = 5;
 
 use super::StateParameter;
 use crate::cosmic::Frame;

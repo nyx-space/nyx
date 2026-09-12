@@ -44,8 +44,14 @@ pub enum TrajError {
         end: Epoch,
         event: String,
     },
-    #[snafu(display("No interpolation data at {epoch}"))]
+    #[snafu(display("no interpolation data at {epoch}, traj valid from {start} to {end}"))]
     NoInterpolationData {
+        epoch: Epoch,
+        start: Epoch,
+        end: Epoch,
+    },
+    #[snafu(display("cannot interpolate empty trajectory at {epoch}"))]
+    EmptyTrajectory {
         epoch: Epoch,
     },
     #[snafu(display("Failed to create trajectory: {msg}"))]

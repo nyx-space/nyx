@@ -36,7 +36,7 @@ pub mod kalman;
 
 /// Provides a range and range rate measuring models.
 mod ground_station;
-pub use ground_station::GroundStation;
+pub use ground_station::{DopplerConfig, GroundStation};
 
 /// Provides Estimate handling functionalities.
 pub mod estimate;
@@ -178,5 +178,5 @@ pub enum ODError {
     #[snafu(display("Maximum iterations ({max_iter}) reached without convergence"))]
     ODMaxIterations { max_iter: usize },
     #[snafu(display("Nyx orbit determination limitation: {action}"))]
-    ODLimitation { action: &'static str },
+    ODLimitation { action: String },
 }

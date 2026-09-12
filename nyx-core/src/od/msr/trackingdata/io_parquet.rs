@@ -18,7 +18,8 @@
 use crate::io::watermark::pq_writer;
 use crate::io::{ArrowSnafu, InputOutputError, MissingDataSnafu, ParquetSnafu, StdIOSnafu};
 use crate::io::{EmptyDatasetSnafu, ExportCfg};
-use crate::od::msr::{Measurement, MeasurementType};
+use crate::od::ground_station::DopplerConfig;
+use crate::od::msr::{IntegrationRef, Measurement, MeasurementType};
 use arrow::array::{Array, BooleanBuilder, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
@@ -27,7 +28,7 @@ use arrow::{
     datatypes,
     record_batch::RecordBatchReader,
 };
-use hifitime::{Epoch, TimeScale};
+use hifitime::{Epoch, TimeScale, Unit};
 use indexmap::IndexMap;
 use log::{info, warn};
 use parquet::arrow::ArrowWriter;
@@ -36,6 +37,7 @@ use snafu::{ResultExt, ensure};
 use std::collections::HashMap;
 use std::fs::File;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::Arc;
 
 use super::TrackingDataArc;
@@ -62,6 +64,8 @@ impl TrackingDataArc {
         let mut az_avail = false;
         let mut el_avail = false;
         let mut rejected_avail = false;
+        let mut integration_ref_avail = false;
+        let mut integration_time_avail = false;
         for field in &reader.schema().fields {
             match field.name().as_str() {
                 "Epoch (UTC)" => has_epoch = true,
@@ -71,6 +75,8 @@ impl TrackingDataArc {
                 "Azimuth (deg)" => az_avail = true,
                 "Elevation (deg)" => el_avail = true,
                 "Rejected" => rejected_avail = true,
+                "Integration reference" => integration_ref_avail = true,
+                "Integration interval (s)" => integration_time_avail = true,
                 _ => {}
             }
         }
@@ -183,6 +189,23 @@ impl TrackingDataArc {
                 None
             };
 
+            let integration_ref_data: Option<&StringArray> = if integration_ref_avail {
+                batch
+                    .column_by_name("Integration reference")
+                    .and_then(|col| col.as_any().downcast_ref::<StringArray>())
+            } else {
+                None
+            };
+
+            let integration_time_data: Option<&PrimitiveArray<datatypes::Float64Type>> =
+                if integration_time_avail {
+                    batch
+                        .column_by_name("Integration interval (s)")
+                        .and_then(|col| col.as_any().downcast_ref::<Float64Array>())
+                } else {
+                    None
+                };
+
             // Set the measurements in the tracking arc
             for i in 0..batch.num_rows() {
                 let epoch = Epoch::from_gregorian_str(epochs.value(i)).map_err(|e| {
@@ -197,11 +220,44 @@ impl TrackingDataArc {
                     false
                 };
 
+                let integration_ref = integration_ref_data.and_then(|data| {
+                    if data.is_null(i) {
+                        None
+                    } else {
+                        IntegrationRef::from_str(data.value(i)).ok()
+                    }
+                });
+
+                let integration_time = integration_time_data.and_then(|data| {
+                    if data.is_null(i) {
+                        None
+                    } else {
+                        Some(Unit::Second * data.value(i))
+                    }
+                });
+
+                let doppler_config = match (integration_time, integration_ref) {
+                    (Some(time), Some(reference)) => Some(DopplerConfig {
+                        integration_time: time,
+                        integration_ref: reference,
+                    }),
+                    (Some(time), None) => Some(DopplerConfig {
+                        integration_time: time,
+                        integration_ref: IntegrationRef::Middle,
+                    }),
+                    (None, Some(reference)) => Some(DopplerConfig {
+                        integration_time: DopplerConfig::default().integration_time,
+                        integration_ref: reference,
+                    }),
+                    (None, None) => None,
+                };
+
                 let mut measurement = Measurement {
                     epoch,
                     tracker: tracking_device.value(i).to_string(),
                     data: IndexMap::new(),
                     rejected,
+                    doppler_config,
                 };
 
                 if range_avail {
@@ -267,6 +323,22 @@ impl TrackingDataArc {
             warn!("The `fields` parameter in the export is not supported for tracking arcs.");
         }
 
+        // Build the measurement iterator
+
+        let measurements =
+            if cfg.start_epoch.is_some() || cfg.end_epoch.is_some() || cfg.step.is_some() {
+                let start = cfg
+                    .start_epoch
+                    .unwrap_or_else(|| self.start_epoch().unwrap());
+                let end = cfg.end_epoch.unwrap_or_else(|| self.end_epoch().unwrap());
+
+                info!("Exporting measurements from {start} to {end}.");
+
+                self.clone().filter_by_epoch(start..end).measurements
+            } else {
+                self.measurements.clone()
+            };
+
         // Build the schema
         let mut hdrs = vec![
             Field::new("Epoch (UTC)", DataType::Utf8, false),
@@ -283,25 +355,19 @@ impl TrackingDataArc {
 
         hdrs.push(Field::new("Rejected", DataType::Boolean, false));
 
+        let has_doppler_config = measurements.iter().any(|m| m.doppler_config.is_some());
+        if has_doppler_config {
+            hdrs.push(Field::new("Integration reference", DataType::Utf8, true));
+            hdrs.push(Field::new(
+                "Integration interval (s)",
+                DataType::Float64,
+                true,
+            ));
+        }
+
         // Build the schema
         let schema = Arc::new(Schema::new(hdrs));
         let mut record: Vec<Arc<dyn Array>> = Vec::new();
-
-        // Build the measurement iterator
-
-        let measurements =
-            if cfg.start_epoch.is_some() || cfg.end_epoch.is_some() || cfg.step.is_some() {
-                let start = cfg
-                    .start_epoch
-                    .unwrap_or_else(|| self.start_epoch().unwrap());
-                let end = cfg.end_epoch.unwrap_or_else(|| self.end_epoch().unwrap());
-
-                info!("Exporting measurements from {start} to {end}.");
-
-                self.clone().filter_by_epoch(start..end).measurements
-            } else {
-                self.measurements.clone()
-            };
 
         // Build all of the records
 
@@ -339,6 +405,23 @@ impl TrackingDataArc {
             rejected_builder.append_value(m.rejected);
         }
         record.push(Arc::new(rejected_builder.finish()));
+
+        if has_doppler_config {
+            let mut integration_ref_builder = StringBuilder::new();
+            let mut integration_time_builder = Float64Builder::new();
+
+            for m in &measurements {
+                if let Some(cfg) = &m.doppler_config {
+                    integration_ref_builder.append_value(format!("{:?}", cfg.integration_ref));
+                    integration_time_builder.append_value(cfg.integration_time.to_seconds());
+                } else {
+                    integration_ref_builder.append_null();
+                    integration_time_builder.append_null();
+                }
+            }
+            record.push(Arc::new(integration_ref_builder.finish()));
+            record.push(Arc::new(integration_time_builder.finish()));
+        }
 
         // Serialize all of the devices and add that to the parquet file too.
         let mut metadata = HashMap::new();

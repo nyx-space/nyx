@@ -26,8 +26,6 @@ use crate::time::{Duration, Epoch, Unit};
 use anise::almanac::Almanac;
 use anise::errors::MathError;
 use log::{info, warn};
-use rayon::iter::ParallelBridge;
-use rayon::prelude::ParallelIterator;
 use snafu::ResultExt;
 use std::f64;
 use std::sync::Arc;
@@ -315,9 +313,8 @@ where
             rx
         };
 
-        traj.states = rx.into_iter().par_bridge().collect();
-        // Push the start state -- will be reordered in the finalize call.
-        // For some reason, this must happen at the end -- can't figure out why.
+        traj.states = rx.into_iter().collect();
+        // Push the start state -- will be reordered and deduplicated in the finalize call.
         traj.states.push(start_state);
 
         traj.finalize();

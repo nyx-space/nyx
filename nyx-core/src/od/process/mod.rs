@@ -21,6 +21,7 @@ use crate::linalg::{DefaultAllocator, DimName};
 use crate::md::trajectory::{Interpolatable, Traj};
 pub use crate::od::estimate::*;
 pub use crate::od::ground_station::*;
+use crate::od::msr::IntegrationRef;
 pub use crate::od::snc::*;
 pub use crate::od::*;
 use crate::propagators::Propagator;
@@ -154,7 +155,25 @@ where
                 MsrSize::DIM
             );
             error!("Filter should be configured for these numbers to match.");
-            error!("Consider running subsequent arcs if ground stations provide different measurements.")
+            error!("Consider running subsequent arcs if ground stations provide different measurements or switch to Scalar processing.");
+        }
+
+        let mut cfg_errors = vec![];
+        for tracker in &arc.unique_aliases() {
+            if let Some(device) = self.devices.get(tracker) {
+                if let Err(e) =
+                device.is_compatible(tracker, &arc.clone().filter_by_tracker(tracker.clone())) {
+                    cfg_errors.push(e);
+                }
+            } else {
+                error!("Tracker `{tracker}` from TrackingDataArc is not configured in the OD Process.");
+                error!("Measurements from `{tracker}` will be ignored!");
+            }
+        }
+        if !cfg_errors.is_empty() {
+            // Return all the errors at once.
+            let msg = cfg_errors.iter().map(|e| e.to_string()).collect::<Vec<String>>().join("\n---\n");
+            return Err(ODError::ODConfigError { source: ConfigError::InvalidConfig { msg } })
         }
 
         // Start by propagating the estimator.
@@ -173,7 +192,7 @@ where
         info!("Navigation propagating for a total of {prop_time} with step size {}", self.max_step);
 
         let resid_crit = if arc.force_reject {
-            warn!("Rejecting all measurements from {arc} as requested");
+            warn!("Rejecting all measurements from {arc} (force_reject is True in TrackingDataArc)");
             Some(SigmaRejection { num_sigmas: 0.0 })
         } else {
             self.sigma_reject
@@ -218,19 +237,12 @@ where
                 // Propagate for the minimum time between the maximum step size, the next step size, and the duration to the next measurement.
                 let next_step_size = delta_t.min(prop_instance.step_size).min(self.max_step);
 
-                // Remove old states from the trajectory
-                // This is a manual implementation of `retain` because we know it's a sorted vec, so no need to resort every time
-                let mut index = traj.states.len();
-                while index > 0 {
-                    index -= 1;
-                    if traj.states[index].epoch() >= epoch {
-                        break;
-                    }
-                }
-                traj.states.truncate(index);
+                // Remove any states at or after the current propagation epoch before appending new steps
+                let keep_idx = traj.states.partition_point(|s| s.epoch() < epoch);
+                traj.states.truncate(keep_idx);
 
                 debug!("propagate for {next_step_size} (Δt to next msr: {delta_t})");
-                let (_, traj_covar) = prop_instance
+                let (latest_state, traj_covar) = prop_instance
                     .for_duration_with_traj(next_step_size)
                     .context(ODPropSnafu)?;
 
@@ -243,7 +255,7 @@ where
                 // Now that we've advanced the propagator, let's see whether we're at the time of the next measurement.
 
                 // Extract the state and update the STM in the filter.
-                let mut nominal_state = prop_instance.state;
+                let nominal_state = prop_instance.state;
                 // Get the datetime and info needed to compute the theoretical measurement according to the model
                 epoch = nominal_state.epoch();
 
@@ -255,7 +267,7 @@ where
                     prop_instance.state.set_epoch(next_msr_epoch);
 
                     if msr.rejected {
-                        debug!("Skipping manually rejected measurement at {}", epoch);
+                        debug!("Skipping manually rejected measurement at {epoch}");
                         let est = kf.time_update(nominal_state)?;
                         od_sol.push_time_update(est);
                         prop_instance.state.reset_stm();
@@ -266,21 +278,40 @@ where
                             Some(device) => {
                                 let msr_types = device.measurement_types().clone();
 
+                                // Inspect the measurement to see if look-ahead is required for light-time computation
+                                let pre_lookahead_len = traj.states.len();
+                                if let Some(dop_cfg) = msr.doppler_config && dop_cfg.integration_ref != IntegrationRef::End {
+                                    let lookahead_by = match dop_cfg.integration_ref {
+                                        IntegrationRef::Start => dop_cfg.integration_time,
+                                        IntegrationRef::Middle => dop_cfg.integration_time * 0.5,
+                                        _ => unreachable!()
+                                    };
+                                    let mut lookahead_prop = prop.with(latest_state, self.almanac.clone()).quiet();
+                                    let (_, lookahead_traj) = lookahead_prop
+                                        .for_duration_with_traj(lookahead_by)
+                                        .context(ODPropSnafu)?;
+
+                                    for state in lookahead_traj.states.into_iter().filter(|s| s.epoch() > latest_state.epoch()) {
+                                        traj.states.push(state);
+                                    }
+                                }
+
+                                // Current nominal prior (needed for separate processing of simultaneous measurements)
+                                let prior_nominal_state = prop_instance.state;
+                                let mut current_state_estimate = prior_nominal_state;
+                                let mut any_measurement_accepted = false;
+
                                 // Perform several measurement updates to ensure the desired dimensionality.
                                 let windows = msr_types.len() / MsrSize::DIM;
                                 for wno in 0..=windows {
                                     // Update the nominal state in case we're ingesting several measurements
                                     // sequentially for the same epoch.
-                                    nominal_state = prop_instance.state;
-                                    let mut cur_msr_types = IndexSet::new();
-                                    for msr_type in msr_types
+                                    let cur_msr_types = msr_types
                                         .iter()
                                         .copied()
                                         .skip(wno * MsrSize::DIM)
                                         .take(MsrSize::DIM)
-                                    {
-                                        cur_msr_types.insert(msr_type);
-                                    }
+                                        .collect::<IndexSet<_>>();
 
                                     if cur_msr_types.is_empty() {
                                         // We've processed all measurements.
@@ -311,26 +342,34 @@ where
                                     }
 
                                     // Compute device specific matrices
+                                    // Sensitivity (H tilde) is computed on the _pristine_ nominal estimate
+                                    // i.e. it is not polluted by a partial measurement update if there are
+                                    // multiple concurrent measurement processed sequentially.
                                     let h_tilde = device.h_tilde::<MsrSize>(
                                         msr,
                                         &cur_msr_types,
-                                        &nominal_state,
+                                        &prior_nominal_state,
                                         &self.almanac,
                                     )?;
 
                                     let measurement_covar = device
                                         .measurement_covar_matrix(&cur_msr_types, epoch)?;
 
-                                    if let Some(computed_meas) =
-                                        device.measure(epoch, &traj, None, &self.almanac)?
+                                    // Evaluate the observation from the trajectory with the look-ahead states
+                                    // but it does not include any of the states from the measurement update.
+                                    let computed_meas_res = device.measure(epoch, &traj, None, &self.almanac);
+
+                                    if let Some(computed_meas) = computed_meas_res?
                                     {
                                         // Apply any biases on the computed observation
-                                        let computed_obs = computed_meas
+                                        let obs_bias = device.measurement_bias_vector::<MsrSize>(
+                                            &cur_msr_types,
+                                            epoch,
+                                        )?;
+
+                                        let mut computed_obs = computed_meas
                                             .observation::<MsrSize>(&cur_msr_types)
-                                            - device.measurement_bias_vector::<MsrSize>(
-                                                &cur_msr_types,
-                                                epoch,
-                                            )?;
+                                            - obs_bias;
 
                                         // Apply the modulo to the real obs
                                         if let Some(moduli) = &arc.moduli {
@@ -347,8 +386,14 @@ where
                                             real_obs += obs_ambiguity;
                                         }
 
+                                        // Map prior shifts to account for partial state update: h_eff = h(x0) + H * (x_curr - x0)
+                                        let delta_state = current_state_estimate.to_state_vector() - prior_nominal_state.to_state_vector();
+                                        let obs_shift = &h_tilde * delta_state;
+                                        computed_obs += obs_shift;
+
+                                        // Kalman measurement update on the filter covariance and state
                                         let (estimate, mut residual, gain) = kf.measurement_update(
-                                            nominal_state,
+                                            current_state_estimate,
                                             real_obs,
                                             computed_obs,
                                             measurement_covar,
@@ -361,23 +406,17 @@ where
                                             device.name()
                                         );
 
-                                        residual.tracker = Some(device.name());
-                                        residual.msr_types = cur_msr_types;
-
-                                        if kf.replace_state() && !residual.rejected {
-                                            // Only update the state of the EKF if the residual was not rejected.
-                                            prop_instance.state = estimate.state();
-                                            traj.states.pop();
-                                            traj.states.push(prop_instance.state);
-                                        }
-
-                                        prop_instance.state.reset_stm();
-
                                         if residual.rejected {
                                             msr_rejected_cnt += 1;
                                         } else {
                                             msr_accepted_cnt += 1;
+                                            current_state_estimate = estimate.state();
+                                            any_measurement_accepted = true;
                                         }
+
+
+                                        residual.tracker = Some(device.name());
+                                        residual.msr_types = cur_msr_types;
                                         od_sol.push_measurement_update(estimate, residual, gain);
                                     } else {
                                         debug!(
@@ -387,6 +426,19 @@ where
                                         msr_rejected_cnt += 1;
                                     }
                                 }
+
+                                // Strip the temporary states to maintain trajectory causality
+                                traj.states.truncate(pre_lookahead_len);
+
+                                if any_measurement_accepted && kf.replace_state() {
+                                    // Only update the state of the EKF if at least one residual was not rejected.
+                                    prop_instance.state = current_state_estimate;
+                                    traj.states.pop();
+                                    traj.states.push(prop_instance.state);
+                                }
+
+                                // Reset the STM strictly once per epoch, after all updates have been absorbed
+                                prop_instance.state.reset_stm();
                             }
                             None => {
                                 if !unknown_trackers.contains(&msr.tracker) {

@@ -46,10 +46,12 @@ impl GroundStation {
                 frame: IAU_EARTH_FRAME.into(),
             },
             measurement_types,
-            integration_time: None,
+            doppler_config: None,
             light_time_correction: false,
             timestamp_noise_s: None,
             stochastic_noises: Some(stochastics),
+            obstructing_body: None,
+            relativistic_corrections: false,
         }
     }
 
@@ -77,10 +79,12 @@ impl GroundStation {
                 frame: IAU_EARTH_FRAME.into(),
             },
             measurement_types,
-            integration_time: None,
+            doppler_config: None,
             light_time_correction: false,
             timestamp_noise_s: None,
             stochastic_noises: Some(stochastics),
+            obstructing_body: None,
+            relativistic_corrections: false,
         }
     }
 
@@ -108,10 +112,12 @@ impl GroundStation {
                 frame: IAU_EARTH_FRAME.into(),
             },
             measurement_types,
-            integration_time: None,
+            doppler_config: None,
             light_time_correction: false,
             timestamp_noise_s: None,
             stochastic_noises: Some(stochastics),
+            obstructing_body: None,
+            relativistic_corrections: false,
         }
     }
 }

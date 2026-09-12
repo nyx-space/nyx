@@ -73,16 +73,22 @@ where
     }
     /// Orders the states, can be used to store the states out of order
     pub fn finalize(&mut self) {
-        // Remove duplicate epochs
-        self.states.dedup_by(|a, b| a.epoch().eq(&b.epoch()));
-        // And sort
+        // Sort first..
         self.states.sort_by_key(|a| a.epoch());
+        // and then remove duplicate epochs (dedup removes only if the preceeding value matches)
+        self.states.dedup_by(|a, b| a.epoch().eq(&b.epoch()));
     }
 
     /// Evaluate the trajectory at this specific epoch.
     pub fn at(&self, epoch: Epoch) -> Result<S, TrajError> {
-        if self.states.is_empty() || self.first().epoch() > epoch || self.last().epoch() < epoch {
-            return Err(TrajError::NoInterpolationData { epoch });
+        if self.states.is_empty() {
+            return Err(TrajError::EmptyTrajectory { epoch });
+        } else if self.first().epoch() > epoch || self.last().epoch() < epoch {
+            return Err(TrajError::NoInterpolationData {
+                epoch,
+                start: self.start_epoch(),
+                end: self.end_epoch(),
+            });
         }
         match self
             .states
@@ -96,7 +102,11 @@ where
                 if idx == 0 || idx >= self.states.len() {
                     // The binary search returns where we should insert the data, so if it's at either end of the list, then we're out of bounds.
                     // This condition should have been handled by the check at the start of this function.
-                    return Err(TrajError::NoInterpolationData { epoch });
+                    return Err(TrajError::NoInterpolationData {
+                        epoch,
+                        start: self.start_epoch(),
+                        end: self.end_epoch(),
+                    });
                 }
                 // This is the closest index, so let's grab the items around it.
                 // NOTE: This is essentially the same code as in ANISE for the Hermite SPK type 13
