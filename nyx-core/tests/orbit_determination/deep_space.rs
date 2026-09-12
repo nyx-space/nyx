@@ -60,6 +60,16 @@ fn od_moon_shapiro_light_time(almanac: Arc<Almanac>) {
     let orbit = Orbit::try_keplerian_altitude(175.0, 1e-3, 51.9, 45.0, 75.0, 90.0, epoch, moon_j2k)
         .unwrap();
 
+    let mdl_dpl_config = DopplerConfig {
+        integration_time: Unit::Second * 10,
+        integration_ref: IntegrationRef::Middle,
+    };
+
+    let start_dpl_config = DopplerConfig {
+        integration_time: Unit::Second * 5,
+        integration_ref: IntegrationRef::Start,
+    };
+
     let initial_state = Spacecraft::builder()
         .orbit(orbit)
         .srp(SRPData::from_area(3.21))
@@ -72,7 +82,7 @@ fn od_moon_shapiro_light_time(almanac: Arc<Almanac>) {
         StochasticNoise::default_doppler_km_s(),
     );
     // Set the integration time so as to generate two way measurements
-    dss65_madrid.doppler_config = Some(DopplerConfig::default());
+    dss65_madrid.doppler_config = Some(mdl_dpl_config);
     dss65_madrid.light_time_correction = true;
     dss65_madrid.relativistic_corrections = true;
     let mut dss34_canberra = GroundStation::dss34_canberra(
@@ -80,7 +90,7 @@ fn od_moon_shapiro_light_time(almanac: Arc<Almanac>) {
         StochasticNoise::default_range_km(),
         StochasticNoise::default_doppler_km_s(),
     );
-    dss34_canberra.doppler_config = Some(DopplerConfig::default());
+    dss34_canberra.doppler_config = Some(start_dpl_config);
     dss34_canberra.light_time_correction = true;
     dss34_canberra.relativistic_corrections = true;
 
