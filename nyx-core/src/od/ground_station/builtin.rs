@@ -50,7 +50,7 @@ impl GroundStation {
             light_time_correction: false,
             timestamp_noise_s: None,
             stochastic_noises: Some(stochastics),
-            obstruction_body: None,
+            obstructing_body: None,
             relativistic_corrections: false,
         }
     }
@@ -83,7 +83,7 @@ impl GroundStation {
             light_time_correction: false,
             timestamp_noise_s: None,
             stochastic_noises: Some(stochastics),
-            obstruction_body: None,
+            obstructing_body: None,
             relativistic_corrections: false,
         }
     }
@@ -116,7 +116,7 @@ impl GroundStation {
             light_time_correction: false,
             timestamp_noise_s: None,
             stochastic_noises: Some(stochastics),
-            obstruction_body: None,
+            obstructing_body: None,
             relativistic_corrections: false,
         }
     }

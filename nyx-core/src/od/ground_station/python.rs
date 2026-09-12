@@ -21,7 +21,7 @@ impl GroundStation {
     /// :type obstruction_body: FrameUid | None
     /// :type relativistic_corrections: bool | None
     #[new]
-    #[pyo3(signature = (name, location, stochastic_noises, doppler_config=None, light_time_correction=false, timestamp_noise_s=None, obstruction_body=None, relativistic_corrections=false))]
+    #[pyo3(signature = (name, location, stochastic_noises, doppler_config=None, light_time_correction=false, timestamp_noise_s=None, obstructing_body=None, relativistic_corrections=false))]
     fn py_new(
         name: String,
         location: Location,
@@ -29,7 +29,7 @@ impl GroundStation {
         doppler_config: Option<DopplerConfig>,
         light_time_correction: Option<bool>,
         timestamp_noise_s: Option<StochasticNoise>,
-        obstruction_body: Option<FrameUid>,
+        obstructing_body: Option<FrameUid>,
         relativistic_corrections: Option<bool>,
     ) -> Self {
         Self {
@@ -45,7 +45,7 @@ impl GroundStation {
             light_time_correction: light_time_correction.unwrap_or(false),
             timestamp_noise_s,
             stochastic_noises: Some(stochastic_noises.into_iter().collect()),
-            obstruction_body,
+            obstructing_body,
             relativistic_corrections: relativistic_corrections.unwrap_or(false),
         }
     }
@@ -177,12 +177,12 @@ impl GroundStation {
 
     #[getter]
     pub fn get_obstruction_body(&self) -> Option<FrameUid> {
-        self.obstruction_body
+        self.obstructing_body
     }
 
     #[setter]
     pub fn set_obstruction_body(&mut self, obstruction_body: Option<FrameUid>) {
-        self.obstruction_body = obstruction_body;
+        self.obstructing_body = obstruction_body;
     }
 
     #[getter]

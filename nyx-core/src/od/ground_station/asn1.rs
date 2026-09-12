@@ -85,7 +85,7 @@ impl<'a> Decode<'a> for GroundStation {
             light_time_correction,
             timestamp_noise_s,
             stochastic_noises,
-            obstruction_body,
+            obstructing_body: obstruction_body,
             relativistic_corrections,
         })
     }
@@ -113,7 +113,7 @@ impl Encode for GroundStation {
             + self.doppler_config.encoded_len()?
             + self.timestamp_noise_s.encoded_len()?
             + stochastics_vec.encoded_len()?
-            + self.obstruction_body.encoded_len()?
+            + self.obstructing_body.encoded_len()?
     }
 
     fn encode(&self, encoder: &mut impl der::Writer) -> der::Result<()> {
@@ -140,7 +140,7 @@ impl Encode for GroundStation {
         });
         stochastics_vec.encode(encoder)?;
 
-        self.obstruction_body.encode(encoder)?;
+        self.obstructing_body.encode(encoder)?;
 
         Ok(())
     }
@@ -193,7 +193,7 @@ mod tests {
             light_time_correction: true,
             timestamp_noise_s: None,
             stochastic_noises: None,
-            obstruction_body: None,
+            obstructing_body: None,
             relativistic_corrections: false,
         };
 
@@ -246,7 +246,7 @@ mod tests {
         assert_eq!(decoded, gs);
 
         // 7. With obstruction_body
-        gs.obstruction_body = Some(IAU_EARTH_FRAME.into());
+        gs.obstructing_body = Some(IAU_EARTH_FRAME.into());
         buf.clear();
         gs.encode_to_vec(&mut buf).unwrap();
         let decoded = GroundStation::from_der(&buf).unwrap();

@@ -76,7 +76,7 @@ pub struct GroundStation {
     pub stochastic_noises: Option<IndexMap<MeasurementType, StochasticNoise>>,
     /// Body that obstructs the line of sight (e.g. Moon if tracking a lunar spacecraft from Earth)
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub obstruction_body: Option<FrameUid>,
+    pub obstructing_body: Option<FrameUid>,
     /// Relativistic corrections (e.g. Shapiro delay)
     #[serde(default)]
     pub relativistic_corrections: bool,
@@ -159,7 +159,7 @@ impl GroundStation {
             light_time_correction: false,
             timestamp_noise_s: None,
             stochastic_noises: None,
-            obstruction_body: None,
+            obstructing_body: None,
             relativistic_corrections: false,
         }
     }
@@ -198,7 +198,7 @@ impl GroundStation {
     }
 
     pub fn with_obstruction_body(mut self, obstruction_body: Option<FrameUid>) -> Self {
-        self.obstruction_body = obstruction_body;
+        self.obstructing_body = obstruction_body;
 
         self
     }
@@ -281,7 +281,7 @@ impl GroundStation {
         if self.stochastic_noises.is_some() {
             bits |= 1 << 2;
         }
-        if self.obstruction_body.is_some() {
+        if self.obstructing_body.is_some() {
             bits |= 1 << 3;
         }
         bits
@@ -328,7 +328,7 @@ impl Default for GroundStation {
             light_time_correction: false,
             timestamp_noise_s: None,
             stochastic_noises: None,
-            obstruction_body: None,
+            obstructing_body: None,
             relativistic_corrections: false,
         }
     }
@@ -411,7 +411,7 @@ mod gs_ut {
             light_time_correction: false,
             timestamp_noise_s: None,
             doppler_config: Some(DopplerConfig::default()),
-            obstruction_body: None,
+            obstructing_body: None,
             relativistic_corrections: false,
         };
 
@@ -477,7 +477,7 @@ mod gs_ut {
                 light_time_correction: false,
                 timestamp_noise_s: None,
                 doppler_config: None,
-                obstruction_body: None,
+                obstructing_body: None,
                 relativistic_corrections: false,
             },
             GroundStation {
@@ -495,7 +495,7 @@ mod gs_ut {
                 light_time_correction: false,
                 timestamp_noise_s: None,
                 doppler_config: None,
-                obstruction_body: None,
+                obstructing_body: None,
                 relativistic_corrections: false,
             },
         ];

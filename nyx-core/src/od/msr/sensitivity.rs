@@ -191,14 +191,6 @@ impl ScalarSensitivityT<Spacecraft, Spacecraft, GroundStation>
                 OMatrix::<f64, U1, <Spacecraft as State>::Size>::from_row_slice(&[
                     m21, m22, m23, m11, m12, m13, 0.0, 0.0, 0.0,
                 ])
-
-                // // d(rho_dot)/d(r) = (delta_v - rho_dot * u_los) / rho
-                // let dr = (delta_v - u_los * rho_dot_km_s) / rho_km;
-
-                // // d(rho_dot)/d(v) = u_los (for differenced/one-way equivalent Doppler)
-                // OMatrix::<f64, U1, <Spacecraft as State>::Size>::from_row_slice(&[
-                //     dr.x, dr.y, dr.z, u_los.x, u_los.y, u_los.z, 0.0, 0.0, 0.0,
-                // ])
             }
             MeasurementType::Range => {
                 // Velocity sensitivity due to retarded bounce epoch: d(rho)/d(v) = -tau * u_los

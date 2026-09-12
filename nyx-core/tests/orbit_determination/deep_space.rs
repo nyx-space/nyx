@@ -85,6 +85,7 @@ fn od_moon_shapiro_light_time(almanac: Arc<Almanac>) {
     dss65_madrid.doppler_config = Some(mdl_dpl_config);
     dss65_madrid.light_time_correction = true;
     dss65_madrid.relativistic_corrections = true;
+    dss65_madrid.obstructing_body = Some(moon_j2k.into());
     let mut dss34_canberra = GroundStation::dss34_canberra(
         elevation_mask,
         StochasticNoise::default_range_km(),
@@ -93,6 +94,7 @@ fn od_moon_shapiro_light_time(almanac: Arc<Almanac>) {
     dss34_canberra.doppler_config = Some(start_dpl_config);
     dss34_canberra.light_time_correction = true;
     dss34_canberra.relativistic_corrections = true;
+    dss34_canberra.obstructing_body = Some(moon_j2k.into());
 
     // Define the tracking configurations
     let configs = BTreeMap::from([
@@ -124,7 +126,7 @@ fn od_moon_shapiro_light_time(almanac: Arc<Almanac>) {
 
     println!("Initial estimate:\n{initial_estimate}");
 
-    let initial_state_dev = initial_estimate.nominal_state;
+    let initial_state_dev = initial_estimate.state();
     let (init_rss_pos_km, init_rss_vel_km_s) =
         rss_orbit_errors(&initial_state.orbit, &initial_state_dev.orbit);
 
@@ -238,11 +240,20 @@ fn od_moon_shapiro_light_time(almanac: Arc<Almanac>) {
     );
 
     assert!(
-        delta.rmag_km() * 1e-3 < 75.0,
-        "Position error should be less than 175 meters (down from ~2600 km)"
+        delta.rmag_km() * 1e-3 < 60.0,
+        "Position error should be less than 60 meters"
     );
     assert!(
         delta.vmag_km_s() < 1e-4,
         "Velocity error should be on the 10 cm/s per second level"
     );
+
+    // Smooth the results
+    let od_smoother = od_sol.smooth(&almanac).unwrap();
+    od_smoother
+        .to_parquet(
+            path.join("od_moon_shapiro_smoothed.parquet"),
+            ExportCfg::default(),
+        )
+        .unwrap();
 }

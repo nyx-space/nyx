@@ -17,8 +17,11 @@
 */
 
 use anise::constants::SPEED_OF_LIGHT_KM_S;
-use anise::constants::frames::{ICRF, SUN_J2000};
+use anise::constants::celestial_objects::SUN;
+use anise::constants::frames::SUN_J2000;
+use anise::constants::orientations::ICRS;
 use anise::errors::AlmanacPhysicsSnafu;
+use anise::frames::Frame;
 use anise::prelude::Almanac;
 use hifitime::{Duration, Epoch, TimeUnits};
 use nalgebra::Vector3;
@@ -28,6 +31,8 @@ use crate::md::prelude::Traj;
 use crate::od::ground_station::GroundStation;
 use crate::od::{ODAlmanacSnafu, ODError, ODPlanetaryDataSnafu, ODTrajSnafu};
 use snafu::ResultExt;
+
+const SUN_ICRS: Frame = Frame::new(SUN, ICRS);
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct LightTimeLeg {
@@ -106,7 +111,7 @@ pub(crate) fn solve_two_way_picard(
         action: "building ground station orbit at t3",
     })?;
     let gs_rx_icrf = almanac
-        .transform_to(gs_rx_orbit, ICRF, None)
+        .transform_to(gs_rx_orbit, SUN_ICRS, None)
         .context(ODAlmanacSnafu {
             action: "transforming station at t3 to ICRF",
         })?;
@@ -128,7 +133,7 @@ pub(crate) fn solve_two_way_picard(
 
         // Transform spacecraft orbit to ICRF
         let sc_icrf = almanac
-            .transform_to(sc_state.orbit, ICRF, None)
+            .transform_to(sc_state.orbit, SUN_ICRS, None)
             .context(ODAlmanacSnafu {
                 action: "transforming spacecraft at t2 to ICRF",
             })?;
@@ -166,11 +171,12 @@ pub(crate) fn solve_two_way_picard(
             action: "building ground station orbit at t1",
         })?;
 
-        let gs_tx_icrf = almanac
-            .transform_to(gs_tx_orbit, ICRF, None)
-            .context(ODAlmanacSnafu {
-                action: "transforming station at t1 to ICRF",
-            })?;
+        let gs_tx_icrf =
+            almanac
+                .transform_to(gs_tx_orbit, SUN_ICRS, None)
+                .context(ODAlmanacSnafu {
+                    action: "transforming station at t1 to ICRF",
+                })?;
 
         r1_icrf_km = gs_tx_icrf.radius_km;
         let dist_up_km = (r2_icrf_km - r1_icrf_km).norm();

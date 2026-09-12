@@ -66,35 +66,16 @@ impl TrackingDevice<Spacecraft> for GroundStation {
                 details: "fetching state for bounce epoch".to_string(),
             })?;
 
-            if let Some(obstruction_body) = self.obstruction_body {
-                // Check if there was an obstruction at the bounce epoch with LT
-                let observer =
-                    Spacecraft::from(self.to_orbit(epoch, almanac).context(ODAlmanacSnafu {
-                        action: "building ground station orbit",
-                    })?);
-                let is_obstructed = almanac
-                    .line_of_sight_obstructed(
-                        observer.orbit,
-                        rx.orbit,
-                        obstruction_body.into(),
-                        Aberration::LT,
-                    )
-                    .context(ODAlmanacSnafu {
-                        action: "computing line of sight",
-                    })?;
-
-                if is_obstructed {
-                    return Ok(None);
-                }
-            }
-
             // Evaluate Azimuth/Elevation from Downlink Look Direction at t3
             // Construct the apparent target state using the solved bounce state r_sc(t2)
+            // XXX Is this correct? Should this be at the t3 epoch of reception? The body fixed frame
+            // should probably be computed at reception, but then what is the state of the vehicle when it
+            // was emitting ... that the state at t2. I need to think more about this.
             let aer_downlink = almanac
                 .azimuth_elevation_range_sez_from_location(
                     rx.orbit,
                     self.location.clone(),
-                    None,
+                    self.obstructing_body.map(|b| b.into()),
                     None, // Position r_sc(t2) is already retarded; do not apply LT twice
                 )
                 .context(ODAlmanacSnafu {
@@ -158,7 +139,7 @@ impl TrackingDevice<Spacecraft> for GroundStation {
                 details: "fetching state for instantaneous measurement".to_string(),
             })?;
 
-            if let Some(obstruction_body) = self.obstruction_body {
+            if let Some(obstruction_body) = self.obstructing_body {
                 let observer =
                     Spacecraft::from(self.to_orbit(epoch, almanac).context(ODAlmanacSnafu {
                         action: "building ground station orbit",
@@ -283,7 +264,7 @@ impl TrackingDevice<Spacecraft> for GroundStation {
     ) -> Result<Option<Measurement>, ODError> {
         // HACK This function should be avoided. A future version will remove the instantaneous measurement
         // because it isn't physically adequate.
-        if let Some(obstruction_body) = self.obstruction_body {
+        if let Some(obstruction_body) = self.obstructing_body {
             let observer = Spacecraft::from(self.to_orbit(rx.orbit.epoch, almanac).context(
                 ODAlmanacSnafu {
                     action: "building ground station orbit",
