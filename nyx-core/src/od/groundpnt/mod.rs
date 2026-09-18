@@ -232,7 +232,7 @@ impl GroundAsset {
 impl Default for GroundAsset {
     fn default() -> Self {
         Self {
-            frame: Frame::from_ephem_j2000(399),
+            frame: Frame::from_ephem_icrs(399),
             latitude_deg: 0.,
             longitude_deg: 0.,
             height_km: 0.,

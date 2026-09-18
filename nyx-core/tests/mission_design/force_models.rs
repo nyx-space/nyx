@@ -2,7 +2,7 @@ extern crate nyx_space as nyx;
 
 use anise::constants::frames::{GCRF, IAU_EARTH_FRAME, MOON_J2000};
 use anise::f64_eq_tol;
-use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use anise::{constants::frames::EARTH_ICRS, prelude::Almanac};
 use nyx::cosmic::{Orbit, Spacecraft};
 use nyx::dynamics::{
     AtmDensity, Drag, GravityField, OrbitalDynamics, SolarPressure, SpacecraftDynamics,
@@ -32,7 +32,7 @@ fn almanac() -> Arc<Almanac> {
 #[rstest]
 fn srp_earth_full_vis(almanac: Arc<Almanac>) {
     let eme2k = almanac
-        .frame_info(EARTH_J2000)
+        .frame_info(EARTH_ICRS)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
 
@@ -84,7 +84,7 @@ fn srp_earth_full_vis(almanac: Arc<Almanac>) {
 #[rstest]
 fn srp_earth_leo(almanac: Arc<Almanac>) {
     let eme2k = almanac
-        .frame_info(EARTH_J2000)
+        .frame_info(EARTH_ICRS)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
 
@@ -138,7 +138,7 @@ fn srp_earth_meo_ecc_inc(almanac: Arc<Almanac>) {
     use std::env::var as envvar;
 
     let eme2k = almanac
-        .frame_info(EARTH_J2000)
+        .frame_info(EARTH_ICRS)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
 
@@ -205,7 +205,7 @@ fn srp_earth_meo_ecc_inc(almanac: Arc<Almanac>) {
     println!("{final_moon_state}");
 
     let final_earth_orbit = almanac
-        .transform_to(final_moon_state.orbit, EARTH_J2000, None)
+        .transform_to(final_moon_state.orbit, EARTH_ICRS, None)
         .unwrap();
 
     let (fw_err_r, fw_err_v) =
@@ -264,7 +264,7 @@ fn srp_earth_meo_ecc_inc(almanac: Arc<Almanac>) {
 #[rstest]
 fn exp_drag_earth(almanac: Arc<Almanac>) {
     let eme2k = almanac
-        .frame_info(EARTH_J2000)
+        .frame_info(EARTH_ICRS)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
 
@@ -299,7 +299,7 @@ fn exp_drag_earth(almanac: Arc<Almanac>) {
 #[rstest]
 fn std_atm_drag_earth(almanac: Arc<Almanac>) {
     let eme2k = almanac
-        .frame_info(EARTH_J2000)
+        .frame_info(EARTH_ICRS)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
 
@@ -347,7 +347,7 @@ fn std_atm_drag_earth(almanac: Arc<Almanac>) {
 #[rstest]
 fn std_atm_drag_earth_low(almanac: Arc<Almanac>) {
     let eme2k = almanac
-        .frame_info(EARTH_J2000)
+        .frame_info(EARTH_ICRS)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
 
@@ -414,7 +414,7 @@ fn test_prop_nrlmsise00_from_weather(almanac: Arc<Almanac>) {
     assert_eq!(weather_rtn, weather);
 
     let eme2k = almanac
-        .frame_info(EARTH_J2000)
+        .frame_info(EARTH_ICRS)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
 
@@ -652,7 +652,7 @@ fn nrlmsise00_compare(almanac: Arc<Almanac>) {
     let weather = SpaceWeatherData::from_static_weather(StaticSpaceWeather::SolarMaximum());
 
     let eme2k = almanac
-        .frame_info(EARTH_J2000)
+        .frame_info(EARTH_ICRS)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
     let iau_earth = almanac
@@ -743,7 +743,7 @@ fn nrlmsise00_compare(almanac: Arc<Almanac>) {
 #[rstest]
 fn regression_harris_drag(almanac: Arc<Almanac>) {
     let eme2k = almanac
-        .frame_info(EARTH_J2000)
+        .frame_info(EARTH_ICRS)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
 

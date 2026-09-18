@@ -333,9 +333,9 @@ impl GuidanceLaw for Kluever {
 fn kluever_direction() {
     use crate::time::Epoch;
     use anise::analysis::prelude::OrbitalElement;
-    use anise::constants::frames::EARTH_J2000;
+    use anise::constants::frames::EARTH_ICRS;
 
-    let eme2k = EARTH_J2000.with_mu_km3_s2(398_600.433);
+    let eme2k = EARTH_ICRS.with_mu_km3_s2(398_600.433);
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
     // Define the objectives

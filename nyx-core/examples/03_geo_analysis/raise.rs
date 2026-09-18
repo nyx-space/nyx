@@ -7,7 +7,7 @@ use anise::{
     almanac::metaload::MetaFile,
     constants::{
         celestial_objects::{MOON, SUN},
-        frames::{EARTH_J2000, IAU_EARTH_FRAME},
+        frames::{EARTH_ICRS, IAU_EARTH_FRAME},
     },
 };
 use hifitime::{Epoch, TimeUnits, Unit};
@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // references to many functions.
     let almanac = Arc::new(MetaAlmanac::latest().map_err(Box::new)?);
     // Fetch the EME2000 frame from the Almabac
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
     // Define the orbit epoch
     let epoch = Epoch::from_gregorian_utc_hms(2024, 2, 29, 12, 13, 14);
 
@@ -116,7 +116,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // We define the solar radiation pressure, using the default solar flux and accounting only
     // for the eclipsing caused by the Earth.
-    let srp_dyn = SolarPressure::default_flux(EARTH_J2000, &almanac)?;
+    let srp_dyn = SolarPressure::default_flux(EARTH_ICRS, &almanac)?;
 
     // Finalize setting up the dynamics, specifying the force models (orbital_dyn) separately from the
     // acceleration models (SRP in this case). Use `from_models` to specify multiple accel models.

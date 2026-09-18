@@ -7,7 +7,7 @@ use anise::{
     almanac::{Almanac, metaload::MetaFile},
     constants::{
         celestial_objects::{MOON, SUN},
-        frames::{EARTH_J2000, IAU_EARTH_FRAME},
+        frames::{EARTH_ICRS, IAU_EARTH_FRAME},
     },
 };
 use hifitime::{Epoch, TimeUnits, Unit};
@@ -50,7 +50,7 @@ impl SharedState {
             4,
             almanac.frame_info(IAU_EARTH_FRAME)?,
         )?);
-        let srp_dyn = SolarPressure::default_flux(EARTH_J2000, &almanac)?;
+        let srp_dyn = SolarPressure::default_flux(EARTH_ICRS, &almanac)?;
 
         Ok(Self {
             almanac,
@@ -142,7 +142,7 @@ fn evaluate_weights(
 ) -> Result<(f64, f64), Box<dyn Error>> {
     let ηthresholds: Vec<f64> = weights.iter().map(|w| *w as f64).collect();
 
-    let eme2k = state.almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = state.almanac.frame_info(EARTH_ICRS).unwrap();
     let epoch = Epoch::from_gregorian_utc_hms(2024, 2, 29, 12, 13, 14);
 
     let orbit = Orbit::keplerian(24505.9, 0.725, 7.05, 0.0, 0.0, 0.0, epoch, eme2k);

@@ -14,7 +14,7 @@ use nyx_space::md::prelude::SpacecraftDynamics;
 // These tests compare the computation of the state transition matrix between the finite differencing methoid (common) and hyperdual numbers.
 // Conclusion: hyperdual numbers lead to less error than finite differencing.
 
-use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use anise::{constants::frames::EARTH_ICRS, prelude::Almanac};
 use rstest::*;
 
 use crate::propagation::GMAT_EARTH_GM;
@@ -28,7 +28,7 @@ fn almanac() -> Arc<Almanac> {
 #[rstest]
 fn stm_fixed_step(almanac: Arc<Almanac>) {
     let eme2k = almanac
-        .frame_info(EARTH_J2000)
+        .frame_info(EARTH_ICRS)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -119,7 +119,7 @@ fn stm_fixed_step(almanac: Arc<Almanac>) {
 #[rstest]
 fn stm_variable_step(almanac: Arc<Almanac>) {
     let eme2k = almanac
-        .frame_info(EARTH_J2000)
+        .frame_info(EARTH_ICRS)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -202,7 +202,7 @@ fn stm_between_steps(almanac: Arc<Almanac>) {
     // Check that \Phi(t_2, t_1) = \Phi(t_2, t_0) * \Phi^{-1}(t_1, t_0)
 
     let eme2k = almanac
-        .frame_info(EARTH_J2000)
+        .frame_info(EARTH_ICRS)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -260,7 +260,7 @@ fn stm_hifi_variable_step(almanac: Arc<Almanac>) {
     // Using higher fidelity dynamics for STM testing
 
     let eme2k = almanac
-        .frame_info(EARTH_J2000)
+        .frame_info(EARTH_ICRS)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -343,7 +343,7 @@ fn stm_hifi_variable_step(almanac: Arc<Almanac>) {
 #[rstest]
 fn orbit_set_unset_static(almanac: Arc<Almanac>) {
     let eme2k = almanac
-        .frame_info(EARTH_J2000)
+        .frame_info(EARTH_ICRS)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -368,7 +368,7 @@ fn orbit_set_unset_static(almanac: Arc<Almanac>) {
 #[rstest]
 fn orbit_set_unset(almanac: Arc<Almanac>) {
     let eme2k = almanac
-        .frame_info(EARTH_J2000)
+        .frame_info(EARTH_ICRS)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -398,7 +398,7 @@ fn orbit_set_unset(almanac: Arc<Almanac>) {
 #[rstest]
 fn sc_set_unset_static(almanac: Arc<Almanac>) {
     let eme2k = almanac
-        .frame_info(EARTH_J2000)
+        .frame_info(EARTH_ICRS)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);

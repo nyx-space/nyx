@@ -4,7 +4,7 @@ use std::{fmt::Write, sync::Arc};
 use anise::{
     analysis::{expr::ScalarExpr, prelude::Condition},
     astro::Occultation,
-    constants::frames::{EARTH_J2000, IAU_EARTH_FRAME, SUN_J2000},
+    constants::frames::{EARTH_ICRS, IAU_EARTH_FRAME, SUN_J2000},
     prelude::Almanac,
 };
 use rstest::*;
@@ -21,7 +21,7 @@ fn event_tracker_true_anomaly(almanac: Arc<Almanac>) {
     use nyx::md::prelude::*;
     use nyx::od::GroundStation;
 
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
 
     let dt = Epoch::from_gregorian_tai_at_noon(2020, 1, 1);
     let state = Orbit::cartesian(

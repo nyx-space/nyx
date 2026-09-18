@@ -457,9 +457,9 @@ impl GuidanceLaw for Ruggiero {
 fn ruggiero_weight() {
     use crate::time::Epoch;
     use anise::analysis::prelude::OrbitalElement;
-    use anise::constants::frames::EARTH_J2000;
+    use anise::constants::frames::EARTH_ICRS;
 
-    let eme2k = EARTH_J2000.with_mu_km3_s2(398_600.433);
+    let eme2k = EARTH_ICRS.with_mu_km3_s2(398_600.433);
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let orbit = Orbit::keplerian(7378.1363, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, eme2k);
     let sc = Spacecraft::new(orbit, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);

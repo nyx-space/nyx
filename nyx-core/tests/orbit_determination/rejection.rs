@@ -1,7 +1,7 @@
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
-use anise::constants::frames::EARTH_J2000;
+use anise::constants::frames::EARTH_ICRS;
 use nyx::cosmic::Orbit;
 use nyx::dynamics::SpacecraftDynamics;
 use nyx::dynamics::orbital::OrbitalDynamics;
@@ -98,7 +98,7 @@ fn od_rejection_test(
     let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 

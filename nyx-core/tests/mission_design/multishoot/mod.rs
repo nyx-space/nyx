@@ -7,7 +7,7 @@ use nyx::md::opti::multishoot::*;
 use nyx::md::prelude::*;
 
 use anise::{
-    constants::frames::{EARTH_J2000, IAU_EARTH_FRAME},
+    constants::frames::{EARTH_ICRS, IAU_EARTH_FRAME},
     prelude::Almanac,
 };
 use nyx_space::cosmic::Mass;
@@ -23,7 +23,7 @@ fn almanac() -> Arc<Almanac> {
 #[rstest]
 fn alt_orbit_raising(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
     let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
 
     /* Define the parking orbit */
@@ -204,7 +204,7 @@ fn alt_orbit_raising(almanac: Arc<Almanac>) {
 fn vmag_orbit_raising(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
     let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
 
     /* Define the parking orbit */

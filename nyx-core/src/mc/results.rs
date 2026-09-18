@@ -33,7 +33,7 @@ use crate::md::prelude::GuidanceMode;
 use crate::md::trajectory::{Interpolatable, Traj};
 use crate::propagators::PropagationError;
 use crate::time::{Duration, Epoch, TimeUnits};
-use anise::constants::frames::EARTH_J2000;
+use anise::constants::frames::EARTH_ICRS;
 use arrow::array::{Array, Float64Builder, Int32Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
@@ -257,7 +257,7 @@ where
         ];
 
         // Use the first successful run to build up some data shared for all
-        let mut frame = EARTH_J2000;
+        let mut frame = EARTH_ICRS;
         let requested_fields = match cfg.fields {
             Some(fields) => fields,
             None => S::export_params(),

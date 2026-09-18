@@ -7,7 +7,7 @@ use anise::{
     almanac::metaload::MetaFile,
     constants::{
         celestial_objects::{MOON, SUN},
-        frames::{EARTH_J2000, IAU_EARTH_FRAME},
+        frames::{EARTH_ICRS, IAU_EARTH_FRAME},
     },
 };
 use hifitime::{Epoch, TimeUnits, Unit};
@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let epoch = Epoch::from_gregorian_utc_hms(2024, 2, 29, 12, 13, 14);
 
     // Define the GEO orbit, and we're just going to maintain it very tightly.
-    let earth_j2000 = almanac.frame_info(EARTH_J2000)?;
+    let earth_j2000 = almanac.frame_info(EARTH_ICRS)?;
     let orbit = Orbit::try_keplerian(42164.0, 1e-5, 0., 163.0, 75.0, 0.0, epoch, earth_j2000)?;
     println!("{orbit:x}");
 
@@ -90,7 +90,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?);
     orbital_dyn.accel_models.push(harmonics);
 
-    let srp_dyn = SolarPressure::default_flux(EARTH_J2000, &almanac)?;
+    let srp_dyn = SolarPressure::default_flux(EARTH_ICRS, &almanac)?;
     let sc_dynamics = SpacecraftDynamics::from_model(orbital_dyn, srp_dyn)
         .with_guidance_law(ruggiero_ctrl.clone());
 

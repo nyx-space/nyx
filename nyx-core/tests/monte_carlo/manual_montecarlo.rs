@@ -18,7 +18,7 @@ use rayon::prelude::*;
 use std::sync::Arc;
 use std::time::Instant as StdInstant;
 
-use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use anise::{constants::frames::EARTH_ICRS, prelude::Almanac};
 use rstest::*;
 
 #[fixture]
@@ -36,7 +36,7 @@ fn multi_thread_monte_carlo_demo(almanac: Arc<Almanac>) {
     extern crate pretty_env_logger;
     let _ = pretty_env_logger::try_init();
 
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
     let iau_earth = almanac.frame_info(IAU_EARTH_FRAME).unwrap();
 
     let earth_sph_harm =

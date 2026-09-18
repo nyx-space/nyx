@@ -20,7 +20,7 @@ use std::str::FromStr;
 
 use rand_pcg::Pcg64Mcg;
 
-use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use anise::{constants::frames::EARTH_ICRS, prelude::Almanac};
 use rstest::*;
 use sensitivity::TrackerSensitivity;
 use std::sync::Arc;
@@ -41,7 +41,7 @@ fn nil_measurement(almanac: Arc<Almanac>) {
     let height = 0.0;
     let epoch = Epoch::from_mjd_tai(JD_J2000);
 
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
 
     let mut stochastics = IndexMap::new();
     stochastics.insert(MeasurementType::Range, StochasticNoise::MIN);
@@ -125,7 +125,7 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
         -8.85806596,
         -5.08576325,
         Epoch::from_str("2023-11-16T06:36:30.232000 UTC").unwrap(),
-        almanac.frame_info(EARTH_J2000).unwrap(),
+        almanac.frame_info(EARTH_ICRS).unwrap(),
     );
 
     // In GMAT's uncommon MJD notation, this epoch corresponds to 29912.78296296296.
@@ -137,7 +137,7 @@ fn val_measurements_topo(almanac: Arc<Almanac>) {
         -1.78800739052,
         -1.69330836191,
         Epoch::from_str("2022-11-29T06:47:28.0 TAI").unwrap(),
-        almanac.frame_info(EARTH_J2000).unwrap(),
+        almanac.frame_info(EARTH_ICRS).unwrap(),
     );
 
     let elevation_mask = 7.0; // in degrees
@@ -340,7 +340,7 @@ fn verif_sensitivity_mat(almanac: Arc<Almanac>) {
         -1.202489,
         -0.714016,
         Epoch::from_str("2022-11-16T13:35:31.0 UTC").unwrap(),
-        almanac.frame_info(EARTH_J2000).unwrap(),
+        almanac.frame_info(EARTH_ICRS).unwrap(),
     );
 
     let cislunar_sc: Spacecraft = cislunar1.into();
@@ -415,7 +415,7 @@ fn val_measurement_noise(almanac: Arc<Almanac>) {
     use std::path::PathBuf;
 
     // Build an example trajectory.
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
     let epoch = Epoch::from_gregorian_tai_at_midnight(2025, 8, 22);
 
     let orbit =

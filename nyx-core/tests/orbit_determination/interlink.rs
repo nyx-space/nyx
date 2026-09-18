@@ -17,7 +17,7 @@ use nyx::od::prelude::*;
 use nyx::propagators::Propagator;
 use nyx::time::{Epoch, TimeUnits};
 
-use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use anise::{constants::frames::EARTH_ICRS, prelude::Almanac};
 use rstest::*;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -42,7 +42,7 @@ fn almanac() -> Arc<Almanac> {
 fn interlink_nrho_llo(#[case] disperse: bool, almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
     let moon_iau = almanac.frame_info(IAU_MOON_FRAME).unwrap();
 
     let epoch = Epoch::from_gregorian_tai(2021, 5, 29, 19, 51, 16, 852_000);

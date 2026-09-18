@@ -1,4 +1,4 @@
-use anise::constants::frames::{EARTH_J2000, IAU_EARTH_FRAME};
+use anise::constants::frames::{EARTH_ICRS, IAU_EARTH_FRAME};
 use nyx_space::io::ConfigRepr;
 use nyx_space::md::prelude::*;
 use nyx_space::od::prelude::*;
@@ -29,7 +29,7 @@ fn traj(almanac: Arc<Almanac>) -> Traj<Spacecraft> {
         75.0,
         23.4,
         Epoch::from_str("2023-02-22T19:18:17.16 UTC").unwrap(),
-        almanac.frame_info(EARTH_J2000).unwrap(),
+        almanac.frame_info(EARTH_ICRS).unwrap(),
     )
     .unwrap();
 

@@ -1,5 +1,5 @@
 use anise::constants::celestial_objects::EARTH;
-use anise::constants::frames::{EARTH_J2000, IAU_EARTH_FRAME};
+use anise::constants::frames::{EARTH_ICRS, IAU_EARTH_FRAME};
 use hifitime::Unit;
 use nalgebra::{Const, OMatrix};
 use nyx_space::Spacecraft;
@@ -17,7 +17,7 @@ use std::collections::BTreeMap;
 fn test_gps_od_position_filtering() {
     let almanac = crate::test_almanac_arcd();
 
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
     let epoch = Epoch::from_gregorian_utc_hms(2020, 1, 1, 4, 0, 0);
     let sim_sc = Spacecraft::from(Orbit::keplerian(
         22000.0, 0.01, 30.0, 80.0, 40.0, 170.0, epoch, eme2k,

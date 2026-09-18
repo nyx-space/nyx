@@ -11,7 +11,7 @@ use std::env;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use anise::{constants::frames::EARTH_ICRS, prelude::Almanac};
 use rstest::*;
 use std::sync::Arc;
 
@@ -58,7 +58,7 @@ fn spacecraft(almanac: Arc<Almanac>) -> Spacecraft {
         75.0,
         23.4,
         Epoch::from_str("2023-02-22T19:18:17.16 UTC").unwrap(),
-        almanac.frame_info(EARTH_J2000).unwrap(),
+        almanac.frame_info(EARTH_ICRS).unwrap(),
     )
     .unwrap();
 

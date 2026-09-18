@@ -674,7 +674,7 @@ mod ut_ccsds_oem {
         let almanac = Arc::new(almanac);
 
         let eme2k = almanac
-            .frame_info(anise::constants::frames::EARTH_J2000)
+            .frame_info(anise::constants::frames::EARTH_ICRS)
             .unwrap();
         let epoch = Epoch::from_gregorian_utc_at_noon(2021, 1, 1);
         let orbit = Orbit::try_keplerian_altitude(900.0, 5e-5, 5e-3, 0.0, 178.0, 0.0, epoch, eme2k)

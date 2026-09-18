@@ -16,7 +16,7 @@ use nyx::utils::rss_orbit_errors;
 use nyx_space::mc::StateDispersion;
 use std::collections::BTreeMap;
 
-use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use anise::{constants::frames::EARTH_ICRS, prelude::Almanac};
 use rstest::*;
 use std::sync::Arc;
 
@@ -46,7 +46,7 @@ fn blse_robust_large_disp(
     let elevation_mask = 0.0;
 
     // Define state information.
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
     let dt = Epoch::from_gregorian_utc_hms(2020, 1, 1, 4, 0, 0);
     let initial_state = Spacecraft::from(Orbit::keplerian(
         22000.0, 0.01, 30.0, 80.0, 40.0, 170.0, dt, eme2k,

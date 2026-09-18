@@ -1,4 +1,4 @@
-use anise::constants::frames::EARTH_J2000;
+use anise::constants::frames::EARTH_ICRS;
 use anise::prelude::Almanac;
 use hifitime::prelude::*;
 use indexmap::IndexMap;
@@ -270,7 +270,7 @@ fn load_test_almanac() -> Arc<Almanac> {
 #[test]
 fn test_ground_station_measure_uses_measurement_doppler_config() {
     let almanac = load_test_almanac();
-    let earth_frame = almanac.frame_info(EARTH_J2000).unwrap();
+    let earth_frame = almanac.frame_info(EARTH_ICRS).unwrap();
 
     let epoch = Epoch::from_str("2023-02-22T19:18:17.16 UTC").unwrap();
     let orbit =
@@ -282,7 +282,7 @@ fn test_ground_station_measure_uses_measurement_doppler_config() {
         .for_duration_with_traj(1.hours())
         .unwrap();
 
-    let mut gs = GroundStation::from_point("TestGS".to_string(), 0.0, 0.0, 0.0, EARTH_J2000);
+    let mut gs = GroundStation::from_point("TestGS".to_string(), 0.0, 0.0, 0.0, EARTH_ICRS);
     let doppler_cfg = DopplerConfig {
         integration_time: 10 * Unit::Second,
         integration_ref: IntegrationRef::Middle,

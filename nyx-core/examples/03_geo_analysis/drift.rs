@@ -7,7 +7,7 @@ use anise::{
     almanac::metaload::MetaFile,
     constants::{
         celestial_objects::{MOON, SUN},
-        frames::{EARTH_J2000, IAU_EARTH_FRAME, MOON_J2000},
+        frames::{EARTH_ICRS, IAU_EARTH_FRAME, MOON_J2000},
     },
 };
 use hifitime::{Epoch, Unit};
@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // This allows the frame to include the gravitational parameters and the shape of the Earth,
     // defined as a tri-axial ellipoid. Note that this shape can be changed manually or in the Almanac
     // by loading a different set of planetary constants.
-    let earth_j2000 = almanac.frame_info(EARTH_J2000)?;
+    let earth_j2000 = almanac.frame_info(EARTH_ICRS)?;
 
     // Placing this GEO bird just above Colorado.
     // In theory, the eccentricity is zero, but in practice, it's about 1e-5 to 1e-6 at best.
@@ -97,7 +97,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // We define the solar radiation pressure, using the default solar flux and accounting only
     // for the eclipsing caused by the Earth and Moon.
-    let srp_dyn = SolarPressure::new(vec![EARTH_J2000, MOON_J2000], &almanac)?;
+    let srp_dyn = SolarPressure::new(vec![EARTH_ICRS, MOON_J2000], &almanac)?;
 
     // Finalize setting up the dynamics, specifying the force models (orbital_dyn) separately from the
     // acceleration models (SRP in this case). Use `from_models` to specify multiple accel models.

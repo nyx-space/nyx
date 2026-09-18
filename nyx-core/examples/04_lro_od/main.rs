@@ -7,7 +7,7 @@ use anise::{
     almanac::metaload::MetaFile,
     constants::{
         celestial_objects::{EARTH, JUPITER_BARYCENTER, MOON, SUN},
-        frames::{EARTH_J2000, MOON_J2000, MOON_PA_FRAME},
+        frames::{EARTH_ICRS, MOON_J2000, MOON_PA_FRAME},
     },
     prelude::Almanac,
 };
@@ -82,7 +82,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // In our case, the trajectory comes from the BSP file, so we need to build a Trajectory from the almanac directly.
     // To query the Almanac, we need to build the LRO frame in the J2000 orientation in our case.
     // Inspecting the LRO BSP in the ANISE GUI shows us that NASA has assigned ID -85 to LRO.
-    let lro_frame = Frame::from_ephem_j2000(-85);
+    let lro_frame = Frame::from_ephem_icrs(-85);
 
     // To build the trajectory we need to provide a spacecraft template.
     let sc_template = Spacecraft::builder()
@@ -146,7 +146,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // We define the solar radiation pressure, using the default solar flux and accounting only
     // for the eclipsing caused by the Earth and Moon.
     // Note that by default, enabling the SolarPressure model will also enable the estimation of the coefficient of reflectivity.
-    let srp_dyn = SolarPressure::new(vec![EARTH_J2000, MOON_J2000], &almanac)?;
+    let srp_dyn = SolarPressure::new(vec![EARTH_ICRS, MOON_J2000], &almanac)?;
 
     // Finalize setting up the dynamics, specifying the force models (orbital_dyn) separately from the
     // acceleration models (SRP in this case). Use `from_models` to specify multiple accel models.

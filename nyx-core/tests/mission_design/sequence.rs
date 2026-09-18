@@ -4,7 +4,7 @@ extern crate pretty_env_logger as pel;
 use anise::constants::celestial_objects::{EARTH, MOON};
 use anise::constants::frames::{IAU_EARTH_FRAME, MOON_J2000};
 use anise::math::Vector3;
-use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use anise::{constants::frames::EARTH_ICRS, prelude::Almanac};
 use nyx::cosmic::{Orbit, Spacecraft};
 use nyx::dynamics::guidance::Thruster;
 use nyx::dynamics::sequence::*;
@@ -91,7 +91,7 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
                 },
                 force_models: ForceModels {
                     solar_pressure: Some(
-                        SolarPressure::default_flux_raw(vec![EARTH_J2000, MOON_J2000], &almanac)
+                        SolarPressure::default_flux_raw(vec![EARTH_ICRS, MOON_J2000], &almanac)
                             .unwrap(),
                     ),
                     drag: None,
@@ -180,7 +180,7 @@ fn spacecraft_sequence(almanac: Arc<Almanac>) {
 
     // Set up the initial state
 
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
 
     let orbit =
         Orbit::try_keplerian_altitude(300.0, 2e-4, 28.5, 10.0, 0.0, 0.0, epoch, eme2k).unwrap();
@@ -403,7 +403,7 @@ fn spacecraft_low_thrust_orbit_raise(
 
     // Set up the initial state
 
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
 
     let orbit =
         Orbit::try_keplerian_altitude(300.0, 2e-4, 28.5, 10.0, 0.0, 0.0, epoch, eme2k).unwrap();

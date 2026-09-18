@@ -691,7 +691,7 @@ impl TidalPerturber {
 mod tests {
     use super::*;
     use crate::cosmic::Orbit;
-    use anise::constants::frames::{EARTH_J2000, IAU_EARTH_FRAME, IAU_MOON_FRAME};
+    use anise::constants::frames::{EARTH_ICRS, IAU_EARTH_FRAME, IAU_MOON_FRAME};
     use std::path::PathBuf;
     use std::str::FromStr;
 
@@ -710,7 +710,7 @@ mod tests {
             .unwrap();
 
         let epoch = Epoch::from_str("2024-01-01T12:00:00 UTC").unwrap();
-        let sc_orbit = Orbit::cartesian(7000.0, 0.0, 0.0, 0.0, 7.5, 0.0, epoch, EARTH_J2000);
+        let sc_orbit = Orbit::cartesian(7000.0, 0.0, 0.0, 0.0, 7.5, 0.0, epoch, EARTH_ICRS);
 
         let tides =
             SolidTides::earth_moon_system(IAU_EARTH_FRAME, IAU_MOON_FRAME, &almanac.clone(), None)

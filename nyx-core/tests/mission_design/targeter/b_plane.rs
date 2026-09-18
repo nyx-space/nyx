@@ -5,7 +5,7 @@ use anise::constants::celestial_objects::{JUPITER_BARYCENTER, MOON, SUN};
 use anise::constants::frames::MOON_J2000;
 use nyx::md::prelude::*;
 
-use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use anise::{constants::frames::EARTH_ICRS, prelude::Almanac};
 use rstest::*;
 use std::sync::Arc;
 
@@ -35,7 +35,7 @@ fn tgt_b_plane_earth_gravity_assist_no_propagation(almanac: Arc<Almanac>) {
         5.36316523097915,
         -5.22166308425181,
         epoch,
-        almanac.frame_info(EARTH_J2000).unwrap(),
+        almanac.frame_info(EARTH_ICRS).unwrap(),
     );
 
     let prop = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
@@ -80,7 +80,7 @@ fn tgt_b_plane_lunar_transfer(almanac: Arc<Almanac>) {
     // This is a reproduction of the B-plane computation from the `Ex_LunarTransfer.script` file from GMAT
 
     // Grab the frame
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
     let luna = almanac.frame_info(MOON_J2000).unwrap();
     // Define the epoch
     let epoch = Epoch::from_gregorian_utc(2014, 7, 22, 11, 29, 10, 811_000);
@@ -191,7 +191,7 @@ fn tgt_b_plane_earth_gravity_assist_with_propagation(almanac: Arc<Almanac>) {
         5.36316523097915,
         -5.22166308425181,
         epoch,
-        almanac.frame_info(EARTH_J2000).unwrap(),
+        almanac.frame_info(EARTH_ICRS).unwrap(),
     );
 
     let prop = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::point_masses(

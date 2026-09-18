@@ -18,7 +18,7 @@
 
 use anise::analysis::prelude::OrbitalElement;
 use anise::astro::PhysicsResult;
-use anise::constants::frames::EARTH_J2000;
+use anise::constants::frames::EARTH_ICRS;
 pub use anise::prelude::Orbit;
 
 pub use anise::structure::spacecraft::{DragData, Mass, SRPData};
@@ -145,7 +145,7 @@ pub struct Spacecraft {
 impl Default for Spacecraft {
     fn default() -> Self {
         Self {
-            orbit: Orbit::zero(EARTH_J2000),
+            orbit: Orbit::zero(EARTH_ICRS),
             mass: Mass::default(),
             srp: SRPData::default(),
             drag: DragData::default(),
@@ -790,7 +790,7 @@ fn test_serde() {
     use serde_yml;
     use std::str::FromStr;
 
-    use anise::constants::frames::EARTH_J2000;
+    use anise::constants::frames::EARTH_ICRS;
 
     let orbit = Orbit::new(
         -9042.862234,
@@ -800,7 +800,7 @@ fn test_serde() {
         -2.226285,
         1.646738,
         Epoch::from_str("2018-09-15T00:15:53.098 UTC").unwrap(),
-        EARTH_J2000,
+        EARTH_ICRS,
     );
 
     let sc = Spacecraft::new(orbit, 500.0, 159.0, 2.0, 2.0, 1.8, 2.2);

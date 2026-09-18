@@ -16,7 +16,7 @@ use nyx_space::propagators::{ErrorControl, IntegratorMethod};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use anise::{constants::frames::EARTH_ICRS, prelude::Almanac};
 use rstest::*;
 use std::sync::Arc;
 
@@ -108,7 +108,7 @@ fn od_val_sc_mb_srp_reals_duals_models(
     let opts = IntegratorOptions::with_fixed_step(step_size);
 
     // Define state information.
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, epoch, eme2k);
 
     let dry_mass_kg = 100.0; // in kg
@@ -274,7 +274,7 @@ fn od_val_sc_srp_estimation(
     let epoch = Epoch::from_gregorian_utc_at_noon(2024, 2, 29);
 
     // Define state information.
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
     // Using a GTO because Cr estimation will be more obvious.
     let initial_orbit = Orbit::keplerian(24505.9, 0.725, 7.05, 0.0, 0.0, 0.0, epoch, eme2k);
 

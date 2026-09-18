@@ -382,12 +382,12 @@ mod ut_kfest {
         od::estimate::KfEstimate,
     };
     use anise::analysis::prelude::OrbitalElement;
-    use anise::{constants::frames::EARTH_J2000, prelude::Orbit};
+    use anise::{constants::frames::EARTH_ICRS, prelude::Orbit};
     use hifitime::Epoch;
 
     #[test]
     fn test_estimate_from_disp() {
-        let eme2k = EARTH_J2000.with_mu_km3_s2(GMAT_EARTH_GM);
+        let eme2k = EARTH_ICRS.with_mu_km3_s2(GMAT_EARTH_GM);
         let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
         let initial_state = Spacecraft::builder()
             .orbit(Orbit::keplerian(

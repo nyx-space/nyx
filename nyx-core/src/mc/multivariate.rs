@@ -337,7 +337,7 @@ mod multivariate_ut {
     use crate::GMAT_EARTH_GM;
     use crate::Spacecraft;
     use crate::time::Epoch;
-    use anise::constants::frames::EARTH_J2000;
+    use anise::constants::frames::EARTH_ICRS;
     use anise::prelude::Orbit;
     use rand::RngExt;
     use statrs;
@@ -376,7 +376,7 @@ mod multivariate_ut {
         let mut cov_resized = SMatrix::<f64, 9, 9>::zeros();
         cov_resized.fixed_view_mut::<6, 6>(0, 0).copy_from(&cov);
 
-        let eme2k = EARTH_J2000.with_mu_km3_s2(GMAT_EARTH_GM);
+        let eme2k = EARTH_ICRS.with_mu_km3_s2(GMAT_EARTH_GM);
 
         let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);
         let state = Spacecraft::builder()
@@ -421,7 +421,7 @@ mod multivariate_ut {
 
     #[test]
     fn disperse_r_mag() {
-        use anise::constants::frames::EARTH_J2000;
+        use anise::constants::frames::EARTH_ICRS;
         use anise::prelude::Orbit;
 
         use crate::time::Epoch;
@@ -431,7 +431,7 @@ mod multivariate_ut {
         // Create a reproducible fast seed
         let seed = 0;
 
-        let eme2k = EARTH_J2000.with_mu_km3_s2(GMAT_EARTH_GM);
+        let eme2k = EARTH_ICRS.with_mu_km3_s2(GMAT_EARTH_GM);
 
         let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);
         let state = Spacecraft::builder()
@@ -477,7 +477,7 @@ mod multivariate_ut {
 
     #[test]
     fn disperse_full_cartesian() {
-        use anise::constants::frames::EARTH_J2000;
+        use anise::constants::frames::EARTH_ICRS;
         use anise::prelude::Orbit;
 
         use crate::GMAT_EARTH_GM;
@@ -486,7 +486,7 @@ mod multivariate_ut {
 
         use rand_pcg::Pcg64Mcg;
 
-        let eme2k = EARTH_J2000.with_mu_km3_s2(GMAT_EARTH_GM);
+        let eme2k = EARTH_ICRS.with_mu_km3_s2(GMAT_EARTH_GM);
 
         let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);
         let state = Orbit::keplerian(8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k);
@@ -558,13 +558,13 @@ mod multivariate_ut {
 
     #[test]
     fn disperse_raan_only() {
-        use anise::constants::frames::EARTH_J2000;
+        use anise::constants::frames::EARTH_ICRS;
         use anise::prelude::Orbit;
 
         use crate::time::Epoch;
         use rand_pcg::Pcg64Mcg;
 
-        let eme2k = EARTH_J2000.with_mu_km3_s2(GMAT_EARTH_GM);
+        let eme2k = EARTH_ICRS.with_mu_km3_s2(GMAT_EARTH_GM);
 
         let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);
         let state = Spacecraft::builder()
@@ -632,13 +632,13 @@ mod multivariate_ut {
 
     #[test]
     fn disperse_keplerian() {
-        use anise::constants::frames::EARTH_J2000;
+        use anise::constants::frames::EARTH_ICRS;
         use anise::prelude::Orbit;
 
         use crate::time::Epoch;
         use rand_pcg::Pcg64Mcg;
 
-        let eme2k = EARTH_J2000.with_mu_km3_s2(GMAT_EARTH_GM);
+        let eme2k = EARTH_ICRS.with_mu_km3_s2(GMAT_EARTH_GM);
 
         let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);
         let state = Spacecraft::builder()

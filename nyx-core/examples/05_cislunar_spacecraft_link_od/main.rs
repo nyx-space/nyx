@@ -6,7 +6,7 @@ use anise::{
     almanac::Almanac,
     constants::{
         celestial_objects::{EARTH, SUN},
-        frames::{EARTH_J2000, IAU_MOON_FRAME, MOON_J2000},
+        frames::{EARTH_ICRS, IAU_MOON_FRAME, MOON_J2000},
     },
 };
 use hifitime::{Epoch, TimeUnits};
@@ -57,7 +57,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .unwrap(),
     );
 
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
     let moon_iau = almanac.frame_info(IAU_MOON_FRAME).unwrap();
 
     let epoch = Epoch::from_gregorian_tai(2021, 5, 29, 19, 51, 16, 852_000);

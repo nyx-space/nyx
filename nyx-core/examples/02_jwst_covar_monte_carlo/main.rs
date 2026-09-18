@@ -7,7 +7,7 @@ use anise::{
     almanac::metaload::MetaFile,
     constants::{
         celestial_objects::{JUPITER_BARYCENTER, MOON, SUN},
-        frames::{EARTH_J2000, MOON_J2000},
+        frames::{EARTH_ICRS, MOON_J2000},
     },
 };
 use hifitime::{TimeUnits, Unit};
@@ -48,13 +48,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     // in the BSP. We need this ID in order to query the ephemeris.
     const JWST_NAIF_ID: i32 = -170;
     // Let's build a frame in the J2000 orientation centered on the JWST.
-    const JWST_J2000: Frame = Frame::from_ephem_j2000(JWST_NAIF_ID);
+    const JWST_J2000: Frame = Frame::from_ephem_icrs(JWST_NAIF_ID);
 
     // Since the ephemeris file is updated regularly, we'll just grab the latest state in the ephem.
     let (earliest_epoch, latest_epoch) = almanac.spk_domain(JWST_NAIF_ID)?;
     println!("JWST defined from {earliest_epoch} to {latest_epoch}");
     // Fetch the state, printing it in the Earth J2000 frame.
-    let jwst_orbit = almanac.transform(JWST_J2000, EARTH_J2000, latest_epoch, None)?;
+    let jwst_orbit = almanac.transform(JWST_J2000, EARTH_ICRS, latest_epoch, None)?;
     println!("{jwst_orbit:x}");
 
     // Build the spacecraft
@@ -97,7 +97,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // We'll also enable solar radiation pressure since the James Webb has a huge and highly reflective sun shield.
 
     let orbital_dyn = OrbitalDynamics::point_masses(vec![MOON, SUN, JUPITER_BARYCENTER]);
-    let srp_dyn = SolarPressure::new(vec![EARTH_J2000, MOON_J2000], &almanac)?;
+    let srp_dyn = SolarPressure::new(vec![EARTH_ICRS, MOON_J2000], &almanac)?;
 
     // Finalize setting up the dynamics.
     let dynamics = SpacecraftDynamics::from_model(orbital_dyn, srp_dyn);

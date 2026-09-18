@@ -1,4 +1,4 @@
-use anise::constants::frames::EARTH_J2000;
+use anise::constants::frames::EARTH_ICRS;
 use anise::prelude::Almanac;
 use nyx_space::State;
 use nyx_space::cosmic::{GuidanceMode, Mass, Orbit, Spacecraft};
@@ -18,7 +18,7 @@ fn almanac() -> Arc<Almanac> {
 }
 #[rstest]
 fn test_qlaw_as_kluever_case_a(almanac: Arc<Almanac>) {
-    let eme2k = EARTH_J2000.with_mu_km3_s2(398_600.433);
+    let eme2k = EARTH_ICRS.with_mu_km3_s2(398_600.433);
 
     // Same conditions as Q Law case A
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);

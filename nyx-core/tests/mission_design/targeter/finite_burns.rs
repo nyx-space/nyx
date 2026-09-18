@@ -14,7 +14,7 @@ use nyx_space::cosmic::Mass;
 use nyx_space::dynamics::sequence::SteeringLaw;
 
 use crate::propagation::GMAT_EARTH_GM;
-use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use anise::{constants::frames::EARTH_ICRS, prelude::Almanac};
 use rstest::*;
 use std::sync::Arc;
 
@@ -28,7 +28,7 @@ fn almanac() -> Arc<Almanac> {
 fn thrust_dir_tgt_sma_aop_raan(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
@@ -82,7 +82,7 @@ fn thrust_dir_tgt_sma_aop_raan(almanac: Arc<Almanac>) {
 fn thrust_dir_rate_tgt_sma_aop_raan(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
@@ -138,7 +138,7 @@ fn thrust_dir_rate_tgt_sma_aop_raan(almanac: Arc<Almanac>) {
 fn thrust_profile_tgt_sma_aop_raan(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
@@ -194,7 +194,7 @@ fn val_tgt_finite_burn(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
     let eme2k = almanac
-        .frame_info(EARTH_J2000)
+        .frame_info(EARTH_ICRS)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
 

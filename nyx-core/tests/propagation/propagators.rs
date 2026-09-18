@@ -10,7 +10,7 @@ use nyx::time::{Epoch, Unit};
 use nyx::utils::rss_orbit_errors;
 use nyx::{Spacecraft, propagators::*};
 
-use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use anise::{constants::frames::EARTH_ICRS, prelude::Almanac};
 use rstest::*;
 
 use crate::propagation::GMAT_EARTH_GM;
@@ -26,7 +26,7 @@ fn almanac() -> Arc<Almanac> {
 fn regress_leo_day_adaptive(almanac: Arc<Almanac>) {
     // Regression test for propagators not available in GMAT.
     let eme2k = almanac
-        .frame_info(EARTH_J2000)
+        .frame_info(EARTH_ICRS)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
 
@@ -87,7 +87,7 @@ fn gmat_val_leo_day_adaptive(almanac: Arc<Almanac>) {
     // Refer to `regress_leo_day_adaptive` for the additional propagators.
 
     let eme2k = almanac
-        .frame_info(EARTH_J2000)
+        .frame_info(EARTH_ICRS)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
 
@@ -305,7 +305,7 @@ fn gmat_val_leo_day_adaptive(almanac: Arc<Almanac>) {
 #[rstest]
 fn gmat_val_leo_day_fixed(almanac: Arc<Almanac>) {
     let eme2k = almanac
-        .frame_info(EARTH_J2000)
+        .frame_info(EARTH_ICRS)
         .unwrap()
         .with_mu_km3_s2(GMAT_EARTH_GM);
 

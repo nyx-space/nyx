@@ -20,7 +20,7 @@ use anise::almanac::Almanac;
 use anise::analysis::prelude::Event;
 use anise::astro::Aberration;
 use anise::astro::Occultation;
-use anise::constants::frames::{EARTH_J2000, MOON_J2000, SUN_J2000};
+use anise::constants::frames::{EARTH_ICRS, MOON_J2000, SUN_J2000};
 use anise::errors::AlmanacResult;
 use serde::{Deserialize, Serialize};
 use serde_dhall::StaticType;
@@ -62,7 +62,7 @@ impl ShadowModel {
     /// Creates a new typical eclipse locator.
     /// The light source is the Sun, and the shadow bodies are the Earth and the Moon.
     pub fn cislunar(almanac: &Almanac) -> Self {
-        let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+        let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
         let moon_j2k = almanac.frame_info(MOON_J2000).unwrap();
         Self {
             light_source: almanac.frame_info(SUN_J2000).unwrap(),
@@ -111,12 +111,12 @@ impl ShadowModel {
 
 #[cfg(test)]
 mod ut_shadow_mdl {
-    use super::{Aberration, EARTH_J2000, MOON_J2000, SUN_J2000, ShadowModel};
+    use super::{Aberration, EARTH_ICRS, MOON_J2000, SUN_J2000, ShadowModel};
     #[test]
     fn ut_shadow_mdl_dhall_no_corr() {
         let mdl_no_corr = ShadowModel {
             light_source: SUN_J2000,
-            shadow_bodies: vec![EARTH_J2000, MOON_J2000],
+            shadow_bodies: vec![EARTH_ICRS, MOON_J2000],
             correction: None,
         };
         let as_dhall = serde_dhall::serialize(&mdl_no_corr)
@@ -133,7 +133,7 @@ mod ut_shadow_mdl {
     fn ut_shadow_mdl_dhall() {
         let mdl_no_corr = ShadowModel {
             light_source: SUN_J2000,
-            shadow_bodies: vec![EARTH_J2000, MOON_J2000],
+            shadow_bodies: vec![EARTH_ICRS, MOON_J2000],
             correction: Aberration::LT,
         };
         let as_dhall = serde_dhall::serialize(&mdl_no_corr)

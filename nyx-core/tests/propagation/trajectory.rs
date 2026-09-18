@@ -2,7 +2,7 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
 use anise::analysis::prelude::OrbitalElement;
-use anise::constants::frames::{EARTH_J2000, MOON_J2000};
+use anise::constants::frames::{EARTH_ICRS, MOON_J2000};
 use hifitime::TimeUnits;
 use nyx::State;
 use nyx::cosmic::{GuidanceMode, Orbit, Spacecraft};
@@ -32,7 +32,7 @@ fn traj_ephem_forward(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
     // Test that we can correctly interpolate a spacecraft orbit
 
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
 
     let start_dt = Epoch::from_gregorian_utc_at_noon(2021, 1, 1);
     let start_state = Orbit::cartesian(
@@ -261,7 +261,7 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
     // Note that we _do not_ attempt to interpolate the Guidance Mode.
     // This is based on the Ruggiero AOP correction
 
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
 
     // Build the initial orbit
     let start_dt = Epoch::from_gregorian_utc_at_noon(2021, 1, 1);
@@ -436,7 +436,7 @@ fn traj_spacecraft(almanac: Arc<Almanac>) {
 fn traj_ephem_backward(almanac: Arc<Almanac>) {
     // Test that we can correctly interpolate a spacecraft orbit
 
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
 
     let start_dt = Epoch::from_gregorian_utc_at_noon(2021, 1, 1);
     let start_state = Orbit::cartesian(

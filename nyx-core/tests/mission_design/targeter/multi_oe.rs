@@ -4,7 +4,7 @@ use nyx::dynamics::guidance::Thruster;
 use nyx::md::prelude::*;
 
 use anise::analysis::prelude::OrbitalElement;
-use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use anise::{constants::frames::EARTH_ICRS, prelude::Almanac};
 use nyx_space::cosmic::Mass;
 use rstest::*;
 use std::sync::Arc;
@@ -19,7 +19,7 @@ fn almanac() -> Arc<Almanac> {
 fn tgt_c3_decl(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
@@ -78,7 +78,7 @@ fn tgt_c3_decl(almanac: Arc<Almanac>) {
 fn conv_tgt_sma_ecc(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
@@ -205,7 +205,7 @@ fn conv_tgt_sma_ecc(almanac: Arc<Almanac>) {
 fn tgt_hd_sma_ecc(almanac: Arc<Almanac>) {
     let _ = pretty_env_logger::try_init();
 
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 

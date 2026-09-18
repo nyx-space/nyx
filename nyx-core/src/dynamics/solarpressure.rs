@@ -23,7 +23,7 @@ use crate::linalg::{Const, Matrix4x3, Vector3};
 use anise::almanac::Almanac;
 #[cfg(feature = "python")]
 use anise::astro::Aberration;
-use anise::constants::frames::{EARTH_J2000, SUN_J2000};
+use anise::constants::frames::{EARTH_ICRS, SUN_J2000};
 use hyperdual::{Float, OHyperdual, hyperspace_from_vector, linalg::norm};
 use log::warn;
 use serde::{Deserialize, Serialize};
@@ -63,7 +63,7 @@ impl Default for SolarPressure {
             estimate: false,
             shadow_model: ShadowModel {
                 light_source: SUN_J2000,
-                shadow_bodies: vec![EARTH_J2000],
+                shadow_bodies: vec![EARTH_ICRS],
                 correction: None,
             },
         }

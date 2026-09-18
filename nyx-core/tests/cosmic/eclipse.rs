@@ -12,7 +12,7 @@ use nyx::time::{Epoch, Unit};
 use std::sync::{Arc, mpsc};
 use std::thread;
 
-use anise::{constants::frames::EARTH_J2000, prelude::Almanac};
+use anise::{constants::frames::EARTH_ICRS, prelude::Almanac};
 use rstest::*;
 
 #[fixture]
@@ -25,7 +25,7 @@ fn almanac() -> Arc<Almanac> {
 fn leo_sun_earth_eclipses(almanac: Arc<Almanac>) {
     let prop_time = 2.0 * Unit::Day;
 
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -76,7 +76,7 @@ fn leo_sun_earth_eclipses(almanac: Arc<Almanac>) {
 fn geo_sun_earth_eclipses(almanac: Arc<Almanac>) {
     let prop_time = 2 * Unit::Day;
 
-    let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
+    let eme2k = almanac.frame_info(EARTH_ICRS).unwrap();
 
     // GEO are in shadow or near shadow during the equinoxes.
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 3, 19);
