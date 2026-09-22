@@ -161,6 +161,8 @@ pub enum InputOutputError {
         action: &'static str,
     },
     #[snafu(display("inconsistency detected: {msg}"))]
+    TDMError { msg: String },
+    #[snafu(display("inconsistency detected: {msg}"))]
     Inconsistency { msg: String },
     #[snafu(display("{action} encountered an Arrow error: {source}"))]
     ArrowError {

@@ -97,12 +97,20 @@ impl TrackingDataArc {
         self.unique_types().iter().cloned().collect()
     }
 
+    fn merge(&mut self, other: Self) {
+        *self = self.clone() + other;
+    }
+
     fn __str__(&self) -> String {
         format!("{self}")
     }
 
     fn __repr__(&self) -> String {
         format!("{self} @ {self:p}")
+    }
+
+    fn __add__(&self, other: Self) -> Self {
+        self.clone() + other
     }
 
     #[getter]
