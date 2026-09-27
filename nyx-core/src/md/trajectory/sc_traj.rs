@@ -22,6 +22,7 @@ use crate::State;
 use crate::cosmic::{GuidanceMode, Spacecraft};
 use crate::dynamics::guidance::{ThrustDirectionReplay, Thruster};
 use crate::errors::{FromAlmanacSnafu, NyxError};
+use crate::io::parquet_string::AbstractStringArray;
 use crate::io::{InputOutputError, MissingDataSnafu, ParquetSnafu, StdIOSnafu};
 use crate::md::prelude::{Interpolatable, StateParameter};
 use crate::time::{Duration, Epoch, TimeUnits};
@@ -31,8 +32,8 @@ use anise::ephemerides::EphemerisError;
 use anise::ephemerides::ephemeris::Ephemeris;
 use anise::errors::AlmanacError;
 use anise::prelude::{Almanac, Frame};
-use arrow::array::RecordBatchReader;
-use arrow::array::{Array, Float64Array, StringArray};
+use arrow::array::{Array, Float64Array, RecordBatchReader};
+use arrow::error::ArrowError;
 use hifitime::TimeSeries;
 use log::info;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
@@ -344,23 +345,30 @@ impl Traj<Spacecraft> {
         for maybe_batch in reader {
             let batch = maybe_batch.unwrap();
 
-            let epochs = batch
-                .column_by_name("Epoch (UTC)")
-                .unwrap()
-                .as_any()
-                .downcast_ref::<StringArray>()
-                .unwrap();
+            let epochs_col = batch.column_by_name("Epoch (UTC)").unwrap();
+            let epochs = AbstractStringArray::try_from(epochs_col).ok_or_else(|| {
+                InputOutputError::ArrowError {
+                    action: "downcasting `Epoch (UTC)` column",
+                    source: ArrowError::CastError(
+                        "`Epoch (UTC)` is neither StringArray nor LargeStringArray".to_string(),
+                    ),
+                }
+            })?;
 
             let mut shared_data = vec![];
-            let guidance_mode_data = if has_guidance_mode {
-                Some(
-                    batch
-                        .column_by_name(StateParameter::GuidanceMode().to_field(None).name())
-                        .unwrap()
-                        .as_any()
-                        .downcast_ref::<StringArray>()
-                        .unwrap(),
-                )
+            let guidance_mode_data: Option<AbstractStringArray> = if has_guidance_mode {
+                let col = batch
+                    .column_by_name(StateParameter::GuidanceMode().to_field(None).name())
+                    .unwrap();
+                Some(AbstractStringArray::try_from(col).ok_or_else(|| {
+                    InputOutputError::ArrowError {
+                        action: "downcasting `GuidanceMode` column",
+                        source: ArrowError::CastError(
+                            "`GuidanceMode` is neither StringArray nor LargeStringArray"
+                                .to_string(),
+                        ),
+                    }
+                })?)
             } else {
                 None
             };
@@ -399,7 +407,7 @@ impl Traj<Spacecraft> {
                         isp_s: 0.0,
                     });
                 }
-                if let Some(guidance_mode_data) = guidance_mode_data {
+                if let Some(guidance_mode_data) = guidance_mode_data.as_ref() {
                     state.mut_mode(match guidance_mode_data.value(i) {
                         "Thrust" => GuidanceMode::Thrust,
                         "Inhibit" => GuidanceMode::Inhibit,

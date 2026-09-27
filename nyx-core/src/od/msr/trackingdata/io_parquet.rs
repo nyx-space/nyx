@@ -15,6 +15,7 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
+use crate::io::parquet_string::AbstractStringArray;
 use crate::io::watermark::pq_writer;
 use crate::io::{ArrowSnafu, InputOutputError, MissingDataSnafu, ParquetSnafu, StdIOSnafu};
 use crate::io::{EmptyDatasetSnafu, ExportCfg};
@@ -24,7 +25,7 @@ use arrow::array::{Array, BooleanBuilder, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 use arrow::{
-    array::{BooleanArray, Float64Array, PrimitiveArray, StringArray},
+    array::{BooleanArray, Float64Array, PrimitiveArray},
     datatypes,
     record_batch::RecordBatchReader,
 };
@@ -110,19 +111,27 @@ impl TrackingDataArc {
                 action: "reading batch of tracking data",
             })?;
 
-            let tracking_device = batch
-                .column_by_name("Tracking device")
-                .unwrap()
-                .as_any()
-                .downcast_ref::<StringArray>()
-                .unwrap();
+            let tracking_device_col = batch.column_by_name("Tracking device").unwrap();
+            let tracking_device =
+                AbstractStringArray::try_from(tracking_device_col).ok_or_else(|| {
+                    InputOutputError::ArrowError {
+                        action: "downcasting Tracking device",
+                        source: arrow::error::ArrowError::CastError(
+                            "Could not cast Tracking device to StringArray or LargeStringArray"
+                                .to_string(),
+                        ),
+                    }
+                })?;
 
-            let epochs = batch
-                .column_by_name("Epoch (UTC)")
-                .unwrap()
-                .as_any()
-                .downcast_ref::<StringArray>()
-                .unwrap();
+            let epochs_col = batch.column_by_name("Epoch (UTC)").unwrap();
+            let epochs = AbstractStringArray::try_from(epochs_col).ok_or_else(|| {
+                InputOutputError::ArrowError {
+                    action: "downcasting Epoch (UTC)",
+                    source: arrow::error::ArrowError::CastError(
+                        "Could not cast Epoch to StringArray or LargeStringArray".to_string(),
+                    ),
+                }
+            })?;
 
             let range_data: Option<&PrimitiveArray<datatypes::Float64Type>> = if range_avail {
                 Some(
@@ -189,10 +198,10 @@ impl TrackingDataArc {
                 None
             };
 
-            let integration_ref_data: Option<&StringArray> = if integration_ref_avail {
+            let integration_ref_data: Option<AbstractStringArray> = if integration_ref_avail {
                 batch
                     .column_by_name("Integration reference")
-                    .and_then(|col| col.as_any().downcast_ref::<StringArray>())
+                    .and_then(AbstractStringArray::try_from)
             } else {
                 None
             };
@@ -220,7 +229,7 @@ impl TrackingDataArc {
                     false
                 };
 
-                let integration_ref = integration_ref_data.and_then(|data| {
+                let integration_ref = integration_ref_data.as_ref().and_then(|data| {
                     if data.is_null(i) {
                         None
                     } else {

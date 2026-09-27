@@ -9,8 +9,6 @@ from nyx_space.plots import TEMPLATE, convert_units, watermark
 
 optional_est_params = ["cr", "cd"]
 
-all_msr_types = ["Range (m)", "Doppler (m/s)", "Azimuth (deg)", "Elevation (deg)"]
-
 # Canonical Seaborn deep colorway
 SEABORN_COLORS = [
     "#4C72B0",
@@ -26,12 +24,27 @@ SEABORN_COLORS = [
 ]
 
 
+def _get_msr_types(df: pl.DataFrame) -> list[str]:
+    prefixes = ["Measurement noise: ", "Postfit residual: ", "Prefit residual: "]
+    for prefix in prefixes:
+        msr_types = [
+            col[len(prefix) :].strip() for col in df.columns if col.startswith(prefix)
+        ]
+        if msr_types:
+            return msr_types
+    raise ValueError(
+        "DataFrame contains no trackers (expecting Prefit/Postfit/Measurement noise columns)"
+    )
+
+
 def _get_tracker_color_map(
     df: pl.DataFrame,
 ) -> tuple[list[str], dict[str, str]]:
     if "Tracker" not in df.columns:
-        return [], {}
+        return ["Default"], {"Default": SEABORN_COLORS[0]}
     trackers = sorted(df["Tracker"].drop_nulls().unique().to_list())
+    if not trackers:
+        return ["Default"], {"Default": SEABORN_COLORS[0]}
     return trackers, {
         trk: SEABORN_COLORS[i % len(SEABORN_COLORS)] for i, trk in enumerate(trackers)
     }
@@ -60,22 +73,28 @@ def autocorr(x: np.ndarray, max_lag: int) -> np.ndarray:
     )
 
 
-def residuals(df: pl.DataFrame, path: str | None = None) -> go.Figure:
+def residuals(df: pl.DataFrame, path: str | None = None) -> go.Figure | None:
     """
-    Plots physical residuals per measurement type decomposed by ground station tracker,
+    Plots physical residuals per measurement type decomposed by tracker,
     retaining postfit as primary points, prefit as secondary markers, and pass-segmented
     3-sigma noise envelopes without interpolating across inter-pass gaps.
     """
     df = convert_units(df)
-    msr_types = [
-        msr for msr in all_msr_types if f"Measurement noise: {msr}" in df.columns
-    ]
+    if "Tracker" not in df.columns:
+        df = df.with_columns(pl.lit("Default").alias("Tracker"))
+    else:
+        df = df.with_columns(pl.col("Tracker").fill_null("Default"))
+
+    msr_types = _get_msr_types(df)
+    if not msr_types:
+        return None
+
     trackers, tracker_colors = _get_tracker_color_map(df)
 
     fig = make_subplots(
         rows=len(msr_types),
         cols=1,
-        subplot_titles=[f"{msr} Residuals by Station" for msr in msr_types],
+        subplot_titles=[f"{msr} Residuals" for msr in msr_types],
         vertical_spacing=0.1,
     )
 
@@ -222,13 +241,16 @@ def uncertainty(
 def od_dashboard(df: pl.DataFrame, path: str | None = None) -> list[go.Figure]:
     """
     Orbit determination dashboard separating scalar measurement streams by observable type,
-    ground station attribution, non-occluding station ACF curves, normalized density histograms
+    tracker attribution, non-occluding station ACF curves, normalized density histograms
     with theoretical N(0,1) envelopes, and station-stratified Q-Q distributions.
     """
     df = convert_units(df)
-    msr_types = [
-        msr for msr in all_msr_types if f"Measurement noise: {msr}" in df.columns
-    ]
+    if "Tracker" not in df.columns:
+        df = df.with_columns(pl.lit("Default").alias("Tracker"))
+    else:
+        df = df.with_columns(pl.col("Tracker").fill_null("Default"))
+
+    msr_types = _get_msr_types(df)
     whitened_cols = [c for c in df.columns if "Whitened residual" in c]
     trackers, tracker_colors = _get_tracker_color_map(df)
 
@@ -273,10 +295,10 @@ def od_dashboard(df: pl.DataFrame, path: str | None = None) -> list[go.Figure]:
             ],
             subplot_titles=(
                 f"Residual Rejection Status & 3σ Gate ({display_title})",
-                f"Whitened Residuals by Ground Station ({display_title})",
-                f"Autocorrelation by Ground Station ({display_title})",
+                f"Whitened Residuals by Tracker ({display_title})",
+                f"Autocorrelation by Tracker ({display_title})",
                 f"Accepted Residuals Density vs N(0,1) ({display_title})",
-                f"Normal Q-Q Distribution by Station ({display_title})",
+                f"Normal Q-Q Distribution by Tracker ({display_title})",
             ),
         )
 
@@ -338,7 +360,7 @@ def od_dashboard(df: pl.DataFrame, path: str | None = None) -> list[go.Figure]:
                 col=1,
             )
 
-        # Row 2: Station timeline with physical observable context in hover
+        # Row 2: Station/Tracker timeline with physical observable context in hover
         for trk in trackers:
             trk_df = active_df.filter(pl.col("Tracker") == trk)
             if trk_df.height == 0:
@@ -350,9 +372,11 @@ def od_dashboard(df: pl.DataFrame, path: str | None = None) -> list[go.Figure]:
                 txt = f"<b>{trk}</b><br>Epoch: {row['Epoch (UTC)']}<br>Norm: {row[w_col]:.3f}σ"
                 if msr_type and f"Postfit residual: {msr_type}" in row:
                     unit_str = msr_type.split()[-1][1:-1]
-                    txt += f"<br>Postfit: {row[f'Postfit residual: {msr_type}']:.4f} {unit_str}"
+                    val = row[f"Postfit residual: {msr_type}"]
+                    txt += f"<br>Postfit: {val:.4f} {unit_str}"
                 txt += f"<br>Status: {'REJECTED' if row['Residual Rejected'] else 'Accepted'}"
                 hover_text.append(txt)
+            showlegend = True
 
             fig.add_trace(
                 go.Scatter(
@@ -424,15 +448,33 @@ def od_dashboard(df: pl.DataFrame, path: str | None = None) -> list[go.Figure]:
             color = tracker_colors.get(trk, "#4C72B0")
             mu, std = np.mean(sample), np.std(sample)
 
+            # 1. Primary Histogram Trace
             fig.add_trace(
                 go.Histogram(
                     x=sample,
                     histnorm="probability density",
-                    name=f"{trk} (μ={mu:.2f}, σ={std:.2f})",
+                    name=f"{trk} (μ={mu:.2f}<br>σ={std:.2f})",
                     legendgroup=trk,
                     marker=dict(color=color),
                     opacity=0.45,
                     showlegend=False,
+                ),
+                row=4,
+                col=1,
+            )
+
+            # 2. Mean Reference Line (Toggles with Tracker)
+            fig.add_trace(
+                go.Scatter(
+                    x=[mu, mu],
+                    y=[0, 0.5],
+                    mode="lines+text",
+                    name=f"{trk} μ",
+                    legendgroup=trk,
+                    showlegend=False,
+                    line=dict(color=color, width=2.0, dash="dot"),
+                    hoverinfo="text",
+                    hovertext=f"Tracker: {trk}<br>μ={mu:.4e}<br>σ={std:.4e}",
                 ),
                 row=4,
                 col=1,

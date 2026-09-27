@@ -160,7 +160,7 @@ pub enum InputOutputError {
         source: ParquetError,
         action: &'static str,
     },
-    #[snafu(display("inconsistency detected: {msg}"))]
+    #[snafu(display("CCSDS TDM error: {msg}"))]
     TDMError { msg: String },
     #[snafu(display("inconsistency detected: {msg}"))]
     Inconsistency { msg: String },
@@ -297,3 +297,4 @@ where
         Ok(None)
     }
 }
+pub mod parquet_string;

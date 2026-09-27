@@ -27,7 +27,10 @@ def main(path: str, wuncertainty: bool, wstats: bool, error_ric: str):
         ricdf = pl.read_parquet(error_ric)
         ric_diff(ricdf).show()
 
-    residuals(df, path).show()
+    resid_plot = residuals(df, path)
+    if resid_plot is not None:
+        resid_plot.show()
+
     for dash in od_dashboard(df, path):
         dash.show()
 
