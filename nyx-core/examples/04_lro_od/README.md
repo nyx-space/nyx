@@ -34,13 +34,11 @@ Cislunar propagation involves several well-determined forces, which can be direc
 
 The purpose of this analysis is to ensure that we've configured these models correctly. This process is tedious because each dynamical model must be configured differently and the difference between the propagation and the truth ephemeris need to be assessed.
 
-When using the GRAIL gravity model JGGRX 250x250 with the SRP configured with a coefficient of reflectivity of `0.96` (as per the LRO OD paper above), and the gravity parameter provided by JPL (and default in ANISE 0.10), we end up with a pretty large error shown in these Radial, In-Track, Cross-Track plots.
+Nyx uses the Luna JGGRX model, the coefficients of which differ slightly from the STK/ODTK `B` version of the GRAIL gravity field (not sure why). While the point mass gravity computed by Nyx will always use the configured gravitational values, the gravity field will properly account for the GM value in the SHADR file, which matches closely with the default data in GMAT/STK.
 
 ![JPL GM Pos error](./plots/sim-default-ric-pos-err.png)
 
 ![JPL GM Vel error](./plots/sim-default-ric-vel-err.png)
-
-Nyx uses the Luna JGGRX model, the coefficients of which differ slightly from the STK/ODTK `B` version of the GRAIL gravity field (not sure why). While the point mass gravity computed by Nyx will always use the configured gravitational values, the gravity field will properly account for the GM value in the SHADR file, which matches closely with the default data in GMAT/STK.
 
 ## Dynamical models
 
@@ -202,4 +200,4 @@ Note how the residuals are properly (very near) zero mean and follow a Normal di
 
 # Conclusion
 
-The successful orbit determination of the Lunar Reconnaissance Orbiter using Nyx validates its capability as a reliable tool for precise orbit estimation in low lunar orbits, which are known for their highly dynamic nature. This validation opens up opportunities for using Nyx in future lunar missions, potentially reducing the reliance on other orbit determination software.
+This validates using Nyx for precise lunar orbit determination using publicly available data. Nyx provides several important metrics most orbit determination software skips, like K-S normality check, NIS, and NEES when a truth trajectory is known.

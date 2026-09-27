@@ -376,7 +376,6 @@ def od_dashboard(df: pl.DataFrame, path: str | None = None) -> list[go.Figure]:
                     txt += f"<br>Postfit: {val:.4f} {unit_str}"
                 txt += f"<br>Status: {'REJECTED' if row['Residual Rejected'] else 'Accepted'}"
                 hover_text.append(txt)
-            showlegend = True
 
             fig.add_trace(
                 go.Scatter(
@@ -505,9 +504,7 @@ def od_dashboard(df: pl.DataFrame, path: str | None = None) -> list[go.Figure]:
                 continue
 
             color = tracker_colors.get(trk, "#4C72B0")
-            (osm, osr), (slope, intercept, _) = stats.probplot(
-                sample, dist="norm", fit=True
-            )
+            (osm, osr), (_, _, _) = stats.probplot(sample, dist="norm", fit=True)
 
             fig.add_trace(
                 go.Scatter(
