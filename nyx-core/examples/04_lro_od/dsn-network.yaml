@@ -23,10 +23,18 @@ DSS-65 Madrid:
       white_noise:
         mean: 0.0
         sigma: 50.0e-6 # 5 cm/s
-  light_time_correction: false
+  light_time_correction: true
+  doppler_config:
+    integration_time: 1 min
+    integration_ref: Middle
   measurement_types:
     - range_km
     - doppler_km_s
+  obstructing_body:
+    ephemeris_id: 301
+    orientation_id: 1
+    force_inertial: false
+    frozen_epoch: null
 
 DSS-34 Canberra:
   name: DSS-34 Canberra
@@ -52,10 +60,18 @@ DSS-34 Canberra:
       white_noise:
         mean: 0.0
         sigma: 50.0e-6 # 5 cm/s
-  light_time_correction: false
+  light_time_correction: true
+  doppler_config:
+    integration_time: 1 min
+    integration_ref: Middle
   measurement_types:
     - range_km
     - doppler_km_s
+  obstructing_body:
+    ephemeris_id: 301
+    orientation_id: 1
+    force_inertial: false
+    frozen_epoch: null
 
 DSS-13 Goldstone:
   name: DSS-13 Goldstone
@@ -81,7 +97,15 @@ DSS-13 Goldstone:
       white_noise:
         mean: 0.0
         sigma: 50.0e-6 # 5 cm/s
-  light_time_correction: false
+  light_time_correction: true
+  doppler_config:
+    integration_time: 1 min
+    integration_ref: Middle
   measurement_types:
     - range_km
     - doppler_km_s
+  obstructing_body:
+    ephemeris_id: 301
+    orientation_id: 1
+    force_inertial: false
+    frozen_epoch: null
