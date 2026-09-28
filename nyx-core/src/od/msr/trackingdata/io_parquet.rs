@@ -113,24 +113,13 @@ impl TrackingDataArc {
 
             let tracking_device_col = batch.column_by_name("Tracking device").unwrap();
             let tracking_device =
-                AbstractStringArray::try_from(tracking_device_col).ok_or_else(|| {
-                    InputOutputError::ArrowError {
-                        action: "downcasting Tracking device",
-                        source: arrow::error::ArrowError::CastError(
-                            "Could not cast Tracking device to StringArray or LargeStringArray"
-                                .to_string(),
-                        ),
-                    }
+                AbstractStringArray::try_from(tracking_device_col).context(ArrowSnafu {
+                    action: "downcasting `Tracking device`",
                 })?;
 
             let epochs_col = batch.column_by_name("Epoch (UTC)").unwrap();
-            let epochs = AbstractStringArray::try_from(epochs_col).ok_or_else(|| {
-                InputOutputError::ArrowError {
-                    action: "downcasting Epoch (UTC)",
-                    source: arrow::error::ArrowError::CastError(
-                        "Could not cast Epoch to StringArray or LargeStringArray".to_string(),
-                    ),
-                }
+            let epochs = AbstractStringArray::try_from(epochs_col).context(ArrowSnafu {
+                action: "downcasting `Epoch (UTC)`",
             })?;
 
             let range_data: Option<&PrimitiveArray<datatypes::Float64Type>> = if range_avail {
@@ -201,7 +190,7 @@ impl TrackingDataArc {
             let integration_ref_data: Option<AbstractStringArray> = if integration_ref_avail {
                 batch
                     .column_by_name("Integration reference")
-                    .and_then(AbstractStringArray::try_from)
+                    .and_then(|col| AbstractStringArray::try_from(col).ok())
             } else {
                 None
             };

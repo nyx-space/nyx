@@ -611,7 +611,7 @@ mod tests {
             let (range_ρ, θ, φ) = cartesian_to_spherical(v);
             let v_prime = spherical_to_cartesian(range_ρ, θ, φ);
 
-            assert!(rss_errors(v, &v_prime) < 1e-12, "{} != {}", v, &v_prime);
+            assert!(rss_errors(v, &v_prime) < 1e-12, "{v} != {v_prime}");
         }
     }
 

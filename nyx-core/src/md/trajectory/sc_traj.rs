@@ -23,7 +23,7 @@ use crate::cosmic::{GuidanceMode, Spacecraft};
 use crate::dynamics::guidance::{ThrustDirectionReplay, Thruster};
 use crate::errors::{FromAlmanacSnafu, NyxError};
 use crate::io::parquet_string::AbstractStringArray;
-use crate::io::{InputOutputError, MissingDataSnafu, ParquetSnafu, StdIOSnafu};
+use crate::io::{ArrowSnafu, InputOutputError, MissingDataSnafu, ParquetSnafu, StdIOSnafu};
 use crate::md::prelude::{Interpolatable, StateParameter};
 use crate::time::{Duration, Epoch, TimeUnits};
 use anise::analysis::prelude::OrbitalElement;
@@ -33,7 +33,6 @@ use anise::ephemerides::ephemeris::Ephemeris;
 use anise::errors::AlmanacError;
 use anise::prelude::{Almanac, Frame};
 use arrow::array::{Array, Float64Array, RecordBatchReader};
-use arrow::error::ArrowError;
 use hifitime::TimeSeries;
 use log::info;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
@@ -346,13 +345,8 @@ impl Traj<Spacecraft> {
             let batch = maybe_batch.unwrap();
 
             let epochs_col = batch.column_by_name("Epoch (UTC)").unwrap();
-            let epochs = AbstractStringArray::try_from(epochs_col).ok_or_else(|| {
-                InputOutputError::ArrowError {
-                    action: "downcasting `Epoch (UTC)` column",
-                    source: ArrowError::CastError(
-                        "`Epoch (UTC)` is neither StringArray nor LargeStringArray".to_string(),
-                    ),
-                }
+            let epochs = AbstractStringArray::try_from(epochs_col).context(ArrowSnafu {
+                action: "downcasting `Epoch (UTC)`",
             })?;
 
             let mut shared_data = vec![];
@@ -360,14 +354,8 @@ impl Traj<Spacecraft> {
                 let col = batch
                     .column_by_name(StateParameter::GuidanceMode().to_field(None).name())
                     .unwrap();
-                Some(AbstractStringArray::try_from(col).ok_or_else(|| {
-                    InputOutputError::ArrowError {
-                        action: "downcasting `GuidanceMode` column",
-                        source: ArrowError::CastError(
-                            "`GuidanceMode` is neither StringArray nor LargeStringArray"
-                                .to_string(),
-                        ),
-                    }
+                Some(AbstractStringArray::try_from(col).context(ArrowSnafu {
+                    action: "downcasting `GuidanceMode` column",
                 })?)
             } else {
                 None

@@ -590,83 +590,79 @@ impl TrackingDataArc {
                 continue;
             }
 
-            if parser_state == TdmParserState::Data {
-                if let Some((mtype, epoch, value)) = parse_measurement_line(line, time_system)? {
-                    let effective_divider = if mtype.may_be_two_way() {
-                        msr_divider
-                    } else {
-                        if [
-                            MeasurementType::ReceiveFrequency,
-                            MeasurementType::TransmitFrequency,
-                            MeasurementType::TransmitFrequencyRate,
-                        ]
-                        .contains(&mtype)
-                        {
-                            has_freq_data = true;
-                        }
-                        1.0
-                    };
-
-                    let mut scaled_value = value;
-                    if mtype == MeasurementType::Range {
-                        if let Some(range_units) = segment_metadata.get("RANGE_UNITS") {
-                            scaled_value = convert_range_units(
-                                value,
-                                range_units.as_str(),
-                                effective_divider,
-                            )?;
-                        } else {
-                            return Err(InputOutputError::MissingData {
-                                which:
-                                    "RANGE_UNITS not specified in metadata for RANGE measurement"
-                                        .to_string(),
-                            });
-                        }
-                    } else {
-                        scaled_value /= effective_divider;
+            if parser_state == TdmParserState::Data
+                && let Some((mtype, epoch, value)) = parse_measurement_line(line, time_system)?
+            {
+                let effective_divider = if mtype.may_be_two_way() {
+                    msr_divider
+                } else {
+                    if [
+                        MeasurementType::ReceiveFrequency,
+                        MeasurementType::TransmitFrequency,
+                        MeasurementType::TransmitFrequencyRate,
+                    ]
+                    .contains(&mtype)
+                    {
+                        has_freq_data = true;
                     }
+                    1.0
+                };
 
-                    let is_concurrent =
-                        segment_measurements
-                            .last()
-                            .is_some_and(|last: &Measurement| {
-                                last.epoch == epoch && last.tracker == current_tracker
-                            });
-
-                    let doppler_config = match (integration_time, integration_ref) {
-                        (Some(time), Some(reference)) => Some(DopplerConfig {
-                            integration_time: time,
-                            integration_ref: reference,
-                        }),
-                        (Some(time), None) => Some(DopplerConfig {
-                            integration_time: time,
-                            integration_ref: IntegrationRef::default(),
-                        }),
-                        (None, Some(reference)) => Some(DopplerConfig {
-                            integration_time: DopplerConfig::default().integration_time,
-                            integration_ref: reference,
-                        }),
-                        (None, None) => None,
-                    };
-
-                    if is_concurrent {
-                        let last = segment_measurements.last_mut().unwrap();
-                        last.data.insert(mtype, scaled_value);
-                        if last.doppler_config.is_none() {
-                            last.doppler_config = doppler_config;
-                        }
+                let mut scaled_value = value;
+                if mtype == MeasurementType::Range {
+                    if let Some(range_units) = segment_metadata.get("RANGE_UNITS") {
+                        scaled_value =
+                            convert_range_units(value, range_units.as_str(), effective_divider)?;
                     } else {
-                        let mut data = IndexMap::new();
-                        data.insert(mtype, scaled_value);
-
-                        segment_measurements.push(Measurement {
-                            tracker: current_tracker.clone(),
-                            epoch,
-                            data,
-                            rejected: false,
-                            doppler_config,
+                        return Err(InputOutputError::MissingData {
+                            which: "RANGE_UNITS not specified in metadata for RANGE measurement"
+                                .to_string(),
                         });
                     }
+                } else {
+                    scaled_value /= effective_divider;
+                }
+
+                let is_concurrent =
+                    segment_measurements
+                        .last()
+                        .is_some_and(|last: &Measurement| {
+                            last.epoch == epoch && last.tracker == current_tracker
+                        });
+
+                let doppler_config = match (integration_time, integration_ref) {
+                    (Some(time), Some(reference)) => Some(DopplerConfig {
+                        integration_time: time,
+                        integration_ref: reference,
+                    }),
+                    (Some(time), None) => Some(DopplerConfig {
+                        integration_time: time,
+                        integration_ref: IntegrationRef::default(),
+                    }),
+                    (None, Some(reference)) => Some(DopplerConfig {
+                        integration_time: DopplerConfig::default().integration_time,
+                        integration_ref: reference,
+                    }),
+                    (None, None) => None,
+                };
+
+                if is_concurrent {
+                    let last = segment_measurements.last_mut().unwrap();
+                    last.data.insert(mtype, scaled_value);
+                    if last.doppler_config.is_none() {
+                        last.doppler_config = doppler_config;
+                    }
+                } else {
+                    let mut data = IndexMap::new();
+                    data.insert(mtype, scaled_value);
+
+                    segment_measurements.push(Measurement {
+                        tracker: current_tracker.clone(),
+                        epoch,
+                        data,
+                        rejected: false,
+                        doppler_config,
+                    });
                 }
             }
         }

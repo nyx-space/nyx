@@ -33,7 +33,6 @@ use anise::prelude::Orbit;
 use anise::structure::spacecraft::{DragData, Mass, SRPData};
 use arrow::array::RecordBatchReader;
 use arrow::array::{Array, BooleanArray, Float64Array};
-use arrow::error::ArrowError;
 use hifitime::Epoch;
 use indexmap::IndexSet;
 use log::{info, warn};
@@ -238,9 +237,8 @@ where
 
             let epoch_col_arc = get_col("Epoch (UTC)")?;
             let epoch_col = AbstractStringArray::try_from(&epoch_col_arc)
-                .ok_or_else(|| InputOutputError::ArrowError {
+                .context(ArrowSnafu {
                      action: "downcasting `Epoch (UTC)` column",
-                     source: ArrowError::CastError("`Epoch (UTC)` is neither StringArray nor LargeStringArray".to_string()),
                  })?;
 
             // State component columns
@@ -280,7 +278,7 @@ where
             // Residual related columns
             let rejected_col = get_col("Residual Rejected").ok().and_then(|arr| arr.as_any().downcast_ref::<BooleanArray>().cloned());
             let tracker_col_arc = get_col("Tracker").ok();
-            let tracker_col = tracker_col_arc.as_ref().and_then(AbstractStringArray::try_from);
+            let tracker_col = tracker_col_arc.as_ref().and_then(|col| AbstractStringArray::try_from(col).ok());
             let ratio_col = get_col("Residual ratio").ok().and_then(|arr| arr.as_any().downcast_ref::<Float64Array>().cloned());
 
             let mut residual_data_cols: HashMap<MeasurementType, BTreeMap<String, Float64Array>> = HashMap::new();
