@@ -15,7 +15,7 @@ RUST_LOG=info cargo run --example 04_lro_od --release
 
 Building in `release` mode will make the computation significantly faster. Specifying `RUST_LOG=info` will allow you to see all of the information messages happening in ANISE and Nyx throughout the execution of the program.
 
-Throughout this analysis, we'll be focusing on an arbitrarily chosen period of one day started on 2024-01-01 at midnight UTC.
+Throughout this analysis, we'll be focusing on an arbitrarily chosen period of one day started on 2024-01-01 at 0100 UTC.
 
 # Preliminary analysis: model matching
 
@@ -34,7 +34,9 @@ Cislunar propagation involves several well-determined forces, which can be direc
 
 The purpose of this analysis is to ensure that we've configured these models correctly. This process is tedious because each dynamical model must be configured differently and the difference between the propagation and the truth ephemeris need to be assessed.
 
-Nyx uses the Luna JGGRX model, the coefficients of which differ slightly from the STK/ODTK `B` version of the GRAIL gravity field (not sure why). While the point mass gravity computed by Nyx will always use the configured gravitational values, the gravity field will properly account for the GM value in the SHADR file, which matches closely with the default data in GMAT/STK.
+Nyx uses the Luna JGGRX model from the NASA Planetary Data Service website directly: its coefficients differ slightly from the STK/ODTK `B` version of the GRAIL gravity field (not sure why). While the point mass gravity computed by Nyx will always use the configured gravitational values, the gravity field will properly account for the GM value in the SHADR file, which matches closely with the default data in GMAT/STK.
+
+When using the same gravity field, Nyx matches Ansys STK to **0.7 meters** in high fidelity low lunar orbit after a 7 day propagation.
 
 ![JPL GM Pos error](./plots/sim-default-ric-pos-err.png)
 
@@ -100,7 +102,7 @@ The tracking scheduler will start by finding the exact times when the vehicle co
  INFO  nyx_space::od::simulator::arc      > Simulated 286 measurements for DSS-13 Goldstone for 1 tracking strands in 64 ms
  INFO  nyx_space::od::simulator::arc      > Simulated 147 measurements for DSS-34 Canberra for 1 tracking strands in 33 ms
  INFO  nyx_space::od::simulator::arc      > Simulated 460 measurements for DSS-65 Madrid for 2 tracking strands in 96 ms
- INFO  nyx_space::od::msr::trackingdata::io_parquet > Serialized Tracking arc with 893 measurements of type {Range, Doppler} over 23 h 58 min (from 2024-01-01T01:01:00 UTC to 2024-01-02T00:59:00 UTC) with trackers {"DSS-65 Madrid", "DSS-13 Goldstone", "DSS-34 Canberra"} to /home/chris/Workspace/nyx-space/nyx-premium/nyx-core/../data/04_output/04_lro_simulated_tracking.parquet
+ INFO  nyx_space::od::msr::trackingdata::io_parquet > Serialized Tracking arc with 893 measurements of type {Range, Doppler} over 23 h 58 min (from 2024-01-01T01:01:00 UTC to 2024-01-02T00:59:00 UTC) with trackers {"DSS-65 Madrid", "DSS-13 Goldstone", "DSS-34 Canberra"} to /home/chris/Workspace/nyx-space/nyx/nyx-core/../data/04_output/04_lro_simulated_tracking.parquet
 Tracking arc with 893 measurements of type {Range, Doppler} over 23 h 58 min (from 2024-01-01T01:01:00 UTC to 2024-01-02T00:59:00 UTC) with trackers {"DSS-65 Madrid", "DSS-13 Goldstone", "DSS-34 Canberra"}
 ```
 
@@ -163,10 +165,10 @@ Ratios normal? true
  INFO  nyx_space::od::process::solution::stats      > NIS passed
  INFO  nyx_space::od::process::solution::export     > Exporting orbit determination result to parquet file...
  INFO  nyx_space::od::process::solution::export     > Serialized 3800 estimates and residuals
- INFO  nyx_space::od::process::solution::export     > Orbit determination results written to /home/chris/Workspace/nyx-space/nyx-premium/nyx-core/../data/04_output/04_lro_od_results.parquet in 58 ms 487 μs 759 ns
+ INFO  nyx_space::od::process::solution::export     > Orbit determination results written to /home/chris/Workspace/nyx-space/nyx/nyx-core/../data/04_output/04_lro_od_results.parquet in 58 ms 487 μs 759 ns
  WARN  anise::ephemerides::ephemeris::spk           > ephemeris contains covariance, which is NOT copied to the SPICE BSP file
- INFO  anise::almanac                               > Loading /home/chris/Workspace/nyx-space/nyx-premium/nyx-core/../data/04_output/04_lro_rebuilt.bsp as DAF/SPK
-=== SPK #0: `/home/chris/Workspace/nyx-space/nyx-premium/nyx-core/../data/04_output/04_lro_rebuilt.bsp` ===
+ INFO  anise::almanac                               > Loading /home/chris/Workspace/nyx-space/nyx/nyx-core/../data/04_output/04_lro_rebuilt.bsp as DAF/SPK
+=== SPK #0: `/home/chris/Workspace/nyx-space/nyx/nyx-core/../data/04_output/04_lro_rebuilt.bsp` ===
 ┌──────────────────────────────────────────┬────────────────┬────────────┬───────────────────────────────────┬───────────────────────────────────┬─────────────┬──────────────────────┐
 │ Name                                     │ Target         │ Center     │ Start epoch                       │ End epoch                         │ Duration    │ Interpolation kind   │
 ├──────────────────────────────────────────┼────────────────┼────────────┼───────────────────────────────────┼───────────────────────────────────┼─────────────┼──────────────────────┤
@@ -174,7 +176,7 @@ Ratios normal? true
 └──────────────────────────────────────────┴────────────────┴────────────┴───────────────────────────────────┴───────────────────────────────────┴─────────────┴──────────────────────┘
  INFO  nyx_space::md::trajectory::traj              > Exporting trajectory to parquet file...
  INFO  nyx_space::md::trajectory::traj              > Serialized 1439 states differences
- INFO  nyx_space::md::trajectory::traj              > Trajectory written to /home/chris/Workspace/nyx-space/nyx-premium/nyx-core/../data/04_output/04_lro_od_truth_error.parquet in 17 ms 659 μs 314 ns
+ INFO  nyx_space::md::trajectory::traj              > Trajectory written to /home/chris/Workspace/nyx-space/nyx/nyx-core/../data/04_output/04_lro_od_truth_error.parquet in 17 ms 659 μs 314 ns
 ```
 
 # Results
@@ -199,5 +201,10 @@ Note how the residuals are properly (very near) zero mean and follow a Normal di
 ![Orbital element Uncertainty](./plots/orbital-elements-uncertainty.png)
 
 # Conclusion
+
+The RIC errors to truth are a combination of the model mismatch from the first section and the added noise on the filter. The NIS metric shows the filter is properly tuned given the innovations; the ratios are also reported to be normal.
+
+There are no patterns in the residuals, neither in Range nor Doppler. The auto-correlation shows zero lag, i.e., the filter is correctly updated its state knowledge from the new measurements (a smug filter would show continuous trend of auto-correlation).
+The absolute value of the mean of the Doppler resids is at most 0.068 m/s, it should be zero with a true random number generator or converge to zero with more measurements.
 
 This validates using Nyx for precise lunar orbit determination using publicly available data. Nyx provides several important metrics most orbit determination software skips, like K-S normality check, NIS, and NEES when a truth trajectory is known.
