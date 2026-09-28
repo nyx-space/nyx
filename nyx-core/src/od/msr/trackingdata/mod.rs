@@ -105,6 +105,10 @@ impl TrackingDataArc {
                 // from the redundant 'next' measurement and merge them into the 'kept' one.
                 kept.data.extend(next.data.drain(..));
 
+                if kept.doppler_config.is_none() {
+                    kept.doppler_config = next.doppler_config;
+                }
+
                 // If either partial record was manually flagged as rejected,
                 // the combined radiometric record must retain that suspicion.
                 kept.rejected |= next.rejected;

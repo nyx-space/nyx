@@ -50,10 +50,10 @@ serde_dhall = { version = "0.13", default-features = false }
 indexmap = { version = "2.6.0", features = ["serde"] }
 statrs = "0.19.0"
 num-traits = "=0.2.19"
-# Optional dependencies
-pyo3 = {workspace = true, optional = true}
 csv = "1.4.0"
 trig-const = "0.4.0"
+# Optional dependencies
+pyo3 = {workspace = true, optional = true}
 
 
 [features]
@@ -63,10 +63,10 @@ premium = []
 python = ["pyo3", "hifitime/python", "anise/python"]
 
 [dev-dependencies]
-polars = { version = "0.54.0", features = ["parquet"] }
+polars = { version = "0.55.0", features = ["parquet"] }
 rstest = "0.26.1"
 pretty_env_logger = "0.5"
-serde_arrow = { version = "0.14", features = ["arrow-59"] }
+serde_arrow = { version = "0.15", features = ["arrow-59"] }
 toml = "1.0.0"
 radiate = "1.2.22"
 approx = "0.5"

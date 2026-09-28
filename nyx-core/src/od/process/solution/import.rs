@@ -21,6 +21,7 @@
 // and ensure necessary imports are present.
 
 use crate::Spacecraft;
+use crate::io::parquet_string::AbstractStringArray;
 use crate::io::{ArrowSnafu, InputOutputError, MissingDataSnafu, ParquetSnafu, StdIOSnafu};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{Const, DefaultAllocator, DimName, OMatrix, OVector, SMatrix};
@@ -31,7 +32,7 @@ use anise::frames::Frame;
 use anise::prelude::Orbit;
 use anise::structure::spacecraft::{DragData, Mass, SRPData};
 use arrow::array::RecordBatchReader;
-use arrow::array::{Array, BooleanArray, Float64Array, StringArray};
+use arrow::array::{Array, BooleanArray, Float64Array};
 use hifitime::Epoch;
 use indexmap::IndexSet;
 use log::{info, warn};
@@ -234,13 +235,11 @@ where
 
             // --- Extract Columns (handle potential errors) ---
 
-            let epoch_col = get_col("Epoch (UTC)")?
-                .as_any()
-                .downcast_ref::<StringArray>()
-                .ok_or_else(|| InputOutputError::ArrowError {
-                     action: "downcasting Epoch column",
-                     source: arrow::error::ArrowError::CastError("Could not cast Epoch to StringArray".to_string()),
-                 })?.clone(); // Clone the concrete array
+            let epoch_col_arc = get_col("Epoch (UTC)")?;
+            let epoch_col = AbstractStringArray::try_from(&epoch_col_arc)
+                .context(ArrowSnafu {
+                     action: "downcasting `Epoch (UTC)` column",
+                 })?;
 
             // State component columns
             let x_col = get_col("X (km)")?.as_any().downcast_ref::<Float64Array>().ok_or_else(|| InputOutputError::ArrowError{action: "downcasting X", source: arrow::error::ArrowError::CastError("".to_string())})?.clone();
@@ -278,7 +277,8 @@ where
 
             // Residual related columns
             let rejected_col = get_col("Residual Rejected").ok().and_then(|arr| arr.as_any().downcast_ref::<BooleanArray>().cloned());
-            let tracker_col = get_col("Tracker").ok().and_then(|arr| arr.as_any().downcast_ref::<StringArray>().cloned());
+            let tracker_col_arc = get_col("Tracker").ok();
+            let tracker_col = tracker_col_arc.as_ref().and_then(|col| AbstractStringArray::try_from(col).ok());
             let ratio_col = get_col("Residual ratio").ok().and_then(|arr| arr.as_any().downcast_ref::<Float64Array>().cloned());
 
             let mut residual_data_cols: HashMap<MeasurementType, BTreeMap<String, Float64Array>> = HashMap::new();

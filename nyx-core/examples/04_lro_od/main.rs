@@ -6,7 +6,7 @@ extern crate pretty_env_logger as pel;
 use anise::{
     almanac::metaload::MetaFile,
     constants::{
-        celestial_objects::{EARTH, JUPITER_BARYCENTER, MOON, SUN},
+        celestial_objects::{EARTH, JUPITER_BARYCENTER, SUN},
         frames::{EARTH_J2000, MOON_J2000, MOON_PA_FRAME},
     },
     prelude::Almanac,
@@ -14,7 +14,7 @@ use anise::{
 use hifitime::{Epoch, TimeSeries, TimeUnits, Unit};
 use nyx::{
     Orbit, Spacecraft, State,
-    cosmic::{Aberration, Frame, Mass, MetaAlmanac, SRPData},
+    cosmic::{Frame, Mass, MetaAlmanac, SRPData},
     dynamics::{
         GravityField, OrbitalDynamics, SolarPressure, SpacecraftDynamics, guidance::LocalFrame,
     },
@@ -22,7 +22,6 @@ use nyx::{
     md::prelude::{GravityFieldData, Traj},
     od::{
         GroundStation, SpacecraftKalmanOD,
-        msr::MeasurementType,
         prelude::{KalmanVariant, TrackingArcSim, TrkConfig},
         process::{Estimate, NavSolution, SigmaRejection, SpacecraftUncertainty},
         snc::ProcessNoise3D,
@@ -53,30 +52,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let meta = data_folder.join("lro-dynamics.dhall");
 
     // Load this ephem in the general Almanac we're using for this analysis.
-    let mut almanac = MetaAlmanac::new(meta.to_string_lossy().as_ref())
-        .map_err(Box::new)?
-        .process(true)
-        .map_err(Box::new)?;
-
-    let mut moon_pc = almanac.get_planetary_data_from_id(MOON).unwrap();
-    moon_pc.mu_km3_s2 = 4902.74987;
-    almanac.set_planetary_data_from_id(MOON, moon_pc).unwrap();
-
-    let mut earth = almanac.get_planetary_data_from_id(EARTH).unwrap();
-    earth.mu_km3_s2 = 398600.436;
-    almanac.set_planetary_data_from_id(EARTH, earth).unwrap();
-
-    // Save this new kernel for reuse.
-    // In an operational context, this would be part of the "Lock" process, and should not change throughout the mission.
-    almanac
-        .planetary_data
-        .values()
-        .next()
-        .unwrap()
-        .save_as(&data_folder.join("lro-specific.pca"), true)?;
-
-    // Lock the almanac (an Arc is a read only structure).
-    let almanac = Arc::new(almanac);
+    let almanac = Arc::new(
+        MetaAlmanac::new(meta.to_string_lossy().as_ref())
+            .map_err(Box::new)?
+            .process(true)
+            .map_err(Box::new)?,
+    );
 
     // Orbit determination requires a Trajectory structure, which can be saved as parquet file.
     // In our case, the trajectory comes from the BSP file, so we need to build a Trajectory from the almanac directly.
@@ -102,9 +83,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         &almanac,
         sc_template,
         5.seconds(),
-        Some(Epoch::from_str("2024-01-01 00:00:00 UTC")?),
-        Some(Epoch::from_str("2024-01-02 00:00:00 UTC")?),
-        Aberration::LT,
+        Some(Epoch::from_str("2024-01-01 01:00:00 UTC")?),
+        Some(Epoch::from_str("2024-01-02 01:00:00 UTC")?),
+        None,
         Some("LRO".to_string()),
     )?;
 
@@ -135,8 +116,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let moon_pa_frame = MOON_PA_FRAME.with_orient(31008);
     let sph_harmonics = GravityField::new(GravityFieldData::from_shadr(
         &jggrx_meta.uri,
-        80,
-        80,
+        81,
+        81,
         almanac.frame_info(moon_pa_frame)?,
     )?);
 
@@ -208,19 +189,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let devices = GroundStation::load_named(ground_station_file)?;
 
-    let mut proc_devices = devices.clone();
-
-    // Increase the noise in the devices to accept more measurements.
-    for gs in proc_devices.values_mut() {
-        if let Some(noise) = &mut gs
-            .stochastic_noises
-            .as_mut()
-            .unwrap()
-            .get_mut(&MeasurementType::Range)
-        {
-            *noise.white_noise.as_mut().unwrap() *= 3.0;
-        }
-    }
+    let proc_devices = devices.clone();
 
     // Typical OD software requires that you specify your own tracking schedule or you'll have overlapping measurements.
     // Nyx can build a tracking schedule for you based on the first station with access.
@@ -270,13 +239,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Build the filter initial estimate, which we will reuse in the filter.
     let mut initial_estimate = sc.to_estimate()?;
-    initial_estimate.covar *= 3.0;
+    initial_estimate.covar *= 1.5;
 
     println!("== FILTER STATE ==\n{sc_seed:x}\n{initial_estimate}");
 
     // Build the SNC in the Moon J2000 frame, specified as a velocity noise over time.
     let process_noise = ProcessNoise3D::from_velocity_km_s(
-        &[1e-12, 1e-12, 1e-12],
+        &[5e-13, 5e-13, 5e-13],
         1 * Unit::Hour,
         10 * Unit::Minute,
         None,
@@ -317,6 +286,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         od_sol.residual_ratio_within_threshold(3.0).unwrap()
     );
     println!("Ratios normal? {}", od_sol.is_normal(None).unwrap());
+    od_sol.nis_consistency(None)?.log();
 
     od_sol.to_parquet(
         output_folder.join("04_lro_od_results.parquet"),

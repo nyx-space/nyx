@@ -17,19 +17,25 @@ optional_est_params = ["cr", "cd"]
 
 @click.command
 @click.option("-p", "--path", type=str)
+@click.option("-u", "--wuncertainty", type=bool, default=True)
 @click.option("-s", "--wstats", type=bool, default=False)
 @click.option("-e", "--error_ric", type=str, default=None)
-def main(path: str, wstats: bool, error_ric: str):
+def main(path: str, wuncertainty: bool, wstats: bool, error_ric: str):
     df = pl.read_parquet(path)
 
     if error_ric:
         ricdf = pl.read_parquet(error_ric)
         ric_diff(ricdf).show()
 
-    residuals(df, path).show()
-    uncertainty(df, 3.0, path).show()
+    resid_plot = residuals(df, path)
+    if resid_plot is not None:
+        resid_plot.show()
+
     for dash in od_dashboard(df, path):
         dash.show()
+
+    if wuncertainty:
+        uncertainty(df, 3.0, path).show()
 
     cr_cd_plot = cr_cd(df, path)
     if cr_cd_plot is not None:

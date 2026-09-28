@@ -490,9 +490,7 @@ def test_howto_position_device_gps_gnss_orbit_determination():
 
     # Simple point-mass gravity
     accel_models = AccelModels(
-        point_masses=PointMasses(
-            celestial_objects=[CelestialObjects.EARTH]
-        )
+        point_masses=PointMasses(celestial_objects=[CelestialObjects.EARTH])
     )
 
     dynamics = Dynamics(accel_models)
@@ -500,7 +498,9 @@ def test_howto_position_device_gps_gnss_orbit_determination():
 
     # Propagate for 6 hours
     prop_duration = Unit.Hour * 6
-    traj = propagator.for_duration(spacecraft, prop_duration, trajectory=True).trajectory
+    traj = propagator.for_duration(
+        spacecraft, prop_duration, trajectory=True
+    ).trajectory
 
     # Step 2: Configure Position Device with noise in Earth-fixed frame
     device_frame = almanac.frame_info(Frames.IAU_EARTH_FRAME)
@@ -508,19 +508,16 @@ def test_howto_position_device_gps_gnss_orbit_determination():
     # Coordinates in Nyx are in kilometers, so 1e-3 sigma = 1 meter noise
     meter_level_noise = StochasticNoise(white_noise=WhiteNoise(mean=0.0, sigma=1e-3))
 
-    device = PositionDevice("GPS", device_frame).with_noise(
-        MeasurementType.X, meter_level_noise
-    ).with_noise(
-        MeasurementType.Y, meter_level_noise
-    ).with_noise(
-        MeasurementType.Z, meter_level_noise
+    device = (
+        PositionDevice("GPS", device_frame)
+        .with_noise(MeasurementType.X, meter_level_noise)
+        .with_noise(MeasurementType.Y, meter_level_noise)
+        .with_noise(MeasurementType.Z, meter_level_noise)
     )
 
     # Step 3: Simulate Tracking Arc
     strand = Strand(orbit.epoch, orbit.epoch + prop_duration)
-    configs = {
-        "GPS": TrkConfig(sampling=Unit.Minute * 1, strands=[strand])
-    }
+    configs = {"GPS": TrkConfig(sampling=Unit.Minute * 1, strands=[strand])}
 
     trk_sim = PositionTrackingArcSim({"GPS": device}, traj, configs, seed=12345)
     trk_arc = trk_sim.generate_measurements(almanac)
@@ -538,7 +535,8 @@ def test_howto_position_device_gps_gnss_orbit_determination():
 
     # Build a fixed estimate from diagonals, always defined in 1-sigma!
     estimate = SpacecraftEstimate.from_diag(
-        disp_spacecraft, np.array([1e-3, 1e-3, 1e-3, 10e-6, 10e-6, 10e-6, 0.0, 0.0, 0.0])
+        disp_spacecraft,
+        np.array([1e-3, 1e-3, 1e-3, 10e-6, 10e-6, 10e-6, 0.0, 0.0, 0.0]),
     )
 
     # Step 5: Filter the tracking arc
@@ -546,6 +544,7 @@ def test_howto_position_device_gps_gnss_orbit_determination():
         propagator, KalmanVariant.ReferenceUpdate, {"GPS": device}
     )
     od_sol = od_proc.process_arc(estimate, trk_arc)
+    od_sol.to_parquet("../data/04_output/gnss_od.pq")
 
     assert od_sol.is_filter_run()
     assert len(od_sol.accepted_residuals()) >= 300
