@@ -205,13 +205,13 @@ impl Dynamics for SpacecraftDynamics {
         let mut d_x = OVector::<f64, Const<90>>::zeros();
 
         // Maybe I use this only when estimating the orbit state from a spacecraft, but that functionality will soon disappear.
-        match ctx.stm {
+        match osc_sc.stm {
             Some(stm) => {
                 // Call the gradient (also called the dual EOM function of the force models)
                 let (state, grad) = self.dual_eom(delta_t_s, &osc_sc, almanac)?;
 
                 // Apply the gradient to the STM
-                let stm_dt = stm * grad;
+                let stm_dt = grad * stm;
 
                 // Rebuild the state vector
                 for (i, val) in state.iter().enumerate() {
