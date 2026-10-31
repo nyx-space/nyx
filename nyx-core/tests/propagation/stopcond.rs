@@ -277,6 +277,44 @@ fn line_of_nodes(almanac: Arc<Almanac>) {
     );
 }
 
+// Longitude changes when the observer axes rotate; unlike latitude, it
+// exposes an inconsistency between event detection and root refinement.
+#[rstest]
+fn longitude_event_in_rotating_frame(almanac: Arc<Almanac>) {
+    let start = Epoch::from_gregorian_utc_at_noon(2025, 1, 1);
+    let inertial = almanac.frame_info(EARTH_J2000).unwrap();
+    let state = Orbit::cartesian(
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start, inertial,
+    );
+    let longitude_zero = Event::new(
+        ScalarExpr::Element(OrbitalElement::Longitude),
+        Condition::Equals(0.0),
+    );
+    let setup = Propagator::rk89(
+        SpacecraftDynamics::new(OrbitalDynamics::two_body()),
+        IntegratorOptions::default(),
+    );
+    let max_duration = 3 * state.period().unwrap();
+
+    let (found, _) = setup
+        .with(state.into(), almanac.clone())
+        .until_event(max_duration, &longitude_zero, Some(IAU_EARTH_FRAME))
+        .expect("Earth-fixed longitude zero must be found in the requested event frame");
+    let earth_fixed = almanac
+        .transform_to(found.orbit, IAU_EARTH_FRAME, None)
+        .unwrap();
+    let residual_deg = longitude_zero.eval(earth_fixed, &almanac).unwrap();
+    assert!(
+        residual_deg.abs() < 1e-3,
+        "refined event has Earth-fixed longitude residual {residual_deg} degrees"
+    );
+    let inertial_residual_deg = longitude_zero.eval(found.orbit, &almanac).unwrap();
+    assert!(
+        inertial_residual_deg.abs() > 1.0,
+        "regression must distinguish inertial and Earth-fixed longitude"
+    );
+}
+
 #[rstest]
 fn latitude(almanac: Arc<Almanac>) {
     let eme2k = almanac.frame_info(EARTH_J2000).unwrap();
@@ -294,18 +332,21 @@ fn latitude(almanac: Arc<Almanac>) {
     );
 
     let setup = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
-    let mut prop = setup.with(state.into(), almanac);
+    let mut prop = setup.with(state.into(), almanac.clone());
     let (lon_state, _) = prop
         .until_event(3 * period, &lat_event, Some(IAU_EARTH_FRAME))
+        .unwrap();
+    let observed_fixed = almanac
+        .transform_to(lon_state.orbit, IAU_EARTH_FRAME, None)
         .unwrap();
     println!(
         "{:x} => latitude = {} degrees",
         lon_state,
-        lon_state.orbit.latitude_deg().unwrap()
+        observed_fixed.latitude_deg().unwrap()
     );
 
     assert!(
-        (2.0 - lon_state.orbit.latitude_deg().unwrap()).abs() < 1e-3,
+        (2.0 - observed_fixed.latitude_deg().unwrap()).abs() < 1e-3,
         "converged, yet convergence criteria not met"
     );
 }
