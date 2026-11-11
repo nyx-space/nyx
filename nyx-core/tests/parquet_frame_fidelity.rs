@@ -7,6 +7,7 @@ use nyx_space::io::ExportCfg;
 use nyx_space::md::prelude::Traj;
 use nyx_space::time::{Epoch, TimeUnits};
 use nyx_space::Spacecraft;
+use rstest::*;
 use std::path::PathBuf;
 
 fn spacecraft(epoch: Epoch, frame: Frame) -> Spacecraft {
@@ -24,6 +25,16 @@ fn trajectory(second_frame: Frame) -> Traj<Spacecraft> {
             spacecraft(epoch + 30.seconds(), second_frame),
         ],
     }
+}
+
+#[fixture]
+fn uniform_trajectory() -> Traj<Spacecraft> {
+    trajectory(EARTH_J2000)
+}
+
+#[fixture]
+fn mixed_trajectory() -> Traj<Spacecraft> {
+    trajectory(IAU_EARTH_FRAME)
 }
 
 fn temporary_path(suffix: &str) -> PathBuf {
@@ -45,9 +56,9 @@ fn round_trip(source: &Traj<Spacecraft>, suffix: &str) -> Result<Traj<Spacecraft
     result
 }
 
-#[test]
-fn uniform_frame_round_trip_preserves_frames_and_coordinates() {
-    let source = trajectory(EARTH_J2000);
+#[rstest]
+fn uniform_frame_round_trip_preserves_frames_and_coordinates(uniform_trajectory: Traj<Spacecraft>) {
+    let source = uniform_trajectory;
     let recovered = round_trip(&source, "uniform").expect("uniform-frame round-trip");
     assert_eq!(recovered.states.len(), 2);
     for (before, after) in source.states.iter().zip(recovered.states.iter()) {
@@ -57,10 +68,13 @@ fn uniform_frame_round_trip_preserves_frames_and_coordinates() {
     }
 }
 
-#[test]
-fn mixed_frames_must_be_preserved_or_explicitly_rejected() {
-    let mixed = trajectory(IAU_EARTH_FRAME);
-    let uniform = trajectory(EARTH_J2000);
+#[rstest]
+fn mixed_frames_must_be_preserved_or_explicitly_rejected(
+    mixed_trajectory: Traj<Spacecraft>,
+    uniform_trajectory: Traj<Spacecraft>,
+) {
+    let mixed = mixed_trajectory;
+    let uniform = uniform_trajectory;
     assert_ne!(mixed.states[1].orbit.frame, uniform.states[1].orbit.frame);
 
     let uniform_imported = round_trip(&uniform, "uniform-comparison").unwrap();
@@ -84,9 +98,9 @@ fn mixed_frames_must_be_preserved_or_explicitly_rejected() {
     assert_eq!(mixed_imported.states[1].orbit.frame, mixed.states[1].orbit.frame);
 }
 
-#[test]
-fn filtered_export_uses_the_frame_of_the_selected_rows() {
-    let source = trajectory(IAU_EARTH_FRAME);
+#[rstest]
+fn filtered_export_uses_the_frame_of_the_selected_rows(mixed_trajectory: Traj<Spacecraft>) {
+    let source = mixed_trajectory;
     let selected_epoch = source.states[1].orbit.epoch;
     let cfg = ExportCfg::builder()
         .start_epoch(selected_epoch)
