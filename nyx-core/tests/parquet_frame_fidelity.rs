@@ -66,7 +66,13 @@ fn mixed_frames_must_be_preserved_or_explicitly_rejected() {
     let uniform_imported = round_trip(&uniform, "uniform-comparison").unwrap();
     let mixed_imported = match round_trip(&mixed, "mixed-comparison") {
         Ok(recovered) => recovered,
-        Err(_) => return, // A single-frame format may safely reject mixed frames.
+        Err(error) => {
+            assert!(
+                error.contains("Cannot export mixed-frame trajectory to Parquet"),
+                "mixed-frame rejection must be explicit, got: {error}"
+            );
+            return;
+        }
     };
 
     assert_eq!(mixed_imported.states.len(), 2);
