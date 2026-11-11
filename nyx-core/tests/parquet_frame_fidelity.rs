@@ -3,10 +3,10 @@
 
 use anise::constants::frames::{EARTH_J2000, IAU_EARTH_FRAME};
 use anise::prelude::{Frame, Orbit};
+use nyx_space::Spacecraft;
 use nyx_space::io::ExportCfg;
 use nyx_space::md::prelude::Traj;
 use nyx_space::time::{Epoch, TimeUnits};
-use nyx_space::Spacecraft;
 use rstest::*;
 use std::path::PathBuf;
 
@@ -91,11 +91,13 @@ fn mixed_frames_must_be_preserved_or_explicitly_rejected(
 
     assert_eq!(mixed_imported.states.len(), 2);
     assert_ne!(
-        uniform_imported.states[1].orbit.frame,
-        mixed_imported.states[1].orbit.frame,
+        uniform_imported.states[1].orbit.frame, mixed_imported.states[1].orbit.frame,
         "distinct reference frames silently collapsed on import"
     );
-    assert_eq!(mixed_imported.states[1].orbit.frame, mixed.states[1].orbit.frame);
+    assert_eq!(
+        mixed_imported.states[1].orbit.frame,
+        mixed.states[1].orbit.frame
+    );
 }
 
 #[rstest]
@@ -114,8 +116,7 @@ fn filtered_export_uses_the_frame_of_the_selected_rows(mixed_trajectory: Traj<Sp
 
     assert_eq!(recovered.states.len(), 1);
     assert_eq!(
-        recovered.states[0].orbit.frame,
-        source.states[1].orbit.frame,
+        recovered.states[0].orbit.frame, source.states[1].orbit.frame,
         "Frame metadata must describe the exported row, not an excluded row"
     );
 }
