@@ -72,6 +72,8 @@ where
     ///
     /// * `max_duration` - The maximum duration to propagate if the event is not triggered the requested number of times.
     /// * `event` - The event definition (scalar expression and condition) to monitor.
+    /// * `event_frame` - Optional frame used for event evaluation and root refinement.
+    ///   The returned state remains in the propagation frame.
     /// * `trigger` - The 1-based index of the event occurrence to stop at (e.g. 1 for the first crossing, 2 for the second).
     ///
     /// # Returns
@@ -189,7 +191,17 @@ where
                     err: format!("{e}"),
                 })?;
 
-            event.eval(state.orbit(), &self.almanac)
+            // Refine the same observer-frame scalar used to detect the crossing.
+            let orbit = if let Some(frame) = event_frame {
+                self.almanac
+                    .transform_to(state.orbit(), frame, None)
+                    .map_err(|e| AnalysisError::GenericAnalysisError {
+                        err: format!("{e}"),
+                    })?
+            } else {
+                state.orbit()
+            };
+            event.eval(orbit, &self.almanac)
         };
 
         // Else Brent solver between these states

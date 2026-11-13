@@ -258,7 +258,26 @@ where
         // Build the schema
         let mut hdrs = vec![Field::new("Epoch (UTC)", DataType::Utf8, false)];
 
-        let frame = self.states[0].frame();
+        // Parquet has one Frame metadata value for the entire exported table.
+        // It must describe the states actually selected for export, not an
+        // excluded earlier state. Mixed-frame tables cannot be represented.
+        let frame = states
+            .first()
+            .ok_or_else(|| InputOutputError::Inconsistency {
+                msg: "Cannot export an empty trajectory to Parquet".to_string(),
+            })?
+            .frame();
+
+        if let Some(state) = states.iter().find(|state| state.frame() != frame) {
+            return Err(InputOutputError::Inconsistency {
+                msg: format!(
+                    "Cannot export mixed-frame trajectory to Parquet: first frame {frame}, frame {} at {}",
+                    state.frame(),
+                    state.epoch()
+                ),
+            }
+            .into());
+        }
         let more_meta = Some(vec![(
             "Frame".to_string(),
             serde_dhall::serialize(&frame)
