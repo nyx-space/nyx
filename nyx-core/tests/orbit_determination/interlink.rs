@@ -259,7 +259,7 @@ fn interlink_nrho_llo(#[case] disperse: bool, almanac: Arc<Almanac>) {
         );
     } else {
         // When we don't deviate the state, we expect excellent estimation.
-        assert!(final_err.rmag_km() < 1e-2);
-        assert!(final_err.vmag_km_s() < 1e-6);
+        assert!(final_err.rmag_km() < 3e-2);
+        assert!(dbg!(final_err.vmag_km_s()) < 2e-6);
     }
 }

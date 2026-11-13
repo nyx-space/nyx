@@ -619,7 +619,7 @@ fn od_tb_val_az_el_ckf_fixed_step_perfect_stations(
      **/
     let _ = pretty_env_logger::try_init();
 
-    for (_, dev) in sim_devices.iter_mut() {
+    for dev in sim_devices.values_mut() {
         dev.measurement_types.swap_remove(&MeasurementType::Range);
         dev.measurement_types.swap_remove(&MeasurementType::Doppler);
         dev.measurement_types.insert(MeasurementType::Azimuth);
@@ -634,7 +634,7 @@ fn od_tb_val_az_el_ckf_fixed_step_perfect_stations(
             .insert(MeasurementType::Elevation, StochasticNoise::ZERO);
     }
 
-    for (_, dev) in proc_devices.iter_mut() {
+    for dev in proc_devices.values_mut() {
         dev.measurement_types.swap_remove(&MeasurementType::Range);
         dev.measurement_types.swap_remove(&MeasurementType::Doppler);
         dev.measurement_types.insert(MeasurementType::Azimuth);

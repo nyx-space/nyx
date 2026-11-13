@@ -123,10 +123,13 @@ where
                     first_idx = last_idx.saturating_sub(2 * num_left);
                 }
 
-                let mut states = Vec::with_capacity(last_idx - first_idx);
-                for idx in first_idx..last_idx {
-                    states.push(self.states[idx]);
-                }
+                let states = self
+                    .states
+                    .iter()
+                    .take(last_idx)
+                    .skip(first_idx)
+                    .copied()
+                    .collect::<Vec<S>>();
 
                 self.states[idx]
                     .interpolate(epoch, &states)

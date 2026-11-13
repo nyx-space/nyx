@@ -13,7 +13,7 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 REPO = os.getenv("GITHUB_REPOSITORY")
 PR_NUMBER = os.getenv("PR_NUMBER")
-MODEL_NAME = "gemini-3.8-flash"
+MODEL_NAME = "gemini-4-hydrogen"
 
 SEVERITY_BADGE = {
     "blocking": "🔴 **BLOCKING**",

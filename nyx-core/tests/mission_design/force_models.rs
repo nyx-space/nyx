@@ -733,7 +733,7 @@ fn nrlmsise00_compare(almanac: Arc<Almanac>) {
     let nominal = outputs[0].1;
 
     for (flags, other_rslt) in outputs.iter().skip(1) {
-        let ric_error = nominal.ric_difference(&other_rslt).unwrap();
+        let ric_error = nominal.ric_difference(other_rslt).unwrap();
 
         println!("=== FLAGS ===\n{flags:?}");
         println!("RIC pos diff (km) = {:.6}", ric_error.rmag_km());
