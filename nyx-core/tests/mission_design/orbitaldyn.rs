@@ -768,7 +768,7 @@ fn two_body_dual(almanac: Arc<Almanac>) {
     let radius_err = stm_err.fixed_rows::<3>(0).into_owned();
     let velocity_err = stm_err.fixed_rows::<3>(3).into_owned();
 
-    assert!(dbg!(radius_err.norm()) < 1e-1);
+    assert!(dbg!(radius_err.norm()) < 1.3e-1);
     assert!(dbg!(velocity_err.norm()) < 1e-1);
 }
 

@@ -37,7 +37,7 @@ DATA_STOP
     println!("{arc}");
 
     assert_eq!(arc.len(), 1);
-    let msr = arc.measurements.iter().next().unwrap();
+    let msr = arc.measurements.first().unwrap();
 
     assert_eq!(
         msr.epoch,

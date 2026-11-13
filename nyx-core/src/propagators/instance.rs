@@ -27,7 +27,6 @@ use anise::almanac::Almanac;
 use anise::errors::MathError;
 use log::{info, warn};
 use snafu::ResultExt;
-use std::f64;
 use std::sync::Arc;
 use std::sync::mpsc::{Sender, channel};
 #[cfg(not(target_arch = "wasm32"))]
